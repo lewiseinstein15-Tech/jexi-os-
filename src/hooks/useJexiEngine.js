@@ -10,11 +10,11 @@ export const useJexiEngine = () => {
     setIsProcessing(true);
     setLogs([]);
     setWebsites([]);
-    
     setMessages(prev => [...prev, { role: 'user', text: query }]);
 
     try {
-      const res = await fetch('http://localhost:3002/api/chat', {
+      const backendUrl = localStorage.getItem('jexi_backend_url') || 'http://localhost:3002';
+      const res = await fetch(`${backendUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query })
@@ -26,33 +26,26 @@ export const useJexiEngine = () => {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        
         const text = decoder.decode(value);
         const lines = text.split('\n').filter(Boolean);
-        
         for (const line of lines) {
           try {
             const data = JSON.parse(line);
-            if (data.type === 'log') {
-              setLogs(prev => [...prev, { agent: data.agent, message: data.message }]);
-            } else if (data.type === 'website') {
-              setWebsites(prev => [...prev, data.site]);
-            } else if (data.type === 'done') {
-              if (data.summary) {
-                setMessages(prev => [...prev, { role: 'jexi', text: data.summary }]);
-              }
+            if (data.type === 'log') setLogs(prev => [...prev, { agent: data.agent, message: data.message }]);
+            else if (data.type === 'website') setWebsites(prev => [...prev, data.site]);
+            else if (data.type === 'done') {
+              if (data.summary) setMessages(prev => [...prev, { role: 'jexi', text: data.summary }]);
             }
           } catch (e) {}
         }
       }
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'jexi', text: `Error: ${error.message}` }]);
+      setMessages(prev => [...prev, { role: 'jexi', text: `Error: ${error.message}. Is the backend running?` }]);
     } finally {
       setIsProcessing(false);
     }
   };
 
   const stopGeneration = () => setIsProcessing(false);
-
   return { messages, logs, websites, isProcessing, runSearch, stopGeneration };
 };
