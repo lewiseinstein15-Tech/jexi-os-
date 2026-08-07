@@ -10,12 +10,18 @@ services:
     plan: free
     region: oregon
     rootDir: server
-    buildCommand: npm ci && npx playwright install --with-deps chromium
+    # Install deps first; if the apt/deps step fails on Render's build image,
+    # still download the browser so the build can't be killed by it.
+    buildCommand: npm ci && (npx playwright install --with-deps chromium || npx playwright install chromium)
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
+      # Pin the Node version used for build AND runtime.
       - key: NODE_VERSION
         value: 22
+      # Chromium needs a writable home dir for its user-data/profile cache.
+      - key: HOME
+        value: /tmp
       # Set these in the Render dashboard (secrets) — or paste them below:
       - key: GROQ_API_KEY
         sync: false
