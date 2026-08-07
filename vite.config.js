@@ -5,6 +5,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
-    port: 3000
+    port: 3000,
+    proxy: {
+      '/desktop-api': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/desktop-api/, '/api')
+      }
+    }
   }
 })

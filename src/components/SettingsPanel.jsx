@@ -1,25 +1,127 @@
-import { Settings, Cpu, Bell, Shield } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles } from 'lucide-react';
 
 export default function SettingsPanel() {
+  const [geminiKey, setGeminiKey] = useState('');
+  const [groqKey, setGroqKey] = useState('');
+  const [status, setStatus] = useState('idle'); // idle, loading, saved, error
+  const [initialLoad, setInitialLoad] = useState(true);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch('http://localhost:3002/api/settings');
+        const data = await res.json();
+        setGeminiKey(data.geminiKey || '');
+        setGroqKey(data.groqKey || '');
+      } catch (e) {
+        console.error("Failed to fetch settings", e);
+      }
+      setInitialLoad(false);
+    };
+    fetchSettings();
+  }, []);
+
+  const handleSave = async () => {
+    setStatus('loading');
+    try {
+      const res = await fetch('http://localhost:3002/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ geminiKey, groqKey })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatus('saved');
+        setTimeout(() => setStatus('idle'), 3000);
+      } else {
+        setStatus('error');
+      }
+    } catch (e) {
+      setStatus('error');
+    }
+  };
+
   return (
-    <div className="glass p-4 rounded-xl">
-      <div className="flex items-center gap-2 mb-4">
-        <Settings className="w-4 h-4 text-[#00FF9D]" />
-        <h2 className="text-sm font-bold text-[#00FF9D]">SYSTEM CONFIG</h2>
+    <div className="space-y-4">
+      <div className="glass p-4 rounded-xl">
+        <div className="flex items-center gap-2 mb-4">
+          <Settings className="w-4 h-4 text-[#00FF9D]" />
+          <h2 className="text-sm font-bold text-[#00FF9D] tracking-wide">SYSTEM SETTINGS</h2>
+        </div>
+
+        <div className="space-y-4">
+          {/* Google Gemini Key */}
+          <div>
+            <label className="flex items-center gap-2 text-[10px] font-bold text-gray-400 mb-1.5 tracking-wider">
+              <Sparkles className="w-3 h-3 text-[#4285F4]" />
+              GOOGLE GEMINI KEY (PRIMARY)
+            </label>
+            <input
+              type="password"
+              value={geminiKey}
+              onChange={(e) => setGeminiKey(e.target.value)}
+              placeholder="Enter Google Gemini API Key"
+              className="w-full bg-[#0a0a0a] text-gray-200 border border-[#1a1a1a] rounded-lg px-3 py-2.5 text-xs focus:outline-none focus:border-[#00FF9D]/50 font-mono"
+            />
+            <p className="text-[8px] text-gray-600 mt-1">Get free key at aistudio.google.com/app/apikey</p>
+          </div>
+
+          {/* Groq Key */}
+          <div>
+            <label className="flex items-center gap-2 text-[10px] font-bold text-gray-400 mb-1.5 tracking-wider">
+              <Zap className="w-3 h-3 text-[#f59e0b]" />
+              GROQ KEY (FALLBACK)
+            </label>
+            <input
+              type="password"
+              value={groqKey}
+              onChange={(e) => setGroqKey(e.target.value)}
+              placeholder="Enter Groq API Key"
+              className="w-full bg-[#0a0a0a] text-gray-200 border border-[#1a1a1a] rounded-lg px-3 py-2.5 text-xs focus:outline-none focus:border-[#00FF9D]/50 font-mono"
+            />
+            <p className="text-[8px] text-gray-600 mt-1">Get free key at console.groq.com/keys</p>
+          </div>
+
+          {/* Save Button */}
+          <button
+            onClick={handleSave}
+            disabled={status === 'loading' || initialLoad}
+            className="w-full bg-[#00FF9D] text-black rounded-lg px-4 py-3 text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
+          >
+            {status === 'loading' ? (
+              'SAVING...'
+            ) : status === 'saved' ? (
+              <>
+                <CheckCircle2 className="w-4 h-4" />
+                KEYS SAVED SUCCESSFULLY
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                SAVE API KEYS
+              </>
+            )}
+          </button>
+
+          {status === 'error' && (
+            <div className="flex items-center gap-2 text-red-500 text-[10px]">
+              <AlertCircle className="w-3 h-3" />
+              Failed to save keys. Check connection.
+            </div>
+          )}
+        </div>
       </div>
-      <div className="space-y-3">
-        <div className="flex items-center justify-between p-3 bg-black/30 rounded-lg border border-[#00ff9d11]">
-          <div className="flex items-center gap-2"><Cpu className="w-4 h-4 text-gray-400" /><span className="text-xs">Performance Mode</span></div>
-          <span className="text-xs text-[#00FF9D]">Ultra</span>
+
+      {/* Info Box */}
+      <div className="glass p-4 rounded-xl">
+        <div className="flex items-center gap-2 mb-2">
+          <Key className="w-3 h-3 text-[#00d4ff]" />
+          <h3 className="text-[10px] font-bold text-[#00d4ff] tracking-wider">SECURE STORAGE</h3>
         </div>
-        <div className="flex items-center justify-between p-3 bg-black/30 rounded-lg border border-[#00ff9d11]">
-          <div className="flex items-center gap-2"><Bell className="w-4 h-4 text-gray-400" /><span className="text-xs">Notifications</span></div>
-          <span className="text-xs text-[#00FF9D]">On</span>
-        </div>
-        <div className="flex items-center justify-between p-3 bg-black/30 rounded-lg border border-[#00ff9d11]">
-          <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-gray-400" /><span className="text-xs">Stealth Mode</span></div>
-          <span className="text-xs text-gray-500">Off</span>
-        </div>
+        <p className="text-[9px] text-gray-500 leading-relaxed">
+          Your API keys are stored locally in JEXI OS's secure settings file on your device. They are never sent to any external server except the official AI provider you configure.
+        </p>
       </div>
     </div>
   );

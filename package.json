@@ -9,6 +9,7 @@
     "preview": "vite preview --host"
   },
   "dependencies": {
+    "axios": "^1.19.0",
     "framer-motion": "^12.43.0",
     "highlight.js": "^11.11.1",
     "katex": "^0.18.1",
@@ -19,7 +20,8 @@
     "rehype-highlight": "^7.0.2",
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
-    "remark-math": "^6.0.0"
+    "remark-math": "^6.0.0",
+    "remark-toc": "^9.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

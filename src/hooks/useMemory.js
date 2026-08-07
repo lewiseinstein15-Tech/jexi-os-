@@ -17,7 +17,7 @@ export const useMemory = (activeNav) => {
     };
 
     fetchMemory();
-    const interval = setInterval(fetchMemory, 2000); // Poll every 2 seconds for real-time updates
+    const interval = setInterval(fetchMemory, 2000);
     return () => clearInterval(interval);
   }, [activeNav]);
 
