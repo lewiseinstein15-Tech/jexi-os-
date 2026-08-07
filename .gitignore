@@ -1,7 +1,19 @@
-node_modules
-dist
-.git
-*.md
-settings.json
+# Dependencies
+node_modules/
+server/node_modules/
+frontend/node_modules/
+
+# Build outputs
+.next/
+dist/
+server/public/
+frontend/dist/
+
+# Environment & Secrets
 .env
+settings.json
 task_state.json
+
+# System files
+.DS_Store
+*.log
