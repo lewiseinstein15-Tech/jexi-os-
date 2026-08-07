@@ -18,7 +18,7 @@ The repo ships a **`render.yaml` blueprint** that pre-configures everything.
 2. Go to [dashboard.render.com](https://dashboard.render.com/select-repo?type=web).
 3. Click **New → Blueprint** (or *New + → Blueprint Instance*).
 4. Select the `jexi-os-` repo. Render finds `render.yaml` and shows one service:
-   - **jexi-os-brain** — Node 22, root dir `server/`, build `npm ci && npx playwright install --with-deps chromium`, start `npm start`, health check `/api/health`.
+   - **jexi-os-brain** — Node 22, root dir `server/`, build `npm ci && (npx playwright install --with-deps chromium || npx playwright install chromium)`, start `npm start`, health check `/api/health`.
 5. Pick your **region** and instance type (Free is fine to start).
 6. Click **Apply / Create Resources**. Render builds & deploys (~4–8 min, the Chromium download is the slow part).
 7. After the first deploy, open the service → **Environment** → add these **secret** env vars:
@@ -30,7 +30,7 @@ The repo ships a **`render.yaml` blueprint** that pre-configures everything.
 Dashboard → **New → Web Service** → connect the repo, then set:
 - **Root Directory:** `server`
 - **Environment:** Node
-- **Build Command:** `npm ci && npx playwright install --with-deps chromium`
+- **Build Command:** `npm ci && (npx playwright install --with-deps chromium || npx playwright install chromium)`
 - **Start Command:** `npm start`
 - **Instance Type:** Free (or Starter)
 - **Health Check Path:** `/api/health`
@@ -42,9 +42,30 @@ Open your service URL, e.g. `https://jexi-os-brain.onrender.com/api/health` — 
 {"ok":true,"name":"JEXI OS Brain","version":"1.0.0","port":10000}
 ```
 
-### Option C — Docker runtime (more reproducible)
-A production-ready `server/Dockerfile` is included (Node 22 slim + Chromium system deps).
-In Render, create the service with **Docker** as the environment instead of Node, then set:
+### Why the first build failed (and why it's fixed)
+
+Render's build environment runs as a **non-root user without `sudo`**, so Playwright's
+`install --with-deps` step (it needs root to run `apt-get` and install Chromium's system
+libraries) fails with `su: Authentication failure` and used to kill the whole build.
+
+The build command now falls back — if the system-deps step can't escalate, it still
+downloads Chromium so the build succeeds:
+
+```bash
+npm ci && (npx playwright install --with-deps chromium || npx playwright install chromium)
+```
+
+> **Browser on the Free tier:** Chromium itself downloads fine, but its system libraries
+> may be missing on a Free instance, so the Virtual Desktop may show **"Browser offline"**.
+> When that happens JEXI reads pages server-side instead — chat, research, link analysis
+> and memory all still work. For a **guaranteed working browser**, use a paid instance
+> with the Docker runtime (Option C) — Docker isn't supported on Free instances.
+
+### Option C — Docker runtime (guaranteed browser, paid)
+A production-ready `server/Dockerfile` is included (Node 22 slim + Chromium system deps
+baked into the image — no build-time `apt` needed, so the browser always works).
+**Docker requires a paid instance** (Free doesn't support Docker). In Render, create the
+service with **Docker** as the environment instead of Node, then set:
 - **Root Directory:** `server` (Render finds `server/Dockerfile` automatically)
 - **Env vars:** `GROQ_API_KEY`, `GEMINI_API_KEY`
 - Docker runtime skips the npm/build steps — the image already contains everything.
