@@ -119,4 +119,4 @@ app.post('/api/chat', async (req, res) => {
   } finally { res.end(); }
 });
 
-app.listen(3002, '0.0.0.0', () => console.log('🧠 JEXI OS BRAIN (Unified) running on port 3002'));
+app.listen(process.env.PORT || 7860, '0.0.0.0', () => console.log('🧠 JEXI OS BRAIN running on port ' + (process.env.PORT || 7860)));

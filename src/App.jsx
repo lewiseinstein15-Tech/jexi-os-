@@ -16,6 +16,8 @@ export default function App() {
   const engine = useJexiEngine();
   const memory = useMemory(activeNav);
 
+  // No more auto-switching! You control the tabs manually.
+
   return (
     <div className="min-h-screen bg-[#030303] text-gray-200 flex flex-col">
       <Header />

@@ -1,0 +1,43 @@
+# Use Ubuntu as the base image
+FROM ubuntu:22.04
+
+# Avoid timezone prompts
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DISPLAY=:1
+
+# Install Node.js, Python, and all desktop/GUI tools
+RUN apt-get update && apt-get install -y \
+    curl wget git \
+    nodejs npm \
+    python3 python3-pip \
+    xvfb openbox xterm \
+    netsurf-gtk \
+    ffmpeg tesseract-ocr \
+    xdotool scrot \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up the working directory
+WORKDIR /app
+
+# Copy the JEXI OS backend and frontend code
+COPY ./server ./server
+COPY ./frontend ./frontend
+
+# Install backend dependencies
+WORKDIR /app/server
+RUN npm install
+
+# Build the frontend
+WORKDIR /app/frontend
+RUN npm install && npm run build
+
+# Move the built frontend to be served by the backend
+RUN mkdir -p /app/server/public
+RUN cp -r ./dist/* /app/server/public/
+
+# Expose the Hugging Face default port
+EXPOSE 7860
+
+# Start the virtual display, window manager, and JEXI backend
+WORKDIR /app/server
+CMD bash -c "Xvfb :1 -screen 0 1280x720x24 & sleep 2 && openbox --sm-disable & sleep 1 && xterm -geometry 160x45+0+0 -bg black -fg green -fs 14 & node index.js"

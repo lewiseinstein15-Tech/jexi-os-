@@ -4,18 +4,18 @@ export class Planner {
   async analyzeIntent(query) {
     const lowerQuery = query.toLowerCase();
     
-    if (/clear (all )?memory|forget everything|wipe memory|delete memory/i.test(query)) return { intent: "clear_memory", tasks: ["memory"], reasoning: "User wants to wipe memory." };
+    if (/clear (all )?memory|forget everything|wipe memory|delete memory/i.test(query)) {
+      return { intent: "clear_memory", tasks: ["memory"], reasoning: "User wants to wipe memory." };
+    }
+    
     if (/study|learn everything about|fill knowledge base|master topic/i.test(query)) {
       const topic = query.replace(/study|learn everything about|fill knowledge base|master topic/i, '').trim();
-      return { intent: "study_topic", tasks: ["knowledge"], reasoning: "User wants JEXI to study a topic.", payload: topic };
+      return { intent: "study_topic", tasks: ["knowledge"], reasoning: "User wants JEXI to study.", payload: topic };
     }
 
-    // NEW: Auto-route coding or research tasks to the Virtual Desktop!
-    const isCoding = /build|create|make|develop|write a|code|function|script|program|component|app|application|python|javascript|react|html|website/i.test(query);
-    const isResearch = /search|research|find|look up|google|what is|how to/i.test(query);
-    
-    if (isCoding || isResearch) {
-      return { intent: "computer_use", tasks: ["computer_use"], reasoning: "Task requires visual desktop interaction." };
+    // Explicit visual requests force computer_use
+    if (/open the browser|use the terminal|visually|on the screen|go to https|navigate to/i.test(query)) {
+      return { intent: "computer_use", tasks: ["computer_use"], reasoning: "Visual task requested." };
     }
 
     const isConversation = /^(hello|hey|hi|sup|yo|howdy|good morning|good evening|what's up|wassup)\b/i.test(query);
@@ -23,11 +23,22 @@ export class Planner {
     
     if (/what is my name|what do you remember|who am i/i.test(query)) return { intent: "memory_query", tasks: ["memory"], reasoning: "User is asking about memory." };
 
+    // Check Knowledge Base
     try {
       const kbRes = await fetch(`${MANAGER_URL}/api/knowledge/search?query=${encodeURIComponent(query)}`);
       const kbData = await kbRes.json();
-      if (kbData && kbData.length > 0) return { intent: "knowledge_recall", tasks: ["reasoning", "memory"], reasoning: "Found relevant book in Knowledge Base." };
+      if (kbData && kbData.length > 0) {
+        return { intent: "knowledge_recall", tasks: ["reasoning", "memory"], reasoning: "Found relevant book." };
+      }
     } catch (e) {}
+
+    // Auto-route coding/research/search tasks to Virtual Desktop
+    const isCoding = /build|create|make|develop|write a|code|function|script|program|component|app|application|python|javascript|react|html|website|calculator|api|server/i.test(query);
+    const isResearch = /search|research|find|look up|google|what is|how to|who is|when did|where is|why does/i.test(query);
+    
+    if (isCoding || isResearch) {
+      return { intent: "computer_use", tasks: ["computer_use"], reasoning: "Task requires visual desktop." };
+    }
 
     return { intent: "learning_research", tasks: ['research', 'reasoning', 'memory'], reasoning: "Will research and learn." };
   }

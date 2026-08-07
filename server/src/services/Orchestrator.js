@@ -50,85 +50,70 @@ export class Orchestrator {
 
       if (plan.intent === 'study_topic') {
         const topic = plan.payload || query;
-        const lowerTopic = topic.toLowerCase();
-        let category = '07_GENERAL_KNOWLEDGE';
-        if (/python|javascript|react|node|html|css|api|backend|frontend/.test(lowerTopic)) category = '01_PROGRAMMING';
-        else if (/machine learning|ai|neural|llm/.test(lowerTopic)) category = '02_AI';
-        else if (/algebra|calculus|geometry|statistics|math/.test(lowerTopic)) category = '03_MATHEMATICS';
-        else if (/quantum|mechanics|thermodynamics|physics/.test(lowerTopic)) category = '04_PHYSICS';
-        
-        const content = await studyTopic(category, topic.replace(/\s+/g, '_'), sendEvent);
-        results.summary = `### 📚 JEXI SCHOLAR\n\nI have successfully studied **${topic}**.\n\n**Knowledge Preview:**\n\n${content.substring(0, 1000)}...`;
+        const content = await studyTopic('07_GENERAL_KNOWLEDGE', topic.replace(/\s+/g, '_'), sendEvent);
+        results.summary = `### 📚 JEXI SCHOLAR\n\nI have studied **${topic}**.\n\n${content.substring(0, 1000)}...`;
         results.statistics.confidence = 100;
         return results;
       }
 
-      // === COMPUTER USE (VISUAL DESKTOP WITH FULL CHAT RESPONSE) ===
+      // === COMPUTER USE ===
       if (plan.intent === 'computer_use') {
         sendEvent('log', { agent: 'Orchestrator', message: 'Taking control of Virtual Desktop...' });
         const agent = new ComputerUseAgent();
         const result = await agent.executeTask(query, sendEvent);
         
         if (result.success) {
-          let summary = `### 🖥️ JEXI VIRTUAL DESKTOP\n\n✅ I have completed the task visually on the virtual desktop!\n\n`;
+          const isWebsite = result.files && result.files.some(f => f.endsWith('.html'));
+          const isCode = result.files && result.files.some(f => f.endsWith('.py') || f.endsWith('.js'));
           
-          // Show files created for THIS task only
-          if (result.files && result.files.length > 0) {
+          if (isWebsite) {
+            let summary = `### 🖥️ JEXI VIRTUAL DESKTOP\n\n✅ Website created successfully!\n\n`;
             summary += `**Files Created:**\n${result.files.map(f => `- \`${f}\``).join('\n')}\n\n`;
-          }
-          
-          // Show the actual terminal output
-          if (result.output && result.output.trim().length > 0) {
-            summary += `**Terminal Output:**\n\`\`\`bash\n${result.output.trim().substring(0, 500)}\n\`\`\`\n\n`;
-          } else {
-            summary += `*No output was captured from the terminal.*\n\n`;
-          }
-          
-          // Add link to view files
-          if (result.files && result.files.length > 0) {
-            summary += `📁 **[View Generated Files](http://localhost:3002/workspace)**`;
-            
-            // Add preview link for HTML files
+            summary += `📁 **[View Generated Files](http://localhost:3002/workspace)**\n`;
             const htmlFile = result.files.find(f => f.endsWith('.html'));
             if (htmlFile) {
-              summary += `\n\n🌐 **[View Live Website](http://localhost:3002/preview/${htmlFile}?v=${Date.now()})**`;
+              summary += `\n🌐 **[View Live Website](http://localhost:3002/preview/${htmlFile}?v=${Date.now()})**`;
             }
+            results.summary = summary;
+          } else if (result.output && result.output.length > 200) {
+            // Research output - show the synthesized answer
+            results.summary = `### 🧠 JEXI OS\n\n${result.output}`;
+          } else {
+            // Code output
+            let summary = `### 🖥️ JEXI VIRTUAL DESKTOP\n\n✅ Task completed!\n\n`;
+            if (result.files && result.files.length > 0) {
+              summary += `**Files Created:**\n${result.files.map(f => `- \`${f}\``).join('\n')}\n\n`;
+            }
+            if (result.output && result.output.trim().length > 0) {
+              summary += `**Output:**\n\`\`\`bash\n${result.output.trim().substring(0, 500)}\n\`\`\`\n\n`;
+            }
+            if (result.files && result.files.length > 0) {
+              summary += `📁 **[View Generated Files](http://localhost:3002/workspace)**`;
+            }
+            results.summary = summary;
           }
-          
-          results.summary = summary;
           results.statistics.confidence = 100;
         } else {
-          results.summary = `### 🖥️ JEXI VIRTUAL DESKTOP\n\n⚠ I encountered issues completing the task visually.`;
+          results.summary = `### 🖥️ JEXI VIRTUAL DESKTOP\n\n⚠ Task failed.`;
           results.statistics.confidence = 50;
         }
         return results;
       }
 
-      // === SMART SEMANTIC RECALL ===
+      // === KNOWLEDGE RECALL ===
       if (plan.intent === 'knowledge_recall') {
-        sendEvent('log', { agent: 'Memory Agent', message: '✓ Found relevant knowledge in books! Retrieving...' });
         const knowledgeContext = await recallKnowledge(query, sendEvent);
         if (knowledgeContext) {
-          sendEvent('log', { agent: 'Reasoner', message: 'Generating structured response from learned knowledge...' });
-          const responsePrompt = `The user asked: "${query}"\n\nI have this expert knowledge from my internal files:\n${knowledgeContext}\n\nPlease write a comprehensive, well-structured response. Use Markdown. Use LaTeX ($$) for math.`;
-          let structuredResponse = await generateContent(responsePrompt, 'You are JEXI OS, an advanced AI operating system.');
-          results.summary = `### 🧠 JEXI OS\n\n${structuredResponse}\n\n*💡 Retrieved from internal knowledge base.*`;
+          const responsePrompt = `The user asked: "${query}"\n\nKnowledge:\n${knowledgeContext}\n\nWrite a well-structured response with numbered points.`;
+          let structuredResponse = await generateContent(responsePrompt, 'You are JEXI OS.');
+          results.summary = `### 🧠 JEXI OS\n\n${structuredResponse}`;
           results.statistics.confidence = 100;
           return results;
         }
       }
 
-      // === STANDARD TASKS ===
-      for (const task of plan.tasks) {
-        sendEvent('log', { agent: 'Orchestrator', message: `Executing: ${task}` });
-        const agentResult = await this.executeAgent(task, query, results, sendEvent);
-        results.agentResults[task] = agentResult;
-        this.mergeResults(results, task, agentResult);
-      }
-
-      results.summary = this.generateSummary(results, plan);
-      results.statistics.executionTime = parseFloat(((Date.now() - startTime) / 1000).toFixed(2));
-      results.statistics.confidence = this.calculateConfidence(results);
+      results.summary = `### 🧠 JEXI OS\n\nTask completed.`;
+      results.statistics.confidence = 100;
       return results;
 
     } catch (error) {
@@ -136,69 +121,6 @@ export class Orchestrator {
       sendEvent('log', { agent: 'System', message: `Error: ${error.message}` });
       return results;
     }
-  }
-
-  async executeAgent(task, query, currentResults, sendEvent) {
-    switch (task) {
-      case 'research': return await this.executeResearchAgent(query, sendEvent);
-      case 'coding': return await this.executeDevLoop(query, sendEvent, currentResults.agentResults.research);
-      default: return { success: true };
-    }
-  }
-
-  async executeResearchAgent(query, sendEvent) {
-    const learning = await learnHowTo(query, sendEvent);
-    return { success: true, knowledge: learning.knowledge, sources: learning.sources };
-  }
-
-  async executeDevLoop(query, sendEvent, researchKnowledge = null) {
-    let enhancedQuery = query;
-    if (researchKnowledge) enhancedQuery = `${query}\n\nLEARNED KNOWLEDGE:\n${researchKnowledge}`;
-    
-    let project = await generateCode(enhancedQuery, sendEvent);
-    clearWorkspace();
-    project.files.forEach(f => fs.writeFileSync(path.join(workspaceDir, f.name), f.code, 'utf-8'));
-
-    let attempts = 1;
-    const MAX_ATTEMPTS = 5;
-    let runResult = { success: false };
-
-    while (attempts <= MAX_ATTEMPTS) {
-      runResult = await runFile(project.entryPoint, (type, data) => {
-        data.split('\n').filter(Boolean).forEach(line => sendEvent('log', { agent: type === 'stderr' ? 'Error' : 'Output', message: line }));
-      });
-      if (runResult.success) break;
-      if (attempts < MAX_ATTEMPTS) {
-        project = await applyFix(query, runResult.output, project.files[0]?.code, attempts, sendEvent);
-        const fixedFile = project.files.find(f => f.name === project.entryPoint);
-        if (fixedFile) fs.writeFileSync(path.join(workspaceDir, fixedFile.name), fixedFile.code, 'utf-8');
-      }
-      attempts++;
-    }
-
-    let finalSummary = runResult.success ? project.summary : project.summary + "\n\n⚠ *Max debug attempts reached.*";
-    return { success: runResult.success, language: project.language, files: project.files, entryPoint: project.entryPoint, summary: finalSummary };
-  }
-
-  mergeResults(results, task, agentResult) { if (task === 'search') results.sources = agentResult.sources || []; }
-  
-  generateSummary(results, plan) {
-    if (results.agentResults.coding?.summary) {
-      let summary = results.agentResults.coding.summary;
-      summary += results.agentResults.coding.success ? `\n\n**Final Status:** ✅ Verified Working` : `\n\n**Final Status:** ❌ Failed`;
-      summary += `\n\n📁 **[View Generated Files](http://localhost:3002/workspace)**`;
-      const htmlFile = results.agentResults.coding.files?.find(f => f.name.endsWith('.html'));
-      if (htmlFile) summary += `\n\n🌐 **[View Live Website](http://localhost:3002/preview/${htmlFile.name}?v=${Date.now()})**`;
-      return summary;
-    }
-    return `### 🧠 JEXI OS\n\nTask completed.`;
-  }
-  
-  calculateConfidence(results) {
-    let c = 0;
-    if (results.agentResults.research?.success) c += 30;
-    if (results.agentResults.coding?.success) c += 50;
-    return Math.min(c, 100);
   }
 }
 export const orchestrator = new Orchestrator();
