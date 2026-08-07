@@ -1,46 +1,82 @@
-const MANAGER_URL = 'http://localhost:3001';
+import { searchKnowledge } from './MemoryManager.js';
 
+/**
+ * JEXI's Planner — decides which agents/tools to use and when.
+ * This is the "know when to call which tool" brain.
+ */
 export class Planner {
-  async analyzeIntent(query) {
-    const lowerQuery = query.toLowerCase();
-    
-    if (/clear (all )?memory|forget everything|wipe memory|delete memory/i.test(query)) {
-      return { intent: "clear_memory", tasks: ["memory"], reasoning: "User wants to wipe memory." };
-    }
-    
-    if (/study|learn everything about|fill knowledge base|master topic/i.test(query)) {
-      const topic = query.replace(/study|learn everything about|fill knowledge base|master topic/i, '').trim();
-      return { intent: "study_topic", tasks: ["knowledge"], reasoning: "User wants JEXI to study.", payload: topic };
+  async analyzeIntent(query, opts = {}) {
+    const q = String(query || '').toLowerCase();
+    const hasImage = Boolean(opts.image);
+
+    // 0. Image given → vision recognition
+    if (hasImage) {
+      return { intent: 'image_recognition', tasks: ['vision', 'reasoning', 'memory'], reasoning: 'User provided an image to analyze.', payload: opts.image };
     }
 
-    // Explicit visual requests force computer_use
-    if (/open the browser|use the terminal|visually|on the screen|go to https|navigate to/i.test(query)) {
-      return { intent: "computer_use", tasks: ["computer_use"], reasoning: "Visual task requested." };
+    // 1. Clear memory
+    if (/clear (all )?memory|forget everything|wipe memory|delete memory/i.test(q)) {
+      return { intent: 'clear_memory', tasks: ['memory'], reasoning: 'User wants to wipe memory.' };
     }
 
-    const isConversation = /^(hello|hey|hi|sup|yo|howdy|good morning|good evening|what's up|wassup)\b/i.test(query);
-    if (isConversation) return { intent: "conversation", tasks: ["memory"], reasoning: "User is greeting." };
-    
-    if (/what is my name|what do you remember|who am i/i.test(query)) return { intent: "memory_query", tasks: ["memory"], reasoning: "User is asking about memory." };
+    // 2. Any link in the message → analyze it (YouTube, TikTok, Instagram, article, any site)
+    const linkMatch = query.match(/https?:\/\/[^\s)'"]+/i);
+    if (linkMatch && !/http:\/\/localhost|127\.0\.0\.1|\.onion/i.test(linkMatch[0])) {
+      return { intent: 'link_analysis', tasks: ['browser', 'extractor', 'reasoning', 'memory'], reasoning: 'User shared a link — JEXI will open it with the browser and summarize.', payload: { url: linkMatch[0], fullQuery: query } };
+    }
 
-    // Check Knowledge Base
+    // 3. Study / deep learn
+    if (/study|learn everything about|fill knowledge base|master topic|teach me (everything about )?/i.test(q)) {
+      const topic = query.replace(/study|learn everything about|fill knowledge base|master topic|teach me/i, '').trim().replace(/^about\s+/i, '');
+      return { intent: 'study_topic', tasks: ['scholar', 'research', 'memory'], reasoning: 'User wants JEXI to deep-study and store in the knowledge library.', payload: topic };
+    }
+
+    // 4. Math detection — symbols, formulas, calculations, word problems
+    const mathHints = /(calculate|compute|solve|integrate|derivative|differentiate|sum of|multiply|divide|sqrt|square root|equation|formula|math|algebra|calculus|geometry|trigonometry|percentage|what is \d|\d+\s*[+\-×÷*\/]\s*\d|\^2|\$\$)/i;
+    if (mathHints.test(q) && !this.isCoding(q)) {
+      return { intent: 'math_solve', tasks: ['reasoning', 'memory'], reasoning: 'Mathematical question — solve with structured LaTeX steps.' };
+    }
+
+    // 5. Coding / programming (code in the question, or ask to build/debug)
+    if (this.isCoding(q)) {
+      return { intent: 'code_task', tasks: ['architect', 'coder', 'runner', 'debugger', 'memory'], reasoning: 'Coding task — write, run, and verify code before answering.' };
+    }
+
+    // 6. Greetings & pure conversation
+    if (/^(hello|hey|hi|sup|yo|howdy|good morning|good evening|what's up|wassup|who are you|what are you|who made you|who created you)\b/i.test(q)) {
+      return { intent: 'conversation', tasks: ['memory'], reasoning: 'Conversation / identity question.' };
+    }
+
+    // 7. Memory questions
+    if (/what is my name|what do you remember|who am i|remember me/i.test(q)) {
+      return { intent: 'memory_query', tasks: ['memory'], reasoning: 'User asks about memory.' };
+    }
+
+    // 8. Knowledge base recall — check the knowledge library first
     try {
-      const kbRes = await fetch(`${MANAGER_URL}/api/knowledge/search?query=${encodeURIComponent(query)}`);
-      const kbData = await kbRes.json();
-      if (kbData && kbData.length > 0) {
-        return { intent: "knowledge_recall", tasks: ["reasoning", "memory"], reasoning: "Found relevant book." };
+      const kb = searchKnowledge(query);
+      if (kb.length > 0) {
+        return { intent: 'knowledge_recall', tasks: ['reasoning', 'memory'], reasoning: 'Found matching knowledge in the library.', payload: kb };
       }
     } catch (e) {}
 
-    // Auto-route coding/research/search tasks to Virtual Desktop
-    const isCoding = /build|create|make|develop|write a|code|function|script|program|component|app|application|python|javascript|react|html|website|calculator|api|server/i.test(query);
-    const isResearch = /search|research|find|look up|google|what is|how to|who is|when did|where is|why does/i.test(query);
-    
-    if (isCoding || isResearch) {
-      return { intent: "computer_use", tasks: ["computer_use"], reasoning: "Task requires visual desktop." };
+    // 9. Research / search / facts
+    const isResearch = /search|research|find|look up|google|what is|who is|when did|where is|why does|how to|explain|latest|news|history|capital|population|meaning|difference between|benefits of|types of|top \d/i.test(q);
+    if (isResearch) {
+      return { intent: 'research', tasks: ['search', 'browser', 'extractor', 'reasoner', 'memory'], reasoning: 'Needs current/verified information from the internet.' };
     }
 
-    return { intent: "learning_research", tasks: ['research', 'reasoning', 'memory'], reasoning: "Will research and learn." };
+    // 10. Default: learning research
+    return { intent: 'learning_research', tasks: ['research', 'reasoning', 'memory'], reasoning: 'General question — research and answer.' };
+  }
+
+  isCoding(q) {
+    const buildVerbs = /(write|build|create|make|develop|fix|debug|refactor|implement|generate|code|program)/i;
+    const codeNouns = /\b(python|javascript|js|typescript|ts|react|node(\.js)?|html|css|java|c\+\+|c#|go|rust|sql|bash|shell|script|function|class|api|server|program|app(lication)?|website|web ?page|code|regex|pipeline|scraper|bot|component|database|endpoint)\b/i;
+    return (buildVerbs.test(q) && codeNouns.test(q)) ||
+      /```[\s\S]*```/i.test(q) || // user pasted code
+      /(error|traceback|exception|syntaxerror|debug this code|code is broken|doesn'?t work|not working|fix this|fix the code|debug)/i.test(q);
   }
 }
+
 export const planner = new Planner();

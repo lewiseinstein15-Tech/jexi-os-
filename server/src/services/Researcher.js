@@ -1,6 +1,7 @@
 import { aggregateSearch } from './SearchEngine.js';
 import { extractContent } from './Extractor.js';
 import { generateContent } from './LLMClient.js';
+import { MANAGER_URL } from '../config.js';
 
 export async function learnHowTo(query, sendEvent) {
   sendEvent('log', { agent: 'Researcher', message: `🎓 Entering Learning Mode for: "${query}"` });

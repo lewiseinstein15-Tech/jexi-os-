@@ -6,12 +6,14 @@ export default function KnowledgePanel() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const backendUrl = localStorage.getItem('jexi_backend_url') || '';
+
   const fetchKnowledge = async () => {
     setLoading(true);
     try {
       const [structRes, statusRes] = await Promise.all([
-        fetch('http://localhost:3001/api/knowledge/structure'),
-        fetch('http://localhost:3001/api/knowledge/status')
+        fetch(`${backendUrl}/api/knowledge/structure`),
+        fetch(`${backendUrl}/api/knowledge/status`)
       ]);
       const structData = await structRes.json();
       const statusData = await statusRes.json();

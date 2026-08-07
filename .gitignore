@@ -14,6 +14,10 @@ frontend/dist/
 settings.json
 task_state.json
 
+# Runtime data (memory core, knowledge library, generated files)
+server/data/
+server/jexi-workspace/
+
 # System files
 .DS_Store
 *.log

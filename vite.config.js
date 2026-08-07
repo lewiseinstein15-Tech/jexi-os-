@@ -3,7 +3,8 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: '/jexi-os-/',
+  // Relative base: works on Vercel (root) and GitHub Pages (subpath)
+  base: './',
   server: {
     host: true,
     port: 3000,

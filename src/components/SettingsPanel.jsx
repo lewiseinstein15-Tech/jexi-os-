@@ -7,10 +7,12 @@ export default function SettingsPanel() {
   const [status, setStatus] = useState('idle'); // idle, loading, saved, error
   const [initialLoad, setInitialLoad] = useState(true);
 
+  const backendUrl = localStorage.getItem('jexi_backend_url') || '';
+
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await fetch('http://localhost:3002/api/settings');
+        const res = await fetch(`${backendUrl}/api/settings`);
         const data = await res.json();
         setGeminiKey(data.geminiKey || '');
         setGroqKey(data.groqKey || '');
@@ -20,12 +22,12 @@ export default function SettingsPanel() {
       setInitialLoad(false);
     };
     fetchSettings();
-  }, []);
+  }, [backendUrl]);
 
   const handleSave = async () => {
     setStatus('loading');
     try {
-      const res = await fetch('http://localhost:3002/api/settings', {
+      const res = await fetch(`${backendUrl}/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ geminiKey, groqKey })

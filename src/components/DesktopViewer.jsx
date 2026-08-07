@@ -7,7 +7,7 @@ export default function DesktopViewer({ logs = [] }) {
   const [manualMode, setManualMode] = useState(false);
   const [typeText, setTypeText] = useState('');
   const [lastClick, setLastClick] = useState({ x: 0, y: 0 });
-  const [backendUrl, setBackendUrl] = useState(localStorage.getItem('jexi_backend_url') || 'http://localhost:3002');
+  const [backendUrl, setBackendUrl] = useState(localStorage.getItem('jexi_backend_url') || '');
   const [showUrlInput, setShowUrlInput] = useState(false);
   const imgRef = useRef(null);
 

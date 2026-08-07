@@ -1,73 +1,191 @@
 import { exec } from 'child_process';
-import util from 'util';
+import { promisify } from 'util';
+import path from 'path';
+import fs from 'fs';
+import { WORKSPACE_DIR } from '../config.js';
 
-const execAsync = util.promisify(exec);
+const execAsync = promisify(exec);
 
+let browser = null;
+let page = null;
+let browserReady = false;
+let browserError = null;
+
+const WELCOME_PAGE = `data:text/html,<html><body style="background:#050505;color:#00FF9D;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+<div style="text-align:center">
+<h1>🖥️ JEXI OS VIRTUAL DESKTOP</h1>
+<p style="color:#888">Browser engine online — JEXI's eyes.</p>
+<p style="color:#555;font-size:12px">Ask JEXI to open a link, research a topic, or build something.<br/>This window shows exactly what JEXI is seeing.</p>
+</div></body></html>`;
+
+export async function ensureBrowser() {
+  if (browserReady) return { ok: true };
+  if (browserError) return { ok: false, error: browserError };
+  try {
+    const { chromium } = await import('playwright');
+    browser = await chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--disable-extensions'],
+    });
+    page = await browser.newPage({ viewport: { width: 1280, height: 720 }, userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' });
+    await page.goto(WELCOME_PAGE, { timeout: 15000 }).catch(() => {});
+    browserReady = true;
+    return { ok: true };
+  } catch (e) {
+    browserError = `Browser unavailable: ${e.message}. JEXI will fall back to server-side reading.`;
+    console.error(`[Desktop] ${browserError}`);
+    return { ok: false, error: browserError };
+  }
+}
+
+export function browserStatus() {
+  return { ready: browserReady, error: browserError };
+}
+
+/**
+ * The virtual desktop: a real Chromium browser (JEXI's eyes) + a real
+ * terminal (her hands) that runs inside the workspace directory.
+ */
 export class DesktopManager {
-  constructor(runtime = 'proot') {
-    this.runtime = runtime; 
+  constructor(runtime = 'playwright') {
+    this.runtime = runtime;
+    fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
   }
 
-  // FIXED: Always inject DISPLAY=:1 into every command!
+  /* ---------------- TERMINAL (her hands) ---------------- */
+
   async executeCommand(agentId, command) {
-    // Ensure the command runs in the graphical environment
-    const fullCommand = `export DISPLAY=:1; ${command}`;
-    const cmd = `proot-distro login ubuntu -- bash -c "${fullCommand} 2>&1"`;
     try {
-      const { stdout } = await execAsync(cmd);
-      return stdout;
-    } catch (error) {
-      return error.stdout || error.stderr || error.message;
+      const { stdout, stderr } = await execAsync(command, {
+        cwd: WORKSPACE_DIR,
+        timeout: 60000,
+        maxBuffer: 10 * 1024 * 1024,
+        env: { ...process.env, DISPLAY: ':1' },
+      });
+      return `${stdout || ''}${stderr || ''}`.trim();
+    } catch (e) {
+      return (e.stdout || e.stderr || e.message || '').toString();
     }
   }
 
   async writeFile(agentId, filename, content) {
-    const b64Content = Buffer.from(content).toString('base64');
-    const command = `echo "${b64Content}" | base64 -d > /root/${filename}`;
-    return await this.executeCommand(agentId, command);
+    const safeName = String(filename || 'file.txt').replace(/\.\./g, '_');
+    const filePath = path.join(WORKSPACE_DIR, safeName);
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, content, 'utf-8');
+    return `Wrote ${safeName} (${content.length} chars)`;
+  }
+
+  /* ---------------- BROWSER (her eyes) ---------------- */
+
+  async goto(agentId, url) {
+    const ready = await ensureBrowser();
+    if (!ready.ok) throw new Error(ready.error);
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await new Promise(r => setTimeout(r, 1200));
+    return { url: page.url(), title: await page.title() };
+  }
+
+  async pageText(agentId) {
+    const ready = await ensureBrowser();
+    if (!ready.ok) throw new Error(ready.error);
+    return await page.evaluate(() => document.body ? document.body.innerText : '');
+  }
+
+  async links(agentId) {
+    const ready = await ensureBrowser();
+    if (!ready.ok) return [];
+    return await page.evaluate(() =>
+      Array.from(document.querySelectorAll('a')).map(a => ({ text: (a.innerText || a.title || '').trim().slice(0, 120), href: a.href })).filter(l => l.text && l.href).slice(0, 80)
+    );
   }
 
   async takeScreenshot(agentId) {
-    const command = `ffmpeg -f x11grab -video_size 1280x720 -i :1 -vframes 1 -update 1 /tmp/jexi_shot.png -y ; base64 /tmp/jexi_shot.png`;
-    const base64String = await this.executeCommand(agentId, command);
-    
-    if (base64String && base64String.length > 100) {
-      return `data:image/png;base64,${base64String.replace(/\n/g, '')}`;
+    const ready = await ensureBrowser();
+    if (!ready.ok) {
+      // Still give the viewer something to render
+      return `data:image/svg+xml;base64,${Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720"><rect width="1280" height="720" fill="#050505"/><text x="640" y="360" fill="#00FF9D" font-family="monospace" font-size="22" text-anchor="middle">Virtual Desktop offline — ${browserError || ''}</text></svg>`).toString('base64')}`;
     }
-    throw new Error("Screenshot failed. Is Session 7 running?");
+    const shot = await page.screenshot({ type: 'png' });
+    return `data:image/png;base64,${shot.toString('base64')}`;
   }
 
   async extractText(agentId) {
-    await this.executeCommand(agentId, `ffmpeg -f x11grab -video_size 1280x720 -i :1 -vframes 1 -update 1 /tmp/jexi_shot.png -y`);
-    const command = `tesseract /tmp/jexi_shot.png - tsv`;
-    const tsvOutput = await this.executeCommand(agentId, command);
-    
-    const lines = tsvOutput.trim().split('\n');
-    const words = [];
-    
-    for (let i = 1; i < lines.length; i++) {
-      const parts = lines[i].split('\t');
-      if (parts.length >= 12) {
-        const text = parts[11].trim();
-        if (text && text.length > 1) {
-          words.push(text);
-        }
-      }
-    }
-    return words.join(' ');
+    return await this.pageText(agentId);
   }
 
   async click(agentId, x, y) {
-    return await this.executeCommand(agentId, `xdotool mousemove ${x} ${y} click 1`);
+    const ready = await ensureBrowser();
+    if (!ready.ok) throw new Error(ready.error);
+    await page.mouse.click(x, y);
+    await new Promise(r => setTimeout(r, 700));
+    return `Clicked ${x},${y}`;
+  }
+
+  async clickText(agentId, text) {
+    const ready = await ensureBrowser();
+    if (!ready.ok) throw new Error(ready.error);
+    try {
+      const el = page.getByText(text, { exact: false }).first();
+      await el.scrollIntoViewIfNeeded({ timeout: 4000 }).catch(() => {});
+      await el.click({ timeout: 8000 });
+      await new Promise(r => setTimeout(r, 1500));
+      return true;
+    } catch (e) {
+      // Fallback: click the first <a> whose text matches
+      try {
+        const clicked = await page.evaluate((t) => {
+          const links = Array.from(document.querySelectorAll('a,button'));
+          const el = links.find(a => (a.innerText || '').toLowerCase().includes(t.toLowerCase()));
+          if (el) { el.click(); return true; }
+          return false;
+        }, text);
+        await new Promise(r => setTimeout(r, 1500));
+        return clicked;
+      } catch (e2) {
+        throw new Error(`Could not find clickable text "${text}"`);
+      }
+    }
   }
 
   async type(agentId, text) {
-    const b64Text = Buffer.from(text).toString('base64');
-    const command = `echo "${b64Text}" | base64 -d > /tmp/jexi_type.txt ; xdotool type --file /tmp/jexi_type.txt`;
-    return await this.executeCommand(agentId, command);
+    const ready = await ensureBrowser();
+    if (!ready.ok) throw new Error(ready.error);
+    await page.keyboard.type(text, { delay: 25 });
+    await new Promise(r => setTimeout(r, 400));
+    return `Typed ${text.length} chars`;
   }
 
   async pressKey(agentId, key) {
-    return await this.executeCommand(agentId, `xdotool key ${key}`);
+    const ready = await ensureBrowser();
+    if (!ready.ok) throw new Error(ready.error);
+    const mapped = key === 'ctrl+l' ? 'Control+l' : key === 'Page_Down' ? 'PageDown' : key === 'Page_Up' ? 'PageUp' : key === 'Return' ? 'Enter' : key === 'Escape' ? 'Escape' : key === 'Alt+F4' ? 'Alt+F4' : key;
+    await page.keyboard.press(mapped).catch(async () => { await page.keyboard.press(key); });
+    await new Promise(r => setTimeout(r, 500));
+    return `Pressed ${key}`;
+  }
+
+  async scroll(agentId, direction = 'down') {
+    const ready = await ensureBrowser();
+    if (!ready.ok) throw new Error(ready.error);
+    await page.evaluate((dir) => window.scrollBy(0, dir === 'up' ? -900 : 900), direction);
+    await new Promise(r => setTimeout(r, 600));
+    return `Scrolled ${direction}`;
+  }
+
+  async back(agentId) {
+    const ready = await ensureBrowser();
+    if (!ready.ok) throw new Error(ready.error);
+    await page.goBack({ timeout: 15000 }).catch(() => {});
+    await new Promise(r => setTimeout(r, 1200));
+    return { url: page.url() };
+  }
+
+  async forward(agentId) {
+    const ready = await ensureBrowser();
+    if (!ready.ok) throw new Error(ready.error);
+    await page.goForward({ timeout: 15000 }).catch(() => {});
+    await new Promise(r => setTimeout(r, 1200));
+    return { url: page.url() };
   }
 }

@@ -1,4 +1,8 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+
+// Backend defaults to same origin (/api is proxied by Vite in dev,
+// and served by the backend in production). Override via localStorage.
+const getBackendUrl = () => localStorage.getItem('jexi_backend_url') || '';
 
 export const useJexiEngine = () => {
   const [messages, setMessages] = useState([]);
@@ -6,18 +10,19 @@ export const useJexiEngine = () => {
   const [websites, setWebsites] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const runSearch = async (query) => {
+  const runSearch = useCallback(async (query, image = null) => {
     setIsProcessing(true);
     setLogs([]);
     setWebsites([]);
-    setMessages(prev => [...prev, { role: 'user', text: query }]);
+    const userMsg = { role: 'user', text: query, image };
+    setMessages(prev => [...prev, userMsg]);
 
     try {
-      const backendUrl = localStorage.getItem('jexi_backend_url') || 'http://localhost:3002';
+      const backendUrl = getBackendUrl();
       const res = await fetch(`${backendUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query })
+        body: JSON.stringify({ query, image: image || undefined })
       });
 
       const reader = res.body.getReader();
@@ -34,7 +39,8 @@ export const useJexiEngine = () => {
             if (data.type === 'log') setLogs(prev => [...prev, { agent: data.agent, message: data.message }]);
             else if (data.type === 'website') setWebsites(prev => [...prev, data.site]);
             else if (data.type === 'done') {
-              if (data.summary) setMessages(prev => [...prev, { role: 'jexi', text: data.summary }]);
+              if (data.summary) setMessages(prev => [...prev, { role: 'jexi', text: data.summary, sources: data.sources, files: data.files }]);
+              else if (!data.success) setMessages(prev => [...prev, { role: 'jexi', text: `⚠ ${data.error || 'Something went wrong. Is the backend running?'}` }]);
             }
           } catch (e) {}
         }
@@ -44,8 +50,9 @@ export const useJexiEngine = () => {
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, []);
 
-  const stopGeneration = () => setIsProcessing(false);
+  const stopGeneration = useCallback(() => setIsProcessing(false), []);
+
   return { messages, logs, websites, isProcessing, runSearch, stopGeneration };
 };

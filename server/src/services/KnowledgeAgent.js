@@ -1,8 +1,9 @@
 import { generateContent } from './LLMClient.js';
 import { aggregateSearch } from './SearchEngine.js';
 import { extractContent } from './Extractor.js';
+import { saveKnowledgeFile, searchKnowledge } from './MemoryManager.js';
+import { MANAGER_URL } from '../config.js';
 
-const MANAGER_URL = 'http://localhost:3001';
 const MAX_RAW_TEXT = 15000; // Reduced to 15k to fit API limits
 
 export async function studyTopic(category, topic, sendEvent) {
@@ -84,10 +85,14 @@ export async function studyTopic(category, topic, sendEvent) {
   }
 
   const filename = `${topic.toLowerCase().replace(/\s+/g, '_')}.md`;
-  await fetch(`${MANAGER_URL}/api/knowledge/save`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ category, filename, content: synthesizedKnowledge })
-  });
+  try {
+    await fetch(`${MANAGER_URL}/api/knowledge/save`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, filename, content: synthesizedKnowledge })
+    });
+  } catch (e) {}
+  // Always save locally too — the knowledge library lives inside JEXI's mind
+  try { saveKnowledgeFile(category, filename, synthesizedKnowledge); } catch (e) {}
 
   sendEvent('log', { agent: 'Scholar', message: `✓ Mastered ${topic}. Saved ${synthesizedKnowledge.length} chars to knowledge base.` });
   return synthesizedKnowledge;
@@ -108,8 +113,18 @@ function getSubtopics(topic) {
 }
 
 export async function recallKnowledge(query, sendEvent) {
-  const res = await fetch(`${MANAGER_URL}/api/knowledge/search?query=${encodeURIComponent(query)}`);
-  const data = await res.json();
-  if (data.length > 0) return data.map(k => `From ${k.title}:\n${k.content}`).join('\n\n---\n\n');
+  // First: search JEXI's own knowledge library (fast, offline)
+  try {
+    const local = searchKnowledge(query);
+    if (local.length > 0) {
+      return local.map(k => `From ${k.title}:\n${k.content}`).join('\n\n---\n\n');
+    }
+  } catch (e) {}
+  // Fallback: ask the manager service
+  try {
+    const res = await fetch(`${MANAGER_URL}/api/knowledge/search?query=${encodeURIComponent(query)}`, { signal: AbortSignal.timeout(4000) });
+    const data = await res.json();
+    if (data.length > 0) return data.map(k => `From ${k.title}:\n${k.content}`).join('\n\n---\n\n');
+  } catch (e) {}
   return null;
 }

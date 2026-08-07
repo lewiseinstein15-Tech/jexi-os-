@@ -2,24 +2,27 @@ import { generateContent } from './LLMClient.js';
 import { jsonrepair } from 'jsonrepair';
 
 export async function planProject(query, sendEvent, existingCode = null, errorContext = null, attemptNum = 1) {
-  let systemInstruction = `You are JEXI Architect. Respond with ONLY valid JSON.
+  let systemInstruction = `You are JEXI Architect, the code design brain of JEXI OS (created by Lewis Einstein). Respond with ONLY valid JSON.
 Schema: { "language": "string", "entryPoint": "string", "summary": "string", "files": [{"name": "string", "code": "string"}] }
 RULES:
 1. Single index.html for web apps (inline CSS/JS).
-2. Node.js MUST use built-in modules (require('http')). NO express.
-3. Servers MUST use port 8080.
-4. HTML buttons in forms MUST have type="button".
-5. Mobile-responsive, modern UI (Flexbox/Grid).`;
+2. Node.js MUST use built-in modules (require('http')). NO express, NO external npm packages.
+3. Python scripts MUST use built-in modules only (no pip packages that may not be installed).
+4. Servers MUST use port 8080.
+5. HTML buttons in forms MUST have type="button".
+6. Mobile-responsive, modern UI (Flexbox/Grid).
+7. Escape newlines properly: use \\n inside JSON strings.
+8. Write clean, correct, runnable code — it will be executed and checked.`;
 
   let prompt = `User Request: "${query}"\n\nGenerate the complete project JSON.`;
 
   if (existingCode && errorContext) {
-    // DEBUG MODE: Strategy variation based on attempt number
-    systemInstruction += `\nYou are in DEBUG MODE. The code failed.`;
+    // DEBUG MODE: read the error, fix it, never leave the loop until clean
+    systemInstruction += `\nYou are in DEBUG MODE. The previous code FAILED. Read the error, fix the exact cause, and keep the rest of the logic intact. Re-run mentally: your fixed code must not produce the same error.`;
     if (attemptNum === 2) {
       prompt = `Code failed with error:\n${errorContext}\n\nOriginal Code:\n${existingCode}\n\nUser Request: "${query}"\n\nAttempt 2: Fix the specific error, but also review the logic. Return ONLY valid JSON.`;
     } else if (attemptNum >= 3) {
-      prompt = `Code repeatedly fails with:\n${errorContext}\n\nOriginal Code:\n${existingCode}\n\nAttempt ${attemptNum}: RADICAL SIMPLIFICATION. Strip out complex logic. Write the absolute simplest version of the app that fulfills the core request: "${query}". Return ONLY valid JSON.`;
+      prompt = `Code repeatedly fails with:\n${errorContext}\n\nOriginal Code:\n${existingCode}\n\nAttempt ${attemptNum}: RADICAL SIMPLIFICATION. Strip out complex logic. Write the absolute simplest version that fulfills the core request: "${query}". Return ONLY valid JSON.`;
     }
   }
 

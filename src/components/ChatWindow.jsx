@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Square } from 'lucide-react';
+import { Send, Square, ImagePlus, X } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 
 export default function ChatWindow({ messages, isProcessing, onSend, onStop }) {
   const [input, setInput] = useState('');
+  const [image, setImage] = useState(null);
+  const fileRef = useRef(null);
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -12,11 +14,21 @@ export default function ChatWindow({ messages, isProcessing, onSend, onStop }) {
     }
   }, [messages, isProcessing]);
 
+  const handleFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = () => setImage(reader.result);
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!input.trim() || isProcessing) return;
-    onSend(input);
+    if ((!input.trim() && !image) || isProcessing) return;
+    onSend(input, image);
     setInput('');
+    setImage(null);
   };
 
   return (
@@ -37,7 +49,10 @@ export default function ChatWindow({ messages, isProcessing, onSend, onStop }) {
                   : 'bg-[#0a0a0a] text-gray-200 border border-[#1a1a1a]'
               }`}>
                 {msg.role === 'user' ? (
-                  <div className="whitespace-pre-wrap break-words">{msg.text}</div>
+                  <div className="whitespace-pre-wrap break-words">
+                    {msg.image && <img src={msg.image} alt="attachment" className="max-w-[220px] rounded-lg mb-2 border border-black/20" />}
+                    {msg.text}
+                  </div>
                 ) : (
                   <MarkdownRenderer content={msg.text} />
                 )}
@@ -58,7 +73,30 @@ export default function ChatWindow({ messages, isProcessing, onSend, onStop }) {
         )}
       </div>
       
-      <form onSubmit={handleSubmit} className="flex gap-2">
+      <form onSubmit={handleSubmit} className="flex gap-2 items-end">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFile}
+        />
+        {image && (
+          <div className="relative">
+            <img src={image} alt="attachment" className="w-14 h-14 object-cover rounded-lg border border-[#00FF9D]/40" />
+            <button type="button" onClick={() => setImage(null)} className="absolute -top-2 -right-2 bg-black border border-gray-700 rounded-full p-0.5 text-gray-400 hover:text-white">
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="bg-[#1a1a1a] text-gray-400 hover:text-[#00FF9D] rounded-lg px-2.5 py-2.5 flex-shrink-0"
+          title="Attach image"
+        >
+          <ImagePlus className="w-4 h-4" />
+        </button>
         <input
           type="text"
           value={input}
