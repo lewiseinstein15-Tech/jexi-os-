@@ -1,41 +1,41 @@
-# Use Ubuntu as the base image
-FROM ubuntu:22.04
+# JEXI OS — single-container image (Hugging Face Spaces / Docker / VPS)
+# - Runs the Express "brain" (chat API, agents, memory, terminal)
+# - Installs Chromium + system libs AS ROOT during build -> JEXI's eyes work
+# - Builds the frontend into server/public so the whole app lives on ONE host
+#
+# Hugging Face Spaces (free, no credit card): create a Space with SDK "Docker"
+# and push this repo — HF runs this Dockerfile as root, so everything installs.
 
-# Avoid timezone prompts
-ENV DEBIAN_FRONTEND=noninteractive
+FROM node:22-slim
 
-# Install Node.js, Python, and all desktop/GUI tools
-RUN apt-get update && apt-get install -y \
-    curl wget git \
-    nodejs npm \
-    python3 python3-pip \
-    xvfb openbox xterm \
-    netsurf-gtk \
-    ffmpeg tesseract-ocr \
-    xdotool scrot \
+# Chromium system dependencies (Playwright — JEXI's eyes)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+    libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 \
+    libasound2 libpango-1.0-0 libcairo2 libglib2.0-0 libx11-6 libx11-xcb1 \
+    libxext6 libxi6 libxtst6 libxrender1 libxss1 \
+    ca-certificates fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
-# Set up the working directory
 WORKDIR /app
 
-# Copy the JEXI OS backend and frontend code
-COPY ./server ./server
-COPY ./frontend ./frontend
-COPY ./package.json ./package.json
+# Backend dependencies + Chromium download (runs as root inside Docker)
+COPY server/package*.json ./server/
+RUN cd server && npm ci --no-audit --no-fund && npx playwright install --with-deps chromium
+COPY server ./server
 
-# Install backend dependencies
+# Frontend build -> served from server/public by Express
+COPY package*.json index.html vite.config.js tailwind.config.js postcss.config.js ./
+COPY src ./src
+RUN npm ci --no-audit --no-fund && npm run build && mkdir -p server/public && cp -r dist/* server/public/
+
+ENV NODE_ENV=production
+# Hugging Face injects PORT=7860; this is the default everywhere else too.
+ENV PORT=7860
+# Attach an HF Storage Bucket at /data (or a Docker volume) so JEXI's memory survives.
+ENV DATA_DIR=/data
+ENV WORKSPACE_DIR=/data/workspace
+EXPOSE 7860
+
 WORKDIR /app/server
-RUN npm install
-
-# Build the frontend
-WORKDIR /app/frontend
-RUN npm install && npm run build
-
-# Move the built frontend to be served by the backend
-RUN mv ./dist ../server/public
-
-# Expose the port JEXI OS runs on
-EXPOSE 3002
-
-# Start the virtual display and the JEXI OS backend
-CMD bash -c "Xvfb :1 -screen 0 1280x720x24 & sleep 2 && export DISPLAY=:1 && openbox --sm-disable & cd /app/server && node index.js"
+CMD ["node", "index.js"]

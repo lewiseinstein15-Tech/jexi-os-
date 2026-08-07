@@ -13,11 +13,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Root of the server package (where index.js lives)
 export const SERVER_ROOT = path.resolve(__dirname, '..');
 
-// Generated files (apps, scripts) that JEXI builds for the user
-export const WORKSPACE_DIR = path.join(SERVER_ROOT, 'jexi-workspace');
+// Generated files (apps, scripts) that JEXI builds for the user.
+// Overridable (e.g. DATA_DIR=/data on Hugging Face Spaces storage).
+export const WORKSPACE_DIR = process.env.WORKSPACE_DIR || path.join(SERVER_ROOT, 'jexi-workspace');
 
-// Persistent memory / knowledge store (gitignored)
-export const DATA_DIR = path.join(SERVER_ROOT, 'data');
+// Persistent memory / knowledge store (gitignored).
+// Set DATA_DIR=/data when a persistent volume is mounted there (HF Spaces bucket).
+export const DATA_DIR = process.env.DATA_DIR || path.join(SERVER_ROOT, 'data');
 export const MEMORY_FILE = path.join(DATA_DIR, 'memory.json');
 export const KNOWLEDGE_DIR = path.join(DATA_DIR, 'knowledge');
 

@@ -112,6 +112,46 @@ Memory always writes to the local JSON file first (fast), then mirrors to Redis 
 
 ---
 
+## Part 3 — 💰 $0 hosting (no credit card): Hugging Face Spaces
+
+No money and no card? Hugging Face Spaces runs JEXI **completely free** — and because its
+Docker build runs as **root**, Chromium's libraries install properly, so JEXI's virtual
+desktop **works** (the one thing Render's free tier can't give you). The repo's
+`Dockerfile` is already a single-container image: it builds the frontend and serves it
+from Express, so the whole app runs on **one** free host — you don't even need Vercel.
+
+- Free CPU Basic space: **$0/month**, sign-up with just an email (no card).
+- URL after deploy: `https://<your-username>-jexi-os.hf.space` — the full JEXI OS UI.
+
+### Steps (about 10 minutes)
+1. Create an account at **huggingface.co** (email only, no card).
+2. Create an access token: **huggingface.co/settings/tokens** → *New token* → role **Write** → copy it.
+3. In GitHub: repo → **Settings → Secrets and variables → Actions → New repository secret** →
+   name `HF_TOKEN`, paste the token.
+4. GitHub → **Actions** → **Deploy to Hugging Face Spaces** → **Run workflow** → enter your Space ID,
+   e.g. `your-username/jexi-os` (the Space is created automatically).
+5. Wait ~5–8 min for the build (it installs Chromium + deps as root — that's a good thing).
+6. Open `https://<your-username>-jexi-os.hf.space/api/health` → expect `{"ok":true,...}`.
+7. Add keys: on the Space page → **Settings → Variables and secrets** → add `GROQ_API_KEY`
+   (and optionally `GEMINI_API_KEY`), then rerun the workflow to apply them.
+8. Open the Space page → JEXI OS is running. 🎉
+
+### Keeping JEXI's memory on HF
+Space disk is ephemeral (resets on rebuild). To make her remember everything:
+- **Storage Bucket**: Space → **Settings → Storage** → attach a bucket, mount path **`/data`**.
+  The Dockerfile already sets `DATA_DIR=/data`, so memory + knowledge auto-persist there.
+- Or set `REDIS_URL` (Upstash free tier) — JEXI mirrors her memory to Redis as backup.
+
+### Free-tier notes
+- A free Space sleeps after **48h** of no visitors and wakes on the next visit (~30–60s).
+- Outbound internet works, so research + link analysis behave normally.
+
+### Same image anywhere else
+`docker compose up --build` runs the identical container locally (port 7860, memory in a
+Docker volume), and it's also the image for any VPS.
+
+---
+
 ## Local development (unchanged)
 
 ```bash

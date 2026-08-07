@@ -1,0 +1,42 @@
+# Deploy JEXI OS to a FREE Hugging Face Space (no credit card needed).
+#
+# First-time setup (2 minutes):
+#   1. Create an account at huggingface.co (email only — no card).
+#   2. In GitHub repo settings, add a repository secret:
+#        Name:  HF_TOKEN
+#        Value: an HF access token (huggingface.co/settings/tokens -> "Write" role)
+#   3. Run this workflow from the Actions tab. It asks for your Space ID,
+#      e.g.  your-username/jexi-os   (the Space is created automatically).
+#
+# The Space will build this repo's Dockerfile as root, so Chromium's system
+# libraries install and JEXI's virtual desktop works. URL:
+#   https://<your-username>-jexi-os.hf.space  (check /api/health)
+# Add GROQ_API_KEY / GEMINI_API_KEY under the Space's "Settings -> Variables".
+
+name: Deploy to Hugging Face Spaces
+
+on:
+  workflow_dispatch:
+    inputs:
+      space_id:
+        description: 'Your HF Space ID (username/space-name)'
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Push to HF Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SPACE_ID: ${{ github.event.inputs.space_id }}
+        run: |
+          pip install --upgrade huggingface_hub
+          huggingface-cli upload "$SPACE_ID" . --repo-type=space \
+            --exclude ".git/*" --exclude ".github/*" \
+            --exclude "node_modules/*" --exclude "dist/*" \
+            --exclude "server/node_modules/*" \
+            --exclude "server/data/*" --exclude "server/jexi-workspace/*" \
+            --exclude "server/public/*" --exclude ".env" --exclude "*.log"

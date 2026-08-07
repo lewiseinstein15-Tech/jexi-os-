@@ -5,7 +5,14 @@ services:
     build: .
     container_name: jexi-os
     ports:
-      - "3002:3002"
+      - "7860:7860"
     environment:
-      - DISPLAY=:1
+      - PORT=7860
+      - DATA_DIR=/data
+      - WORKSPACE_DIR=/data/workspace
+    volumes:
+      - jexi-data:/data
     restart: unless-stopped
+
+volumes:
+  jexi-data:
