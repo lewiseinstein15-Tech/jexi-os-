@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-
-const getBackendUrl = () => localStorage.getItem('jexi_backend_url') || '';
+import { getBackendUrl } from '../utils/helpers';
 
 export const useMemory = (activeNav) => {
   const [memory, setMemory] = useState(null);

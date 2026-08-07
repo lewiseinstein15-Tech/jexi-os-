@@ -1,0 +1,25 @@
+# Render Blueprint — JEXI OS Backend ("Brain")
+# Deploy: https://dashboard.render.com/select-repo?type=web (pick this repo)
+# Render auto-detects this file and pre-fills the service below.
+#
+# The frontend lives on Vercel; this web service is the API + virtual desktop backend.
+services:
+  - type: web
+    name: jexi-os-brain
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: server
+    buildCommand: npm ci && npx playwright install --with-deps chromium
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      # Set these in the Render dashboard (secrets) — or paste them below:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      # Optional: point the frontend at this service without touching code.
+      # After deploy, set VITE_JEXI_BACKEND_URL on Vercel to your onrender.com URL.

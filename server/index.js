@@ -10,8 +10,13 @@ import {
   addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory,
   saveInternetKnowledge, saveCodingKnowledge, searchInternetKnowledge, searchCodingKnowledge,
   saveKnowledgeFile, searchKnowledge, getKnowledgeStructure, getKnowledgeStatus,
+  hydrateFromRedis,
 } from './src/services/MemoryManager.js';
 import { PORT, WORKSPACE_DIR } from './src/config.js';
+
+// If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
+// everything across restarts/redeploys (non-blocking).
+hydrateFromRedis().catch(() => {});
 
 const app = express();
 app.use(cors());

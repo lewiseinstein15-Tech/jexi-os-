@@ -1,15 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { Monitor, MousePointer, Keyboard, Hand, Bot, Server } from 'lucide-react';
 import axios from 'axios';
+import { getBackendUrl, onBackendUrlChange } from '../utils/helpers';
 
 export default function DesktopViewer({ logs = [] }) {
   const [screenshot, setScreenshot] = useState(null);
   const [manualMode, setManualMode] = useState(false);
   const [typeText, setTypeText] = useState('');
   const [lastClick, setLastClick] = useState({ x: 0, y: 0 });
-  const [backendUrl, setBackendUrl] = useState(localStorage.getItem('jexi_backend_url') || '');
+  const [backendUrl, setBackendUrl] = useState(getBackendUrl());
   const [showUrlInput, setShowUrlInput] = useState(false);
   const imgRef = useRef(null);
+
+  // React live when the backend URL changes in Settings
+  useEffect(() => {
+    const unsub = onBackendUrlChange((url) => setBackendUrl(url));
+    return unsub;
+  }, []);
 
   useEffect(() => {
     const takeScreenshot = async () => {

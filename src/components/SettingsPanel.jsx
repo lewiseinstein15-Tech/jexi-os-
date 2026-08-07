@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles } from 'lucide-react';
+import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server } from 'lucide-react';
+import { getBackendUrl, setBackendUrl } from '../utils/helpers';
 
 export default function SettingsPanel() {
   const [geminiKey, setGeminiKey] = useState('');
@@ -7,12 +8,14 @@ export default function SettingsPanel() {
   const [status, setStatus] = useState('idle'); // idle, loading, saved, error
   const [initialLoad, setInitialLoad] = useState(true);
 
-  const backendUrl = localStorage.getItem('jexi_backend_url') || '';
+  const [backendUrl, setBackendUrlState] = useState(getBackendUrl());
+  const [backendInput, setBackendInput] = useState(getBackendUrl());
+  const [backendStatus, setBackendStatus] = useState('idle'); // idle, saved, error
 
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await fetch(`${backendUrl}/api/settings`);
+        const res = await fetch(`${getBackendUrl()}/api/settings`);
         const data = await res.json();
         setGeminiKey(data.geminiKey || '');
         setGroqKey(data.groqKey || '');
@@ -22,7 +25,14 @@ export default function SettingsPanel() {
       setInitialLoad(false);
     };
     fetchSettings();
-  }, [backendUrl]);
+  }, []);
+
+  const saveBackendUrl = () => {
+    const clean = setBackendUrl(backendInput);
+    setBackendUrlState(clean);
+    setBackendStatus('saved');
+    setTimeout(() => setBackendStatus('idle'), 2500);
+  };
 
   const handleSave = async () => {
     setStatus('loading');
@@ -83,6 +93,34 @@ export default function SettingsPanel() {
               className="w-full bg-[#0a0a0a] text-gray-200 border border-[#1a1a1a] rounded-lg px-3 py-2.5 text-xs focus:outline-none focus:border-[#00FF9D]/50 font-mono"
             />
             <p className="text-[8px] text-gray-600 mt-1">Get free key at console.groq.com/keys</p>
+          </div>
+
+          {/* Backend URL (runtime override) */}
+          <div className="pt-3 border-t border-[#1a1a1a]">
+            <label className="flex items-center gap-2 text-[10px] font-bold text-gray-400 mb-1.5 tracking-wider">
+              <Server className="w-3 h-3 text-[#00d4ff]" />
+              BACKEND URL (RUNTIME OVERRIDE)
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={backendInput}
+                onChange={(e) => setBackendInput(e.target.value)}
+                placeholder="https://jexi-os-brain.onrender.com"
+                className="w-full bg-[#0a0a0a] text-gray-200 border border-[#1a1a1a] rounded-lg px-3 py-2.5 text-xs focus:outline-none focus:border-[#00d4ff]/50 font-mono"
+              />
+              <button
+                onClick={saveBackendUrl}
+                className="bg-[#00d4ff] text-black rounded-lg px-3 py-2.5 text-xs font-bold flex items-center gap-1.5 flex-shrink-0"
+              >
+                <Save className="w-3.5 h-3.5" /> SAVE
+              </button>
+            </div>
+            <p className="text-[8px] text-gray-600 mt-1">
+              Current: <span className="text-[#00d4ff]">{backendUrl || 'same origin (/api)'}</span>
+              {backendStatus === 'saved' && <span className="text-[#22c55e] ml-1">✓ Saved — applies immediately</span>}
+            </p>
+            <p className="text-[8px] text-gray-600">Leave empty to use the same origin or VITE_JEXI_BACKEND_URL. Changes apply instantly, no reload needed.</p>
           </div>
 
           {/* Save Button */}

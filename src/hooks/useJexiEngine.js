@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
+import { getBackendUrl } from '../utils/helpers';
 
-// Backend defaults to same origin (/api is proxied by Vite in dev,
-// and served by the backend in production). Override via localStorage.
-const getBackendUrl = () => localStorage.getItem('jexi_backend_url') || '';
+// Backend defaults to same origin (/api is proxied by Vite in dev),
+// VITE_JEXI_BACKEND_URL for hosted frontends (Vercel), or a localStorage override.
 
 export const useJexiEngine = () => {
   const [messages, setMessages] = useState([]);

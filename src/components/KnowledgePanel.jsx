@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { BookOpen, Folder, FileText, Brain, RefreshCw, CheckCircle2, Circle } from 'lucide-react';
+import { getBackendUrl } from '../utils/helpers';
 
 export default function KnowledgePanel() {
   const [structure, setStructure] = useState(null);
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const backendUrl = localStorage.getItem('jexi_backend_url') || '';
+  const backendUrl = getBackendUrl();
 
   const fetchKnowledge = async () => {
     setLoading(true);

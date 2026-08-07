@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { MEMORY_FILE, KNOWLEDGE_DIR } from '../config.js';
+import { MEMORY_FILE, KNOWLEDGE_DIR, WORKSPACE_DIR } from '../config.js';
 
 /**
  * JEXI OS Memory Core
@@ -10,7 +10,13 @@ import { MEMORY_FILE, KNOWLEDGE_DIR } from '../config.js';
  *   - remember the user across sessions
  *   - retrieve previously learned answers from "her mind" instead of re-searching
  *   - keep a structured knowledge library of studied topics
+ *
+ * PERSISTENCE LAYERS (in order):
+ *  1. Local JSON file (server/data/memory.json) — always used, fast
+ *  2. Redis (REDIS_URL, e.g. Upstash) — optional, survives redeploys/restarts on Render
  */
+
+const MEMORY_REDIS_KEY = 'jexi:memory';
 
 const DEFAULT_MEMORY = {
   userProfile: { name: '', location: '', interests: [] },
@@ -21,11 +27,64 @@ const DEFAULT_MEMORY = {
 };
 
 let cache = null;
+let redisClient = null;
+let redisEnabled = Boolean(process.env.REDIS_URL);
 
 function ensureDirs() {
   fs.mkdirSync(path.dirname(MEMORY_FILE), { recursive: true });
   fs.mkdirSync(KNOWLEDGE_DIR, { recursive: true });
 }
+
+/* ---------------- Redis (optional durable layer) ---------------- */
+
+async function getRedis() {
+  if (!redisEnabled) return null;
+  if (redisClient) return redisClient;
+  try {
+    const { Redis } = await import('ioredis');
+    redisClient = new Redis(process.env.REDIS_URL, {
+      lazyConnect: true,
+      maxRetriesPerRequest: 2,
+      enableReadyCheck: true,
+    });
+    return redisClient;
+  } catch (e) {
+    console.error('[Memory] Redis client failed to init, using local file only:', e.message);
+    redisEnabled = false;
+    return null;
+  }
+}
+
+/** Load memory from Redis into the local cache (called once at boot). */
+export async function hydrateFromRedis() {
+  if (!redisEnabled) return false;
+  const r = await getRedis();
+  if (!r) return false;
+  try {
+    const raw = await r.get(MEMORY_REDIS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      cache = { ...structuredClone(DEFAULT_MEMORY), ...parsed };
+      ensureDirs();
+      fs.writeFileSync(MEMORY_FILE, JSON.stringify(cache, null, 2), 'utf-8');
+      console.log('[Memory] ✓ Hydrated memory core from Redis.');
+      return true;
+    }
+  } catch (e) {
+    console.error('[Memory] Redis hydrate failed, using local file:', e.message);
+  }
+  return false;
+}
+
+async function redisPush(memory) {
+  if (!redisEnabled) return;
+  const r = await getRedis();
+  if (!r) return;
+  try { await r.set(MEMORY_REDIS_KEY, JSON.stringify(memory), 'EX', 60 * 60 * 24 * 30); } // 30-day TTL
+  catch (e) { console.error('[Memory] Redis write failed:', e.message); }
+}
+
+/* ---------------- Local JSON store ---------------- */
 
 export function loadMemory() {
   ensureDirs();
@@ -50,6 +109,8 @@ export function saveMemory() {
   } catch (e) {
     console.error('[Memory] save error:', e.message);
   }
+  // Fire-and-forget Redis mirror — never blocks or throws
+  redisPush(loadMemory()).catch(() => {});
 }
 
 export function resetCache() { cache = null; }
@@ -74,10 +135,10 @@ export function clearMemory() {
   cache = structuredClone(DEFAULT_MEMORY);
   ensureDirs();
   try { fs.writeFileSync(MEMORY_FILE, JSON.stringify(cache, null, 2), 'utf-8'); } catch (e) {}
+  if (redisEnabled) { getRedis().then(r => { if (r) r.del(MEMORY_REDIS_KEY).catch(() => {}); }).catch(() => {}); }
   // Also wipe generated workspace files
-  const ws = path.resolve(__dirname, '../../jexi-workspace');
   try {
-    if (fs.existsSync(ws)) fs.readdirSync(ws).forEach(f => fs.unlinkSync(path.join(ws, f)));
+    if (fs.existsSync(WORKSPACE_DIR)) fs.readdirSync(WORKSPACE_DIR).forEach(f => fs.unlinkSync(path.join(WORKSPACE_DIR, f)));
   } catch (e) {}
 }
 
