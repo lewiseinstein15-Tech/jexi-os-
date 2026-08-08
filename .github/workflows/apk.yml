@@ -1,0 +1,68 @@
+# Build JEXI OS as a real Android APK — FREE (GitHub Actions free tier,
+# no credit card, no Play Store needed). The APK is downloadable from the
+# workflow's Artifacts and installable directly on any Android 7.0+ phone.
+#
+# How it works:
+#   1. Builds the React/Vite web app (pointed at the Render backend)
+#   2. Syncs it into the Capacitor Android shell
+#   3. Compiles a debug-signed APK with the Android SDK
+#   4. Uploads the APK as an artifact you can download and install
+#
+# Getting the APK after a run:
+#   Repo -> Actions -> "Build JEXI OS APK" -> latest run -> Artifacts ->
+#   download "jexi-os-apk" -> unzip -> install app-debug.apk on your phone.
+
+name: Build JEXI OS APK
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'android/**'
+      - 'package.json'
+      - 'capacitor.config.json'
+      - '.github/workflows/apk.yml'
+  # Manual "Rebuild APK" button in the Actions tab (no code change needed).
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Java (Android build)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build web app and sync into Android shell
+        env:
+          # Point the app at the free Render backend (same as the Pages deploy).
+          # Change this if your Render service URL differs.
+          VITE_JEXI_BACKEND_URL: https://jexi-os-brain.onrender.com
+        run: |
+          npm run build
+          npx cap sync android
+
+      - name: Compile debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jexi-os-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30

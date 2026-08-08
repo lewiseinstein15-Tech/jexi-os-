@@ -1,0 +1,23 @@
+{
+  "appId": "com.jexi.os",
+  "appName": "JEXI OS",
+  "webDir": "dist",
+  "backgroundColor": "#050508",
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "launchAutoHide": true,
+      "backgroundColor": "#050508",
+      "androidSplashResourceName": "splash",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#050508",
+      "overlaysWebView": false
+    }
+  }
+}
