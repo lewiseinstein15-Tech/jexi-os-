@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
 import {
-  Smartphone, Download, ShieldCheck, Zap, CheckCircle2, PlayCircle, Github, Sparkles, Wifi, Star
+  Smartphone, Download, ShieldCheck, Zap, CheckCircle2, PlayCircle, Github, Sparkles, Wifi, Star, RefreshCw
 } from 'lucide-react';
+import useUpdateChecker from '../hooks/useUpdateChecker';
 
 // Permanent direct link — GitHub always points this at the newest "Latest" release.
 const APK_URL = 'https://github.com/lewiseinstein15-Tech/jexi-os-/releases/latest/download/app-debug.apk';
@@ -13,6 +14,8 @@ const fadeUp = {
 };
 
 export default function DownloadPanel() {
+  const updater = useUpdateChecker();
+
   const steps = [
     {
       icon: Download,
@@ -60,7 +63,7 @@ export default function DownloadPanel() {
           Install JEXI OS on your Android phone like any normal app — own icon, splash screen, full-screen window.
         </p>
 
-        {/* Big download button */}
+        {/* Big download button — label changes when an update is ready */}
         <motion.a
           href={APK_URL}
           target="_blank"
@@ -69,8 +72,15 @@ export default function DownloadPanel() {
           className="mt-5 relative inline-flex items-center justify-center gap-2.5 bg-[#00FF9D] text-black rounded-2xl px-8 py-4 font-black tracking-wide shadow-[0_0_30px_rgba(0,255,157,0.35)] hover:shadow-[0_0_45px_rgba(0,255,157,0.55)] transition-shadow"
         >
           <Download className="w-5 h-5" />
-          DOWNLOAD JEXI OS APK
-          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[#00FF9D] animate-ping" />
+          {updater.updateAvailable ? `UPDATE TO BUILD #${updater.latest.number}` : 'DOWNLOAD JEXI OS APK'}
+          {updater.updateAvailable && (
+            <>
+              <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[#00FF9D] animate-ping" />
+              <span className="absolute -top-2.5 -right-2.5 bg-[#f472b6] text-white text-[7px] font-black rounded-full px-2 py-0.5">
+                NEW
+              </span>
+            </>
+          )}
         </motion.a>
 
         {/* badges */}
@@ -84,6 +94,67 @@ export default function DownloadPanel() {
         <p className="text-[8px] text-gray-500 mt-3">
           Android 7.0+ • debug-signed, sideload-friendly • rebuilt automatically after every update
         </p>
+      </motion.div>
+
+      {/* Auto-update status */}
+      <motion.div {...fadeUp} transition={{ delay: 0.05 }} className="glass rounded-xl p-3.5">
+        <div className="flex items-center gap-2 mb-2">
+          <RefreshCw className={`w-3.5 h-3.5 text-[#00FF9D] ${updater.checking ? 'animate-spin' : ''}`} />
+          <h3 className="text-[10px] font-bold text-[#00FF9D] tracking-wider">AUTO-UPDATE STATUS</h3>
+          <button
+            onClick={updater.checkNow}
+            disabled={updater.checking}
+            className="ml-auto text-gray-500 hover:text-[#00FF9D] transition-colors p-1 disabled:opacity-50"
+            title="Check for updates now"
+          >
+            <RefreshCw className={`w-3 h-3 ${updater.checking ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+
+        {!updater.enabled ? (
+          <p className="text-[9px] text-gray-500 leading-relaxed">
+            You're viewing a <span className="text-gray-300 font-bold">web/dev build</span> — websites always serve the
+            newest version automatically, so no update checks are needed here.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center text-[9px]">
+              <span className="text-gray-500">Installed build</span>
+              <span className="text-gray-300 font-bold font-mono">{updater.installedTag || 'unknown'}</span>
+            </div>
+            <div className="flex justify-between items-center text-[9px]">
+              <span className="text-gray-500">Latest build</span>
+              {updater.latest ? (
+                <span className="text-gray-300 font-bold font-mono">
+                  {updater.latest.tag}
+                  {updater.latest.date && <span className="text-gray-600 font-normal"> · {updater.latest.date}</span>}
+                </span>
+              ) : (
+                <span className="text-gray-600">
+                  {updater.checking ? 'checking…' : updater.error ? 'offline — will retry' : '—'}
+                </span>
+              )}
+            </div>
+            {updater.updateAvailable ? (
+              <div className="flex items-center gap-1.5 mt-1.5 bg-[#00FF9D]/10 border border-[#00FF9D]/30 rounded-lg px-2 py-1.5">
+                <span className="relative flex w-1.5 h-1.5 flex-shrink-0">
+                  <span className="absolute inline-flex w-full h-full rounded-full bg-[#00FF9D] opacity-60 animate-ping" />
+                  <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-[#00FF9D]" />
+                </span>
+                <span className="text-[8px] font-black text-[#00FF9D]">NEW UPDATE READY — TAP THE GREEN BUTTON ABOVE</span>
+              </div>
+            ) : updater.latest && !updater.error ? (
+              <div className="flex items-center gap-1.5 mt-1.5 text-[#22c55e]">
+                <CheckCircle2 className="w-3 h-3" />
+                <span className="text-[8px] font-bold">YOU'RE ON THE LATEST BUILD</span>
+              </div>
+            ) : null}
+            <p className="text-[8px] text-gray-600 mt-1.5 leading-relaxed">
+              The app checks for new builds automatically every few minutes and the moment you open it — no need to
+              manually re-check for updates ever again.
+            </p>
+          </div>
+        )}
       </motion.div>
 
       {/* Install steps */}

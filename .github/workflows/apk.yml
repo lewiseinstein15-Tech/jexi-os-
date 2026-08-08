@@ -54,6 +54,11 @@ jobs:
           # Point the app at the free Render backend (same as the Pages deploy).
           # Change this if your Render service URL differs.
           VITE_JEXI_BACKEND_URL: https://jexi-os-brain.onrender.com
+          # Bake this build's identity into the APK so the in-app auto-update
+          # checker can compare it with the newest GitHub Release and notify the
+          # user when a newer build is published.
+          VITE_APP_VERSION: apk-build-${{ github.run_number }}
+          VITE_BUILD_SHA: ${{ github.sha }}
         run: |
           npm run build
           npx cap sync android

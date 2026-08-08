@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
-import { Database, User, Globe, MessageSquare, HardDrive, Code, MapPin } from 'lucide-react';
+import { Database, User, Globe, MessageSquare, HardDrive, Code } from 'lucide-react';
+import PanelHeader from './PanelHeader';
 
 export default function MemoryPanel({ memory }) {
   if (!memory) {
@@ -21,15 +22,15 @@ export default function MemoryPanel({ memory }) {
   return (
     <div className="space-y-3">
       <div className="glass p-4 rounded-xl">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
-            <Database className="w-4 h-4 text-[#00FF9D]" />
-            <h2 className="text-sm font-bold text-[#00FF9D] tracking-wide">MEMORY CORE</h2>
-          </div>
-          <span className="text-[9px] text-gray-600">
-            Last updated: {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-          </span>
-        </div>
+        <PanelHeader
+          icon={Database}
+          title="MEMORY CORE"
+          right={
+            <span className="text-[9px] text-gray-600">
+              Last updated: {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+            </span>
+          }
+        />
         <div className="grid grid-cols-4 gap-2 mt-3">
           <div className="text-center bg-[#0a0a0a] p-2 rounded-lg">
             <p className="text-[#22c55e] font-bold text-lg">{userCount}</p>

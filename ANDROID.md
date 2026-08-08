@@ -69,12 +69,31 @@ https://github.com/lewiseinstein15-Tech/jexi-os-/releases/latest/download/app-de
 
 ---
 
+## 🔄 Automatic updates (no more missing new versions)
+
+The APK now **tells you when a new build is out** — no more wondering if you're
+on the latest version:
+
+- Every APK has a build number baked in at compile time.
+- The app **automatically checks** GitHub for the newest release:
+  - the moment you open the app,
+  - every time the app regains focus,
+  - and every few minutes while it's open.
+- When a newer build exists, a green **"NEW UPDATE READY"** banner appears at
+the top of the app with a one-tap **UPDATE** button that downloads the newest
+APK straight from GitHub. The **GET APP** tab also shows your installed build
+vs the latest, and its download button turns into **"UPDATE TO BUILD #N"**.
+- You still tap Install once Android asks — Android never allows an app to
+replace itself without your permission, so the update banner + one download is
+as automatic as it gets on a free, no-Play-Store setup.
+
 ## 🔄 After you make code changes
 
 Nothing to do manually — every push to `main` (that touches the app, Android
-project, or config) triggers a fresh APK build automatically. Download the
-new artifact and reinstall (your chat memory and creator face-print are stored
-on the device / in the app, so they survive reinstalls where supported).
+project, or config) triggers a fresh APK build automatically and publishes it
+as the new "Latest". Install the new APK when the update banner appears (your
+chat memory and creator face-print are stored on the device / in the app, so
+they survive reinstalls where supported).
 
 ---
 

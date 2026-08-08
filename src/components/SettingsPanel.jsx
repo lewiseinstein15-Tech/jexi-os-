@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server } from 'lucide-react';
 import { getBackendUrl, setBackendUrl } from '../utils/helpers';
+import PanelHeader from './PanelHeader';
 
 export default function SettingsPanel() {
   const [geminiKey, setGeminiKey] = useState('');
@@ -57,10 +58,7 @@ export default function SettingsPanel() {
   return (
     <div className="space-y-4">
       <div className="glass p-4 rounded-xl">
-        <div className="flex items-center gap-2 mb-4">
-          <Settings className="w-4 h-4 text-[#00FF9D]" />
-          <h2 className="text-sm font-bold text-[#00FF9D] tracking-wide">SYSTEM SETTINGS</h2>
-        </div>
+        <PanelHeader icon={Settings} title="SYSTEM SETTINGS" />
 
         <div className="space-y-4">
           {/* Google Gemini Key */}
@@ -155,10 +153,7 @@ export default function SettingsPanel() {
 
       {/* Info Box */}
       <div className="glass p-4 rounded-xl">
-        <div className="flex items-center gap-2 mb-2">
-          <Key className="w-3 h-3 text-[#00d4ff]" />
-          <h3 className="text-[10px] font-bold text-[#00d4ff] tracking-wider">SECURE STORAGE</h3>
-        </div>
+        <PanelHeader icon={Key} title="SECURE STORAGE" color="text-[#00d4ff]" />
         <p className="text-[9px] text-gray-500 leading-relaxed">
           Your API keys are stored locally in JEXI OS's secure settings file on your device. They are never sent to any external server except the official AI provider you configure.
         </p>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, Folder, FileText, Brain, RefreshCw, CheckCircle2, Circle } from 'lucide-react';
+import { BookOpen, Folder, Brain, RefreshCw, CheckCircle2, Circle } from 'lucide-react';
 import { getBackendUrl } from '../utils/helpers';
+import PanelHeader from './PanelHeader';
 
 export default function KnowledgePanel() {
   const [structure, setStructure] = useState(null);
@@ -34,15 +35,15 @@ export default function KnowledgePanel() {
   return (
     <div className="space-y-3">
       <div className="glass p-4 rounded-xl">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
-            <Brain className="w-4 h-4 text-[#00FF9D]" />
-            <h2 className="text-sm font-bold text-[#00FF9D] tracking-wide">KNOWLEDGE CORE</h2>
-          </div>
-          <button onClick={fetchKnowledge} className="text-gray-500 hover:text-[#00FF9D]">
-            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
+        <PanelHeader
+          icon={Brain}
+          title="KNOWLEDGE CORE"
+          right={
+            <button onClick={fetchKnowledge} className="text-gray-500 hover:text-[#00FF9D] transition-colors" title="Refresh">
+              <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          }
+        />
         
         {status && (
           <div className="grid grid-cols-3 gap-2 mt-3 mb-4">
@@ -63,10 +64,7 @@ export default function KnowledgePanel() {
       </div>
 
       <div className="glass p-4 rounded-xl">
-        <div className="flex items-center gap-2 mb-3">
-          <BookOpen className="w-4 h-4 text-[#00d4ff]" />
-          <h2 className="text-sm font-bold text-[#00d4ff] tracking-wide">LIBRARY STRUCTURE</h2>
-        </div>
+        <PanelHeader icon={BookOpen} title="LIBRARY STRUCTURE" color="text-[#00d4ff]" />
         
         {loading ? (
           <p className="text-center text-gray-600 text-xs py-4">Loading knowledge base...</p>
