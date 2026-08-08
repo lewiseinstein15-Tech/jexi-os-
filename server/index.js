@@ -5,7 +5,7 @@ import path from 'path';
 import { planner } from './src/services/Planner.js';
 import { orchestrator } from './src/services/Orchestrator.js';
 import { loadSettings, saveSettings } from './src/services/SettingsManager.js';
-import { DesktopManager, browserStatus } from './src/services/DesktopManager.js';
+import { DesktopManager, ensureBrowser, browserStatus } from './src/services/DesktopManager.js';
 import {
   addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory,
   saveInternetKnowledge, saveCodingKnowledge, searchInternetKnowledge, searchCodingKnowledge,
@@ -198,4 +198,15 @@ if (fs.existsSync(publicDir)) {
   });
 }
 
-app.listen(PORT, '0.0.0.0', () => console.log(`🧠 JEXI OS BRAIN running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🧠 JEXI OS BRAIN running on port ${PORT}`);
+  // Boot-time browser self-check (non-blocking): confirms in the deploy logs whether
+  // Chromium can actually launch here (free hosts may lack its system libraries) and
+  // warms the browser so the first visitor sees the desktop instantly.
+  setTimeout(async () => {
+    try {
+      const { ok, error } = await ensureBrowser();
+      console.log(ok ? '✅ [Desktop] Chromium ready - JEXI has eyes.' : `⚠️ [Desktop] ${error}`);
+    } catch (e) { console.log(`⚠️ [Desktop] browser self-check failed: ${e.message}`); }
+  }, 4000);
+});
