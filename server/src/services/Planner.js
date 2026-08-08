@@ -37,24 +37,26 @@ export class Planner {
       return { intent: 'math_solve', tasks: ['reasoning', 'memory'], reasoning: 'Mathematical question — solve with structured LaTeX steps.' };
     }
 
-    // 5. Coding / programming (code in the question, or ask to build/debug)
+    // 5. Self-diagnosis — JEXI checks her own system, reads her source, reports root causes.
+    //    Checked BEFORE coding so "check yourself ... errors ... fix" style queries never
+    //    get misrouted to the coding pipeline.
+    if (/self[- ]?check|check yourself|diagnos(e|tic)|run (a )?(system|self) check|system status|are you (ok|okay|healthy|fine)|monitor yourself|what'?s wrong|any errors|health check/i.test(q)) {
+      return { intent: 'self_check', tasks: ['self', 'reasoning', 'memory'], reasoning: 'JEXI runs a full self-diagnosis and reports system health with root causes.' };
+    }
+
+    // 6. Coding / programming (code in the question, or ask to build/debug)
     if (this.isCoding(q)) {
       return { intent: 'code_task', tasks: ['architect', 'coder', 'runner', 'debugger', 'memory'], reasoning: 'Coding task — write, run, and verify code before answering.' };
     }
 
-    // 6. Greetings & pure conversation
+    // 7. Greetings & pure conversation
     if (/^(hello|hey|hi|sup|yo|howdy|good morning|good evening|what's up|wassup|who are you|what are you|who made you|who created you)\b/i.test(q)) {
       return { intent: 'conversation', tasks: ['memory'], reasoning: 'Conversation / identity question.' };
     }
 
-    // 7. Memory questions
+    // 8. Memory questions
     if (/what is my name|what do you remember|who am i|remember me/i.test(q)) {
       return { intent: 'memory_query', tasks: ['memory'], reasoning: 'User asks about memory.' };
-    }
-
-    // 8. Self-diagnosis — JEXI checks her own system, reads her source, reports root causes
-    if (/self[- ]?check|check yourself|diagnos(e|tic)|run (a )?(system|self) check|system status|are you (ok|okay|healthy|fine)|monitor yourself|what'?s wrong|any errors|health check/i.test(q)) {
-      return { intent: 'self_check', tasks: ['self', 'reasoning', 'memory'], reasoning: 'JEXI runs a full self-diagnosis and reports system health with root causes.' };
     }
 
     // 9. Knowledge base recall — check the knowledge library first
@@ -80,7 +82,7 @@ export class Planner {
     const codeNouns = /\b(python|javascript|js|typescript|ts|react|node(\.js)?|html|css|java|c\+\+|c#|go|rust|sql|bash|shell|script|function|class|api|server|program|app(lication)?|website|web ?page|code|regex|pipeline|scraper|bot|component|database|endpoint)\b/i;
     return (buildVerbs.test(q) && codeNouns.test(q)) ||
       /```[\s\S]*```/i.test(q) || // user pasted code
-      /(error|traceback|exception|syntaxerror|debug this code|code is broken|doesn'?t work|not working|fix this|fix the code|debug)/i.test(q);
+      /(\berrors?\b|traceback|exception|syntax ?error|debug this code|code is broken|doesn'?t work|not working|fix this|fix the code|\bdebug\b)/i.test(q);
   }
 }
 

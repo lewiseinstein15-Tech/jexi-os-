@@ -1,5 +1,81 @@
 import { generateContent } from './LLMClient.js';
 import { jsonrepair } from 'jsonrepair';
+import { recordError } from './SelfMonitor.js';
+
+/** Strip markdown fences + surrounding prose, then isolate the outermost {...} block. */
+function isolateJson(raw) {
+  let clean = String(raw || '')
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim();
+  const firstBrace = clean.indexOf('{');
+  const lastBrace = clean.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1) clean = clean.substring(firstBrace, lastBrace + 1);
+  return clean.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+}
+
+/** Post-process parsed files: unescape newlines, enforce safe buttons. */
+function normalizeFiles(files) {
+  return (files || [])
+    .filter(f => f.name && f.code)
+    .map(f => ({
+      name: f.name,
+      code: f.code
+        .replace(/\\n/g, '\n')
+        .replace(/\\t/g, '\t')
+        .replace(/<button(?![^>]*type=)/g, '<button type="button"'),
+    }));
+}
+
+/** Strict parse with a one-shot retry when the model wraps JSON in prose. */
+async function parseProject(raw, prompt, systemInstruction, sendEvent) {
+  // Pass 1 — clean the raw response
+  try {
+    const project = JSON.parse(jsonrepair(isolateJson(raw)));
+    project.files = normalizeFiles(project.files);
+    if (project.files.length === 0) throw new Error('No valid files generated.');
+    return project;
+  } catch (e) { /* fall through to retry */ }
+
+  // Pass 2 — one targeted retry demanding ONLY raw JSON (models love markdown fences)
+  try {
+    sendEvent('log', { agent: 'Architect', message: '⚠ JSON was malformed — retrying with strict format…' });
+    const retry = await generateContent(
+      `${prompt}\n\nIMPORTANT: Reply with ONLY the raw JSON object. No markdown, no code fences, no explanation, no trailing text — it is parsed directly with JSON.parse().`,
+      systemInstruction + '\nOUTPUT FORMAT: ONLY the raw JSON object, nothing else.'
+    );
+    const retryProject = JSON.parse(jsonrepair(isolateJson(retry)));
+    retryProject.files = normalizeFiles(retryProject.files);
+    if (retryProject.files.length === 0) throw new Error('No valid files generated.');
+    sendEvent('log', { agent: 'Architect', message: '✓ Strict retry succeeded.' });
+    return retryProject;
+  } catch (retryError) {
+    sendEvent('log', { agent: 'Architect', message: '✗ Strict retry also failed.' });
+    throw retryError;
+  }
+}
+
+/** Regex fallback: pull every { "name": ..., "code": ... } block out of the mess. */
+function regexFallback(cleanResponse) {
+  const blocks = [...cleanResponse.matchAll(/"name"\s*:\s*"([^"]+)"[\s\S]*?"code"\s*:\s*"((?:[^"\\]|\\.)*)"/g)];
+  const files = blocks.map(m => ({
+    name: m[1],
+    code: m[2]
+      .replace(/\\n/g, '\n')
+      .replace(/\\t/g, '\t')
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\')
+      .replace(/<button(?![^>]*type=)/g, '<button type="button"'),
+  })).filter(f => f.name && f.code);
+  if (files.length === 0) throw new Error('Regex fallback failed.');
+  const entryMatch = cleanResponse.match(/"entryPoint"\s*:\s*"([^"]+)"/);
+  return {
+    language: 'HTML/CSS/JS',
+    entryPoint: entryMatch ? entryMatch[1] : files[0].name,
+    summary: 'Fallback parse',
+    files,
+  };
+}
 
 export async function planProject(query, sendEvent, existingCode = null, errorContext = null, attemptNum = 1) {
   let systemInstruction = `You are JEXI Architect, the code design brain of JEXI OS (created by Lewis Einstein). Respond with ONLY valid JSON.
@@ -27,44 +103,24 @@ RULES:
   }
 
   const response = await generateContent(prompt, systemInstruction);
-  let cleanResponse = response.replace(/```json/g, '').replace(/```/g, '');
-  const firstBrace = cleanResponse.indexOf('{');
-  const lastBrace = cleanResponse.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace !== -1) cleanResponse = cleanResponse.substring(firstBrace, lastBrace + 1);
-  cleanResponse = cleanResponse.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+  const cleanResponse = isolateJson(response);
 
   try {
-    const repairedJson = jsonrepair(cleanResponse);
-    const project = JSON.parse(repairedJson);
-    project.files = (project.files || []).filter(f => f.name && f.code);
-    project.files.forEach(file => {
-      if (file.code) {
-        file.code = file.code.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
-        file.code = file.code.replace(/<button(?![^>]*type=)/g, '<button type="button"');
-      }
-    });
-    if (project.files.length === 0) throw new Error("No valid files generated.");
-    return project;
+    return await parseProject(cleanResponse, prompt, systemInstruction, sendEvent);
   } catch (e) {
-    // Regex Fallback Extraction
+    // Last resort: regex extraction of each file block
     try {
-      const entryMatch = cleanResponse.match(/"entryPoint"\s*:\s*"([^"]+)"/);
-      const entryPoint = entryMatch ? entryMatch[1] : 'index.html';
-      const codeMatch = cleanResponse.match(/"code"\s*:\s*"([\s\S]*?)"\s*[,}]/);
-      let code = codeMatch ? codeMatch[1] : '';
-      if (!code) throw new Error("Regex fallback failed.");
-      code = code.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-      code = code.replace(/<button(?![^>]*type=)/g, '<button type="button"');
-      const project = { language: 'HTML/CSS/JS', entryPoint, summary: "Fallback parse", files: [{ name: entryPoint, code }] };
-      sendEvent('log', { agent: 'Architect', message: '⚠ JSON parse failed, but Regex Fallback extracted code.' });
+      const project = regexFallback(cleanResponse);
+      sendEvent('log', { agent: 'Architect', message: '⚠ JSON parse failed, but Regex Fallback extracted the files.' });
       return project;
     } catch (regexError) {
-      throw new Error("Architect returned invalid JSON.");
+      recordError('architect', `Architect returned invalid JSON for: "${String(query).slice(0, 90)}"`);
+      throw new Error('Architect returned invalid JSON.');
     }
   }
 }
 
 export async function generateCode(query, sendEvent) { return await planProject(query, sendEvent); }
-export async function applyFix(query, errorContext, existingCode, attemptNum, sendEvent) { 
-  return await planProject(query, sendEvent, existingCode, errorContext, attemptNum); 
+export async function applyFix(query, errorContext, existingCode, attemptNum, sendEvent) {
+  return await planProject(query, sendEvent, existingCode, errorContext, attemptNum);
 }
