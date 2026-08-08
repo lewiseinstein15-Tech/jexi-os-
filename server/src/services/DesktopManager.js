@@ -1,10 +1,19 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
+import os from 'os';
 import fs from 'fs';
 import { WORKSPACE_DIR } from '../config.js';
 
 const execAsync = promisify(exec);
+
+// Keep Chromium inside the app's own node_modules when the default $HOME cache
+// wouldn't survive a build->runtime handoff (Render, serverless hosts wipe the
+// home cache between build and run). Respects an explicit PLAYWRIGHT_BROWSERS_PATH.
+if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
+  const defaultCache = path.join(os.homedir(), '.cache', 'ms-playwright');
+  if (!fs.existsSync(defaultCache)) process.env.PLAYWRIGHT_BROWSERS_PATH = '0';
+}
 
 let browser = null;
 let page = null;

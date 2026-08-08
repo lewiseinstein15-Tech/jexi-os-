@@ -19,10 +19,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Backend dependencies + Chromium download (runs as root inside Docker)
+# Backend dependencies + Chromium download (runs as root inside Docker).
+# PLAYWRIGHT_BROWSERS_PATH=0 keeps browsers inside node_modules (persist to runtime).
 COPY server/package*.json ./server/
-RUN cd server && npm ci --no-audit --no-fund && npx playwright install --with-deps chromium
+RUN cd server && npm ci --no-audit --no-fund && PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
 COPY server ./server
+ENV PLAYWRIGHT_BROWSERS_PATH=0
 
 # Frontend build -> served from server/public by Express
 COPY package*.json index.html vite.config.js tailwind.config.js postcss.config.js ./

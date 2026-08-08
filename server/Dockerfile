@@ -15,7 +15,9 @@ WORKDIR /app
 
 # Install Node deps first (better layer caching)
 COPY package*.json ./
-RUN npm ci && npx playwright install chromium
+# Browsers inside node_modules so they survive to runtime (PLAYWRIGHT_BROWSERS_PATH=0)
+RUN npm ci && PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium
+ENV PLAYWRIGHT_BROWSERS_PATH=0
 
 # Copy the backend source
 COPY index.js ./

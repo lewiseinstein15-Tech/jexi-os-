@@ -12,6 +12,10 @@ jobs:
         with:
           node-version: 20
       - name: Install and Build
+        # Point the free GitHub Pages frontend at the Render backend.
+        # Change this if your Render service URL differs.
+        env:
+          VITE_JEXI_BACKEND_URL: https://jexi-os-brain.onrender.com
         run: |
           npm install
           npm run build
