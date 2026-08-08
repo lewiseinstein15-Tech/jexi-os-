@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { planner } from './src/services/Planner.js';
 import { orchestrator } from './src/services/Orchestrator.js';
+import { generateContent, resolveKeys } from './src/services/LLMClient.js';
 import { loadSettings, saveSettings } from './src/services/SettingsManager.js';
 import { DesktopManager, ensureBrowser, browserStatus } from './src/services/DesktopManager.js';
 import {
@@ -163,6 +164,31 @@ app.post('/api/knowledge/save', (req, res) => {
 });
 
 // === CHAT API ===
+// === VISION ENDPOINT (JEXI's camera eyes) ===
+// Accepts a base64 image from the user's webcam and asks the AI to describe it.
+// Works with either a Groq (llama-4-scout is multimodal) or Gemini key.
+app.post('/api/vision', async (req, res) => {
+  try {
+    const { image, prompt } = req.body;
+    if (!image) return res.status(400).json({ success: false, error: 'No image provided' });
+    const { groqKey, geminiKey } = resolveKeys();
+    if (!groqKey && !geminiKey) {
+      return res.status(400).json({ success: false, error: 'No AI keys configured. Add GROQ_API_KEY or GEMINI_API_KEY (Render env or Settings).' });
+    }
+    const text = await generateContent(
+      prompt || 'Describe what you see in this image in 2-3 warm sentences.',
+      'You are JEXI OS, created by Lewis Einstein (an AI & ML Engineer). You now have eyes through the user\'s camera. ' +
+      'Describe what you see warmly and precisely: who or what is in frame, expressions, lighting, surroundings. ' +
+      'Be honest if the image is unclear or if no face is visible. Keep it natural and short (2-4 sentences).',
+      image,
+      { temperature: 0.5 }
+    );
+    res.json({ success: true, text });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 app.post('/api/chat', async (req, res) => {
   const { query, image } = req.body;
   if (!query && !image) return res.status(400).json({ success: false, error: 'No query provided' });

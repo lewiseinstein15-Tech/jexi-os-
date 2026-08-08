@@ -43,6 +43,7 @@ export default function App() {
                   isProcessing={engine.isProcessing}
                   onSend={engine.runSearch}
                   onStop={engine.stopGeneration}
+                  onVisionResult={(text) => engine.pushMessage('jexi', text)}
                 />
               </>
             )}

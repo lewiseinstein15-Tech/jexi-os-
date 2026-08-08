@@ -9,6 +9,7 @@
     "preview": "vite preview --host"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^1.0.1",
     "axios": "^1.19.0",
     "framer-motion": "^12.43.0",
     "highlight.js": "^11.11.1",

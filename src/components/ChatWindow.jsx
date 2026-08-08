@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Square, ImagePlus, X } from 'lucide-react';
+import { Send, Square, ImagePlus, X, Camera } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
+import TypedMessage from './TypedMessage';
+import VisionPanel from './VisionPanel';
 
-export default function ChatWindow({ messages, isProcessing, onSend, onStop }) {
+export default function ChatWindow({ messages, isProcessing, onSend, onStop, onVisionResult }) {
   const [input, setInput] = useState('');
   const [image, setImage] = useState(null);
+  const [visionOpen, setVisionOpen] = useState(false);
   const fileRef = useRef(null);
   const scrollRef = useRef(null);
 
@@ -54,7 +57,7 @@ export default function ChatWindow({ messages, isProcessing, onSend, onStop }) {
                     {msg.text}
                   </div>
                 ) : (
-                  <MarkdownRenderer content={msg.text} />
+                  <TypedMessage text={msg.text} />
                 )}
               </div>
             </div>
@@ -91,6 +94,14 @@ export default function ChatWindow({ messages, isProcessing, onSend, onStop }) {
         )}
         <button
           type="button"
+          onClick={() => setVisionOpen(true)}
+          className="bg-[#1a1a1a] text-gray-400 hover:text-[#00FF9D] rounded-lg px-2.5 py-2.5 flex-shrink-0"
+          title="Give JEXI eyes — camera vision"
+        >
+          <Camera className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
           onClick={() => fileRef.current?.click()}
           className="bg-[#1a1a1a] text-gray-400 hover:text-[#00FF9D] rounded-lg px-2.5 py-2.5 flex-shrink-0"
           title="Attach image"
@@ -113,6 +124,12 @@ export default function ChatWindow({ messages, isProcessing, onSend, onStop }) {
           {isProcessing ? <Square className="w-4 h-4" onClick={onStop} /> : <Send className="w-4 h-4" />}
         </button>
       </form>
+
+      <VisionPanel
+        open={visionOpen}
+        onClose={() => setVisionOpen(false)}
+        onVision={(text) => onVisionResult && onVisionResult(text)}
+      />
     </div>
   );
 }

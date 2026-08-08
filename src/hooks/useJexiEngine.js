@@ -54,5 +54,11 @@ export const useJexiEngine = () => {
 
   const stopGeneration = useCallback(() => setIsProcessing(false), []);
 
-  return { messages, logs, websites, isProcessing, runSearch, stopGeneration };
+  // Append an assistant or user message directly (used by the camera vision panel).
+  const pushMessage = useCallback((role, text) => {
+    if (!text) return;
+    setMessages(prev => [...prev, { role, text }]);
+  }, []);
+
+  return { messages, logs, websites, isProcessing, runSearch, stopGeneration, pushMessage };
 };
