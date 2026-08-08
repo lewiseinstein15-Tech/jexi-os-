@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Monitor, MousePointer, Keyboard, Hand, Bot, Server } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Monitor, MousePointer, Keyboard, Hand, Bot, Server, RefreshCw, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import { getBackendUrl, onBackendUrlChange } from '../utils/helpers';
 
@@ -7,12 +7,16 @@ export default function DesktopViewer({ logs = [] }) {
   const [screenshot, setScreenshot] = useState(null);
   const [status, setStatus] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [shotError, setShotError] = useState(null);
+  const [restarting, setRestarting] = useState(false);
   const [manualMode, setManualMode] = useState(false);
   const [typeText, setTypeText] = useState('');
   const [lastClick, setLastClick] = useState({ x: 0, y: 0 });
   const [backendUrl, setBackendUrl] = useState(getBackendUrl());
   const [showUrlInput, setShowUrlInput] = useState(false);
   const imgRef = useRef(null);
+  const inflightRef = useRef(false);
+  const lastGoodShotRef = useRef(0);
 
   // React live when the backend URL changes in Settings
   useEffect(() => {
@@ -20,30 +24,65 @@ export default function DesktopViewer({ logs = [] }) {
     return unsub;
   }, []);
 
+  // One screenshot at a time — never pile up overlapping polls (which froze the stream
+  // when the free backend was slow to wake or Chromium was relaunching).
+  const takeScreenshot = useCallback(async () => {
+    if (inflightRef.current) return;
+    inflightRef.current = true;
+    try {
+      const res = await axios.get(`${backendUrl}/api/desktop/coder/screenshot`, { timeout: 30000 });
+      if (res.data.success && res.data.image) {
+        setScreenshot(res.data.image);
+        lastGoodShotRef.current = Date.now();
+        setShotError(null);
+      } else if (res.data.error) {
+        setShotError(res.data.error);
+      }
+    } catch (e) {
+      // Most common cause on free hosting: the backend just woke from its idle sleep.
+      setShotError('Backend is sleeping/waking — this can take up to a minute on the free tier. Keep this tab open; it reconnects automatically.');
+    } finally {
+      inflightRef.current = false;
+    }
+  }, [backendUrl]);
+
   useEffect(() => {
-    const takeScreenshot = async () => {
-      try {
-        const res = await axios.get(`${backendUrl}/api/desktop/coder/screenshot`);
-        if (res.data.success) setScreenshot(res.data.image);
-      } catch (e) {}
-    };
     takeScreenshot();
     const interval = setInterval(takeScreenshot, 800);
     return () => clearInterval(interval);
-  }, [backendUrl]);
+  }, [backendUrl, takeScreenshot]);
 
-  // Live browser status so the viewer is never silently blank
+  // Live browser status — refresh the frame the moment eyes come back online.
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const res = await axios.get(`${backendUrl}/api/desktop/status`);
+        const res = await axios.get(`${backendUrl}/api/desktop/status`, { timeout: 15000 });
+        const wasReady = status?.ready;
         setStatus(res.data);
-      } catch (e) { setStatus({ ready: false, error: 'Backend unreachable — check the Cloud URL above' }); }
+        if (res.data.ready && !wasReady) takeScreenshot();
+      } catch (e) {
+        setStatus({ ready: false, error: 'waking' });
+      }
     };
     fetchStatus();
     const interval = setInterval(fetchStatus, 4000);
     return () => clearInterval(interval);
-  }, [backendUrl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backendUrl, takeScreenshot]);
+
+  const restartEyes = async () => {
+    setRestarting(true);
+    setShotError('Restarting JEXI\u2019s eyes — one moment…');
+    try {
+      const res = await axios.post(`${backendUrl}/api/desktop/restart`, {}, { timeout: 60000 });
+      if (!res.data.success) throw new Error(res.data.error || 'Restart failed');
+      await takeScreenshot();
+    } catch (e) {
+      setShotError('Could not restart: ' + (e.message || 'backend unreachable'));
+    } finally {
+      setRestarting(false);
+    }
+  };
 
   const saveUrl = () => {
     localStorage.setItem('jexi_backend_url', backendUrl);
@@ -58,11 +97,8 @@ export default function DesktopViewer({ logs = [] }) {
     setLastClick({ x, y });
     try {
       await axios.post(`${backendUrl}/api/desktop/coder/click`, { x, y });
-      setTimeout(async () => {
-        const res = await axios.get(`${backendUrl}/api/desktop/coder/screenshot`);
-        if (res.data.success) setScreenshot(res.data.image);
-      }, 500);
-    } catch (e) {}
+      setTimeout(takeScreenshot, 500);
+    } catch (err) { setShotError('Click failed — browser may be reconnecting.'); }
   };
 
   const handleType = async () => {
@@ -70,24 +106,21 @@ export default function DesktopViewer({ logs = [] }) {
     try {
       await axios.post(`${backendUrl}/api/desktop/coder/type`, { text: typeText });
       setTypeText('');
-      setTimeout(async () => {
-        const res = await axios.get(`${backendUrl}/api/desktop/coder/screenshot`);
-        if (res.data.success) setScreenshot(res.data.image);
-      }, 500);
-    } catch (e) {}
+      setTimeout(takeScreenshot, 500);
+    } catch (err) { setShotError('Typing failed — browser may be reconnecting.'); }
   };
 
   const handleKeyPress = async (key) => {
     try {
       await axios.post(`${backendUrl}/api/desktop/coder/press`, { key });
-      setTimeout(async () => {
-        const res = await axios.get(`${backendUrl}/api/desktop/coder/screenshot`);
-        if (res.data.success) setScreenshot(res.data.image);
-      }, 500);
-    } catch (e) {}
+      setTimeout(takeScreenshot, 500);
+    } catch (err) { setShotError('Key press failed — browser may be reconnecting.'); }
   };
 
   const agentLogs = logs.filter(l => l.agent === 'ComputerUseAgent' || l.agent === 'Debugger' || l.agent === 'Output' || l.agent === 'Vision');
+
+  const staleSecs = screenshot ? Math.round((Date.now() - lastGoodShotRef.current) / 1000) : 0;
+  const showStaleWarning = screenshot && status?.ready && staleSecs > 15;
 
   return (
     <div className="flex flex-col h-full p-2 pb-20">
@@ -98,10 +131,13 @@ export default function DesktopViewer({ logs = [] }) {
           {status && (
             status.ready
               ? <span className="flex items-center gap-1 bg-[#00FF9D]/10 border border-[#00FF9D]/30 text-[#00FF9D] rounded-full px-2 py-0.5 text-[8px] font-bold"><span className="w-1.5 h-1.5 rounded-full bg-[#00FF9D] animate-pulse" />LIVE</span>
-              : <span className="flex items-center gap-1 bg-red-500/10 border border-red-500/30 text-red-400 rounded-full px-2 py-0.5 text-[8px] font-bold"><span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />OFFLINE</span>
+              : <span className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-full px-2 py-0.5 text-[8px] font-bold"><span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />CONNECTING</span>
           )}
         </div>
         <div className="flex gap-1">
+          <button onClick={restartEyes} disabled={restarting} className="bg-[#1a1a1a] text-gray-400 hover:text-[#00FF9D] rounded px-2 py-1 text-[8px] font-bold flex items-center gap-1 disabled:opacity-50" title="Force-restart JEXI's browser (fixes a stuck/white screen)">
+            {restarting ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Restart eyes
+          </button>
           <button onClick={() => setShowUrlInput(!showUrlInput)} className="bg-[#1a1a1a] text-gray-400 rounded px-2 py-1 text-[8px] font-bold flex items-center gap-1">
             <Server className="w-3 h-3" /> Cloud URL
           </button>
@@ -122,20 +158,31 @@ export default function DesktopViewer({ logs = [] }) {
       <div className="flex-1 bg-black rounded-xl overflow-hidden border border-[#1a1a1a] relative flex items-center justify-center min-h-0">
         {screenshot ? (
           <img ref={imgRef} src={screenshot} alt="Desktop" onClick={handleScreenClick} onLoad={() => setLastUpdate(Date.now())} className={`w-full h-full object-contain ${manualMode ? 'cursor-pointer' : ''}`} />
-        ) : status?.ready === false ? (
+        ) : shotError || (status && !status.ready) ? (
           <div className="text-center px-4">
-            <p className="text-red-400 text-[10px] font-bold mb-1">Virtual Desktop unavailable</p>
-            <p className="text-gray-500 text-[9px] break-all">{status.error || 'Unknown error'}</p>
+            <p className="text-amber-400 text-[10px] font-bold mb-1">🖥️ Virtual Desktop connecting…</p>
+            <p className="text-gray-500 text-[9px] break-all">{status?.error === 'waking' ? 'Backend is waking from idle sleep (free tier) — this takes up to a minute. Keep this tab open.' : (shotError || status?.error || 'Unknown')}</p>
           </div>
         ) : (
           <div className="text-gray-600 text-[10px] animate-pulse">Connecting to Virtual Desktop...</div>
         )}
         {manualMode && <div className="absolute top-2 left-2 bg-blue-500/20 backdrop-blur-sm rounded-lg px-2 py-1 border border-blue-500/30"><span className="text-blue-400 text-[8px] font-bold">👆 TAP TO CLICK</span></div>}
+        {showStaleWarning && (
+          <div className="absolute bottom-2 left-2 right-2 bg-amber-500/15 backdrop-blur-sm rounded-lg px-2 py-1 border border-amber-500/40">
+            <span className="text-amber-300 text-[8px] font-bold">⚠ Screen frozen ({staleSecs}s) — tap "Restart eyes" to reconnect.</span>
+          </div>
+        )}
       </div>
       <div className="flex items-center justify-between mt-1 px-1 text-[8px] text-gray-600">
         <span>{status?.ready ? '● Streaming live screenshots' : '○ Live streaming paused'}</span>
         <span>{lastUpdate ? `Updated ${Math.max(0, Math.round((Date.now() - lastUpdate) / 1000))}s ago` : '—'}</span>
       </div>
+
+      {shotError && status?.ready && (
+        <div className="mt-1 bg-red-500/10 border border-red-500/30 rounded-lg px-2 py-1">
+          <span className="text-red-400 text-[8px] break-all">{shotError}</span>
+        </div>
+      )}
 
       {manualMode && (
         <div className="mt-2 space-y-2">

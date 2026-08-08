@@ -19,6 +19,9 @@ let browser = null;
 let page = null;
 let browserReady = false;
 let browserError = null;
+let launching = null;      // in-flight launch promise (share one launch among callers)
+let lastRelaunchAt = 0;    // cooldown so a broken host isn't hammered with relaunches
+const RELAUNCH_COOLDOWN_MS = 30000;
 
 const WELCOME_HTML = `<html><body style="background:#050505;color:#00FF9D;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
 <div style="text-align:center">
@@ -26,31 +29,123 @@ const WELCOME_HTML = `<html><body style="background:#050505;color:#00FF9D;font-f
 <p style="color:#888">Browser engine online — JEXI's eyes.</p>
 <p style="color:#555;font-size:12px">Ask JEXI to open a link, research a topic, or build something.<br/>This window shows exactly what JEXI is seeing.</p>
 </div></body></html>`;
-// Must be URL-encoded, or Chromium navigation to the data: URL fails and leaves a blank white page.
-const WELCOME_PAGE = 'data:text/html;charset=utf-8,' + encodeURIComponent(WELCOME_HTML);
 
-export async function ensureBrowser() {
-  if (browserReady) return { ok: true };
-  if (browserError) return { ok: false, error: browserError };
+/** True only if the browser AND page are genuinely alive right now. */
+function isAlive() {
   try {
-    const { chromium } = await import('playwright');
-    browser = await chromium.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--disable-extensions'],
-    });
-    page = await browser.newPage({ viewport: { width: 1280, height: 720 }, userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' });
-    await page.goto(WELCOME_PAGE, { timeout: 15000 }).catch(() => {});
-    browserReady = true;
-    return { ok: true };
-  } catch (e) {
-    browserError = `Browser unavailable: ${e.message}. JEXI will fall back to server-side reading.`;
-    console.error(`[Desktop] ${browserError}`);
-    return { ok: false, error: browserError };
+    return Boolean(browserReady && browser && typeof browser.isConnected === 'function' && browser.isConnected() && page && !page.isClosed());
+  } catch {
+    return false;
   }
 }
 
+async function resetBrowser() {
+  try { await page?.close(); } catch {}
+  try { await browser?.close(); } catch {}
+  page = null;
+  browser = null;
+  browserReady = false;
+}
+
+export async function ensureBrowser() {
+  // Fast path: browser is genuinely alive.
+  if (isAlive()) return { ok: true };
+
+  // Share one launch among concurrent callers.
+  if (launching) return launching;
+
+  launching = (async () => {
+    // Clear any dead references before relaunching.
+    if (!browserReady || !browser) {
+      try { await browser?.close(); } catch {}
+      browser = null;
+      page = null;
+    }
+    browserError = null;
+    try {
+      const { chromium } = await import('playwright');
+      browser = await chromium.launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--disable-extensions',
+          '--no-zygote',
+          '--disable-background-networking',
+          '--disable-component-update',
+        ],
+      });
+      page = await browser.newPage({
+        viewport: { width: 1280, height: 720 },
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      });
+      page.setDefaultTimeout(20000);
+
+      // Self-healing: if Chromium dies for ANY reason, drop the ready flag so
+      // the next call relaunches instead of throwing forever (the old white-screen bug).
+      browser.on('disconnected', () => {
+        browserReady = false;
+        browser = null;
+        page = null;
+        console.error('[Desktop] Chromium disconnected — will relaunch on next use.');
+      });
+      page.on('crash', () => {
+        browserReady = false;
+        console.error('[Desktop] Tab crashed — will relaunch on next use.');
+      });
+
+      // Bulletproof welcome screen: setContent never fails on encoding/URL issues
+      // (the old data: URL navigation silently left a BLANK WHITE page).
+      await page.setContent(WELCOME_HTML, { waitUntil: 'load' }).catch(() => {});
+      browserReady = true;
+      return { ok: true };
+    } catch (e) {
+      browserError = `Browser unavailable: ${e.message}. JEXI will fall back to server-side reading.`;
+      console.error(`[Desktop] ${browserError}`);
+      try { await browser?.close(); } catch {}
+      browser = null;
+      page = null;
+      return { ok: false, error: browserError };
+    } finally {
+      launching = null;
+    }
+  })();
+
+  return launching;
+}
+
+/** Force a clean restart of JEXI's eyes (used by the viewer's "Restart eyes" button). */
+export async function restartBrowser() {
+  await resetBrowser();
+  return ensureBrowser();
+}
+
 export function browserStatus() {
-  return { ready: browserReady, error: browserError };
+  if (isAlive()) return { ready: true, error: browserError };
+  return { ready: false, error: browserError || (browserReady ? 'Browser disconnected — restarting on next use.' : null) };
+}
+
+/** Retry a screenshot with one self-heal: if the tab died, relaunch (cooldown-guarded). */
+async function screenshotWithHeal() {
+  try {
+    const shot = await page.screenshot({ type: 'jpeg', quality: 70 });
+    return `data:image/jpeg;base64,${shot.toString('base64')}`;
+  } catch (e) {
+    const now = Date.now();
+    if (now - lastRelaunchAt < RELAUNCH_COOLDOWN_MS) {
+      throw new Error(`Browser error: ${e.message}`);
+    }
+    lastRelaunchAt = now;
+    console.error(`[Desktop] screenshot failed (${e.message}) — relaunching browser…`);
+    browserReady = false;
+    try { await page?.close(); } catch {}
+    page = null;
+    const retry = await ensureBrowser();
+    if (!retry.ok) throw new Error(retry.error);
+    const shot = await page.screenshot({ type: 'jpeg', quality: 70 });
+    return `data:image/jpeg;base64,${shot.toString('base64')}`;
+  }
 }
 
 /**
@@ -114,11 +209,9 @@ export class DesktopManager {
   async takeScreenshot(agentId) {
     const ready = await ensureBrowser();
     if (!ready.ok) {
-      // Still give the viewer something to render
       return `data:image/svg+xml;base64,${Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720"><rect width="1280" height="720" fill="#050505"/><text x="640" y="360" fill="#00FF9D" font-family="monospace" font-size="22" text-anchor="middle">Virtual Desktop offline — ${browserError || ''}</text></svg>`).toString('base64')}`;
     }
-    const shot = await page.screenshot({ type: 'png' });
-    return `data:image/png;base64,${shot.toString('base64')}`;
+    return screenshotWithHeal();
   }
 
   async extractText(agentId) {

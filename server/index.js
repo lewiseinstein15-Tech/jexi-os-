@@ -10,7 +10,7 @@ import {
   collectSystemStatus, readSourceFile,
 } from './src/services/SelfMonitor.js';
 import { loadSettings, saveSettings } from './src/services/SettingsManager.js';
-import { DesktopManager, ensureBrowser, browserStatus } from './src/services/DesktopManager.js';
+import { DesktopManager, ensureBrowser, browserStatus, restartBrowser } from './src/services/DesktopManager.js';
 import {
   addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory,
   saveInternetKnowledge, saveCodingKnowledge, searchInternetKnowledge, searchCodingKnowledge,
@@ -39,7 +39,7 @@ const dm = new DesktopManager('playwright');
 
 app.get('/api/desktop/coder/screenshot', async (req, res) => {
   try { res.json({ success: true, image: await dm.takeScreenshot('coder') }); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  catch (e) { recordError('desktop', e.message); res.status(500).json({ success: false, error: e.message }); }
 });
 
 app.post('/api/desktop/coder/click', async (req, res) => {
@@ -106,6 +106,17 @@ app.post('/api/desktop/coder/screenshot-json', async (req, res) => {
 });
 
 app.get('/api/desktop/status', (req, res) => res.json({ ok: true, ...browserStatus() }));
+
+// Force-restart JEXI's eyes (self-heal button in the Virtual Desktop viewer).
+app.post('/api/desktop/restart', async (req, res) => {
+  try {
+    const result = await restartBrowser();
+    res.json({ success: true, ...result });
+  } catch (e) {
+    recordError('desktop', e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
 
 // === FILE VIEWER & PREVIEW ENDPOINTS ===
 app.get('/api/files/:filename', (req, res) => {
