@@ -13,6 +13,20 @@ install the file — exactly like installing any APK from a website.
 
 ## 📥 How to get the APK (2 minutes)
 
+### Easiest — the download page (for you AND friends)
+
+Open the app's **"GET APP"** tab (or go straight to the live site
+`https://lewiseinstein15-Tech.github.io/jexi-os-/`) and tap **DOWNLOAD JEXI OS
+APK**. It grabs the newest build automatically.
+
+Direct permanent link (always the newest build, no login needed):
+
+```
+https://github.com/lewiseinstein15-Tech/jexi-os-/releases/latest/download/app-debug.apk
+```
+
+### Manual — from GitHub Actions
+
 1. Open your repo on GitHub: `https://github.com/lewiseinstein15-Tech/jexi-os-`
 2. Click the **Actions** tab (top of the page)
 3. In the left sidebar click **"Build JEXI OS APK"**

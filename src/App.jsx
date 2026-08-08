@@ -10,6 +10,7 @@ import MemoryPanel from './components/MemoryPanel';
 import SettingsPanel from './components/SettingsPanel';
 import KnowledgePanel from './components/KnowledgePanel';
 import DesktopViewer from './components/DesktopViewer';
+import DownloadPanel from './components/DownloadPanel';
 
 export default function App() {
   const [activeNav, setActiveNav] = useState("home");
@@ -58,6 +59,7 @@ export default function App() {
             {activeNav === 'knowledge' && <KnowledgePanel />}
             {activeNav === 'desktop' && <DesktopViewer logs={engine.logs} />}
             {activeNav === 'settings' && <SettingsPanel />}
+            {activeNav === 'download' && <DownloadPanel />}
           </motion.div>
         </AnimatePresence>
       </main>

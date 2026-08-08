@@ -1,4 +1,4 @@
-import { Home, Bot, Database, BookOpen, Monitor, Settings } from 'lucide-react';
+import { Home, Bot, Database, BookOpen, Monitor, Settings, Smartphone } from 'lucide-react';
 
 export default function BottomNavigation({ activeNav, setActiveNav }) {
   const items = [
@@ -8,6 +8,7 @@ export default function BottomNavigation({ activeNav, setActiveNav }) {
     { id: 'knowledge', icon: BookOpen, label: 'BOOKS' },
     { id: 'desktop', icon: Monitor, label: 'DESKTOP' },
     { id: 'settings', icon: Settings, label: 'SETTINGS' },
+    { id: 'download', icon: Smartphone, label: 'GET APP' },
   ];
 
   return (
