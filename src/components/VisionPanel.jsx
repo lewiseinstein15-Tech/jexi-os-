@@ -73,6 +73,8 @@ export default function VisionPanel({ open, onClose, onVision }) {
   const lastTickRef = useRef(0);
   const enrolledRef = useRef(null);
   const streakRef = useRef(0);
+  const continuousBusyRef = useRef(false);
+  const continuousTimerRef = useRef(null);
 
   const [camStatus, setCamStatus] = useState('starting'); // starting | on | error
   const [camError, setCamError] = useState('');
@@ -85,6 +87,8 @@ export default function VisionPanel({ open, onClose, onVision }) {
   const [matched, setMatched] = useState(false);
   const [similarity, setSimilarity] = useState(0);
   const [enrolling, setEnrolling] = useState(false);
+  const [continuous, setContinuous] = useState(false);
+  const [continuousNote, setContinuousNote] = useState('');
 
   // Load the saved creator face (device-local, private)
   useEffect(() => {
@@ -99,6 +103,14 @@ export default function VisionPanel({ open, onClose, onVision }) {
       }
     } catch {}
   }, []);
+
+  // Stop live narration whenever the panel closes
+  useEffect(() => {
+    if (!open) {
+      setContinuous(false);
+      setContinuousNote('');
+    }
+  }, [open]);
 
   const stopCamera = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -197,6 +209,27 @@ export default function VisionPanel({ open, onClose, onVision }) {
     return canvas.toDataURL('image/jpeg', 0.7);
   };
 
+  // Shared helper: send the current frame to JEXI's AI vision and return her words
+  const captureAndAsk = async (prompt) => {
+    const img = captureFrame();
+    if (!img) throw new Error('No camera frame available.');
+    const res = await fetch(`${getBackendUrl()}/api/vision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: img, prompt }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+    return data.text;
+  };
+
+  const creatorPrompt = (short) => short
+    ? 'You are looking at your creator, Lewis Einstein (an AI & ML Engineer), through my camera. Briefly narrate right now what you see: how I look today, my expression, my surroundings. 1-2 sentences.'
+    : 'I am Lewis Einstein, your creator (an AI & ML Engineer), looking at you through my camera. Recognize me, greet me by name as your creator, and describe how I look today.';
+  const strangerPrompt = (short) => short
+    ? 'Look at me through my camera. Briefly narrate right now what you see: who is in frame, expression, surroundings. 1-2 sentences.'
+    : 'Look at me through my camera. Tell me what you see, who I am, and how I look right now.';
+
   const enroll = async () => {
     if (enrolling) return;
     setEnrolling(true);
@@ -235,29 +268,53 @@ export default function VisionPanel({ open, onClose, onVision }) {
   };
 
   const askVision = async () => {
-    const img = captureFrame();
-    if (!img) return;
     setThinking(true);
     setVisionError('');
     try {
-      const who = matched
-        ? 'I am Lewis Einstein, your creator (an AI & ML Engineer), looking at you through my camera. Recognize me, greet me by name as your creator, and describe how I look today.'
-        : 'Look at me through my camera. Tell me what you see, who I am, and how I look right now.';
-      const res = await fetch(`${getBackendUrl()}/api/vision`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: img, prompt: who }),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
-      setVisionText(data.text);
-      onVision(data.text);
+      const text = await captureAndAsk(matched ? creatorPrompt(false) : strangerPrompt(false));
+      setVisionText(text);
+      onVision(text);
     } catch (e) {
       setVisionError(e.message || 'Vision failed — is the backend reachable?');
     } finally {
       setThinking(false);
     }
   };
+
+  // LIVE CONTINUOUS VISION — she narrates what she sees every ~10s while active.
+  // The next tick is scheduled only after the previous one finishes, so calls
+  // never overlap even on slow connections.
+  useEffect(() => {
+    if (!open || !continuous || camStatus !== 'on') return;
+    let alive = true;
+
+    const tick = async () => {
+      if (!alive) return;
+      if (continuousBusyRef.current) {
+        continuousTimerRef.current = setTimeout(tick, 2000);
+        return;
+      }
+      continuousBusyRef.current = true;
+      setVisionError('');
+      try {
+        const text = await captureAndAsk(matched ? creatorPrompt(true) : strangerPrompt(true));
+        if (!alive) return;
+        setVisionText(text);
+        onVision(text);
+        setContinuousNote(`Narrated ${new Date().toLocaleTimeString()}`);
+      } catch (e) {
+        if (alive) setVisionError(e.message || 'Vision failed — is the backend reachable?');
+      } finally {
+        continuousBusyRef.current = false;
+      }
+      if (alive && continuous) {
+        continuousTimerRef.current = setTimeout(tick, 10000);
+      }
+    };
+
+    continuousTimerRef.current = setTimeout(tick, 400);
+    return () => { alive = false; if (continuousTimerRef.current) clearTimeout(continuousTimerRef.current); };
+  }, [open, continuous, camStatus, matched]);
 
   if (!open) return null;
 
@@ -271,7 +328,7 @@ export default function VisionPanel({ open, onClose, onVision }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-md glass rounded-2xl p-4 border border-[#00FF9D]/25">
+      <div className="w-full max-w-md glass rounded-2xl p-4 border border-[#00FF9D]/25 max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Eye className="w-4 h-4 text-[#00FF9D]" />
@@ -294,6 +351,13 @@ export default function VisionPanel({ open, onClose, onVision }) {
             <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm rounded-full px-2.5 py-1 border border-[#00FF9D]/30">
               <span className="text-[9px] font-bold text-[#00FF9D] flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#00FF9D] animate-pulse" /> FACE ENGINE LIVE
+              </span>
+            </div>
+          )}
+          {camStatus === 'on' && continuous && (
+            <div className="absolute top-2 right-2 bg-red-500/20 backdrop-blur-sm rounded-full px-2.5 py-1 border border-red-400/50">
+              <span className="text-[9px] font-bold text-red-300 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping" /> LIVE VISION
               </span>
             </div>
           )}
@@ -328,11 +392,29 @@ export default function VisionPanel({ open, onClose, onVision }) {
 
         <button
           onClick={askVision}
-          disabled={thinking || camStatus !== 'on'}
+          disabled={thinking || camStatus !== 'on' || continuous}
           className="mt-3 w-full bg-[#00FF9D] text-black rounded-xl py-2.5 text-[11px] font-bold flex items-center justify-center gap-2 disabled:opacity-40 hover:bg-[#00e68a] transition-colors"
         >
           {thinking ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> JEXI is looking…</> : <><Video className="w-3.5 h-3.5" /> 👁 What do you see?</>}
         </button>
+
+        <button
+          onClick={() => setContinuous(c => !c)}
+          disabled={camStatus !== 'on'}
+          className={`mt-2 w-full rounded-xl py-2.5 text-[11px] font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-40 ${
+            continuous
+              ? 'bg-red-500/20 border border-red-400/50 text-red-300 hover:bg-red-500/30'
+              : 'bg-[#1a1a1a] border border-[#2a2a2a] text-gray-300 hover:border-red-400/50 hover:text-red-300'
+          }`}
+        >
+          {continuous
+            ? <><span className="w-2 h-2 rounded-full bg-red-400 animate-ping" /> ⏹ Stop live vision</>
+            : <><VideoOff className="w-3.5 h-3.5" /> 🔴 Live vision — she narrates every ~10s</>}
+        </button>
+        {continuous && continuousNote && (
+          <p className="mt-1.5 text-[9px] text-red-300/80 text-center">{continuousNote} — her narration types itself into the chat</p>
+        )}
+
         {visionError && <p className="mt-2 text-[9px] text-red-400">{visionError}</p>}
         {visionText && (
           <div className="mt-2 bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg p-2.5 text-[10px] text-gray-200 max-h-28 overflow-y-auto whitespace-pre-wrap">
@@ -342,7 +424,7 @@ export default function VisionPanel({ open, onClose, onVision }) {
 
         <p className="mt-2 text-[8px] text-gray-600 leading-relaxed">
           Engine A: on-device face tracking (free, instant, runs in your browser). Engine B: JEXI's AI vision via
-          Groq/Gemini when you tap "What do you see?" — her reply types itself into the chat.
+          Groq/Gemini. Live vision narrates what she sees every ~10 seconds straight into the chat.
         </p>
       </div>
     </div>
