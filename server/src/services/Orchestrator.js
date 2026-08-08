@@ -9,6 +9,7 @@ import { learnHowTo } from './Researcher.js';
 import { generateContent, resolveKeys } from './LLMClient.js';
 import { collectSystemStatus, readSourceFile } from './SelfMonitor.js';
 import { studyTopic, recallKnowledge } from './KnowledgeAgent.js';
+import { latestNews, twitterLatest } from './TrustedLibrary.js';
 import { ComputerUseAgent } from './ComputerUseAgent.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import {
@@ -325,11 +326,11 @@ export class Orchestrator {
           return results;
         }
 
-        /* ---------------- STUDY A TOPIC (books/papers) ---------------- */
+        /* ---------------- STUDY A TOPIC (trusted books/papers) ---------------- */
         case 'study_topic': {
           const topic = plan.payload || query;
           const content = await studyTopic('07_GENERAL_KNOWLEDGE', topic, sendEvent);
-          results.summary = `### 📚 JEXI SCHOLAR\n\nI have studied **${topic}** and saved it to my knowledge library.\n\n${content.slice(0, 4000)}`;
+          results.summary = `### 📚 JEXI SCHOLAR\n\nI studied **${topic}** using the Trusted Library (Wikipedia, Project Gutenberg, arXiv, Open Library) and saved it to my knowledge library.\n\n${content.slice(0, 4000)}`;
           results.statistics.confidence = 100;
           return results;
         }
@@ -348,6 +349,54 @@ export class Orchestrator {
           // Fall through to research if the library has nothing
           const { summary } = await reasonAndWrite(query, []);
           results.summary = summary;
+          return results;
+        }
+
+        /* ---------------- LATEST NEWS & TWITTER/X ---------------- */
+        case 'news_latest': {
+          sendEvent('log', { agent: 'News', message: `📰 Gathering the latest on: "${query}"` });
+
+          // 1. Try X/Twitter first (best-effort — no free API exists)
+          let twitterItems = [];
+          try {
+            const tw = await twitterLatest(query);
+            if (tw) {
+              twitterItems = tw.items;
+              sendEvent('log', { agent: 'News', message: `🐦 Read ${twitterItems.length} recent X/Twitter posts (via ${tw.instance}).` });
+            } else {
+              sendEvent('log', { agent: 'News', message: '🐦 X/Twitter requires login — no public feed available. Using trusted news feeds instead.' });
+            }
+          } catch (e) {}
+
+          // 2. Trusted news feeds (Google News + BBC)
+          const newsItems = await latestNews(query);
+          sendEvent('log', { agent: 'News', message: `📡 ${newsItems.length} headlines from trusted news feeds.` });
+          results.sources = newsItems.slice(0, 6).map(n => ({ title: n.title, link: n.link }));
+          for (const n of newsItems.slice(0, 4)) {
+            sendEvent('website', { site: { title: n.title, url: n.link, favicon: `https://www.google.com/s2/favicons?domain=${n.source}&sz=64`, status: 'success' } });
+          }
+
+          const keys = resolveKeys();
+          let summary;
+          if (!keys.groqKey && !keys.geminiKey) {
+            const lines = newsItems.slice(0, 8).map((n, i) => `${i + 1}. **${n.title}** — ${n.source}${n.date ? ` (${n.date})` : ''}\n   ${n.link}`).join('\n');
+            summary = `### 📰 JEXI OS — LATEST NEWS\n\n${twitterItems.length ? `**X/Twitter needs login** (X has no free API) — here are the top headlines instead:\n\n` : ''}${lines || 'No headlines found right now — try again in a minute.'}`;
+          } else {
+            const twBlock = twitterItems.length
+              ? `\n\nRecent X/Twitter posts:\n${twitterItems.slice(0, 5).map(t => `- ${t.snippet || t.title}`).join('\n')}`
+              : '\n\n(X/Twitter could not be read without login — headlines below are from trusted news feeds.)';
+            summary = await generateContent(
+              `The user asked: "${query}"\n\nLatest headlines (trusted news feeds):\n${newsItems.slice(0, 10).map(n => `- ${n.title} [${n.source}]${n.date ? ` (${n.date})` : ''}`).join('\n')}${twBlock}\n\nSummarize the current news in a structured answer: ## HEADLINES (numbered, source after each), ## WHAT'S HAPPENING (2-4 sentence synthesis), ## SOURCES. Be accurate — only report what the headlines actually say.`,
+              JEXI_SYSTEM_PROMPT,
+              null,
+              { temperature: 0.3 }
+            );
+            summary = `### 📰 JEXI OS — LATEST NEWS\n\n${summary}`;
+          }
+          try { saveInternetKnowledge(query, summary, results.sources.map(s => s.title)); } catch (e) {}
+          try { addChat('jexi', summary); } catch (e) {}
+          results.summary = summary;
+          results.statistics.confidence = 85;
           return results;
         }
 

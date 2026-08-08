@@ -193,6 +193,45 @@ AI guesses or heavy internet research.
 
 ---
 
+## 📚 The Trusted Library — JEXI reads books & news herself
+
+No uploads needed: JEXI has **built-in access to free, legal, no-key sources** —
+her own "training data", like how big AI companies train on books and papers.
+
+### Sources she reads automatically
+
+| Source | What she gets |
+|--------|---------------|
+| **Wikipedia** | trusted overview of any topic |
+| **Project Gutenberg** | full public-domain BOOKS (whole texts) |
+| **arXiv** | academic papers (PDF) |
+| **Open Library** | book finder (titles, authors, years) |
+| **Google News + BBC RSS** | latest headlines, no API key |
+| **X/Twitter (best-effort)** | via public Nitter mirrors — X has no free API, so this
+  often hits a login wall; she falls back to news feeds and says so honestly |
+
+### How to use it
+
+- **Study / train her on a topic:** say *"study calculus"*, *"learn everything
+  about quantum physics"* or *"master machine learning"*. JEXI opens the
+  Trusted Library, reads the books/papers, distills the knowledge into
+  structured files in her knowledge library, and answers from them forever
+  after — no user uploads involved.
+- **Latest news:** say *"what's the latest news on AI"* or *"what's trending
+  on X"* — she pulls live headlines from trusted feeds (and tries Twitter),
+  summarizes with sources, and **remembers it** so future questions about the
+  same event are answered from memory.
+- Answers cite which source/book each point came from, and everything
+  synthesizes into her memory core (Redis-mirrored, survives redeploys).
+
+> Honest limits: she reads as much of each book as fits her context window
+> (capped per read) and distills the rest — she can't hold thousands of books
+> in RAM on a free 512MB instance. And true neural-network pre-training (like
+> ChatGPT's) needs thousands of GPUs; this retrieval-based "training" is the
+> practical free equivalent.
+
+---
+
 ## Local development (unchanged)
 
 ```bash

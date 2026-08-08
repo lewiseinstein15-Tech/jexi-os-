@@ -75,6 +75,11 @@ export class Planner {
       }
     } catch (e) {}
 
+    // 8.7 Latest news, Twitter/X & trending → dedicated news pipeline
+    if (/(latest|today'?s|breaking|top|headlines?|current)\s*(news|events|stories?)|news (about|on|regarding)|headlines|what'?s? trending|trending on|(latest|breaking) (news|story)|twitter (news|trending|posts|trends)|tweets? (about|on|regarding)|x (posts|tweets|threads?)\b/i.test(q)) {
+      return { intent: 'news_latest', tasks: ['news', 'twitter', 'reasoner', 'memory'], reasoning: 'User wants the latest news / social updates.' };
+    }
+
     // 9. Research / search / facts
     const isResearch = /search|research|find|look up|google|what is|who is|when did|where is|why does|how to|explain|latest|news|history|capital|population|meaning|difference between|benefits of|types of|top \d/i.test(q);
     if (isResearch) {
