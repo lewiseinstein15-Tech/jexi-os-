@@ -15,7 +15,7 @@ import {
   searchInternetKnowledge, searchCodingKnowledge,
   saveInternetKnowledge, saveCodingKnowledge, saveKnowledgeFile,
 } from './MemoryManager.js';
-import { WORKSPACE_DIR, MANAGER_URL, MAX_DEBUG_ATTEMPTS } from '../config.js';
+import { WORKSPACE_DIR, MANAGER_URL, PUBLIC_URL, MAX_DEBUG_ATTEMPTS } from '../config.js';
 
 function readWorkspaceFile(name) {
   const filePath = path.join(WORKSPACE_DIR, name);
@@ -213,7 +213,8 @@ export class Orchestrator {
               return `#### 📄 ${name}\n\n\`\`\`${lang}\n${code.slice(0, 12000)}\n\`\`\``;
             }).join('\n\n');
 
-            const workspaceLinks = files.map(name => `- [${name}](${MANAGER_URL}/api/files/${name})`).join('\n');
+            const linkBase = PUBLIC_URL || MANAGER_URL;
+            const workspaceLinks = files.map(name => `- [${name}](${linkBase}/api/files/${name})`).join('\n');
             const finalOutput = lastOutput && lastOutput.trim() ? `\`\`\`bash\n${lastOutput.trim().slice(0, 1500)}\n\`\`\`` : '';
 
             results.summary = `### 💻 JEXI CODING AGENT — VERIFIED & TESTED\n\n✅ I wrote the code, ran it in the terminal, and confirmed it works without errors.\n\n${fileSections}\n\n**Test Output:**\n${finalOutput || '✓ Ran successfully.'}\n\n**Download the files:**\n${workspaceLinks}`;

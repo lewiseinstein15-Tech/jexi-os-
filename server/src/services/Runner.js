@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import path from 'path';
 import fs from 'fs';
-import { WORKSPACE_DIR, MANAGER_URL } from '../config.js';
+import { WORKSPACE_DIR, MANAGER_URL, PUBLIC_URL } from '../config.js';
 
 /**
  * Run a file in the workspace and capture its output.
@@ -17,7 +17,7 @@ export function runFile(fileName, onOutput) {
     }
 
     if (cleanName.toLowerCase().endsWith('.html')) {
-      const url = `${MANAGER_URL}/preview/${cleanName}`;
+      const url = `${PUBLIC_URL || MANAGER_URL}/preview/${cleanName}`;
       if (onOutput) onOutput('stdout', `Website ready. Preview at: ${url}\n`);
       return resolve({ success: true, output: 'Website generated successfully.', url });
     }

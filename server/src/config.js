@@ -8,6 +8,10 @@ export const PORT = Number(process.env.PORT) || 3002;
 // Override with MANAGER_URL if the manager lives elsewhere.
 export const MANAGER_URL = process.env.MANAGER_URL || `http://127.0.0.1:${PORT}`;
 
+// Public origin for user-facing links (file downloads, previews).
+// Render injects RENDER_EXTERNAL_URL automatically; fall back to MANAGER_URL locally.
+export const PUBLIC_URL = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || '';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Root of the server package (where index.js lives)
