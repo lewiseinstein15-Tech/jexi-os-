@@ -5,6 +5,8 @@ import { getBackendUrl, onBackendUrlChange } from '../utils/helpers';
 
 export default function DesktopViewer({ logs = [] }) {
   const [screenshot, setScreenshot] = useState(null);
+  const [status, setStatus] = useState(null);
+  const [lastUpdate, setLastUpdate] = useState(null);
   const [manualMode, setManualMode] = useState(false);
   const [typeText, setTypeText] = useState('');
   const [lastClick, setLastClick] = useState({ x: 0, y: 0 });
@@ -27,6 +29,19 @@ export default function DesktopViewer({ logs = [] }) {
     };
     takeScreenshot();
     const interval = setInterval(takeScreenshot, 800);
+    return () => clearInterval(interval);
+  }, [backendUrl]);
+
+  // Live browser status so the viewer is never silently blank
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const res = await axios.get(`${backendUrl}/api/desktop/status`);
+        setStatus(res.data);
+      } catch (e) { setStatus({ ready: false, error: 'Backend unreachable — check the Cloud URL above' }); }
+    };
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 4000);
     return () => clearInterval(interval);
   }, [backendUrl]);
 
@@ -80,6 +95,11 @@ export default function DesktopViewer({ logs = [] }) {
         <div className="flex items-center gap-2">
           <Monitor className="w-4 h-4 text-[#00FF9D]" />
           <h2 className="text-[10px] font-bold text-[#00FF9D] tracking-wider">VIRTUAL DESKTOP</h2>
+          {status && (
+            status.ready
+              ? <span className="flex items-center gap-1 bg-[#00FF9D]/10 border border-[#00FF9D]/30 text-[#00FF9D] rounded-full px-2 py-0.5 text-[8px] font-bold"><span className="w-1.5 h-1.5 rounded-full bg-[#00FF9D] animate-pulse" />LIVE</span>
+              : <span className="flex items-center gap-1 bg-red-500/10 border border-red-500/30 text-red-400 rounded-full px-2 py-0.5 text-[8px] font-bold"><span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />OFFLINE</span>
+          )}
         </div>
         <div className="flex gap-1">
           <button onClick={() => setShowUrlInput(!showUrlInput)} className="bg-[#1a1a1a] text-gray-400 rounded px-2 py-1 text-[8px] font-bold flex items-center gap-1">
@@ -100,8 +120,21 @@ export default function DesktopViewer({ logs = [] }) {
       )}
 
       <div className="flex-1 bg-black rounded-xl overflow-hidden border border-[#1a1a1a] relative flex items-center justify-center min-h-0">
-        {screenshot ? <img ref={imgRef} src={screenshot} alt="Desktop" onClick={handleScreenClick} className={`w-full h-full object-contain ${manualMode ? 'cursor-pointer' : ''}`} /> : <div className="text-gray-600 text-[10px]">Connecting to Virtual Desktop...</div>}
+        {screenshot ? (
+          <img ref={imgRef} src={screenshot} alt="Desktop" onClick={handleScreenClick} onLoad={() => setLastUpdate(Date.now())} className={`w-full h-full object-contain ${manualMode ? 'cursor-pointer' : ''}`} />
+        ) : status?.ready === false ? (
+          <div className="text-center px-4">
+            <p className="text-red-400 text-[10px] font-bold mb-1">Virtual Desktop unavailable</p>
+            <p className="text-gray-500 text-[9px] break-all">{status.error || 'Unknown error'}</p>
+          </div>
+        ) : (
+          <div className="text-gray-600 text-[10px] animate-pulse">Connecting to Virtual Desktop...</div>
+        )}
         {manualMode && <div className="absolute top-2 left-2 bg-blue-500/20 backdrop-blur-sm rounded-lg px-2 py-1 border border-blue-500/30"><span className="text-blue-400 text-[8px] font-bold">👆 TAP TO CLICK</span></div>}
+      </div>
+      <div className="flex items-center justify-between mt-1 px-1 text-[8px] text-gray-600">
+        <span>{status?.ready ? '● Streaming live screenshots' : '○ Live streaming paused'}</span>
+        <span>{lastUpdate ? `Updated ${Math.max(0, Math.round((Date.now() - lastUpdate) / 1000))}s ago` : '—'}</span>
       </div>
 
       {manualMode && (

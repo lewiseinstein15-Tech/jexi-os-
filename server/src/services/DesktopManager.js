@@ -20,12 +20,14 @@ let page = null;
 let browserReady = false;
 let browserError = null;
 
-const WELCOME_PAGE = `data:text/html,<html><body style="background:#050505;color:#00FF9D;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+const WELCOME_HTML = `<html><body style="background:#050505;color:#00FF9D;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
 <div style="text-align:center">
 <h1>🖥️ JEXI OS VIRTUAL DESKTOP</h1>
 <p style="color:#888">Browser engine online — JEXI's eyes.</p>
 <p style="color:#555;font-size:12px">Ask JEXI to open a link, research a topic, or build something.<br/>This window shows exactly what JEXI is seeing.</p>
 </div></body></html>`;
+// Must be URL-encoded, or Chromium navigation to the data: URL fails and leaves a blank white page.
+const WELCOME_PAGE = 'data:text/html;charset=utf-8,' + encodeURIComponent(WELCOME_HTML);
 
 export async function ensureBrowser() {
   if (browserReady) return { ok: true };
