@@ -24,6 +24,7 @@ const DEFAULT_MEMORY = {
   internetKnowledge: [],    // { topic, answer, sources[], date }
   codingKnowledge: [],      // { topic, language, solution, files[], date }
   learnedAnswers: [],       // { question, answer, date }  (distilled Q&A)
+  bookLibrary: [],          // { name, file, chars, size, date, text } — the user's own books
 };
 
 let cache = null;
@@ -224,29 +225,107 @@ export function saveKnowledgeFile(category, filename, content) {
   return path.join(safeCat, safeName);
 }
 
-export function searchKnowledge(query) {
+/** Find the densest cluster of keyword hits and return a window around it. */
+function bestExcerpt(content, qwords, radius = 2600) {
+  const lower = content.toLowerCase();
+  const hits = [];
+  for (const w of qwords) {
+    let idx = lower.indexOf(w);
+    while (idx !== -1) { hits.push(idx); idx = lower.indexOf(w, idx + 1); }
+  }
+  if (!hits.length) return null;
+  hits.sort((a, b) => a - b);
+  let bestStart = hits[0], bestCount = 1;
+  for (let i = 0; i < hits.length; i++) {
+    let count = 1;
+    for (let j = i + 1; j < hits.length && hits[j] - hits[i] <= radius * 2; j++) count++;
+    if (count > bestCount) { bestCount = count; bestStart = hits[i]; }
+  }
+  const start = Math.max(0, bestStart - radius);
+  const end = Math.min(content.length, bestStart + radius);
+  const excerpt = content.slice(start, end).trim();
+  return `${start > 0 ? '…' : ''}${excerpt}${end < content.length ? '…' : ''}`;
+}
+
+/**
+ * Search the whole knowledge base: the user's uploaded books (kept in memory so
+ * they survive redeploys via Redis) plus studied-topic files on disk.
+ * Returns excerpts centered on the best match, not whole files.
+ */
+export function searchKnowledge(query, minScore = 2) {
   const results = [];
   const q = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
   if (q.length === 0) return results;
+  const count = (hay) => q.reduce((acc, w) => acc + (hay.includes(w) ? 1 : 0), 0);
+
+  // 1) The user's own books (memory-first: survives restarts via Redis mirror)
+  for (const book of loadMemory().bookLibrary || []) {
+    const text = book.text || '';
+    const score = count(text.toLowerCase());
+    if (score >= 1) {
+      const excerpt = bestExcerpt(text, q);
+      if (excerpt) results.push({ title: book.name, category: 'USER_BOOKS', content: excerpt, score, source: 'book' });
+    }
+  }
+
+  // 2) Studied topic files on disk (USER_BOOKS .md copies are the same books as
+  //    memory, so they are skipped while the memory library is active)
+  const skipBooks = loadMemory().bookLibrary.length > 0;
+  const threshold = Math.min(minScore, q.length);
   const walk = (dir, cat) => {
     if (!fs.existsSync(dir)) return;
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(full, cat || entry.name);
       else if (entry.isFile() && entry.name.endsWith('.md')) {
+        if (cat === 'USER_BOOKS' && skipBooks) continue;
         try {
           const content = fs.readFileSync(full, 'utf-8');
-          const score = q.reduce((acc, w) => acc + (content.toLowerCase().includes(w) ? 1 : 0), 0);
-          if (score >= Math.min(2, q.length)) {
-            results.push({ title: entry.name.replace('.md', ''), category: cat || 'general', content: content.slice(0, 20000), score });
+          const score = count(content.toLowerCase());
+          if (score >= threshold) {
+            results.push({ title: entry.name.replace('.md', ''), category: cat || 'general', content: bestExcerpt(content, q) || content.slice(0, 20000), score });
           }
         } catch (e) {}
       }
     }
   };
   walk(KNOWLEDGE_DIR, null);
-  results.sort((a, b) => b.score - a.score);
-  return results;
+
+  // De-dupe (memory book entries and their USER_BOOKS .md copies are the same book)
+  const seen = new Set();
+  const unique = [];
+  for (const r of results) {
+    const key = String(r.title).toLowerCase();
+    if (!seen.has(key)) { seen.add(key); unique.push(r); }
+  }
+  unique.sort((a, b) => b.score - a.score);
+  return unique;
+}
+
+/* ------------------------------------------------------------------ */
+/* The user's own book library (uploaded PDFs, texts, markdown)        */
+/* ------------------------------------------------------------------ */
+
+export function saveBook(store) {
+  const mem = loadMemory();
+  mem.bookLibrary = (mem.bookLibrary || []).filter(b => b.name !== store.name);
+  mem.bookLibrary.push(store);
+  if (mem.bookLibrary.length > 6) mem.bookLibrary = mem.bookLibrary.slice(-6);
+  saveMemory();
+  return store;
+}
+
+export function listSavedBooks() {
+  return loadMemory().bookLibrary || [];
+}
+
+export function removeSavedBook(name) {
+  const mem = loadMemory();
+  const idx = (mem.bookLibrary || []).findIndex(b => b.name === name);
+  if (idx === -1) return null;
+  const [removed] = mem.bookLibrary.splice(idx, 1);
+  saveMemory();
+  return removed;
 }
 
 export function getKnowledgeStructure() {

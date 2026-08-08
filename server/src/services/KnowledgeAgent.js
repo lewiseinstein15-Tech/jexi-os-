@@ -112,19 +112,19 @@ function getSubtopics(topic) {
   return [topic];
 }
 
-export async function recallKnowledge(query, sendEvent) {
-  // First: search JEXI's own knowledge library (fast, offline)
+export async function recallKnowledge(query, sendEvent, minScore = 2) {
+  // First: search JEXI's own knowledge library (fast, offline) — includes the user's books
   try {
-    const local = searchKnowledge(query);
+    const local = searchKnowledge(query, minScore);
     if (local.length > 0) {
-      return local.map(k => `From ${k.title}:\n${k.content}`).join('\n\n---\n\n');
+      return local.map(k => ({ title: k.title, content: k.content, score: k.score, source: k.source || 'library' }));
     }
   } catch (e) {}
   // Fallback: ask the manager service
   try {
     const res = await fetch(`${MANAGER_URL}/api/knowledge/search?query=${encodeURIComponent(query)}`, { signal: AbortSignal.timeout(4000) });
     const data = await res.json();
-    if (data.length > 0) return data.map(k => `From ${k.title}:\n${k.content}`).join('\n\n---\n\n');
+    if (data.length > 0) return data.map(k => ({ title: k.title, content: k.content, score: k.score || 2, source: k.source || 'library' }));
   } catch (e) {}
   return null;
 }

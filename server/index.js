@@ -17,7 +17,8 @@ import {
   saveKnowledgeFile, searchKnowledge, getKnowledgeStructure, getKnowledgeStatus,
   hydrateFromRedis,
 } from './src/services/MemoryManager.js';
-import { PORT, WORKSPACE_DIR, SERVER_ROOT } from './src/config.js';
+import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
+import { PORT, WORKSPACE_DIR, DATA_DIR, SERVER_ROOT } from './src/config.js';
 
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
 // everything across restarts/redeploys (non-blocking).
@@ -30,7 +31,7 @@ process.on('unhandledRejection', (e) => { recordError('process', (e && e.message
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '20mb' })); // Increased for code files + images
+app.use(express.json({ limit: '30mb' })); // Room for base64 book uploads + code files + images
 
 fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
 
@@ -181,6 +182,33 @@ app.post('/api/knowledge/save', (req, res) => {
     const file = saveKnowledgeFile(req.body.category, req.body.filename, req.body.content);
     res.json({ success: true, file });
   } catch (e) { res.json({ success: false, error: e.message }); }
+});
+
+// === THE USER'S OWN BOOK LIBRARY (PDF / TXT / Markdown → knowledge) ===
+app.post('/api/knowledge/books/upload', async (req, res) => {
+  try { res.json(await importBookBuffer(req.body || {})); }
+  catch (e) { recordError('knowledge', e.message); res.status(400).json({ success: false, error: e.message }); }
+});
+
+app.post('/api/knowledge/books/url', async (req, res) => {
+  try { res.json(await importBookUrl(req.body || {})); }
+  catch (e) { recordError('knowledge', e.message); res.status(400).json({ success: false, error: e.message }); }
+});
+
+app.get('/api/knowledge/books', (req, res) => res.json(listBooks()));
+
+app.delete('/api/knowledge/books/:name', (req, res) => {
+  try { res.json(deleteBook(req.params.name)); }
+  catch (e) { res.status(400).json({ success: false, error: e.message }); }
+});
+
+app.get('/api/knowledge/books/:name/file', (req, res) => {
+  try {
+    const file = path.basename(req.params.name); // basename blocks path traversal
+    const fp = path.join(DATA_DIR, 'books', file);
+    if (!fs.existsSync(fp)) return res.status(404).json({ error: 'Original file not stored (only link-imported books lack a local copy).' });
+    res.download(fp, file);
+  } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 // === CHAT API ===

@@ -130,6 +130,38 @@ export async function analyzeLink(url) {
   throw new Error('No readable content found on this page (login wall or empty page).');
 }
 
+/** Extract plain text from a PDF buffer (used by the book library). */
+export async function extractPdfText(arrayBuffer) {
+  const pdf = await getDocumentProxy(new Uint8Array(arrayBuffer));
+  const { text } = await extractText(pdf, { mergePages: true });
+  return String(text || '');
+}
+
+/**
+ * Download a book/document from a URL for the knowledge library.
+ * PDFs are parsed with unpdf; anything else is read as plain text.
+ */
+export async function downloadBookFromUrl(url) {
+  if (await isSSRF(url)) throw new Error('Security blocked (SSRF)');
+  const buf = await fetchBuffer(url);
+  const bytes = new Uint8Array(buf);
+  const isPdf =
+    url.toLowerCase().endsWith('.pdf') ||
+    url.includes('filetype=pdf') ||
+    (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46); // %PDF
+  let name = '';
+  try { name = decodeURIComponent(url.split('/').pop()?.split('?')[0] || ''); } catch (e) {}
+  if (!name) name = isPdf ? 'book.pdf' : 'book.txt';
+  if (isPdf) {
+    const text = await extractPdfText(buf);
+    if (text.length < 40) throw new Error('This PDF has no extractable text (it may be a scanned/image PDF).');
+    return { name, mime: 'application/pdf', text };
+  }
+  const text = Buffer.from(buf).toString('utf-8');
+  if (text.length < 40) throw new Error('No readable text found at this URL.');
+  return { name, mime: 'text/plain', text };
+}
+
 export async function extractContent(url) {
   if (await isSSRF(url)) throw new Error('Security blocked (SSRF)');
 
@@ -164,8 +196,7 @@ export async function extractContent(url) {
   if (url.toLowerCase().endsWith('.pdf') || url.includes('filetype=pdf')) {
     try {
       const arrayBuffer = await fetchBuffer(url);
-      const pdf = await getDocumentProxy(new Uint8Array(arrayBuffer));
-      const { text } = await extractText(pdf, { mergePages: true });
+      const text = await extractPdfText(arrayBuffer);
       return { title: url.split('/').pop() || 'PDF Document', content: text, length: text.length, method: 'pdf-book' };
     } catch (e) {
       throw new Error(`PDF extraction failed: ${e.message}`);

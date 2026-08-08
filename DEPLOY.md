@@ -152,6 +152,47 @@ Docker volume), and it's also the image for any VPS.
 
 ---
 
+---
+
+## 📚 The book library — JEXI answers from YOUR books (not just the internet)
+
+Upload your own books & PDFs and JEXI treats them as the **first source of truth**
+when answering — grounded, accurate answers with citations, instead of generic
+AI guesses or heavy internet research.
+
+### Add books (two ways, in the **Knowledge** tab)
+
+1. **ADD A BOOK / PDF** — pick `.pdf`, `.txt` or `.md` files from your device
+   (max 15MB each, up to 6 books). PDFs are parsed server-side with `unpdf`;
+   text files are read directly.
+2. **FETCH from a link** — paste a direct URL to a PDF or text file and JEXI
+   downloads and indexes it (SSRF-guarded).
+
+### How it works
+
+- Book text is stored in the memory core (`bookLibrary`), which is **mirrored to
+  Redis** when `REDIS_URL` is set — so books survive redeploys/restarts.
+- On every chat message, JEXI searches her books **before** touching the
+  internet. Questions like *"what does my book say about X"* are routed
+  straight to the library.
+- Answers cite the source book, quote the relevant passages, and only use the
+  AI to *compose* the answer from those passages (a small, cheap prompt).
+- **No AI key? Still useful** — she returns the exact matching passage as a
+  direct quote, so simple lookups work even without `GROQ_API_KEY`/
+  `GEMINI_API_KEY`.
+
+### Persistence notes
+
+- Book *text* lives in `memory.json` (Redis-mirrored) → survives restarts.
+- The original uploaded file is saved to `DATA_DIR/books/` for download — on
+  Render's free tier that disk is ephemeral and resets on redeploy, so keep
+  your source PDFs; a persistent disk or HF Spaces bucket makes originals
+  permanent too.
+- Scanned/image-only PDFs (no text layer) can't be read without OCR — JEXI
+  will tell you when a file has no extractable text.
+
+---
+
 ## Local development (unchanged)
 
 ```bash

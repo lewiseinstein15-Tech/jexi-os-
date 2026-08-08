@@ -38,6 +38,27 @@ function conversationContext() {
 export class Orchestrator {
   constructor() { this.executionHistory = []; }
 
+  /** Answer using ONLY the user's own books/knowledge library (with citations). */
+  async answerFromKnowledge(kb, query) {
+    const items = Array.isArray(kb) ? kb : [kb];
+    const context = items.map(k => `📖 From "${k.title}":\n${k.content}`).join('\n\n---\n\n').slice(0, 14000);
+
+    // No AI key? Still useful: return the exact passage as a direct quote.
+    const keys = resolveKeys();
+    if (!keys.groqKey && !keys.geminiKey) {
+      const top = items[0];
+      return `### 📚 JEXI OS — FROM YOUR BOOKS\n\nI found this in **${top.title}** (direct quote — no AI key needed):\n\n> ${top.content.slice(0, 2500)}`;
+    }
+
+    const reply = await generateContent(
+      `The user asked: "${query}"\n\nThe passages below come from the user's OWN books and knowledge library — they are the authoritative source for this answer.\n\n${context}\n\nAnswer the question using ONLY these passages. Rules:\n- Structure the answer clearly (headings, numbered points, tables where helpful).\n- Cite the source book after each point, e.g. (From "Title").\n- If the passages do not contain the answer, say so honestly instead of guessing or inventing.\n- Do NOT go outside these passages.`,
+      JEXI_SYSTEM_PROMPT,
+      null,
+      { temperature: 0.3 }
+    );
+    return `### 📚 JEXI OS — FROM YOUR BOOKS\n\n${reply}`;
+  }
+
   async executePlan(plan, query, sendEvent, opts = {}) {
     const startTime = Date.now();
     const results = { success: true, query, intent: plan.intent, tasks: plan.tasks, agentResults: {}, summary: '', sources: [], statistics: { executionTime: 0, agentsUsed: plan.tasks.length, confidence: 0 } };
@@ -237,7 +258,21 @@ export class Orchestrator {
         /* ---------------- DEEP RESEARCH & LEARNING ---------------- */
         case 'research':
         case 'learning_research': {
-          // 1. Check memory first — did we already learn this?
+          // 1. The user's own books/library come FIRST — grounded answers from their materials
+          try {
+            const fromBooks = await recallKnowledge(query, sendEvent, 1);
+            if (fromBooks) {
+              sendEvent('log', { agent: 'Books', message: '📚 Found it in your books / knowledge library — answering from there.' });
+              const summary = await this.answerFromKnowledge(fromBooks, query);
+              try { addChat('jexi', summary); } catch (e) {}
+              results.summary = summary;
+              results.sources = fromBooks.map(k => ({ title: k.title, link: '' }));
+              results.statistics.confidence = 95;
+              return results;
+            }
+          } catch (e) {}
+
+          // 2. Check memory first — did we already learn this?
           try {
             const remembered = searchInternetKnowledge(query);
             if (remembered) {
@@ -249,7 +284,7 @@ export class Orchestrator {
             }
           } catch (e) {}
 
-          // 2. Search the internet (trusted sources)
+          // 3. Search the internet (trusted sources)
           sendEvent('log', { agent: 'Search', message: `🔍 Searching trusted sources for: "${query}"` });
           const sources = await aggregateSearch(query);
           results.sources = sources.slice(0, 5).map(s => ({ title: s.title, link: s.link }));
@@ -266,7 +301,7 @@ export class Orchestrator {
             }
           }
 
-          // 3. Deep-read the top trusted sources
+          // 4. Deep-read the top trusted sources
           sendEvent('log', { agent: 'Extractor', message: `📖 Deep-reading top ${Math.min(sources.length, 4)} sources...` });
           const deep = [];
           for (const src of sources.slice(0, 4)) {
@@ -281,7 +316,7 @@ export class Orchestrator {
             }
           }
 
-          // 4. Synthesize: reframe raw info into a direct answer
+          // 5. Synthesize: reframe raw info into a direct answer
           sendEvent('log', { agent: 'Reasoner', message: '🧠 Synthesizing answer...' });
           const { summary } = await reasonAndWrite(query, deep);
           try { addChat('jexi', summary); } catch (e) {}
@@ -299,21 +334,18 @@ export class Orchestrator {
           return results;
         }
 
-        /* ---------------- KNOWLEDGE RECALL ---------------- */
+        /* ---------------- KNOWLEDGE RECALL (answer from the user's books/library) ---------------- */
         case 'knowledge_recall': {
           const kb = plan.payload || (await recallKnowledge(query, sendEvent));
           if (kb) {
-            const context = Array.isArray(kb) ? kb.map(k => `From ${k.title}:\n${k.content}`).join('\n\n---\n\n') : kb;
-            const reply = await generateContent(
-              `The user asked: "${query}"\n\nKnowledge from my library:\n${context.slice(0, 14000)}\n\nWrite a well-structured answer with numbered points.`,
-              JEXI_SYSTEM_PROMPT
-            );
-            try { addChat('jexi', reply); } catch (e) {}
-            results.summary = `### 🧠 JEXI OS\n\n${reply}`;
+            const summary = await this.answerFromKnowledge(kb, query);
+            try { addChat('jexi', summary); } catch (e) {}
+            results.summary = summary;
+            results.sources = (Array.isArray(kb) ? kb : [kb]).map(k => ({ title: k.title, link: '' }));
             results.statistics.confidence = 95;
             return results;
           }
-          // Fall through to research if library has nothing
+          // Fall through to research if the library has nothing
           const { summary } = await reasonAndWrite(query, []);
           results.summary = summary;
           return results;
@@ -361,6 +393,17 @@ export class Orchestrator {
 
         /* ---------------- DEFAULT ---------------- */
         default: {
+          // Check the user's own books/library before generic research
+          try {
+            const fromBooks = await recallKnowledge(query, sendEvent, 1);
+            if (fromBooks) {
+              const summary = await this.answerFromKnowledge(fromBooks, query);
+              try { addChat('jexi', summary); } catch (e) {}
+              results.summary = summary;
+              results.statistics.confidence = 90;
+              return results;
+            }
+          } catch (e) {}
           const { summary } = await reasonAndWrite(query, [], { memoryContext: conversationContext() });
           try { addChat('jexi', summary); } catch (e) {}
           results.summary = summary;
