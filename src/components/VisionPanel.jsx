@@ -14,6 +14,37 @@ const MOUTH_LEFT = 61, MOUTH_RIGHT = 291, MOUTH_TOP = 13, MOUTH_BOTTOM = 14;
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
+// --- Face recognition (creator enrollment) ---
+// Normalize 10 geometric face ratios (scale-invariant) and compare with cosine
+// similarity, entirely on-device. Saved to localStorage — never leaves the browser.
+const MATCH_THRESHOLD = 0.95;
+const MATCH_STREAK = 3;
+const CREATOR_KEY = 'jexi_creator_face';
+
+const faceVector = (lms) => {
+  const d = (i, j) => Math.hypot(lms[i].x - lms[j].x, lms[i].y - lms[j].y);
+  const eyeLine = d(33, 263), faceH = d(10, 152), faceW = d(234, 454);
+  const e = (a, b) => a / (b + 1e-6);
+  return [
+    e(eyeLine, faceH),
+    e(faceW, faceH),
+    e(d(1, 13), eyeLine),
+    e(d(61, 291), eyeLine),
+    e(d(13, 14), eyeLine),
+    e(d(159, 145), d(33, 133)),
+    e(d(386, 374), d(362, 263)),
+    e(d(55, 159), eyeLine),
+    e(d(285, 386), eyeLine),
+    e(Math.abs(lms[168].y - lms[10].y), faceH),
+  ];
+};
+
+const cosine = (a, b) => {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-9);
+};
+
 function computeExpressions(lms) {
   const fw = dist(lms[234], lms[454]);
   const fh = dist(lms[10], lms[152]);
@@ -40,6 +71,8 @@ export default function VisionPanel({ open, onClose, onVision }) {
   const landmarkerRef = useRef(null);
   const rafRef = useRef(null);
   const lastTickRef = useRef(0);
+  const enrolledRef = useRef(null);
+  const streakRef = useRef(0);
 
   const [camStatus, setCamStatus] = useState('starting'); // starting | on | error
   const [camError, setCamError] = useState('');
@@ -48,6 +81,24 @@ export default function VisionPanel({ open, onClose, onVision }) {
   const [thinking, setThinking] = useState(false);
   const [visionText, setVisionText] = useState('');
   const [visionError, setVisionError] = useState('');
+  const [enrolled, setEnrolled] = useState(null);
+  const [matched, setMatched] = useState(false);
+  const [similarity, setSimilarity] = useState(0);
+  const [enrolling, setEnrolling] = useState(false);
+
+  // Load the saved creator face (device-local, private)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CREATOR_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.vector)) {
+          enrolledRef.current = parsed.vector;
+          setEnrolled(parsed.vector);
+        }
+      }
+    } catch {}
+  }, []);
 
   const stopCamera = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -113,7 +164,17 @@ export default function VisionPanel({ open, onClose, onVision }) {
           if (lm && video && video.videoWidth > 0) {
             const res = lm.detectForVideo(video, ts);
             if (res.faceLandmarks && res.faceLandmarks.length > 0) {
-              setExpressions(computeExpressions(res.faceLandmarks[0]));
+              const lms = res.faceLandmarks[0];
+              setExpressions(computeExpressions(lms));
+              if (enrolledRef.current) {
+                const sim = cosine(enrolledRef.current, faceVector(lms));
+                streakRef.current = sim > MATCH_THRESHOLD ? streakRef.current + 1 : 0;
+                const isMatch = streakRef.current >= MATCH_STREAK;
+                setMatched(isMatch);
+                setSimilarity(Math.round(sim * 1000) / 10);
+              } else {
+                setMatched(false);
+              }
             } else {
               setExpressions(prev => prev ? { ...prev, faceLost: true } : { faceLost: true });
             }
@@ -136,16 +197,56 @@ export default function VisionPanel({ open, onClose, onVision }) {
     return canvas.toDataURL('image/jpeg', 0.7);
   };
 
+  const enroll = async () => {
+    if (enrolling) return;
+    setEnrolling(true);
+    setVisionError('');
+    const samples = [];
+    for (let i = 0; i < 4; i++) {
+      try {
+        const lm = landmarkerRef.current;
+        const video = videoRef.current;
+        if (lm && video && video.videoWidth > 0) {
+          const res = lm.detectForVideo(video, performance.now());
+          if (res.faceLandmarks && res.faceLandmarks.length > 0) samples.push(faceVector(res.faceLandmarks[0]));
+        }
+      } catch {}
+      await new Promise(r => setTimeout(r, 400));
+    }
+    if (samples.length >= 3) {
+      const avg = samples[0].map((_, i) => samples.reduce((s, v) => s + v[i], 0) / samples.length);
+      enrolledRef.current = avg;
+      setEnrolled(avg);
+      setMatched(true);
+      setSimilarity(100);
+      localStorage.setItem(CREATOR_KEY, JSON.stringify({ vector: avg, at: new Date().toISOString() }));
+    } else {
+      setVisionError('Could not capture your face — make sure you are centered and well-lit in the camera.');
+    }
+    setEnrolling(false);
+  };
+
+  const clearCreator = () => {
+    enrolledRef.current = null;
+    setEnrolled(null);
+    setMatched(false);
+    setSimilarity(0);
+    localStorage.removeItem(CREATOR_KEY);
+  };
+
   const askVision = async () => {
     const img = captureFrame();
     if (!img) return;
     setThinking(true);
     setVisionError('');
     try {
+      const who = matched
+        ? 'I am Lewis Einstein, your creator (an AI & ML Engineer), looking at you through my camera. Recognize me, greet me by name as your creator, and describe how I look today.'
+        : 'Look at me through my camera. Tell me what you see, who I am, and how I look right now.';
       const res = await fetch(`${getBackendUrl()}/api/vision`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: img, prompt: 'Look at me through my camera. Tell me what you see, who I am, and how I look right now.' }),
+        body: JSON.stringify({ image: img, prompt: who }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
@@ -200,10 +301,30 @@ export default function VisionPanel({ open, onClose, onVision }) {
 
         <div className="flex flex-wrap gap-1.5 mt-2 min-h-[24px]">
           {mpStatus === 'loading' && <span className="text-[9px] text-gray-500 animate-pulse">Loading face engine…</span>}
-          {mpStatus === 'ready' && chips.length === 0 && <span className="text-[9px] text-gray-500">Look at the camera 👋</span>}
+          {mpStatus === 'ready' && chips.length === 0 && !enrolled && <span className="text-[9px] text-gray-500">Look at the camera 👋</span>}
           {chips.map((c, i) => <span key={i} className="bg-[#00FF9D]/10 border border-[#00FF9D]/30 text-[#00FF9D] rounded-full px-2 py-0.5 text-[9px] font-bold">{c}</span>)}
+          {enrolled && matched && <span className="bg-amber-400/15 border border-amber-400/40 text-amber-300 rounded-full px-2 py-0.5 text-[9px] font-bold">👑 Creator — Lewis{similarity > 0 && ` · ${similarity}%`}</span>}
+          {enrolled && !matched && expressions && !expressions.faceLost && <span className="bg-gray-500/10 border border-gray-500/30 text-gray-300 rounded-full px-2 py-0.5 text-[9px] font-bold">🙂 New face{similarity > 0 && ` · ${similarity}%`}</span>}
           {mpStatus === 'error' && <span className="text-[9px] text-amber-400">Face engine off — camera + JEXI vision still work.</span>}
         </div>
+
+        {!enrolled && camStatus === 'on' && mpStatus === 'ready' && (
+          <button
+            onClick={enroll}
+            disabled={enrolling}
+            className="mt-3 w-full bg-amber-400/15 border border-amber-400/40 text-amber-300 rounded-xl py-2.5 text-[11px] font-bold flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-amber-400/25 transition-colors"
+          >
+            {enrolling
+              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Capturing your face — keep looking at the camera…</>
+              : <>👑 Teach JEXI your face (make me creator)</>}
+          </button>
+        )}
+        {enrolled && (
+          <div className="flex items-center justify-between mt-3">
+            <span className="text-[9px] text-amber-300/80">👑 Creator face saved on this device</span>
+            <button onClick={clearCreator} className="text-[9px] text-gray-500 hover:text-red-400 underline">Re-teach / Clear</button>
+          </div>
+        )}
 
         <button
           onClick={askVision}

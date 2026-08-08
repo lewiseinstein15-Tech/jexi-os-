@@ -7,6 +7,7 @@ import { extractContent, analyzeLink } from './Extractor.js';
 import { reasonAndWrite } from './Reasoner.js';
 import { learnHowTo } from './Researcher.js';
 import { generateContent, resolveKeys } from './LLMClient.js';
+import { collectSystemStatus, readSourceFile } from './SelfMonitor.js';
 import { studyTopic, recallKnowledge } from './KnowledgeAgent.js';
 import { ComputerUseAgent } from './ComputerUseAgent.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
@@ -315,6 +316,46 @@ export class Orchestrator {
           // Fall through to research if library has nothing
           const { summary } = await reasonAndWrite(query, []);
           results.summary = summary;
+          return results;
+        }
+
+        /* ---------------- SELF-DIAGNOSIS — JEXI inspects her own system ---------------- */
+        case 'self_check': {
+          sendEvent('log', { agent: 'SelfDiagnose', message: '🔍 Running full system diagnostics...' });
+          const status = collectSystemStatus();
+
+          // Read the most likely source files based on recent errors
+          const hints = [
+            [/groq|gemini|api.?key|401|403|429|rate ?limit/i, 'server/src/services/LLMClient.js'],
+            [/browser|chromium|playwright|executable|missing|no-sandbox/i, 'server/src/services/DesktopManager.js'],
+            [/redis|memory|hydrate|knowledge/i, 'server/src/services/MemoryManager.js'],
+            [/fetch|enotfound|timeout|search|aggregate/i, 'server/src/services/SearchEngine.js'],
+            [/vision|no image/i, 'server/index.js'],
+          ];
+          const targets = [];
+          for (const e of status.errors.recent) {
+            for (const [re, file] of hints) {
+              if (re.test(e.message) && !targets.includes(file)) targets.push(file);
+            }
+          }
+          if (targets.length === 0) targets.push('server/index.js', 'server/src/services/Orchestrator.js');
+          const excerpts = targets.slice(0, 3)
+            .map(f => readSourceFile(f))
+            .filter(r => r.ok)
+            .map(r => `--- FILE: ${r.path} ---\n${r.content.slice(0, 2500)}`)
+            .join('\n\n');
+
+          sendEvent('log', { agent: 'SelfDiagnose', message: `📋 Status: ${status.keys.groq || status.keys.gemini ? 'AI keys OK' : 'NO AI KEYS'}, browser ${status.browser.ready ? 'OK' : 'DOWN'}, ${status.errors.count} logged error(s).` });
+          const reply = await generateContent(
+            `My live self-diagnosis (JSON):\n${JSON.stringify(status, null, 2)}\n\nSource code I inspected:\n${excerpts || '(none)'}\n\nIf something is wrong, identify the exact file and root cause, then give the precise fix. If everything is healthy, say so briefly and warmly (I am JEXI OS, created by Lewis Einstein). Use ## HEALTH, ## ISSUES FOUND, ## ROOT CAUSE + FILE, ## FIX.`,
+            JEXI_SYSTEM_PROMPT,
+            null,
+            { temperature: 0.3 }
+          );
+          try { addChat('jexi', reply); } catch (e) {}
+          results.summary = `### 🩺 JEXI SELF-DIAGNOSIS\n\n${reply}`;
+          results.statistics.agentsUsed = 2;
+          results.statistics.confidence = 90;
           return results;
         }
 

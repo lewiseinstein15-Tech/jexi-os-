@@ -5,6 +5,10 @@ import path from 'path';
 import { planner } from './src/services/Planner.js';
 import { orchestrator } from './src/services/Orchestrator.js';
 import { generateContent, resolveKeys } from './src/services/LLMClient.js';
+import {
+  recordBoot, recordChat, recordVision, recordError,
+  collectSystemStatus, readSourceFile,
+} from './src/services/SelfMonitor.js';
 import { loadSettings, saveSettings } from './src/services/SettingsManager.js';
 import { DesktopManager, ensureBrowser, browserStatus } from './src/services/DesktopManager.js';
 import {
@@ -17,7 +21,12 @@ import { PORT, WORKSPACE_DIR, SERVER_ROOT } from './src/config.js';
 
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
 // everything across restarts/redeploys (non-blocking).
-hydrateFromRedis().catch(() => {});
+hydrateFromRedis().catch((e) => { recordError('memory', (e && e.message) || String(e)); });
+
+// Self-monitoring: she keeps a live error log and can diagnose her own system.
+recordBoot();
+process.on('uncaughtException', (e) => { recordError('process', e.message, e.stack); console.error('[FATAL]', e); process.exit(1); });
+process.on('unhandledRejection', (e) => { recordError('process', (e && e.message) || String(e)); });
 
 const app = express();
 app.use(cors());
@@ -170,6 +179,7 @@ app.post('/api/knowledge/save', (req, res) => {
 app.post('/api/vision', async (req, res) => {
   try {
     const { image, prompt } = req.body;
+    recordVision();
     if (!image) return res.status(400).json({ success: false, error: 'No image provided' });
     const { groqKey, geminiKey } = resolveKeys();
     if (!groqKey && !geminiKey) {
@@ -185,12 +195,14 @@ app.post('/api/vision', async (req, res) => {
     );
     res.json({ success: true, text });
   } catch (e) {
+    recordError('vision', e.message);
     res.status(500).json({ success: false, error: e.message });
   }
 });
 
 app.post('/api/chat', async (req, res) => {
   const { query, image } = req.body;
+  recordChat();
   if (!query && !image) return res.status(400).json({ success: false, error: 'No query provided' });
 
   res.setHeader('Content-Type', 'application/x-ndjson');
@@ -205,12 +217,17 @@ app.post('/api/chat', async (req, res) => {
 
     sendEvent('done', { success: results.success, query, summary: results.summary, sources: results.sources || [], statistics: results.statistics, files: results.files || [] });
   } catch (error) {
+    recordError('chat', error.message);
     sendEvent('log', { agent: 'System', message: `Critical Error: ${error.message}` });
     sendEvent('done', { success: false, error: error.message });
   } finally { res.end(); }
 });
 
 app.get('/api/health', (req, res) => res.json({ ok: true, name: 'JEXI OS Brain', version: '1.0.0', port: PORT }));
+
+// === SELF-MONITORING (JEXI diagnoses her own system + reads her own source) ===
+app.get('/api/self/status', (req, res) => res.json(collectSystemStatus()));
+app.get('/api/self/source', (req, res) => res.json(readSourceFile(req.query.path || '')));
 
 // === SINGLE-CONTAINER MODE ===
 // When the frontend is built into server/public (Hugging Face Spaces Docker image),
@@ -232,7 +249,8 @@ app.listen(PORT, '0.0.0.0', () => {
   setTimeout(async () => {
     try {
       const { ok, error } = await ensureBrowser();
-      console.log(ok ? '✅ [Desktop] Chromium ready - JEXI has eyes.' : `⚠️ [Desktop] ${error}`);
+      if (ok) console.log('✅ [Desktop] Chromium ready - JEXI has eyes.');
+      else { console.log(`⚠️ [Desktop] ${error}`); recordError('desktop', error); }
     } catch (e) { console.log(`⚠️ [Desktop] browser self-check failed: ${e.message}`); }
   }, 4000);
 });

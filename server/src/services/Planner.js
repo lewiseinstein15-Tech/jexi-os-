@@ -52,7 +52,12 @@ export class Planner {
       return { intent: 'memory_query', tasks: ['memory'], reasoning: 'User asks about memory.' };
     }
 
-    // 8. Knowledge base recall — check the knowledge library first
+    // 8. Self-diagnosis — JEXI checks her own system, reads her source, reports root causes
+    if (/self[- ]?check|check yourself|diagnos(e|tic)|run (a )?(system|self) check|system status|are you (ok|okay|healthy|fine)|monitor yourself|what'?s wrong|any errors|health check/i.test(q)) {
+      return { intent: 'self_check', tasks: ['self', 'reasoning', 'memory'], reasoning: 'JEXI runs a full self-diagnosis and reports system health with root causes.' };
+    }
+
+    // 9. Knowledge base recall — check the knowledge library first
     try {
       const kb = searchKnowledge(query);
       if (kb.length > 0) {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Square, ImagePlus, X, Camera } from 'lucide-react';
+import { Send, Square, ImagePlus, X, Camera, Stethoscope } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import TypedMessage from './TypedMessage';
 import VisionPanel from './VisionPanel';
@@ -107,6 +107,14 @@ export default function ChatWindow({ messages, isProcessing, onSend, onStop, onV
           title="Attach image"
         >
           <ImagePlus className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onSend('JEXI, run a full system self-check now. Check your health, memory, eyes and recent errors. If anything is wrong, tell me the exact source file and the fix.')}
+          className="bg-[#1a1a1a] text-gray-400 hover:text-[#00FF9D] rounded-lg px-2.5 py-2.5 flex-shrink-0"
+          title="Run a self-check — JEXI diagnoses her own system"
+        >
+          <Stethoscope className="w-4 h-4" />
         </button>
         <input
           type="text"
