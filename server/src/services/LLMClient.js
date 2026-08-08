@@ -15,54 +15,87 @@ export function resolveKeys() {
   };
 }
 
+// --- Current, valid model names (verified against Google's docs, Aug 2026).
+// gemini-1.5-flash-latest was REMOVED from the API (404) — never use it as primary.
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'; // multimodal, best price-performance
+const GEMINI_FALLBACK_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-1.5-flash'];
+
+// Groq vision-capable models, tried in order when an image is attached.
+const GROQ_VISION_MODELS = [
+  'meta-llama/llama-4-scout-17b-16e-instruct',
+  'meta-llama/llama-3.2-11b-vision-preview',
+];
+const GROQ_TEXT_MODEL = 'llama-3.1-8b-instant';
+
+/** Read the MIME type out of a data: URL (camera sends image/jpeg, uploads can be png/webp). */
+export function mimeFromDataUrl(dataUrl) {
+  const m = /^data:([^;,]+)[;,]/.exec(dataUrl || '');
+  return m ? m[1] : 'image/png';
+}
+
 export async function generateContent(prompt, systemInstruction = '', imageBase64 = null, opts = {}) {
   const { groqKey, geminiKey } = resolveKeys();
+  const errors = [];
+  const system = systemInstruction || 'You are JEXI OS, an expert AI operating system.';
 
   // 1. Try Groq first (fast, free tier)
   if (groqKey) {
-    try {
-      const groq = new Groq({ apiKey: groqKey });
-      const messages = [
-        { role: 'system', content: systemInstruction || 'You are JEXI OS, an expert AI operating system.' },
-        {
-          role: 'user',
-          content: imageBase64
-            ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: imageBase64 } }]
-            : prompt,
-        },
-      ];
-      const model = imageBase64 ? 'meta-llama/llama-4-scout-17b-16e-instruct' : (opts.model || 'llama-3.1-8b-instant');
-      const completion = await groq.chat.completions.create({ messages, model, temperature: opts.temperature ?? 0.4 });
-      const text = completion.choices[0]?.message?.content || '';
-      if (text) return text.trim();
-      console.error('[LLMClient] Groq returned empty response');
-    } catch (e) {
-      console.error('[LLMClient] Groq failed:', e.message);
-    }
-  }
-
-  // 2. Fallback to Google Gemini
-  if (geminiKey) {
-    try {
-      const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({
-        model: opts.geminiModel || 'gemini-1.5-flash-latest',
-        systemInstruction: systemInstruction || 'You are JEXI OS, an expert AI operating system.',
-      });
-      const parts = [{ text: prompt }];
-      if (imageBase64) {
-        parts.push({ inlineData: { data: imageBase64.split(',')[1] || imageBase64, mimeType: 'image/png' } });
+    const groq = new Groq({ apiKey: groqKey });
+    const models = imageBase64 ? GROQ_VISION_MODELS : [opts.model || GROQ_TEXT_MODEL];
+    for (const model of models) {
+      try {
+        const messages = [
+          { role: 'system', content: system },
+          {
+            role: 'user',
+            content: imageBase64
+              ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: imageBase64 } }]
+              : prompt,
+          },
+        ];
+        const completion = await groq.chat.completions.create({ messages, model, temperature: opts.temperature ?? 0.4 });
+        const text = completion.choices[0]?.message?.content || '';
+        if (text) return text.trim();
+        errors.push(`Groq(${model}) returned an empty response`);
+      } catch (e) {
+        errors.push(`Groq(${model}): ${e.message}`);
+        console.error('[LLMClient] Groq failed:', e.message);
       }
-      const result = await model.generateContent(parts);
-      const text = result.response.text();
-      if (text) return text.trim();
-      throw new Error('Gemini returned empty response');
-    } catch (e) {
-      console.error('[LLMClient] Gemini failed:', e.message);
-      throw new Error(`Both AI providers failed. Last error: ${e.message}`);
     }
   }
 
+  // 2. Fallback to Google Gemini — try the primary model, then recent valid ones.
+  if (geminiKey) {
+    const genAI = new GoogleGenerativeAI(geminiKey);
+    const primary = opts.geminiModel || process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+    const candidates = [primary, ...GEMINI_FALLBACK_MODELS.filter(m => m !== primary)].slice(0, 4);
+
+    for (const modelName of candidates) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName, systemInstruction: system });
+        const parts = [{ text: prompt }];
+        if (imageBase64) {
+          parts.push({
+            inlineData: {
+              data: imageBase64.split(',')[1] || imageBase64,
+              mimeType: mimeFromDataUrl(imageBase64),
+            },
+          });
+        }
+        const result = await model.generateContent(parts);
+        const text = result.response.text();
+        if (text) return text.trim();
+        errors.push(`Gemini(${modelName}) returned an empty response`);
+      } catch (e) {
+        errors.push(`Gemini(${modelName}): ${e.message}`);
+        console.error('[LLMClient] Gemini failed:', e.message);
+      }
+    }
+  }
+
+  if (groqKey || geminiKey) {
+    throw new Error(`Both AI providers failed. ${errors.join(' | ')}`);
+  }
   throw new Error('No API keys configured. Add a Groq or Gemini key in Settings, or set GROQ_API_KEY/GEMINI_API_KEY.');
 }
 
