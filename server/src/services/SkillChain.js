@@ -175,7 +175,14 @@ export async function reviewAndShip({ query, plan, files, lastOutput, previewUrl
       const first = (files || [])[0];
       if (!first) return '(no files)';
       const p = path.join(WORKSPACE_DIR, first);
-      return fs.existsSync(p) ? fs.readFileSync(p, 'utf-8').slice(0, 4000) : '(file missing)';
+      if (!fs.existsSync(p)) return '(file missing)';
+      const code = fs.readFileSync(p, 'utf-8');
+      // The Security Officer must see the real logic: full HTML head/markup +
+      // the complete <script> body (truncating at N chars hid the JS before).
+      const scriptMatch = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+      const js = scriptMatch ? scriptMatch[1] : '';
+      if (js.length > 0) return `${code.slice(0, 2500)}\n\n--- FULL <script> BODY (${js.length} chars) ---\n${js.slice(0, 12000)}`;
+      return code.slice(0, 12000);
     } catch { return '(could not read)'; }
   })();
 
