@@ -43,19 +43,30 @@ function extractCoreQuery(query) {
 }
 
 async function fetchSearXNG(query, category = 'general') {
-  const instances = ['https://search.sapti.me', 'https://searx.be', 'https://search.bus-hit.me', 'https://paulgo.io'];
-  for (const instance of instances) {
+  // Try every public instance IN PARALLEL (instances go down / block IPs
+  // regularly) and take the healthiest pool — faster and far more resilient
+  // than the old sequential loop.
+  const instances = ['https://search.sapti.me', 'https://searx.be', 'https://search.bus-hit.me', 'https://paulgo.io', 'https://priv.au', 'https://opnxng.com'];
+  const attempts = instances.map(async (instance) => {
     try {
       const url = `${instance}/search?q=${encodeURIComponent(query)}&format=json&categories=${category}`;
       const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(6000) });
-      if (!res.ok) continue;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data?.results?.length > 0) {
-        return data.results.slice(0, 8).map(r => ({ title: r.title, link: r.url, snippet: r.content, source: 'SearXNG' })).filter(r => !isGarbage(r));
+        return data.results
+          .slice(0, 8)
+          .map(r => ({ title: r.title, link: r.url, snippet: r.content, source: 'SearXNG' }))
+          .filter(r => !isGarbage(r));
       }
-    } catch (e) {}
-  }
-  return [];
+      throw new Error('empty');
+    } catch (e) { return null; }
+  });
+  const settled = await Promise.allSettled(attempts);
+  const pools = settled.filter(r => r.status === 'fulfilled' && r.value && r.value.length > 0).map(r => r.value);
+  if (!pools.length) return [];
+  pools.sort((a, b) => b.length - a.length);
+  return pools[0];
 }
 
 async function fetchDDG(query) {
@@ -72,6 +83,45 @@ async function fetchDDG(query) {
       if (uddg) link = decodeURIComponent(uddg[1]);
       const snippet = $(el).find('.result__snippet').text().trim();
       if (title && link) results.push({ title, link, snippet, source: 'DuckDuckGo' });
+    });
+    return results.filter(r => !isGarbage(r));
+  } catch (e) { return []; }
+}
+
+async function fetchDDGLite(query) {
+  // DDG's lite endpoint is more bot-tolerant than the html one.
+  try {
+    const url = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`DDGLite ${res.status}`);
+    const $ = cheerio.load(await res.text());
+    const results = [];
+    $('a.result-link').each((i, el) => {
+      let link = $(el).attr('href') || '';
+      const uddg = link.match(/uddg=([^&]+)/);
+      if (uddg) link = decodeURIComponent(uddg[1]);
+      const title = $(el).text().trim();
+      const snippet = $(el).closest('tr').find('.result-snippet').text().trim();
+      if (title && link) results.push({ title, link, snippet, source: 'DuckDuckGo' });
+    });
+    return results.filter(r => !isGarbage(r));
+  } catch (e) { return []; }
+}
+
+async function fetchMojeek(query) {
+  // Mojeek is a bot-tolerant independent index — a good last-resort engine.
+  try {
+    const url = `https://www.mojeek.com/search?q=${encodeURIComponent(query)}`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`Mojeek ${res.status}`);
+    const $ = cheerio.load(await res.text());
+    const results = [];
+    $('ul.results-standard li').each((i, el) => {
+      const a = $(el).find('h2 a').first();
+      const title = a.text().trim();
+      const link = a.attr('href') || '';
+      const snippet = $(el).find('p.s').text().trim();
+      if (title && link && !link.includes('mojeek.com')) results.push({ title, link, snippet, source: 'Mojeek' });
     });
     return results.filter(r => !isGarbage(r));
   } catch (e) { return []; }
@@ -126,6 +176,8 @@ export async function aggregateSearch(query, specificEngine = null) {
   const engines = {
     searx: fetchSearXNG(coreQuery, 'general'),
     ddg: fetchDDG(coreQuery),
+    ddglite: fetchDDGLite(coreQuery),
+    mojeek: fetchMojeek(coreQuery),
     bing: fetchBing(coreQuery),
     ...(wantArxiv ? { arxiv: fetchArxiv(coreQuery) } : {}),
   };
@@ -136,8 +188,11 @@ export async function aggregateSearch(query, specificEngine = null) {
   } else if (specificEngine && engines[specificEngine]) {
     combined = await engines[specificEngine];
   } else {
-    const [searx, ddg, bing, arxiv = []] = await Promise.all([engines.searx, engines.ddg, engines.bing, engines.arxiv || Promise.resolve([])]);
-    combined = [...(wantArxiv ? arxiv : []), ...searx, ...ddg, ...bing];
+    const [searx, ddg, ddglite, mojeek, bing, arxiv = []] = await Promise.all([
+      engines.searx, engines.ddg, engines.ddglite, engines.mojeek, engines.bing,
+      engines.arxiv || Promise.resolve([]),
+    ]);
+    combined = [...(wantArxiv ? arxiv : []), ...searx, ...ddg, ...ddglite, ...mojeek, ...bing];
   }
 
   // Dedupe by link, then rank: trusted first, then by source
