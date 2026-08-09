@@ -285,6 +285,11 @@ app.post('/api/chat', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   const sendEvent = (type, data) => { try { res.write(JSON.stringify({ type, ...data }) + '\n'); } catch (e) {} };
 
+  // Heartbeat: Cloudflare's proxy in front of Render kills streams that stay
+  // silent too long (deep-reads and LLM calls pause for 10-30s). A tiny event
+  // every 10s keeps the connection alive — the frontend ignores unknown types.
+  const heartbeat = setInterval(() => { try { res.write('{"type":"heartbeat"}\n'); } catch (e) {} }, 10000);
+
   try {
     const plan = await planner.analyzeIntent(query, { image });
     sendEvent('log', { agent: 'Planner', message: `Intent: ${plan.intent} — ${plan.reasoning}` });
@@ -296,7 +301,7 @@ app.post('/api/chat', async (req, res) => {
     recordError('chat', error.message);
     sendEvent('log', { agent: 'System', message: `Critical Error: ${error.message}` });
     sendEvent('done', { success: false, error: error.message });
-  } finally { res.end(); }
+  } finally { clearInterval(heartbeat); res.end(); }
 });
 
 // Health endpoint used by the load balancer's active probes (and the keep-alive
