@@ -11,7 +11,7 @@ import { WORKSPACE_DIR } from '../config.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const SKILLS_DIR = path.resolve(__dirname, '../../skills');
 
-/** Skill file → agent name shown in the live pipeline. */
+/** Skill slug → agent name shown in the live pipeline. */
 const SKILL_META = {
   product: 'Product',
   designer: 'Designer',
@@ -19,9 +19,12 @@ const SKILL_META = {
   coder: 'Coder',
   qa: 'QA Lead',
   reviewer: 'Reviewer',
+  'security-officer': 'Security Officer',
   shipper: 'Shipper',
+  reflector: 'Reflector',
 };
 
+/** Think → Plan → Build → Test → Review → Ship → Reflect (gstack sprint). */
 const PHASE = {
   product: 'Think',
   designer: 'Plan',
@@ -29,7 +32,9 @@ const PHASE = {
   coder: 'Build',
   qa: 'Test',
   reviewer: 'Review',
+  'security-officer': 'Review',
   shipper: 'Ship',
+  reflector: 'Reflect',
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -39,7 +44,7 @@ export function listSkillFiles() {
   return fs.readdirSync(SKILLS_DIR).filter((f) => f.endsWith('.md')).sort();
 }
 
-/** Load a skill's portable Markdown instructions by slug (e.g. 'qa'). */
+/** Load a skill's portable Markdown instructions by slug (e.g. 'qa', 'security-officer'). */
 export function loadSkill(slug) {
   const file = listSkillFiles().find((f) => f.toLowerCase().includes(`-${slug}.md`));
   if (!file) return null;
@@ -47,6 +52,26 @@ export function loadSkill(slug) {
 }
 
 const short = (s) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+
+/**
+ * STRICT HANDOFF: pull only the previous specialist's output section
+ * (e.g. `## PRODUCT BRIEF`) out of a chained document. Each role consumes
+ * exactly the artifact the prior role produced — nothing else. This keeps
+ * context small and prevents roles from drifting into each other's work.
+ */
+export function extractSection(doc, sectionTitle) {
+  const re = new RegExp(`##\\s*${sectionTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*?(?=\\n##\\s|$)`, 'i');
+  const m = String(doc || '').match(re);
+  return m ? m[0].trim() : '';
+}
+
+/** Parse a gate verdict out of a report (PASS / NEEDS FIX / APPROVED / CLEARED / BLOCKED…). */
+export function gateVerdict(report, allowed) {
+  const m = String(report || '').match(/(PASS|NEEDS FIX|APPROVED|NEEDS WORK|CLEARED|BLOCKED)/i);
+  if (!m) return null;
+  const v = m[1].toUpperCase();
+  return allowed.includes(v) ? v : null;
+}
 
 /**
  * Run one specialist pass. Every pass: skill instructions + task input →
@@ -66,11 +91,14 @@ export async function runSkill(slug, input, sendEvent) {
   return String(out || '').trim();
 }
 
-/** THINK + PLAN: product brief → design spec → build plan. */
+/** THINK + PLAN: product brief → design spec → build plan (strict handoffs). */
 export async function planForBuild(query, sendEvent) {
-  const brief = await runSkill('product', query, sendEvent);
-  const design = await runSkill('designer', brief, sendEvent);
-  const plan = await runSkill('engineer', `${brief}\n\n${design}`, sendEvent);
+  const full = await runSkill('product', query, sendEvent);
+  const brief = extractSection(full, 'PRODUCT BRIEF') || full;
+  const full2 = await runSkill('designer', brief, sendEvent);
+  const design = extractSection(full2, 'DESIGN SPEC') || full2;
+  const full3 = await runSkill('engineer', `${brief}\n\n${design}`, sendEvent);
+  const plan = extractSection(full3, 'BUILD PLAN') || full3;
   return { brief, design, plan };
 }
 
@@ -132,7 +160,14 @@ export async function qaScripted({ query, files, lastOutput, sendEvent }) {
   );
 }
 
-/** REVIEW + SHIP: security/quality review, then packaging + reflection. */
+/**
+ * REVIEW + SECURITY GATE + SHIP + REFLECT.
+ * Runs the remaining specialists in order, feeding each only the previous
+ * outputs. Returns all sections so the caller can enforce the gates:
+ *   - qaVerdict  NEEDS FIX  → caller re-runs the fix loop before shipping
+ *   - secVerdict BLOCKED    → caller must NOT ship
+ *   - reviewVerdict NEEDS WORK → included in the summary so the user sees it
+ */
 export async function reviewAndShip({ query, plan, files, lastOutput, previewUrl, qaReport, sendEvent }) {
   const fileList = (files || []).map((n) => `- ${n}`).join('\n');
   const codePeek = (() => {
@@ -144,19 +179,43 @@ export async function reviewAndShip({ query, plan, files, lastOutput, previewUrl
     } catch { return '(could not read)'; }
   })();
 
-  const review = await runSkill(
+  const reviewFull = await runSkill(
     'reviewer',
     `QUERY: ${query}\n${plan ? `BUILD PLAN:\n${plan.slice(0, 1500)}` : ''}\nFILES:\n${fileList}\nCODE SAMPLE:\n${codePeek}\n\nQA REPORT:\n${qaReport}`,
     sendEvent,
   );
+  const review = extractSection(reviewFull, 'REVIEW NOTES') || reviewFull;
 
-  const shipped = await runSkill(
-    'shipper',
-    `QUERY: ${query}\nFILES:\n${fileList}\nLIVE PREVIEW: ${previewUrl || 'n/a'}\nQA REPORT:\n${String(qaReport).slice(0, 1500)}\nREVIEW NOTES:\n${String(review).slice(0, 1500)}`,
+  const secFull = await runSkill(
+    'security-officer',
+    `FILES:\n${fileList}\nCODE SAMPLE:\n${codePeek}\n\nQA REPORT:\n${String(qaReport).slice(0, 1500)}\n\nREVIEW NOTES:\n${String(review).slice(0, 1200)}`,
     sendEvent,
   );
+  const security = extractSection(secFull, 'SECURITY REVIEW') || secFull;
 
-  return { review, shipped };
+  const shippedFull = await runSkill(
+    'shipper',
+    `QUERY: ${query}\nFILES:\n${fileList}\nLIVE PREVIEW: ${previewUrl || 'n/a'}\nQA REPORT:\n${String(qaReport).slice(0, 1500)}\nREVIEW NOTES:\n${String(review).slice(0, 1500)}\nSECURITY REVIEW:\n${String(security).slice(0, 1200)}`,
+    sendEvent,
+  );
+  const shipped = extractSection(shippedFull, 'SHIPPED') || shippedFull;
+
+  const reflectFull = await runSkill(
+    'reflector',
+    `PRODUCT BRIEF:\n${String(plan).slice(0, 800)}\nQA REPORT:\n${String(qaReport).slice(0, 1200)}\nREVIEW NOTES:\n${String(review).slice(0, 1000)}\nSECURITY REVIEW:\n${String(security).slice(0, 800)}`,
+    sendEvent,
+  );
+  const reflection = extractSection(reflectFull, 'REFLECTION') || reflectFull;
+
+  return {
+    review,
+    security,
+    shipped,
+    reflection,
+    qaVerdict: gateVerdict(qaReport, ['PASS', 'NEEDS FIX']),
+    reviewVerdict: gateVerdict(review, ['APPROVED', 'NEEDS WORK']),
+    secVerdict: gateVerdict(security, ['CLEARED', 'BLOCKED']),
+  };
 }
 
 /** One QA-driven fix round: send the QA report to the coder, apply, return. */

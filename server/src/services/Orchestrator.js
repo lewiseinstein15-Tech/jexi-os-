@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { generateCode, applyFix } from './Architect.js';
-import { planForBuild, qaWebApp, qaScripted, reviewAndShip, fixFromQA, isDebugQuery } from './SkillChain.js';
+import { planForBuild, qaWebApp, qaScripted, reviewAndShip, fixFromQA, isDebugQuery, gateVerdict } from './SkillChain.js';
 import { runFile } from './Runner.js';
 import { aggregateSearch } from './SearchEngine.js';
 import { extractContent, analyzeLink } from './Extractor.js';
@@ -276,31 +276,53 @@ export class Orchestrator {
               }
             }
 
-            // 3.75 THE TEAM: QA → REVIEW → SHIP (each output feeds the next)
+            // 3.75 THE TEAM: QA → REVIEW → SECURITY GATE → SHIP → REFLECT
+            //     (each output feeds the next; QA + Security gates are enforced)
             let qaReport = '';
             let reviewNotes = '';
             let shipNotes = '';
+            let securityNotes = '';
+            let reflectionNotes = '';
+            let qaVerdict = null;
+            let secVerdict = null;
             try {
               const builtFiles = listWorkspaceFiles();
+              // TEST — the QA gate: run the app in a real browser (or scripted)
               if (previewUrl && /\.html$/i.test(entryPoint || '')) {
                 qaReport = await qaWebApp({ previewUrl, brief: teamBrief || effQuery, scope, sendEvent });
-                if (/NEEDS FIX|❌|FAIL/i.test(qaReport) && !debugAsk) {
-                  const fixedOnce = await fixFromQA({ query: effQuery, qaReport, entryPoint, sendEvent });
-                  if (fixedOnce) {
-                    sendEvent('log', { agent: 'Runner', message: '↻ Re-running after QA fix...' });
-                    const rerun = await runFile(fixedOnce.entryPoint, (s, d) => sendEvent('log', { agent: 'Terminal', message: String(d).slice(0, 160) }));
-                    if (rerun.url) previewUrl = rerun.url;
-                    if (previewUrl && /\.html$/i.test(fixedOnce.entryPoint || '')) {
-                      qaReport = await qaWebApp({ previewUrl, brief: teamBrief || effQuery, scope, sendEvent });
-                    }
-                  }
-                }
               } else {
                 qaReport = await qaScripted({ query: effQuery, files: builtFiles, lastOutput, sendEvent });
               }
+              qaVerdict = gateVerdict(qaReport, ['PASS', 'NEEDS FIX']);
+
+              // QA gate enforcement: NEEDS FIX → the debug loop re-runs once and QA re-verifies.
+              if (qaVerdict === 'NEEDS FIX' && !debugAsk) {
+                sendEvent('log', { agent: 'QA Lead', message: '⛔ QA gate: NEEDS FIX — sending back to the coder.' });
+                const fixedOnce = await fixFromQA({ query: effQuery, qaReport, entryPoint, sendEvent });
+                if (fixedOnce) {
+                  sendEvent('log', { agent: 'Runner', message: '↻ Re-running after QA fix...' });
+                  const rerun = await runFile(fixedOnce.entryPoint, (s, d) => sendEvent('log', { agent: 'Terminal', message: String(d).slice(0, 160) }));
+                  if (rerun.url) previewUrl = rerun.url;
+                  if (previewUrl && /\.html$/i.test(fixedOnce.entryPoint || '')) {
+                    qaReport = await qaWebApp({ previewUrl, brief: teamBrief || effQuery, scope, sendEvent });
+                    qaVerdict = gateVerdict(qaReport, ['PASS', 'NEEDS FIX']);
+                  }
+                }
+              }
+
+              // REVIEW + SECURITY GATE + SHIP + REFLECT
               const shipped = await reviewAndShip({ query: effQuery, plan: teamPlan, files: builtFiles, lastOutput, previewUrl, qaReport, sendEvent });
               reviewNotes = shipped.review;
+              securityNotes = shipped.security;
               shipNotes = shipped.shipped;
+              reflectionNotes = shipped.reflection;
+              qaVerdict = shipped.qaVerdict || qaVerdict;
+              secVerdict = shipped.secVerdict;
+
+              // SECURITY GATE enforcement: BLOCKED → do not present as shipped.
+              if (secVerdict === 'BLOCKED') {
+                sendEvent('log', { agent: 'Security Officer', message: '⛔ SECURITY GATE BLOCKED — build withheld from shipping.' });
+              }
             } catch (e) {
               sendEvent('log', { agent: 'Shipper', message: `⚠ Team pass issue: ${e.message}` });
             }
@@ -322,13 +344,20 @@ export class Orchestrator {
               : '';
 
             const teamLine = teamPlan
-              ? '\n\n**🏢 Team:** Product → Designer → Engineer → Coder → QA Lead → Reviewer → Shipper'
-              : '\n\n**🏢 Team:** Coder → QA Lead → Reviewer → Shipper';
+              ? '\n\n**🏢 Team:** Product → Designer → Engineer → Coder → QA Lead → Reviewer → Security Officer → Shipper → Reflector'
+              : '\n\n**🏢 Team:** Coder → QA Lead → Reviewer → Security Officer → Shipper → Reflector';
             const qaSection = qaReport ? `\n\n**🧪 QA REPORT**\n${qaReport}` : '';
             const reviewSection = reviewNotes ? `\n\n**🔍 REVIEW NOTES**\n${reviewNotes}` : '';
+            const securitySection = securityNotes ? `\n\n**🛡 SECURITY REVIEW**\n${securityNotes}` : '';
             const shipSection = shipNotes ? `\n\n**📦 SHIPPED**\n${shipNotes}` : '';
+            const reflectSection = reflectionNotes ? `\n\n**♻ REFLECTION**\n${reflectionNotes}` : '';
             const planSection = teamPlan ? `\n\n**🛠 BUILD PLAN** (Product + Designer + Engineer)\n${teamPlan.split('\n').slice(0, 42).join('\n')}` : '';
-            results.summary = `### 💻 JEXI TEAM — PLANNED, BUILT, TESTED & SHIPPED\n\n✅ The full agent team worked together: planned, wrote, ran, QA-tested and reviewed your app.${teamLine}${previewLine}${qaSection}${reviewSection}${shipSection}${planSection}\n\n${fileSections}\n\n**Test Output:**\n${finalOutput || '✓ Ran successfully.'}\n\n**Download the files:**\n${workspaceLinks}`;
+            const gateNote = secVerdict === 'BLOCKED'
+              ? '\n\n> ⛔ **Security gate BLOCKED shipping.** The app ran and is usable, but the Security Officer found issues that must be fixed before you rely on it. Ask me to fix the findings and re-ship.'
+              : qaVerdict === 'NEEDS FIX'
+                ? '\n\n> ⚠ **QA verdict: NEEDS FIX.** The app runs, but QA found issues — ask me to fix them.'
+                : '';
+            results.summary = `### 💻 JEXI TEAM — PLANNED, BUILT, TESTED & SHIPPED\n\n✅ The full agent team worked together: planned, wrote, ran, QA-tested, security-checked and reviewed your app.${teamLine}${previewLine}${qaSection}${reviewSection}${securitySection}${shipSection}${reflectSection}${gateNote}${planSection}\n\n${fileSections}\n\n**Test Output:**\n${finalOutput || '✓ Ran successfully.'}\n\n**Download the files:**\n${workspaceLinks}`;
             results.files = files;
             results.previewUrl = previewUrl || undefined;
             results.statistics.confidence = 100;
@@ -337,6 +366,13 @@ export class Orchestrator {
             try {
               const codeSummary = fileSections.replace(/```[\s\S]*?```/g, '```code```').slice(0, 8000);
               saveCodingKnowledge(effQuery, 'code', codeSummary, files);
+            } catch (e) {}
+
+            // 5.5 Remember the team's reflection so future builds start smarter
+            try {
+              if (reflectionNotes) {
+                saveCodingKnowledge(`lesson: ${effQuery.slice(0, 80)}`, 'reflection', reflectionNotes.slice(0, 1200), []);
+              }
             } catch (e) {}
           } else {
             results.summary = "### 💻 JEXI CODING AGENT\n\nI couldn't generate the code. Please rephrase your request with more detail.";
