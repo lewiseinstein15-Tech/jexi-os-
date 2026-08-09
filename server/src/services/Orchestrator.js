@@ -311,7 +311,7 @@ export class Orchestrator {
               }
 
               // REVIEW + SECURITY GATE + SHIP + REFLECT
-              const shipped = await reviewAndShip({ query: effQuery, plan: teamPlan, files: builtFiles, lastOutput, previewUrl, qaReport, sendEvent });
+              let shipped = await reviewAndShip({ query: effQuery, plan: teamPlan, files: builtFiles, lastOutput, previewUrl, qaReport, sendEvent });
               reviewNotes = shipped.review;
               securityNotes = shipped.security;
               shipNotes = shipped.shipped;
@@ -319,9 +319,24 @@ export class Orchestrator {
               qaVerdict = shipped.qaVerdict || qaVerdict;
               secVerdict = shipped.secVerdict;
 
-              // SECURITY GATE enforcement: BLOCKED → do not present as shipped.
+              // SECURITY GATE enforcement: BLOCKED → one enforced fix round
+              // (coder rewrites, runner re-tests, Security Officer re-reviews),
+              // then the verdict is final for this run.
               if (secVerdict === 'BLOCKED') {
-                sendEvent('log', { agent: 'Security Officer', message: '⛔ SECURITY GATE BLOCKED — build withheld from shipping.' });
+                sendEvent('log', { agent: 'Security Officer', message: '⛔ SECURITY GATE BLOCKED — sending findings to the coder for a fix round.' });
+                const secFix = await fixFromQA({ query: effQuery, qaReport: securityNotes, entryPoint, sendEvent });
+                if (secFix) {
+                  sendEvent('log', { agent: 'Runner', message: '↻ Re-running after security fix...' });
+                  const rerun = await runFile(secFix.entryPoint, (s, d) => sendEvent('log', { agent: 'Terminal', message: String(d).slice(0, 160) }));
+                  if (rerun.url) previewUrl = rerun.url;
+                  shipped = await reviewAndShip({ query: effQuery, plan: teamPlan, files: listWorkspaceFiles(), lastOutput, previewUrl, qaReport, sendEvent });
+                  reviewNotes = shipped.review;
+                  securityNotes = shipped.security;
+                  shipNotes = shipped.shipped;
+                  reflectionNotes = shipped.reflection;
+                  secVerdict = shipped.secVerdict || secVerdict;
+                  sendEvent('log', { agent: 'Security Officer', message: secVerdict === 'BLOCKED' ? '⛔ Still BLOCKED after the fix round — issues need human attention.' : '✅ SECURITY GATE CLEARED after fix round.' });
+                }
               }
             } catch (e) {
               sendEvent('log', { agent: 'Shipper', message: `⚠ Team pass issue: ${e.message}` });
