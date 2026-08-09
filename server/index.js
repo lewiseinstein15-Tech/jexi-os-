@@ -290,6 +290,7 @@ app.post('/api/chat', async (req, res) => {
     sendEvent('log', { agent: 'Planner', message: `Intent: ${plan.intent} — ${plan.reasoning}` });
     const results = await orchestrator.executePlan(plan, query, sendEvent, { image });
 
+    sendEvent('log', { agent: 'JEXI', message: '🎯 Mission complete — here is the result.' });
     sendEvent('done', { success: results.success, query, summary: results.summary, sources: results.sources || [], statistics: results.statistics, files: results.files || [] });
   } catch (error) {
     recordError('chat', error.message);

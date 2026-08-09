@@ -1,11 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Square, ImagePlus, X, Camera, Stethoscope } from 'lucide-react';
-import MarkdownRenderer from './MarkdownRenderer';
+import { Send, Square, ImagePlus, X, Camera, Stethoscope, Hammer, Search, GraduationCap, Link2 } from 'lucide-react';
 import TypedMessage from './TypedMessage';
 import VisionPanel from './VisionPanel';
+import AgentPipeline from './AgentPipeline';
 
 const SELF_CHECK_QUERY =
   'JEXI, run a full system self-check now. Check your health, memory, eyes and recent errors. If anything is wrong, tell me the exact source file and the fix.';
+
+// Agent capability launcher shown when the chat is empty — makes JEXI feel
+// like a mission control for an agent that can DO things, not a blank chat.
+const CAPABILITIES = [
+  { icon: Hammer, label: 'BUILD AN APP', hint: 'calculator, tracker, website…', query: 'Build me a calculator web app' },
+  { icon: Search, label: 'RESEARCH', hint: 'facts, how-to, current events', query: 'Research how solar panels work and explain it to me' },
+  { icon: GraduationCap, label: 'STUDY', hint: 'deep-learn a topic, save it', query: 'Study the basics of machine learning and save it to my knowledge' },
+  { icon: Link2, label: 'OPEN A LINK', hint: 'YouTube, TikTok, articles', query: 'Open a popular YouTube video about artificial intelligence and tell me what it is about' },
+  { icon: Camera, label: 'USE MY EYES', hint: 'camera vision', vision: true },
+  { icon: Stethoscope, label: 'SELF-CHECK', hint: 'health + source of issues', query: SELF_CHECK_QUERY },
+];
 
 function QuickAction({ icon: Icon, label, title, onClick }) {
   return (
@@ -21,7 +32,7 @@ function QuickAction({ icon: Icon, label, title, onClick }) {
   );
 }
 
-export default function ChatWindow({ messages, isProcessing, onSend, onStop, onVisionResult }) {
+export default function ChatWindow({ messages, logs, isProcessing, onSend, onStop, onVisionResult }) {
   const [input, setInput] = useState('');
   const [image, setImage] = useState(null);
   const [visionOpen, setVisionOpen] = useState(false);
@@ -67,9 +78,24 @@ export default function ChatWindow({ messages, isProcessing, onSend, onStop, onV
 
       <div ref={scrollRef} className="space-y-3 mb-3 max-h-[50vh] overflow-y-auto pr-1">
         {messages.length === 0 ? (
-          <div className="text-center py-6">
-            <p className="text-gray-600 text-xs italic mb-2">Ready to assist</p>
-            <p className="text-[9px] text-gray-700">Ask me to build code, research topics, or learn something new</p>
+          <div className="py-2">
+            <p className="text-[9px] font-bold text-[#00FF9D] tracking-widest mb-2 text-center">⚡ WHAT JEXI CAN DO</p>
+            <div className="grid grid-cols-2 gap-2">
+              {CAPABILITIES.map((c) => (
+                <button
+                  key={c.label}
+                  type="button"
+                  onClick={() => (c.vision ? setVisionOpen(true) : onSend(c.query))}
+                  className="group flex items-center gap-2 bg-[#0f0f0f] hover:bg-[#00FF9D]/10 border border-[#1a1a1a] hover:border-[#00FF9D]/40 rounded-lg px-3 py-2.5 text-left transition-colors"
+                >
+                  <c.icon className="w-4 h-4 text-[#00FF9D] flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-bold text-gray-200 group-hover:text-[#00FF9D]">{c.label}</p>
+                    <p className="text-[8px] text-gray-600 truncate">{c.hint}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
           messages.map((msg, i) => (
@@ -93,12 +119,8 @@ export default function ChatWindow({ messages, isProcessing, onSend, onStop, onV
         )}
         {isProcessing && (
           <div className="flex justify-start">
-            <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-3 rounded-lg">
-              <div className="flex gap-1">
-                <div className="w-2 h-2 rounded-full bg-[#00FF9D] animate-pulse" />
-                <div className="w-2 h-2 rounded-full bg-[#00FF9D] animate-pulse" style={{ animationDelay: '0.2s' }} />
-                <div className="w-2 h-2 rounded-full bg-[#00FF9D] animate-pulse" style={{ animationDelay: '0.4s' }} />
-              </div>
+            <div className="w-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg">
+              <AgentPipeline logs={logs} isProcessing />
             </div>
           </div>
         )}

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { getBackendUrl } from '../utils/helpers';
 
 // Backend defaults to same origin (/api is proxied by Vite in dev),
@@ -9,8 +9,12 @@ export const useJexiEngine = () => {
   const [logs, setLogs] = useState([]);
   const [websites, setWebsites] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const abortRef = useRef(null);
 
   const runSearch = useCallback(async (query, image = null) => {
+    // Halt any previous run before starting a new one.
+    abortRef.current?.abort();
+
     setIsProcessing(true);
     setLogs([]);
     setWebsites([]);
@@ -19,10 +23,12 @@ export const useJexiEngine = () => {
 
     try {
       const backendUrl = getBackendUrl();
+      abortRef.current = new AbortController();
       const res = await fetch(`${backendUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, image: image || undefined })
+        body: JSON.stringify({ query, image: image || undefined }),
+        signal: abortRef.current.signal,
       });
 
       const reader = res.body.getReader();
@@ -46,13 +52,20 @@ export const useJexiEngine = () => {
         }
       }
     } catch (error) {
+      // Aborted by the user (STOP) — don't show a scary network error.
+      if (error?.name === 'AbortError') return;
       setMessages(prev => [...prev, { role: 'jexi', text: `Error: ${error.message}. Is the backend running?` }]);
     } finally {
       setIsProcessing(false);
     }
   }, []);
 
-  const stopGeneration = useCallback(() => setIsProcessing(false), []);
+  const stopGeneration = useCallback(() => {
+    abortRef.current?.abort();
+    setIsProcessing(false);
+    // An agent never leaves you hanging — acknowledge the halt and propose the next move.
+    setMessages(prev => [...prev, { role: 'jexi', text: '⏹ Stopped mid-task. Tell me what to do next and I\'ll take it from there.' }]);
+  }, []);
 
   // Append an assistant or user message directly (used by the camera vision panel).
   const pushMessage = useCallback((role, text) => {

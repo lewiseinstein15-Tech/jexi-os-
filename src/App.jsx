@@ -53,6 +53,7 @@ export default function App() {
                 />
                 <ChatWindow
                   messages={engine.messages}
+                  logs={engine.logs}
                   isProcessing={engine.isProcessing}
                   onSend={engine.runSearch}
                   onStop={engine.stopGeneration}
