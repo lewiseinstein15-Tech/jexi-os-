@@ -128,6 +128,10 @@ app.post('/api/desktop/coder/screenshot-json', async (req, res) => {
 
 app.get('/api/desktop/status', (req, res) => res.json({ ok: true, ...browserStatus() }));
 
+// Alias under /coder/ — ComputerUseAgent pings this path. Without it the agent
+// ALWAYS believed the browser was offline (404) and never attempted real navigation.
+app.get('/api/desktop/coder/status', (req, res) => res.json({ ok: true, ...browserStatus() }));
+
 // Force-restart JEXI's eyes (self-heal button in the Virtual Desktop viewer).
 app.post('/api/desktop/restart', async (req, res) => {
   try {
