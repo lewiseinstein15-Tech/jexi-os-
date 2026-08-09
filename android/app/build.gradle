@@ -3,12 +3,32 @@ apply plugin: 'com.android.application'
 android {
     namespace = "com.jexi.os"
     compileSdk = rootProject.ext.compileSdkVersion
+
+    // Every build signs with the SAME committed keystore so a new APK installs
+    // over the previous one. (Gradle's default auto-generated debug key is a
+    // NEW random key on every CI machine — that mismatch caused
+    // "App not installed as package conflicts with an existing package".)
+    signingConfigs {
+        debug {
+            storeFile file('jexi-debug.p12')
+            storePassword 'jexi-debug-2026'
+            keyAlias 'jexidebug'
+            keyPassword 'jexi-debug-2026'
+            storeType 'PKCS12'
+        }
+    }
+
     defaultConfig {
         applicationId "com.jexi.os"
+        // minSdk 24 = Android 7.0+, so the APK installs and runs on Android
+        // 14, 15 and 16 (API 34/35/36) — and everything older too.
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // versionCode MUST rise on every build or Android refuses the update.
+        // The CI workflow passes github.run_number (build #N) as APK_BUILD_NUMBER.
+        def buildNumber = (System.getenv('APK_BUILD_NUMBER') ?: '1') as int
+        versionCode buildNumber
+        versionName "1.0.${buildNumber}"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -17,6 +37,9 @@ android {
         }
     }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

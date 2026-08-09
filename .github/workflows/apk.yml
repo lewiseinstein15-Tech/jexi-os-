@@ -65,6 +65,10 @@ jobs:
 
       - name: Compile debug APK
         working-directory: android
+        env:
+          # Bake the GitHub run number into versionCode so every APK is a
+          # strictly newer version than the last (Android refuses equal/lower).
+          APK_BUILD_NUMBER: ${{ github.run_number }}
         run: ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK artifact (Actions tab)
