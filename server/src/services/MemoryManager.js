@@ -189,6 +189,19 @@ export function searchInternetKnowledge(query) {
   return scored[0]?.entry || null;
 }
 
+/**
+ * Same as searchInternetKnowledge, but only returns answers JEXI learned
+ * recently (default: within the last 30 minutes). Used for instant repeat
+ * answers — e.g. asking the same news question twice within minutes.
+ */
+export function searchFreshInternetKnowledge(query, maxAgeMs = 30 * 60 * 1000) {
+  const entry = searchInternetKnowledge(query);
+  if (!entry?.date) return null;
+  const age = Date.now() - new Date(entry.date).getTime();
+  if (!Number.isFinite(age) || age > maxAgeMs) return null;
+  return entry;
+}
+
 /* ------------------------------------------------------------------ */
 /* Coding solutions (JEXI's "mind" for code tasks)                     */
 /* ------------------------------------------------------------------ */
@@ -252,6 +265,39 @@ function bestExcerpt(content, qwords, radius = 2600) {
   return `${start > 0 ? '…' : ''}${excerpt}${end < content.length ? '…' : ''}`;
 }
 
+// Fingerprinted index of the knowledge library files, so search doesn't re-read
+// every file from disk on EVERY chat message (only re-reads when a file is
+// added/changed — detected by name+size+mtime, so it self-heals).
+let knowledgeIndex = { key: null, files: [] };
+
+function indexKnowledgeFiles() {
+  const files = [];
+  const walk = (dir, cat) => {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full, cat || entry.name);
+      else if (entry.isFile() && entry.name.endsWith('.md')) {
+        try {
+          const st = fs.statSync(full);
+          files.push({ cat: cat || 'general', name: entry.name, full, mtime: st.mtimeMs, size: st.size });
+        } catch (e) {}
+      }
+    }
+  };
+  walk(KNOWLEDGE_DIR, null);
+  const key = files.map(f => `${f.name}:${f.size}:${f.mtime}`).join('|');
+  if (key === knowledgeIndex.key) return knowledgeIndex.files;
+  const contents = [];
+  for (const f of files) {
+    try {
+      contents.push({ cat: f.cat, name: f.name.replace('.md', ''), content: fs.readFileSync(f.full, 'utf-8') });
+    } catch (e) {}
+  }
+  knowledgeIndex = { key, files: contents };
+  return knowledgeIndex.files;
+}
+
 /**
  * Search the whole knowledge base: the user's uploaded books (kept in memory so
  * they survive redeploys via Redis) plus studied-topic files on disk.
@@ -273,28 +319,16 @@ export function searchKnowledge(query, minScore = 2) {
     }
   }
 
-  // 2) Studied topic files on disk (USER_BOOKS .md copies are the same books as
-  //    memory, so they are skipped while the memory library is active)
+  // 2) Studied topic files on disk (indexed — read once per change, not per query)
   const skipBooks = loadMemory().bookLibrary.length > 0;
   const threshold = Math.min(minScore, q.length);
-  const walk = (dir, cat) => {
-    if (!fs.existsSync(dir)) return;
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(full, cat || entry.name);
-      else if (entry.isFile() && entry.name.endsWith('.md')) {
-        if (cat === 'USER_BOOKS' && skipBooks) continue;
-        try {
-          const content = fs.readFileSync(full, 'utf-8');
-          const score = count(content.toLowerCase());
-          if (score >= threshold) {
-            results.push({ title: entry.name.replace('.md', ''), category: cat || 'general', content: bestExcerpt(content, q) || content.slice(0, 20000), score });
-          }
-        } catch (e) {}
-      }
+  for (const f of indexKnowledgeFiles()) {
+    if (f.cat === 'USER_BOOKS' && skipBooks) continue;
+    const score = count(f.content.toLowerCase());
+    if (score >= threshold) {
+      results.push({ title: f.name, category: f.cat, content: bestExcerpt(f.content, q) || f.content.slice(0, 20000), score });
     }
-  };
-  walk(KNOWLEDGE_DIR, null);
+  }
 
   // De-dupe (memory book entries and their USER_BOOKS .md copies are the same book)
   const seen = new Set();

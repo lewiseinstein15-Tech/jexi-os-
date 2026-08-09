@@ -59,19 +59,21 @@ export class Planner {
       return { intent: 'memory_query', tasks: ['memory'], reasoning: 'User asks about memory.' };
     }
 
-    // 8.5 Questions about the user's OWN books/library → answer from them, not the internet
-    if (/my books?|the books?|in the (book|pdf|library)|from the (book|pdf)|according to (the )?(book|pdf|textbook)|read (the|my) (book|pdf)|uploaded (book|pdf|files?)|knowledge library/i.test(q)) {
-      const kb = searchKnowledge(query, 1);
-      if (kb.length > 0) {
-        return { intent: 'knowledge_recall', tasks: ['reasoning', 'memory'], reasoning: 'User is asking about their own books/library — answer from those materials.', payload: kb };
-      }
-    }
-
-    // 9. Knowledge base recall — check the knowledge library first
+    // 8.5+9. Knowledge base recall — ONE search (books first, studied topics
+    //     second). Questions mentioning the user's own books/library match with a
+    //     lower bar (minScore 1); everything else needs minScore 2. Previously this
+    //     ran the search twice for book questions — now it never re-scans the
+    //     library twice for the same message.
+    const bookish = /my books?|the books?|in the (book|pdf|library)|from the (book|pdf)|according to (the )?(book|pdf|textbook)|read (the|my) (book|pdf)|uploaded (book|pdf|files?)|knowledge library/i.test(q);
     try {
-      const kb = searchKnowledge(query);
+      const kb = searchKnowledge(query, bookish ? 1 : 2);
       if (kb.length > 0) {
-        return { intent: 'knowledge_recall', tasks: ['reasoning', 'memory'], reasoning: 'Found matching knowledge in the library.', payload: kb };
+        return {
+          intent: 'knowledge_recall',
+          tasks: ['reasoning', 'memory'],
+          reasoning: bookish ? 'User is asking about their own books/library — answer from those materials.' : 'Found matching knowledge in the library.',
+          payload: kb,
+        };
       }
     } catch (e) {}
 

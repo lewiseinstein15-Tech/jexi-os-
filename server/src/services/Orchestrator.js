@@ -14,7 +14,7 @@ import { ComputerUseAgent } from './ComputerUseAgent.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import {
   addChat, getChatHistory, clearMemory, updateUserProfile,
-  searchInternetKnowledge, searchCodingKnowledge,
+  searchInternetKnowledge, searchFreshInternetKnowledge, searchCodingKnowledge,
   saveInternetKnowledge, saveCodingKnowledge, saveKnowledgeFile,
 } from './MemoryManager.js';
 import { WORKSPACE_DIR, MANAGER_URL, PUBLIC_URL, MAX_DEBUG_ATTEMPTS } from '../config.js';
@@ -355,6 +355,19 @@ export class Orchestrator {
         /* ---------------- LATEST NEWS & TWITTER/X ---------------- */
         case 'news_latest': {
           sendEvent('log', { agent: 'News', message: `📰 Gathering the latest on: "${query}"` });
+
+          // 0. Same news question answered within the last ~30 min? Serve the
+          //    saved summary instantly — no feeds, no AI call, no wait.
+          try {
+            const fresh = searchFreshInternetKnowledge(query, 30 * 60 * 1000);
+            if (fresh) {
+              sendEvent('log', { agent: 'Memory Agent', message: '✓ Fresh news on this from earlier — returning instantly from memory.' });
+              results.summary = `### 🧠 JEXI OS — FROM MEMORY (news I just gathered)\n\n${fresh.answer}`;
+              if (fresh.sources?.length) results.sources = fresh.sources.map(s => ({ title: s, link: s }));
+              results.statistics.confidence = 90;
+              return results;
+            }
+          } catch (e) {}
 
           // 1. Try X/Twitter first (best-effort — no free API exists)
           let twitterItems = [];

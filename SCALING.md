@@ -27,6 +27,7 @@ follow the setup steps.
 | Load-balancer health endpoint (instance id + uptime + Redis) | `server/index.js` → `GET /api/health` | ✅ shipped |
 | Memory already mirrors to Redis on every write (shared brain for N servers) | `server/src/services/MemoryManager.js` | ✅ shipped (just needs `REDIS_URL`) |
 | Cloudflare Worker load balancer (probe, failover, IP stickiness, streaming chat pass-through, `/__lb/status`) | `deploy/lb-worker.js` | ✅ shipped, tested locally (see below) |
+| Repeat answers are **instant**: news/study fetches cached (news 424ms→0ms, study topic 8s→0s), same news question answered from memory for 30 min, knowledge library indexed so chat never re-reads files | `server/src/services/TrustedLibrary.js`, `MemoryManager.js`, `Orchestrator.js`, `Planner.js` | ✅ shipped + tested (12/12) |
 
 **Verified locally** with two simulated servers: health probe takes a sick server
 out of rotation, a 5xx mid-request fails over to the other one, the same visitor
