@@ -117,7 +117,10 @@ export default function DesktopViewer({ logs = [] }) {
     } catch (err) { setShotError('Key press failed — browser may be reconnecting.'); }
   };
 
-  const agentLogs = logs.filter(l => l.agent === 'ComputerUseAgent' || l.agent === 'Debugger' || l.agent === 'Output' || l.agent === 'Vision');
+  // Show every agent's live activity (Planner, Coder, Runner, Terminal,
+  // Debugger, Vision, Search, …) so the panel reflects what JEXI is doing
+  // right now — not just computer-use actions.
+  const agentLogs = (logs || []).filter(l => l && (l.agent || l.message));
 
   const staleSecs = screenshot ? Math.round((Date.now() - lastGoodShotRef.current) / 1000) : 0;
   const showStaleWarning = screenshot && status?.ready && staleSecs > 15;

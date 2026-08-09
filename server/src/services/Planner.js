@@ -93,9 +93,13 @@ export class Planner {
   }
 
   isCoding(q) {
-    const buildVerbs = /(write|build|create|make|develop|fix|debug|refactor|implement|generate|code|program)/i;
-    const codeNouns = /\b(python|javascript|js|typescript|ts|react|node(\.js)?|html|css|java|c\+\+|c#|go|rust|sql|bash|shell|script|function|class|api|server|program|app(lication)?|website|web ?page|code|regex|pipeline|scraper|bot|component|database|endpoint)\b/i;
+    const buildVerbs = /(write|build|create|make|develop|fix|debug|refactor|implement|generate|code|program|design|need|want)/i;
+    const codeNouns = /\b(python|javascript|js|typescript|ts|react|node(\.js)?|html|css|java|c\+\+|c#|go|rust|sql|bash|shell|script|function|class|api|server|program|app(lication)?|website|web ?page|web ?app|code|regex|pipeline|scraper|bot|component|database|endpoint|calculator|game|quiz|dashboard|tool|plugin|extension|landing page|portfolio|template|form|notebook)\b/i;
+    // Natural phrasings: "I need an app…", "I want a website…", "build me a calculator…"
+    const wantDeliverable = /\b(i (need|want)|i'?d like|can you (build|make|create|write)|help me (build|make|create|write)|need a|want a|build me|make me|create a|build a|make a)\b/i;
+    const deliverable = /\b(app(lication)?|website|web ?app|web ?page|game|quiz|calculator|dashboard|tool|bot|plugin|extension|landing page|portfolio|template|scraper|script)\b/i;
     return (buildVerbs.test(q) && codeNouns.test(q)) ||
+      (wantDeliverable.test(q) && deliverable.test(q)) ||
       /```[\s\S]*```/i.test(q) || // user pasted code
       /(\berrors?\b|traceback|exception|syntax ?error|debug this code|code is broken|doesn'?t work|not working|fix this|fix the code|\bdebug\b)/i.test(q);
   }

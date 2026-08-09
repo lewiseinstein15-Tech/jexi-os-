@@ -11,6 +11,7 @@ import { collectSystemStatus, readSourceFile } from './SelfMonitor.js';
 import { studyTopic, recallKnowledge } from './KnowledgeAgent.js';
 import { latestNews, twitterLatest } from './TrustedLibrary.js';
 import { ComputerUseAgent } from './ComputerUseAgent.js';
+import { DesktopManager, ensureBrowser } from './DesktopManager.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import {
   addChat, getChatHistory, clearMemory, updateUserProfile,
@@ -227,6 +228,19 @@ export class Orchestrator {
                 }
               } catch (e) {
                 sendEvent('log', { agent: 'Debugger', message: `✗ Fix failed: ${e.message}` });
+              }
+            }
+
+            // 3.5 SHOW HER WORK: open the finished web app in the virtual
+            //     desktop's Chromium so the user watches it render live
+            //     (the desktop viewer streams screenshots every ~0.8s).
+            if (previewUrl && /\.html$/i.test(entryPoint || '')) {
+              try {
+                await ensureBrowser();
+                await new DesktopManager().goto('coder', previewUrl);
+                sendEvent('log', { agent: 'Vision', message: `🖥 Showing the app in my virtual desktop: ${previewUrl}` });
+              } catch (e) {
+                sendEvent('log', { agent: 'Vision', message: `⚠ Could not open the app in the virtual desktop (the preview link still works): ${e.message}` });
               }
             }
 
