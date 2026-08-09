@@ -60,7 +60,7 @@ async function fetchSearXNG(query, category = 'general') {
 async function fetchDDG(query) {
   try {
     const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' } });
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`DDG ${res.status}`);
     const $ = cheerio.load(await res.text());
     const results = [];
@@ -79,7 +79,7 @@ async function fetchDDG(query) {
 async function fetchBing(query) {
   try {
     const url = `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' } });
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`Bing ${res.status}`);
     const $ = cheerio.load(await res.text());
     const results = [];

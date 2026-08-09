@@ -3,9 +3,9 @@ import path from 'path';
 import { generateCode, applyFix } from './Architect.js';
 import { planForBuild, qaWebApp, qaScripted, reviewAndShip, fixFromQA, isDebugQuery, gateVerdict } from './SkillChain.js';
 import { runFile } from './Runner.js';
-import { aggregateSearch } from './SearchEngine.js';
-import { extractContent, analyzeLink } from './Extractor.js';
+import { analyzeLink } from './Extractor.js';
 import { reasonAndWrite } from './Reasoner.js';
+import { runSearchTeam } from './SearchAgent.js';
 import { learnHowTo } from './Researcher.js';
 import { generateContent, resolveKeys } from './LLMClient.js';
 import { collectSystemStatus, readSourceFile } from './SelfMonitor.js';
@@ -425,12 +425,12 @@ export class Orchestrator {
             }
           } catch (e) {}
 
-          // 3. Search the internet (trusted sources)
-          sendEvent('log', { agent: 'Search', message: `🔍 Searching trusted sources for: "${query}"` });
-          const sources = await aggregateSearch(query);
-          results.sources = sources.slice(0, 5).map(s => ({ title: s.title, link: s.link }));
+          // 3. Search the internet with the specialist Search Team
+          //    (Query Analyzer → Searcher → Re-ranker → Extractor → Synthesizer)
+          const team = await runSearchTeam(query, sendEvent);
+          results.sources = team.sources.slice(0, 5).map(s => ({ title: s.title, link: s.link }));
 
-          if (sources.length === 0) {
+          if (team.sources.length === 0) {
             sendEvent('log', { agent: 'Search', message: '⚠ No results. Trying the browser...' });
             const agent = new ComputerUseAgent();
             const br = await agent.executeTask(query, sendEvent, { intent: 'research' });
@@ -442,27 +442,9 @@ export class Orchestrator {
             }
           }
 
-          // 4. Deep-read the top trusted sources
-          sendEvent('log', { agent: 'Extractor', message: `📖 Deep-reading top ${Math.min(sources.length, 4)} sources...` });
-          const deep = [];
-          for (const src of sources.slice(0, 4)) {
-            try {
-              const hostname = new URL(src.link).hostname;
-              const content = await extractContent(src.link);
-              deep.push({ title: content.title || src.title, link: src.link, source_name: hostname, content: content.content.slice(0, 4000) });
-              sendEvent('website', { site: { title: content.title || src.title, url: src.link, favicon: `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`, status: 'success' } });
-              sendEvent('log', { agent: 'Extractor', message: `✓ Read ${hostname}` });
-            } catch (e) {
-              sendEvent('log', { agent: 'Extractor', message: `✗ Could not read ${src.link}` });
-            }
-          }
-
-          // 5. Synthesize: reframe raw info into a direct answer
-          sendEvent('log', { agent: 'Reasoner', message: '🧠 Synthesizing answer...' });
-          const { summary } = await reasonAndWrite(query, deep);
-          try { addChat('jexi', summary); } catch (e) {}
-          results.summary = summary;
-          results.statistics.confidence = 90;
+          try { addChat('jexi', team.summary); } catch (e) {}
+          results.summary = team.summary;
+          results.statistics.confidence = team.confidence;
           return results;
         }
 
