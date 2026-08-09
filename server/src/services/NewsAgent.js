@@ -71,6 +71,7 @@ function sourceNameFromUrl(url) {
 /* ---------------- STAGE 1 — NEWS SCOUT: which feeds to read ---------------- */
 const TOPIC_FEEDS = {
   technology: 'TECHNOLOGY', tech: 'TECHNOLOGY', crypto: 'TECHNOLOGY', ai: 'TECHNOLOGY',
+  artificial: 'TECHNOLOGY', intelligence: 'TECHNOLOGY', robot: 'TECHNOLOGY', software: 'TECHNOLOGY',
   business: 'BUSINESS', economy: 'BUSINESS', finance: 'BUSINESS', stock: 'BUSINESS',
   world: 'WORLD', international: 'WORLD', sports: 'SPORTS', football: 'SPORTS', soccer: 'SPORTS',
   science: 'SCIENCE', space: 'SCIENCE', health: 'HEALTH', medical: 'HEALTH', covid: 'HEALTH',
