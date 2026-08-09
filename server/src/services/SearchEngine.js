@@ -15,6 +15,7 @@ function isGarbage(r) {
   try {
     const host = new URL(r.link).hostname;
     if (BAD_DOMAINS.some(d => host.includes(d) || host === d)) return true;
+    if (r.link.includes('ad_domain=') || host === 'duckduckgo.com') return true; // DDG ad redirects
   } catch (e) { return true; }
   return false;
 }
@@ -94,6 +95,13 @@ async function fetchBing(query) {
   } catch (e) { return []; }
 }
 
+/** arXiv is for academic queries only — consumer/product questions must not
+ *  be polluted by research-paper PDFs that merely share keywords. */
+const ACADEMIC_MARKERS = /\b(paper|arxiv|study|survey|thesis|journal|algorithm|theory|methodology|scientific|experiment|dataset|preprint|research paper)\b/i;
+export function isAcademicQuery(query) {
+  return ACADEMIC_MARKERS.test(String(query || ''));
+}
+
 async function fetchArxiv(query) {
   try {
     const url = `http://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&max_results=4`;
@@ -114,11 +122,12 @@ export async function aggregateSearch(query, specificEngine = null) {
   const coreQuery = extractCoreQuery(query);
   if (!coreQuery) return [];
 
+  const wantArxiv = isAcademicQuery(coreQuery);
   const engines = {
     searx: fetchSearXNG(coreQuery, 'general'),
     ddg: fetchDDG(coreQuery),
     bing: fetchBing(coreQuery),
-    arxiv: fetchArxiv(coreQuery),
+    ...(wantArxiv ? { arxiv: fetchArxiv(coreQuery) } : {}),
   };
 
   let combined;
@@ -127,8 +136,8 @@ export async function aggregateSearch(query, specificEngine = null) {
   } else if (specificEngine && engines[specificEngine]) {
     combined = await engines[specificEngine];
   } else {
-    const [searx, ddg, bing, arxiv] = await Promise.all([engines.searx, engines.ddg, engines.bing, engines.arxiv]);
-    combined = [...arxiv, ...searx, ...ddg, ...bing];
+    const [searx, ddg, bing, arxiv = []] = await Promise.all([engines.searx, engines.ddg, engines.bing, engines.arxiv || Promise.resolve([])]);
+    combined = [...(wantArxiv ? arxiv : []), ...searx, ...ddg, ...bing];
   }
 
   // Dedupe by link, then rank: trusted first, then by source

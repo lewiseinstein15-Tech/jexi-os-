@@ -1,4 +1,4 @@
-import { aggregateSearch } from './SearchEngine.js';
+import { aggregateSearch, isAcademicQuery } from './SearchEngine.js';
 import { extractContent } from './Extractor.js';
 import { generateContent } from './LLMClient.js';
 import { saveInternetKnowledge } from './MemoryManager.js';
@@ -260,6 +260,18 @@ export async function runSearchTeam(query, sendEvent) {
   sendEvent?.('log', { agent: 'Extractor', message: `✅ Extracted full text from ${deep.length} sources.` });
 
   if (deep.length === 0) return { summary: '', sources: [] };
+
+  // Quality gate: for a NON-academic question, only academic papers/PDFs means
+  // the general engines failed (flaky/blocked) — let the orchestrator fall back
+  // to the browser instead of answering from irrelevant papers.
+  const junkOnly =
+    !isAcademicQuery(query) &&
+    deep.length > 0 &&
+    deep.every((s) => /arxiv\.org|\.pdf/i.test(s.link || ''));
+  if (junkOnly) {
+    sendEvent?.('log', { agent: 'Re-ranker', message: '⚠ Only academic papers matched — not relevant to this question. Falling back to the browser...' });
+    return { summary: '', sources: [] };
+  }
 
   // 5. Synthesizer (grounded, cited)
   sendEvent?.('log', { agent: 'Synthesizer', message: '🧠 Synthesizing a cited answer from the sources...' });
