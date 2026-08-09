@@ -80,6 +80,15 @@ async function oembed(url) {
   return null;
 }
 
+function docTitleSafe(html, url) {
+  try {
+    const m = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+    if (m && m[1].trim()) return m[1].trim();
+  } catch (e) {}
+  try { return new URL(url).hostname; } catch (e) {}
+  return 'Page';
+}
+
 /** Describe ANY link: video, social post, article, website. */
 export async function analyzeLink(url) {
   if (await isSSRF(url)) throw new Error('Security blocked (SSRF)');
@@ -212,6 +221,16 @@ export async function extractContent(url) {
   const html = await fetchHTML(url); // js rendering off — search extraction stays lightweight
   if (html.includes('cf-challenge') || html.includes('Cloudflare Ray ID')) {
     throw new Error('Cloudflare bot protection triggered.');
+  }
+
+  // Oversized pages skip JSDOM+Readability (memory spike on small hosts) — the
+  // regex-based html-to-text path is far lighter and good enough for extraction.
+  if (html.length > 2_500_000) {
+    const text = convert(html, { wordwrap: 130 });
+    if (text && text.length > 300) {
+      return { title: docTitleSafe(html, url), content: text, length: text.length, method: 'html-to-text' };
+    }
+    throw new Error('Page has no readable content or is too short.');
   }
 
   const doc = new JSDOM(html, { url });

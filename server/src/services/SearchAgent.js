@@ -141,27 +141,42 @@ function withTimeout(promise, ms, label) {
 }
 
 const SOURCE_READ_TIMEOUT_MS = 25000;
+const MAX_CONCURRENT_READS = 3; // JSDOM is memory-hungry — keep peak RSS safe on small hosts
+
+async function readOne(src) {
+  const content = await extractContent(src.link);
+  let hostname = '';
+  try { hostname = new URL(src.link).hostname; } catch (e) {}
+  return {
+    title: content.title || src.title,
+    link: src.link,
+    source_name: hostname,
+    snippet: src.snippet || '',
+    content: String(content.content || '').slice(0, 6000),
+  };
+}
+
+/** Run tasks with a concurrency cap (bounded Promise pool). */
+async function mapPool(items, worker, limit) {
+  const results = new Array(items.length);
+  let next = 0;
+  const run = async (idx) => {
+    while (next < items.length) {
+      const i = next++;
+      try { results[i] = { status: 'fulfilled', value: await worker(items[i]) }; }
+      catch (e) { results[i] = { status: 'rejected', reason: e }; }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, (_, k) => run(k)));
+  return results;
+}
 
 export async function deepRead(sources, query, sendEvent) {
-  const settled = await Promise.allSettled(
-    (sources || []).map((src) =>
-      withTimeout((async () => {
-        const content = await extractContent(src.link);
-        let hostname = '';
-        try { hostname = new URL(src.link).hostname; } catch (e) {}
-        return {
-          title: content.title || src.title,
-          link: src.link,
-          source_name: hostname,
-          snippet: src.snippet || '',
-          content: String(content.content || '').slice(0, 6000),
-        };
-      })(),
-      SOURCE_READ_TIMEOUT_MS,
-      src.link
-    )
-  )
-);
+  const settled = await mapPool(
+    sources || [],
+    (src) => withTimeout(readOne(src), SOURCE_READ_TIMEOUT_MS, src.link),
+    MAX_CONCURRENT_READS
+  );
   const deep = [];
   settled.forEach((res, i) => {
     const src = (sources || [])[i];
