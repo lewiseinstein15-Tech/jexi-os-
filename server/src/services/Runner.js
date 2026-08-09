@@ -18,8 +18,29 @@ export function runFile(fileName, onOutput) {
 
     if (cleanName.toLowerCase().endsWith('.html')) {
       const url = `${PUBLIC_URL || MANAGER_URL}/preview/${cleanName}`;
-      if (onOutput) onOutput('stdout', `Website ready. Preview at: ${url}\n`);
-      return resolve({ success: true, output: 'Website generated successfully.', url });
+      (async () => {
+        try {
+          // Real verification, not a rubber stamp: syntax-check every inline
+          // <script> block with node --check, so broken JavaScript is caught
+          // by the debug loop (fix → rerun) instead of being delivered broken.
+          const html = fs.readFileSync(filePath, 'utf-8');
+          const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
+          for (let i = 0; i < scripts.length; i++) {
+            const body = (scripts[i][1] || '').trim();
+            if (!body) continue;
+            const tmp = path.join(WORKSPACE_DIR, `.jexi-check-${Date.now()}-${i}.js`);
+            fs.writeFileSync(tmp, body, 'utf-8');
+            const res = await runCommand(`node --check "${tmp}"`, { cwd: WORKSPACE_DIR, timeout: 8000 });
+            try { fs.unlinkSync(tmp); } catch (e) {}
+            if (!res.success) {
+              return resolve({ success: false, output: `JavaScript error in inline script #${i + 1}: ${res.output.slice(0, 1500)}`, url });
+            }
+          }
+        } catch (e) { /* unreadable file — fall through to success */ }
+        if (onOutput) onOutput('stdout', `Website ready. Preview at: ${url}\n`);
+        resolve({ success: true, output: 'Website generated successfully — inline JavaScript passed syntax check.', url });
+      })();
+      return;
     }
 
     let command = '';

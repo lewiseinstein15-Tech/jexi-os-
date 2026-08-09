@@ -193,6 +193,7 @@ export class Orchestrator {
             let attempt = 0;
             let entryPoint = project.entryPoint || project.files[0]?.name;
             let lastOutput = '';
+            let previewUrl = null; // set when the built app is live on a preview link
 
             while (attempt < MAX_DEBUG_ATTEMPTS) {
               attempt++;
@@ -204,6 +205,7 @@ export class Orchestrator {
 
               if (runResult.success && !looksLikeError) {
                 sendEvent('log', { agent: 'Runner', message: '✅ Code ran successfully with no errors!' });
+                if (runResult.url) previewUrl = runResult.url;
                 break;
               }
 
@@ -240,8 +242,13 @@ export class Orchestrator {
             const workspaceLinks = files.map(name => `- [${name}](${linkBase}/api/files/${name})`).join('\n');
             const finalOutput = lastOutput && lastOutput.trim() ? `\`\`\`bash\n${lastOutput.trim().slice(0, 1500)}\n\`\`\`` : '';
 
-            results.summary = `### 💻 JEXI CODING AGENT — VERIFIED & TESTED\n\n✅ I wrote the code, ran it in the terminal, and confirmed it works without errors.\n\n${fileSections}\n\n**Test Output:**\n${finalOutput || '✓ Ran successfully.'}\n\n**Download the files:**\n${workspaceLinks}`;
+            const previewLine = previewUrl
+              ? `\n\n**🔗 LIVE PREVIEW:** [Open ${entryPoint}](${previewUrl})\n*(hosted for free — works in any browser, share the link with anyone)*`
+              : '';
+
+            results.summary = `### 💻 JEXI CODING AGENT — VERIFIED & TESTED\n\n✅ I wrote the code, ran it in the terminal, and confirmed it works without errors.${previewLine}\n\n${fileSections}\n\n**Test Output:**\n${finalOutput || '✓ Ran successfully.'}\n\n**Download the files:**\n${workspaceLinks}`;
             results.files = files;
+            results.previewUrl = previewUrl || undefined;
             results.statistics.confidence = 100;
 
             // 5. Store the verified solution in memory
