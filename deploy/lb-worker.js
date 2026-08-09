@@ -30,7 +30,12 @@ const ORIGINS = [
 const PROBE_SECONDS = 25;       // active health-check freshness window
 const COOLDOWN_MS = 60_000;     // how long a failed origin stays out of rotation
 const PROBE_TIMEOUT_MS = 5_000; // health probe timeout
-const REQUEST_TIMEOUT_MS = 25_000; // stay under the Workers' 30s wall-clock limit
+const REQUEST_TIMEOUT_MS = 28_000; // max wall time (Workers free caps an invocation at ~30s)
+
+// NOTE: Cloudflare's free plan caps each invocation at ~30s wall-clock, so very
+// long chat answers (deep research can take 20-60s) cannot stream through the
+// balancer on the free tier. Point the app at an origin directly for those, or
+// run the worker on a paid plan (5-minute limit) once a second server exists.
 
 // ==== HEALTH STATE (per-isolate bookkeeping) ==============================
 const state = {};
@@ -137,7 +142,7 @@ export async function route(request, origins = ORIGINS) {
       } catch (e2) { /* both down — fall through */ }
     }
     return Response.json(
-      { success: false, error: 'All JEXI brain servers are unreachable right now. Try again in a minute.' },
+      { success: false, error: 'JEXI\'s brain did not answer in time (the free Worker caps requests at ~30s — long answers should go straight to the server, or the balancer needs a paid plan). Try again, or set the app\'s Server URL back to the direct address.' },
       { status: 503, headers: { 'content-type': 'application/json' } }
     );
   }
