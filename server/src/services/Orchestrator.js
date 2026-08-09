@@ -15,7 +15,7 @@ import { ComputerUseAgent } from './ComputerUseAgent.js';
 import { DesktopManager, ensureBrowser } from './DesktopManager.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import {
-  addChat, getChatHistory, clearMemory, updateUserProfile,
+  addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory, topUserFacts,
   searchInternetKnowledge, searchFreshInternetKnowledge, searchCodingKnowledge,
   saveInternetKnowledge, saveCodingKnowledge, saveKnowledgeFile,
 } from './MemoryManager.js';
@@ -35,7 +35,14 @@ function listWorkspaceFiles() {
 /** Build a compact conversation context for JEXI to stay focused. */
 function conversationContext() {
   const history = getChatHistory(12);
-  return history.map(h => `${h.role === 'user' ? 'User' : 'JEXI'}: ${String(h.text).slice(0, 600)}`).join('\n');
+  const facts = topUserFacts(4);
+  const profile = loadMemory().userProfile || {};
+  const memoryBlock = [];
+  if (profile.name) memoryBlock.push(`User's name: ${profile.name}`);
+  if (profile.location) memoryBlock.push(`User's location: ${profile.location}`);
+  if (facts.length) memoryBlock.push(...facts);
+  const extra = memoryBlock.length ? `\n\nWhat I know about the user (from memory):\n${memoryBlock.map(f => `- ${f}`).join('\n')}` : '';
+  return `${history.map(h => `${h.role === 'user' ? 'User' : 'JEXI'}: ${String(h.text).slice(0, 600)}`).join('\n')}${extra}`;
 }
 
 export class Orchestrator {
