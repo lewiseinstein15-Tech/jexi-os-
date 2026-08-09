@@ -14,6 +14,24 @@ export class Planner {
       return { intent: 'image_recognition', tasks: ['vision', 'reasoning', 'memory'], reasoning: 'User provided an image to analyze.', payload: opts.image };
     }
 
+    // 0.5 Agent-team safety controls: /careful, /freeze, /guard <paths>, /unfreeze
+    const scope = { mode: 'normal', paths: [] };
+    const cmdMatch = q.match(/^\s*\/(careful|freeze|unfreeze|guard|team)\b(.*)$/i);
+    if (cmdMatch) {
+      const cmd = cmdMatch[1].toLowerCase();
+      if (cmd === 'careful') scope.mode = 'careful';            // read-only QA, no destructive ops
+      else if (cmd === 'freeze') scope.mode = 'freeze';          // plan only — write nothing
+      else if (cmd === 'unfreeze') scope.mode = 'normal';        // unlock
+      else if (cmd === 'guard') {                                // careful + only touch named files
+        scope.mode = 'careful';
+        scope.paths = String(cmdMatch[2] || '').split(/[\s,]+/).filter(Boolean);
+      }
+      // /team keeps normal mode — the team already runs for every build.
+    } else if (/be careful|careful mode/i.test(q)) {
+      scope.mode = 'careful';
+    }
+    const scopedQuery = query.replace(/^\s*\/(careful|freeze|unfreeze|guard|team)\b\s*/i, '').trim();
+
     // 1. Clear memory
     if (/clear (all )?memory|forget everything|wipe memory|delete memory/i.test(q)) {
       return { intent: 'clear_memory', tasks: ['memory'], reasoning: 'User wants to wipe memory.' };
@@ -25,15 +43,10 @@ export class Planner {
       return { intent: 'link_analysis', tasks: ['browser', 'extractor', 'reasoning', 'memory'], reasoning: 'User shared a link — JEXI will open it with the browser and summarize.', payload: { url: linkMatch[0], fullQuery: query } };
     }
 
-    // 3. Study / deep learn
-    if (/study|learn everything about|fill knowledge base|master topic|teach me (everything about )?/i.test(q)) {
-      const topic = query.replace(/study|learn everything about|fill knowledge base|master topic|teach me/i, '').trim().replace(/^about\s+/i, '');
-      return { intent: 'study_topic', tasks: ['scholar', 'research', 'memory'], reasoning: 'User wants JEXI to deep-study and store in the knowledge library.', payload: topic };
-    }
-
-    // 4. Math detection — symbols, formulas, calculations, word problems
+    // 3. Math detection — symbols, formulas, calculations, word problems
+    //    (checked BEFORE coding: "calculate" etc. is math unless it's a build request)
     const mathHints = /(calculate|compute|solve|integrate|derivative|differentiate|sum of|multiply|divide|sqrt|square root|equation|formula|math|algebra|calculus|geometry|trigonometry|percentage|what is \d|\d+\s*[+\-×÷*\/]\s*\d|\^2|\$\$)/i;
-    if (mathHints.test(q) && !this.isCoding(q)) {
+    if (mathHints.test(q) && !this.isCoding(scopedQuery)) {
       return { intent: 'math_solve', tasks: ['reasoning', 'memory'], reasoning: 'Mathematical question — solve with structured LaTeX steps.' };
     }
 
@@ -44,9 +57,18 @@ export class Planner {
       return { intent: 'self_check', tasks: ['self', 'reasoning', 'memory'], reasoning: 'JEXI runs a full self-diagnosis and reports system health with root causes.' };
     }
 
-    // 6. Coding / programming (code in the question, or ask to build/debug)
-    if (this.isCoding(q)) {
-      return { intent: 'code_task', tasks: ['architect', 'coder', 'runner', 'debugger', 'memory'], reasoning: 'Coding task — write, run, and verify code before answering.' };
+    // 6. Coding / programming — the FULL AGENT TEAM plans, builds, QA-tests and ships.
+    //    Checked BEFORE study/research so "build me a study planner", "an app to
+    //    track habits", "/team build…" and "/careful check my code" all land here
+    //    (slash commands are stripped first — isCoding tests the scopedQuery).
+    if (this.isCoding(scopedQuery)) {
+      return { intent: 'code_task', tasks: ['architect', 'coder', 'runner', 'debugger', 'qa', 'reviewer', 'memory'], reasoning: 'Coding task — the team: product → designer → engineer → coder → QA → reviewer → shipper.', scope, query: scopedQuery };
+    }
+
+    // 6.5 Study / deep learn (AFTER coding so "study planner" apps aren't hijacked)
+    if (/study|learn everything about|fill knowledge base|master topic|teach me (everything about )?/i.test(q)) {
+      const topic = query.replace(/study|learn everything about|fill knowledge base|master topic|teach me/i, '').trim().replace(/^about\s+/i, '');
+      return { intent: 'study_topic', tasks: ['scholar', 'research', 'memory'], reasoning: 'User wants JEXI to deep-study and store in the knowledge library.', payload: topic };
     }
 
     // 7. Greetings & pure conversation
@@ -93,11 +115,11 @@ export class Planner {
   }
 
   isCoding(q) {
-    const buildVerbs = /(write|build|create|make|develop|fix|debug|refactor|implement|generate|code|program|design|need|want)/i;
-    const codeNouns = /\b(python|javascript|js|typescript|ts|react|node(\.js)?|html|css|java|c\+\+|c#|go|rust|sql|bash|shell|script|function|class|api|server|program|app(lication)?|website|web ?page|web ?app|code|regex|pipeline|scraper|bot|component|database|endpoint|calculator|game|quiz|dashboard|tool|plugin|extension|landing page|portfolio|template|form|notebook)\b/i;
+    const buildVerbs = /(write|build|create|make|develop|fix|debug|refactor|implement|generate|code|program|design|plan|need|want)/i;
+    const codeNouns = /\b(python|javascript|js|typescript|ts|react|node(\.js)?|html|css|java|c\+\+|c#|go|rust|sql|bash|shell|script|function|class|api|server|program|app(lication)?|website|web ?page|web ?app|code|regex|pipeline|scraper|bot|component|database|endpoint|calculator|game|quiz|dashboard|tool|plugin|extension|landing page|portfolio|template|form|notebook|planner|tracker|manager|reminder|timer|stopwatch|converter|generator|finder|logger|monitor|notes?|todo|habit|budget|finance)\b/i;
     // Natural phrasings: "I need an app…", "I want a website…", "build me a calculator…"
-    const wantDeliverable = /\b(i (need|want)|i'?d like|can you (build|make|create|write)|help me (build|make|create|write)|need a|want a|build me|make me|create a|build a|make a)\b/i;
-    const deliverable = /\b(app(lication)?|website|web ?app|web ?page|game|quiz|calculator|dashboard|tool|bot|plugin|extension|landing page|portfolio|template|scraper|script)\b/i;
+    const wantDeliverable = /\b(i (need|want)|i'?d like|can you (build|make|create|write)|help me (build|make|create|write)|need (a|an)|want (a|an)|build me|make me|create (a|an)|build (a|an)|make (a|an))\b/i;
+    const deliverable = /\b(app(lication)?|website|web ?app|web ?page|game|quiz|calculator|dashboard|tool|bot|plugin|extension|landing page|portfolio|template|scraper|script|planner|tracker|manager|reminder|timer|stopwatch|converter|generator|finder|logger|monitor|notes?|todo|habit|budget|finance|panel|page|form|screen)\b/i;
     return (buildVerbs.test(q) && codeNouns.test(q)) ||
       (wantDeliverable.test(q) && deliverable.test(q)) ||
       /```[\s\S]*```/i.test(q) || // user pasted code

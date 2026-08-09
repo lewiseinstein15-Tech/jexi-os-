@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { generateCode, applyFix } from './Architect.js';
+import { planForBuild, qaWebApp, qaScripted, reviewAndShip, fixFromQA, isDebugQuery } from './SkillChain.js';
 import { runFile } from './Runner.js';
 import { aggregateSearch } from './SearchEngine.js';
 import { extractContent, analyzeLink } from './Extractor.js';
@@ -165,10 +166,12 @@ export class Orchestrator {
         /* ---------------- CODE TASK — THE DEBUG LOOP ---------------- */
         case 'code_task': {
           sendEvent('log', { agent: 'Coder', message: '💻 Entering coding pipeline...' });
+          const scope = (plan.scope) || {};
+          const effQuery = (plan.scope && plan.scope.query) || query;
 
           // 1. Do we already know this from memory?
           try {
-            const remembered = searchCodingKnowledge(query);
+            const remembered = searchCodingKnowledge(effQuery);
             if (remembered) {
               sendEvent('log', { agent: 'Memory Agent', message: '✓ Found a solution I built before — recalling from memory.' });
               results.summary = `### 🧠 JEXI OS — RECALLED FROM MEMORY\n\nI solved this before, so I'm giving you the verified solution.\n\n${remembered.solution}\n\n${remembered.files?.length ? `**Files:** ${remembered.files.join(', ')}` : ''}`;
@@ -177,17 +180,43 @@ export class Orchestrator {
             }
           } catch (e) {}
 
-          // 2. Plan the project
+          // 1.5 THINK + PLAN — the team's Product → Designer → Engineer pass
+          let teamPlan = '';
+          let teamBrief = '';
+          const debugAsk = isDebugQuery(effQuery);
+          if (!debugAsk && scope.mode !== 'freeze') {
+            try {
+              const planned = await planForBuild(effQuery, sendEvent);
+              teamBrief = planned.brief;
+              teamPlan = `${planned.brief}\n\n${planned.design}\n\n${planned.plan}`;
+            } catch (e) {
+              sendEvent('log', { agent: 'Engineer', message: `⚠ Planning pass failed: ${e.message}` });
+            }
+          }
+
+          // FROZEN mode: plan only — nothing is written to disk.
+          if (scope.mode === 'freeze') {
+            results.summary = `### 📋 BUILD PLAN — FROZEN\n\nNothing was written to disk. Here is the team's plan:\n\n${teamPlan || '(planning skipped — say /unfreeze and I will plan then build)'}\n\n> Say **/unfreeze** or ask me to *build it* and I will execute this plan end-to-end.`;
+            results.statistics.confidence = 90;
+            return results;
+          }
+
+          // 2. Plan the project (coder pass — follows the team's build plan)
           let project;
           try {
-            project = await generateCode(query, sendEvent);
+            project = await generateCode(teamPlan ? `${effQuery}\n\nIMPLEMENT THIS PLAN:\n${teamPlan}` : effQuery, sendEvent);
           } catch (e) {
             sendEvent('log', { agent: 'Architect', message: `⚠ Planning failed: ${e.message}` });
           }
 
           if (project && project.files && project.files.length > 0) {
             fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
-            project.files.forEach(f => fs.writeFileSync(path.join(WORKSPACE_DIR, f.name), f.code, 'utf-8'));
+            // /guard: only write files inside the user-declared scope
+            const allowedWrite = (name) => !scope.paths || !scope.paths.length || scope.paths.some(p => name.includes(p));
+            project.files.forEach(f => {
+              if (!allowedWrite(f.name)) { sendEvent('log', { agent: 'Coder', message: `⛔ /guard: skipping ${f.name} (outside allowed scope)` }); return; }
+              fs.writeFileSync(path.join(WORKSPACE_DIR, f.name), f.code, 'utf-8');
+            });
             sendEvent('log', { agent: 'Coder', message: `✓ Created ${project.files.length} file(s)` });
 
             // 3. THE DEBUG LOOP: run → check → fix → rerun (never leave until success)
@@ -222,7 +251,10 @@ export class Orchestrator {
               try {
                 const fixed = await applyFix(query, errorContext, existingCode, attempt + 1, sendEvent);
                 if (fixed && fixed.files && fixed.files.length > 0) {
-                  fixed.files.forEach(f => fs.writeFileSync(path.join(WORKSPACE_DIR, f.name), f.code, 'utf-8'));
+                  fixed.files.forEach(f => {
+                    if (!allowedWrite(f.name)) { sendEvent('log', { agent: 'Coder', message: `⛔ /guard: skipping ${f.name} (outside allowed scope)` }); return; }
+                    fs.writeFileSync(path.join(WORKSPACE_DIR, f.name), f.code, 'utf-8');
+                  });
                   entryPoint = fixed.entryPoint || entryPoint;
                   sendEvent('log', { agent: 'Debugger', message: '✍ Rewrote code with fixes. Re-running...' });
                 }
@@ -244,6 +276,35 @@ export class Orchestrator {
               }
             }
 
+            // 3.75 THE TEAM: QA → REVIEW → SHIP (each output feeds the next)
+            let qaReport = '';
+            let reviewNotes = '';
+            let shipNotes = '';
+            try {
+              const builtFiles = listWorkspaceFiles();
+              if (previewUrl && /\.html$/i.test(entryPoint || '')) {
+                qaReport = await qaWebApp({ previewUrl, brief: teamBrief || effQuery, scope, sendEvent });
+                if (/NEEDS FIX|❌|FAIL/i.test(qaReport) && !debugAsk) {
+                  const fixedOnce = await fixFromQA({ query: effQuery, qaReport, entryPoint, sendEvent });
+                  if (fixedOnce) {
+                    sendEvent('log', { agent: 'Runner', message: '↻ Re-running after QA fix...' });
+                    const rerun = await runFile(fixedOnce.entryPoint, (s, d) => sendEvent('log', { agent: 'Terminal', message: String(d).slice(0, 160) }));
+                    if (rerun.url) previewUrl = rerun.url;
+                    if (previewUrl && /\.html$/i.test(fixedOnce.entryPoint || '')) {
+                      qaReport = await qaWebApp({ previewUrl, brief: teamBrief || effQuery, scope, sendEvent });
+                    }
+                  }
+                }
+              } else {
+                qaReport = await qaScripted({ query: effQuery, files: builtFiles, lastOutput, sendEvent });
+              }
+              const shipped = await reviewAndShip({ query: effQuery, plan: teamPlan, files: builtFiles, lastOutput, previewUrl, qaReport, sendEvent });
+              reviewNotes = shipped.review;
+              shipNotes = shipped.shipped;
+            } catch (e) {
+              sendEvent('log', { agent: 'Shipper', message: `⚠ Team pass issue: ${e.message}` });
+            }
+
             // 4. Present the verified code
             const files = listWorkspaceFiles();
             const fileSections = files.map(name => {
@@ -260,7 +321,14 @@ export class Orchestrator {
               ? `\n\n**🔗 LIVE PREVIEW:** [Open ${entryPoint}](${previewUrl})\n*(hosted for free — works in any browser, share the link with anyone)*`
               : '';
 
-            results.summary = `### 💻 JEXI CODING AGENT — VERIFIED & TESTED\n\n✅ I wrote the code, ran it in the terminal, and confirmed it works without errors.${previewLine}\n\n${fileSections}\n\n**Test Output:**\n${finalOutput || '✓ Ran successfully.'}\n\n**Download the files:**\n${workspaceLinks}`;
+            const teamLine = teamPlan
+              ? '\n\n**🏢 Team:** Product → Designer → Engineer → Coder → QA Lead → Reviewer → Shipper'
+              : '\n\n**🏢 Team:** Coder → QA Lead → Reviewer → Shipper';
+            const qaSection = qaReport ? `\n\n**🧪 QA REPORT**\n${qaReport}` : '';
+            const reviewSection = reviewNotes ? `\n\n**🔍 REVIEW NOTES**\n${reviewNotes}` : '';
+            const shipSection = shipNotes ? `\n\n**📦 SHIPPED**\n${shipNotes}` : '';
+            const planSection = teamPlan ? `\n\n**🛠 BUILD PLAN** (Product + Designer + Engineer)\n${teamPlan.split('\n').slice(0, 42).join('\n')}` : '';
+            results.summary = `### 💻 JEXI TEAM — PLANNED, BUILT, TESTED & SHIPPED\n\n✅ The full agent team worked together: planned, wrote, ran, QA-tested and reviewed your app.${teamLine}${previewLine}${qaSection}${reviewSection}${shipSection}${planSection}\n\n${fileSections}\n\n**Test Output:**\n${finalOutput || '✓ Ran successfully.'}\n\n**Download the files:**\n${workspaceLinks}`;
             results.files = files;
             results.previewUrl = previewUrl || undefined;
             results.statistics.confidence = 100;
@@ -268,7 +336,7 @@ export class Orchestrator {
             // 5. Store the verified solution in memory
             try {
               const codeSummary = fileSections.replace(/```[\s\S]*?```/g, '```code```').slice(0, 8000);
-              saveCodingKnowledge(query, 'code', codeSummary, files);
+              saveCodingKnowledge(effQuery, 'code', codeSummary, files);
             } catch (e) {}
           } else {
             results.summary = "### 💻 JEXI CODING AGENT\n\nI couldn't generate the code. Please rephrase your request with more detail.";
