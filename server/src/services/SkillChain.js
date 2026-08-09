@@ -181,8 +181,8 @@ export async function reviewAndShip({ query, plan, files, lastOutput, previewUrl
       // the complete <script> body (truncating at N chars hid the JS before).
       const scriptMatch = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
       const js = scriptMatch ? scriptMatch[1] : '';
-      if (js.length > 0) return `${code.slice(0, 2500)}\n\n--- FULL <script> BODY (${js.length} chars) ---\n${js.slice(0, 12000)}`;
-      return code.slice(0, 12000);
+      if (js.length > 0) return `${code.slice(0, 2500)}\n\n--- FULL <script> BODY (${js.length} chars) ---\n${js.slice(0, 30000)}`;
+      return code.slice(0, 30000);
     } catch { return '(could not read)'; }
   })();
 
