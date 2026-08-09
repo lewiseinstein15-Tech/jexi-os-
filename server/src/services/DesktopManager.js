@@ -218,6 +218,99 @@ export class DesktopManager {
     return await this.pageText(agentId);
   }
 
+  /**
+   * Numbered element indexing (browser-use / WebVoyager / Set-of-Mark pattern):
+   * injects data-agent-id markers into visible interactive elements and returns
+   * an indexed map the LLM can target by number — far more reliable than pixel
+   * coordinates or guessing at text. This is JEXI's real "eyes" for the browser.
+   */
+  async interactiveMap(agentId) {
+    const ready = await ensureBrowser();
+    if (!ready.ok) throw new Error(ready.error);
+    return await page.evaluate(() => {
+      const selector = 'a, button, input, select, textarea, [role="button"], [role="link"], [role="tab"], [tabindex]:not([tabindex="-1"]), summary';
+      const all = Array.from(document.querySelectorAll(selector));
+      let idx = 0;
+      const elements = [];
+      for (const el of all) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width < 4 || rect.height < 4) continue;
+        const style = window.getComputedStyle(el);
+        if (style.visibility === 'hidden' || style.display === 'none') continue;
+        el.setAttribute('data-agent-id', String(idx));
+        const text = (el.innerText || el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.value || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+        if (!text && el.tagName !== 'INPUT' && el.tagName !== 'SELECT' && el.tagName !== 'TEXTAREA') continue;
+        elements.push({
+          id: idx,
+          tag: el.tagName.toLowerCase(),
+          text,
+          type: el.getAttribute('type') || '',
+          href: el.tagName === 'A' ? (el.href || '').slice(0, 160) : '',
+          placeholder: el.getAttribute('placeholder') || '',
+          x: Math.round(rect.x + rect.width / 2),
+          y: Math.round(rect.y + rect.height / 2),
+        });
+        idx++;
+      }
+      return {
+        url: location.href,
+        title: document.title,
+        elements: elements.slice(0, 60),
+      };
+    });
+  }
+
+  /** Click the interactive element with the given index (SPA-healing: re-indexes and retries). */
+  async clickIndex(agentId, index) {
+    const ready = await ensureBrowser();
+    if (!ready.ok) throw new Error(ready.error);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const el = page.locator(`[data-agent-id="${index}"]`).first();
+        await el.scrollIntoViewIfNeeded({ timeout: 4000 }).catch(() => {});
+        await el.click({ timeout: 8000 });
+        await new Promise(r => setTimeout(r, 1200));
+        return { ok: true, index };
+      } catch (e) {
+        if (attempt === 0) {
+          // SPA re-render may have wiped the markers — re-inject and retry.
+          await this.interactiveMap(agentId);
+          continue;
+        }
+        // Last resort: click the element's recorded center coordinates.
+        try {
+          const map = await this.interactiveMap(agentId);
+          const el = map.elements.find(elm => elm.id === Number(index));
+          if (el) {
+            await page.mouse.click(el.x, el.y);
+            await new Promise(r => setTimeout(r, 1200));
+            return { ok: true, index, via: 'coords' };
+          }
+        } catch {}
+        throw new Error(`Element [${index}] not clickable after re-index`);
+      }
+    }
+  }
+
+  /** Focus element [index] and type text into it (fills inputs, falls back to keystrokes). */
+  async typeIndex(agentId, index, text) {
+    const ready = await ensureBrowser();
+    if (!ready.ok) throw new Error(ready.error);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const el = page.locator(`[data-agent-id="${index}"]`).first();
+        await el.scrollIntoViewIfNeeded({ timeout: 4000 }).catch(() => {});
+        await el.click({ timeout: 8000 });
+        await el.fill(text, { timeout: 6000 }).catch(async () => { await page.keyboard.type(text, { delay: 25 }); });
+        await new Promise(r => setTimeout(r, 400));
+        return { ok: true, index };
+      } catch (e) {
+        if (attempt === 0) { await this.interactiveMap(agentId); continue; }
+        throw new Error(`Element [${index}] not focusable`);
+      }
+    }
+  }
+
   async click(agentId, x, y) {
     const ready = await ensureBrowser();
     if (!ready.ok) throw new Error(ready.error);

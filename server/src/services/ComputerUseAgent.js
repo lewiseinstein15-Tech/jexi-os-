@@ -51,6 +51,8 @@ export class ComputerUseAgent {
     else if (val.includes('write') || (raw.filename && raw.code)) action.action = 'write_file';
     else if (val.includes('read_page') || val.includes('read page') || val.includes('read_screen')) action.action = 'read_page';
     else if (val.includes('screenshot') || val.includes('vision')) action.action = 'screenshot';
+    else if (val.includes('click_index') || val.includes('click index')) action.action = 'click_index';
+    else if (val.includes('type_index') || val.includes('type index')) action.action = 'type_index';
     else if (val.includes('click_text') || val.includes('click text')) action.action = 'click_text';
     else if (val.includes('click')) action.action = 'click';
     else if (val.includes('scroll')) action.action = 'scroll';
@@ -64,12 +66,42 @@ export class ComputerUseAgent {
     return action;
   }
 
+  /** Fetch the live interactive element map (JEXI's numbered eyes) or a friendly empty fallback. */
+  async currentElements() {
+    try {
+      const map = await this.api('elements', {});
+      if (map?.elements?.length) {
+        const lines = map.elements.map(e =>
+          `[${e.id}] ${e.tag}${e.type ? `:${e.type}` : ''} "${e.text}"${e.href ? ` -> ${e.href}` : ''}${e.placeholder ? ` (placeholder: ${e.placeholder})` : ''}`
+        ).join('\n');
+        return { map, lines, count: map.elements.length };
+      }
+    } catch {}
+    return { map: null, lines: '', count: 0 };
+  }
+
+  /** Format a compact, LLM-friendly screen snapshot: page text + numbered elements. */
+  async screenSnapshot(maxText = 6000) {
+    let out = '';
+    try {
+      const txt = await this.api('page-text', {});
+      if (txt && txt.trim()) {
+        out += `\n[SCREEN CONTENTS]:\n${txt.trim().slice(0, maxText)}\n`;
+      }
+    } catch {}
+    const { lines, count } = await this.currentElements();
+    if (count > 0) {
+      out += `\n[SCREEN ELEMENTS — interact by number]:\n${lines}\n`;
+    }
+    return out;
+  }
+
   async executeTask(task, sendEvent, opts = {}) {
     const intent = opts.intent || 'task';
     const isResearch = intent === 'research';
     const isLink = intent === 'link_analysis';
     const isCode = intent === 'code_task';
-    sendEvent?.('log', { agent: 'ComputerUseAgent', message: `Starting task: ${task}` });
+    sendEvent?.('log', { agent: 'Navigator', message: `Planning task: ${task}` });
 
     // Try to talk to the real browser/terminal first.
     const desktopOk = await this.pingDesktop(sendEvent);
@@ -96,6 +128,11 @@ export class ComputerUseAgent {
         }
         if (lastError.includes('Browser unavailable')) {
           guidance += `The visual browser is unavailable. Do not attempt 'goto'. Instead use 'shell' with a python script that fetches the page, or simply finish — the orchestrator will read sources server-side.\n`;
+        }
+        // Give the fix attempt JEXI's current numbered eyes so it stops guessing.
+        if (desktopOk.ok) {
+          const snap = await this.screenSnapshot(4000).catch(() => '');
+          if (snap) guidance += `\nHere is what is currently on screen — use the numbered [N] elements:\n${snap}`;
         }
         prompt += `\n\n${guidance}\nFix the issue and try again.`;
       } else {
@@ -137,6 +174,11 @@ export class ComputerUseAgent {
               const r = await this.api('goto', { url: action.url });
               sendEvent?.('log', { agent: 'Vision', message: `🌐 Opened: ${r.title || action.url}` });
               await new Promise(r2 => setTimeout(r2, 1200));
+              const { lines, count } = await this.currentElements();
+              if (count > 0) {
+                stepOutput.text += `\n[SCREEN ELEMENTS]:\n${lines}\n`;
+                sendEvent?.('log', { agent: 'Navigator', message: `🔢 Indexed ${count} interactive elements` });
+              }
               break;
             }
             case 'write_file': {
@@ -155,6 +197,18 @@ export class ComputerUseAgent {
             case 'press': {
               await this.api('press', { key: action.key });
               await new Promise(r2 => setTimeout(r2, 500));
+              break;
+            }
+            case 'click_index': {
+              const r = await this.api('click-index', { index: action.index });
+              sendEvent?.('log', { agent: 'Navigator', message: r.ok ? `✓ Clicked element [${action.index}]` : `✗ Element [${action.index}] not found` });
+              await new Promise(r2 => setTimeout(r2, 1200));
+              break;
+            }
+            case 'type_index': {
+              const r = await this.api('type-index', { index: action.index, text: action.text });
+              sendEvent?.('log', { agent: 'Navigator', message: `⌨ Typed into element [${action.index}]: ${String(action.text).slice(0, 40)}` });
+              await new Promise(r2 => setTimeout(r2, 400));
               break;
             }
             case 'click_text': {
@@ -182,13 +236,18 @@ export class ComputerUseAgent {
             }
             case 'read_page': {
               didReadPage = true;
-              sendEvent?.('log', { agent: 'Vision', message: '📖 Reading page...' });
+              sendEvent?.('log', { agent: 'Vision', message: '📖 Reading page + indexing elements...' });
               const txt = await this.api('page-text', {});
               if (txt && txt.trim().length > 0) {
                 stepOutput.text += `\n[SCREEN CONTENTS]:\n${txt.trim().slice(0, 8000)}\n`;
                 sendEvent?.('log', { agent: 'Vision', message: `✓ Read ${txt.length} chars from page` });
               } else {
                 sendEvent?.('log', { agent: 'Vision', message: 'Page was empty or unreadable.' });
+              }
+              const { lines, count } = await this.currentElements();
+              if (count > 0) {
+                stepOutput.text += `\n[SCREEN ELEMENTS]:\n${lines}\n`;
+                sendEvent?.('log', { agent: 'Navigator', message: `🔢 Indexed ${count} interactive elements` });
               }
               break;
             }

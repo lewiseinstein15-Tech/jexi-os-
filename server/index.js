@@ -91,6 +91,21 @@ app.post('/api/desktop/coder/click-text', async (req, res) => {
   catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+app.post('/api/desktop/coder/elements', async (req, res) => {
+  try { res.json({ success: true, ...(await dm.interactiveMap('coder')) }); }
+  catch (e) { res.status(500).json({ error: e.message, elements: [] }); }
+});
+
+app.post('/api/desktop/coder/click-index', async (req, res) => {
+  try { res.json({ success: true, ...(await dm.clickIndex('coder', req.body.index)) }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/desktop/coder/type-index', async (req, res) => {
+  try { res.json({ success: true, ...(await dm.typeIndex('coder', req.body.index, req.body.text)) }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/desktop/coder/scroll', async (req, res) => {
   try { res.json({ success: true, ...(await dm.scroll('coder', req.body.direction)) }); }
   catch (e) { res.status(500).json({ error: e.message }); }
