@@ -333,14 +333,7 @@ if (fs.existsSync(publicDir)) {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🧠 JEXI OS BRAIN running on port ${PORT}`);
-  // Boot-time browser self-check (non-blocking): confirms in the deploy logs whether
-  // Chromium can actually launch here (free hosts may lack its system libraries) and
-  // warms the browser so the first visitor sees the desktop instantly.
-  setTimeout(async () => {
-    try {
-      const { ok, error } = await ensureBrowser();
-      if (ok) console.log('✅ [Desktop] Chromium ready - JEXI has eyes.');
-      else { console.log(`⚠️ [Desktop] ${error}`); recordError('desktop', error); }
-    } catch (e) { console.log(`⚠️ [Desktop] browser self-check failed: ${e.message}`); }
-  }, 4000);
+  // Chromium is launched LAZILY on first desktop/QA use, never held resident at
+  // boot: on small hosts (512MB) a permanently-open browser + concurrent page
+  // parsing during search was OOM-killing the process mid-request.
 });

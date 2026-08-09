@@ -141,7 +141,7 @@ function withTimeout(promise, ms, label) {
 }
 
 const SOURCE_READ_TIMEOUT_MS = 25000;
-const MAX_CONCURRENT_READS = 3; // JSDOM is memory-hungry — keep peak RSS safe on small hosts
+const MAX_CONCURRENT_READS = 2; // JSDOM is memory-hungry — keep peak RSS safe on small hosts
 
 async function readOne(src) {
   const content = await extractContent(src.link);

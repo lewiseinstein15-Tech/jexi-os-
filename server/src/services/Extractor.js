@@ -126,6 +126,7 @@ export async function analyzeLink(url) {
 
   const reader = new Readability(document);
   const article = reader.parse();
+  doc.window.close(); // release the DOM immediately
 
   if (article && article.textContent && article.length >= 300) {
     return {
@@ -236,11 +237,12 @@ export async function extractContent(url) {
   const doc = new JSDOM(html, { url });
   const reader = new Readability(doc.window.document);
   const article = reader.parse();
+  doc.window.close(); // release the DOM immediately — JSDOM is memory-heavy on small hosts
 
   if (!article || !article.textContent || article.length < 500) {
     const text = convert(html, { wordwrap: 130 });
     if (text && text.length > 500) {
-      return { title: doc.window.document.title || new URL(url).hostname, content: text, length: text.length, method: 'html-to-text' };
+      return { title: docTitleSafe(html, url), content: text, length: text.length, method: 'html-to-text' };
     }
     throw new Error('Page has no readable content or is too short.');
   }
