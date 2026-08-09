@@ -43,14 +43,19 @@ async function fetchBuffer(url) {
   }
 }
 
-async function fetchHTML(url) {
+async function fetchHTML(url, opts = {}) {
   try {
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, timeout: 12000 });
     if (res.status === 403 || res.status === 503) throw new Error('Blocked by host');
     return await res.text();
   } catch (e) {
-    const jsHtml = await renderWithJS(url);
-    if (jsHtml) return jsHtml;
+    // JS rendering launches a full Chromium browser — only for explicit link
+    // analysis, NEVER during bulk search extraction (memory-heavy, and a crash
+    // there kills the whole request).
+    if (opts.js) {
+      const jsHtml = await renderWithJS(url);
+      if (jsHtml) return jsHtml;
+    }
     const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
     const proxyRes = await fetch(proxyUrl, { timeout: 20000 });
     if (proxyRes.ok) return await proxyRes.text();
@@ -99,7 +104,7 @@ export async function analyzeLink(url) {
   }
 
   // 2) Regular pages: fetch + readability, with meta-tag fallback
-  const html = await fetchHTML(url);
+  const html = await fetchHTML(url, { js: true });
   const doc = new JSDOM(html, { url });
   const { document } = doc.window;
 
@@ -204,7 +209,7 @@ export async function extractContent(url) {
   }
 
   // HTML PAGES
-  const html = await fetchHTML(url);
+  const html = await fetchHTML(url); // js rendering off — search extraction stays lightweight
   if (html.includes('cf-challenge') || html.includes('Cloudflare Ray ID')) {
     throw new Error('Cloudflare bot protection triggered.');
   }

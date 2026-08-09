@@ -108,10 +108,21 @@ export function rankSources(query, results) {
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter((w) => w.length > 3);
+  // Proper nouns (capitalized words) are strong signals — a page titled "Paris"
+  // must beat "French people" when the question asks about Paris.
+  const entities = [
+    ...new Set(
+      String(query || '')
+        .replace(/[^a-zA-Z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length > 2 && /^[A-Z]/.test(w))
+    ),
+  ];
   const scored = (results || []).map((r) => {
     const blob = `${r.title || ''} ${r.snippet || ''}`.toLowerCase();
     let relevance = 0;
     for (const t of terms) if (blob.includes(t)) relevance += 1;
+    for (const e of entities) if (blob.includes(e.toLowerCase())) relevance += 3;
     return { ...r, relevance };
   });
   scored.sort((a, b) => b.relevance - a.relevance || 0);
