@@ -85,6 +85,11 @@ async function redisPush(memory) {
   catch (e) { console.error('[Memory] Redis write failed:', e.message); }
 }
 
+/** True when a Redis layer is configured (used by the load-balancer health check). */
+export function isRedisActive() {
+  return redisEnabled && !!redisClient;
+}
+
 /* ---------------- Local JSON store ---------------- */
 
 export function loadMemory() {

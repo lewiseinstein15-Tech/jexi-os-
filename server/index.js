@@ -16,7 +16,7 @@ import {
   addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory,
   saveInternetKnowledge, saveCodingKnowledge, searchInternetKnowledge, searchCodingKnowledge,
   saveKnowledgeFile, searchKnowledge, getKnowledgeStructure, getKnowledgeStatus,
-  hydrateFromRedis,
+  hydrateFromRedis, isRedisActive,
 } from './src/services/MemoryManager.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
 import { PORT, WORKSPACE_DIR, DATA_DIR, SERVER_ROOT } from './src/config.js';
@@ -33,6 +33,10 @@ process.on('unhandledRejection', (e) => { recordError('process', (e && e.message
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '30mb' })); // Room for base64 book uploads + code files + images
+
+// Every instance has its own id (Render injects RENDER_INSTANCE_ID automatically).
+// A load balancer can see which instance answered, and you can verify stickiness.
+const INSTANCE_ID = process.env.RENDER_INSTANCE_ID || Math.random().toString(36).slice(2, 8);
 
 fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
 
@@ -294,7 +298,21 @@ app.post('/api/chat', async (req, res) => {
   } finally { res.end(); }
 });
 
-app.get('/api/health', (req, res) => res.json({ ok: true, name: 'JEXI OS Brain', version: '1.0.0', port: PORT }));
+// Health endpoint used by the load balancer's active probes (and the keep-alive
+// cron) — must be fast, never cached, and identify the exact instance.
+app.get('/api/health', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    ok: true,
+    name: 'JEXI OS Brain',
+    version: '1.0.0',
+    instanceId: INSTANCE_ID,
+    uptime: Math.round(process.uptime()),
+    redis: isRedisActive(),
+    port: PORT,
+    time: new Date().toISOString(),
+  });
+});
 
 // === SELF-MONITORING (JEXI diagnoses her own system + reads her own source) ===
 app.get('/api/self/status', (req, res) => res.json(collectSystemStatus()));
