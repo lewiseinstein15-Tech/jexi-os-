@@ -33,6 +33,24 @@ function trustedScore(r) {
   return score;
 }
 
+/**
+ * Direct fetch first, then retry through a server-side fetch proxy (allorigins).
+ * Datacenter IPs (Render) are blacklisted by most HTML engines — the proxy
+ * fetches from its own infrastructure and usually gets through.
+ */
+async function fetchWithFallback(url, headers, timeoutMs) {
+  try {
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeoutMs) });
+    if (res.ok) return res;
+  } catch (e) {}
+  try {
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(timeoutMs + 5000) });
+    if (res.ok) return res;
+  } catch (e) {}
+  return null;
+}
+
 function extractCoreQuery(query) {
   if (query.includes(':')) return query;
   let q = query.toLowerCase();
@@ -50,8 +68,8 @@ async function fetchSearXNG(query, category = 'general') {
   const attempts = instances.map(async (instance) => {
     try {
       const url = `${instance}/search?q=${encodeURIComponent(query)}&format=json&categories=${category}`;
-      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(6000) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const res = await fetchWithFallback(url, { 'User-Agent': 'Mozilla/5.0' }, 6000);
+      if (!res) throw new Error('blocked or empty');
       const data = await res.json();
       if (data?.results?.length > 0) {
         return data.results
@@ -72,8 +90,8 @@ async function fetchSearXNG(query, category = 'general') {
 async function fetchDDG(query) {
   try {
     const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, signal: AbortSignal.timeout(8000) });
-    if (!res.ok) throw new Error(`DDG ${res.status}`);
+    const res = await fetchWithFallback(url, { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, 8000);
+    if (!res) throw new Error('DDG blocked');
     const $ = cheerio.load(await res.text());
     const results = [];
     $('.result').slice(0, 8).each((i, el) => {
@@ -92,8 +110,8 @@ async function fetchDDGLite(query) {
   // DDG's lite endpoint is more bot-tolerant than the html one.
   try {
     const url = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, signal: AbortSignal.timeout(8000) });
-    if (!res.ok) throw new Error(`DDGLite ${res.status}`);
+    const res = await fetchWithFallback(url, { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, 8000);
+    if (!res) throw new Error('DDGLite blocked');
     const $ = cheerio.load(await res.text());
     const results = [];
     $('a.result-link').each((i, el) => {
@@ -112,8 +130,8 @@ async function fetchMojeek(query) {
   // Mojeek is a bot-tolerant independent index — a good last-resort engine.
   try {
     const url = `https://www.mojeek.com/search?q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, signal: AbortSignal.timeout(8000) });
-    if (!res.ok) throw new Error(`Mojeek ${res.status}`);
+    const res = await fetchWithFallback(url, { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, 8000);
+    if (!res) throw new Error(`Mojeek ${res.status}`);
     const $ = cheerio.load(await res.text());
     const results = [];
     $('ul.results-standard li').each((i, el) => {
@@ -130,8 +148,8 @@ async function fetchMojeek(query) {
 async function fetchBing(query) {
   try {
     const url = `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, signal: AbortSignal.timeout(8000) });
-    if (!res.ok) throw new Error(`Bing ${res.status}`);
+    const res = await fetchWithFallback(url, { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, 8000);
+    if (!res) throw new Error(`Bing ${res.status}`);
     const $ = cheerio.load(await res.text());
     const results = [];
     $('li.b_algo').slice(0, 8).each((i, el) => {
@@ -150,6 +168,24 @@ async function fetchBing(query) {
 const ACADEMIC_MARKERS = /\b(paper|arxiv|study|survey|thesis|journal|algorithm|theory|methodology|scientific|experiment|dataset|preprint|research paper)\b/i;
 export function isAcademicQuery(query) {
   return ACADEMIC_MARKERS.test(String(query || ''));
+}
+
+async function fetchWiki(query) {
+  // Wikipedia's API is a real API — works from any IP (datacenter included)
+  // and aligns with JEXI's trusted-source ranking.
+  try {
+    const url = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=5`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'JEXI-OS/1.0 (research agent)' }, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`Wiki ${res.status}`);
+    const data = await res.json();
+    const results = (data?.query?.search || []).map(r => ({
+      title: r.title,
+      link: `https://en.wikipedia.org/wiki/${encodeURIComponent(r.title.replace(/ /g, '_'))}`,
+      snippet: String(r.snippet || '').replace(/<[^>]+>/g, ''),
+      source: 'Wikipedia',
+    }));
+    return results.filter(r => !isGarbage(r));
+  } catch (e) { return []; }
 }
 
 async function fetchArxiv(query) {
@@ -179,6 +215,7 @@ export async function aggregateSearch(query, specificEngine = null) {
     ddglite: fetchDDGLite(coreQuery),
     mojeek: fetchMojeek(coreQuery),
     bing: fetchBing(coreQuery),
+    wiki: fetchWiki(coreQuery),
     ...(wantArxiv ? { arxiv: fetchArxiv(coreQuery) } : {}),
   };
 
@@ -188,11 +225,11 @@ export async function aggregateSearch(query, specificEngine = null) {
   } else if (specificEngine && engines[specificEngine]) {
     combined = await engines[specificEngine];
   } else {
-    const [searx, ddg, ddglite, mojeek, bing, arxiv = []] = await Promise.all([
-      engines.searx, engines.ddg, engines.ddglite, engines.mojeek, engines.bing,
+    const [searx, ddg, ddglite, mojeek, bing, wiki, arxiv = []] = await Promise.all([
+      engines.searx, engines.ddg, engines.ddglite, engines.mojeek, engines.bing, engines.wiki,
       engines.arxiv || Promise.resolve([]),
     ]);
-    combined = [...(wantArxiv ? arxiv : []), ...searx, ...ddg, ...ddglite, ...mojeek, ...bing];
+    combined = [...(wantArxiv ? arxiv : []), ...wiki, ...searx, ...ddg, ...ddglite, ...mojeek, ...bing];
   }
 
   // Dedupe by link, then rank: trusted first, then by source
