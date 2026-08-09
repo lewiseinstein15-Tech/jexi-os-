@@ -10,7 +10,7 @@ import { learnHowTo } from './Researcher.js';
 import { generateContent, resolveKeys } from './LLMClient.js';
 import { collectSystemStatus, readSourceFile } from './SelfMonitor.js';
 import { studyTopic, recallKnowledge } from './KnowledgeAgent.js';
-import { latestNews, twitterLatest } from './TrustedLibrary.js';
+import { runNewsTeam } from './NewsAgent.js';
 import { ComputerUseAgent } from './ComputerUseAgent.js';
 import { DesktopManager, ensureBrowser } from './DesktopManager.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
@@ -491,47 +491,13 @@ export class Orchestrator {
             }
           } catch (e) {}
 
-          // 1. Try X/Twitter first (best-effort — no free API exists)
-          let twitterItems = [];
-          try {
-            const tw = await twitterLatest(query);
-            if (tw) {
-              twitterItems = tw.items;
-              sendEvent('log', { agent: 'News', message: `🐦 Read ${twitterItems.length} recent X/Twitter posts (via ${tw.instance}).` });
-            } else {
-              sendEvent('log', { agent: 'News', message: '🐦 X/Twitter requires login — no public feed available. Using trusted news feeds instead.' });
-            }
-          } catch (e) {}
-
-          // 2. Trusted news feeds (Google News + BBC)
-          const newsItems = await latestNews(query);
-          sendEvent('log', { agent: 'News', message: `📡 ${newsItems.length} headlines from trusted news feeds.` });
-          results.sources = newsItems.slice(0, 6).map(n => ({ title: n.title, link: n.link }));
-          for (const n of newsItems.slice(0, 4)) {
-            sendEvent('website', { site: { title: n.title, url: n.link, favicon: `https://www.google.com/s2/favicons?domain=${n.source}&sz=64`, status: 'success' } });
-          }
-
-          const keys = resolveKeys();
-          let summary;
-          if (!keys.groqKey && !keys.geminiKey) {
-            const lines = newsItems.slice(0, 8).map((n, i) => `${i + 1}. **${n.title}** — ${n.source}${n.date ? ` (${n.date})` : ''}\n   ${n.link}`).join('\n');
-            summary = `### 📰 JEXI OS — LATEST NEWS\n\n${twitterItems.length ? `**X/Twitter needs login** (X has no free API) — here are the top headlines instead:\n\n` : ''}${lines || 'No headlines found right now — try again in a minute.'}`;
-          } else {
-            const twBlock = twitterItems.length
-              ? `\n\nRecent X/Twitter posts:\n${twitterItems.slice(0, 5).map(t => `- ${t.snippet || t.title}`).join('\n')}`
-              : '\n\n(X/Twitter could not be read without login — headlines below are from trusted news feeds.)';
-            summary = await generateContent(
-              `The user asked: "${query}"\n\nLatest headlines (trusted news feeds):\n${newsItems.slice(0, 10).map(n => `- ${n.title} [${n.source}]${n.date ? ` (${n.date})` : ''}`).join('\n')}${twBlock}\n\nSummarize the current news in a structured answer: ## HEADLINES (numbered, source after each), ## WHAT'S HAPPENING (2-4 sentence synthesis), ## SOURCES. Be accurate — only report what the headlines actually say.`,
-              JEXI_SYSTEM_PROMPT,
-              null,
-              { temperature: 0.3 }
-            );
-            summary = `### 📰 JEXI OS — LATEST NEWS\n\n${summary}`;
-          }
-          try { saveInternetKnowledge(query, summary, results.sources.map(s => s.title)); } catch (e) {}
-          try { addChat('jexi', summary); } catch (e) {}
-          results.summary = summary;
-          results.statistics.confidence = 85;
+          // 1. Run the specialist News Team
+          //    (News Scout → News Filter → News Editor — free feeds, no API key)
+          const team = await runNewsTeam(query, sendEvent);
+          results.sources = team.sources;
+          try { addChat('jexi', team.summary); } catch (e) {}
+          results.summary = team.summary;
+          results.statistics.confidence = team.confidence;
           return results;
         }
 
