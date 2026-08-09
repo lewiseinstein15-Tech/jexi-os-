@@ -223,10 +223,13 @@ export function searchCodingKnowledge(query) {
     .map(entry => {
       const hay = `${entry.topic} ${entry.solution}`.toLowerCase();
       const score = q.reduce((acc, w) => acc + (hay.includes(w) ? 1 : 0), 0);
-      return { entry, score };
+      return { entry, score, ratio: q.length ? score / q.length : 0 };
     })
-    .filter(r => r.score >= 1)
-    .sort((a, b) => b.score - a.score);
+    // Only recall when the request is genuinely the SAME build: at least 2 shared
+    // words AND half the query covered. Anything less (e.g. a different app that
+    // happens to share words like "dark theme") must build fresh.
+    .filter(r => r.score >= 2 && r.ratio >= 0.5)
+    .sort((a, b) => b.ratio - a.ratio || b.score - a.score);
   return scored[0]?.entry || null;
 }
 
