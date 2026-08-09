@@ -1,0 +1,35 @@
+# Auto-deploy the JEXI OS load balancer to Cloudflare Workers — FREE.
+#
+# No need to paste code in the Cloudflare dashboard. Just:
+#   1. Cloudflare → My Profile → API Tokens → Create Token → template
+#      "Edit Cloudflare Workers" → create → copy the token.
+#   2. GitHub → repo Settings → Secrets and variables → Actions → new repo secrets:
+#        CLOUDFLARE_API_TOKEN = <the token>
+#        CLOUDFLARE_ACCOUNT_ID = <your account number, from dash.cloudflare.com URL>
+#   3. Run this workflow (Actions → "Deploy Load Balancer" → Run workflow),
+#      or just push a change to deploy/lb-worker.js — it deploys itself.
+#
+# Result: https://jexi-lb.<your-subdomain>.workers.dev
+
+name: Deploy Load Balancer
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'deploy/lb-worker.js'
+      - '.github/workflows/deploy-worker.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy worker with wrangler
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy deploy/lb-worker.js --name jexi-lb
