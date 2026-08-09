@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { planner } from './src/services/Planner.js';
@@ -209,6 +210,37 @@ app.get('/api/knowledge/books/:name/file', (req, res) => {
     if (!fs.existsSync(fp)) return res.status(404).json({ error: 'Original file not stored (only link-imported books lack a local copy).' });
     res.download(fp, file);
   } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// === APK UPDATE PROXY (in-app updates for the Android app) ===
+// GitHub's release-asset server does NOT send CORS headers, so a fetch of the
+// APK straight from the app's WebView is blocked by the browser. This route
+// streams the newest APK through the backend (CORS is fully open here), so the
+// JEXI app can download it into its own storage and open the Android package
+// installer directly — no browser download step, no missing install prompt.
+const APK_DOWNLOAD_URL = 'https://github.com/lewiseinstein15-Tech/jexi-os-/releases/latest/download/app-debug.apk';
+
+app.get('/api/update/apk', async (req, res) => {
+  try {
+    const upstream = await axios({
+      method: 'GET',
+      url: APK_DOWNLOAD_URL,
+      responseType: 'stream',
+      timeout: 90000,
+      maxRedirects: 5,
+      headers: { 'User-Agent': 'JEXI-OS-Update/1.0' },
+    });
+    const len = upstream.headers['content-length'];
+    res.setHeader('Content-Type', upstream.headers['content-type'] || 'application/vnd.android.package-archive');
+    if (len) res.setHeader('Content-Length', len);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Disposition', 'attachment; filename="app-debug.apk"');
+    upstream.data.on('error', (e) => res.destroy(e));
+    upstream.data.pipe(res);
+  } catch (e) {
+    recordError('update', e.message);
+    res.status(502).json({ success: false, error: 'Could not fetch the newest APK: ' + e.message });
+  }
 });
 
 // === CHAT API ===

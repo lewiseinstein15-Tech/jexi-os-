@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion';
 import {
-  Smartphone, Download, ShieldCheck, Zap, CheckCircle2, PlayCircle, Github, Sparkles, Wifi, Star, RefreshCw
+  Smartphone, Download, ShieldCheck, Zap, CheckCircle2, PlayCircle, Github, Sparkles, Wifi, Star, RefreshCw, Loader2, AlertTriangle
 } from 'lucide-react';
 import useUpdateChecker from '../hooks/useUpdateChecker';
+import useApkInstaller from '../hooks/useApkInstaller';
 
 // Permanent direct link — GitHub always points this at the newest "Latest" release.
 const APK_URL = 'https://github.com/lewiseinstein15-Tech/jexi-os-/releases/latest/download/app-debug.apk';
@@ -15,6 +16,17 @@ const fadeUp = {
 
 export default function DownloadPanel() {
   const updater = useUpdateChecker();
+  const installer = useApkInstaller();
+
+  const buttonLabel = () => {
+    const base = updater.updateAvailable ? `UPDATE TO BUILD #${updater.latest.number}` : 'DOWNLOAD JEXI OS APK';
+    if (!installer.isAndroid) return base;
+    if (installer.phase === 'installing') return 'OPENING INSTALLER…';
+    if (installer.phase === 'downloading') {
+      return installer.progress >= 0 ? `DOWNLOADING ${installer.progress}%` : 'DOWNLOADING…';
+    }
+    return base;
+  };
 
   const steps = [
     {
@@ -63,25 +75,94 @@ export default function DownloadPanel() {
           Install JEXI OS on your Android phone like any normal app — own icon, splash screen, full-screen window.
         </p>
 
-        {/* Big download button — label changes when an update is ready */}
-        <motion.a
-          href={APK_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          whileTap={{ scale: 0.96 }}
-          className="mt-5 relative inline-flex items-center justify-center gap-2.5 bg-[#00FF9D] text-black rounded-2xl px-8 py-4 font-black tracking-wide shadow-[0_0_30px_rgba(0,255,157,0.35)] hover:shadow-[0_0_45px_rgba(0,255,157,0.55)] transition-shadow"
-        >
-          <Download className="w-5 h-5" />
-          {updater.updateAvailable ? `UPDATE TO BUILD #${updater.latest.number}` : 'DOWNLOAD JEXI OS APK'}
-          {updater.updateAvailable && (
-            <>
-              <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[#00FF9D] animate-ping" />
-              <span className="absolute -top-2.5 -right-2.5 bg-[#f472b6] text-white text-[7px] font-black rounded-full px-2 py-0.5">
-                NEW
-              </span>
-            </>
-          )}
-        </motion.a>
+        {/* Big download button — inside the app it installs directly; on web it opens the link */}
+        {installer.isAndroid ? (
+          <button
+            onClick={installer.start}
+            disabled={installer.busy}
+            className="mt-5 relative inline-flex items-center justify-center gap-2.5 bg-[#00FF9D] text-black rounded-2xl px-8 py-4 font-black tracking-wide shadow-[0_0_30px_rgba(0,255,157,0.35)] hover:shadow-[0_0_45px_rgba(0,255,157,0.55)] transition-shadow disabled:opacity-80 disabled:cursor-wait min-w-[240px]"
+          >
+            {installer.busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+            {buttonLabel()}
+            {updater.updateAvailable && !installer.busy && (
+              <>
+                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[#00FF9D] animate-ping" />
+                <span className="absolute -top-2.5 -right-2.5 bg-[#f472b6] text-white text-[7px] font-black rounded-full px-2 py-0.5">
+                  NEW
+                </span>
+              </>
+            )}
+          </button>
+        ) : (
+          <motion.a
+            href={APK_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            whileTap={{ scale: 0.96 }}
+            className="mt-5 relative inline-flex items-center justify-center gap-2.5 bg-[#00FF9D] text-black rounded-2xl px-8 py-4 font-black tracking-wide shadow-[0_0_30px_rgba(0,255,157,0.35)] hover:shadow-[0_0_45px_rgba(0,255,157,0.55)] transition-shadow"
+          >
+            <Download className="w-5 h-5" />
+            {buttonLabel()}
+            {updater.updateAvailable && (
+              <>
+                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[#00FF9D] animate-ping" />
+                <span className="absolute -top-2.5 -right-2.5 bg-[#f472b6] text-white text-[7px] font-black rounded-full px-2 py-0.5">
+                  NEW
+                </span>
+              </>
+            )}
+          </motion.a>
+        )}
+
+        {/* in-app download progress + result hints */}
+        {installer.busy && (
+          <div className="mt-4 text-left">
+            <div className="h-2 rounded-full bg-black/40 overflow-hidden border border-[#00FF9D]/20">
+              <motion.div
+                className="h-full rounded-full bg-[#00FF9D]"
+                animate={{ width: installer.phase === 'installing' ? '100%' : `${Math.max(4, installer.progress)}%` }}
+                transition={{ duration: 0.3 }}
+              />
+            </div>
+            <p className="mt-2 text-[9px] text-gray-400">
+              {installer.phase === 'installing'
+                ? 'Saving the new build… then opening the Android installer.'
+                : `Downloading the newest JEXI OS build${installer.progress >= 0 ? ` — ${installer.progress}%` : '…'}`}
+            </p>
+          </div>
+        )}
+        {installer.phase === 'done' && (
+          <p className="mt-3 text-[10px] font-bold text-[#22c55e] flex items-center justify-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5" /> Tap INSTALL in the Android dialog — JEXI OS will update itself.
+          </p>
+        )}
+        {installer.phase === 'error' && (
+          <div className="mt-3 rounded-xl bg-[#f87171]/10 border border-[#f87171]/40 p-3 text-left">
+            <p className="text-[9px] font-bold text-[#f87171] flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> Install blocked — {installer.error}
+            </p>
+            <p className="text-[8px] text-gray-400 mt-1 leading-relaxed">
+              First time only: <span className="text-gray-200">Settings → Apps → JEXI OS → “Install unknown apps” → Allow</span>, then tap
+              UPDATE again. Or grab the file from your browser below.
+            </p>
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={installer.start}
+                className="bg-[#f87171]/20 border border-[#f87171]/50 text-[#f87171] rounded-lg px-3 py-1.5 text-[9px] font-black"
+              >
+                RETRY UPDATE
+              </button>
+              <a
+                href={APK_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-300 border border-gray-700 rounded-lg px-3 py-1.5 text-[9px] font-black"
+              >
+                BROWSER LINK
+              </a>
+            </div>
+          </div>
+        )}
 
         {/* badges */}
         <div className="mt-4 flex flex-wrap justify-center gap-1.5">

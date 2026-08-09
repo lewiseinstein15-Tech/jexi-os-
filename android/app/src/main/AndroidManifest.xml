@@ -32,6 +32,9 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- In-app updates: lets JEXI open the Android package installer to update
+         itself directly from the app (no browser download step). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- JEXI's eyes: camera (MediaPipe face tracking + AI vision) -->
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Future: microphone for voice conversations with JEXI -->
