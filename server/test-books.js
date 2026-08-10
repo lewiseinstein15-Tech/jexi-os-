@@ -1,7 +1,11 @@
 // Quick self-test for the JEXI book library.
-// Run with:  DATA_DIR=/tmp/jexi-books-test node server/test-books.js
-import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
-import { searchKnowledge } from './src/services/MemoryManager.js';
+// Self-isolating: uses a FRESH temp DATA_DIR so the real library is never
+// touched and runs are deterministic (a leftover book from an earlier bare run
+// used to make listBooks/search/delete assertions fail).
+process.env.DATA_DIR = process.env.DATA_DIR || `/tmp/jexi-books-test-${Date.now()}`;
+
+const { importBookBuffer, importBookUrl, listBooks, deleteBook } = await import('./src/services/BookLibrary.js');
+const { searchKnowledge } = await import('./src/services/MemoryManager.js');
 
 const TEXT = `This is a story about photosynthesis. Photosynthesis is the process by which green plants convert light into chemical energy. It happens inside the chloroplasts of leaves. The overall equation is 6CO2 + 6H2O -> C6H12O6 + 6O2. Chlorophyll is the green pigment that captures sunlight.`;
 

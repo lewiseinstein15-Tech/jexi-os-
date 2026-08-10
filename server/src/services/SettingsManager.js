@@ -9,8 +9,9 @@ export function loadSettings() {
       return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
     }
   } catch (e) { console.error('Settings load error:', e); }
-  // Changed from zhipuKey to geminiKey
-  return { geminiKey: '', groqKey: '' };
+  // Changed from zhipuKey to geminiKey; githubToken powers the GitHub Agent
+  // (commits, pushes, PRs) — read in GitHubAgent.js as GITHUB_TOKEN || GH_TOKEN || settings
+  return { geminiKey: '', groqKey: '', githubToken: '' };
 }
 
 export function saveSettings(settings) {

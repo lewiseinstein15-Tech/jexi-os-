@@ -37,19 +37,48 @@ const tests = [
   { q: 'research frontend style layout and apply the better one to make it look cooler', expect: 'compound_task' },
   { q: 'study machine learning then build me a quiz app', expect: 'compound_task' },
   { q: 'look up modern pricing and then redesign my landing page', expect: 'compound_task' },
-  // Guard: research-first WITHOUT an app/UI deliverable stays in research
-  { q: 'go research on x and then apply it', expect: 'research' },
-  { q: 'research how to bake a cake and then make it', expect: 'research' },
-  { q: 'research solar panels and explain how they work', expect: 'research' },
-  { q: 'research the best diet and tell me the top tips', expect: 'research' },
+  // Guard: research-first WITHOUT an app/UI deliverable stays in the light
+  // pipeline (research, or knowledge_recall when the user's own library already
+  // holds the topic — answering from the library is even better than a web search).
+  { q: 'go research on x and then apply it', expectAny: ['research', 'knowledge_recall'] },
+  { q: 'research how to bake a cake and then make it', expectAny: ['research', 'knowledge_recall'] },
+  { q: 'research solar panels and explain how they work', expectAny: ['research', 'knowledge_recall'] },
+  { q: 'research the best diet and tell me the top tips', expectAny: ['research', 'knowledge_recall'] },
 ];
 
 let failures = 0;
-for (const { q, expect } of tests) {
-  const p = await planner.analyzeIntent(q);
+for (const t of tests) {
+  const p = await planner.analyzeIntent(t.q);
+  const ok = t.expectAny ? t.expectAny.includes(p.intent) : p.intent === t.expect;
+  const want = t.expectAny ? t.expectAny.join('|') : t.expect;
+  if (!ok) failures++;
+  console.log(`${ok ? '✅' : '❌'} ${(p.intent + '          ').slice(0, 12)} expected ${want.padEnd(14)} <- "${t.q.slice(0, 55)}"`);
+}
+
+// Confirmation-resume: when JEXI asks "would you like me to…?" and the user says
+// yes, planConfirmed re-plans the ORIGINAL request. A vague personal task
+// ("I want to track my water intake") must map to the coding team, while plain
+// questions ("tell me about…") must stay research — the word "yes" alone must
+// never trigger a re-search.
+const confirmTests = [
+  { q: 'I want to track my water intake', expect: 'code_task' },
+  { q: 'track my expenses', expect: 'code_task' },
+  { q: 'I want an app that reminds me to drink water', expect: 'code_task' },
+  { q: 'tell me about solar panels', expect: 'learning_research' },
+  { q: 'I want to understand quantum physics', expect: 'learning_research' },
+  { q: 'what is the capital of Kenya', expect: 'research' },
+  // Math topic words alone are NOT a solve request (regression for the trusted-library test)
+  { q: 'study calculus', expect: 'study_topic' },
+  { q: 'what is calculus', expect: 'research' },
+  { q: 'solve this calculus problem', expect: 'math_solve' },
+  { q: 'build a dashboard of today\'s news', expect: 'compound_task' },
+];
+for (const { q, expect } of confirmTests) {
+  const p = await planner.planConfirmed(q);
   const ok = p.intent === expect;
   if (!ok) failures++;
-  console.log(`${ok ? '✅' : '❌'} ${(p.intent + '          ').slice(0, 12)} expected ${expect.padEnd(12)} <- "${q.slice(0, 55)}"`);
+  console.log(`${ok ? '✅' : '❌'} ${(p.intent + '          ').slice(0, 12)} expected ${expect.padEnd(12)} <- CONFIRM "${q.slice(0, 55)}"`);
 }
+
 console.log(failures === 0 ? '\nALL ROUTING TESTS PASSED' : `\n${failures} ROUTING TEST(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

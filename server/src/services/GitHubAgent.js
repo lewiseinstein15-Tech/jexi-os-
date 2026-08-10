@@ -2,8 +2,22 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import { WORKSPACE_DIR } from '../config.js';
+import { loadSettings } from './SettingsManager.js';
 
 const execP = promisify(exec);
+
+/**
+ * GitHub token resolution, same precedence as the AI keys (LLMClient.resolveKeys):
+ *   1. GITHUB_TOKEN env (Render/HF/Docker)
+ *   2. GH_TOKEN env
+ *   3. the token pasted in Settings → GitHub (settings.json)
+ * When set, every `gh` command runs with GH_TOKEN so commits/pushes/PRs work
+ * without the user's own gh login. When unset, gh falls back to its ambient
+ * auth (or honestly reports not-authenticated).
+ */
+export function getGhToken() {
+  return process.env.GITHUB_TOKEN || process.env.GH_TOKEN || loadSettings().githubToken || '';
+}
 
 /**
  * GITHUB AGENT — JEXI's hands on GitHub (skill: 15-github-agent.md).
@@ -74,8 +88,10 @@ function extractUrl(q) {
 
 async function runCmd(cmd, cwd, sendEvent) {
   sendEvent?.('log', { agent: 'GitHub Agent', message: `$ ${cmd}` });
+  const token = getGhToken();
+  const env = token ? { ...process.env, GH_TOKEN: token, GITHUB_TOKEN: token } : { ...process.env };
   try {
-    const { stdout, stderr } = await execP(cmd, { cwd, timeout: 30000, maxBuffer: 4 * 1024 * 1024, env: { ...process.env } });
+    const { stdout, stderr } = await execP(cmd, { cwd, timeout: 30000, maxBuffer: 4 * 1024 * 1024, env });
     return { ok: true, output: (stdout + stderr).trim() };
   } catch (e) {
     return { ok: false, output: String(e.stdout || '') + String(e.stderr || e.message || '').trim() };
@@ -85,7 +101,9 @@ async function runCmd(cmd, cwd, sendEvent) {
 /** Check the gh token once (cheap) — the agent never pretends auth exists. */
 export async function checkGithubAuth(sendEvent) {
   const res = await runCmd('gh auth status', WORKSPACE_DIR, sendEvent);
-  return { authed: res.ok && !/not logged in|no auth/i.test(res.output), detail: res.output.slice(0, 400) };
+  const tokenSet = Boolean(getGhToken());
+  const authed = (res.ok && !/not logged in|no auth/i.test(res.output)) || tokenSet;
+  return { authed, tokenSet, detail: res.output.slice(0, 400) };
 }
 
 export async function runGitHubAction({ action, args = {} }, sendEvent) {

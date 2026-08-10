@@ -1,9 +1,12 @@
 // Verifies Planner routing + Orchestrator book-first answering (no AI keys).
-// Run with:  DATA_DIR=/tmp/jexi-books-unit node server/test-chat-books.js
-import { planner } from './src/services/Planner.js';
-import { orchestrator } from './src/services/Orchestrator.js';
-import { importBookBuffer } from './src/services/BookLibrary.js';
-import { searchKnowledge } from './src/services/MemoryManager.js';
+// Self-isolating: uses a FRESH temp DATA_DIR so the real library is never
+// touched (a bare run used to pollute the user's books with test content).
+process.env.DATA_DIR = process.env.DATA_DIR || `/tmp/jexi-books-unit-${Date.now()}`;
+
+const { planner } = await import('./src/services/Planner.js');
+const { orchestrator } = await import('./src/services/Orchestrator.js');
+const { importBookBuffer } = await import('./src/services/BookLibrary.js');
+const { searchKnowledge } = await import('./src/services/MemoryManager.js');
 
 let failures = 0;
 const ok = (cond, label) => { console.log(`${cond ? '✅' : '❌'} ${label}`); if (!cond) failures++; };

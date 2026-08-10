@@ -17,7 +17,7 @@ async function runTests() {
     const plan = await planner.analyzeIntent(query);
     console.log('Plan:', JSON.stringify(plan, null, 2));
     
-    const results = await orchestrator.executePlan(plan, query, null);
+    const results = await orchestrator.executePlan(plan, query, () => {}); // silent stub — no live client attached
     console.log('Results Summary:', JSON.stringify({
       success: results.success,
       intent: results.intent,

@@ -295,6 +295,20 @@ app.post('/api/vision', async (req, res) => {
   }
 });
 
+// --- CONTINUATION MEMORY ---
+// Lets a follow-up "yes / go ahead / do it" RESUME the user's original task
+// instead of re-planning the bare confirmation (which matched no intent and
+// made JEXI fall into research — "she searched again" instead of acting).
+// The original request is kept for ~15 minutes so conversations flow naturally:
+//   user: "I want to track my water intake" → JEXI offers to build it
+//   user: "yes"                            → JEXI builds the app (resumes task)
+//   user: "no / never mind"                → pending task cleared, no search
+const RESUME_TTL_MS = 15 * 60 * 1000;
+let pendingTask = null; // { at, query }
+
+const CONFIRM_RE = /^(yes|yeah|yep|yup|sure|ok|okay|k|go ahead|do it|do that|do it now|please|please do|yes please|absolutely|alright|alrighty|proceed|sounds good|fine|make it|build it|go on|sure do it|yes do it)\b[\s.,!?]*$/i;
+const DECLINE_RE = /^(no|nope|never ?mind|cancel|stop|forget it|skip|don'?t|no thanks)\b[\s.,!?]*$/i;
+
 app.post('/api/chat', async (req, res) => {
   const { query, image } = req.body;
   recordChat();
@@ -311,9 +325,35 @@ app.post('/api/chat', async (req, res) => {
   const heartbeat = setInterval(() => { try { res.write('{"type":"heartbeat"}\n'); } catch (e) {} }, 10000);
 
   try {
-    const plan = await planner.analyzeIntent(query, { image });
+    const raw = String(query || '').trim();
+    const hasPending = pendingTask && Date.now() - pendingTask.at < RESUME_TTL_MS;
+    let effectiveQuery = raw;
+    let plan;
+
+    if (!image && DECLINE_RE.test(raw) && hasPending) {
+      // "no / cancel" — clear the pending task, answer WITHOUT searching.
+      pendingTask = null;
+      sendEvent('log', { agent: 'Planner', message: '✖ Declined — pending task cleared, nothing will run.' });
+      sendEvent('done', { success: true, query, summary: '### 🧠 JEXI OS\n\n👍 Understood — I won\'t go ahead with that. Tell me what you\'d like next and I\'ll take it from there.' });
+      return;
+    }
+
+    if (!image && CONFIRM_RE.test(raw) && hasPending) {
+      // "yes / go ahead" — resume the ORIGINAL request so the action actually
+      // happens (build the app, run the research, etc.) instead of searching
+      // the word "yes".
+      const original = pendingTask.query;
+      sendEvent('log', { agent: 'Planner', message: `✓ Confirmed — resuming your original task: “${original.slice(0, 90)}”` });
+      plan = await planner.planConfirmed(original);
+      effectiveQuery = original;
+      pendingTask = { at: Date.now(), query: original }; // keep ORIGINAL as the resume target
+    } else {
+      plan = await planner.analyzeIntent(query, { image });
+      pendingTask = { at: Date.now(), query: raw };
+    }
+
     sendEvent('log', { agent: 'Planner', message: `Intent: ${plan.intent} — ${plan.reasoning}` });
-    const results = await orchestrator.executePlan(plan, query, sendEvent, { image });
+    const results = await orchestrator.executePlan(plan, effectiveQuery, sendEvent, { image });
 
     sendEvent('log', { agent: 'JEXI', message: '🎯 Mission complete — here is the result.' });
     sendEvent('done', { success: results.success, query, summary: results.summary, sources: results.sources || [], statistics: results.statistics, files: results.files || [] });

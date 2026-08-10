@@ -2,13 +2,17 @@
  * Performance-layer tests: TTL caches (TrustedLibrary), fresh-memory fast path,
  * and the fingerprint-invalidated knowledge-file index.
  *
- * Run:  DATA_DIR=/tmp/jexi-perf-test node server/test-perf.js
+ * Self-isolating: uses a FRESH temp DATA_DIR so the real knowledge library is
+ * never polluted with TEST_PERF entries (which used to make searchKnowledge
+ * match junk content like "quantum entanglement" even for unrelated queries).
  */
-import { latestNews, searchTrustedBooks } from './src/services/TrustedLibrary.js';
-import {
+process.env.DATA_DIR = process.env.DATA_DIR || `/tmp/jexi-perf-test-${Date.now()}`;
+
+const { latestNews, searchTrustedBooks } = await import('./src/services/TrustedLibrary.js');
+const {
   saveInternetKnowledge, searchFreshInternetKnowledge, searchInternetKnowledge,
   saveKnowledgeFile, searchKnowledge, loadMemory, saveMemory,
-} from './src/services/MemoryManager.js';
+} = await import('./src/services/MemoryManager.js');
 
 let passed = 0;
 let failed = 0;

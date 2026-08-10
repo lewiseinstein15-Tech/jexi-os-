@@ -86,6 +86,30 @@ export class Planner {
     return plan;
   }
 
+  /**
+   * Confirmation-resume: the user answered "yes / go ahead" to a task JEXI
+   * offered. Re-plan the ORIGINAL request (not the empty "yes", which used to
+   * fall into research and made JEXI re-search instead of acting).
+   *
+   * A vague personal task like "I want to track my water intake" that first
+   * landed in research gets nudged toward the coding team — but only when the
+   * request really sounds like a personal task ("I want…", "track…", "remind
+   * me…"), never for plain questions ("tell me about…", "how does…").
+   */
+  async planConfirmed(originalQuery) {
+    const plan = await this.analyzeIntent(originalQuery);
+    const passive = new Set(['research', 'learning_research', 'conversation']);
+    if (passive.has(plan.intent)) {
+      const asksToLearn = /understand|learn (about|how)|explain|tell me about|how (does|do|is|can)|what is|meaning of/i.test(String(originalQuery || ''));
+      const asksForTask = /i (want|need|would like|'d like)\b|track|remind me|manage my|organize my|store my|convert|automate|monitor my|notif|keep track|log my|budget my|save my|wish to/i.test(String(originalQuery || ''));
+      if (!asksToLearn && asksForTask) {
+        const nudge = await this.analyzeIntent(`${originalQuery} — please build an app for it now`);
+        if (!passive.has(nudge.intent)) return nudge;
+      }
+    }
+    return plan;
+  }
+
   async _classify(query, opts = {}) {
     const q = String(query || '').toLowerCase();
     const hasImage = Boolean(opts.image);
@@ -124,10 +148,15 @@ export class Planner {
       return { intent: 'link_analysis', tasks: ['browser', 'extractor', 'reasoning', 'memory'], reasoning: 'User shared a link — JEXI will open it with the browser and summarize.', payload: { url: linkMatch[0], fullQuery: query } };
     }
 
-    // 3. Math detection — symbols, formulas, calculations, word problems
+    // 3. Math detection — symbols, formulas, calculations, word problems.
     //    (checked BEFORE coding: "calculate" etc. is math unless it's a build request)
-    const mathHints = /(calculate|compute|solve|integrate|derivative|differentiate|sum of|multiply|divide|sqrt|square root|equation|formula|math|algebra|calculus|geometry|trigonometry|percentage|what is \d|\d+\s*[+\-×÷*\/]\s*\d|\^2|\$\$)/i;
-    if (mathHints.test(q) && !this.isCoding(scopedQuery)) {
+    //    Topic words alone (calculus, algebra, geometry) must NOT trigger a solve:
+    //    "study calculus" is a study task and "what is calculus" is a research
+    //    question — they need a compute verb or an actual expression to be math.
+    const mathCompute = /(calculate|compute|solve|integrate|derivative|differentiate|sum of|multiply|divide|sqrt|square root|equation|formula|percentage|what is \d|\d+\s*[+\-×÷*\/]\s*\d|\^2|\$\$)/i;
+    const mathTopic = /(math|algebra|calculus|geometry|trigonometry)/i;
+    const mathAsk = /(solve|problem|question|homework|calculate|compute|how (do|can) (i|you) (solve|do|find)|work (out|this) out)/i;
+    if ((mathCompute.test(q) || (mathTopic.test(q) && mathAsk.test(q))) && !this.isCoding(scopedQuery)) {
       return { intent: 'math_solve', tasks: ['reasoning', 'memory'], reasoning: 'Mathematical question — solve with structured LaTeX steps.' };
     }
 
@@ -235,7 +264,8 @@ export class Planner {
       return { intent: 'devops', tasks: ['devops'], reasoning: 'Deployment/infra request — the DevOps Agent detects the stack, generates the Dockerfile/CI and gives exact deploy steps.' };
     }
 
-    // 6.5 Study / deep learn (AFTER coding so "study planner" apps aren't hijacked)
+    // 6.5 Study / deep learn (AFTER coding so "study planner" apps aren't hijacked;
+    //    also after math so "study calculus" is a study task, not a math solve)
     if (/study|learn everything about|fill knowledge base|master topic|teach me (everything about )?/i.test(q)) {
       const topic = query.replace(/study|learn everything about|fill knowledge base|master topic|teach me/i, '').trim().replace(/^about\s+/i, '');
       return { intent: 'study_topic', tasks: ['scholar', 'research', 'memory'], reasoning: 'User wants JEXI to deep-study and store in the knowledge library.', payload: topic };

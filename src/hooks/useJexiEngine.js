@@ -33,24 +33,41 @@ export const useJexiEngine = () => {
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
+      // NDJSON lines can arrive SPLIT across network chunks (a full build report
+      // is one big line — tens of KB — and almost always crosses a chunk
+      // boundary). Naively splitting each chunk on '\n' silently drops those
+      // events, which is exactly why JEXI finished a task in the logs while the
+      // chat showed no answer. Buffer partial lines until the newline arrives.
+      let buffer = '';
+
+      const handleLine = (line) => {
+        if (!line) return;
+        try {
+          const data = JSON.parse(line);
+          if (data.type === 'log') setLogs(prev => [...prev, { agent: data.agent, message: data.message }]);
+          else if (data.type === 'website') setWebsites(prev => [...prev, data.site]);
+          else if (data.type === 'done') {
+            if (data.summary) setMessages(prev => [...prev, { role: 'jexi', text: data.summary, sources: data.sources, files: data.files }]);
+            else if (!data.success) setMessages(prev => [...prev, { role: 'jexi', text: `⚠ ${data.error || 'Something went wrong. Is the backend running?'}` }]);
+          }
+        } catch (e) {}
+      };
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const text = decoder.decode(value);
-        const lines = text.split('\n').filter(Boolean);
-        for (const line of lines) {
-          try {
-            const data = JSON.parse(line);
-            if (data.type === 'log') setLogs(prev => [...prev, { agent: data.agent, message: data.message }]);
-            else if (data.type === 'website') setWebsites(prev => [...prev, data.site]);
-            else if (data.type === 'done') {
-              if (data.summary) setMessages(prev => [...prev, { role: 'jexi', text: data.summary, sources: data.sources, files: data.files }]);
-              else if (!data.success) setMessages(prev => [...prev, { role: 'jexi', text: `⚠ ${data.error || 'Something went wrong. Is the backend running?'}` }]);
-            }
-          } catch (e) {}
+        // { stream: true } keeps multi-byte UTF-8 (emoji!) intact across chunks
+        buffer += decoder.decode(value, { stream: true });
+        let nl;
+        while ((nl = buffer.indexOf('\n')) !== -1) {
+          const line = buffer.slice(0, nl);
+          buffer = buffer.slice(nl + 1);
+          handleLine(line);
         }
       }
+      // Flush anything left (final newline might be missing) + decoder tail bytes
+      buffer += decoder.decode();
+      handleLine(buffer);
     } catch (error) {
       // Aborted by the user (STOP) — don't show a scary network error.
       if (error?.name === 'AbortError') return;

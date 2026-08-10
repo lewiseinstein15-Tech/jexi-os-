@@ -5,10 +5,12 @@
  *  - LLMClient: exports load and behave (no keys needed for import)
  *
  * Run:  WORKSPACE_DIR=/tmp/jexi-preview-test node server/test-preview.js
+ * (self-isolating: if WORKSPACE_DIR is unset it uses a fresh temp dir)
  */
+process.env.WORKSPACE_DIR = process.env.WORKSPACE_DIR || `/tmp/jexi-preview-test-${Date.now()}`;
 import fs from 'node:fs';
-import { runFile } from './src/services/Runner.js';
-import { resolveKeys, mimeFromDataUrl } from './src/services/LLMClient.js';
+const { runFile } = await import('./src/services/Runner.js');
+const { resolveKeys, mimeFromDataUrl } = await import('./src/services/LLMClient.js');
 
 let passed = 0;
 let failed = 0;

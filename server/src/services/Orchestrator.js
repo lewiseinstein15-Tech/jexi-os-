@@ -77,6 +77,9 @@ export class Orchestrator {
 
   async executePlan(plan, query, sendEvent, opts = {}) {
     const startTime = Date.now();
+    // Defensive: callers (tests, tools) may omit the event callback — the
+    // engine must never crash mid-task just because nothing is listening.
+    if (typeof sendEvent !== 'function') sendEvent = () => {};
     const agentsUsed = (plan.steps || plan.tasks || []).length;
     const results = { success: true, query, intent: plan.intent, tasks: plan.tasks, steps: plan.steps, agentResults: {}, summary: '', sources: [], statistics: { executionTime: 0, agentsUsed, confidence: 0 } };
 

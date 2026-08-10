@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server } from 'lucide-react';
+import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server, Github } from 'lucide-react';
 import { getBackendUrl, setBackendUrl } from '../utils/helpers';
 import PanelHeader from './PanelHeader';
 
 export default function SettingsPanel() {
   const [geminiKey, setGeminiKey] = useState('');
   const [groqKey, setGroqKey] = useState('');
+  const [githubToken, setGithubToken] = useState('');
   const [status, setStatus] = useState('idle'); // idle, loading, saved, error
   const [initialLoad, setInitialLoad] = useState(true);
 
@@ -20,6 +21,7 @@ export default function SettingsPanel() {
         const data = await res.json();
         setGeminiKey(data.geminiKey || '');
         setGroqKey(data.groqKey || '');
+        setGithubToken(data.githubToken || '');
       } catch (e) {
         console.error("Failed to fetch settings", e);
       }
@@ -41,7 +43,7 @@ export default function SettingsPanel() {
       const res = await fetch(`${backendUrl}/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ geminiKey, groqKey })
+        body: JSON.stringify({ geminiKey, groqKey, githubToken })
       });
       const data = await res.json();
       if (data.success) {
@@ -75,6 +77,22 @@ export default function SettingsPanel() {
               className="w-full bg-[#0a0a0a] text-gray-200 border border-[#1a1a1a] rounded-lg px-3 py-2.5 text-xs focus:outline-none focus:border-[#00FF9D]/50 font-mono"
             />
             <p className="text-[8px] text-gray-600 mt-1">Get free key at aistudio.google.com/app/apikey</p>
+          </div>
+
+          {/* GitHub Token — powers the GitHub Agent (commit, push, PR, issues) */}
+          <div>
+            <label className="flex items-center gap-2 text-[10px] font-bold text-gray-400 mb-1.5 tracking-wider">
+              <Github className="w-3 h-3 text-white" />
+              GITHUB TOKEN (COMMIT, PUSH, PRS)
+            </label>
+            <input
+              type="password"
+              value={githubToken}
+              onChange={(e) => setGithubToken(e.target.value)}
+              placeholder="ghp_… (Settings → Developer settings → Personal access tokens → repo scope)"
+              className="w-full bg-[#0a0a0a] text-gray-200 border border-[#1a1a1a] rounded-lg px-3 py-2.5 text-xs focus:outline-none focus:border-[#00FF9D]/50 font-mono"
+            />
+            <p className="text-[8px] text-gray-600 mt-1">Without it, GitHub actions show "not authenticated" — paste a token with the <span className="text-gray-400">repo</span> scope to let JEXI commit, push and open pull requests for you.</p>
           </div>
 
           {/* Groq Key */}
@@ -155,7 +173,7 @@ export default function SettingsPanel() {
       <div className="glass p-4 rounded-xl">
         <PanelHeader icon={Key} title="SECURE STORAGE" color="text-[#00d4ff]" />
         <p className="text-[9px] text-gray-500 leading-relaxed">
-          Your API keys are stored locally in JEXI OS's secure settings file on your device. They are never sent to any external server except the official AI provider you configure.
+          Your API keys and GitHub token are stored in JEXI OS's secure settings file on your device. They are never sent to any external server except the official AI provider / GitHub API you configure — the GitHub token is only used to authenticate <span className="text-gray-400">gh</span> commands you explicitly ask for (commit, push, PR).
         </p>
       </div>
     </div>
