@@ -188,6 +188,24 @@ app.get('/workspace', (req, res) => {
 app.get('/api/settings', (req, res) => res.json(loadSettings()));
 app.post('/api/settings', (req, res) => res.json({ success: saveSettings(req.body) }));
 
+// Reports WHERE each credential is configured (env / settings file / none) so the
+// Settings panel can show "ACTIVE — from Render environment" instead of an empty
+// input. NEVER returns actual key values.
+app.get('/api/settings/status', (req, res) => {
+  const settings = loadSettings();
+  const statusOf = (envVars, settingKey) => {
+    const envVal = envVars.map(v => process.env[v]).find(Boolean);
+    if (envVal) return { configured: true, source: 'env' };
+    if (settings[settingKey]) return { configured: true, source: 'settings' };
+    return { configured: false, source: 'none' };
+  };
+  res.json({
+    groq: statusOf(['GROQ_API_KEY'], 'groqKey'),
+    gemini: statusOf(['GEMINI_API_KEY'], 'geminiKey'),
+    github: statusOf(['GITHUB_TOKEN', 'GH_TOKEN'], 'githubToken'),
+  });
+});
+
 // === MEMORY CORE ENDPOINTS (JEXI's mind) ===
 app.get('/api/memory', (req, res) => res.json(loadMemory()));
 app.post('/api/memory/clear', (req, res) => { clearMemory(); res.json({ success: true }); });
