@@ -32,6 +32,47 @@ function TabButton({ active, onClick, children }) {
   );
 }
 
+// Agent → stream color. Covers the specialist sprint team (01-09), the search
+// and news sub-teams, and the memory / computer-use / vision specialists.
+const AGENT_COLORS = {
+  Error: 'text-red-500',
+  Output: 'text-blue-400',
+  Terminal: 'text-yellow-400',
+  Runner: 'text-purple-400',
+  Product: 'text-amber-300',
+  Designer: 'text-pink-400',
+  Engineer: 'text-violet-300',
+  Coder: 'text-green-400',
+  Architect: 'text-green-400',
+  'QA Lead': 'text-amber-400',
+  Reviewer: 'text-blue-300',
+  'Security Officer': 'text-red-400',
+  Shipper: 'text-orange-400',
+  Reflector: 'text-teal-300',
+  Debugger: 'text-orange-400',
+  'Memory Agent': 'text-pink-400',
+  'Query Analyzer': 'text-sky-300',
+  Searcher: 'text-cyan-400',
+  'Re-Ranker': 'text-blue-300',
+  ReRanker: 'text-blue-300',
+  Search: 'text-cyan-400',
+  Extractor: 'text-cyan-400',
+  Synthesizer: 'text-indigo-300',
+  Reasoner: 'text-indigo-400',
+  Researcher: 'text-teal-400',
+  Scholar: 'text-emerald-400',
+  News: 'text-emerald-400',
+  'News Scout': 'text-emerald-300',
+  'News Filter': 'text-lime-400',
+  'News Editor': 'text-green-300',
+  ComputerUseAgent: 'text-emerald-400',
+  Navigator: 'text-cyan-300',
+  Vision: 'text-purple-400',
+  Planner: 'text-cyan-400',
+  JEXI: 'text-[#00FF9D]',
+  System: 'text-gray-500',
+};
+
 function StreamView({ logs, isProcessing }) {
   return (
     <div className="bg-[#050505] p-3 rounded-lg max-h-44 overflow-y-auto font-mono text-[10px] space-y-1">
@@ -48,20 +89,7 @@ function StreamView({ logs, isProcessing }) {
             animate={{ opacity: 1 }}
             className="flex gap-2 leading-tight"
           >
-            <span className={`font-bold flex-shrink-0 ${
-              log.agent === 'Error' ? 'text-red-500' :
-              log.agent === 'Output' ? 'text-blue-400' :
-              log.agent === 'Terminal' ? 'text-yellow-400' :
-              log.agent === 'Runner' ? 'text-purple-400' :
-              log.agent === 'Coder' || log.agent === 'Architect' ? 'text-green-400' :
-              log.agent === 'Debugger' ? 'text-orange-400' :
-              log.agent === 'Memory Agent' ? 'text-pink-400' :
-              log.agent === 'Search' || log.agent === 'Extractor' ? 'text-cyan-400' :
-              log.agent === 'Reasoner' ? 'text-indigo-400' :
-              log.agent === 'Researcher' ? 'text-teal-400' :
-              log.agent === 'Scholar' ? 'text-emerald-400' :
-              'text-gray-500'
-            }`}>
+            <span className={`font-bold flex-shrink-0 ${AGENT_COLORS[log.agent] || 'text-gray-500'}`}>
               [{log.agent}]
             </span>
             <span className="text-gray-300 break-all flex-1">{log.message}</span>

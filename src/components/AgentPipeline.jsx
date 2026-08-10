@@ -3,27 +3,55 @@ import {
   Bot, Compass, DraftingCompass, Code2, PlayCircle, Terminal, Bug, Search,
   FileText, BrainCircuit, BookOpen, GraduationCap, Eye, MemoryStick,
   BookMarked, Stethoscope, Sparkles, Cpu, MousePointerClick, CheckCircle2, Loader2,
+  Crown, Palette, ShieldAlert, Rocket, RefreshCw, Newspaper, SlidersHorizontal,
+  PenLine, Navigation, FileSearch, ArrowUpDown,
 } from 'lucide-react';
 
+// Every agent the engine can emit, mapped to its icon + color.
+// Includes the specialist coding team (01-09), the search team sub-stages,
+// the news team sub-stages, and the memory/computer-use/vision specialists.
 const AGENT_META = {
+  // --- Sprint team (Think → Plan → Build → Test → Review → Ship → Reflect) ---
   Planner: { icon: Compass, color: 'text-cyan-400' },
   Architect: { icon: DraftingCompass, color: 'text-violet-400' },
+  Product: { icon: Crown, color: 'text-amber-300' },
+  Designer: { icon: Palette, color: 'text-pink-400' },
+  Engineer: { icon: DraftingCompass, color: 'text-violet-300' },
   Coder: { icon: Code2, color: 'text-green-400' },
+  'QA Lead': { icon: Bug, color: 'text-amber-400' },
+  Reviewer: { icon: FileSearch, color: 'text-blue-300' },
+  'Security Officer': { icon: ShieldAlert, color: 'text-red-400' },
+  Shipper: { icon: Rocket, color: 'text-orange-400' },
+  Reflector: { icon: RefreshCw, color: 'text-teal-300' },
   Runner: { icon: PlayCircle, color: 'text-purple-400' },
   Terminal: { icon: Terminal, color: 'text-yellow-400' },
   Debugger: { icon: Bug, color: 'text-orange-400' },
+  Output: { icon: Terminal, color: 'text-slate-300' },
+  // --- Search team sub-stages ---
   Search: { icon: Search, color: 'text-sky-400' },
+  'Query Analyzer': { icon: SlidersHorizontal, color: 'text-sky-300' },
+  Searcher: { icon: Search, color: 'text-sky-400' },
+  'Re-Ranker': { icon: ArrowUpDown, color: 'text-blue-300' },
+  ReRanker: { icon: ArrowUpDown, color: 'text-blue-300' },
   Extractor: { icon: FileText, color: 'text-blue-400' },
+  Synthesizer: { icon: PenLine, color: 'text-indigo-300' },
   Reasoner: { icon: BrainCircuit, color: 'text-indigo-400' },
   Researcher: { icon: BookOpen, color: 'text-teal-400' },
   Scholar: { icon: GraduationCap, color: 'text-emerald-400' },
-  Vision: { icon: Eye, color: 'text-fuchsia-400' },
+  // --- News team sub-stages ---
+  News: { icon: Newspaper, color: 'text-emerald-400' },
+  'News Scout': { icon: Newspaper, color: 'text-emerald-300' },
+  'News Filter': { icon: SlidersHorizontal, color: 'text-lime-400' },
+  'News Editor': { icon: PenLine, color: 'text-green-300' },
+  // --- Memory / computer-use / vision specialists ---
   'Memory Agent': { icon: MemoryStick, color: 'text-pink-400' },
   Books: { icon: BookMarked, color: 'text-amber-400' },
   SelfDiagnose: { icon: Stethoscope, color: 'text-rose-400' },
+  ComputerUseAgent: { icon: MousePointerClick, color: 'text-emerald-400' },
+  Navigator: { icon: Navigation, color: 'text-cyan-300' },
+  Vision: { icon: Eye, color: 'text-fuchsia-400' },
   JEXI: { icon: Sparkles, color: 'text-[#00FF9D]' },
   System: { icon: Cpu, color: 'text-gray-400' },
-  ComputerUseAgent: { icon: MousePointerClick, color: 'text-emerald-400' },
 };
 const FALLBACK = { icon: Bot, color: 'text-gray-400' };
 

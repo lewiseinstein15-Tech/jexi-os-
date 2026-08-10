@@ -3,6 +3,31 @@ import { Monitor, MousePointer, Keyboard, Hand, Bot, Server, RefreshCw, Loader2 
 import axios from 'axios';
 import { getBackendUrl, onBackendUrlChange } from '../utils/helpers';
 
+// Agent → color for the live activity strip (specialist team + search/news sub-teams).
+const AGENT_ACTIVITY_COLORS = {
+  Debugger: 'text-orange-400',
+  Output: 'text-blue-400',
+  Vision: 'text-purple-400',
+  Navigator: 'text-cyan-300',
+  'QA Lead': 'text-amber-400',
+  'Security Officer': 'text-red-400',
+  Reviewer: 'text-blue-300',
+  Shipper: 'text-orange-400',
+  Reflector: 'text-teal-300',
+  Product: 'text-amber-300',
+  Designer: 'text-pink-400',
+  Engineer: 'text-violet-300',
+  Coder: 'text-green-400',
+  'News Scout': 'text-emerald-300',
+  'News Filter': 'text-lime-400',
+  'News Editor': 'text-green-300',
+  'Query Analyzer': 'text-sky-300',
+  Searcher: 'text-cyan-400',
+  Synthesizer: 'text-indigo-300',
+  ComputerUseAgent: 'text-emerald-400',
+  'Memory Agent': 'text-pink-400',
+};
+
 export default function DesktopViewer({ logs = [] }) {
   const [screenshot, setScreenshot] = useState(null);
   const [status, setStatus] = useState(null);
@@ -205,7 +230,7 @@ export default function DesktopViewer({ logs = [] }) {
           <div className="flex items-center gap-1 mb-1 sticky top-0 bg-[#0a0a0a] pb-1"><Bot className="w-3 h-3 text-[#00FF9D] animate-pulse" /><span className="text-[8px] font-bold text-[#00FF9D] tracking-wider">JEXI ACTIVITY</span></div>
           {agentLogs.length === 0 ? <p className="text-gray-700 text-[8px] italic">Waiting for JEXI to act...</p> : agentLogs.slice(-10).reverse().map((log, i) => (
             <div key={i} className="text-[8px] flex gap-1 leading-tight mb-1">
-              <span className={`font-bold flex-shrink-0 ${log.agent === 'Debugger' ? 'text-orange-400' : log.agent === 'Output' ? 'text-blue-400' : log.agent === 'Vision' ? 'text-purple-400' : 'text-[#00FF9D]'}`}>[{log.agent}]</span>
+              <span className={`font-bold flex-shrink-0 ${AGENT_ACTIVITY_COLORS[log.agent] || 'text-[#00FF9D]'}`}>[{log.agent}]</span>
               <span className="text-gray-400 break-all">{log.message}</span>
             </div>
           ))}
