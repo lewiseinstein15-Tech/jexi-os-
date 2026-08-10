@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getBackendUrl } from '../utils/helpers';
+import { getBackendUrl, jexiFetch } from '../utils/helpers';
 
 export const useMemory = (activeNav) => {
   const [memory, setMemory] = useState(null);
 
   const fetchMemory = useCallback(async () => {
     try {
-      const res = await fetch(`${getBackendUrl()}/api/memory`);
+      const res = await jexiFetch(`${getBackendUrl()}/api/memory`);
       const data = await res.json();
       if (data && data.chatHistory) setMemory(data);
     } catch (e) {

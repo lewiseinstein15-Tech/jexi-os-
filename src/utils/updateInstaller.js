@@ -1,6 +1,6 @@
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { FileOpener } from '@capacitor-community/file-opener';
-import { getBackendUrl } from './helpers';
+import { getBackendUrl, jexiFetch } from './helpers';
 
 const APK_FILENAME = 'jexi-update.apk';
 
@@ -38,7 +38,7 @@ export async function installAndroidUpdate({ onProgress } = {}) {
     throw new Error('JEXI Brain address is not configured. Open Settings → Server and set the backend URL, then try again.');
   }
 
-  const res = await fetch(`${backend}/api/update/apk`, { cache: 'no-store' });
+  const res = await jexiFetch(`${backend}/api/update/apk`, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Download failed (${res.status}) — the update server may still be warming up. Try again in a minute.`);
   }

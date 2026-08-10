@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server, Github, ShieldCheck, Globe } from 'lucide-react';
-import { getBackendUrl, setBackendUrl } from '../utils/helpers';
+import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server, Github, ShieldCheck, Globe, Lock } from 'lucide-react';
+import { getBackendUrl, setBackendUrl, getAccessKey, setAccessKey, jexiFetch } from '../utils/helpers';
 import PanelHeader from './PanelHeader';
 
 // Each credential's status from the backend: { configured, source: 'env' | 'settings' | 'none' }
@@ -51,6 +51,7 @@ export default function SettingsPanel() {
   const [status, setStatus] = useState('idle'); // idle, loading, saved, error
   const [initialLoad, setInitialLoad] = useState(true);
 
+  const [accessKey, setAccessKeyState] = useState(getAccessKey());
   const [backendUrl, setBackendUrlState] = useState(getBackendUrl());
   const [backendInput, setBackendInput] = useState(getBackendUrl());
   const [backendStatus, setBackendStatus] = useState('idle'); // idle, saved, error
@@ -60,8 +61,8 @@ export default function SettingsPanel() {
       try {
         const base = getBackendUrl();
         const [res, statusRes] = await Promise.all([
-          fetch(`${base}/api/settings`),
-          fetch(`${base}/api/settings/status`),
+          jexiFetch(`${base}/api/settings`),
+          jexiFetch(`${base}/api/settings/status`),
         ]);
         const data = await res.json();
         setGeminiKey(data.geminiKey || '');
@@ -92,7 +93,7 @@ export default function SettingsPanel() {
       if (!keyStatus?.gemini?.configured) body.geminiKey = geminiKey;
       if (!keyStatus?.groq?.configured) body.groqKey = groqKey;
       if (!keyStatus?.github?.configured) body.githubToken = githubToken;
-      const res = await fetch(`${backendUrl}/api/settings`, {
+      const res = await jexiFetch(`${backendUrl}/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -150,6 +151,39 @@ export default function SettingsPanel() {
             status={keyStatus?.github}
             envNames={['GITHUB_TOKEN / GH_TOKEN']}
           />
+
+          {/* JEXI Access Key — required only if the backend is locked with JEXI_API_KEY */}
+          <div>
+            <label className="flex items-center gap-2 text-[10px] font-bold text-gray-400 mb-1.5 tracking-wider">
+              <Lock className="w-3 h-3 text-[#00FF9D]" />
+              JEXI ACCESS KEY (OPTIONAL)
+              {accessKey ? (
+                <span className="ml-auto flex items-center gap-1 text-[#22c55e] text-[8px] bg-[#22c55e]/10 border border-[#22c55e]/30 rounded-full px-2 py-0.5">
+                  <CheckCircle2 className="w-2.5 h-2.5" /> KEY SET
+                </span>
+              ) : (
+                <span className="ml-auto text-[#6b7280] text-[8px] bg-[#1a1a1a] border border-[#2a2a2a] rounded-full px-2 py-0.5">
+                  NOT LOCKED
+                </span>
+              )}
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={accessKey}
+                onChange={(e) => setAccessKeyState(e.target.value)}
+                placeholder="Leave empty if your server is open"
+                className="w-full bg-[#0a0a0a] text-gray-200 border border-[#1a1a1a] rounded-lg px-3 py-2.5 text-xs focus:outline-none focus:border-[#00FF9D]/50 font-mono"
+              />
+              <button
+                onClick={() => { setAccessKey(accessKey.trim()); setStatus('saved'); setTimeout(() => setStatus('idle'), 3000); }}
+                className="bg-[#00FF9D] text-black rounded-lg px-3 py-2.5 text-xs font-bold flex items-center gap-1.5 flex-shrink-0"
+              >
+                <Save className="w-3.5 h-3.5" /> APPLY
+              </button>
+            </div>
+            <p className="text-[8px] text-gray-600 mt-1">If you set <span className="font-mono text-gray-400">JEXI_API_KEY</span> on the server (Render → Environment), every request must carry this key. Stored in your browser, sent only to your own backend.</p>
+          </div>
 
           {/* Backend URL (runtime override) */}
           <div className="pt-3 border-t border-[#1a1a1a]">

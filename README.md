@@ -1,0 +1,92 @@
+# 🧠 JEXI OS — Multi-Agent AI Operating System
+
+**JEXI OS** turns one AI coding agent into a **virtual team of 20 specialized roles** — each with a focused mandate, strict deliverables, and enforced review gates — all orchestrated through one chat interface.
+
+Ask it to **"build an app that tracks my water intake"** and JEXI plans a team, then runs Product → Designer → Engineer → Coder → Runner → QA → Reviewer → Security → Shipper → Reflector in sequence, streaming live logs, writing real files you can preview and download, and reporting a full build report in chat.
+
+---
+
+## ✨ The 20 Specialists
+
+| # | Agent | What it does |
+|---|-------|--------------|
+| 01 | **Product Manager** | Defines requirements, scope modes, success criteria |
+| 02 | **Designer** | UI/UX design system, layouts, visual spec |
+| 03 | **Engineer** | Architecture, build plan, technical approach |
+| 04 | **Coder** | Writes the actual code, fixes debug loops |
+| 05 | **QA Lead** | Runs the app, verifies against spec, PASS/FAIL gate |
+| 06 | **Reviewer** | Code review with APPROVED/CHANGES-REQUESTED gate |
+| 07 | **Shipper** | Release notes, handoff summary |
+| 08 | **Security Officer** | Security review with CLEARED/FLAGGED gate |
+| 09 | **Reflector** | Retrospective on the completed mission |
+| 10 | **Search Agent** | Web research with re-ranking + source synthesis |
+| 11 | **News Agent** | Live headlines from free feeds (no API key) |
+| 12 | **Memory Agent** | Long-term memory: tf-idf, recency×importance×relevance scoring, consolidation |
+| 13 | **Computer Use Agent** | Real browser control — numbered elements, click/type/scroll |
+| 14 | **Vision Agent** | Webcam eyes + on-device face/gesture landmarking |
+| 15 | **GitHub Agent** | Commit, push, PRs, issues — powered by your token |
+| 16 | **Data Agent** | Data analysis, statistics |
+| 17 | **DevOps Agent** | Deploy config, infrastructure |
+| 18 | **Writer Agent** | Long-form writing |
+| 19 | **Translator Agent** | Translation between languages |
+| 20 | **Perf Agent** | Performance analysis & optimization |
+
+The **Planner** reads your request and picks the right team — including *compound tasks* (e.g. "research X, then build Y" runs the Research team, then hands its findings to the Coding team).
+
+---
+
+## 🚀 Quick Start (local)
+
+```bash
+# Terminal 1 — the Brain (Express backend, port 3002)
+cd server && npm ci && npm start
+
+# Terminal 2 — the UI (Vite, port 3000, proxies /api → 3002)
+npm ci && npm run dev
+```
+
+Open http://localhost:3000 and say *"build an app that tracks my water intake"*.
+
+> Without an AI key, research, news, memory and book-library features still work.
+> Add a key in **Settings** (or set env vars) to unlock app-building, vision and full chat.
+
+## 🔑 Environment Variables
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `GROQ_API_KEY` | one of the two | Fast chat/code generation (Groq) |
+| `GEMINI_API_KEY` | one of the two | Code tasks & vision (Gemini, preferred for code) |
+| `GITHUB_TOKEN` | optional | GitHub Agent (commit/push/PRs) |
+| `JEXI_API_KEY` | optional | **Locks the API** — all requests must send `x-jexi-key` |
+| `CORS_ORIGINS` | optional | Comma-separated browser origins allowed to call the API |
+| `REDIS_URL` | optional | Shared memory across instances/restarts |
+| `DATA_DIR` | optional | Persistent data location (defaults to `server/data`) |
+| `PORT` | optional | Backend port (default 3002) |
+
+Env vars always win over values pasted in the Settings panel — ideal for Render/Vercel/serverless.
+
+## 🧪 Testing
+
+```bash
+npm test          # runs all 10 backend test suites (routing, agents, books, perf, PDF…)
+```
+
+See [TEST.md](TEST.md) for the suite list.
+
+## 🚢 Deployment
+
+- **Render (backend):** the repo ships a [render.yaml](render.yaml) blueprint — New → Blueprint → pick repo. Free tier included.
+- **Frontend:** GitHub Pages workflow (`.github/workflows/deploy.yml`) or Vercel (set `VITE_JEXI_BACKEND_URL` to your Render URL).
+- **Docker / Hugging Face Spaces:** `docker build -t jexi-os . && docker compose up -d` (see [Dockerfile](Dockerfile)).
+- **Scaling:** [SCALING.md](SCALING.md) covers Redis-mirrored memory and the Cloudflare Worker load balancer.
+- **Android app:** [ANDROID.md](ANDROID.md) builds the Capacitor APK.
+
+Full instructions: **[DEPLOY.md](DEPLOY.md)**.
+
+## 📚 Built-in Knowledge
+
+JEXI reads books & news herself — Wikipedia, Project Gutenberg, arXiv, Open Library, Google News/BBC RSS — no API keys. Say *"study calculus"* and she distills the topic into your knowledge library for good. Upload your own PDFs/TXT/MD in the **Knowledge** tab too.
+
+---
+
+Built for **Lewis Einstein** (AI & ML Engineer) — the entire team works for you, 24/7, free.

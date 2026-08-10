@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import axios from 'axios';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { planner } from './src/services/Planner.js';
@@ -31,7 +33,46 @@ process.on('uncaughtException', (e) => { recordError('process', e.message, e.sta
 process.on('unhandledRejection', (e) => { recordError('process', (e && e.message) || String(e)); });
 
 const app = express();
-app.use(cors());
+
+// === API ACCESS CONTROL (optional but recommended for production) ===
+// Set JEXI_API_KEY in the host env (Render dashboard) and every AI-spend / data
+// endpoint requires the `x-jexi-key` header (the Settings panel has a matching
+// field). Without it, JEXI stays wide open — fine locally, risky on the public
+// internet where strangers could burn your Groq/Gemini quota. When unset, local
+// dev and self-hosted use are unchanged.
+const API_KEY = process.env.JEXI_API_KEY || '';
+const keyMatches = (sent) => {
+  if (!API_KEY || !sent) return false;
+  const a = Buffer.from(String(sent));
+  const b = Buffer.from(API_KEY);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+};
+
+// CORS: when CORS_ORIGINS is set (comma-separated origins), only browsers from
+// those origins may call the API. Unset → open (local dev / curl / mobile).
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors({ origin: CORS_ORIGINS.length ? CORS_ORIGINS : true }));
+
+// Cheap, always-open endpoints the infra + onboarding path needs. Everything
+// else under /api/* (chat, vision, knowledge, memory, desktop, settings write,
+// APK proxy) is gated when JEXI_API_KEY is set.
+// NOTE: mounted on the app root (not '/api') so req.path keeps its full form.
+const OPEN_PATHS = ['/api/health', '/api/settings/status'];
+app.use((req, res, next) => {
+  if (!API_KEY || req.method === 'OPTIONS') return next();
+  if (!req.path.startsWith('/api')) return next();
+  if (OPEN_PATHS.includes(req.path)) return next();
+  if (keyMatches(req.headers['x-jexi-key'])) return next();
+  res.status(401).json({ error: 'Unauthorized — this server is locked. Set the JEXI access key in Settings → System.' });
+});
+
+// Rate limiting: protects your AI quota from runaway loops / abuse.
+const aiLimiter = rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests — JEXI is throttling to protect your quota. Try again in a minute.' } });
+const generalLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 600, standardHeaders: 'draft-7', legacyHeaders: false });
+app.use(['/api/chat', '/api/vision', '/api/knowledge/search'], aiLimiter);
+app.use('/api', generalLimiter);
+
 app.use(express.json({ limit: '30mb' })); // Room for base64 book uploads + code files + images
 
 // Every instance has its own id (Render injects RENDER_INSTANCE_ID automatically).

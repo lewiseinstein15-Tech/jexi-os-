@@ -7,6 +7,31 @@ export const getFavicon = (url) => {
 export const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
 /**
+ * JEXI access key (optional). If the backend was locked with JEXI_API_KEY
+ * (recommended on Render), every /api call must carry it as `x-jexi-key`.
+ * Stored in localStorage, never sent anywhere except your own backend.
+ */
+export const getAccessKey = () => localStorage.getItem('jexi_access_key') || '';
+export const setAccessKey = (key) => {
+  if (key) localStorage.setItem('jexi_access_key', key);
+  else localStorage.removeItem('jexi_access_key');
+  window.dispatchEvent(new CustomEvent('jexi:access-key', { detail: key || '' }));
+};
+export const onAccessKeyChange = (cb) => {
+  const h = (e) => cb(e.detail || '');
+  window.addEventListener('jexi:access-key', h);
+  return () => window.removeEventListener('jexi:access-key', h);
+};
+
+/** fetch() wrapper that attaches the JEXI access key header when one is set. */
+export const jexiFetch = (url, opts = {}) => {
+  const key = getAccessKey();
+  const headers = new Headers(opts.headers || {});
+  if (key) headers.set('x-jexi-key', key);
+  return fetch(url, { ...opts, headers });
+};
+
+/**
  * Backend base URL, resolved in this order:
  *  1. localStorage override (settable in Settings / the Virtual Desktop tab)
  *  2. VITE_JEXI_BACKEND_URL (build-time env on Vercel/Render static)

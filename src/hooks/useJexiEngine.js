@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { getBackendUrl } from '../utils/helpers';
+import { getBackendUrl, jexiFetch } from '../utils/helpers';
 
 // Backend defaults to same origin (/api is proxied by Vite in dev),
 // VITE_JEXI_BACKEND_URL for hosted frontends (Vercel), or a localStorage override.
@@ -24,7 +24,7 @@ export const useJexiEngine = () => {
     try {
       const backendUrl = getBackendUrl();
       abortRef.current = new AbortController();
-      const res = await fetch(`${backendUrl}/api/chat`, {
+      const res = await jexiFetch(`${backendUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query, image: image || undefined }),

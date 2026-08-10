@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { BookOpen, Folder, Brain, RefreshCw, CheckCircle2, Circle, Upload, Link2, Trash2, FileText, Loader2, AlertTriangle } from 'lucide-react';
-import { getBackendUrl } from '../utils/helpers';
+import { getBackendUrl, jexiFetch } from '../utils/helpers';
 import PanelHeader from './PanelHeader';
 
 const fmtKB = (n) => n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n > 1024 ? `${(n / 1024).toFixed(0)} KB` : `${n} B`;
@@ -20,9 +20,9 @@ export default function KnowledgePanel() {
     setLoading(true);
     try {
       const [structRes, statusRes, booksRes] = await Promise.all([
-        fetch(`${backendUrl}/api/knowledge/structure`),
-        fetch(`${backendUrl}/api/knowledge/status`),
-        fetch(`${backendUrl}/api/knowledge/books`)
+        jexiFetch(`${backendUrl}/api/knowledge/structure`),
+        jexiFetch(`${backendUrl}/api/knowledge/status`),
+        jexiFetch(`${backendUrl}/api/knowledge/books`)
       ]);
       setStructure(await structRes.json());
       setStatus(await statusRes.json());
@@ -48,7 +48,7 @@ export default function KnowledgePanel() {
       setMsg({ type: 'ok', text: `📖 Reading ${file.name}…` });
       try {
         const data = await toBase64(file);
-        const resp = await fetch(`${backendUrl}/api/knowledge/books/upload`, {
+        const resp = await jexiFetch(`${backendUrl}/api/knowledge/books/upload`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: file.name, mime: file.type || '', data })
@@ -72,7 +72,7 @@ export default function KnowledgePanel() {
     setBusy(true);
     setMsg({ type: 'ok', text: '⬇️ Downloading the book from that link…' });
     try {
-      const resp = await fetch(`${backendUrl}/api/knowledge/books/url`, {
+      const resp = await jexiFetch(`${backendUrl}/api/knowledge/books/url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url })
@@ -92,7 +92,7 @@ export default function KnowledgePanel() {
   const removeBook = async (name) => {
     if (!window.confirm(`Remove "${name}" from the library?`)) return;
     try {
-      const resp = await fetch(`${backendUrl}/api/knowledge/books/${encodeURIComponent(name)}`, { method: 'DELETE' });
+      const resp = await jexiFetch(`${backendUrl}/api/knowledge/books/${encodeURIComponent(name)}`, { method: 'DELETE' });
       const json = await resp.json();
       setMsg(json.success
         ? { type: 'ok', text: `Removed "${name}".` }

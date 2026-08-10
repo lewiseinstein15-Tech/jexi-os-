@@ -1,11 +1,11 @@
-# 🚀 Deploying JEXI OS — Render (backend) + Vercel (frontend)
+# 🚀 Deploying JEXI OS — Render (backend) + GitHub Pages/Vercel (frontend)
 
 JEXI OS is two pieces:
 
 | Piece | What it is | Where it runs |
 |-------|-----------|---------------|
 | `server/` | Express "Brain": chat API, agents, memory core, knowledge library, Playwright browser (JEXI's eyes), terminal runner | **Render** (web service) |
-| Frontend (`src/`, repo root) | React/Vite UI (chat, virtual desktop, memory, knowledge) | **Vercel** (static) |
+| Frontend (`src/`, repo root) | React/Vite UI (chat, virtual desktop, memory, knowledge) | **GitHub Pages** (free, auto-deploys on push) or **Vercel** |
 
 ---
 
@@ -24,6 +24,9 @@ The repo ships a **`render.yaml` blueprint** that pre-configures everything.
 7. After the first deploy, open the service → **Environment** → add these **secret** env vars:
    - `GROQ_API_KEY` — from console.groq.com/keys
    - `GEMINI_API_KEY` (optional fallback) — from aistudio.google.com/app/apikey
+   - `GITHUB_TOKEN` (optional) — lets the GitHub Agent commit/push/PR for you
+   - `JEXI_API_KEY` (**recommended**) — a secret passphrase that locks the API; the app sends it as `x-jexi-key` (Settings → JEXI Access Key). Without it, anyone with your URL can use your AI quota.
+   - `CORS_ORIGINS` (optional) — comma-separated browser origins allowed to call the API, e.g. `https://lewiseinstein15-Tech.github.io`
    - Then **Manual Deploy → Deploy latest commit** to apply them.
 
 ### Option B — Manual web service
@@ -77,18 +80,26 @@ Build locally to test: `docker build -f server/Dockerfile -t jexi-os-brain serve
 ## Part 2 — Point the frontend at your Render backend
 
 The frontend finds the backend in this order:
-1. `VITE_JEXI_BACKEND_URL` (set in Vercel — recommended)
+1. `VITE_JEXI_BACKEND_URL` (set at build time — GitHub Pages or Vercel)
 2. The **Backend URL** field in the **Settings** tab (runtime override, applies instantly — no reload)
 3. The "Cloud URL" box in the **Virtual Desktop** tab (stored in the browser)
 
-### On Vercel
+### On GitHub Pages (free, auto-deploys on every push)
+1. The repo ships `.github/workflows/deploy.yml` — every push to `main` builds the UI with
+   `VITE_JEXI_BACKEND_URL=https://jexi-os-brain.onrender.com` baked in and publishes to GitHub Pages.
+2. Enable it once: **Repo → Settings → Pages → Source: GitHub Actions**.
+3. Your app is live at `https://lewiseinstein15-Tech.github.io/jexi-os-/`.
+4. Change the URL in the workflow if your Render service URL differs.
+
+### On Vercel (alternative)
 1. Import the same repo into Vercel (framework preset: **Vite**; build `npm run build`, output `dist/`).
 2. **Project → Settings → Environment Variables**, add:
    - `VITE_JEXI_BACKEND_URL` = `https://jexi-os-brain.onrender.com`
 3. Redeploy. The chat, memory, knowledge and virtual desktop will now talk to Render.
 
-> No key goes on Vercel — `GROQ_API_KEY`/`GEMINI_API_KEY` stay server-side on Render.
-> CORS is already wide open on the backend, so the Vercel domain can call it directly.
+> No key goes on the frontend host — `GROQ_API_KEY`/`GEMINI_API_KEY` stay server-side on Render.
+> If you set `CORS_ORIGINS` on Render, add your frontend origin (e.g. `https://lewiseinstein15-Tech.github.io`).
+> If you set `JEXI_API_KEY` on Render, paste the same key in the app's **Settings → JEXI Access Key** so the UI can unlock the API.
 
 ---
 

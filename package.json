@@ -1,12 +1,13 @@
 {
   "name": "jexi-os",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview --host",
+    "test": "cd server && npm test",
     "apk:generate": "node scripts/make-icon.js && npx @capacitor/assets generate --android",
     "apk:sync": "npm run build && npx cap sync android"
   },

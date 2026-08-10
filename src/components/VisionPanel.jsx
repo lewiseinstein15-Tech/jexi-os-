@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Eye, Loader2, Video, VideoOff, Hand, VolumeX } from 'lucide-react';
-import { getBackendUrl } from '../utils/helpers';
+import { getBackendUrl, jexiFetch } from '../utils/helpers';
 
 // Must match the installed @mediapipe/tasks-vision version (JS + WASM stay in sync)
 const WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm';
@@ -291,7 +291,7 @@ export default function VisionPanel({ open, onClose, onVision }) {
   const captureAndAsk = useCallback(async (prompt) => {
     const img = captureFrame();
     if (!img) throw new Error('No camera frame available.');
-    const res = await fetch(`${getBackendUrl()}/api/vision`, {
+    const res = await jexiFetch(`${getBackendUrl()}/api/vision`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: img, prompt }),
