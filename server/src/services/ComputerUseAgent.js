@@ -101,6 +101,7 @@ export class ComputerUseAgent {
     const isResearch = intent === 'research';
     const isLink = intent === 'link_analysis';
     const isCode = intent === 'code_task';
+    const isComputer = intent === 'computer_use';
     sendEvent?.('log', { agent: 'Navigator', message: `Planning task: ${task}` });
 
     // Try to talk to the real browser/terminal first.
@@ -123,7 +124,7 @@ export class ComputerUseAgent {
         if (isCode) {
           guidance += `You are in the CODE DEBUG LOOP. Read the error, rewrite the file with the fix, and run it again. Do not claim success while an error is on screen.\n`;
         }
-        if ((isResearch || isLink) && lastError.includes("DIDN'T READ")) {
+        if ((isResearch || isLink || isComputer) && lastError.includes("DIDN'T READ")) {
           guidance += `You MUST read the page content with 'read_page' before finishing. Open the page, wait, read_page.\n`;
         }
         if (lastError.includes('Browser unavailable')) {
@@ -297,7 +298,7 @@ export class ComputerUseAgent {
       if (this.hasError(capturedOutput) && isCode) {
         lastError = capturedOutput.split('\n').filter(l => l.trim()).slice(-12).join('\n');
         sendEvent?.('log', { agent: 'Debugger', message: '⚠ Error found in output! Retrying...' });
-      } else if ((isResearch || isLink) && !didReadPage) {
+      } else if ((isResearch || isLink || isComputer) && !didReadPage) {
         lastError = "You finished but you DIDN'T READ the page content with 'read_page'.";
         sendEvent?.('log', { agent: 'Debugger', message: `⚠ ${lastError}` });
       } else {
@@ -313,12 +314,12 @@ export class ComputerUseAgent {
 
     // --- Fallback / enrichment for research & links: read sources server-side ---
     let researchText = capturedOutput;
-    if ((isResearch || isLink) && (!researchText || researchText.length < 300)) {
+    if ((isResearch || isLink || isComputer) && (!researchText || researchText.length < 300)) {
       researchText = await this.serverSideRead(task, sendEvent, intent);
     }
 
     // --- Synthesis: answer the user's question from everything read ---
-    if ((isResearch || isLink) && researchText && researchText.trim().length > 0) {
+    if ((isResearch || isLink || isComputer) && researchText && researchText.trim().length > 0) {
       sendEvent?.('log', { agent: 'Reasoner', message: 'Synthesizing answer from everything read...' });
       const synth = await generateContent(
         `The user asked: "${task}"\n\nInformation I gathered from the browser/internet:\n${researchText.slice(0, 16000)}\n\nReframe this into a clear, well-structured answer that DIRECTLY answers the user's question. Follow JEXI OS formatting rules.`,

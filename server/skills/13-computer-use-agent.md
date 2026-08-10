@@ -51,6 +51,11 @@ re-indexes automatically and retries — that is the self-heal.
 - **Research:** goto search → read_page → click_index on trusted results →
   read each page → back → repeat 2-3 sources → done.
 - **Link analysis:** goto the exact link → read_page → scroll → read_page → done.
+- **Computer use (explicit):** when the user says "use the browser…",
+  "go to <site>…", "search on <engine>…", "click on…", "log into…" the
+  Planner routes to `computer_use` — drive the browser interactively, click,
+  type, fill forms, read the result, then answer from what was actually
+  seen on screen. Never answer from the search pipeline for these.
 - **Verify-first:** read_page/shell output is the ONLY evidence of success.
   If you finished without reading, you must go back and read.
 

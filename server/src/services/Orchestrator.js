@@ -156,6 +156,30 @@ export class Orchestrator {
           return results;
         }
 
+        /* ---------------- COMPUTER USE — DRIVE THE BROWSER ---------------- */
+        case 'computer_use': {
+          sendEvent('log', { agent: 'Navigator', message: '🖥 Taking over the browser — I will navigate, click and type myself.' });
+          const agent = new ComputerUseAgent();
+          const result = await agent.executeTask(query, sendEvent, { intent: 'computer_use' });
+
+          if (result.output && result.output.trim().length > 0) {
+            const reply = result.output.includes('###') ? result.output : `### 🖥 COMPUTER USE\n\n${result.output}`;
+            try { addChat('jexi', reply); } catch (e) {}
+            results.summary = reply;
+            results.statistics.confidence = result.output.length > 300 ? 88 : 75;
+            return results;
+          }
+
+          // Fallback: browser produced nothing — use the search team instead.
+          sendEvent('log', { agent: 'Navigator', message: '⚠ Browser gave no answer — switching to the search team.' });
+          const team = await runSearchTeam(query, sendEvent);
+          results.sources = team.sources.slice(0, 5).map(s => ({ title: s.title, link: s.link }));
+          try { addChat('jexi', team.summary); } catch (e) {}
+          results.summary = team.summary;
+          results.statistics.confidence = team.confidence;
+          return results;
+        }
+
         /* ---------------- MATH ---------------- */
         case 'math_solve': {
           sendEvent('log', { agent: 'Reasoner', message: '🔢 Solving with structured mathematics...' });

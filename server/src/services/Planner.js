@@ -65,6 +65,31 @@ export class Planner {
       return { intent: 'code_task', tasks: ['architect', 'coder', 'runner', 'debugger', 'qa', 'reviewer', 'memory'], reasoning: 'Coding task — the team: product → designer → engineer → coder → QA → reviewer → shipper.', scope, query: scopedQuery };
     }
 
+    // 6.4 COMPUTER USE — the user wants JEXI to DRIVE the browser (navigate,
+    //    click, type, interact), not just search. Checked after coding (so
+    //    "build a web scraper" still hits the team) and before research (so
+    //    "use the browser to find…" actually drives the browser instead of
+    //    falling into the text-search pipeline).
+    const SITES = 'wikipedia|google|youtube|amazon|github|stack ?overflow|reddit|twitter|facebook|instagram|netflix|spotify|apple|microsoft|bbc|cnn|nytimes|duckduckgo|bing';
+    const browserDriving = new RegExp(
+      'use (the |your |a )?(browser|computer|desktop)|' +
+      'browse the web|' +
+      '(open|go to|take me to|visit|navigate to) (the |this |a )?(website|site|web ?page|' + SITES + ')|' +
+      '(click on|click the|tap on)( the)? (button|link|tab|search|icon|menu|\\d+)|' +
+      'type .*(in|into|on) (the )?(search|input|box|field)|' +
+      'search (for )?.* on (the |this )?(website|site|page|web)|' +
+      'fill (in|out )?(the )?(form|login|signup|checkout)|' +
+      '(log|sign)(\\s*(in|into))(\\s+to)?(\\s+(my|the|this|a))?\\s+(email|mail|gmail|outlook|yahoo|hotmail|account|bank|app|application|site|website|platform|dashboard|portal|twitter|facebook|instagram|youtube|amazon|netflix|spotify)|' +
+      'search on (google|wikipedia|bing|duckduckgo|youtube|amazon)|' +
+      'scroll (down|up|through)|' +
+      'interact with (the |this |a )?(website|site|page|app|browser)|' +
+      'computer ?use|desktop (automation|use)|control (the )?(computer|desktop|browser)',
+      'i'
+    );
+    if (browserDriving.test(q)) {
+      return { intent: 'computer_use', tasks: ['browser', 'reasoner', 'memory'], reasoning: 'User wants JEXI to drive the browser interactively — the Computer Use agent navigates, clicks and types.' };
+    }
+
     // 6.5 Study / deep learn (AFTER coding so "study planner" apps aren't hijacked)
     if (/study|learn everything about|fill knowledge base|master topic|teach me (everything about )?/i.test(q)) {
       const topic = query.replace(/study|learn everything about|fill knowledge base|master topic|teach me/i, '').trim().replace(/^about\s+/i, '');
