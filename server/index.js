@@ -415,7 +415,15 @@ app.post('/api/chat', async (req, res) => {
     const results = await orchestrator.executePlan(plan, effectiveQuery, sendEvent, { image });
 
     sendEvent('log', { agent: 'JEXI', message: '🎯 Mission complete — here is the result.' });
-    sendEvent('done', { success: results.success, query, summary: results.summary, sources: results.sources || [], statistics: results.statistics, files: results.files || [] });
+    // Contract: a successful done ALWAYS carries a readable summary — the
+    // frontend never renders a blank answer (an empty summary previously left
+    // users staring at the activity log with no chat reply).
+    const finalSummary = results.summary && String(results.summary).trim()
+      ? results.summary
+      : results.success
+        ? '✅ Task completed — the team finished, but returned no readable summary. Check the activity log above to see what ran.'
+        : (results.error || 'The task failed — check the activity log for details.');
+    sendEvent('done', { success: results.success, query, summary: finalSummary, sources: results.sources || [], statistics: results.statistics, files: results.files || [] });
   } catch (error) {
     recordError('chat', error.message);
     sendEvent('log', { agent: 'System', message: `Critical Error: ${error.message}` });
