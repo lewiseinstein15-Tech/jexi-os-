@@ -35,6 +35,31 @@ Plus the five specialist teams (each rebuilt the same way, from their own lineag
 | 13 | `computer-use` | Computer Use Agent | Numbered element eyes (browser-use / WebVoyager / Set-of-Mark) that DRIVE the browser |
 | 14 | `vision` | Vision Agent | Camera eyes: MediaPipe face + hand landmarks on-device, creator-vs-stranger match, expressions/gaze, gesture control (thumbs-up, open-palm quiet, wave…), dHash scene gate → narrates ONLY when something changed |
 
+## How a task gets planned & routed (plan first, then execute one-by-one)
+
+Every request runs through JEXI's **Planner → Orchestrator** architecture (built
+from the patterns that survive in LangGraph Supervisor, AutoGen GroupChatManager,
+Plan-and-Solve, and CrewAI sequential processes):
+
+1. **Planner classifies** — a fast deterministic regex classifier picks the intent
+   (zero AI cost, instant, works with no API key).
+2. **Planner announces the team FIRST** — before anything runs, the chat shows
+   `🧠 Plan first — team for this task: …`, listing the exact specialists in
+   order. The team for every intent lives in `TEAM_PLAN` in `Planner.js`.
+3. **Orchestrator executes one-by-one** — each specialist runs in order and gets
+   ONLY the previous specialist's output (strict handoff, `extractSection`). The
+   live pipeline shows each step as it happens.
+4. **Gates in code** — QA must PASS and Security must CLEAR shipping; failures
+   send work back to the coder for a fix round.
+5. **Compound tasks** — when a request needs two teams (e.g. "build a dashboard
+   of today's news" → News Team gathers FIRST, then the Coding Team builds on
+   that context), the Planner detects it (`compound_task`), names both phases up
+   front, and the Orchestrator runs them in order, handing phase 1's output to
+   phase 2. Add new compound patterns in `COMPOUND_DETECT` in `Planner.js`.
+
+Ask JEXI *"how do you decide which agents to use"* — she explains this herself
+(`explain_team` intent).
+
 ## Handoffs (strict)
 
 Every skill outputs **one `## SECTION`** with a fixed contract. The engine

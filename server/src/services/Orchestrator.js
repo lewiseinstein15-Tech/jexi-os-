@@ -71,11 +71,21 @@ export class Orchestrator {
 
   async executePlan(plan, query, sendEvent, opts = {}) {
     const startTime = Date.now();
-    const results = { success: true, query, intent: plan.intent, tasks: plan.tasks, agentResults: {}, summary: '', sources: [], statistics: { executionTime: 0, agentsUsed: plan.tasks.length, confidence: 0 } };
+    const agentsUsed = (plan.steps || plan.tasks || []).length;
+    const results = { success: true, query, intent: plan.intent, tasks: plan.tasks, steps: plan.steps, agentResults: {}, summary: '', sources: [], statistics: { executionTime: 0, agentsUsed, confidence: 0 } };
 
     try {
       // Log the incoming request into memory so long conversations keep context
       try { addChat('user', query); } catch (e) {}
+
+      // PLAN FIRST — announce the team before ANY agent runs (supervisor pattern:
+      // the planner names the sequence, the orchestrator executes it one-by-one).
+      if (plan.planSummary && sendEvent) {
+        sendEvent('log', { agent: 'Planner', message: `🧠 Plan first — team for this task: ${plan.planSummary}` });
+        if (plan.phases?.length > 1) {
+          plan.phases.forEach((p, i) => sendEvent('log', { agent: 'Planner', message: `   Phase ${i + 1}/${plan.phases.length}: ${p.name} → ${p.agents.join(', ')}` }));
+        }
+      }
 
       switch (plan.intent) {
         /* ---------------- CLEAR MEMORY ---------------- */
@@ -96,6 +106,91 @@ export class Orchestrator {
           try { addChat('jexi', reply); } catch (e) {}
           results.summary = `### 🧠 JEXI OS\n\n${reply}`;
           results.statistics.confidence = 100;
+          return results;
+        }
+
+        /* ---------------- EXPLAIN THE TEAM — how JEXI plans her agents ---------------- */
+        case 'explain_team': {
+          const explain = `### 🧠 HOW JEXI PLANS A TASK
+
+I don't just answer — I **plan first, then run the team one-by-one** until the task is finished. Here is exactly how I decide which agents to use:
+
+**1. Planner (me) — classify + plan first.** I read your request and pick the intent with a fast deterministic classifier (no AI call needed — instant and free), then name the specialist team for it **before anything runs**:
+
+| Intent | The team I plan to run (in order) |
+|---|---|
+| Build an app / code | Product → Designer → Engineer → Coder → Runner → Debugger → QA Lead → Reviewer → Security Officer → Shipper → Reflector |
+| Research / question | Query Analyzer → Searcher → Re-ranker → Extractor → Synthesizer |
+| Latest news | News Scout → News Filter → News Editor |
+| Open a link | Navigator → Extractor → Reasoner |
+| Study a topic | Scholar → Researcher |
+| Use the browser | Navigator → Vision → Reasoner |
+| Math problem | Reasoner |
+| Remember / memory | Memory Agent |
+| **Compound** (e.g. "build a tracker from today's news") | Phase 1: News/Research team gathers → Phase 2: Coding team builds on that context |
+
+**2. Orchestrator — run them one-by-one.** Each specialist runs in order, and each gets **only the previous specialist's output** (strict handoff — no context pollution). The pipeline shows live: you watch every agent step in the chat.
+
+**3. Gates in code, not suggestions.** QA's verdict must be PASS, and the Security Officer must CLEAR shipping — if not, the team fixes and re-runs. Nothing ships on a rubber-stamp.
+
+Try it: say *"build a weather app"* and watch Product → Designer → Engineer → Coder → QA → Security → Shipper run in order. Or *"build a dashboard of today's news"* — that plans TWO teams: news first, then build.`;
+          results.summary = explain;
+          results.statistics.confidence = 100;
+          return results;
+        }
+
+        /* ---------------- COMPOUND TASK — plan two teams, run them one-by-one ---------------- */
+        // The planner detected the task needs TWO specialist teams (e.g. gather news
+        // FIRST, then build on it). Execute each phase in order and hand phase 1's
+        // output to phase 2 as grounding context (Plan-and-Solve / supervisor pattern).
+        case 'compound_task': {
+          const phases = plan.phases || [];
+          let phaseContext = query; // phase 1 output feeds phase 2 as context
+          const phaseSummaries = [];
+
+          for (let i = 0; i < phases.length; i++) {
+            const phase = phases[i];
+            const isLast = i === phases.length - 1;
+            const phaseQuery = i === 0 ? query : `${query}\n\nContext the ${phases[0].name} already gathered (use it — do not re-fetch):\n${phaseContext}`;
+            sendEvent('log', { agent: 'Planner', message: `▶ Running phase ${i + 1}/${phases.length}: ${phase.name} (${phase.intent})` });
+
+            let phaseResult;
+            try {
+              phaseResult = await this.executePlan(
+                { intent: phase.intent, tasks: phase.agents, reasoning: phase.reasoning, scope: { mode: 'normal', query: phaseQuery } },
+                phaseQuery,
+                sendEvent,
+                opts
+              );
+            } catch (e) {
+              phaseResult = { success: false, summary: `Phase ${phase.name} failed: ${e.message}`, error: e.message };
+              sendEvent('log', { agent: 'Planner', message: `⚠ ${phase.name} failed — ${e.message}` });
+            }
+
+            phaseSummaries.push({ name: phase.name, intent: phase.intent, result: phaseResult });
+            if (phaseResult?.summary) phaseContext = phaseResult.summary;
+
+            // Phase 1's output IS the input to phase 2 (strict handoff). If a
+            // non-final phase produced nothing, note it and continue — the next
+            // phase still runs with the original query.
+            if (!isLast && (!phaseResult?.summary || !phaseResult?.success)) {
+              sendEvent('log', { agent: 'Planner', message: `⚠ ${phase.name} produced no usable output — phase ${i + 2} runs from the original request.` });
+            }
+          }
+
+          const final = phaseSummaries[phaseSummaries.length - 1];
+          results.summary = final?.result?.summary || 'The team finished, but produced no readable summary.';
+          results.sources = [];
+          (phaseSummaries || []).forEach((p) => {
+            if (p.result?.sources?.length) results.sources.push(...p.result.sources);
+          });
+          results.statistics.confidence = final?.result?.statistics?.confidence ?? 75;
+          results.phaseSummaries = phaseSummaries.map((p) => ({
+            name: p.name,
+            intent: p.intent,
+            success: p.result?.success !== false,
+            summary: String(p.result?.summary || '').slice(0, 400),
+          }));
           return results;
         }
 

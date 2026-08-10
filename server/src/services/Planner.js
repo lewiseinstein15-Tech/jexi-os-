@@ -3,9 +3,70 @@ import { searchKnowledge } from './MemoryManager.js';
 /**
  * JEXI's Planner — decides which agents/tools to use and when.
  * This is the "know when to call which tool" brain.
+ *
+ * Open-source lineage: LangGraph Supervisor / AutoGen GroupChatManager
+ * (a planner names the team FIRST), Plan-and-Solve (plan, then execute
+ * one-by-one until finished), CrewAI sequential process (strict handoffs).
+ *
+ * analyzeIntent() = classify (deterministic fast-path regex, zero AI cost)
+ *                 + decorate (attach the ordered agent team + plan summary
+ *                 so the Orchestrator announces it BEFORE running anything).
  */
+
+/** Which specialists run, in order, for each intent (the "plan first" contract). */
+const TEAM_PLAN = {
+  image_recognition: ['Vision', 'Reasoner', 'Memory Agent'],
+  clear_memory: ['Memory Agent'],
+  link_analysis: ['Navigator', 'Extractor', 'Reasoner', 'Memory Agent'],
+  math_solve: ['Reasoner', 'Memory Agent'],
+  self_check: ['SelfDiagnose', 'Reasoner', 'Memory Agent'],
+  code_task: ['Product', 'Designer', 'Engineer', 'Coder', 'Runner', 'Debugger', 'QA Lead', 'Reviewer', 'Security Officer', 'Shipper', 'Reflector'],
+  computer_use: ['Navigator', 'Vision', 'Reasoner', 'Memory Agent'],
+  study_topic: ['Scholar', 'Researcher', 'Memory Agent'],
+  conversation: ['JEXI'],
+  memory_query: ['Memory Agent'],
+  knowledge_recall: ['Books', 'Reasoner', 'Memory Agent'],
+  news_latest: ['News Scout', 'News Filter', 'News Editor', 'Reasoner', 'Memory Agent'],
+  research: ['Query Analyzer', 'Searcher', 'Re-ranker', 'Extractor', 'Synthesizer', 'Memory Agent'],
+  learning_research: ['Researcher', 'Reasoner', 'Memory Agent'],
+  explain_team: ['Planner'],
+};
+
+/** "gather news/research/study, THEN build" → the compound team, run in phases. */
+const COMPOUND_DETECT = [
+  {
+    re: /(build|create|make|write|code|develop)\b[^.!?\n]{0,80}\b(news|headlines?|latest stories|breaking stories|today['’]?s (stories|news)|current events)\b/i,
+    phases: [
+      { name: 'News Team', intent: 'news_latest', agents: ['News Scout', 'News Filter', 'News Editor', 'Reasoner'] },
+      { name: 'Coding Team', intent: 'code_task', agents: ['Product', 'Designer', 'Engineer', 'Coder', 'Runner', 'Debugger', 'QA Lead', 'Reviewer', 'Security Officer', 'Shipper', 'Reflector'] },
+    ],
+    reasoning: 'The user wants something built from fresh news — the News Team gathers first, then the Coding Team builds on that context.',
+  },
+  {
+    re: /(build|create|make|write|code|develop)\b[^.!?\n]{0,80}\b(weather|calculator|tracker|dashboard|app|website|web ?page|tool|game|quiz|planner)\b[^.!?\n]{0,80}\b(research|find out|look up|based on|from (the )?(data|facts|information)|about)\b/i,
+    phases: [
+      { name: 'Research Team', intent: 'research', agents: ['Query Analyzer', 'Searcher', 'Re-ranker', 'Extractor', 'Synthesizer'] },
+      { name: 'Coding Team', intent: 'code_task', agents: ['Product', 'Designer', 'Engineer', 'Coder', 'Runner', 'Debugger', 'QA Lead', 'Reviewer', 'Security Officer', 'Shipper', 'Reflector'] },
+    ],
+    reasoning: 'The user wants an app whose content needs research first — Research gathers facts, then the Coding Team builds on them.',
+  },
+];
+
 export class Planner {
+  /** Classify the intent (fast, deterministic, free) then attach the team plan. */
   async analyzeIntent(query, opts = {}) {
+    const plan = await this._classify(query, opts);
+    // Decorate every plan with the ordered specialist team ("plan first")
+    if (plan.intent === 'compound_task') {
+      plan.steps = (plan.phases || []).flatMap((p) => p.agents);
+    } else {
+      plan.steps = TEAM_PLAN[plan.intent] || plan.tasks || [];
+    }
+    plan.planSummary = plan.steps.join(' → ');
+    return plan;
+  }
+
+  async _classify(query, opts = {}) {
     const q = String(query || '').toLowerCase();
     const hasImage = Boolean(opts.image);
 
@@ -55,6 +116,21 @@ export class Planner {
     //    get misrouted to the coding pipeline.
     if (/self[- ]?check|check yourself|diagnos(e|tic)|run (a )?(system|self) check|system status|are you (ok|okay|healthy|fine)|monitor yourself|what'?s wrong|any errors|health check/i.test(q)) {
       return { intent: 'self_check', tasks: ['self', 'reasoning', 'memory'], reasoning: 'JEXI runs a full self-diagnosis and reports system health with root causes.' };
+    }
+
+    // 5.2 EXPLAIN THE TEAM — "how do you decide which agents to use" is a question
+    //     about JEXI herself, not a task. She explains the planner + team routing.
+    if (/which agents? (will|should|do) (you|i) (use|run|pick|call|choose)|how do you (decide|choose|pick|know) (which|what) (agents?|team|specialists?|skills?)|how (does|do) (your|the) (team|agent team|pipeline|planning|agents?) (work|plan|decide|choose|pick)|explain (your|the) (agent )?(team|planning|routing|pipeline)|explain how (your|the|you) (agent )?(team|planner|system|agents?) (plan|work|decide)|how (do|does) you plan (a |your |the |out )?(task|request|build)|plan (which|what) agents/i.test(q)) {
+      return { intent: 'explain_team', tasks: ['planner'], reasoning: 'User asks how JEXI plans and routes her agent team — she explains the planner-first architecture.' };
+    }
+
+    // 5.5 COMPOUND TASK — the task needs TWO teams: gather (news/research) FIRST,
+    //    then BUILD on top of it. The planner names both phases up front; the
+    //    orchestrator runs them one-by-one, feeding phase 1's output to phase 2.
+    //    (Plan-and-Solve / supervisor pattern: plan first, execute in order.)
+    const compound = COMPOUND_DETECT.find((c) => c.re.test(q));
+    if (compound) {
+      return { intent: 'compound_task', phases: compound.phases, reasoning: compound.reasoning };
     }
 
     // 6. Coding / programming — the FULL AGENT TEAM plans, builds, QA-tests and ships.
