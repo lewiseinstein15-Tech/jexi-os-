@@ -31,6 +31,17 @@ const tests = [
   { q: 'build a documentation website', expect: 'code_task' },
   { q: 'build a chart generator app', expect: 'code_task' },
   { q: 'build a translation app', expect: 'code_task' },
+  // Research-first compounds — "research X, then apply/build Y" plans TWO teams
+  // (was previously misrouted into the heavy coding sprint → silent chat).
+  { q: 'go research on frontend style layout how it should looks like on GitHub repositories then apply the better one to make it look much coller', expect: 'compound_task' },
+  { q: 'research frontend style layout and apply the better one to make it look cooler', expect: 'compound_task' },
+  { q: 'study machine learning then build me a quiz app', expect: 'compound_task' },
+  { q: 'look up modern pricing and then redesign my landing page', expect: 'compound_task' },
+  // Guard: research-first WITHOUT an app/UI deliverable stays in research
+  { q: 'go research on x and then apply it', expect: 'research' },
+  { q: 'research how to bake a cake and then make it', expect: 'research' },
+  { q: 'research solar panels and explain how they work', expect: 'research' },
+  { q: 'research the best diet and tell me the top tips', expect: 'research' },
 ];
 
 let failures = 0;

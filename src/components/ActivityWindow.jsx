@@ -9,8 +9,10 @@ function StatusPill({ icon: Icon, label, value, tone, pulse }) {
     dim: 'text-gray-500 border-[#1c1c1c] bg-[#0a0a0a]',
   };
   return (
-    <div className={`rounded-lg border px-2 py-2 text-center ${tones[tone]}`}>
-      <Icon className={`w-3 h-3 mx-auto mb-1 ${pulse ? 'animate-pulse' : ''}`} />
+    <div className={`rounded-xl border px-2 py-2 text-center transition-colors duration-200 hover:brightness-125 ${tones[tone]}`}>
+      <div className="w-6 h-6 mx-auto mb-1 rounded-md bg-black/25 border border-white/10 flex items-center justify-center">
+        <Icon className={`w-3 h-3 ${pulse ? 'animate-pulse' : ''}`} />
+      </div>
       <p className="text-[7px] font-bold tracking-wider opacity-60">{label}</p>
       <p className="text-[9px] font-black mt-0.5">{value}</p>
     </div>
@@ -21,10 +23,10 @@ function TabButton({ active, onClick, children }) {
   return (
     <button
       onClick={onClick}
-      className={`px-2.5 py-1 rounded-md text-[8px] font-bold tracking-wider transition-colors ${
+      className={`px-2.5 py-1 rounded-lg text-[8px] font-bold tracking-wider transition-all duration-200 ${
         active
-          ? 'bg-[#00FF9D]/15 text-[#00FF9D] border border-[#00FF9D]/30'
-          : 'text-gray-500 border border-transparent hover:text-gray-300'
+          ? 'bg-[#00FF9D]/15 text-[#00FF9D] border border-[#00FF9D]/35 shadow-[0_0_14px_rgba(0,255,157,0.15)]'
+          : 'text-gray-500 border border-transparent hover:text-gray-300 hover:bg-white/[0.04]'
       }`}
     >
       {children}
@@ -81,7 +83,7 @@ const AGENT_COLORS = {
 
 function StreamView({ logs, isProcessing }) {
   return (
-    <div className="bg-[#050505] p-3 rounded-lg max-h-44 overflow-y-auto font-mono text-[10px] space-y-1">
+    <div className="bg-black/40 border border-white/[0.05] p-3 rounded-lg max-h-44 overflow-y-auto font-mono text-[10px] space-y-1">
       {logs.length === 0 && !isProcessing ? (
         <p className="text-gray-700 italic flex items-center gap-1.5">
           Awaiting commands
@@ -114,7 +116,7 @@ function StreamView({ logs, isProcessing }) {
 function SitesView({ websites }) {
   if (websites.length === 0) {
     return (
-      <div className="bg-[#050505] rounded-lg p-4 text-center">
+      <div className="bg-black/40 border border-white/[0.05] rounded-lg p-4 text-center">
         <Globe className="w-4 h-4 mx-auto mb-2 text-gray-700" />
         <p className="text-[9px] text-gray-700 italic">No active connections — JEXI will show sites she visits here</p>
       </div>

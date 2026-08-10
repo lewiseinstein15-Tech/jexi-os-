@@ -169,7 +169,7 @@ export default function DesktopViewer({ logs = [] }) {
           )}
         </div>
         <div className="flex gap-1">
-          <button onClick={restartEyes} disabled={restarting} className="bg-[#1a1a1a] text-gray-400 hover:text-[#00FF9D] rounded px-2 py-1 text-[8px] font-bold flex items-center gap-1 disabled:opacity-50" title="Force-restart JEXI's browser (fixes a stuck/white screen)">
+          <button onClick={restartEyes} disabled={restarting} className="bg-white/[0.05] border border-white/[0.08] text-gray-400 hover:text-[#00FF9D] hover:border-[#00FF9D]/40 rounded-lg px-2 py-1 text-[8px] font-bold flex items-center gap-1 disabled:opacity-50 transition-all duration-200 active:scale-95" title="Force-restart JEXI's browser (fixes a stuck/white screen)">
             {restarting ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Restart eyes
           </button>
           <button onClick={() => setShowUrlInput(!showUrlInput)} className="bg-[#1a1a1a] text-gray-400 rounded px-2 py-1 text-[8px] font-bold flex items-center gap-1">
@@ -189,7 +189,7 @@ export default function DesktopViewer({ logs = [] }) {
         </div>
       )}
 
-      <div className="flex-1 bg-black rounded-xl overflow-hidden border border-[#1a1a1a] relative flex items-center justify-center min-h-0">
+      <div className="flex-1 bg-black rounded-xl overflow-hidden border border-white/[0.08] relative flex items-center justify-center min-h-0 shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]">
         {screenshot ? (
           <img ref={imgRef} src={screenshot} alt="Desktop" onClick={handleScreenClick} onLoad={() => setLastUpdate(Date.now())} className={`w-full h-full object-contain ${manualMode ? 'cursor-pointer' : ''}`} />
         ) : shotError || (status && !status.ready) ? (
@@ -232,8 +232,8 @@ export default function DesktopViewer({ logs = [] }) {
       )}
 
       {!manualMode && (
-        <div className="mt-2 bg-[#0a0a0a] rounded-lg p-2 h-28 overflow-y-auto border border-[#1a1a1a] flex-shrink-0">
-          <div className="flex items-center gap-1 mb-1 sticky top-0 bg-[#0a0a0a] pb-1"><Bot className="w-3 h-3 text-[#00FF9D] animate-pulse" /><span className="text-[8px] font-bold text-[#00FF9D] tracking-wider">JEXI ACTIVITY</span></div>
+        <div className="mt-2 bg-[#0a0a0c] rounded-lg p-2 h-28 overflow-y-auto border border-white/[0.06] flex-shrink-0">
+          <div className="flex items-center gap-1 mb-1 sticky top-0 bg-[#0a0a0c] pb-1 border-b border-white/[0.05]"><Bot className="w-3 h-3 text-[#00FF9D] animate-pulse" /><span className="text-[8px] font-bold text-[#00FF9D] tracking-wider">JEXI ACTIVITY</span></div>
           {agentLogs.length === 0 ? <p className="text-gray-700 text-[8px] italic">Waiting for JEXI to act...</p> : agentLogs.slice(-10).reverse().map((log, i) => (
             <div key={i} className="text-[8px] flex gap-1 leading-tight mb-1">
               <span className={`font-bold flex-shrink-0 ${AGENT_ACTIVITY_COLORS[log.agent] || 'text-[#00FF9D]'}`}>[{log.agent}]</span>

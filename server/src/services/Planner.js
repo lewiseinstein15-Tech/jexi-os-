@@ -57,6 +57,19 @@ const COMPOUND_DETECT = [
     ],
     reasoning: 'The user wants an app whose content needs research first — Research gathers facts, then the Coding Team builds on them.',
   },
+  // RESEARCH-FIRST — "research X, then apply/build/make Y". This is the classic
+  // two-team phrasing ("go research the best layout, then apply it"). Without it,
+  // these requests fell into the heavy coding sprint and the chat went silent.
+  // The trailing modifier keeps "research a recipe, then make it" (cooking) in
+  // research — there must be an app/UI/design deliverable after the build verb.
+  {
+    re: /\b(research|study|find out|look up|investigate|check out|go research|search( for| up)?)\b[^.!?\n]{0,90}\b(then|and then|and|afterwards|after that|finally)\b[^.!?\n]{0,70}\b(apply|implement|build|create|develop|redesign|restyle|restructure|revamp|style)\b[^.!?\n]{0,80}\b(to make|so it|so the|look|better|nicer|cooler|prettier|cleaner|modern|beautiful|professional|app(lication)?|ui|interface|frontend|website|web ?page|dashboard|component|page|panel|tool|game|calculator|tracker|portfolio|script|code|project|theme|design)\b/i,
+    phases: [
+      { name: 'Research Team', intent: 'research', agents: ['Query Analyzer', 'Searcher', 'Re-ranker', 'Extractor', 'Synthesizer'] },
+      { name: 'Coding Team', intent: 'code_task', agents: ['Product', 'Designer', 'Engineer', 'Coder', 'Runner', 'Debugger', 'QA Lead', 'Reviewer', 'Security Officer', 'Shipper', 'Reflector'] },
+    ],
+    reasoning: 'The user wants RESEARCH first, then the findings APPLIED/built on top — the Research Team gathers, then the Coding Team applies it.',
+  },
 ];
 
 export class Planner {

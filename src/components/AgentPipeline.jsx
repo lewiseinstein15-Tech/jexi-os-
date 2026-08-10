@@ -79,9 +79,9 @@ export default function AgentPipeline({ logs = [], isProcessing }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-lg">
+    <div className="overflow-hidden rounded-lg bg-[#0a0a0c]">
       {/* header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-[#0d0d0d] border-b border-[#161616]">
+      <div className="flex items-center gap-2 px-3 py-2 bg-white/[0.03] border-b border-white/[0.06]">
         <span className="relative flex w-1.5 h-1.5 flex-shrink-0">
           <span className={`absolute inline-flex w-full h-full rounded-full bg-[#00FF9D] opacity-60 ${isProcessing ? 'animate-ping' : ''}`} />
           <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-[#00FF9D]" />
@@ -94,6 +94,8 @@ export default function AgentPipeline({ logs = [], isProcessing }) {
           <span className="ml-auto text-[8px] text-[#22c55e] font-black">✓ {order.length} STEP{order.length > 1 ? 'S' : ''}</span>
         )}
       </div>
+
+      {isProcessing && <div className="shimmer-bar" />}
 
       <AnimatePresence initial={false}>
         {order.length === 0 && (
@@ -116,10 +118,13 @@ export default function AgentPipeline({ logs = [], isProcessing }) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
-              className="flex items-start gap-2.5 px-3 py-2 border-b border-[#121212] last:border-0 bg-[#0a0a0a]"
+              className={`flex items-start gap-2.5 px-3 py-2 border-b border-white/[0.04] last:border-0 transition-colors duration-200 ${
+                isRunning ? 'bg-[#00FF9D]/[0.05]' : 'hover:bg-white/[0.02]'
+              }`}
             >
-              <div className={`mt-0.5 flex-shrink-0 ${meta.color}`}>
-                <Icon className="w-3.5 h-3.5" />
+              {/* icon tile */}
+              <div className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded-md bg-white/[0.05] border border-white/[0.06] flex items-center justify-center ${meta.color}`}>
+                <Icon className="w-3 h-3" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -130,7 +135,7 @@ export default function AgentPipeline({ logs = [], isProcessing }) {
                     <CheckCircle2 className="w-3 h-3 text-[#22c55e] flex-shrink-0" />
                   )}
                 </div>
-                <p className={`text-[9px] mt-0.5 leading-snug ${isRunning ? 'text-gray-300' : 'text-gray-500'} break-words`}>
+                <p className={`text-[9px] mt-0.5 leading-snug ${isRunning ? 'text-gray-200' : 'text-gray-500'} break-words`}>
                   {lastMsg}
                 </p>
               </div>
@@ -143,7 +148,7 @@ export default function AgentPipeline({ logs = [], isProcessing }) {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="px-3 py-2 bg-[#00FF9D]/5 border-t border-[#00FF9D]/15 flex items-center gap-2"
+          className="px-3 py-2 bg-gradient-to-r from-[#00FF9D]/[0.08] via-[#22d3ee]/[0.05] to-transparent border-t border-[#00FF9D]/20 flex items-center gap-2"
         >
           <Sparkles className="w-3 h-3 text-[#00FF9D]" />
           <span className="text-[8px] font-black text-[#00FF9D] tracking-wider">MISSION COMPLETE</span>
