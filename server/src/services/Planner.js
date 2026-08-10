@@ -271,9 +271,13 @@ export class Planner {
       return { intent: 'study_topic', tasks: ['scholar', 'research', 'memory'], reasoning: 'User wants JEXI to deep-study and store in the knowledge library.', payload: topic };
     }
 
-    // 7. Greetings & pure conversation
-    if (/^(hello|hey|hi|sup|yo|howdy|good morning|good evening|what's up|wassup|who are you|what are you|who made you|who created you)\b/i.test(q)) {
-      return { intent: 'conversation', tasks: ['memory'], reasoning: 'Conversation / identity question.' };
+    // 7. Greetings & pure conversation — INCLUDES identity/origin questions
+    //    (name, creator, origin, built-by). Without these, "what's your name",
+    //    "who built you" and "your origin" fell through to WEB SEARCH and JEXI
+    //    couldn't answer her own identity. Match anywhere in the message, not
+    //    just at the start ("hey JEXI, what's your name?" must land here too).
+    if (/^(hello|hey|hi|sup|yo|howdy|good morning|good evening|what's up|wassup|how are you)\b|\b(who are you|what are you|what'?s your name|your name|who (built|made|created|designed|programmed|invented) you|who is your (creator|maker|father|mom|mum|mother|owner|boss)|your (origin|creator|maker|builder|father|mother|story)|where (are you from|do you come from|were you (born|created|made))|are you (a |an )?(bot|robot|ai|human|real|girl|boy|machine)|what are you (made of|built with|made from)|is your name|tell me about yourself|introduce yourself)\b/i.test(q)) {
+      return { intent: 'conversation', tasks: ['memory'], reasoning: 'Conversation / identity question — JEXI answers her name, creator and origin directly.' };
     }
 
     // 8. Memory questions

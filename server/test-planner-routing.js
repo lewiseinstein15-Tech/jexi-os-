@@ -80,5 +80,39 @@ for (const { q, expect } of confirmTests) {
   console.log(`${ok ? '✅' : '❌'} ${(p.intent + '          ').slice(0, 12)} expected ${expect.padEnd(12)} <- CONFIRM "${q.slice(0, 55)}"`);
 }
 
+// Identity & origin questions MUST route to conversation (not web search) —
+// JEXI has to know her own name, creator and origin.
+const identityTests = [
+  'what is your name',
+  "what's your name",
+  'your name',
+  'who are you',
+  'what are you',
+  'who built you',
+  'who made you',
+  'who created you',
+  'who programmed you',
+  'who is your creator',
+  'your origin',
+  'where are you from',
+  'where do you come from',
+  'where were you created',
+  'are you a robot',
+  'are you an AI',
+  'are you a human',
+  'what are you made of',
+  'introduce yourself',
+  'tell me about yourself',
+  'hey JEXI, what is your name',
+  'hello, who built you',
+  'so who made you?',
+];
+for (const q of identityTests) {
+  const p = await planner.analyzeIntent(q);
+  const ok = p.intent === 'conversation';
+  if (!ok) failures++;
+  console.log(`${ok ? '✅' : '❌'} ${(p.intent + '          ').slice(0, 12)} expected conversation  <- IDENTITY "${q.slice(0, 45)}"`);
+}
+
 console.log(failures === 0 ? '\nALL ROUTING TESTS PASSED' : `\n${failures} ROUTING TEST(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

@@ -38,6 +38,13 @@ function listWorkspaceFiles() {
   return fs.readdirSync(WORKSPACE_DIR).filter(f => fs.statSync(path.join(WORKSPACE_DIR, f)).isFile());
 }
 
+/** Deterministic identity answer — always available, even with NO AI key. */
+const IDENTITY_ANSWER = `I'm **JEXI OS** — a sophisticated multi-agent AI operating system.
+
+I was created by **Lewis Einstein**, an AI & ML Engineer — his most advanced creation. I work as a virtual team of 20 specialized agents (Product, Designer, Engineer, Coder, QA, Reviewer, Security, Shipper, GitHub, Memory, Vision, Computer Use and more), all orchestrated through one chat interface to research, build, verify and ship anything you ask.
+
+I'm free, open-source, and always awake. Ask me to build you an app, study a topic, or remember something — I'll run the whole team for you.`;
+
 /** Build a compact conversation context for JEXI to stay focused. */
 function conversationContext() {
   const history = getChatHistory(12);
@@ -108,6 +115,15 @@ export class Orchestrator {
         /* ---------------- CONVERSATION & IDENTITY ---------------- */
         case 'conversation': {
           const ctx = conversationContext();
+          // No AI key? Still answer identity/origin questions deterministically —
+          // JEXI must ALWAYS know her own name, creator and origin, key or no key.
+          const keys = resolveKeys();
+          if (!keys.groqKey && !keys.geminiKey) {
+            try { addChat('jexi', IDENTITY_ANSWER); } catch (e) {}
+            results.summary = `### 🧠 JEXI OS\n\n${IDENTITY_ANSWER}`;
+            results.statistics.confidence = 100;
+            return results;
+          }
           const reply = await generateContent(
             `The user just said: "${query}"\n\nRecent conversation:\n${ctx}\n\nRespond naturally as JEXI OS. If they ask who you are or who created you, answer: you are JEXI OS, a sophisticated multi-agent AI operating system built by Lewis Einstein (AI & ML Engineer) to run any task. Be warm and brief.`,
             JEXI_SYSTEM_PROMPT
@@ -749,7 +765,7 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
 
           sendEvent('log', { agent: 'SelfDiagnose', message: `📋 Status: ${status.keys.groq || status.keys.gemini ? 'AI keys OK' : 'NO AI KEYS'}, browser ${status.browser.ready ? 'OK' : 'DOWN'}, ${status.errors.count} logged error(s).` });
           const reply = await generateContent(
-            `My live self-diagnosis (JSON):\n${JSON.stringify(status, null, 2)}\n\nSource code I inspected:\n${excerpts || '(none)'}\n\nIf something is wrong, identify the exact file and root cause, then give the precise fix. If everything is healthy, say so briefly and warmly (I am JEXI OS, created by Lewis Einstein). Use ## HEALTH, ## ISSUES FOUND, ## ROOT CAUSE + FILE, ## FIX.`,
+            `My live self-diagnosis (JSON):\n${JSON.stringify(status, null, 2)}\n\nSource code I inspected:\n${excerpts || '(none)'}\n\nCRITICAL INSTRUCTION — DO NOT HALLUCINATE BUGS:\n- Only report an issue if you can point to the EXACT buggy line in the code excerpt above (quote it verbatim).\n- Do NOT invent bugs, typos, missing imports, or unused variables. This is a real production system; the code above is live and working.\n- If the code looks correct (or you cannot be sure from the excerpt), write: \"No issues found — system healthy.\"\n- Only report issues from the JSON status (memory, browser, keys, errors, writable dirs) or the exact code you saw.\n\nIf everything is healthy, say so briefly and warmly (I am JEXI OS, created by Lewis Einstein). Use ## HEALTH, ## ISSUES FOUND, ## ROOT CAUSE + FILE, ## FIX. If no issues, put \"None — system healthy\" under ISSUES FOUND.`,
             JEXI_SYSTEM_PROMPT,
             null,
             { temperature: 0.3 }
