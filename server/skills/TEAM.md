@@ -35,6 +35,25 @@ Plus the five specialist teams (each rebuilt the same way, from their own lineag
 | 13 | `computer-use` | Computer Use Agent | Numbered element eyes (browser-use / WebVoyager / Set-of-Mark) that DRIVE the browser |
 | 14 | `vision` | Vision Agent | Camera eyes: MediaPipe face + hand landmarks on-device, creator-vs-stranger match, expressions/gaze, gesture control (thumbs-up, open-palm quiet, wave…), dHash scene gate → narrates ONLY when something changed |
 
+And the **round-2 specialists** that complete the JEXI OS roster (from agency-agents,
+PR-Agent, SWE-agent, MetaGPT DataInterpreter, ai-data-science-team, andrewyng/translation-agent,
+gstack /benchmark, ai-data-science-team — the roles every serious multi-agent system ships):
+
+| # | Skill | Role | What it does |
+|---|-------|------|--------------|
+| 15 | `github` | GitHub Agent | Real `gh`/`git` CLI: status, commit, push, PRs, issues, repo create — honest output, never a faked push |
+| 16 | `data` | Data Analyst | Loads CSV/JSON (chat, file, URL), computes real statistics, generates a self-contained HTML chart |
+| 17 | `devops` | DevOps Agent | Stack detection → Dockerfile + GitHub Actions CI → exact copy-paste deploy steps, verified with `node --check`/`py_compile` |
+| 18 | `writer` | Technical Writer | README/API refs/how-tos grounded in the real workspace files — no generic filler |
+| 19 | `translator` | Translator | Draft → critique → revise reflection loop (andrewyng/translation-agent pattern) |
+| 20 | `perf` | Performance Engineer | Static perf scan with real numbers (bundle size, blocking scripts, N+1 fetches), top fixes, honest runtime-check commands |
+
+**Routing:** each new specialist is a first-class intent in `Planner.js` (`github`,
+`data`, `devops`, `docs`, `translate`, `perf`) and runs one-by-one through the
+Orchestrator. GitHub mutating actions (commit/push/PR/repo) verify auth FIRST and
+say plainly when a token is missing. Compound patterns (e.g. "build from news")
+can chain any of these teams the same way.
+
 ## How a task gets planned & routed (plan first, then execute one-by-one)
 
 Every request runs through JEXI's **Planner → Orchestrator** architecture (built

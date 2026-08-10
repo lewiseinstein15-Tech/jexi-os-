@@ -30,6 +30,13 @@ const TEAM_PLAN = {
   research: ['Query Analyzer', 'Searcher', 'Re-ranker', 'Extractor', 'Synthesizer', 'Memory Agent'],
   learning_research: ['Researcher', 'Reasoner', 'Memory Agent'],
   explain_team: ['Planner'],
+  // Specialist team round 2 — the complete JEXI OS roster
+  github: ['GitHub Agent', 'Shipper'],
+  translate: ['Translator', 'Reviewer'],
+  data: ['Data Analyst', 'Reasoner'],
+  devops: ['DevOps Agent', 'Shipper'],
+  docs: ['Technical Writer', 'Reviewer'],
+  perf: ['Performance Engineer', 'Coder', 'Reviewer'],
 };
 
 /** "gather news/research/study, THEN build" → the compound team, run in phases. */
@@ -133,6 +140,34 @@ export class Planner {
       return { intent: 'compound_task', phases: compound.phases, reasoning: compound.reasoning };
     }
 
+    // 5.7 DOCUMENTATION — "write a readme / docs for this project" is a writer task,
+    //    not a coding task. Checked BEFORE coding so "write documentation for my code"
+    //    never gets misrouted to the build pipeline (but "build a docs website" still
+    //    codes — the negative lookahead keeps app/tool nouns out of this intent).
+    if (/\b(write|create|generate|update|add|document)\s+(a\s+|the\s+)?(readme|documentation|docs|api reference|how[- ]to guide|release notes?)(?!\s+(app|tool|generator|bot|website|web ?page))\b|document (this|my|the) code/i.test(q)) {
+      return { intent: 'docs', tasks: ['writer'], reasoning: 'User wants documentation written for existing work — the Technical Writer reads the files and writes real docs.' };
+    }
+
+    // 5.8 GITHUB — git operations (commit, push, PR, issues, repo). Real CLI work,
+    //     not coding. Checked BEFORE coding because "push my code to github" mentions
+    //     code; action-first / git-dominant / git-phrase patterns keep "build a push
+    //     notification app" in the coding team.
+    const gitActionFirst = /^(?:please\s+)?(?:can you\s+)?(?:commit|push|clone|pull|git status|upload to github|send to github)\b/i.test(q);
+    const gitDominant = /\b(push|commit|clone|pull|upload|sync)\b[^.!?\n]{0,50}\b(github|git|remote|origin)\b/i.test(q);
+    const gitPhrases = /(create|make|new|start|open)\s+(a\s+|an\s+)?(repo|repository)|\brepo(ository)?\s+(create|new)|open (a )?pull request|create (a )?pull request|pr (create|list)|list (pull requests|prs|issues)|issue (create|list)|open (an? )?issue|create (an? )?issue|file (an? )?issue|git status|github (connected|token|auth|connected\?)|check github|init (a )?(git )?repo\b/i.test(q);
+    if (gitActionFirst || gitDominant || gitPhrases) {
+      return { intent: 'github', tasks: ['github'], reasoning: 'Git/GitHub operation — the GitHub Agent runs the real gh/git CLI and reports honest output.' };
+    }
+
+    // 5.9 PERF — "make my app faster" is a performance task, NOT a build task.
+    //     Checked BEFORE coding ("make my app load faster" mentions make+app and
+    //     would otherwise route to the coding team). The regex needs a speed
+    //     symptom, so "build a speed tracker app" still codes.
+    const perfHints = /\boptimize\b|performance issue|bottleneck|bundle size|web vitals|laggy|improve (the )?performance|speed ?up|loads? (faster|slow(ly)?)|load time|too slow|running slow|make (it|this|the|my|our) [^.!?\n]{0,35} (faster|slow(er|ly)?|snappier)\b/i;
+    if (perfHints.test(q)) {
+      return { intent: 'perf', tasks: ['perf'], reasoning: 'Performance request — the Performance Engineer measures the real files, fixes the top bottlenecks and proves the improvement.' };
+    }
+
     // 6. Coding / programming — the FULL AGENT TEAM plans, builds, QA-tests and ships.
     //    Checked BEFORE study/research so "build me a study planner", "an app to
     //    track habits", "/team build…" and "/careful check my code" all land here
@@ -140,6 +175,15 @@ export class Planner {
     if (this.isCoding(scopedQuery)) {
       return { intent: 'code_task', tasks: ['architect', 'coder', 'runner', 'debugger', 'qa', 'reviewer', 'memory'], reasoning: 'Coding task — the team: product → designer → engineer → coder → QA → reviewer → shipper.', scope, query: scopedQuery };
     }
+
+    // 6.3 TRANSLATE — meaning-first translation with a reflection loop. Checked after
+    //     coding so "build a translation app" still builds, and before computer-use
+    //     so a plain text request never grabs the browser.
+    if (/^\s*(please\s+)?(can you\s+)?translate\b|\btranslate (this|the|that|it|following|to|into)|\b(in|into)\s+(french|spanish|german|italian|portuguese|japanese|korean|chinese|mandarin|hindi|arabic|russian|swahili|dutch|polish|turkish|yoruba|igbo|hausa|greek|latin)\b/i.test(q)) {
+      return { intent: 'translate', tasks: ['translator'], reasoning: 'Translation request — the Translator runs the draft → critique → revise reflection loop.' };
+    }
+
+    // 6.4 COMPUTER USE — the user wants JEXI to DRIVE the browser (navigate,
 
     // 6.4 COMPUTER USE — the user wants JEXI to DRIVE the browser (navigate,
     //    click, type, interact), not just search. Checked after coding (so
@@ -164,6 +208,18 @@ export class Planner {
     );
     if (browserDriving.test(q)) {
       return { intent: 'computer_use', tasks: ['browser', 'reasoner', 'memory'], reasoning: 'User wants JEXI to drive the browser interactively — the Computer Use agent navigates, clicks and types.' };
+    }
+
+    // 6.45 DATA — analyze data, compute real statistics, build a chart. Checked
+    //     after coding ("build a chart app" still codes) and before study/research.
+    if (/\b(analyze|analyse|profile)\b.*\b(data|csv|json|dataset|spreadsheet|table|numbers)\b|\b(data|csv|json|dataset|spreadsheet)\b.*\b(analy|statistics|stats|mean|average|sum|chart|graph|plot|visuali[sz]e|insights?)\b|\b(make|build|create|generate|draw)\b.*\b(chart|graph|plot)\b.*\b(data|from|using)\b|\b(statistics|stats)\b/i.test(q)) {
+      return { intent: 'data', tasks: ['data'], reasoning: 'Data analysis request — the Data Analyst loads the data, computes real statistics and charts it.' };
+    }
+
+    // 6.47 DEVOPS — deploy, containerize, CI/CD. Checked after coding ("build a
+    //     deployment tool" still codes) and before study/research.
+    if (/\b(deploy|deployment|docker|containeri[sz]e|ci\/cd|github actions|ci workflow|host (this|the|my)|put (this|the|my) (app|site|code) online)\b/i.test(q)) {
+      return { intent: 'devops', tasks: ['devops'], reasoning: 'Deployment/infra request — the DevOps Agent detects the stack, generates the Dockerfile/CI and gives exact deploy steps.' };
     }
 
     // 6.5 Study / deep learn (AFTER coding so "study planner" apps aren't hijacked)

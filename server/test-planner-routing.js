@@ -14,6 +14,23 @@ const tests = [
   { q: 'who are you and who built you?', expect: 'conversation' },
   { q: 'what do you remember about me?', expect: 'memory_query' },
   { q: 'calculate 7 * 6', expect: 'math_solve' },
+  // Round-2 specialists (GitHub / Data / DevOps / Docs / Translate / Perf)
+  { q: 'push my code to github', expect: 'github' },
+  { q: 'commit and push to github', expect: 'github' },
+  { q: 'open a pull request for my changes', expect: 'github' },
+  { q: 'analyze this csv data and give me stats', expect: 'data' },
+  { q: 'make a chart of the sales data', expect: 'data' },
+  { q: 'deploy this app to render', expect: 'devops' },
+  { q: 'write a readme for this project', expect: 'docs' },
+  { q: 'document this code', expect: 'docs' },
+  { q: 'translate this text to french', expect: 'translate' },
+  { q: 'say hello in swahili', expect: 'translate' },
+  { q: 'make my app load faster', expect: 'perf' },
+  { q: 'optimize the performance of this site', expect: 'perf' },
+  // Guard: building a docs/chart app still routes to the coding team
+  { q: 'build a documentation website', expect: 'code_task' },
+  { q: 'build a chart generator app', expect: 'code_task' },
+  { q: 'build a translation app', expect: 'code_task' },
 ];
 
 let failures = 0;

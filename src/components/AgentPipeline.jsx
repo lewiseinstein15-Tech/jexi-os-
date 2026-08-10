@@ -4,7 +4,8 @@ import {
   FileText, BrainCircuit, BookOpen, GraduationCap, Eye, MemoryStick,
   BookMarked, Stethoscope, Sparkles, Cpu, MousePointerClick, CheckCircle2, Loader2,
   Crown, Palette, ShieldAlert, Rocket, RefreshCw, Newspaper, SlidersHorizontal,
-  PenLine, Navigation, FileSearch, ArrowUpDown,
+  PenLine, Navigation, FileSearch, ArrowUpDown, Github, Database, Container,
+  FileCode2, Languages, Gauge,
 } from 'lucide-react';
 
 // Every agent the engine can emit, mapped to its icon + color.
@@ -52,6 +53,13 @@ const AGENT_META = {
   Vision: { icon: Eye, color: 'text-fuchsia-400' },
   JEXI: { icon: Sparkles, color: 'text-[#00FF9D]' },
   System: { icon: Cpu, color: 'text-gray-400' },
+  // --- Specialist team round 2 — the complete JEXI OS roster ---
+  'GitHub Agent': { icon: Github, color: 'text-slate-200' },
+  'Data Analyst': { icon: Database, color: 'text-cyan-300' },
+  'DevOps Agent': { icon: Container, color: 'text-sky-400' },
+  'Technical Writer': { icon: FileCode2, color: 'text-amber-300' },
+  Translator: { icon: Languages, color: 'text-emerald-300' },
+  'Performance Engineer': { icon: Gauge, color: 'text-lime-400' },
 };
 const FALLBACK = { icon: Bot, color: 'text-gray-400' };
 

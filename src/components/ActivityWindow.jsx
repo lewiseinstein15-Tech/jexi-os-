@@ -69,6 +69,12 @@ const AGENT_COLORS = {
   Navigator: 'text-cyan-300',
   Vision: 'text-purple-400',
   Planner: 'text-cyan-400',
+  'GitHub Agent': 'text-slate-200',
+  'Data Analyst': 'text-cyan-300',
+  'DevOps Agent': 'text-sky-400',
+  'Technical Writer': 'text-amber-300',
+  Translator: 'text-emerald-300',
+  'Performance Engineer': 'text-lime-400',
   JEXI: 'text-[#00FF9D]',
   System: 'text-gray-500',
 };

@@ -26,6 +26,12 @@ const AGENT_ACTIVITY_COLORS = {
   Synthesizer: 'text-indigo-300',
   ComputerUseAgent: 'text-emerald-400',
   'Memory Agent': 'text-pink-400',
+  'GitHub Agent': 'text-slate-200',
+  'Data Analyst': 'text-cyan-300',
+  'DevOps Agent': 'text-sky-400',
+  'Technical Writer': 'text-amber-300',
+  Translator: 'text-emerald-300',
+  'Performance Engineer': 'text-lime-400',
 };
 
 export default function DesktopViewer({ logs = [] }) {

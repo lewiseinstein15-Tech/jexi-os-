@@ -11,6 +11,12 @@ import { generateContent, resolveKeys } from './LLMClient.js';
 import { collectSystemStatus, readSourceFile } from './SelfMonitor.js';
 import { studyTopic, recallKnowledge } from './KnowledgeAgent.js';
 import { runNewsTeam } from './NewsAgent.js';
+import { runGitHubAction, parseGithubRequest, checkGithubAuth } from './GitHubAgent.js';
+import { runDataAgent } from './DataAgent.js';
+import { runDevOpsAgent } from './DevOpsAgent.js';
+import { runWriterAgent } from './WriterAgent.js';
+import { runTranslatorAgent } from './TranslatorAgent.js';
+import { runPerfAgent } from './PerfAgent.js';
 import { ComputerUseAgent } from './ComputerUseAgent.js';
 import { DesktopManager, ensureBrowser } from './DesktopManager.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
@@ -127,6 +133,12 @@ I don't just answer — I **plan first, then run the team one-by-one** until the
 | Use the browser | Navigator → Vision → Reasoner |
 | Math problem | Reasoner |
 | Remember / memory | Memory Agent |
+| GitHub (commit/push/PR/issues) | GitHub Agent → Shipper |
+| Translate text | Translator → Reviewer (reflection loop) |
+| Analyze data / charts | Data Analyst → Reasoner |
+| Deploy / Docker / CI | DevOps Agent → Shipper |
+| Write docs / README | Technical Writer → Reviewer |
+| Make it faster | Performance Engineer → Coder → Reviewer |
 | **Compound** (e.g. "build a tracker from today's news") | Phase 1: News/Research team gathers → Phase 2: Coding team builds on that context |
 
 **2. Orchestrator — run them one-by-one.** Each specialist runs in order, and each gets **only the previous specialist's output** (strict handoff — no context pollution). The pipeline shows live: you watch every agent step in the chat.
@@ -624,6 +636,85 @@ Try it: say *"build a weather app"* and watch Product → Designer → Engineer 
           try { addChat('jexi', team.summary); } catch (e) {}
           results.summary = team.summary;
           results.statistics.confidence = team.confidence;
+          return results;
+        }
+
+        /* ---------------- GITHUB — commit, push, PR, issues (real gh/git CLI) ---------------- */
+        case 'github': {
+          const req = parseGithubRequest(query);
+          const lower = query.toLowerCase();
+
+          // "commit and push" — run both steps, show both outputs
+          if (req.action === 'commit' && /\b(push|upload to github|send to github)\b/.test(lower)) {
+            sendEvent('log', { agent: 'GitHub Agent', message: '📦 Commit + push — running both steps in order.' });
+            const commitRes = await runGitHubAction({ action: 'commit', args: {} }, sendEvent);
+            const pushRes = await runGitHubAction({ action: 'push', args: {} }, sendEvent);
+            results.summary = `${commitRes.summary}\n\n${pushRes.summary}`;
+            results.statistics.confidence = 90;
+            return results;
+          }
+
+          // Mutating actions need real auth — check once, honestly
+          if (['commit', 'push', 'pr_create', 'issue_create', 'repo_create'].includes(req.action)) {
+            const auth = await checkGithubAuth(sendEvent);
+            if (!auth.authed) {
+              results.summary = `### 🔗 GITHUB AGENT
+
+⚠ I'm not authenticated with GitHub yet, so I can't ${req.action === 'repo_create' ? 'create that repository' : 'run that command'}.
+
+**To fix:** add a GitHub token — Settings → GitHub (or the \`GITHUB_TOKEN\` env var). Create one at *github.com → Settings → Developer settings → Personal access tokens* with the **repo** scope.
+
+What I saw:\n${auth.detail.slice(0, 300)}`;
+              results.statistics.confidence = 100;
+              return results;
+            }
+          }
+
+          const res = await runGitHubAction(req, sendEvent);
+          results.summary = res.summary;
+          results.statistics.confidence = res.success ? 92 : 60;
+          return results;
+        }
+
+        /* ---------------- DATA ANALYST — load, profile, compute, chart ---------------- */
+        case 'data': {
+          sendEvent('log', { agent: 'Data Analyst', message: '📊 Loading data — parsing CSV/JSON from your message, the workspace, or a URL...' });
+          const res = await runDataAgent({ query, sendEvent });
+          try { addChat('jexi', res.summary); } catch (e) {}
+          results.summary = res.summary;
+          results.statistics.confidence = res.success ? 90 : 60;
+          return results;
+        }
+
+        /* ---------------- DEVOPS — stack detect, Dockerfile, CI, deploy steps ---------------- */
+        case 'devops': {
+          const res = await runDevOpsAgent({ query, sendEvent });
+          results.summary = res.summary;
+          results.statistics.confidence = res.success ? 85 : 60;
+          return results;
+        }
+
+        /* ---------------- TECHNICAL WRITER — docs grounded in the real files ---------------- */
+        case 'docs': {
+          const res = await runWriterAgent({ query, sendEvent });
+          results.summary = res.summary;
+          results.statistics.confidence = res.success ? 88 : 60;
+          return results;
+        }
+
+        /* ---------------- TRANSLATOR — draft → critique → revise reflection loop ---------------- */
+        case 'translate': {
+          const res = await runTranslatorAgent({ query, sendEvent });
+          results.summary = res.summary;
+          results.statistics.confidence = res.success ? 85 : 60;
+          return results;
+        }
+
+        /* ---------------- PERFORMANCE ENGINEER — measure, fix, prove ---------------- */
+        case 'perf': {
+          const res = await runPerfAgent({ query, sendEvent });
+          results.summary = res.summary;
+          results.statistics.confidence = res.success ? 85 : 60;
           return results;
         }
 
