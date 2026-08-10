@@ -45,6 +45,7 @@ export class ComputerUseAgent {
       command: raw.command || raw.shell, key: raw.key, ms: raw.ms,
       url: raw.url || raw.link || raw.href, direction: raw.direction,
       x: raw.x, y: raw.y,
+      index: raw.index !== undefined ? raw.index : (raw.number !== undefined ? raw.number : raw.id),
     };
     const val = (raw.action || raw.type || raw.name || '').toLowerCase();
     if (val.includes('goto') || val.includes('open') || val.includes('navigate') || action.url) action.action = 'goto';
@@ -201,12 +202,22 @@ export class ComputerUseAgent {
               break;
             }
             case 'click_index': {
+              if (action.index === undefined) {
+                stepOutput.text += `\n[ERROR] click_index needs an "index" number from [SCREEN ELEMENTS] — re-read the page with read_page and emit click_index with the exact number.\n`;
+                sendEvent?.('log', { agent: 'Navigator', message: '✗ click_index needs an index number — re-read the page and use the [N] numbers' });
+                break;
+              }
               const r = await this.api('click-index', { index: action.index });
               sendEvent?.('log', { agent: 'Navigator', message: r.ok ? `✓ Clicked element [${action.index}]` : `✗ Element [${action.index}] not found` });
               await new Promise(r2 => setTimeout(r2, 1200));
               break;
             }
             case 'type_index': {
+              if (action.index === undefined) {
+                stepOutput.text += `\n[ERROR] type_index needs an "index" number from [SCREEN ELEMENTS] — re-read the page with read_page and emit type_index with the exact number.\n`;
+                sendEvent?.('log', { agent: 'Navigator', message: '✗ type_index needs an index number — re-read the page and use the [N] numbers' });
+                break;
+              }
               const r = await this.api('type-index', { index: action.index, text: action.text });
               sendEvent?.('log', { agent: 'Navigator', message: `⌨ Typed into element [${action.index}]: ${String(action.text).slice(0, 40)}` });
               await new Promise(r2 => setTimeout(r2, 400));
