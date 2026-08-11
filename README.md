@@ -59,6 +59,7 @@ Open http://localhost:3000 and say *"build an app that tracks my water intake"*.
 | `OPENROUTER_API_KEY` | optional | **Seed vision** (ByteDance `bytedance-seed/seed-2.0-mini`) — tried last for image understanding when set |
 | `GITHUB_TOKEN` | optional | GitHub Agent (commit/push/PRs) |
 | `JEXI_API_KEY` | optional | **Locks the API** — all requests must send `x-jexi-key` |
+| `JEXI_MCP_KEY` | optional | **Locks the MCP endpoint** (`/mcp`) — clients must send `Authorization: Bearer <key>` |
 | `CORS_ORIGINS` | optional | Comma-separated browser origins allowed to call the API |
 | `REDIS_URL` | optional | Shared memory across instances/restarts |
 | `DATA_DIR` | optional | Persistent data location (defaults to `server/data`) |
@@ -73,6 +74,78 @@ npm test          # runs all 10 backend test suites (routing, agents, books, per
 ```
 
 See [TEST.md](TEST.md) for the suite list.
+
+---
+
+## 🔌 Model Context Protocol (MCP)
+
+JEXI exposes a **Model Context Protocol** server so AI assistants (Claude Desktop, Cursor, Claude Code, ChatGPT…) can securely call JEXI's tools and read her data — the same brain the chat UI uses, over one endpoint: **`/mcp`**.
+
+### Start it
+
+It's mounted inside the main server — just run JEXI normally:
+
+```bash
+cd server && npm start        # http://127.0.0.1:3002/mcp
+# or standalone on its own port:
+node mcp-server.js            # http://127.0.0.1:3457/mcp
+```
+
+Your deployed instance exposes it at `https://<your-host>/mcp` (e.g. `https://jexi-os-brain.onrender.com/mcp`).
+
+### Exposed tools (allowlist)
+
+| Tool | What it does |
+|------|--------------|
+| `ask_jexi` | Run any task/question through JEXI's full agent team (planner → agents → verified result) |
+| `memory_lookup` | Read what JEXI remembers about you (profile, facts, memory stats) |
+| `knowledge_search` | Search the saved knowledge library |
+| `list_books` | List books in the library |
+| `get_health` | Check brain status + which AI providers are configured |
+
+### Exposed resources (read-only)
+
+| Resource | Contents |
+|----------|----------|
+| `memory://user` | User profile + learned preferences/facts |
+| `memory://chat` | Recent chat history |
+| `knowledge://structure` | Knowledge library structure & status |
+| `knowledge://files/{category}` | Knowledge files for a category |
+
+> **Safety:** this is a deliberate minimal surface — the only action tool is `ask_jexi`, which runs JEXI's own safe planner (no destructive operations are exposed: no memory wipe, no deletes, no settings writes). Unknown tools are rejected automatically by the SDK. Set `JEXI_MCP_KEY` to require a bearer token on every MCP request.
+
+### Connect Claude Desktop
+
+Add to `claude_desktop_config.json` (`~/Library/Application Support/Claude/` on macOS):
+
+```json
+{
+  "mcpServers": {
+    "jexi-os": {
+      "type": "http",
+      "url": "http://127.0.0.1:3002/mcp",
+      "headers": { "Authorization": "Bearer YOUR_JEXI_MCP_KEY_IF_SET" }
+    }
+  }
+}
+```
+
+### Connect Cursor
+
+Cursor → **Settings → MCP → + Add new MCP server** → mode **HTTP** → URL `http://127.0.0.1:3002/mcp` (add the bearer header if `JEXI_MCP_KEY` is set). Then ask Cursor to use the `ask_jexi` tool.
+
+### Test it
+
+```bash
+npx @modelcontextprotocol/inspector --url http://127.0.0.1:3002/mcp
+# or with curl:
+curl -X POST http://127.0.0.1:3002/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}'
+```
+
+A full example client config lives in [`mcp.example.json`](mcp.example.json).
 
 ## 🚢 Deployment
 

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "jexi-os": {
+      "type": "http",
+      "url": "http://127.0.0.1:3002/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_JEXI_MCP_KEY_IF_SET"
+      }
+    }
+  }
+}

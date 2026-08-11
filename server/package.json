@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "test": "node test-planner-routing.js && node test-new-agents.js && node test-books.js && node test-preview.js && node test-pdf.js && node test-perf.js && node test-llm-models.js && node test-planner-orchestrator.js && node test-chat-books.js && node test-trusted-library.js && node test-memory-preferences.js"
+    "test": "node test-planner-routing.js && node test-new-agents.js && node test-books.js && node test-preview.js && node test-pdf.js && node test-perf.js && node test-llm-models.js && node test-planner-orchestrator.js && node test-chat-books.js && node test-trusted-library.js && node test-memory-preferences.js && node test-mcp.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@mozilla/readability": "^0.6.0",
     "axios": "^1.19.0",
     "cheerio": "^1.0.0-rc.12",
@@ -23,6 +24,7 @@
     "node-fetch": "^3.3.2",
     "playwright": "^1.62.1",
     "unpdf": "^1.8.0",
-    "youtube-transcript": "^1.3.1"
+    "youtube-transcript": "^1.3.1",
+    "zod": "^4.4.3"
   }
 }

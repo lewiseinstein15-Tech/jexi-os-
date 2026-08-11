@@ -26,6 +26,7 @@ This runs all 10 suites sequentially — a failure stops the run (exit code 1).
 | `test-llm-models.js` | Model name selection & fallbacks |
 | `test-planner-orchestrator.js` | Plan → executePlan handoff |
 | `test-trusted-library.js` | Trusted Library routing |
+| `test-mcp.js` | MCP endpoint: initialize, tool/resource allowlist, tool call |
 
 ## Notes
 

@@ -22,6 +22,7 @@ import {
   hydrateFromRedis, isRedisActive,
 } from './src/services/MemoryManager.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
+import { mountMcp } from './mcp-server.js';
 import { PORT, WORKSPACE_DIR, DATA_DIR, SERVER_ROOT } from './src/config.js';
 
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
@@ -75,6 +76,10 @@ app.use(['/api/chat', '/api/vision', '/api/knowledge/search'], aiLimiter);
 app.use('/api', generalLimiter);
 
 app.use(express.json({ limit: '30mb' })); // Room for base64 book uploads + code files + images
+
+// === MODEL CONTEXT PROTOCOL (MCP) — let Claude Desktop / Cursor / any MCP
+// client connect to JEXI's tools and data at /mcp (read-only + ask_jexi only).
+mountMcp(app);
 
 // Every instance has its own id (Render injects RENDER_INSTANCE_ID automatically).
 // A load balancer can see which instance answered, and you can verify stickiness.
