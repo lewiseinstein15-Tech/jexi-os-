@@ -75,7 +75,10 @@ export const useJexiEngine = () => {
             const footer = bits.length ? `\n\n---\n⚙️ ${bits.join(' · ')}` : '';
             setMessages(prev => [...prev, { role: 'jexi', text: summary + footer, sources: data.sources, files: data.files }]);
           } else {
-            setMessages(prev => [...prev, { role: 'jexi', text: `⚠ ${data.error || 'Something went wrong. Is the backend running?'}` }]);
+            // Honest, actionable failure — never a confusing "is the backend
+            // running?" (the backend is online; the TASK failed mid-flight).
+            const why = data.error || 'the task hit an unexpected error';
+            setMessages(prev => [...prev, { role: 'jexi', text: `⚠ ${why}\n\nThe server is online — tap STOP and try again, or ask me to continue from where it stopped.` }]);
           }
         }
       };
@@ -107,7 +110,12 @@ export const useJexiEngine = () => {
     } catch (error) {
       // Aborted by the user (STOP) — don't show a scary network error.
       if (error?.name === 'AbortError') return;
-      setMessages(prev => [...prev, { role: 'jexi', text: `Error: ${error.message}. Is the backend running?` }]);
+      // Connection lost mid-task (free host restart, proxy timeout, browser
+      // closed). Honest + actionable: the task may still be running server-side.
+      setMessages(prev => [...prev, {
+        role: 'jexi',
+        text: `⚠ The connection to the backend dropped mid-task (${error.message || 'network error'}). The work may still be running on the server — wait a moment, then ask me to continue from where it stopped.`,
+      }]);
     } finally {
       abortRef.current = null;
       setIsProcessing(false);

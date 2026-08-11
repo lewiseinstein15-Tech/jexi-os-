@@ -317,6 +317,20 @@ export class Planner {
       return { intent: 'research', tasks: ['search', 'browser', 'extractor', 'reasoner', 'memory'], reasoning: 'Needs current/verified information from the internet.' };
     }
 
+    // 9.5 AUTONOMOUS ACTION — a personal task phrased as a want/need WITHOUT a
+    //     build verb ("I want to track my water intake", "remind me to drink
+    //     water", "I need a todo list") is a BUILD, not a question. JEXI acts
+    //     by herself and reports the result — she never stops to ask
+    //     "want me to?" when the request is clearly a task.
+    if (!/(build|create|make|write|develop|code)\b/i.test(q)) {
+      const wantsTask = /i (want|need|would like|'d like|wanna|wish)\b|track |tracker|remind me|manage my|organize my|store my|monitor my|keep track|log my|budget my|save my|todo|to-do|planner|calculator|dashboard for|app for|website for|game about/i.test(q);
+      const asksToLearn = /understand|learn (about|how)|explain|tell me about|how (does|do|is|can)|what is|meaning of/i.test(q);
+      if (wantsTask && !asksToLearn) {
+        const nudge = await this.analyzeIntent(`${query} — please build an app for it now`);
+        if (nudge.intent === 'code_task' || nudge.intent === 'compound_task') return nudge;
+      }
+    }
+
     // 10. Default: learning research
     return { intent: 'learning_research', tasks: ['research', 'reasoning', 'memory'], reasoning: 'General question — research and answer.' };
   }

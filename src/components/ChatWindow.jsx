@@ -40,11 +40,15 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
   const fileRef = useRef(null);
   const scrollRef = useRef(null);
 
+  // Auto-scroll to the newest content: when a new message lands AND while the
+  // agent pipeline streams live logs (the "JEXI AT WORK" panel grows as agents
+  // run — without `logs` in the deps the view stays stuck and you must scroll
+  // by hand during every task).
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isProcessing]);
+  }, [messages, isProcessing, logs]);
 
   const handleFile = (e) => {
     const file = e.target.files?.[0];

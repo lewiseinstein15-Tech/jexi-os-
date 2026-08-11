@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Globe, Terminal, Activity, ChevronDown, Cpu, Radio } from 'lucide-react';
 
@@ -82,8 +82,15 @@ const AGENT_COLORS = {
 };
 
 function StreamView({ logs, isProcessing }) {
+  // Auto-scroll the live stream to the newest event — JEXI's work must stay
+  // visible as it streams in, never leave you chasing the scrollbar.
+  const streamRef = useRef(null);
+  useEffect(() => {
+    if (streamRef.current) streamRef.current.scrollTop = streamRef.current.scrollHeight;
+  }, [logs, isProcessing]);
+
   return (
-    <div className="bg-black/40 border border-white/[0.05] p-3 rounded-lg max-h-44 overflow-y-auto font-mono text-[10px] space-y-1">
+    <div ref={streamRef} className="bg-black/40 border border-white/[0.05] p-3 rounded-lg max-h-44 overflow-y-auto font-mono text-[10px] space-y-1">
       {logs.length === 0 && !isProcessing ? (
         <p className="text-gray-700 italic flex items-center gap-1.5">
           Awaiting commands

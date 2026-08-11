@@ -149,5 +149,26 @@ for (const { q, expect } of notComputerUseTests) {
   console.log(`${ok ? '✅' : '❌'} ${(p.intent + '          ').slice(0, 12)} expected ${expect.padEnd(12)} <- NOT-BROWSER "${q.slice(0, 45)}"`);
 }
 
+// AUTONOMOUS ACTION — a personal task phrased as a want/need without a build
+// verb must be BUILT directly (JEXI acts by herself, never offers "want me
+// to?"), while learning/news/research wants stay on their own tracks.
+const autonomousTests = [
+  { q: 'I want to track my water intake', expect: 'code_task' },
+  { q: 'I need a todo list', expect: 'code_task' },
+  { q: 'remind me to drink water every hour', expect: 'code_task' },
+  { q: 'I want a calorie counter app', expect: 'code_task' },
+  { q: 'manage my monthly budget', expect: 'code_task' },
+  { q: 'I want to learn about quantum physics', expect: 'learning_research' },
+  { q: 'I want the latest news on AI', expect: 'news_latest' },
+  { q: 'I want to find out about black holes', expect: 'research' },
+  { q: 'tell me about the moon', expect: 'learning_research' },
+];
+for (const { q, expect } of autonomousTests) {
+  const p = await planner.analyzeIntent(q);
+  const ok = p.intent === expect;
+  if (!ok) failures++;
+  console.log(`${ok ? '✅' : '❌'} ${(p.intent + '          ').slice(0, 12)} expected ${expect.padEnd(12)} <- AUTONOMOUS "${q.slice(0, 45)}"`);
+}
+
 console.log(failures === 0 ? '\nALL ROUTING TESTS PASSED' : `\n${failures} ROUTING TEST(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
