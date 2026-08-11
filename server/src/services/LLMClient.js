@@ -49,7 +49,14 @@ async function tryGroq(prompt, system, imageBase64, opts, errors) {
             : prompt,
         },
       ];
-      const completion = await groq.chat.completions.create({ messages, model, temperature: opts.temperature ?? 0.4 });
+      // Hard 90s per-attempt timeout — a hung upstream API must never hang
+      // the whole chat request forever (the old code had NO timeout at all).
+      const completion = await groq.chat.completions.create({
+        messages,
+        model,
+        temperature: opts.temperature ?? 0.4,
+        timeout: 90000,
+      });
       const text = completion.choices[0]?.message?.content || '';
       if (text) return text.trim();
       errors.push(`Groq(${model}) returned an empty response`);
@@ -69,7 +76,9 @@ async function tryGemini(prompt, system, imageBase64, opts, errors) {
   const candidates = [primary, ...GEMINI_FALLBACK_MODELS.filter(m => m !== primary)].slice(0, 4);
   for (const modelName of candidates) {
     try {
-      const model = genAI.getGenerativeModel({ model: modelName, systemInstruction: system });
+      // requestOptions.timeout caps each attempt at 90s (SDK default is 10 min
+      // and previously there was NO cap — a hung Gemini call stalled chat).
+      const model = genAI.getGenerativeModel({ model: modelName, systemInstruction: system, requestOptions: { timeout: 90000 } });
       const parts = [{ text: prompt }];
       if (imageBase64) {
         parts.push({

@@ -383,6 +383,21 @@ app.post('/api/chat', async (req, res) => {
   // every 10s keeps the connection alive — the frontend ignores unknown types.
   const heartbeat = setInterval(() => { try { res.write('{"type":"heartbeat"}\n'); } catch (e) {} }, 10000);
 
+  // Hard deadline: no single request may hold the connection forever (a
+  // pathological research pass, browser hang, or provider stall). On fire it
+  // emits a readable done event instead of leaving the UI spinning forever.
+  const CHAT_DEADLINE_MS = 15 * 60 * 1000;
+  let finished = false;
+  const finish = () => { clearInterval(heartbeat); try { res.end(); } catch (e) {} };
+  const deadline = setTimeout(() => {
+    if (finished) return;
+    finished = true;
+    recordError('chat', 'request exceeded 15min deadline');
+    sendEvent('log', { agent: 'System', message: '⏱ Deadline reached (15 min) — the task is still running server-side. Ask me to continue and I will pick it up.' });
+    sendEvent('done', { success: false, error: 'The task exceeded the 15-minute safety deadline. It may still be running server-side — ask me to continue.', summary: '⏱ **Deadline reached.** This task ran longer than 15 minutes, so the connection was closed as a safety valve. The work may still be completing on the server — send **"continue"** and I will resume it.' });
+    finish();
+  }, CHAT_DEADLINE_MS);
+
   try {
     const raw = String(query || '').trim();
     const hasPending = pendingTask && Date.now() - pendingTask.at < RESUME_TTL_MS;
@@ -428,7 +443,7 @@ app.post('/api/chat', async (req, res) => {
     recordError('chat', error.message);
     sendEvent('log', { agent: 'System', message: `Critical Error: ${error.message}` });
     sendEvent('done', { success: false, error: error.message });
-  } finally { clearInterval(heartbeat); res.end(); }
+  } finally { finished = true; clearTimeout(deadline); finish(); }
 });
 
 // Health endpoint used by the load balancer's active probes (and the keep-alive
