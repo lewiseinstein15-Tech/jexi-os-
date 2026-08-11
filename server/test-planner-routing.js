@@ -114,5 +114,40 @@ for (const q of identityTests) {
   console.log(`${ok ? '✅' : '❌'} ${(p.intent + '          ').slice(0, 12)} expected conversation  <- IDENTITY "${q.slice(0, 45)}"`);
 }
 
+// Browsing/computer-use language MUST drive the VISIBLE desktop browser
+// ("browse the internet" previously fell into the invisible fetch-based
+// research path, leaving the Virtual Desktop stuck on the welcome screen).
+const computerUseTests = [
+  { q: 'browse the internet', expect: 'computer_use' },
+  { q: 'browse the web', expect: 'computer_use' },
+  { q: 'surf the internet', expect: 'computer_use' },
+  { q: 'open the browser', expect: 'computer_use' },
+  { q: 'open a browser', expect: 'computer_use' },
+  { q: 'look up React hooks in the browser', expect: 'computer_use' },
+  { q: 'use the browser to find the best laptop', expect: 'computer_use' },
+  { q: 'search for cheap flights on the internet', expect: 'computer_use' },
+  { q: 'go to youtube', expect: 'computer_use' },
+  { q: 'scroll down on this website', expect: 'computer_use' },
+];
+for (const { q, expect } of computerUseTests) {
+  const p = await planner.analyzeIntent(q);
+  const ok = p.intent === expect;
+  if (!ok) failures++;
+  console.log(`${ok ? '✅' : '❌'} ${(p.intent + '          ').slice(0, 12)} expected ${expect.padEnd(12)} <- BROWSER "${q.slice(0, 45)}"`);
+}
+
+// ...but plain research and coding must NOT grab the visible browser.
+const notComputerUseTests = [
+  { q: 'search the internet for quantum computing news', expect: 'research' },
+  { q: 'what is the capital of France', expect: 'research' },
+  { q: 'build me a browser game', expect: 'code_task' },
+];
+for (const { q, expect } of notComputerUseTests) {
+  const p = await planner.analyzeIntent(q);
+  const ok = p.intent === expect;
+  if (!ok) failures++;
+  console.log(`${ok ? '✅' : '❌'} ${(p.intent + '          ').slice(0, 12)} expected ${expect.padEnd(12)} <- NOT-BROWSER "${q.slice(0, 45)}"`);
+}
+
 console.log(failures === 0 ? '\nALL ROUTING TESTS PASSED' : `\n${failures} ROUTING TEST(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

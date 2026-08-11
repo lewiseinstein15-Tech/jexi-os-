@@ -234,8 +234,11 @@ export class Planner {
     //    falling into the text-search pipeline).
     const SITES = 'wikipedia|google|youtube|amazon|github|stack ?overflow|reddit|twitter|facebook|instagram|netflix|spotify|apple|microsoft|bbc|cnn|nytimes|duckduckgo|bing';
     const browserDriving = new RegExp(
-      'use (the |your |a )?(browser|computer|desktop)|' +
-      'browse the web|' +
+      'use (the |your |a )?(browser|computer|desktop|internet)|' +
+      'browse (the |on the |through |around |for |online |a bit )?(web|internet|net|browser)|' +
+      'surf (the |on the )?(web|internet|net)|' +
+      '(open|start|launch) (the |a |an )?(browser|internet|web)|' +
+      '(look up|search|find|check) .{0,50} (in|on|using) (the )?(browser|web|internet)|' +
       '(open|go to|take me to|visit|navigate to) (the |this |a )?(website|site|web ?page|' + SITES + ')|' +
       '(click on|click the|tap on)( the)? (button|link|tab|search|icon|menu|\\d+)|' +
       'type .*(in|into|on) (the )?(search|input|box|field)|' +
