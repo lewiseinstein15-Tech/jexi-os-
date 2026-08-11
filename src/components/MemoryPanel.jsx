@@ -81,8 +81,8 @@ export default function MemoryPanel({ memory }) {
         </span>
       </div>
 
-      {/* 4-up stat tiles (spec §3C) — the one place four accents coexist (pure data) */}
-      <div className="grid grid-cols-4 gap-2">
+      {/* 4-up stat tiles (spec §3C) — 2x2 on phones, 4-up on wider screens */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {statTiles.map((t) => (
           <div key={t.label} className="surface-card p-3 text-center">
             <p className="text-[20px] font-semibold leading-none" style={{ color: t.color }}>{t.value}</p>

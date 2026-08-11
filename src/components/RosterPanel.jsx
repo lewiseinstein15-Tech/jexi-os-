@@ -186,7 +186,7 @@ function Chip({ active, onClick, children }) {
   return (
     <button
       onClick={onClick}
-      className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[8px] font-bold tracking-wider transition-all duration-200 ${
+      className={`tap-target flex-shrink-0 px-2.5 py-1.5 rounded-full text-[8px] font-bold tracking-wider transition-all duration-200 ${
         active ? 'bg-brand-dim text-brand border border-brand-line' : 'bg-surface-1 text-text-tertiary border border-hairline hover:text-text-secondary'
       }`}
     >

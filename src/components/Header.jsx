@@ -1,8 +1,17 @@
 import { motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Home, Bot, Database, BookOpen, Settings, Smartphone } from 'lucide-react';
 import JexiCore from './JexiCore';
 
-export default function Header({ plan = null, logs = [], running = false }) {
+const NAV_ITEMS = [
+  { id: 'home', icon: Home, label: 'HOME' },
+  { id: 'agents', icon: Bot, label: 'AGENTS' },
+  { id: 'memory', icon: Database, label: 'MEMORY' },
+  { id: 'knowledge', icon: BookOpen, label: 'BOOKS' },
+  { id: 'settings', icon: Settings, label: 'SETTINGS' },
+  { id: 'download', icon: Smartphone, label: 'APP' },
+];
+
+export default function Header({ plan = null, logs = [], running = false, activeNav = 'home', setActiveNav = () => {} }) {
   // The active agent is the last one that logged — the Core lights its segment.
   let activeAgent = null;
   let roster = (plan?.roster) || [];
@@ -30,7 +39,7 @@ export default function Header({ plan = null, logs = [], running = false }) {
         </div>
 
         <div className="flex items-center gap-1.5">
-          <div className="flex items-center gap-1.5 bg-white/[0.04] border border-hairline rounded-full px-2.5 py-1.5">
+          <div className="hidden sm:flex items-center gap-1.5 bg-white/[0.04] border border-hairline rounded-full px-2.5 py-1.5">
             <Sparkles className="w-3 h-3 text-cyan-400" />
             <span className="text-[8px] text-cyan-300 font-bold tracking-wider">
               {plan?.rosterCatalogSize || 79} AGENTS
@@ -48,6 +57,36 @@ export default function Header({ plan = null, logs = [], running = false }) {
           </div>
         </div>
       </div>
+
+      {/* §7 desktop: persistent tab bar in the header instead of bottom nav */}
+      <nav className="hidden md:flex items-center gap-1 mt-4 border-t border-hairline pt-3">
+        {NAV_ITEMS.map(({ id, icon: Icon, label }) => {
+          const active = activeNav === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveNav(id)}
+              className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all duration-200 active:scale-95 ${
+                active ? 'text-brand' : 'text-text-tertiary hover:text-text-secondary'
+              }`}
+              aria-label={label}
+            >
+              {active && (
+                <motion.div
+                  layoutId="header-tab-glow"
+                  className="absolute inset-0 rounded-lg bg-brand-dim border border-brand-line"
+                  transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                />
+              )}
+              <span className="relative flex items-center justify-center w-5 h-5">
+                <Icon className="w-4 h-4" />
+              </span>
+              <span className="relative text-[9px] font-bold tracking-wider">{label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </motion.div>
   );
 }

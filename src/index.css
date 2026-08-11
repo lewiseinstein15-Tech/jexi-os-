@@ -85,6 +85,16 @@ body::before {
   z-index: 0;
 }
 
+/* Tap target padding (spec §7): extend a small control's hit area to >=40px
+   with invisible padding while keeping the visual size — used on dense rows. */
+.tap-target { position: relative; }
+.tap-target::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit;
+}
+
 /* Eyebrow / label — the spec's micro-typography workhorse */
 .eyebrow {
   font-family: var(--sans);
@@ -250,7 +260,7 @@ body::before {
   padding: 1px 5px;
   border-radius: 5px;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11px;
 }
 .markdown-body pre {
   position: relative;
@@ -284,14 +294,14 @@ body::before {
   border: none;
   padding: 0;
   color: #d6d6db;
-  font-size: 10.5px;
+  font-size: 11px;
   line-height: 1.6;
 }
 .markdown-body table {
   width: 100%;
   border-collapse: collapse;
   margin: 0 0 10px;
-  font-size: 10.5px;
+  font-size: 11px;
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 8px;
   overflow: hidden;

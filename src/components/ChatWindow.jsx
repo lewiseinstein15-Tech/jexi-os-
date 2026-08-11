@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Square, ImagePlus, X, Camera, Stethoscope, Hammer, Search, GraduationCap, Link2 } from 'lucide-react';
+import { Send, Square, ImagePlus, X, Camera, Stethoscope, Hammer, Search, GraduationCap, Link2, Plus } from 'lucide-react';
 import TypedMessage from './TypedMessage';
 import VisionPanel from './VisionPanel';
 import AgentPipeline from './AgentPipeline';
@@ -25,20 +25,50 @@ function QuickAction({ icon: Icon, label, title, onClick }) {
       type="button"
       onClick={onClick}
       title={title}
-      className="w-8 h-8 flex items-center justify-center bg-surface-1 hover:bg-brand-dim border border-hairline hover:border-brand-line text-text-secondary hover:text-brand rounded-md transition-all duration-200 active:scale-95"
+      aria-label={label}
+      className="w-10 h-10 flex items-center justify-center bg-surface-1 hover:bg-brand-dim border border-hairline hover:border-brand-line text-text-secondary hover:text-brand rounded-md transition-all duration-200 active:scale-95"
     >
-      <Icon className="w-3.5 h-3.5" />
+      <Icon className="w-4 h-4" />
       <span className="sr-only">{label}</span>
     </button>
   );
 }
 
+// §7: on narrow screens (<340px available width) the quick-action row collapses
+// into a single "+" that opens the actions in a bottom sheet — tap targets stay
+// >=40px and the row never squishes.
+const QUICK_ACTIONS = [
+  { icon: Camera, label: 'EYES', title: 'Give JEXI eyes — camera vision', action: 'vision' },
+  { icon: ImagePlus, label: 'PHOTO', title: 'Attach an image', action: 'photo' },
+  { icon: Stethoscope, label: 'CHECK', title: 'Run a self-check — JEXI diagnoses her own system', action: 'check' },
+];
+
 export default function ChatWindow({ messages, logs, isProcessing, onSend, onStop, onVisionResult }) {
   const [input, setInput] = useState('');
   const [image, setImage] = useState(null);
   const [visionOpen, setVisionOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
   const fileRef = useRef(null);
   const scrollRef = useRef(null);
+  const qaRef = useRef(null);
+  const [narrowQA, setNarrowQA] = useState(false);
+
+  // §7: measure the quick-action row's real available width — below 340px it
+  // collapses to a single "+" that opens the actions in a sheet.
+  useEffect(() => {
+    const el = qaRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setNarrowQA(el.clientWidth < 340));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const runQuickAction = (action) => {
+    setQuickOpen(false);
+    if (action === 'vision') setVisionOpen(true);
+    else if (action === 'photo') fileRef.current?.click();
+    else onSend(SELF_CHECK_QUERY);
+  };
 
   // Auto-scroll to the newest content: when a new message lands AND while the
   // agent pipeline streams live logs (the "JEXI AT WORK" panel grows as agents
@@ -162,7 +192,7 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
           <button
             type="button"
             onClick={() => setImage(null)}
-            className="absolute -top-2 -right-2 bg-black border border-gray-700 rounded-full p-0.5 text-gray-400 hover:text-white"
+            className="tap-target absolute -top-2 -right-2 w-7 h-7 flex items-center justify-center bg-black border border-gray-700 rounded-full text-gray-400 hover:text-white"
             title="Remove attachment"
           >
             <X className="w-3 h-3" />
@@ -170,26 +200,15 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
         </div>
       )}
 
-      {/* Quick actions — labeled icon chips (spec §3A) */}
-      <div className="flex gap-1.5 mb-2 flex-wrap flex-shrink-0">
-        <QuickAction
-          icon={Camera}
-          label="EYES"
-          title="Give JEXI eyes — camera vision"
-          onClick={() => setVisionOpen(true)}
-        />
-        <QuickAction
-          icon={ImagePlus}
-          label="PHOTO"
-          title="Attach an image"
-          onClick={() => fileRef.current?.click()}
-        />
-        <QuickAction
-          icon={Stethoscope}
-          label="CHECK"
-          title="Run a self-check — JEXI diagnoses her own system"
-          onClick={() => onSend(SELF_CHECK_QUERY)}
-        />
+      {/* Quick actions (spec §3A) — §7: collapse to a single "+" below 340px */}
+      <div ref={qaRef} className="flex gap-1.5 mb-2 flex-shrink-0 min-w-0">
+        {narrowQA ? (
+          <QuickAction icon={Plus} label="MORE" title="Quick actions" onClick={() => setQuickOpen(true)} />
+        ) : (
+          QUICK_ACTIONS.map((qa) => (
+            <QuickAction key={qa.label} icon={qa.icon} label={qa.label} title={qa.title} onClick={() => runQuickAction(qa.action)} />
+          ))
+        )}
       </div>
 
       {/* Input + send — floating frosted bar with a focus glow, pinned to the bottom */}
@@ -232,6 +251,49 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
           </button>
         )}
       </form>
+
+      {/* Quick-actions bottom sheet (§7 — sheets, not modals) */}
+      <AnimatePresence>
+        {quickOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end"
+            onClick={() => setQuickOpen(false)}
+          >
+            <motion.div
+              initial={{ y: 80, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 80, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full bg-surface-1 border-t border-hairline rounded-t-xl p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.4)]"
+            >
+              <div className="w-8 h-1 bg-white/15 rounded-full mx-auto mb-4" />
+              <p className="eyebrow mb-2">Quick actions</p>
+              <div className="space-y-2">
+                {QUICK_ACTIONS.map((qa) => (
+                  <button
+                    key={qa.label}
+                    type="button"
+                    onClick={() => runQuickAction(qa.action)}
+                    className="w-full flex items-center gap-3 bg-surface-2 border border-hairline hover:border-brand-line rounded-lg px-3 py-3 text-left transition-colors"
+                  >
+                    <span className="w-10 h-10 flex items-center justify-center bg-surface-1 border border-hairline rounded-md text-text-secondary">
+                      <qa.icon className="w-4 h-4" />
+                    </span>
+                    <span>
+                      <span className="block text-[12px] font-semibold text-text-primary">{qa.label}</span>
+                      <span className="block text-[10px] text-text-tertiary">{qa.title}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <VisionPanel
         open={visionOpen}

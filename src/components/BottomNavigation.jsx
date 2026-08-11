@@ -16,7 +16,7 @@ export default function BottomNavigation({ activeNav, setActiveNav }) {
       initial={{ y: 40 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.35, ease: 'easeOut' }}
-      className="fixed bottom-0 left-0 right-0 bg-surface-1/85 backdrop-blur-xl border-t border-hairline"
+      className="fixed bottom-0 left-0 right-0 bg-surface-1/85 backdrop-blur-xl border-t border-hairline md:hidden"
       style={{ boxShadow: '0 -10px 34px rgba(0,0,0,0.55)' }}
     >
       <div className="flex justify-around items-center py-2 px-1">

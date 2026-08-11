@@ -8,7 +8,7 @@ function Tab({ active, onClick, children }) {
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-lg text-[9px] font-bold tracking-wider transition-all duration-200 ${
+      className={`tap-target px-3 py-2 rounded-lg text-[9px] font-bold tracking-wider transition-all duration-200 ${
         active ? 'bg-brand-dim text-brand border border-brand-line' : 'text-text-tertiary border border-transparent hover:text-text-secondary hover:bg-white/[0.04]'
       }`}
     >

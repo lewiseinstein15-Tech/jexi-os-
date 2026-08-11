@@ -33,9 +33,13 @@ export default function MarkdownRenderer({ content }) {
           strong: ({node, ...props}) => <strong className="font-bold text-white" {...props} />,
           code: ({node, inline, className, children, ...props}) => 
             inline ? 
-              <code className="bg-[#111] text-[#00FF9D] px-1.5 py-0.5 rounded text-[10px] font-mono" {...props}>{children}</code> : 
-              <pre className="bg-[#050505] border border-[#1a1a1a] p-3 rounded-lg overflow-x-auto mb-2"><code className="font-mono text-[10px] text-gray-300" {...props}>{children}</code></pre>,
-          table: ({node, ...props}) => <table className="w-full border-collapse mb-2 text-[10px]" {...props} />,
+              <code className="bg-[#111] text-[#00FF9D] px-1.5 py-0.5 rounded text-[11px] font-mono" {...props}>{children}</code> : 
+              <pre className="bg-[#050505] border border-[#1a1a1a] p-3 rounded-lg overflow-x-auto mb-2"><code className="font-mono text-[11px] text-gray-300" {...props}>{children}</code></pre>,
+          table: ({node, ...props}) => (
+            <div className="overflow-x-auto mb-2">
+              <table className="w-full border-collapse text-[11px]" {...props} />
+            </div>
+          ),
           th: ({node, ...props}) => <th className="border border-[#222] bg-[#0a0a0a] p-2 text-left text-[#00d4ff] font-bold" {...props} />,
           td: ({node, ...props}) => <td className="border border-[#222] p-2 text-gray-300" {...props} />,
           blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-[#00FF9D] pl-3 italic text-gray-400 my-2" {...props} />,

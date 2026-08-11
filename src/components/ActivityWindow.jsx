@@ -49,10 +49,12 @@ const AGENT_COLORS = {
   Critic: 'text-violet-300',
 };
 
-function StatusPill({ icon: Icon, label, value, active, pulse }) {
+function StatusPill({ icon: Icon, label, value, active, pulse, onClick }) {
   return (
     <button
-      className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 border transition-all duration-200 active:scale-95 ${
+      type="button"
+      onClick={onClick}
+      className={`tap-target flex items-center gap-2 rounded-md px-2.5 py-1.5 border transition-all duration-200 active:scale-95 ${
         active
           ? 'bg-brand-dim border-brand-line text-brand'
           : 'bg-surface-1 border-hairline text-text-secondary hover:border-hairline-strong'
@@ -104,7 +106,7 @@ function StreamView({ logs, isProcessing, onOpenFull }) {
       {onOpenFull && (
         <button
           onClick={onOpenFull}
-          className="mt-1.5 flex items-center gap-1 text-[8px] font-bold tracking-wider text-brand hover:text-brand/80 transition-colors"
+          className="tap-target mt-1.5 flex items-center gap-1 text-[8px] font-bold tracking-wider text-brand hover:text-brand/80 transition-colors"
         >
           VIEW FULL PIPELINE <ExternalLink className="w-2.5 h-2.5" />
         </button>
@@ -144,37 +146,76 @@ function SitesView({ websites }) {
 }
 
 /**
- * Activity strip (spec §3A): a slim 36px status bar with three pills when idle;
- * auto-expands while JEXI works into the pipeline mini-view. On the AGENTS
- * screen it renders as the full-page pipeline.
+ * Activity window (spec §3A + §7):
+ * - collapsed: 3 status pills in one slim row (36px feel, 40px hit areas)
+ * - expanded: pipeline mini-view (LIVE STREAM / WEBSITES tabs), capped ~180px
+ * - `rail` (desktop ≥768px): persistent right rail — always expanded, no pills
+ * - `full`: full-page mode used by callers that render their own chrome
+ * - short screens (<700px tall): collapsed by default; auto-expands for the
+ *   first 3s of a new run, then re-collapses so it never eats the viewport
  */
-export default function ActivityWindow({ logs, websites, isProcessing, compact, full = false, onOpenFull }) {
+export default function ActivityWindow({ logs, websites, isProcessing, compact, full = false, rail = false, onOpenFull }) {
   const [tab, setTab] = useState('stream');
   const [userToggled, setUserToggled] = useState(false);
+  const [shortScreen, setShortScreen] = useState(false);
+  const [autoPeek, setAutoPeek] = useState(false);
+  const wasProcessing = useRef(isProcessing);
+
+  // §7: short screens (landscape / split-screen phones) collapse by default.
+  useEffect(() => {
+    const onResize = () => setShortScreen(window.innerHeight < 700);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // §7: on short screens, auto-expand for the first 3s of a new run only.
+  useEffect(() => {
+    if (isProcessing && !wasProcessing.current) {
+      setAutoPeek(true);
+      const t = setTimeout(() => setAutoPeek(false), 3000);
+      wasProcessing.current = isProcessing;
+      return () => clearTimeout(t);
+    }
+    wasProcessing.current = isProcessing;
+  }, [isProcessing]);
+
   const hasActivity = isProcessing || logs.length > 0 || websites.length > 0;
-  const expanded = full ? true : userToggled || hasActivity;
+  const expanded = full || rail ? true : userToggled || (shortScreen ? autoPeek : hasActivity);
+  const pinned = full || rail;
 
   const brainActive = isProcessing || logs.length > 0;
   const sitesActive = websites.length > 0;
   const streamActive = logs.length > 0;
 
   return (
-    <div className={full ? 'space-y-4' : 'space-y-2 flex-shrink-0'}>
-      {/* Collapsed strip — the 3 status pills, one row (spec: 36px, justify-between) */}
-      <div className={`${compact ? 'px-1' : ''} flex items-center justify-between gap-2`}>
-        <StatusPill icon={Cpu} label="BRAIN" value={isProcessing ? 'WORK' : 'ON'} active={brainActive} pulse={isProcessing} />
-        <StatusPill icon={Globe} label="SITES" value={sitesActive ? `${websites.length}` : 'IDLE'} active={sitesActive} />
-        <StatusPill icon={Radio} label="STREAM" value={streamActive ? `${logs.length}` : 'STBY'} active={streamActive} pulse={streamActive && isProcessing} />
-        {!full && (
-          <button
-            onClick={() => setUserToggled((v) => !v)}
-            className="ml-auto flex items-center gap-1 text-text-tertiary hover:text-brand transition-colors p-1"
-            title={expanded ? 'Hide activity' : 'Show activity'}
-          >
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
-          </button>
-        )}
-      </div>
+    <div className={rail ? 'space-y-2 h-full flex flex-col' : full ? 'space-y-4' : 'space-y-2 flex-shrink-0'}>
+      {/* Collapsed strip — 3 status pills, one row (spec: 36px strip, 40px targets) */}
+      {!rail && (
+        <div className={`${compact ? 'px-1' : ''} flex items-center justify-between gap-2`}>
+          <StatusPill icon={Cpu} label="BRAIN" value={isProcessing ? 'WORK' : 'ON'} active={brainActive} pulse={isProcessing} onClick={() => setUserToggled(true)} />
+          <StatusPill icon={Globe} label="SITES" value={sitesActive ? `${websites.length}` : 'IDLE'} active={sitesActive} onClick={() => setUserToggled(true)} />
+          <StatusPill icon={Radio} label="STREAM" value={streamActive ? `${logs.length}` : 'STBY'} active={streamActive} pulse={streamActive && isProcessing} onClick={() => setUserToggled(true)} />
+          {!pinned && (
+            <button
+              type="button"
+              onClick={() => setUserToggled((v) => !v)}
+              className="tap-target ml-auto flex items-center gap-1 text-text-tertiary hover:text-brand transition-colors p-2"
+              title={expanded ? 'Hide activity' : 'Show activity'}
+            >
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {rail && (
+        <div className="flex items-center gap-2">
+          <Radio className="w-3 h-3 text-brand" />
+          <p className="text-[9px] font-bold text-brand tracking-wider">ACTIVITY</p>
+          {isProcessing && <span className="ml-auto text-[8px] text-text-tertiary font-bold animate-pulse">LIVE</span>}
+        </div>
+      )}
 
       {/* Expanded pipeline mini-view */}
       <AnimatePresence initial={false}>
@@ -184,9 +225,9 @@ export default function ActivityWindow({ logs, websites, isProcessing, compact, 
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="overflow-hidden"
+            className={rail ? 'overflow-hidden flex-1 min-h-0' : 'overflow-hidden'}
           >
-            <div className="surface-card p-3">
+            <div className="surface-card p-3 h-full flex flex-col">
               <div className="flex items-center gap-1 mb-2.5">
                 <TabButton active={tab === 'stream'} onClick={() => setTab('stream')}>
                   <span className="flex items-center gap-1.5">
@@ -202,9 +243,11 @@ export default function ActivityWindow({ logs, websites, isProcessing, compact, 
                   </span>
                 </TabButton>
               </div>
-              {tab === 'stream'
-                ? <StreamView logs={logs} isProcessing={isProcessing} onOpenFull={full ? undefined : onOpenFull} />
-                : <SitesView websites={websites} />}
+              <div className="min-h-0 flex-1">
+                {tab === 'stream'
+                  ? <StreamView logs={logs} isProcessing={isProcessing} onOpenFull={full ? undefined : onOpenFull} />
+                  : <SitesView websites={websites} />}
+              </div>
             </div>
           </motion.div>
         )}
@@ -216,8 +259,9 @@ export default function ActivityWindow({ logs, websites, isProcessing, compact, 
 function TabButton({ active, onClick, children }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`px-2.5 py-1 rounded-lg text-[8px] font-bold tracking-wider transition-all duration-200 ${
+      className={`tap-target px-2.5 py-2 rounded-lg text-[8px] font-bold tracking-wider transition-all duration-200 ${
         active
           ? 'bg-brand-dim text-brand border border-brand-line'
           : 'text-text-tertiary border border-transparent hover:text-text-secondary hover:bg-white/[0.04]'
