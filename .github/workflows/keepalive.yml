@@ -15,13 +15,15 @@ on:
     # every 10 minutes (GitHub cron can be delayed a couple of minutes —
     # still well inside Render's 15-minute sleep window)
     - cron: '*/10 * * * *'
-  workflow_dispatch:
-
-jobs:
+  workflow_dispatch:  jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
       - name: Health check
+        env:
+          # Change target without editing the file: repo Settings -> Variables ->
+          # Actions -> add KEEPALIVE_URL (e.g. https://your-user-jexi-os.hf.space)
+          TARGET: ${{ vars.KEEPALIVE_URL || 'https://jexi-os-brain.onrender.com' }}
         run: |
           curl -s -m 30 -o /dev/null -w 'JEXI brain: HTTP %{http_code} in %{time_total}s\n' \
-            https://jexi-os-brain.onrender.com/api/health || echo 'ping failed (server may be restarting)'
+            "$TARGET/api/health" || echo 'ping failed (server may be restarting)'
