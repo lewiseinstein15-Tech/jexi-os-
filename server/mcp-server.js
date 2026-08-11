@@ -32,6 +32,7 @@ import { orchestrator } from './src/services/Orchestrator.js';
 import { loadMemory, getChatHistory, getMemoryStats, topUserFacts, searchKnowledge, getKnowledgeStructure, getKnowledgeStatus } from './src/services/MemoryManager.js';
 import { listBooks } from './src/services/BookLibrary.js';
 import { loadSettings } from './src/services/SettingsManager.js';
+import { providerHealthSnapshot } from './src/services/ProviderRouter.js';
 
 export const MCP_PORT = Number(process.env.MCP_PORT) || 3457;
 
@@ -159,7 +160,7 @@ server.tool(
       gemini: hasEnv.gemini || !!settings.geminiKey,
       openrouter: hasEnv.openrouter,
     };
-    const out = { ok: true, name: 'jexi-os', providers, memory: loadMemory() ? 'available' : 'empty' };
+    const out = { ok: true, name: 'jexi-os', providers, providerHealth: providerHealthSnapshot(), memory: loadMemory() ? 'available' : 'empty' };
     return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], structuredContent: out };
   }
 );

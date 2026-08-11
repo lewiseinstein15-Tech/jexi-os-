@@ -21,6 +21,8 @@ import { ComputerUseAgent } from './ComputerUseAgent.js';
 import { DesktopManager, ensureBrowser } from './DesktopManager.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { preferencesBlock, recallPreferences } from './PreferenceLearner.js';
+import { verifyAnswer } from './VerificationLoop.js';
+import { rosterStats } from './AgentRoster.js';
 import {
   addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory, topUserFacts,
   searchInternetKnowledge, searchFreshInternetKnowledge, searchCodingKnowledge,
@@ -42,7 +44,7 @@ function listWorkspaceFiles() {
 /** Deterministic identity answer — always available, even with NO AI key. */
 const IDENTITY_ANSWER = `I'm **JEXI OS** — a sophisticated multi-agent AI operating system.
 
-I was created by **Lewis Einstein**, an AI & ML Engineer — his most advanced creation. I work as a virtual team of 20 specialized agents (Product, Designer, Engineer, Coder, QA, Reviewer, Security, Shipper, GitHub, Memory, Vision, Computer Use and more), all orchestrated through one chat interface to research, build, verify and ship anything you ask.
+I was created by **Lewis Einstein**, an AI & ML Engineer — his most advanced creation. I run a **${rosterStats().agents}+ specialist roster** with a **${rosterStats().skills}+ skill registry** (Product, Designer, Engineer, Coder, QA, Reviewer, Security, Shipper, GitHub, Memory, Vision, Computer Use, Fact Checker, Critic and more). For every task I compose the exact team it needs, run them one-by-one with gates and verification loops, and stream what I'm doing live.
 
 I'm free, open-source, and always awake. Ask me to build you an app, study a topic, or remember something — I'll run the whole team for you.`;
 
@@ -103,6 +105,11 @@ export class Orchestrator {
         sendEvent('log', { agent: 'Planner', message: `🧠 Plan first — team for this task: ${plan.planSummary}` });
         if (plan.phases?.length > 1) {
           plan.phases.forEach((p, i) => sendEvent('log', { agent: 'Planner', message: `   Phase ${i + 1}/${plan.phases.length}: ${p.name} → ${p.agents.join(', ')}` }));
+        }
+        // Roster + skills from the 60+ specialist catalog (Agent Roster / Skill Registry)
+        if (plan.skillsLine) {
+          const stats = rosterStats();
+          sendEvent('log', { agent: 'Planner', message: `🎓 Roster (${stats.agents}+ specialists) → ${plan.steps.length} deployed for this task. Skills: ${plan.skillsLine}` });
         }
       }
 
@@ -605,6 +612,20 @@ Try it: say *"build a weather app"* and watch Product → Designer → Engineer 
           try { addChat('jexi', team.summary); } catch (e) {}
           results.summary = team.summary;
           results.statistics.confidence = team.confidence;
+
+          // VERIFICATION LOOP (reflection engineering): a cheap Critic re-reads
+          // the grounded answer against the sources and fixes invented/unsupported
+          // claims before it reaches the user. Bounded to MAX 2 rounds.
+          sendEvent('log', { agent: 'Critic', message: '🔎 Verifying the answer against its sources (fact-check pass)...' });
+          const verified = await verifyAnswer({ query, draft: results.summary, sources: results.sources });
+          if (verified.changed) {
+            sendEvent('log', { agent: 'Critic', message: verified.verdict === 'verified' ? '✓ Answer verified clean after revision.' : '✍ Fixed unsupported claims — revised answer ready.' });
+            results.summary = verified.text;
+            try { addChat('jexi', results.summary); } catch (e) {}
+            results.statistics.verification = { rounds: verified.rounds, verdict: verified.verdict };
+          } else {
+            sendEvent('log', { agent: 'Critic', message: '✓ Answer verified clean.' });
+          }
           return results;
         }
 
@@ -621,11 +642,17 @@ Try it: say *"build a weather app"* and watch Product → Designer → Engineer 
         case 'knowledge_recall': {
           const kb = plan.payload || (await recallKnowledge(query, sendEvent));
           if (kb) {
-            const summary = await this.answerFromKnowledge(kb, query);
+            let summary = await this.answerFromKnowledge(kb, query);
+            const sources = (Array.isArray(kb) ? kb : [kb]).map(k => ({ title: k.title, link: '' }));
+            // VERIFICATION LOOP — keep book answers grounded in the actual passages.
+            sendEvent('log', { agent: 'Critic', message: '🔎 Checking the answer stays true to your book...' });
+            const verified = await verifyAnswer({ query, draft: summary, sources });
+            if (verified.changed) summary = verified.text;
             try { addChat('jexi', summary); } catch (e) {}
             results.summary = summary;
-            results.sources = (Array.isArray(kb) ? kb : [kb]).map(k => ({ title: k.title, link: '' }));
+            results.sources = sources;
             results.statistics.confidence = 95;
+            if (verified.changed) results.statistics.verification = { rounds: verified.rounds, verdict: verified.verdict };
             return results;
           }
           // Fall through to research if the library has nothing

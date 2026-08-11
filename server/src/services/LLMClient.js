@@ -1,10 +1,11 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Groq } from 'groq-sdk';
 import { loadSettings } from './SettingsManager.js';
+import { providerOrder, recordProviderSuccess, recordProviderFailure } from './ProviderRouter.js';
 
 /**
  * Keys are resolved in this order:
- *  1. Environment variables (GROQ_API_KEY / GEMINI_API_KEY) — for Vercel / serverless deploys
+ *  1. Environment variables (GROQ_API_KEY / GEMINI_API_KEY / OPENROUTER_API_KEY / HF_TOKEN) — for Render / serverless
  *  2. settings.json (written by the Settings panel) — for local / self-hosted
  */
 export function resolveKeys() {
@@ -12,6 +13,8 @@ export function resolveKeys() {
   return {
     groqKey: process.env.GROQ_API_KEY || settings.groqKey || '',
     geminiKey: process.env.GEMINI_API_KEY || settings.geminiKey || '',
+    openrouterKey: process.env.OPENROUTER_API_KEY || settings.openrouterKey || '',
+    hfKey: process.env.HF_TOKEN || settings.hfKey || '',
   };
 }
 
@@ -27,36 +30,114 @@ const GROQ_VISION_MODELS = [
 ];
 const GROQ_TEXT_MODEL = 'llama-3.1-8b-instant';
 
-// Seed-family vision (ByteDance) via OpenRouter — an optional extra provider
-// for image understanding, gated on OPENROUTER_API_KEY. SeedRealtime itself
-// (the full-duplex audio-visual model) has NO public API yet — it is free only
-// inside the Doubao app — but the Seed 2.0 / 1.6 vision models are live today.
+// Seed-family (ByteDance) + free text models via OpenRouter. SeedRealtime
+// itself has NO public API yet — it is free only inside the Doubao app — but
+// the Seed 2.0 / 1.6 vision models and free text models are live today.
 const OPENROUTER_VISION_MODELS = ['bytedance-seed/seed-2.0-mini', 'bytedance-seed/seed-1.6-flash'];
+const OPENROUTER_TEXT_MODELS = ['bytedance-seed/seed-2.0-mini', 'meta-llama/llama-3.3-70b-instruct:free', 'deepseek/deepseek-chat-v3-0324:free'];
 
+// Free text models on the HuggingFace Inference API (HF_TOKEN). Free tier is
+// slow — these are a last-resort text provider, gated on the token.
+const HF_TEXT_MODELS = ['microsoft/phi-4', 'HuggingFaceH4/zephyr-7b-beta', 'mistralai/Mistral-7B-Instruct-v0.3'];
+
+const TIMEOUT_MS = 90000;
+
+/** Read the MIME type out of a data: URL (camera sends image/jpeg, uploads can be png/webp). */
+export function mimeFromDataUrl(dataUrl) {
+  const m = /^data:([^;,]+)[;,]/.exec(dataUrl || '');
+  return m ? m[1] : 'image/png';
+}
+
+async function tryGroq(prompt, system, imageBase64, opts, errors) {
+  const { groqKey } = resolveKeys();
+  if (!groqKey) return null;
+  const groq = new Groq({ apiKey: groqKey });
+  const models = imageBase64 ? GROQ_VISION_MODELS : [opts.model || GROQ_TEXT_MODEL];
+  for (const model of models) {
+    try {
+      const messages = [
+        { role: 'system', content: system },
+        {
+          role: 'user',
+          content: imageBase64
+            ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: imageBase64 } }]
+            : prompt,
+        },
+      ];
+      const completion = await groq.chat.completions.create({
+        messages,
+        model,
+        temperature: opts.temperature ?? 0.4,
+        timeout: TIMEOUT_MS,
+      });
+      const text = completion.choices[0]?.message?.content || '';
+      if (text) return text.trim();
+      errors.push(`Groq(${model}) returned an empty response`);
+    } catch (e) {
+      errors.push(`Groq(${model}): ${e.message}`);
+      console.error('[LLMClient] Groq failed:', e.message);
+    }
+  }
+  return null;
+}
+
+async function tryGemini(prompt, system, imageBase64, opts, errors) {
+  const { geminiKey } = resolveKeys();
+  if (!geminiKey) return null;
+  const genAI = new GoogleGenerativeAI(geminiKey);
+  const primary = opts.geminiModel || process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+  const candidates = [primary, ...GEMINI_FALLBACK_MODELS.filter(m => m !== primary)].slice(0, 4);
+  for (const modelName of candidates) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName, systemInstruction: system, requestOptions: { timeout: TIMEOUT_MS } });
+      const parts = [{ text: prompt }];
+      if (imageBase64) {
+        parts.push({
+          inlineData: {
+            data: imageBase64.split(',')[1] || imageBase64,
+            mimeType: mimeFromDataUrl(imageBase64),
+          },
+        });
+      }
+      const result = await model.generateContent(parts);
+      const text = result.response.text();
+      if (text) return text.trim();
+      errors.push(`Gemini(${modelName}) returned an empty response`);
+    } catch (e) {
+      errors.push(`Gemini(${modelName}): ${e.message}`);
+      console.error('[LLMClient] Gemini failed:', e.message);
+    }
+  }
+  return null;
+}
+
+/** OpenRouter — text AND vision (Seed family + free text models). */
 async function tryOpenRouter(prompt, system, imageBase64, opts, errors) {
-  if (!process.env.OPENROUTER_API_KEY || !imageBase64) return null;
-  for (const model of OPENROUTER_VISION_MODELS) {
+  const { openrouterKey } = resolveKeys();
+  if (!openrouterKey) return null;
+  const models = imageBase64 ? OPENROUTER_VISION_MODELS : OPENROUTER_TEXT_MODELS;
+  for (const model of models) {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 90000);
+      const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
       try {
+        const content = imageBase64
+          ? [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: imageBase64 } },
+            ]
+          : prompt;
         const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            Authorization: `Bearer ${openrouterKey}`,
           },
           body: JSON.stringify({
             model,
             messages: [
               { role: 'system', content: system },
-              {
-                role: 'user',
-                content: [
-                  { type: 'text', text: prompt },
-                  { type: 'image_url', image_url: { url: imageBase64 } },
-                ],
-              },
+              { role: 'user', content },
             ],
             temperature: opts.temperature ?? 0.4,
           }),
@@ -82,114 +163,88 @@ async function tryOpenRouter(prompt, system, imageBase64, opts, errors) {
   return null;
 }
 
-/** Read the MIME type out of a data: URL (camera sends image/jpeg, uploads can be png/webp). */
-export function mimeFromDataUrl(dataUrl) {
-  const m = /^data:([^;,]+)[;,]/.exec(dataUrl || '');
-  return m ? m[1] : 'image/png';
-}
-
-async function tryGroq(prompt, system, imageBase64, opts, errors) {
-  const { groqKey } = resolveKeys();
-  if (!groqKey) return null;
-  const groq = new Groq({ apiKey: groqKey });
-  const models = imageBase64 ? GROQ_VISION_MODELS : [opts.model || GROQ_TEXT_MODEL];
-  for (const model of models) {
+/** HuggingFace free Inference API — text only, last-resort provider. */
+async function tryHuggingFace(prompt, system, imageBase64, opts, errors) {
+  if (imageBase64) return null; // HF free tier text-only here
+  const { hfKey } = resolveKeys();
+  if (!hfKey) return null;
+  for (const model of HF_TEXT_MODELS) {
     try {
-      const messages = [
-        { role: 'system', content: system },
-        {
-          role: 'user',
-          content: imageBase64
-            ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: imageBase64 } }]
-            : prompt,
-        },
-      ];
-      // Hard 90s per-attempt timeout — a hung upstream API must never hang
-      // the whole chat request forever (the old code had NO timeout at all).
-      const completion = await groq.chat.completions.create({
-        messages,
-        model,
-        temperature: opts.temperature ?? 0.4,
-        timeout: 90000,
-      });
-      const text = completion.choices[0]?.message?.content || '';
-      if (text) return text.trim();
-      errors.push(`Groq(${model}) returned an empty response`);
-    } catch (e) {
-      errors.push(`Groq(${model}): ${e.message}`);
-      console.error('[LLMClient] Groq failed:', e.message);
-    }
-  }
-  return null;
-}
-
-async function tryGemini(prompt, system, imageBase64, opts, errors) {
-  const { geminiKey } = resolveKeys();
-  if (!geminiKey) return null;
-  const genAI = new GoogleGenerativeAI(geminiKey);
-  const primary = opts.geminiModel || process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
-  const candidates = [primary, ...GEMINI_FALLBACK_MODELS.filter(m => m !== primary)].slice(0, 4);
-  for (const modelName of candidates) {
-    try {
-      // requestOptions.timeout caps each attempt at 90s (SDK default is 10 min
-      // and previously there was NO cap — a hung Gemini call stalled chat).
-      const model = genAI.getGenerativeModel({ model: modelName, systemInstruction: system, requestOptions: { timeout: 90000 } });
-      const parts = [{ text: prompt }];
-      if (imageBase64) {
-        parts.push({
-          inlineData: {
-            data: imageBase64.split(',')[1] || imageBase64,
-            mimeType: mimeFromDataUrl(imageBase64),
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 60000);
+      try {
+        const res = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${hfKey}`,
           },
+          body: JSON.stringify({ inputs: `${system}\n\n${prompt}`, parameters: { max_new_tokens: 900, temperature: opts.temperature ?? 0.4 } }),
+          signal: controller.signal,
         });
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          errors.push(`HF(${model}): HTTP ${res.status} ${body.slice(0, 100)}`);
+          continue;
+        }
+        const data = await res.json();
+        const text = Array.isArray(data) ? data?.[0]?.generated_text : data?.generated_text;
+        if (typeof text === 'string' && text.trim()) {
+          // Strip the echoed prompt prefix the inference API sometimes returns.
+          return text.trim().replace(new RegExp(`^${system.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), '').replace(new RegExp(`^${prompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), '').trim().slice(0, 6000) || text.trim().slice(0, 6000);
+        }
+        errors.push(`HF(${model}) returned an empty response`);
+      } finally {
+        clearTimeout(timer);
       }
-      const result = await model.generateContent(parts);
-      const text = result.response.text();
-      if (text) return text.trim();
-      errors.push(`Gemini(${modelName}) returned an empty response`);
     } catch (e) {
-      errors.push(`Gemini(${modelName}): ${e.message}`);
-      console.error('[LLMClient] Gemini failed:', e.message);
+      errors.push(`HF(${model}): ${e.message}`);
+      console.error('[LLMClient] HuggingFace failed:', e.message);
     }
   }
   return null;
 }
+
+const PROVIDER_CALLS = {
+  groq: tryGroq,
+  gemini: tryGemini,
+  openrouter: tryOpenRouter,
+  huggingface: tryHuggingFace,
+};
 
 /**
- * Generate text from the best available AI provider.
- * opts.prefer: 'gemini' routes code tasks to Gemini first (much stronger at
- * writing/debugging code); everything else keeps Groq-first (fast, free tier).
+ * Generate text from the best available AI provider, walking the health-aware
+ * ProviderRouter order (Groq → Gemini → OpenRouter → HuggingFace by default;
+ * Gemini-first for code). Each provider's success/failure updates the router's
+ * health state, so a provider that keeps failing drops to the back of the line.
  */
 export async function generateContent(prompt, systemInstruction = '', imageBase64 = null, opts = {}) {
   const errors = [];
   const system = systemInstruction || 'You are JEXI OS, an expert AI operating system.';
-  const preferGemini = opts.prefer === 'gemini';
 
-  if (preferGemini) {
-    const geminiText = await tryGemini(prompt, system, imageBase64, opts, errors);
-    if (geminiText) return geminiText;
-    const groqText = await tryGroq(prompt, system, imageBase64, opts, errors);
-    if (groqText) return groqText;
-  } else {
-    const groqText = await tryGroq(prompt, system, imageBase64, opts, errors);
-    if (groqText) return groqText;
-    const geminiText = await tryGemini(prompt, system, imageBase64, opts, errors);
-    if (geminiText) return geminiText;
+  const prefer = opts.prefer || (imageBase64 ? 'gemini' : '');
+  const order = providerOrder(prefer);
+
+  for (const provider of order) {
+    const call = PROVIDER_CALLS[provider];
+    if (!call) continue;
+    try {
+      const text = await call(prompt, system, imageBase64, opts, errors);
+      if (text) {
+        recordProviderSuccess(provider);
+        return text;
+      }
+    } catch (e) {
+      errors.push(`${provider}: ${e.message}`);
+    }
+    recordProviderFailure(provider);
   }
 
-  // Optional Seed-family vision (ByteDance) via OpenRouter — tried last, only
-  // for images, only when OPENROUTER_API_KEY is set. Makes JEXI's eyes
-  // Seed-powered the moment a key exists.
-  if (imageBase64) {
-    const seedText = await tryOpenRouter(prompt, system, imageBase64, opts, errors);
-    if (seedText) return seedText;
-  }
-
-  const { groqKey, geminiKey } = resolveKeys();
-  if (groqKey || geminiKey || process.env.OPENROUTER_API_KEY) {
+  const { groqKey, geminiKey, openrouterKey, hfKey } = resolveKeys();
+  if (groqKey || geminiKey || openrouterKey || hfKey) {
     throw new Error(`All AI providers failed. ${errors.join(' | ')}`);
   }
-  throw new Error('No API keys configured. Add a Groq, Gemini or OpenRouter key in Settings, or set GROQ_API_KEY/GEMINI_API_KEY/OPENROUTER_API_KEY.');
+  throw new Error('No API keys configured. Add a Groq, Gemini, OpenRouter or HuggingFace key in Settings, or set GROQ_API_KEY/GEMINI_API_KEY/OPENROUTER_API_KEY/HF_TOKEN.');
 }
 
 /** Ask the LLM a yes/no or one-word verification question. */

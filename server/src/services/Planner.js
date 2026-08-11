@@ -1,4 +1,5 @@
 import { searchKnowledge } from './MemoryManager.js';
+import { composeTeam, skillsForTeam, rosterSummary, ROSTER_COUNT, SKILL_COUNT, rosterFor, skillsFor, skillsLine, rosterStats } from './AgentRoster.js';
 
 /**
  * JEXI's Planner — decides which agents/tools to use and when.
@@ -83,6 +84,16 @@ export class Planner {
       plan.steps = TEAM_PLAN[plan.intent] || plan.tasks || [];
     }
     plan.planSummary = plan.steps.join(' → ');
+    // Decorate every plan with the 60+ roster subset + 100+ skills this task
+    // will exercise (Agent Roster & Skill Registry) so the pipeline can
+    // announce the team and stream the skills it is using.
+    plan.roster = rosterFor(plan.intent);
+    plan.skillIds = skillsFor(plan.intent);
+    plan.skillsLine = skillsLine(plan.intent);
+    plan.rosterStats = rosterStats();
+    plan.rosterSummary = rosterSummary(plan.intent);
+    plan.rosterCatalogSize = rosterStats().agents;
+    plan.skillCatalogSize = rosterStats().skills;
     return plan;
   }
 

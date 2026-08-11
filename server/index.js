@@ -14,6 +14,7 @@ import {
   collectSystemStatus, readSourceFile,
 } from './src/services/SelfMonitor.js';
 import { loadSettings, saveSettings } from './src/services/SettingsManager.js';
+import { providerHealthSnapshot } from './src/services/ProviderRouter.js';
 import { DesktopManager, ensureBrowser, browserStatus, restartBrowser } from './src/services/DesktopManager.js';
 import {
   addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory,
@@ -249,6 +250,8 @@ app.get('/api/settings/status', (req, res) => {
   res.json({
     groq: statusOf(['GROQ_API_KEY'], 'groqKey'),
     gemini: statusOf(['GEMINI_API_KEY'], 'geminiKey'),
+    openrouter: statusOf(['OPENROUTER_API_KEY'], 'openrouterKey'),
+    huggingface: statusOf(['HF_TOKEN'], 'hfKey'),
     github: statusOf(['GITHUB_TOKEN', 'GH_TOKEN'], 'githubToken'),
   });
 });
@@ -472,6 +475,7 @@ app.get('/api/health', (req, res) => {
     uptime: Math.round(process.uptime()),
     redis: isRedisActive(),
     port: PORT,
+    providers: providerHealthSnapshot(),
     time: new Date().toISOString(),
   });
 });

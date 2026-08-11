@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { SERVER_ROOT, PORT, DATA_DIR, WORKSPACE_DIR } from '../config.js';
 import { resolveKeys } from './LLMClient.js';
+import { providerHealthSnapshot } from './ProviderRouter.js';
 import { browserStatus } from './DesktopManager.js';
 
 /**
@@ -50,6 +51,7 @@ export function collectSystemStatus() {
     node: process.version,
     port: PORT,
     keys: { groq: !!groqKey, gemini: !!geminiKey },
+    providers: providerHealthSnapshot(),
     browser: browserStatus(),
     requests: { chat: chatCount, vision: visionCount },
     errors: { count: errors.length, recent: getRecentErrors(10) },
