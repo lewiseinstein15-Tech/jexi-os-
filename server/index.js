@@ -337,8 +337,8 @@ app.post('/api/vision', async (req, res) => {
     recordVision();
     if (!image) return res.status(400).json({ success: false, error: 'No image provided' });
     const { groqKey, geminiKey } = resolveKeys();
-    if (!groqKey && !geminiKey) {
-      return res.status(400).json({ success: false, error: 'No AI keys configured. Add GROQ_API_KEY or GEMINI_API_KEY (Render env or Settings).' });
+    if (!groqKey && !geminiKey && !process.env.OPENROUTER_API_KEY) {
+      return res.status(400).json({ success: false, error: 'No AI keys configured. Add GROQ_API_KEY, GEMINI_API_KEY or OPENROUTER_API_KEY (Render env or Settings).' });
     }
     const text = await generateContent(
       prompt || 'Describe what you see in this image in 2-3 warm sentences.',
@@ -346,7 +346,10 @@ app.post('/api/vision', async (req, res) => {
       'Describe what you see warmly and precisely: who or what is in frame, expressions, lighting, surroundings. ' +
       'Be honest if the image is unclear or if no face is visible. Keep it natural and short (2-4 sentences).',
       image,
-      { temperature: 0.5 }
+      // prefer Gemini first — its vision (gemini-2.5-flash) is far sharper than
+      // Groq's llama-4-scout, and it is a key the user already has. Seed-family
+      // vision (via OpenRouter) is tried last when OPENROUTER_API_KEY is set.
+      { prefer: 'gemini', temperature: 0.5 }
     );
     res.json({ success: true, text });
   } catch (e) {

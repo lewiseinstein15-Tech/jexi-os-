@@ -56,6 +56,7 @@ Open http://localhost:3000 and say *"build an app that tracks my water intake"*.
 |----------|----------|---------|
 | `GROQ_API_KEY` | one of the two | Fast chat/code generation (Groq) |
 | `GEMINI_API_KEY` | one of the two | Code tasks & vision (Gemini, preferred for code) |
+| `OPENROUTER_API_KEY` | optional | **Seed vision** (ByteDance `bytedance-seed/seed-2.0-mini`) — tried last for image understanding when set |
 | `GITHUB_TOKEN` | optional | GitHub Agent (commit/push/PRs) |
 | `JEXI_API_KEY` | optional | **Locks the API** — all requests must send `x-jexi-key` |
 | `CORS_ORIGINS` | optional | Comma-separated browser origins allowed to call the API |

@@ -27,6 +27,61 @@ const GROQ_VISION_MODELS = [
 ];
 const GROQ_TEXT_MODEL = 'llama-3.1-8b-instant';
 
+// Seed-family vision (ByteDance) via OpenRouter — an optional extra provider
+// for image understanding, gated on OPENROUTER_API_KEY. SeedRealtime itself
+// (the full-duplex audio-visual model) has NO public API yet — it is free only
+// inside the Doubao app — but the Seed 2.0 / 1.6 vision models are live today.
+const OPENROUTER_VISION_MODELS = ['bytedance-seed/seed-2.0-mini', 'bytedance-seed/seed-1.6-flash'];
+
+async function tryOpenRouter(prompt, system, imageBase64, opts, errors) {
+  if (!process.env.OPENROUTER_API_KEY || !imageBase64) return null;
+  for (const model of OPENROUTER_VISION_MODELS) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 90000);
+      try {
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: system },
+              {
+                role: 'user',
+                content: [
+                  { type: 'text', text: prompt },
+                  { type: 'image_url', image_url: { url: imageBase64 } },
+                ],
+              },
+            ],
+            temperature: opts.temperature ?? 0.4,
+          }),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          errors.push(`OpenRouter(${model}): HTTP ${res.status} ${body.slice(0, 120)}`);
+          continue;
+        }
+        const data = await res.json();
+        const text = data?.choices?.[0]?.message?.content || '';
+        if (text) return text.trim();
+        errors.push(`OpenRouter(${model}) returned an empty response`);
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch (e) {
+      errors.push(`OpenRouter(${model}): ${e.message}`);
+      console.error('[LLMClient] OpenRouter failed:', e.message);
+    }
+  }
+  return null;
+}
+
 /** Read the MIME type out of a data: URL (camera sends image/jpeg, uploads can be png/webp). */
 export function mimeFromDataUrl(dataUrl) {
   const m = /^data:([^;,]+)[;,]/.exec(dataUrl || '');
@@ -122,11 +177,19 @@ export async function generateContent(prompt, systemInstruction = '', imageBase6
     if (geminiText) return geminiText;
   }
 
-  const { groqKey, geminiKey } = resolveKeys();
-  if (groqKey || geminiKey) {
-    throw new Error(`Both AI providers failed. ${errors.join(' | ')}`);
+  // Optional Seed-family vision (ByteDance) via OpenRouter — tried last, only
+  // for images, only when OPENROUTER_API_KEY is set. Makes JEXI's eyes
+  // Seed-powered the moment a key exists.
+  if (imageBase64) {
+    const seedText = await tryOpenRouter(prompt, system, imageBase64, opts, errors);
+    if (seedText) return seedText;
   }
-  throw new Error('No API keys configured. Add a Groq or Gemini key in Settings, or set GROQ_API_KEY/GEMINI_API_KEY.');
+
+  const { groqKey, geminiKey } = resolveKeys();
+  if (groqKey || geminiKey || process.env.OPENROUTER_API_KEY) {
+    throw new Error(`All AI providers failed. ${errors.join(' | ')}`);
+  }
+  throw new Error('No API keys configured. Add a Groq, Gemini or OpenRouter key in Settings, or set GROQ_API_KEY/GEMINI_API_KEY/OPENROUTER_API_KEY.');
 }
 
 /** Ask the LLM a yes/no or one-word verification question. */
