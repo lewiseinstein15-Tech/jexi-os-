@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Square, ImagePlus, X, Camera, Stethoscope, Hammer, Search, GraduationCap, Link2, Plus } from 'lucide-react';
 import TypedMessage from './TypedMessage';
 import VisionPanel from './VisionPanel';
