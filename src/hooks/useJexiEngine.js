@@ -13,7 +13,7 @@ import { getBackendUrl, jexiFetch } from '../utils/helpers';
  * exactly why JEXI finished a task in the logs while the chat showed no answer.
  * Buffer partial lines until the newline arrives.
  */
-async function consumeStream(res, setMessages, setLogs, setWebsites) {
+async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -34,6 +34,7 @@ async function consumeStream(res, setMessages, setLogs, setWebsites) {
     }
     if (data.type === 'log') setLogs(prev => [...prev, { agent: data.agent, message: data.message }]);
     else if (data.type === 'website') setWebsites(prev => [...prev, data.site]);
+    else if (data.type === 'plan') setPlan(prev => ({ ...prev, ...data }));
     else if (data.type === 'done') {
       sawDone = true;
       if (data.success) {
@@ -91,6 +92,7 @@ export const useJexiEngine = () => {
   const [messages, setMessages] = useState([]);
   const [logs, setLogs] = useState([]);
   const [websites, setWebsites] = useState([]);
+  const [plan, setPlan] = useState(null); // { intent, steps, roster, skillsLine } from the /api/chat plan event
   const [isProcessing, setIsProcessing] = useState(false);
   const abortRef = useRef(null);
 
@@ -120,6 +122,7 @@ export const useJexiEngine = () => {
     setIsProcessing(true);
     setLogs([]);
     setWebsites([]);
+    setPlan(null);
     const userMsg = { role: 'user', text: query, image };
     setMessages(prev => [...prev, userMsg]);
 
@@ -148,11 +151,11 @@ export const useJexiEngine = () => {
           signal: abortRef.current.signal,
         });
         if (!retry.ok) throw new Error(`Backend replied HTTP ${retry.status}`);
-        await consumeStream(retry, setMessages, setLogs, setWebsites);
+        await consumeStream(retry, setMessages, setLogs, setWebsites, setPlan);
         return;
       }
       if (!res.ok) throw new Error(`Backend replied HTTP ${res.status}`);
-      await consumeStream(res, setMessages, setLogs, setWebsites);
+      await consumeStream(res, setMessages, setLogs, setWebsites, setPlan);
     } catch (error) {
       // Aborted by the user (STOP) — don't show a scary network error.
       if (error?.name === 'AbortError') return;
@@ -184,5 +187,5 @@ export const useJexiEngine = () => {
     setMessages(prev => [...prev, { role, text }]);
   }, []);
 
-  return { messages, logs, websites, isProcessing, runSearch, stopGeneration, pushMessage };
+  return { messages, logs, websites, plan, isProcessing, runSearch, stopGeneration, pushMessage };
 };

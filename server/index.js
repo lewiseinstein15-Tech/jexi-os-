@@ -15,6 +15,7 @@ import {
 } from './src/services/SelfMonitor.js';
 import { loadSettings, saveSettings } from './src/services/SettingsManager.js';
 import { providerHealthSnapshot } from './src/services/ProviderRouter.js';
+import { AGENT_ROSTER, SKILL_REGISTRY } from './src/services/AgentRoster.js';
 import { DesktopManager, ensureBrowser, browserStatus, restartBrowser } from './src/services/DesktopManager.js';
 import {
   addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory,
@@ -256,6 +257,16 @@ app.get('/api/settings/status', (req, res) => {
   });
 });
 
+// === AGENT ROSTER (the 79-specialist catalog + 226-skill registry) ===
+app.get('/api/roster', (req, res) => {
+  res.json({
+    agents: AGENT_ROSTER,
+    skills: SKILL_REGISTRY,
+    agentCount: AGENT_ROSTER.length,
+    skillCount: SKILL_REGISTRY.length,
+  });
+});
+
 // === MEMORY CORE ENDPOINTS (JEXI's mind) ===
 app.get('/api/memory', (req, res) => res.json(loadMemory()));
 app.post('/api/memory/clear', (req, res) => { clearMemory(); res.json({ success: true }); });
@@ -439,6 +450,16 @@ app.post('/api/chat', async (req, res) => {
     }
 
     sendEvent('log', { agent: 'Planner', message: `Intent: ${plan.intent} — ${plan.reasoning}` });
+    // Structured plan event — the frontend's agent Core needs the composed
+    // team (roster) to draw its orbital ring segments before agents start.
+    sendEvent('plan', {
+      intent: plan.intent,
+      steps: plan.steps || [],
+      roster: plan.roster || [],
+      skillsLine: plan.skillsLine || '',
+      rosterCatalogSize: plan.rosterCatalogSize || 79,
+      skillCatalogSize: plan.skillCatalogSize || 226,
+    });
     const results = await orchestrator.executePlan(plan, effectiveQuery, sendEvent, { image });
 
     sendEvent('log', { agent: 'JEXI', message: '🎯 Mission complete — here is the result.' });

@@ -12,21 +12,21 @@ function KeyField({ label, icon, color, value, onChange, placeholder, hint, stat
         {icon}
         {label}
         {activeEnv ? (
-          <span className="ml-auto flex items-center gap-1 text-[#22c55e] text-[8px] bg-[#22c55e]/10 border border-[#22c55e]/30 rounded-full px-2 py-0.5">
+          <span className="ml-auto flex items-center gap-1 text-brand text-[8px] bg-brand-dim border border-brand-line rounded-full px-2 py-0.5">
             <CheckCircle2 className="w-2.5 h-2.5" /> ACTIVE — ENV VAR
           </span>
         ) : status && status.source === 'settings' ? (
-          <span className="ml-auto flex items-center gap-1 text-[#00d4ff] text-[8px] bg-[#00d4ff]/10 border border-[#00d4ff]/30 rounded-full px-2 py-0.5">
+          <span className="ml-auto flex items-center gap-1 text-cyan-400 text-[8px] bg-[#22D3EE]/10 border border-[#22D3EE]/30 rounded-full px-2 py-0.5">
             <ShieldCheck className="w-2.5 h-2.5" /> STORED ON DEVICE
           </span>
         ) : (
-          <span className="ml-auto text-[#6b7280] text-[8px] bg-[#1a1a1a] border border-[#2a2a2a] rounded-full px-2 py-0.5">
+          <span className="ml-auto text-text-tertiary text-[8px] bg-surface-2 border border-hairline rounded-full px-2 py-0.5">
             NOT SET
           </span>
         )}
       </label>
       {activeEnv ? (
-        <div className="w-full bg-[#0a0a0a]/60 text-gray-400 border border-[#22c55e]/20 rounded-lg px-3 py-2.5 text-xs font-mono">
+        <div className="w-full bg-surface-2/60 text-text-secondary border border-brand-line rounded-md px-3 py-2.5 text-xs font-mono">
           ✓ Loaded from the server environment ({envNames.join(' / ')}) — set in Render, nothing to paste here.
         </div>
       ) : (
@@ -35,10 +35,10 @@ function KeyField({ label, icon, color, value, onChange, placeholder, hint, stat
           value={value}
           onChange={onChange}
           placeholder={placeholder}
-          className="w-full bg-[#0a0a0a] text-gray-200 border border-[#1a1a1a] rounded-lg px-3 py-2.5 text-xs focus:outline-none focus:border-[#00FF9D]/50 font-mono"
+          className="w-full bg-surface-2 text-text-primary border border-hairline rounded-md px-3 py-2.5 text-xs focus:outline-none focus:border-brand-line font-mono"
         />
       )}
-      <p className="text-[8px] text-gray-600 mt-1">{hint}</p>
+      <p className="text-[8px] text-text-tertiary mt-1">{hint}</p>
     </div>
   );
 }
@@ -46,6 +46,8 @@ function KeyField({ label, icon, color, value, onChange, placeholder, hint, stat
 export default function SettingsPanel() {
   const [geminiKey, setGeminiKey] = useState('');
   const [groqKey, setGroqKey] = useState('');
+  const [openrouterKey, setOpenrouterKey] = useState('');
+  const [hfKey, setHfKey] = useState('');
   const [githubToken, setGithubToken] = useState('');
   const [keyStatus, setKeyStatus] = useState(null); // { groq, gemini, github }
   const [status, setStatus] = useState('idle'); // idle, loading, saved, error
@@ -67,6 +69,8 @@ export default function SettingsPanel() {
         const data = await res.json();
         setGeminiKey(data.geminiKey || '');
         setGroqKey(data.groqKey || '');
+        setOpenrouterKey(data.openrouterKey || '');
+        setHfKey(data.hfKey || '');
         setGithubToken(data.githubToken || '');
         try { setKeyStatus(await statusRes.json()); } catch (e) { /* status endpoint optional */ }
       } catch (e) {
@@ -92,6 +96,8 @@ export default function SettingsPanel() {
       const body = {};
       if (!keyStatus?.gemini?.configured) body.geminiKey = geminiKey;
       if (!keyStatus?.groq?.configured) body.groqKey = groqKey;
+      if (!keyStatus?.openrouter?.configured) body.openrouterKey = openrouterKey;
+      if (!keyStatus?.huggingface?.configured) body.hfKey = hfKey;
       if (!keyStatus?.github?.configured) body.githubToken = githubToken;
       const res = await jexiFetch(`${backendUrl}/api/settings`, {
         method: 'POST',
@@ -112,7 +118,7 @@ export default function SettingsPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="glass p-4 rounded-xl">
+      <div className="surface-card p-4">
         <PanelHeader icon={Settings} title="SYSTEM SETTINGS" />
 
         <div className="space-y-4">
@@ -130,14 +136,38 @@ export default function SettingsPanel() {
 
           {/* Groq Key */}
           <KeyField
-            label="GROQ KEY (FALLBACK)"
-            icon={<Zap className="w-3 h-3 text-[#f59e0b]" />}
+            label="GROQ KEY (FAST CHAT)"
+            icon={<Zap className="w-3 h-3 text-status-warn" />}
             value={groqKey}
             onChange={(e) => setGroqKey(e.target.value)}
             placeholder="Enter Groq API Key"
             hint="Get free key at console.groq.com/keys — or set GROQ_API_KEY in Render and it's automatic."
             status={keyStatus?.groq}
             envNames={['GROQ_API_KEY']}
+          />
+
+          {/* OpenRouter — Seed vision + free text fallback */}
+          <KeyField
+            label="OPENROUTER KEY (SEED VISION + FREE TEXT)"
+            icon={<Globe className="w-3 h-3 text-cyan-400" />}
+            value={openrouterKey}
+            onChange={(e) => setOpenrouterKey(e.target.value)}
+            placeholder="sk-or-…"
+            hint="Get free key at openrouter.ai — unlocks Seed 2.0 vision (ByteDance) + free model routes as a fallback provider."
+            status={keyStatus?.openrouter}
+            envNames={['OPENROUTER_API_KEY']}
+          />
+
+          {/* HuggingFace — free Inference API text fallback */}
+          <KeyField
+            label="HUGGINGFACE TOKEN (FREE FALLBACK)"
+            icon={<Sparkles className="w-3 h-3 text-brand" />}
+            value={hfKey}
+            onChange={(e) => setHfKey(e.target.value)}
+            placeholder="hf_…"
+            hint="Get free token at huggingface.co/settings/tokens — used as the last-resort text provider when the others rate-limit."
+            status={keyStatus?.huggingface}
+            envNames={['HF_TOKEN']}
           />
 
           {/* GitHub Token — powers the GitHub Agent (commit, push, PR, issues) */}
@@ -153,16 +183,16 @@ export default function SettingsPanel() {
           />
 
           {/* JEXI Access Key — required only if the backend is locked with JEXI_API_KEY */}
-          <div>
-            <label className="flex items-center gap-2 text-[10px] font-bold text-gray-400 mb-1.5 tracking-wider">
-              <Lock className="w-3 h-3 text-[#00FF9D]" />
+          <div className="bg-surface-2 border border-hairline rounded-md p-3">
+            <label className="flex items-center gap-2 text-[10px] font-bold text-text-secondary mb-1.5 tracking-wider">
+              <Lock className="w-3 h-3 text-brand" />
               JEXI ACCESS KEY (OPTIONAL)
               {accessKey ? (
-                <span className="ml-auto flex items-center gap-1 text-[#22c55e] text-[8px] bg-[#22c55e]/10 border border-[#22c55e]/30 rounded-full px-2 py-0.5">
+                <span className="ml-auto flex items-center gap-1 text-brand text-[8px] bg-brand-dim border border-brand-line rounded-full px-2 py-0.5">
                   <CheckCircle2 className="w-2.5 h-2.5" /> KEY SET
                 </span>
               ) : (
-                <span className="ml-auto text-[#6b7280] text-[8px] bg-[#1a1a1a] border border-[#2a2a2a] rounded-full px-2 py-0.5">
+                <span className="ml-auto text-text-tertiary text-[8px] bg-surface-1 border border-hairline rounded-full px-2 py-0.5">
                   NOT LOCKED
                 </span>
               )}
@@ -173,22 +203,22 @@ export default function SettingsPanel() {
                 value={accessKey}
                 onChange={(e) => setAccessKeyState(e.target.value)}
                 placeholder="Leave empty if your server is open"
-                className="w-full bg-[#0a0a0a] text-gray-200 border border-[#1a1a1a] rounded-lg px-3 py-2.5 text-xs focus:outline-none focus:border-[#00FF9D]/50 font-mono"
+                className="w-full bg-surface-1 text-text-primary border border-hairline rounded-md px-3 py-2.5 text-xs focus:outline-none focus:border-brand-line font-mono"
               />
               <button
                 onClick={() => { setAccessKey(accessKey.trim()); setStatus('saved'); setTimeout(() => setStatus('idle'), 3000); }}
-                className="bg-[#00FF9D] text-black rounded-lg px-3 py-2.5 text-xs font-bold flex items-center gap-1.5 flex-shrink-0"
+                className="bg-brand text-black rounded-md px-3 py-2.5 text-xs font-bold flex items-center gap-1.5 flex-shrink-0"
               >
                 <Save className="w-3.5 h-3.5" /> APPLY
               </button>
             </div>
-            <p className="text-[8px] text-gray-600 mt-1">If you set <span className="font-mono text-gray-400">JEXI_API_KEY</span> on the server (Render → Environment), every request must carry this key. Stored in your browser, sent only to your own backend.</p>
+            <p className="text-[8px] text-text-tertiary mt-1">If you set <span className="font-mono text-text-secondary">JEXI_API_KEY</span> on the server (Render → Environment), every request must carry this key. Stored in your browser, sent only to your own backend.</p>
           </div>
 
           {/* Backend URL (runtime override) */}
-          <div className="pt-3 border-t border-[#1a1a1a]">
-            <label className="flex items-center gap-2 text-[10px] font-bold text-gray-400 mb-1.5 tracking-wider">
-              <Server className="w-3 h-3 text-[#00d4ff]" />
+          <div className="pt-3 border-t border-hairline">
+            <label className="flex items-center gap-2 text-[10px] font-bold text-text-secondary mb-1.5 tracking-wider">
+              <Server className="w-3 h-3 text-cyan-400" />
               BACKEND URL (RUNTIME OVERRIDE)
             </label>
             <div className="flex gap-2">
@@ -197,27 +227,27 @@ export default function SettingsPanel() {
                 value={backendInput}
                 onChange={(e) => setBackendInput(e.target.value)}
                 placeholder="https://jexi-os-brain.onrender.com"
-                className="w-full bg-[#0a0a0a] text-gray-200 border border-[#1a1a1a] rounded-lg px-3 py-2.5 text-xs focus:outline-none focus:border-[#00d4ff]/50 font-mono"
+                className="w-full bg-surface-2 text-text-primary border border-hairline rounded-md px-3 py-2.5 text-xs focus:outline-none focus:border-brand-line font-mono"
               />
               <button
                 onClick={saveBackendUrl}
-                className="bg-[#00d4ff] text-black rounded-lg px-3 py-2.5 text-xs font-bold flex items-center gap-1.5 flex-shrink-0"
+                className="bg-cyan-500/15 text-cyan-400 border border-[#22D3EE]/30 rounded-md px-3 py-2.5 text-xs font-bold flex items-center gap-1.5 flex-shrink-0 hover:bg-cyan-500/25"
               >
                 <Save className="w-3.5 h-3.5" /> SAVE
               </button>
             </div>
-            <p className="text-[8px] text-gray-600 mt-1">
-              Current: <span className="text-[#00d4ff]">{backendUrl || 'same origin (/api)'}</span>
-              {backendStatus === 'saved' && <span className="text-[#22c55e] ml-1">✓ Saved — applies immediately</span>}
+            <p className="text-[8px] text-text-tertiary mt-1">
+              Current: <span className="text-cyan-400">{backendUrl || 'same origin (/api)'}</span>
+              {backendStatus === 'saved' && <span className="text-brand ml-1">✓ Saved — applies immediately</span>}
             </p>
-            <p className="text-[8px] text-gray-600">Leave empty to use the same origin or VITE_JEXI_BACKEND_URL. Changes apply instantly, no reload needed.</p>
+            <p className="text-[8px] text-text-tertiary">Leave empty to use the same origin or VITE_JEXI_BACKEND_URL. Changes apply instantly, no reload needed.</p>
           </div>
 
           {/* Save Button */}
           <button
             onClick={handleSave}
             disabled={status === 'loading' || initialLoad}
-            className="w-full bg-[#00FF9D] text-black rounded-lg px-4 py-3 text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
+            className="w-full bg-brand text-black rounded-md px-4 py-3 text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-40 transition-opacity active:scale-[0.98]"
           >
             {status === 'loading' ? (
               'SAVING...'
@@ -233,7 +263,7 @@ export default function SettingsPanel() {
           </button>
 
           {status === 'error' && (
-            <div className="flex items-center gap-2 text-red-500 text-[10px]">
+            <div className="flex items-center gap-2 text-status-error text-[10px]">
               <AlertCircle className="w-3 h-3" />
               Failed to save keys. Check connection.
             </div>
@@ -242,11 +272,11 @@ export default function SettingsPanel() {
       </div>
 
       {/* Info Box */}
-      <div className="glass p-4 rounded-xl">
-        <PanelHeader icon={Key} title="WHERE YOUR KEYS LIVE" color="text-[#00d4ff]" />
-        <p className="text-[9px] text-gray-500 leading-relaxed space-y-1">
-          <span className="flex items-start gap-1.5"><Globe className="w-3 h-3 mt-0.5 text-[#22c55e] flex-shrink-0" /> <span><span className="text-gray-400">Production (Render):</span> keys are set as environment variables (<span className="font-mono text-gray-400">GEMINI_API_KEY</span>, <span className="font-mono text-gray-400">GROQ_API_KEY</span>, <span className="font-mono text-gray-400">GITHUB_TOKEN</span>) — JEXI reads them automatically, no pasting required.</span></span>
-          <span className="flex items-start gap-1.5"><ShieldCheck className="w-3 h-3 mt-0.5 text-[#00d4ff] flex-shrink-0" /> <span><span className="text-gray-400">Local / self-hosted:</span> the fields above store keys in JEXI's settings file on your device. They're never sent anywhere except the official AI provider / GitHub API, and only for actions you explicitly ask for.</span></span>
+      <div className="surface-card p-4">
+        <PanelHeader icon={Key} title="WHERE YOUR KEYS LIVE" color="text-cyan-400" />
+        <p className="text-[9px] text-text-secondary leading-relaxed space-y-1">
+          <span className="flex items-start gap-1.5"><Globe className="w-3 h-3 mt-0.5 text-[#34D399] flex-shrink-0" /> <span><span className="text-text-primary">Production (Render):</span> keys are set as environment variables (<span className="font-mono text-text-secondary">GEMINI_API_KEY</span>, <span className="font-mono text-text-secondary">GROQ_API_KEY</span>, <span className="font-mono text-text-secondary">OPENROUTER_API_KEY</span>, <span className="font-mono text-text-secondary">HF_TOKEN</span>, <span className="font-mono text-text-secondary">GITHUB_TOKEN</span>) — JEXI reads them automatically, no pasting required.</span></span>
+          <span className="flex items-start gap-1.5"><ShieldCheck className="w-3 h-3 mt-0.5 text-cyan-400 flex-shrink-0" /> <span><span className="text-text-primary">Local / self-hosted:</span> the fields above store keys in JEXI's settings file on your device. They're never sent anywhere except the official AI provider / GitHub API, and only for actions you explicitly ask for.</span></span>
         </p>
       </div>
     </div>

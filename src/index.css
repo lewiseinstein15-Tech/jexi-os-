@@ -3,23 +3,56 @@
 @tailwind utilities;
 
 /* ============================================================
-   JEXI OS — design tokens (premium dark · Vercel/Linear school)
+   JEXI OS — design tokens (mission-control dark · Linear school)
    ============================================================ */
 :root {
+  /* Surfaces — elevation by shade, not shadow */
+  --bg-void: #030303;
+  --bg-surface-1: #0a0a0b;
+  --bg-surface-2: #111113;
+  --bg-surface-3: #18181b;
+  --border-hairline: rgba(255, 255, 255, 0.06);
+  --border-hairline-strong: rgba(255, 255, 255, 0.10);
+
+  /* Text */
+  --text-primary: #f5f5f7;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #616166;
+
+  /* Brand / signal — ONE accent, used sparingly */
+  --brand: #00ff9d;
+  --brand-dim: rgba(0, 255, 157, 0.20);
+  --brand-line: rgba(0, 255, 157, 0.40);
+
+  /* Agent / semantic palette — identity + status only, never brand moments */
+  --agent-planner: #22d3ee;
+  --agent-coder: #00ff9d;
+  --agent-qa: #fbbf24;
+  --agent-security: #fb7185;
+  --agent-research: #a78bfa;
+  --agent-vision: #f472b6;
+
+  /* Status */
+  --status-online: #00ff9d;
+  --status-warn: #fbbf24;
+  --status-error: #fb7185;
+  --status-idle: #616166;
+
+  /* Legacy aliases (markdown + utility classes still reference these) */
   --bg: #030303;
-  --surface: #0c0c0f;
-  --surface-2: #111114;
-  --surface-3: #17171b;
+  --surface: #0a0a0b;
+  --surface-2: #111113;
+  --surface-3: #18181b;
   --border: rgba(255, 255, 255, 0.06);
-  --border-strong: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.10);
   --accent: #00ff9d;
-  --accent-dim: rgba(0, 255, 157, 0.12);
+  --accent-dim: rgba(0, 255, 157, 0.20);
   --cyan: #22d3ee;
   --violet: #a78bfa;
   --pink: #f472b6;
   --amber: #fbbf24;
   --text: #e9e9ec;
-  --text-dim: #9ca3af;
+  --text-dim: #a1a1aa;
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
@@ -35,8 +68,8 @@ body {
     radial-gradient(900px 520px at 88% -10%, rgba(34, 211, 238, 0.07), transparent 62%),
     radial-gradient(760px 520px at -12% 8%, rgba(0, 255, 157, 0.055), transparent 62%),
     radial-gradient(820px 640px at 50% 118%, rgba(167, 139, 250, 0.05), transparent 62%),
-    var(--bg);
-  color: var(--text);
+    var(--bg-void);
+  color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -50,6 +83,17 @@ body::before {
   background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
   background-size: 24px 24px;
   z-index: 0;
+}
+
+/* Eyebrow / label — the spec's micro-typography workhorse */
+.eyebrow {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 10px;
+  line-height: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
 }
 
 ::selection { background: rgba(0, 255, 157, 0.25); color: #fff; }
@@ -78,6 +122,23 @@ body::before {
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 10px;
+}
+
+/* Level 1 card — the spec's base surface */
+.surface-card {
+  background: var(--bg-surface-1);
+  border: 1px solid var(--border-hairline);
+  border-radius: 16px;
+}
+.surface-card:hover { border-color: var(--border-hairline-strong); }
+
+/* Level 3 floating — input bar, sheets */
+.surface-float {
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-hairline-strong);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 /* ---------- Scrollbars ---------- */
@@ -114,6 +175,13 @@ body::before {
 }
 .typing-dot { animation: bounceDot 1.2s infinite ease-in-out; }
 .spin-ring { animation: spinRing 9s linear infinite; }
+
+/* Skeleton / shimmer surface (spec §4) */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-surface-1), var(--bg-surface-3), var(--bg-surface-1));
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
 
 /* Gradient text for brand moments */
 .text-gradient {

@@ -25,10 +25,10 @@ function QuickAction({ icon: Icon, label, title, onClick }) {
       type="button"
       onClick={onClick}
       title={title}
-      className="flex items-center gap-1.5 bg-white/[0.04] hover:bg-[#00FF9D]/10 border border-white/[0.07] hover:border-[#00FF9D]/40 text-gray-400 hover:text-[#00FF9D] rounded-lg px-2.5 py-1.5 transition-all duration-200 active:scale-95"
+      className="w-8 h-8 flex items-center justify-center bg-surface-1 hover:bg-brand-dim border border-hairline hover:border-brand-line text-text-secondary hover:text-brand rounded-md transition-all duration-200 active:scale-95"
     >
       <Icon className="w-3.5 h-3.5" />
-      <span className="text-[8px] font-bold tracking-wider">{label}</span>
+      <span className="sr-only">{label}</span>
     </button>
   );
 }
@@ -70,17 +70,17 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
   const canSend = (input.trim() || image) && !isProcessing;
 
   return (
-    <div className="glass p-4 rounded-xl relative z-10 flex flex-col flex-1 min-h-0">
+    <div className="surface-card p-4 rounded-xl relative z-10 flex flex-col flex-1 min-h-0">
       <div className="flex items-center gap-2 mb-3 flex-shrink-0">
-        <h2 className="text-[10px] font-bold text-[#00FF9D] tracking-wider">JEXI CHAT INTERFACE</h2>
+        <h2 className="text-[10px] font-bold text-brand tracking-wider">JEXI CHAT INTERFACE</h2>
         {isProcessing && (
-          <span className="ml-auto flex items-center gap-1.5 text-[8px] text-[#00FF9D] font-bold">
+          <span className="ml-auto flex items-center gap-1.5 text-[8px] text-brand font-bold">
             THINKING
             <span className="flex gap-0.5">
               {[0, 1, 2].map((i) => (
                 <span
                   key={i}
-                  className="typing-dot w-1 h-1 rounded-full bg-[#00FF9D]"
+                  className="typing-dot w-1 h-1 rounded-full bg-brand"
                   style={{ animationDelay: `${i * 0.15}s` }}
                 />
               ))}
@@ -92,8 +92,8 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
       <div ref={scrollRef} className="space-y-3 mb-3 flex-1 min-h-0 overflow-y-auto pr-1">
         {messages.length === 0 ? (
           <div className="py-2">
-            <p className="text-[9px] font-bold text-[#00FF9D] tracking-widest mb-2 text-center">⚡ WHAT JEXI CAN DO</p>
-            <div className="grid grid-cols-2 gap-2">
+            <p className="eyebrow mb-3 text-center">⚡ What JEXI can do</p>
+            <div className="grid grid-cols-2 gap-3">
               {CAPABILITIES.map((c, i) => (
                 <motion.button
                   key={c.label}
@@ -101,15 +101,16 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05, duration: 0.25 }}
+                  whileTap={{ scale: 0.96 }}
                   onClick={() => (c.vision ? setVisionOpen(true) : onSend(c.query))}
-                  className="group relative flex items-center gap-2.5 overflow-hidden rounded-xl border border-white/[0.06] bg-gradient-to-b from-white/[0.04] to-transparent px-3 py-2.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[#00FF9D]/40 hover:shadow-[0_8px_24px_rgba(0,0,0,0.5),0_0_20px_rgba(0,255,157,0.08)] active:scale-[0.98]"
+                  className="group relative flex items-center gap-2.5 overflow-hidden rounded-lg border border-hairline bg-surface-1 px-3 py-3 text-left transition-all duration-200 hover:border-hairline-strong active:scale-[0.98]"
                 >
-                  <div className={`flex-shrink-0 w-8 h-8 rounded-lg border flex items-center justify-center transition-transform duration-200 group-hover:scale-110 ${c.tile}`}>
+                  <div className={`flex-shrink-0 w-10 h-10 rounded-md border flex items-center justify-center transition-transform duration-200 group-hover:scale-110 ${c.tile}`}>
                     <c.icon className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[9px] font-bold text-gray-200 group-hover:text-[#00FF9D]">{c.label}</p>
-                    <p className="text-[8px] text-gray-600 truncate">{c.hint}</p>
+                    <p className="text-[11px] font-semibold text-text-primary group-hover:text-brand">{c.label}</p>
+                    <p className="text-[10px] text-text-tertiary truncate">{c.hint}</p>
                   </div>
                 </motion.button>
               ))}
@@ -126,8 +127,8 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
             >
               <div className={`max-w-[90%] p-3 ${
                 msg.role === 'user'
-                  ? 'rounded-2xl rounded-tr-md bg-gradient-to-br from-[#00FF9D] to-[#00d68a] text-black font-medium text-[11px] shadow-[0_4px_18px_rgba(0,255,157,0.28)]'
-                  : 'rounded-2xl rounded-tl-md bg-[#0d0d11] text-gray-200 border border-white/[0.07] shadow-[0_4px_16px_rgba(0,0,0,0.4)]'
+                  ? 'rounded-lg rounded-tr-sm bg-gradient-to-br from-brand to-[#00D98A] text-[#04140D] font-medium text-[11px] shadow-[0_4px_18px_rgba(0,255,157,0.28)]'
+                  : 'rounded-lg rounded-tl-sm bg-surface-1 text-text-primary border border-hairline'
               }`}>
                 {msg.role === 'user' ? (
                   <div className="whitespace-pre-wrap break-words">
@@ -169,7 +170,7 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
         </div>
       )}
 
-      {/* Quick actions — labeled, in their own row */}
+      {/* Quick actions — labeled icon chips (spec §3A) */}
       <div className="flex gap-1.5 mb-2 flex-wrap flex-shrink-0">
         <QuickAction
           icon={Camera}
@@ -191,10 +192,10 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
         />
       </div>
 
-      {/* Input + send — frosted field with a focus glow, pinned to the bottom */}
+      {/* Input + send — floating frosted bar with a focus glow, pinned to the bottom */}
       <form
         onSubmit={handleSubmit}
-        className="flex gap-2 items-center rounded-xl border border-white/[0.07] bg-[#0a0a0c] p-1.5 pl-3 flex-shrink-0 transition-all duration-200 focus-within:border-[#00FF9D]/50 focus-within:shadow-[0_0_0_3px_rgba(0,255,157,0.07),0_0_24px_rgba(0,255,157,0.06)]"
+        className="surface-float flex gap-2 items-center rounded-xl p-1.5 pl-3 flex-shrink-0 transition-all duration-200 focus-within:border-brand-line focus-within:shadow-[0_0_0_3px_var(--brand-dim)]"
       >
         <input
           ref={fileRef}
@@ -208,14 +209,14 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Message JEXI..."
-          className="flex-1 bg-transparent text-gray-200 placeholder-gray-600 rounded-lg py-2 text-xs focus:outline-none"
+          className="flex-1 bg-transparent text-text-primary placeholder-text-tertiary rounded-lg py-2 text-xs focus:outline-none"
           disabled={isProcessing}
         />
         {isProcessing ? (
           <button
             type="button"
             onClick={onStop}
-            className="bg-gradient-to-br from-red-500/90 to-red-600/90 text-white rounded-lg px-4 py-2.5 transition-all duration-200 hover:scale-105 active:scale-95"
+            className="w-10 h-10 flex items-center justify-center bg-status-error/10 text-status-error border border-status-error/40 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
             title="Stop"
           >
             <Square className="w-4 h-4" />
@@ -224,7 +225,7 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
           <button
             type="submit"
             disabled={!canSend}
-            className="bg-gradient-to-br from-[#00FF9D] to-[#00d68a] text-black rounded-lg px-4 py-2.5 disabled:opacity-30 disabled:hover:scale-100 transition-all duration-200 hover:scale-105 hover:shadow-[0_0_18px_rgba(0,255,157,0.4)] active:scale-95"
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-brand text-black disabled:bg-surface-2 disabled:text-text-tertiary transition-all duration-200 hover:scale-105 hover:shadow-[0_0_18px_rgba(0,255,157,0.4)] active:scale-95"
             title="Send"
           >
             <Send className="w-4 h-4" />

@@ -6,6 +6,7 @@ import { useMemory } from './hooks/useMemory';
 import Header from './components/Header';
 import BottomNavigation from './components/BottomNavigation';
 import ActivityWindow from './components/ActivityWindow';
+import AgentsScreen from './components/AgentsScreen';
 import ChatWindow from './components/ChatWindow';
 import MemoryPanel from './components/MemoryPanel';
 import SettingsPanel from './components/SettingsPanel';
@@ -30,8 +31,8 @@ export default function App() {
   // No more auto-switching! You control the tabs manually.
 
   return (
-    <div className="min-h-screen bg-[#030303] text-gray-200 flex flex-col">
-      <Header />
+    <div className="min-h-screen bg-void text-text-primary flex flex-col">
+      <Header plan={engine.plan} logs={engine.logs} running={engine.isProcessing} />
       <UpdateBanner />
       {/* Home is a fixed app viewport (not a scrolling web page): the activity
           strip sits on top and the chat fills the remaining space with its own
@@ -65,10 +66,11 @@ export default function App() {
               </>
             )}
             {activeNav === 'agents' && (
-              <ActivityWindow
+              <AgentsScreen
                 logs={engine.logs}
                 websites={engine.websites}
                 isProcessing={engine.isProcessing}
+                plan={engine.plan}
               />
             )}
             {activeNav === 'memory' && <MemoryPanel memory={memory} />}
