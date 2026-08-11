@@ -91,7 +91,7 @@ cd server && npm start        # http://127.0.0.1:3002/mcp
 node mcp-server.js            # http://127.0.0.1:3457/mcp
 ```
 
-Your deployed instance exposes it at `https://<your-host>/mcp` (e.g. `https://jexi-os-brain.onrender.com/mcp`).
+Your deployed instance exposes it at `https://<your-host>/mcp` (e.g. `https://jexi-os-brain.onrender.com/mcp`) — you can point Claude Desktop / Cursor straight at that public URL instead of localhost.
 
 ### Exposed tools (allowlist)
 
