@@ -20,6 +20,7 @@ import { runPerfAgent } from './PerfAgent.js';
 import { ComputerUseAgent } from './ComputerUseAgent.js';
 import { DesktopManager, ensureBrowser } from './DesktopManager.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
+import { preferencesBlock, recallPreferences } from './PreferenceLearner.js';
 import {
   addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory, topUserFacts,
   searchInternetKnowledge, searchFreshInternetKnowledge, searchCodingKnowledge,
@@ -54,6 +55,8 @@ function conversationContext() {
   if (profile.name) memoryBlock.push(`User's name: ${profile.name}`);
   if (profile.location) memoryBlock.push(`User's location: ${profile.location}`);
   if (facts.length) memoryBlock.push(...facts);
+  const prefs = recallPreferences(3);
+  if (prefs.length) memoryBlock.push(...prefs);
   const extra = memoryBlock.length ? `\n\nWhat I know about the user (from memory):\n${memoryBlock.map(f => `- ${f}`).join('\n')}` : '';
   return `${history.map(h => `${h.role === 'user' ? 'User' : 'JEXI'}: ${String(h.text).slice(0, 600)}`).join('\n')}${extra}`;
 }
@@ -75,7 +78,7 @@ export class Orchestrator {
 
     const reply = await generateContent(
       `The user asked: "${query}"\n\nThe passages below come from the user's OWN books and knowledge library — they are the authoritative source for this answer.\n\n${context}\n\nAnswer the question using ONLY these passages. Rules:\n- Structure the answer clearly (headings, numbered points, tables where helpful).\n- Cite the source book after each point, e.g. (From "Title").\n- If the passages do not contain the answer, say so honestly instead of guessing or inventing.\n- Do NOT go outside these passages.`,
-      JEXI_SYSTEM_PROMPT,
+      JEXI_SYSTEM_PROMPT + preferencesBlock(),
       null,
       { temperature: 0.3 }
     );
@@ -126,7 +129,7 @@ export class Orchestrator {
           }
           const reply = await generateContent(
             `The user just said: "${query}"\n\nRecent conversation:\n${ctx}\n\nRespond naturally as JEXI OS. If they ask who you are or who created you, answer: you are JEXI OS, a sophisticated multi-agent AI operating system built by Lewis Einstein (AI & ML Engineer) to run any task. Be warm and brief.`,
-            JEXI_SYSTEM_PROMPT
+            JEXI_SYSTEM_PROMPT + preferencesBlock()
           );
           try { addChat('jexi', reply); } catch (e) {}
           results.summary = `### 🧠 JEXI OS\n\n${reply}`;
@@ -231,7 +234,7 @@ Try it: say *"build a weather app"* and watch Product → Designer → Engineer 
           const ctx = conversationContext();
           const reply = await generateContent(
             `The user asked: "${query}"\n\nUser profile: ${JSON.stringify(userProfile)}\nRecent conversation:\n${ctx}\n\nAnswer what JEXI remembers about the user, naturally.`,
-            JEXI_SYSTEM_PROMPT
+            JEXI_SYSTEM_PROMPT + preferencesBlock()
           );
           try { addChat('jexi', reply); } catch (e) {}
           results.summary = `### 🧠 JEXI OS\n\n${reply}`;
@@ -244,7 +247,7 @@ Try it: say *"build a weather app"* and watch Product → Designer → Engineer 
           sendEvent('log', { agent: 'Vision', message: '🔍 Analyzing image...' });
           const reply = await generateContent(
             `The user attached an image and asked: "${query || 'What is this?'}"\n\nAnalyze the image thoroughly: describe what it shows, read any text/numbers/symbols, and if it is a math problem, solve it with full LaTeX steps.`,
-            JEXI_SYSTEM_PROMPT,
+            JEXI_SYSTEM_PROMPT + preferencesBlock(),
             plan.payload
           );
           try { addChat('jexi', reply); } catch (e) {}
@@ -311,7 +314,7 @@ Try it: say *"build a weather app"* and watch Product → Designer → Engineer 
           sendEvent('log', { agent: 'Reasoner', message: '🔢 Solving with structured mathematics...' });
           const reply = await generateContent(
             `Solve this mathematics question step by step: "${query}"\n\nRULES:\n- Use LaTeX everywhere: $...$ for inline math, $$...$$ for display math.\n- Clearly distinguish letters (variables), numbers, and symbols.\n- Use a table if comparing values, and include a diagram or graph description when helpful.\n- Structure: # SOLUTION / ## GIVEN / ## FORMULA / ## WORKING / ## FINAL ANSWER.\n- Double-check your arithmetic before answering.`,
-            JEXI_SYSTEM_PROMPT
+            JEXI_SYSTEM_PROMPT + preferencesBlock()
           );
           try { addChat('jexi', reply); } catch (e) {}
           try { saveInternetKnowledge(query, reply, []); } catch (e) {}
@@ -766,7 +769,7 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
           sendEvent('log', { agent: 'SelfDiagnose', message: `📋 Status: ${status.keys.groq || status.keys.gemini ? 'AI keys OK' : 'NO AI KEYS'}, browser ${status.browser.ready ? 'OK' : 'DOWN'}, ${status.errors.count} logged error(s).` });
           const reply = await generateContent(
             `My live self-diagnosis (JSON):\n${JSON.stringify(status, null, 2)}\n\nSource code I inspected:\n${excerpts || '(none)'}\n\nCRITICAL INSTRUCTION — DO NOT HALLUCINATE BUGS:\n- Only report an issue if you can point to the EXACT buggy line in the code excerpt above (quote it verbatim).\n- Do NOT invent bugs, typos, missing imports, or unused variables. This is a real production system; the code above is live and working.\n- If the code looks correct (or you cannot be sure from the excerpt), write: \"No issues found — system healthy.\"\n- Only report issues from the JSON status (memory, browser, keys, errors, writable dirs) or the exact code you saw.\n\nIf everything is healthy, say so briefly and warmly (I am JEXI OS, created by Lewis Einstein). Use ## HEALTH, ## ISSUES FOUND, ## ROOT CAUSE + FILE, ## FIX. If no issues, put \"None — system healthy\" under ISSUES FOUND.`,
-            JEXI_SYSTEM_PROMPT,
+            JEXI_SYSTEM_PROMPT + preferencesBlock(),
             null,
             { temperature: 0.3 }
           );

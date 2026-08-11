@@ -4,6 +4,7 @@ import { jsonrepair } from 'jsonrepair';
 import { generateContent } from './LLMClient.js';
 import { MASTER_TRAINING_PROMPT } from './ComputerUseTraining.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
+import { preferencesBlock } from './PreferenceLearner.js';
 import { WORKSPACE_DIR, MANAGER_URL, MAX_DEBUG_ATTEMPTS } from '../config.js';
 import { extractContent } from './Extractor.js';
 import { aggregateSearch } from './SearchEngine.js';
@@ -334,7 +335,7 @@ export class ComputerUseAgent {
       sendEvent?.('log', { agent: 'Reasoner', message: 'Synthesizing answer from everything read...' });
       const synth = await generateContent(
         `The user asked: "${task}"\n\nInformation I gathered from the browser/internet:\n${researchText.slice(0, 16000)}\n\nReframe this into a clear, well-structured answer that DIRECTLY answers the user's question. Follow JEXI OS formatting rules.`,
-        JEXI_SYSTEM_PROMPT
+        JEXI_SYSTEM_PROMPT + preferencesBlock()
       );
       try { saveInternetKnowledge(task, synth, []); } catch (e) {}
       return { success: true, output: synth, files: filesCreated };

@@ -1,5 +1,6 @@
 import { generateContent } from './LLMClient.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
+import { preferencesBlock } from './PreferenceLearner.js';
 import { saveInternetKnowledge } from './MemoryManager.js';
 
 /**
@@ -24,7 +25,7 @@ export async function reasonAndWrite(query, sources, opts = {}) {
     prompt = `Answer the user's question clearly and completely: "${query}"\n\n${memoryContext ? `Context from previous conversation:\n${memoryContext}` : ''}\nFollow JEXI OS formatting rules.`;
   }
 
-  const summary = await generateContent(prompt, JEXI_SYSTEM_PROMPT);
+  const summary = await generateContent(prompt, JEXI_SYSTEM_PROMPT + preferencesBlock());
 
   // Store what we learned so next time JEXI answers from memory
   try {

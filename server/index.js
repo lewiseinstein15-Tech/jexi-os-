@@ -8,6 +8,7 @@ import path from 'path';
 import { planner } from './src/services/Planner.js';
 import { orchestrator } from './src/services/Orchestrator.js';
 import { generateContent, resolveKeys } from './src/services/LLMClient.js';
+import { learnFromExchange } from './src/services/PreferenceLearner.js';
 import {
   recordBoot, recordChat, recordVision, recordError,
   collectSystemStatus, readSourceFile,
@@ -439,6 +440,11 @@ app.post('/api/chat', async (req, res) => {
         ? '✅ Task completed — the team finished, but returned no readable summary. Check the activity log above to see what ran.'
         : (results.error || 'The task failed — check the activity log for details.');
     sendEvent('done', { success: results.success, query, summary: finalSummary, sources: results.sources || [], statistics: results.statistics, files: results.files || [] });
+
+    // Mem0-style preference learning — fire-and-forget in the background so it
+    // never delays the reply or breaks the stream. JEXI learns what the user
+    // likes and how they like things done, then applies it to every future task.
+    learnFromExchange(effectiveQuery).catch(() => {});
   } catch (error) {
     recordError('chat', error.message);
     sendEvent('log', { agent: 'System', message: `Critical Error: ${error.message}` });

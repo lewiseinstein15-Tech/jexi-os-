@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "test": "node test-planner-routing.js && node test-new-agents.js && node test-books.js && node test-preview.js && node test-pdf.js && node test-perf.js && node test-llm-models.js && node test-planner-orchestrator.js && node test-chat-books.js && node test-trusted-library.js"
+    "test": "node test-planner-routing.js && node test-new-agents.js && node test-books.js && node test-preview.js && node test-pdf.js && node test-perf.js && node test-llm-models.js && node test-planner-orchestrator.js && node test-chat-books.js && node test-trusted-library.js && node test-memory-preferences.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
