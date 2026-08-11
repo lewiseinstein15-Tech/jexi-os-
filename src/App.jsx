@@ -10,7 +10,6 @@ import ChatWindow from './components/ChatWindow';
 import MemoryPanel from './components/MemoryPanel';
 import SettingsPanel from './components/SettingsPanel';
 import KnowledgePanel from './components/KnowledgePanel';
-import DesktopViewer from './components/DesktopViewer';
 import DownloadPanel from './components/DownloadPanel';
 import UpdateBanner from './components/UpdateBanner';
 
@@ -70,7 +69,6 @@ export default function App() {
             )}
             {activeNav === 'memory' && <MemoryPanel memory={memory} />}
             {activeNav === 'knowledge' && <KnowledgePanel />}
-            {activeNav === 'desktop' && <DesktopViewer logs={engine.logs} />}
             {activeNav === 'settings' && <SettingsPanel />}
             {activeNav === 'download' && <DownloadPanel />}
           </motion.div>

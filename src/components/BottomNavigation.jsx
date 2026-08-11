@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Home, Bot, Database, BookOpen, Monitor, Settings, Smartphone } from 'lucide-react';
+import { Home, Bot, Database, BookOpen, Settings, Smartphone } from 'lucide-react';
 
 export default function BottomNavigation({ activeNav, setActiveNav }) {
   const items = [
@@ -7,7 +7,6 @@ export default function BottomNavigation({ activeNav, setActiveNav }) {
     { id: 'agents', icon: Bot, label: 'AGENTS' },
     { id: 'memory', icon: Database, label: 'MEMORY' },
     { id: 'knowledge', icon: BookOpen, label: 'BOOKS' },
-    { id: 'desktop', icon: Monitor, label: 'DESKTOP' },
     { id: 'settings', icon: Settings, label: 'SETTINGS' },
     { id: 'download', icon: Smartphone, label: 'APP' },
   ];
