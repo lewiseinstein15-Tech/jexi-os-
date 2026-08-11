@@ -70,8 +70,8 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
   const canSend = (input.trim() || image) && !isProcessing;
 
   return (
-    <div className="glass p-4 rounded-xl relative z-10">
-      <div className="flex items-center gap-2 mb-3">
+    <div className="glass p-4 rounded-xl relative z-10 flex flex-col flex-1 min-h-0">
+      <div className="flex items-center gap-2 mb-3 flex-shrink-0">
         <h2 className="text-[10px] font-bold text-[#00FF9D] tracking-wider">JEXI CHAT INTERFACE</h2>
         {isProcessing && (
           <span className="ml-auto flex items-center gap-1.5 text-[8px] text-[#00FF9D] font-bold">
@@ -89,7 +89,7 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
         )}
       </div>
 
-      <div ref={scrollRef} className="space-y-3 mb-3 max-h-[50vh] overflow-y-auto pr-1">
+      <div ref={scrollRef} className="space-y-3 mb-3 flex-1 min-h-0 overflow-y-auto pr-1">
         {messages.length === 0 ? (
           <div className="py-2">
             <p className="text-[9px] font-bold text-[#00FF9D] tracking-widest mb-2 text-center">⚡ WHAT JEXI CAN DO</p>
@@ -156,7 +156,7 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
 
       {/* Image attachment preview */}
       {image && (
-        <div className="relative inline-block mb-2">
+        <div className="relative inline-block mb-2 flex-shrink-0">
           <img src={image} alt="attachment" className="w-16 h-16 object-cover rounded-lg border border-[#00FF9D]/40" />
           <button
             type="button"
@@ -170,7 +170,7 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
       )}
 
       {/* Quick actions — labeled, in their own row */}
-      <div className="flex gap-1.5 mb-2 flex-wrap">
+      <div className="flex gap-1.5 mb-2 flex-wrap flex-shrink-0">
         <QuickAction
           icon={Camera}
           label="EYES"
@@ -191,10 +191,10 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
         />
       </div>
 
-      {/* Input + send — frosted field with a focus glow */}
+      {/* Input + send — frosted field with a focus glow, pinned to the bottom */}
       <form
         onSubmit={handleSubmit}
-        className="flex gap-2 items-center rounded-xl border border-white/[0.07] bg-[#0a0a0c] p-1.5 pl-3 transition-all duration-200 focus-within:border-[#00FF9D]/50 focus-within:shadow-[0_0_0_3px_rgba(0,255,157,0.07),0_0_24px_rgba(0,255,157,0.06)]"
+        className="flex gap-2 items-center rounded-xl border border-white/[0.07] bg-[#0a0a0c] p-1.5 pl-3 flex-shrink-0 transition-all duration-200 focus-within:border-[#00FF9D]/50 focus-within:shadow-[0_0_0_3px_rgba(0,255,157,0.07),0_0_24px_rgba(0,255,157,0.06)]"
       >
         <input
           ref={fileRef}

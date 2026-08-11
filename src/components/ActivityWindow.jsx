@@ -150,26 +150,35 @@ function SitesView({ websites }) {
   );
 }
 
-export default function ActivityWindow({ logs, websites, isProcessing }) {
+export default function ActivityWindow({ logs, websites, isProcessing, compact }) {
   const [tab, setTab] = useState('stream');
-  const [expanded, setExpanded] = useState(logs.length > 0 || websites.length > 0);
+  // Idle = collapsed (the chat owns the screen). Working = auto-expand so you
+  // can watch JEXI's agents run — it never blocks the chat below it.
+  const [userToggled, setUserToggled] = useState(false);
+  const expanded = compact
+    ? userToggled || isProcessing || logs.length > 0 || websites.length > 0
+    : userToggled || logs.length > 0 || websites.length > 0;
+
+  const toggle = () => {
+    setUserToggled((v) => !v);
+  };
 
   return (
     <div className="space-y-3">
-      {/* SYSTEM STATUS strip */}
-      <div className="glass p-3 rounded-xl">
-        <div className="flex items-center gap-2 mb-2.5">
-          <Activity className="w-4 h-4 text-[#00FF9D]" />
-          <h2 className="text-[10px] font-bold text-[#00FF9D] tracking-wider">SYSTEM STATUS</h2>
+      {/* SYSTEM STATUS strip — compact in app mode so it never steals the screen */}
+      <div className={`glass ${compact ? 'p-2.5' : 'p-3'} rounded-xl flex-shrink-0`}>
+        <div className="flex items-center gap-2">
+          <Activity className="w-3.5 h-3.5 text-[#00FF9D]" />
+          <h2 className="text-[9px] font-bold text-[#00FF9D] tracking-wider">SYSTEM STATUS</h2>
           <button
-            onClick={() => setExpanded(!expanded)}
+            onClick={toggle}
             className="ml-auto text-gray-500 hover:text-[#00FF9D] transition-colors p-1"
             title={expanded ? 'Hide activity' : 'Show activity'}
           >
-            <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
           </button>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2 mt-2">
           <StatusPill
             icon={Cpu}
             label="BRAIN"

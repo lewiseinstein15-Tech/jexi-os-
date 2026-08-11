@@ -33,6 +33,9 @@ export default function App() {
     <div className="min-h-screen bg-[#030303] text-gray-200 flex flex-col">
       <Header />
       <UpdateBanner />
+      {/* Home is a fixed app viewport (not a scrolling web page): the activity
+          strip sits on top and the chat fills the remaining space with its own
+          internal scroll — input always pinned at the bottom, no page scroll. */}
       <main className="flex-1 overflow-y-auto p-3 pb-24">
         <AnimatePresence mode="wait">
           <motion.div
@@ -41,7 +44,7 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="space-y-3"
+            className={activeNav === 'home' ? 'h-[calc(100dvh-118px)] flex flex-col gap-3' : 'space-y-3'}
           >
             {activeNav === 'home' && (
               <>
@@ -49,6 +52,7 @@ export default function App() {
                   logs={engine.logs}
                   websites={engine.websites}
                   isProcessing={engine.isProcessing}
+                  compact
                 />
                 <ChatWindow
                   messages={engine.messages}
