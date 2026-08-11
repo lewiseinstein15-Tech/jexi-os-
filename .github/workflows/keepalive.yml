@@ -19,11 +19,18 @@ on:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Health check
+      - name: Health check (primary)
         env:
           # Change target without editing the file: repo Settings -> Variables ->
           # Actions -> add KEEPALIVE_URL (e.g. https://your-user-jexi-os.hf.space)
           TARGET: ${{ vars.KEEPALIVE_URL || 'https://jexi-os-brain.onrender.com' }}
         run: |
-          curl -s -m 30 -o /dev/null -w 'JEXI brain: HTTP %{http_code} in %{time_total}s\n' \
-            "$TARGET/api/health" || echo 'ping failed (server may be restarting)'
+          curl -s -m 30 -o /dev/null -w 'Primary:  HTTP %{http_code} in %{time_total}s\n' \
+            "$TARGET/api/health" || echo 'primary ping failed (server may be restarting)'
+
+      - name: Health check (Render backup)
+        # Always keep the Render instance warm too, so a switch back is instant.
+        if: vars.KEEPALIVE_URL != ''
+        run: |
+          curl -s -m 30 -o /dev/null -w 'Render:   HTTP %{http_code} in %{time_total}s\n' \
+            https://jexi-os-brain.onrender.com/api/health || echo 'render ping failed (may be asleep)'
