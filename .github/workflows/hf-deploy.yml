@@ -1,4 +1,8 @@
-# Deploy JEXI OS to a FREE Hugging Face Space (no credit card needed).
+# ⚠️ NOTE (July 2026): Hugging Face now requires a paid PRO plan to CREATE Docker
+# Spaces — the free tier only allows static Spaces (API returns 402). This
+# workflow only works with a PRO account, or if HF reverses the policy.
+#
+# Deploy JEXI OS to a Hugging Face Space.
 #
 # First-time setup (2 minutes):
 #   1. Create an account at huggingface.co (email only — no card).

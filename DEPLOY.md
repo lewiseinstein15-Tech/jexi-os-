@@ -123,15 +123,19 @@ Memory always writes to the local JSON file first (fast), then mirrors to Redis 
 
 ---
 
-## Part 3 — 💰 $0 hosting (no credit card): Hugging Face Spaces
+## Part 3 — Hugging Face Spaces (⚠️ NO LONGER FREE — July 2026 policy change)
 
-No money and no card? Hugging Face Spaces runs JEXI **completely free** — and because its
-Docker build runs as **root**, Chromium's libraries install properly, so JEXI's virtual
-desktop **works** (the one thing Render's free tier can't give you). The repo's
-`Dockerfile` is already a single-container image: it builds the frontend and serves it
-from Express, so the whole app runs on **one** free host — you don't even need Vercel.
+> **Update (July 2026):** Hugging Face changed its policy — **creating Docker or Gradio
+> Spaces now requires a paid PRO subscription (~$9/mo)**; only *static* Spaces are free.
+> The API returns `402 Payment Required` when a free account tries to create a Docker
+> Space (verified). This section is kept for PRO users / in case the policy reverses.
+> **Free, no-card alternatives today:** Render free tier + the keep-alive cron (see
+> Part 1 + `.github/workflows/keepalive.yml`), or your own machine with a Cloudflare
+> Tunnel (see `deploy/selfhost/README-SELFHOST.md`).
 
-- Free CPU Basic space: **$0/month**, sign-up with just an email (no card).
+The single-container image still works wherever a Docker host exists (VPS, PRO Space):
+it builds the frontend and serves it from Express, so the whole app runs on **one** host.
+
 - URL after deploy: `https://<your-username>-jexi-os.hf.space` — the full JEXI OS UI.
 
 ### Steps (about 10 minutes)
