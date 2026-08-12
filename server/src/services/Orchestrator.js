@@ -326,6 +326,26 @@ Try it: say *"build a weather app"* and watch Product → Designer → Engineer 
           sendEvent('log', { agent: 'Vision', message: `🌐 Opening link: ${url}` });
           sendEvent('website', { site: { title: url, url, favicon: `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=64`, status: 'reading' } });
 
+          // VIDEO LINKS (YouTube / TikTok / Instagram / direct files) get the
+          // Video Analyst first: timestamped captions + sampled frames + vision
+          // (the agentic video-understanding pattern). Only falls back to the
+          // browser when the analyst can't read the video at all.
+          try {
+            const { isVideoUrl, analyzeVideo } = await import('./VideoAnalyzer.js');
+            if (isVideoUrl(url)) {
+              try {
+                const reply = await analyzeVideo(url, { sendEvent, maxFrames: 5 });
+                try { addChat('jexi', reply); } catch (e) {}
+                results.summary = reply;
+                results.sources = [{ title: url, link: url }];
+                results.statistics.confidence = 90;
+                return results;
+              } catch (e) {
+                sendEvent('log', { agent: 'Video Analyst', message: `⚠ Video analysis failed (${e.message}) — trying the browser.` });
+              }
+            }
+          } catch (e) { /* VideoAnalyzer unavailable — keep the existing path */ }
+
           // Use the browser agent (her eyes) — falls back to server-side reading
           const agent = new ComputerUseAgent();
           const result = await agent.executeTask(plan.payload.fullQuery || query, sendEvent, { intent: 'link_analysis' });

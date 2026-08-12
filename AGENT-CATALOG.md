@@ -1,6 +1,6 @@
 # JEXI OS — Agent & Skill Catalog
 
-**206 specialist agents · 490 skills · 148 tools · 1 orchestrator.** One plain-language request in,
+**207 specialist agents · 495 skills · 151 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
 ---
@@ -74,7 +74,7 @@ You type:  "Build me a water-intake tracker"
 
 ---
 
-## The 206 agents (grouped by role)
+## The 207 agents (grouped by role)
 
 ### Command (5)
 | Agent | What it does |
@@ -202,7 +202,7 @@ You type:  "Build me a water-intake tracker"
 
 ---
 
-## The 490 skills (by category)
+## The 495 skills (by category)
 
 - **Core (12):** intent-detection, team-composition, task-decomposition, pipeline-execution, gates, handoff, conversation, identity, system-prompt, reasoning, reflection, retrospective
 - **Math (9):** math, latex, step-by-step, explanations, visuals, science, statistics, finance, calculations

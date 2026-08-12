@@ -194,6 +194,11 @@ export const TOOL_REGISTRY = [
   { slug: 'task-board', name: 'Task Board', type: 'Productivity', desc: 'Build task lists and priority boards.', agents: ['task-manager', 'scheduler'], engine: 'SkillChain' },
   { slug: 'inbox-triage', name: 'Inbox Triage', type: 'Productivity', desc: 'Triage email and draft replies.', agents: ['email-triage', 'email'], engine: 'SkillChain' },
   { slug: 'notes-organize', name: 'Notes Organize', type: 'Productivity', desc: 'Organize notes and action items.', agents: ['note-taker', 'study'], engine: 'MemoryManager' },
+
+  // ── Media & video ────────────────────────────────────────────
+  { slug: 'video-analyze', name: 'Video Analyze', type: 'Media', desc: 'Watch any video link frame-by-frame: timestamped captions, sampled frames, key moments.', agents: ['video-analyst'], engine: 'VideoAnalyzer' },
+  { slug: 'video-transcript', name: 'Video Transcript', type: 'Media', desc: 'Pull the full timestamped transcript of a YouTube/TikTok/Instagram video.', agents: ['video-analyst'], engine: 'VideoAnalyzer' },
+  { slug: 'video-frames', name: 'Video Frames', type: 'Media', desc: 'Sample visual frames across a video timeline for vision analysis.', agents: ['video-analyst', 'vision'], engine: 'VideoAnalyzer' },
 ];
 
 export const TOOL_COUNT = TOOL_REGISTRY.length;

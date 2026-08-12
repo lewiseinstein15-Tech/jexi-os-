@@ -20,7 +20,7 @@ import { toolsForTeam } from './ToolRegistry.js';
 const TEAM_PLAN = {
   image_recognition: ['vision', 'reasoner', 'memory'],
   clear_memory: ['memory'],
-  link_analysis: ['navigator', 'extractor', 'reasoner', 'memory'],
+  link_analysis: ['video-analyst', 'navigator', 'extractor', 'reasoner', 'memory'],
   math_solve: ['math', 'reasoner', 'memory'],
   self_check: ['self-diagnose', 'reasoner', 'memory'],
   code_task: ['product', 'designer', 'engineer', 'architect', 'coder', 'runner', 'debugger', 'qa', 'reviewer', 'critic', 'security', 'shipper', 'reflector'],
