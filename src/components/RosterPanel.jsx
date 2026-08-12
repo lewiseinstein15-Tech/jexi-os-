@@ -4,15 +4,18 @@ import { Search, X, Users, Zap } from 'lucide-react';
 import { getBackendUrl, jexiFetch } from '../utils/helpers';
 import { coreColor } from './JexiCore';
 
-const CATEGORIES = ['Core', 'Research', 'News', 'Memory', 'Perception', 'Coding', 'DevOps', 'Data', 'Writing', 'Teaching', 'Life', 'Agent', 'Product', 'Design', 'Math'];
-
+// Category accents — a fixed palette with a stable hash fallback for any new category.
 const CATEGORY_ACCENTS = {
   Core: '#00FF9D', Research: '#22D3EE', News: '#34D399', Memory: '#F472B6',
   Perception: '#F472B6', Coding: '#A78BFA', DevOps: '#22D3EE', Data: '#22D3EE',
   Writing: '#FBBF24', Teaching: '#FBBF24', Life: '#FB7185', Agent: '#A1A1AA',
   Product: '#FBBF24', Design: '#F472B6', Math: '#A78BFA',
+  Knowledge: '#34D399', Quality: '#FB7185', Safety: '#FBBF24', Engineering: '#22D3EE',
+  Security: '#A78BFA', Creative: '#F472B6', Media: '#FBBF24', Business: '#34D399',
+  Education: '#22D3EE', Marketing: '#FBBF24', Productivity: '#00FF9D', Platform: '#A1A1AA',
 };
-const catAccent = (c) => CATEGORY_ACCENTS[c] || '#A1A1AA';
+const ACCENT_PALETTE = ['#00FF9D', '#22D3EE', '#34D399', '#F472B6', '#A78BFA', '#FBBF24', '#FB7185', '#A1A1AA'];
+const catAccent = (c) => CATEGORY_ACCENTS[c] || ACCENT_PALETTE[(c || '').length % ACCENT_PALETTE.length];
 
 export default function RosterPanel() {
   const [agents, setAgents] = useState([]);
@@ -38,14 +41,40 @@ export default function RosterPanel() {
 
   const skillBySlug = useMemo(() => new Map(skills.map(s => [s.slug, s])), [skills]);
 
+  // Real categories, derived from the backend skill registry (no hardcoded list).
+  const categories = useMemo(() => {
+    const counts = new Map();
+    for (const s of skills) {
+      if (!s.category) continue;
+      counts.set(s.category, (counts.get(s.category) || 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+  }, [skills]);
+
+  // An agent's category set = the categories of the skills it masters.
+  const agentCategories = useMemo(() => {
+    const map = new Map();
+    for (const a of agents) {
+      const cats = new Set();
+      for (const slug of a.skills || []) {
+        const s = skillBySlug.get(slug);
+        if (s && s.category) cats.add(s.category);
+      }
+      map.set(a.slug, cats);
+    }
+    return map;
+  }, [agents, skillBySlug]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return agents.filter(a => {
-      if (cat && a.skills && !a.skills.includes(cat.toLowerCase())) return false;
+      if (cat && !agentCategories.get(a.slug)?.has(cat)) return false;
       if (!q) return true;
       return (a.name || '').toLowerCase().includes(q) || (a.role || '').toLowerCase().includes(q);
     });
-  }, [agents, search, cat]);
+  }, [agents, search, cat, agentCategories]);
 
   if (loading) {
     return (
@@ -77,12 +106,17 @@ export default function RosterPanel() {
         </div>
       </div>
 
-      {/* Category filter chips */}
+      {/* Category filter chips — every real category from the catalog */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
-        <Chip active={cat === ''} onClick={() => setCat('')}>ALL</Chip>
-        {CATEGORIES.map((c) => (
-          <Chip key={c} active={cat === c.toLowerCase()} onClick={() => setCat(cat === c.toLowerCase() ? '' : c.toLowerCase())}>
-            {c.toUpperCase()}
+        <Chip active={cat === ''} onClick={() => setCat('')}>ALL · {agents.length}</Chip>
+        {categories.map(({ name, count }) => (
+          <Chip
+            key={name}
+            active={cat === name}
+            onClick={() => setCat(cat === name ? '' : name)}
+            accent={catAccent(name)}
+          >
+            {name.toUpperCase()} · {count}
           </Chip>
         ))}
       </div>
@@ -116,7 +150,9 @@ export default function RosterPanel() {
               <span className="flex items-center gap-1 text-[8px] font-bold tracking-wider text-text-tertiary">
                 <Zap className="w-2.5 h-2.5" /> {agent.skills?.length || 0} SKILLS
               </span>
-              <span className="text-[8px] text-text-tertiary">{catAccent(agent.skills?.[0] || '') && ''}</span>
+              <span className="text-[8px] font-bold tracking-wider" style={{ color: catAccent([...agentCategories.get(agent.slug) || []][0]) }}>
+                {[...(agentCategories.get(agent.slug) || [])][0] || ''}
+              </span>
             </div>
           </motion.button>
         ))}
@@ -182,13 +218,14 @@ export default function RosterPanel() {
   );
 }
 
-function Chip({ active, onClick, children }) {
+function Chip({ active, onClick, children, accent }) {
   return (
     <button
       onClick={onClick}
       className={`tap-target flex-shrink-0 px-2.5 py-1.5 rounded-full text-[8px] font-bold tracking-wider transition-all duration-200 ${
         active ? 'bg-brand-dim text-brand border border-brand-line' : 'bg-surface-1 text-text-tertiary border border-hairline hover:text-text-secondary'
       }`}
+      style={!active && accent ? { borderColor: `${accent}33`, color: accent } : undefined}
     >
       {children}
     </button>
