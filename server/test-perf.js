@@ -37,7 +37,7 @@ console.log('=== 2) Fresh-memory fast path (repeat news questions) ===');
 {
   const q = 'what is the latest news on Kenya elections';
   saveInternetKnowledge(q, '### NEWS\n\n1. Headline A — Kenya News\n2. Headline B — Nation', ['A', 'B']);
-  const fresh = searchFreshInternetKnowledge(q, 30 * 60 * 1000);
+  const fresh = await searchFreshInternetKnowledge(q, 30 * 60 * 1000);
   check('recently learned answer is recalled', fresh !== null && fresh.topic === q);
 
   // Seed a genuinely old answer (1 hour ago) and confirm it is not "fresh"
@@ -45,8 +45,8 @@ console.log('=== 2) Fresh-memory fast path (repeat news questions) ===');
   const mem = loadMemory();
   mem.internetKnowledge.push({ topic: 'stale-news-question', answer: 'old answer', sources: [], date: new Date(Date.now() - 3600 * 1000).toISOString() });
   saveMemory();
-  check('answer older than maxAge is not "fresh"', searchFreshInternetKnowledge('stale-news-question', 30 * 60 * 1000) === null);
-  check('plain search still finds the old answer', searchInternetKnowledge('stale-news-question') !== null);
+  check('answer older than maxAge is not "fresh"', await searchFreshInternetKnowledge('stale-news-question', 30 * 60 * 1000) === null);
+  check('plain search still finds the old answer', (await searchInternetKnowledge('stale-news-question')) !== null);
 }
 
 console.log('=== 3) Knowledge index (re-reads only when files change) ===');

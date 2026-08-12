@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Groq } from 'groq-sdk';
 import { loadSettings } from './SettingsManager.js';
-import { providerOrder, recordProviderSuccess, recordProviderFailure, configuredProviders } from './ProviderRouter.js';
+import { providerOrder, recordProviderSuccess, recordProviderFailure, configuredProviders, markProviderUnavailable } from './ProviderRouter.js';
 
 /**
  * Keys are resolved in this order:
@@ -54,6 +54,41 @@ const DEEPINFRA_MODELS = ['meta-llama/Meta-Llama-3.1-8B-Instruct', 'meta-llama/M
 const MISTRAL_MODELS = ['open-mistral-7b', 'open-mixtral-8x7b']; // Experiment free tier
 
 const TIMEOUT_MS = 90000;
+
+// Groq's free embedding model — rides the same GROQ_API_KEY, no extra key.
+// Used by MemoryManager for vector recall (TencentDB-Agent-Memory pattern).
+const EMBED_MODEL = 'nomic-embed-text-v1.5';
+const embedCache = new Map();
+const EMBED_CACHE_MAX = 2000;
+
+/**
+ * Embed a text with Groq's nomic-embed-text-v1.5 (cached). Returns a number[]
+ * or null — null on any failure or when no Groq key is set, so memory retrieval
+ * always falls back to keyword matching and never breaks because of embeddings.
+ */
+export async function embedText(text) {
+  const clean = String(text || '').trim().slice(0, 8000);
+  if (!clean) return null;
+  if (embedCache.has(clean)) return embedCache.get(clean);
+  const { groqKey } = resolveKeys();
+  if (!groqKey) return null;
+  try {
+    const groq = new Groq({ apiKey: groqKey });
+    const res = await groq.embeddings.create({ model: EMBED_MODEL, input: clean });
+    const vec = res?.data?.[0]?.embedding;
+    if (Array.isArray(vec) && vec.length) {
+      if (embedCache.size >= EMBED_CACHE_MAX) {
+        const oldest = embedCache.keys().next().value;
+        if (oldest !== undefined) embedCache.delete(oldest);
+      }
+      embedCache.set(clean, vec);
+      return vec;
+    }
+  } catch (e) {
+    // quiet — embeddings are an enhancement, never a hard dependency
+  }
+  return null;
+}
 
 /** Read the MIME type out of a data: URL (camera sends image/jpeg, uploads can be png/webp). */
 export function mimeFromDataUrl(dataUrl) {
@@ -225,7 +260,7 @@ async function tryHuggingFace(prompt, system, imageBase64, opts, errors) {
  * Mistral all expose the same REST shape, so one helper serves all three.
  * Text-only (vision stays on Groq/Gemini/OpenRouter).
  */
-async function tryOpenAICompat({ key, baseUrl, models, label }, prompt, system, imageBase64, opts, errors) {
+async function tryOpenAICompat({ key, baseUrl, models, label, providerKey = '' }, prompt, system, imageBase64, opts, errors) {
   if (imageBase64) return null;
   if (!key) return null;
   for (const model of models) {
@@ -249,6 +284,9 @@ async function tryOpenAICompat({ key, baseUrl, models, label }, prompt, system, 
         });
         if (!res.ok) {
           const body = await res.text().catch(() => '');
+          // 402 payment-required → the account can't use this provider at all.
+          // Park it for an hour so it stops slowing down every request.
+          if (res.status === 402 && providerKey) markProviderUnavailable(providerKey, 60);
           errors.push(`${label}(${model}): HTTP ${res.status} ${body.slice(0, 120)}`);
           continue;
         }
@@ -268,11 +306,11 @@ async function tryOpenAICompat({ key, baseUrl, models, label }, prompt, system, 
 }
 
 const tryCerebras = (p, s, img, o, e) =>
-  tryOpenAICompat({ key: resolveKeys().cerebrasKey, baseUrl: 'https://api.cerebras.ai/v1', models: CEREBRAS_MODELS, label: 'Cerebras' }, p, s, img, o, e);
+  tryOpenAICompat({ key: resolveKeys().cerebrasKey, baseUrl: 'https://api.cerebras.ai/v1', models: CEREBRAS_MODELS, label: 'Cerebras', providerKey: 'cerebras' }, p, s, img, o, e);
 const tryDeepInfra = (p, s, img, o, e) =>
-  tryOpenAICompat({ key: resolveKeys().deepinfraKey, baseUrl: 'https://api.deepinfra.com/v1/openai', models: DEEPINFRA_MODELS, label: 'DeepInfra' }, p, s, img, o, e);
+  tryOpenAICompat({ key: resolveKeys().deepinfraKey, baseUrl: 'https://api.deepinfra.com/v1/openai', models: DEEPINFRA_MODELS, label: 'DeepInfra', providerKey: 'deepinfra' }, p, s, img, o, e);
 const tryMistral = (p, s, img, o, e) =>
-  tryOpenAICompat({ key: resolveKeys().mistralKey, baseUrl: 'https://api.mistral.ai/v1', models: MISTRAL_MODELS, label: 'Mistral' }, p, s, img, o, e);
+  tryOpenAICompat({ key: resolveKeys().mistralKey, baseUrl: 'https://api.mistral.ai/v1', models: MISTRAL_MODELS, label: 'Mistral', providerKey: 'mistral' }, p, s, img, o, e);
 
 const PROVIDER_CALLS = {
   groq: tryGroq,

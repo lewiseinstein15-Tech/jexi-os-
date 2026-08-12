@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { MEMORY_FILE, KNOWLEDGE_DIR, WORKSPACE_DIR } from '../config.js';
-import { generateContent, resolveKeys } from './LLMClient.js';
+import { generateContent, resolveKeys, embedText } from './LLMClient.js';
 
 /**
  * JEXI OS Memory Core
@@ -238,6 +238,108 @@ export function memoryScore(query, entry, idf) {
   return { score: 0.4 * relevance + 0.35 * recency + 0.25 * importance, relevance, recency, importance };
 }
 
+/* ------------------------------------------------------------------ */
+/* Vector layer (TencentDB-Agent-Memory pattern: keyword BM25/tf-idf +  */
+/* embedding vectors fused together, so recall is semantic not literal) */
+/* ------------------------------------------------------------------ */
+
+/** Cosine similarity of two embedding vectors (0..1 for normalized-ish vecs). */
+export function vectorCosine(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || !a.length || a.length !== b.length) return 0;
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  if (!na || !nb) return 0;
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
+/**
+ * TencentDB-style fusion of the two retrievers: 0.65·vector + 0.35·keyword.
+ * Vector wins when an embedding exists; pure keyword otherwise.
+ */
+export function fuseScore(vector, keyword) {
+  if (typeof vector !== 'number' || !Number.isFinite(vector)) return keyword || 0;
+  return 0.65 * Math.max(0, vector) + 0.35 * (keyword || 0);
+}
+
+/** The canonical text to embed for a memory entry (topic + body). */
+function entryText(entry) {
+  return `${entry.topic || ''} ${entry.answer || entry.fact || entry.solution || ''}`.trim().slice(0, 2000);
+}
+
+/** Awaitable: embed an entry's text and store the vector on it (persisted). */
+async function computeAndStoreEmb(entry, store) {
+  if (entry.emb) return entry.emb;
+  const text = entryText(entry);
+  if (!text) return null;
+  const vec = await embedText(text);
+  if (!vec) return null;
+  const mem = loadMemory();
+  const idx = (mem[store] || []).findIndex((e) => e === entry);
+  if (idx === -1) return null; // pruned or replaced meanwhile
+  mem[store][idx].emb = vec;
+  saveMemory();
+  return vec;
+}
+
+/** Fire-and-forget wrapper — a failed embedding never breaks a save. */
+function attachEmbedding(entry, store) {
+  computeAndStoreEmb(entry, store).catch(() => {});
+}
+
+/**
+ * Boot-time pass: attach embeddings to entries saved before the vector layer
+ * existed (bounded to the first 50 per boot so startup stays instant).
+ * Returns how many got an embedding. No-op without a Groq key.
+ */
+export async function backfillEmbeddings() {
+  const { groqKey } = resolveKeys();
+  if (!groqKey) return 0;
+  const mem = loadMemory();
+  const targets = [];
+  for (const store of ['internetKnowledge', 'codingKnowledge', 'userFacts']) {
+    for (const entry of mem[store] || []) if (!entry.emb) targets.push([entry, store]);
+  }
+  let done = 0;
+  for (const [entry, store] of targets.slice(0, 50)) {
+    try { if (await computeAndStoreEmb(entry, store)) done++; } catch (e) {}
+  }
+  return done;
+}
+
+/**
+ * Pure ranker (no network): fuse keyword tf-idf relevance with vector cosine.
+ * `qEmb` is the query embedding (or null → keyword-only). Exported so tests
+ * can exercise the vector path without calling the embeddings API.
+ */
+export function hybridRank(list, query, qEmb, { relevanceFloor = 0.12, limit = 1 } = {}) {
+  if (!Array.isArray(list) || !list.length) return [];
+  const docs = list.map((e) => entryText(e));
+  const idf = buildIdf(docs);
+  const scored = [];
+  for (let i = 0; i < list.length; i++) {
+    const entry = list[i];
+    const kw = memoryScore(query, { ...entry, answer: docs[i] }, idf);
+    const vec = qEmb && Array.isArray(entry.emb) ? vectorCosine(qEmb, entry.emb) : 0;
+    const score = qEmb && Array.isArray(entry.emb) ? fuseScore(vec, kw.relevance) : kw.relevance;
+    if (score >= relevanceFloor) scored.push({ entry, score, relevance: kw.relevance, vector: vec });
+  }
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit);
+}
+
+/** Hybrid search across a store: embedding (if available) fused with tf-idf. */
+export async function hybridSearch(list, query, opts = {}) {
+  const qEmb = await embedText(query);
+  const top = hybridRank(list, query, qEmb, opts);
+  for (const r of top) touch(r.entry);
+  if (top.length) saveMemory();
+  return top;
+}
+
 /** Mark an entry as accessed (boosts its recency for next time). */
 function touch(entry) {
   entry.lastAccess = new Date().toISOString();
@@ -461,29 +563,22 @@ export function rememberUserFact(fact, importance = IMPORTANCE.fact, label = 'fa
     existing.date = new Date().toISOString();
     existing.importance = Math.max(existing.importance || 3, importance);
   } else {
-    mem.userFacts.push({ fact: text, label: label || 'fact', importance, date: new Date().toISOString(), lastAccess: new Date().toISOString(), accessCount: 0 });
+    const entry = { fact: text, label: label || 'fact', importance, date: new Date().toISOString(), lastAccess: new Date().toISOString(), accessCount: 0 };
+    mem.userFacts.push(entry);
+    attachEmbedding(entry, 'userFacts'); // vector layer (TencentDB pattern)
   }
   prune(mem, 'userFacts');
   saveMemory();
   return mem.userFacts[mem.userFacts.length - 1];
 }
 
-/** Retrieve facts relevant to the current context (three-pillar scoring). */
-export function searchUserFacts(query, limit = 5) {
+/** Retrieve facts relevant to the current context (hybrid vector + keyword). */
+export async function searchUserFacts(query, limit = 5) {
   const mem = loadMemory();
   const facts = mem.userFacts || [];
   if (!facts.length) return [];
-  const idf = buildIdf(facts.map((f) => `${f.fact} ${f.label || ''}`));
-  const scored = facts
-    .map((f) => {
-      const { score, relevance } = memoryScore(query, { ...f, topic: f.fact, answer: f.label }, idf);
-      return { fact: f, score, relevance };
-    })
-    .filter((r) => r.relevance >= 0.15)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
-  for (const r of scored) touch(r.fact);
-  return scored.map((r) => r.fact);
+  const hits = await hybridSearch(facts, query, { relevanceFloor: 0.15, limit });
+  return hits.map((h) => h.entry);
 }
 
 /** Top facts by importance × recency — for always-on conversation context. */
@@ -532,42 +627,31 @@ export function saveInternetKnowledge(topic, answer, sources = []) {
   prune(mem, 'internetKnowledge');
   prune(mem, 'learnedAnswers');
   saveMemory();
+  attachEmbedding(entry, 'internetKnowledge'); // vector layer (TencentDB pattern)
   return entry;
 }
 
-export function searchInternetKnowledge(query) {
+export async function searchInternetKnowledge(query) {
   const mem = loadMemory();
   const list = mem.internetKnowledge;
   if (!list.length) return null;
-  const idf = buildIdf(list.map((e) => `${e.topic} ${e.answer}`));
-  let best = null, bestScore = 0;
-  for (const entry of list) {
-    const { score, relevance } = memoryScore(query, entry, idf);
-    // Need a genuine topical match: at least some semantic overlap AND a solid composite
-    if (relevance >= 0.12 && score > bestScore) { best = entry; bestScore = score; }
-  }
-  if (!best) return null;
-  touch(best);
-  saveMemory();
-  return best;
+  const hits = await hybridSearch(list, query, { relevanceFloor: 0.12, limit: 1 });
+  return hits.length ? hits[0].entry : null;
 }
 
 /**
  * Same as searchInternetKnowledge, but only returns answers JEXI learned
  * recently (default: within the last 30 minutes). Used for instant repeat
  * answers — e.g. asking the same news question twice within minutes.
+ * Returns the entry OBJECT (never an array) — callers must check it directly.
  */
-export function searchFreshInternetKnowledge(query, maxAgeMs = 30 * 60 * 1000) {
+export async function searchFreshInternetKnowledge(query, maxAgeMs = 30 * 60 * 1000) {
   const mem = loadMemory();
   const list = mem.internetKnowledge;
   if (!list.length) return null;
-  const idf = buildIdf(list.map((e) => `${e.topic} ${e.answer}`));
-  let best = null, bestScore = 0;
-  for (const entry of list) {
-    const { score, relevance } = memoryScore(query, entry, idf);
-    if (relevance >= 0.3 && score > bestScore) { best = entry; bestScore = score; }
-  }
-  if (!best) return null;
+  const hits = await hybridSearch(list, query, { relevanceFloor: 0.12, limit: 1 });
+  if (!hits.length) return null;
+  const best = hits[0].entry;
   const age = Date.now() - new Date(best.date || 0).getTime();
   if (!Number.isFinite(age) || age > maxAgeMs) return null;
   return best;
@@ -593,26 +677,85 @@ export function saveCodingKnowledge(topic, language, solution, files = []) {
   mem.codingKnowledge.push(entry);
   prune(mem, 'codingKnowledge');
   saveMemory();
+  attachEmbedding(entry, 'codingKnowledge'); // vector layer (TencentDB pattern)
   return entry;
 }
 
-export function searchCodingKnowledge(query) {
+export async function searchCodingKnowledge(query) {
   const mem = loadMemory();
   const list = mem.codingKnowledge;
   if (!list.length) return null;
-  const idf = buildIdf(list.map((e) => `${e.topic} ${e.solution}`));
-  let best = null, bestScore = 0;
-  for (const entry of list) {
-    const { score, relevance } = memoryScore(query, entry, idf);
-    // Strict recall: only a genuinely SIMILAR build is reused — tf-idf relevance
-    // floor of 0.28 stops a different app that merely shares a word (e.g. "dark
-    // theme") from hijacking the pipeline. Then rank by the composite score.
-    if (relevance >= 0.28 && score > bestScore) { best = entry; bestScore = score; }
+  const hits = await hybridSearch(list, query, { relevanceFloor: 0.25, limit: 1 });
+  return hits.length ? hits[0].entry : null;
+}
+
+/* ------------------------------------------------------------------ */
+/* Semantic recall + per-agent memory loadouts                         */
+/* (TencentDB-Agent-Memory pattern: layered L1/L2 fusion on demand,     */
+/*  and each specialist is "equipped" with the memory it needs)         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Recall across ALL memory stores, fused and capped by a character budget
+ * (TencentDB caps retrieval so memory never overwhelms the context window).
+ * Returns [{ kind, label, text, score }].
+ */
+export async function semanticRecall(query, { limit = 3, maxChars = 1200 } = {}) {
+  const mem = loadMemory();
+  const q = String(query || '').trim();
+  if (q.length < 4) return [];
+  const results = [];
+  const internet = await hybridSearch(mem.internetKnowledge || [], q, { relevanceFloor: 0.12, limit });
+  for (const h of internet) results.push({ kind: 'research', label: String(h.entry.topic || '').slice(0, 120), text: String(h.entry.answer || '').slice(0, 600), score: h.score });
+  const coding = await hybridSearch(mem.codingKnowledge || [], q, { relevanceFloor: 0.25, limit });
+  for (const h of coding) results.push({ kind: 'code', label: String(h.entry.topic || '').slice(0, 120), text: String(h.entry.solution || '').slice(0, 600), score: h.score });
+  const facts = await hybridSearch(mem.userFacts || [], q, { relevanceFloor: 0.15, limit });
+  for (const h of facts) results.push({ kind: 'fact', label: String(h.entry.fact || '').slice(0, 200), text: '', score: h.score });
+  results.sort((a, b) => b.score - a.score);
+  let budget = 0;
+  const capped = [];
+  for (const r of results) {
+    if (budget >= maxChars) break;
+    capped.push(r);
+    budget += r.text.length + 60;
   }
-  if (!best) return null;
-  touch(best);
-  saveMemory();
-  return best;
+  return capped.slice(0, limit);
+}
+
+/** Which memory stores each specialist is equipped with (TencentDB loadout). */
+const AGENT_MEMORY_MAP = {
+  coder: ['codingKnowledge'],
+  engineer: ['codingKnowledge'],
+  architect: ['codingKnowledge'],
+  qa: ['codingKnowledge'],
+  debugger: ['codingKnowledge'],
+  reviewer: ['codingKnowledge'],
+  'fact-checker': ['internetKnowledge'],
+  researcher: ['internetKnowledge'],
+  searcher: ['internetKnowledge'],
+  synthesizer: ['internetKnowledge'],
+  writer: ['internetKnowledge'],
+  translator: ['internetKnowledge'],
+  'data-analyst': ['internetKnowledge'],
+  planner: ['userFacts', 'internetKnowledge'],
+  reasoning: ['userFacts', 'internetKnowledge'],
+};
+
+/**
+ * Equip an agent with its relevant past memories (TencentDB "agent loadout").
+ * Returns [{ store, entry }]. No-op for agents with no loadout.
+ */
+export async function memoryForAgent(agentSlug, query, { limit = 2 } = {}) {
+  const stores = AGENT_MEMORY_MAP[String(agentSlug || '').toLowerCase()] || [];
+  const mem = loadMemory();
+  const out = [];
+  for (const store of stores) {
+    const list = mem[store] || [];
+    if (!list.length) continue;
+    const hits = await hybridSearch(list, query, { relevanceFloor: 0.2, limit });
+    for (const h of hits) out.push({ store, entry: h.entry });
+  }
+  return out;
 }
 
 /* ------------------------------------------------------------------ */

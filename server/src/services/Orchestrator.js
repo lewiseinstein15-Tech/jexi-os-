@@ -28,6 +28,7 @@ import {
   searchInternetKnowledge, searchFreshInternetKnowledge, searchCodingKnowledge,
   saveInternetKnowledge, saveCodingKnowledge, saveKnowledgeFile,
   getRollingSummary, getRecentEpisodes, rememberEpisode,
+  semanticRecall, memoryForAgent,
 } from './MemoryManager.js';
 import { WORKSPACE_DIR, MANAGER_URL, PUBLIC_URL, MAX_DEBUG_ATTEMPTS } from '../config.js';
 
@@ -55,7 +56,7 @@ I'm free, open-source, and always awake. Ask me to build you an app, study a top
  * of older turns → episodic memory → long-term semantic recall of anything
  * JEXI already researched, so she never forgets the thread mid-conversation.
  */
-function conversationContext(query = '') {
+async function conversationContext(query = '') {
   const history = getChatHistory(12);
   const facts = topUserFacts(4);
   const profile = loadMemory().userProfile || {};
@@ -77,13 +78,14 @@ function conversationContext(query = '') {
   }
 
   // Semantic recall — if JEXI already researched/learned this, say so instead
-  // of searching again (Memory Agent). "I remembered this from my mind."
+  // of searching again (Memory Agent). Hybrid vector + keyword retrieval
+  // (TencentDB-Agent-Memory pattern). "I remembered this from my mind."
   try {
     if (String(query || '').trim().length > 4) {
-      const learned = searchFreshInternetKnowledge(query, 7 * 24 * 60 * 60 * 1000);
+      const learned = await semanticRecall(query, { limit: 1 });
       if (learned.length) {
         const top = learned[0];
-        memoryBlock.push(`From my mind (I researched this before): ${String(top.topic).slice(0, 120)} — ${String(top.answer).slice(0, 300)}`);
+        memoryBlock.push(`From my mind (I researched this before): ${top.label} — ${String(top.text).slice(0, 300)}`);
       }
     }
   } catch (e) {}
@@ -145,6 +147,22 @@ export class Orchestrator {
         if (plan.toolsLine) {
           sendEvent('log', { agent: 'Tool Router', message: `🛠 Auto-selected tools for this task (${plan.toolCount}): ${plan.toolsLine}` });
         }
+        // MEMORY LOADOUT (TencentDB-Agent-Memory pattern) — each specialist is
+        // equipped with the past memories it needs, so JEXI never re-learns what
+        // she already knows. Best-effort: never blocks or breaks the plan.
+        try {
+          const agentSlugs = [...new Set((plan.tasks || []).filter(Boolean))];
+          if (agentSlugs.length) {
+            const loadouts = await Promise.all(agentSlugs.map(async (slug) => {
+              const items = await memoryForAgent(slug, query, { limit: 1 });
+              return items.length
+                ? `🧠 ${slug} ← ${items.map(i => String(i.entry.topic || i.entry.fact || 'memory')).join(' · ').slice(0, 70)}`
+                : null;
+            }));
+            const lines = loadouts.filter(Boolean).slice(0, 5);
+            if (lines.length) lines.forEach((l) => sendEvent('log', { agent: 'Memory Agent', message: l }));
+          }
+        } catch (e) {}
       }
 
       switch (plan.intent) {
@@ -158,7 +176,7 @@ export class Orchestrator {
 
         /* ---------------- CONVERSATION & IDENTITY ---------------- */
         case 'conversation': {
-          const ctx = conversationContext(query);
+          const ctx = await conversationContext(query);
           // No AI key? Still answer identity/origin questions deterministically —
           // JEXI must ALWAYS know her own name, creator and origin, key or no key.
           const keys = resolveKeys();
@@ -277,7 +295,7 @@ Try it: say *"build a weather app"* and watch Product → Designer → Engineer 
         /* ---------------- MEMORY QUERY ---------------- */
         case 'memory_query': {
           const { userProfile } = await import('./MemoryManager.js').then(m => ({ userProfile: m.loadMemory().userProfile }));
-          const ctx = conversationContext(query);
+          const ctx = await conversationContext(query);
           const reply = await generateContent(
             `The user asked: "${query}"\n\nUser profile: ${JSON.stringify(userProfile)}\nRecent conversation:\n${ctx}\n\nAnswer what JEXI remembers about the user, naturally.`,
             JEXI_SYSTEM_PROMPT + preferencesBlock()
@@ -377,7 +395,7 @@ Try it: say *"build a weather app"* and watch Product → Designer → Engineer 
 
           // 1. Do we already know this from memory?
           try {
-            const remembered = searchCodingKnowledge(effQuery);
+            const remembered = await searchCodingKnowledge(effQuery);
             if (remembered) {
               sendEvent('log', { agent: 'Memory Agent', message: '✓ Found a solution I built before — recalling from memory.' });
               results.summary = `### 🧠 JEXI OS — RECALLED FROM MEMORY\n\nI solved this before, so I'm giving you the verified solution.\n\n${remembered.solution}\n\n${remembered.files?.length ? `**Files:** ${remembered.files.join(', ')}` : ''}`;
@@ -621,7 +639,7 @@ Try it: say *"build a weather app"* and watch Product → Designer → Engineer 
 
           // 2. Check memory first — did we already learn this?
           try {
-            const remembered = searchInternetKnowledge(query);
+            const remembered = await searchInternetKnowledge(query);
             if (remembered) {
               sendEvent('log', { agent: 'Memory Agent', message: '✓ I already know this — retrieving from my mind.' });
               results.summary = `### 🧠 JEXI OS — FROM MEMORY\n\n${remembered.answer}`;
@@ -707,7 +725,7 @@ Try it: say *"build a weather app"* and watch Product → Designer → Engineer 
           // 0. Same news question answered within the last ~30 min? Serve the
           //    saved summary instantly — no feeds, no AI call, no wait.
           try {
-            const fresh = searchFreshInternetKnowledge(query, 30 * 60 * 1000);
+            const fresh = await searchFreshInternetKnowledge(query, 30 * 60 * 1000);
             if (fresh) {
               sendEvent('log', { agent: 'Memory Agent', message: '✓ Fresh news on this from earlier — returning instantly from memory.' });
               results.summary = `### 🧠 JEXI OS — FROM MEMORY (news I just gathered)\n\n${fresh.answer}`;
@@ -859,7 +877,7 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
               return results;
             }
           } catch (e) {}
-          const { summary } = await reasonAndWrite(query, [], { memoryContext: conversationContext() });
+          const { summary } = await reasonAndWrite(query, [], { memoryContext: await conversationContext() });
           try { addChat('jexi', summary); } catch (e) {}
           results.summary = summary;
           results.statistics.confidence = 70;

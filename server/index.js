@@ -22,7 +22,7 @@ import {
   addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory,
   saveInternetKnowledge, saveCodingKnowledge, searchInternetKnowledge, searchCodingKnowledge,
   saveKnowledgeFile, searchKnowledge, getKnowledgeStructure, getKnowledgeStatus,
-  hydrateFromRedis, isRedisActive,
+  hydrateFromRedis, isRedisActive, semanticRecall, backfillEmbeddings,
 } from './src/services/MemoryManager.js';
 import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
@@ -32,6 +32,10 @@ import { PORT, WORKSPACE_DIR, DATA_DIR, SERVER_ROOT } from './src/config.js';
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
 // everything across restarts/redeploys (non-blocking).
 hydrateFromRedis().catch((e) => { recordError('memory', (e && e.message) || String(e)); });
+
+// Vector layer (TencentDB-Agent-Memory pattern): embed memories saved before
+// the vector layer existed. Non-blocking; no-op without a Groq key.
+backfillEmbeddings().catch((e) => { recordError('memory', (e && e.message) || String(e)); });
 
 // Self-monitoring: she keeps a live error log and can diagnose her own system.
 recordBoot();
@@ -276,6 +280,15 @@ app.get('/api/roster', (req, res) => {
 app.get('/api/memory', (req, res) => res.json(loadMemory()));
 app.post('/api/memory/clear', (req, res) => { clearMemory(); res.json({ success: true }); });
 app.post('/api/memory/user', (req, res) => { updateUserProfile(req.body); res.json({ success: true }); });
+
+// Semantic memory search — hybrid vector + keyword recall across everything
+// JEXI remembers (TencentDB-Agent-Memory pattern). Requires ?q= (min 3 chars).
+app.get('/api/memory/search', async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  if (q.length < 3) return res.json({ query: q, results: [] });
+  const results = await semanticRecall(q, { limit: 5 });
+  res.json({ query: q, results });
+});
 app.post('/api/chat/add', (req, res) => {
   try { addChat(req.body.role, req.body.text); res.json({ success: true }); }
   catch (e) { res.json({ success: false }); }

@@ -56,6 +56,19 @@ export function resetProviderHealth(key) {
 }
 
 /**
+ * Force a LONG cooldown (default 1h) — used when a provider is unusable, e.g.
+ * HTTP 402 payment-required (Cerebras/DeepInfra without billing). A dead
+ * provider shouldn't slow down every request with a retry loop, so it gets
+ * parked for an hour instead of the usual 30s.
+ */
+export function markProviderUnavailable(key, minutes = 60) {
+  const s = h(key);
+  s.fails = Math.max(s.fails, 3);
+  s.lastFail = Date.now();
+  s.cooldownUntil = Date.now() + minutes * 60 * 1000;
+}
+
+/**
  * Ordered provider keys for a request, adjusted by health.
  * `prefer` biases the order for the task type:
  *   'gemini'     → Gemini first (strong at code), then Groq, then OpenRouter, then HF

@@ -60,7 +60,7 @@ Open http://localhost:3000 and say *"build an app that tracks my water intake"*.
 | `CEREBRAS_API_KEY` | optional | **Cerebras free tier** (GPT-OSS 120B, no card) — extra fallback |
 | `DEEPINFRA_API_KEY` | optional | **DeepInfra free tier** (Llama 3.1 8B etc., no card) — extra fallback |
 | `MISTRAL_API_KEY` | optional | **Mistral free Experiment tier** (open models, no card) — extra fallback |
-| `HF_TOKEN` | optional | **HuggingFace free Inference API** (text) — last-resort provider when the others rate-limit |
+| `HF_TOKEN` | optional | **HuggingFace free Inference API** (text) — last-resort provider when the others rate-limit (often blocked from datacenter IPs — usually skipped) |
 | `GITHUB_TOKEN` | optional | GitHub Agent (commit/push/PRs) |
 | `JEXI_API_KEY` | optional | **Locks the API** — all requests must send `x-jexi-key` |
 | `JEXI_MCP_KEY` | optional | **Locks the MCP endpoint** (`/mcp`) — clients must send `Authorization: Bearer <key>` |
@@ -85,7 +85,9 @@ Inspired by the research on open-source agent frameworks (OmniRoute's provider a
 
 **4. Verification Loop — anti-hallucination.** After research/learning/knowledge answers are synthesized, a Critic re-reads the draft against the sources it cites, flags invented or unsupported claims, and a revision pass fixes them — bounded to 2 rounds so it always terminates. With no AI keys or for short answers it no-ops instantly, so it never slows a plain reply.
 
-**5. Layered Conversation Memory — remembers like a real AI.** A three-layer memory (the Mem0 / DeepAgents / OpenAI sessions pattern): recent turns stay verbatim, older turns are compressed into a **rolling running summary** (Context Manager), memorable exchanges are kept as **episodes** (Archivist), and anything JEXI already researched is **recalled from her mind** and injected into the next reply ("I remembered this from my mind."). Long conversation replies also pass the anti-hallucination loop, so JEXI doesn't invent facts while chatting. Run a live per-provider key test at `GET /api/health/providers` to see exactly which AI keys work end-to-end.
+**5. Layered Conversation Memory — remembers like a real AI.** A three-layer memory (the Mem0 / DeepAgents / OpenAI sessions pattern): recent turns stay verbatim, older turns are compressed into a **rolling running summary** (Context Manager), memorable exchanges are kept as **episodes** (Archivist), and anything JEXI already researched is **recalled from her mind** and injected into the next reply ("I remembered this from my mind."). Long conversation replies also pass the anti-hallucination loop, so JEXI doesn't invent facts while chatting.
+
+**5.5 Hybrid Vector Memory — the TencentDB-Agent-Memory pattern.** Every memory (research, code solutions, user facts) also gets a **vector embedding** via Groq's free `nomic-embed-text-v1.5` (rides the existing `GROQ_API_KEY` — no new key). Recall fuses **keyword tf-idf + vector cosine** (TencentDB's "BM25 + vector + RRF" idea), so JEXI finds memories *semantically* — "machine intelligence" can surface her notes on "neural networks" even when no word matches. Each task's specialists are also **equipped with the memories they need** (Coder → past solutions, Researcher → past research — the "agent loadout" idea), and retrieval is capped by count + character budget so memory never floods the context window. Try it: `GET /api/memory/search?q=...` (locked behind `x-jexi-key` when the API is locked). Run a live per-provider key test at `GET /api/health/providers` to see exactly which AI keys work end-to-end.
 
 ## 🧪 Testing
 
