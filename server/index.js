@@ -61,8 +61,15 @@ const keyMatches = (sent) => {
 
 // CORS: when CORS_ORIGINS is set (comma-separated origins), only browsers from
 // those origins may call the API. Unset → open (local dev / curl / mobile).
+// The Android/iOS Capacitor app and local dev tools always call from "localhost"
+// origins (http://localhost on Android, capacitor://localhost and https://localhost
+// on iOS). A remote attacker cannot spoof those — their Origin is their own domain —
+// so they are always allowed. Without this, the app is silently CORS-blocked while
+// the website works (the classic "website fine, app broken" failure).
 const CORS_ORIGINS = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
-app.use(cors({ origin: CORS_ORIGINS.length ? CORS_ORIGINS : true }));
+const NATIVE_APP_ORIGINS = ['http://localhost', 'https://localhost', 'capacitor://localhost', 'ionic://localhost'];
+const CORS_ALLOWLIST = CORS_ORIGINS.length ? [...new Set([...CORS_ORIGINS, ...NATIVE_APP_ORIGINS])] : true;
+app.use(cors({ origin: CORS_ALLOWLIST }));
 
 // Cheap, always-open endpoints the infra + onboarding path needs. Everything
 // else under /api/* (chat, vision, knowledge, memory, desktop, settings write,
