@@ -218,7 +218,7 @@ Rules: one command input per screen; conversation is a reusable workspace compon
 | 20 | MCP management UI + permission control | later |
 | 21 | Plugin system (install/enable/disable/update) | later |
 | 22 | Hook engine (before/after tool/file/task, gates) | later |
-| 23 | Automation (recurring workflows, notifications) | later |
+| 23 | Automation (recurring workflows, notifications) | ✅ recurring missions — TaskScheduler fires TaskManager missions on an interval (pause/resume/run-now, persistence, no-stacking); notifications later |
 | 24 | Model routing per agent/skill + local inference | later |
 | 25 | Cloud/runtime deployment | later |
 | 26 | Testing (unit + integration + live domain probes) | in progress |

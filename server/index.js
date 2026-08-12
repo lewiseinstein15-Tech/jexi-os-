@@ -29,6 +29,7 @@ import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
 import { mountMcp } from './mcp-server.js';
 import { taskManager } from './src/services/TaskManager.js';
+import { taskScheduler } from './src/services/TaskScheduler.js';
 import { PORT, WORKSPACE_DIR, DATA_DIR, SERVER_ROOT } from './src/config.js';
 
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
@@ -594,6 +595,43 @@ app.post('/api/tasks/:id/rerun', (req, res) => {
 
 app.delete('/api/tasks/:id', (req, res) => {
   res.json({ success: taskManager.remove(req.params.id) });
+});
+
+// === AUTOMATIONS (roadmap stage 23 — recurring missions) ===
+// A schedule is a query + interval; each due run launches a real background
+// mission through TaskManager, so every run shows up in /api/tasks with its
+// own task.* event stream. Schedules survive restarts (DATA_DIR/schedules.json).
+app.get('/api/schedules', (req, res) => {
+  res.json({ schedules: taskScheduler.list().map((s) => taskScheduler.publicSchedule(s)) });
+});
+
+app.post('/api/schedules', (req, res) => {
+  const { query, everySeconds, label, image } = req.body || {};
+  const result = taskScheduler.create({ query, everySeconds, label, image });
+  if (result.error) return res.status(400).json({ success: false, error: result.error });
+  res.json({ success: true, schedule: result.schedule });
+});
+
+app.post('/api/schedules/:id/pause', (req, res) => {
+  const s = taskScheduler.pause(req.params.id);
+  if (!s) return res.status(404).json({ success: false, error: 'Schedule not found' });
+  res.json({ success: true, schedule: s });
+});
+
+app.post('/api/schedules/:id/resume', (req, res) => {
+  const s = taskScheduler.resume(req.params.id);
+  if (!s) return res.status(404).json({ success: false, error: 'Schedule not found' });
+  res.json({ success: true, schedule: s });
+});
+
+app.post('/api/schedules/:id/run-now', (req, res) => {
+  const s = taskScheduler.runNow(req.params.id);
+  if (!s) return res.status(404).json({ success: false, error: 'Schedule not found' });
+  res.json({ success: true, schedule: s });
+});
+
+app.delete('/api/schedules/:id', (req, res) => {
+  res.json({ success: taskScheduler.remove(req.params.id) });
 });
 
 // Health endpoint used by the load balancer's active probes (and the keep-alive
