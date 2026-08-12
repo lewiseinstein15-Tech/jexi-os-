@@ -69,7 +69,23 @@ jobs:
           # Bake the GitHub run number into versionCode so every APK is a
           # strictly newer version than the last (Android refuses equal/lower).
           APK_BUILD_NUMBER: ${{ github.run_number }}
-        run: ./gradlew assembleDebug --no-daemon
+        # Retry: the very first Gradle wrapper download (gradle-8.14.3-all.zip)
+        # has hit transient HTTP 503s on the distribution mirror, which killed
+        # two consecutive builds and left the published APK stuck on an old
+        # build number. Three attempts with a backoff make a blip survivable.
+        run: |
+          for attempt in 1 2 3; do
+            echo "--- Gradle build attempt $attempt of 3 ---"
+            if ./gradlew assembleDebug --no-daemon; then
+              exit 0
+            fi
+            if [ $attempt -lt 3 ]; then
+              echo "--- build failed (transient download or compile error?), retrying in 20s ---"
+              sleep 20
+            fi
+          done
+          echo "Gradle build failed after 3 attempts"
+          exit 1
 
       - name: Upload APK artifact (Actions tab)
         uses: actions/upload-artifact@v4
