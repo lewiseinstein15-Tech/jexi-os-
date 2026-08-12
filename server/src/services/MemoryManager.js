@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { MEMORY_FILE, KNOWLEDGE_DIR, WORKSPACE_DIR } from '../config.js';
+import { generateContent, resolveKeys } from './LLMClient.js';
 
 /**
  * JEXI OS Memory Core
@@ -31,6 +32,8 @@ const DEFAULT_MEMORY = {
   codingKnowledge: [],      // { topic, language, solution, files[], date, importance, lastAccess, accessCount }
   learnedAnswers: [],       // { question, answer, date }  (distilled Q&A)
   bookLibrary: [],          // { name, file, chars, size, date, text } — the user's own books
+  conversationSummary: '',  // rolling compressed summary of older turns (Context Manager)
+  episodes: [],             // { ask, reply, time } — memorable exchanges across sessions (Archivist)
 };
 
 // ---------------------------------------------------------------------------
@@ -125,6 +128,9 @@ function migrate(mem) {
     if (!f.lastAccess) { f.lastAccess = f.date || new Date(now).toISOString(); f.accessCount = 0; }
   }
   if (!Array.isArray(mem.userFacts)) mem.userFacts = [];
+  // Round-3 fields: conversation summary + episodes (written by older builds)
+  if (typeof mem.conversationSummary !== 'string') mem.conversationSummary = '';
+  if (!Array.isArray(mem.episodes)) mem.episodes = [];
 }
 
 export function loadMemory() {
@@ -349,6 +355,78 @@ export function addChat(role, text) {
 
 export function getChatHistory(n = 20) {
   return loadMemory().chatHistory.slice(-n);
+}
+
+/* ------------------------------------------------------------------ */
+/* Conversation memory — rolling summary + episodic memory             */
+/* (layered-memory pattern from Mem0 / DeepAgents / OpenAI sessions:    */
+/*  recent turns verbatim → compressed running summary → long-term      */
+/*  semantic retrieval, so JEXI never forgets the thread mid-conversation */
+/* ------------------------------------------------------------------ */
+
+// Keep this many most-recent turns verbatim; everything older is compressed.
+const SUMMARY_RECENT_TURNS = 12;
+// Only start compressing once the history is comfortably past the verbatim window.
+const SUMMARY_THRESHOLD = 28;
+
+/** Cached rolling summary of the whole conversation ('' until it exists). */
+export function getRollingSummary() {
+  return loadMemory().conversationSummary || '';
+}
+
+/**
+ * Async context compaction — compress the turns older than the recent window
+ * into one dense running summary (Mem0/DeepAgents pattern). No AI keys → the
+ * cached summary is returned untouched; failures never break a chat.
+ */
+export async function rollingConversationSummary({ force = false } = {}) {
+  const mem = loadMemory();
+  const turns = mem.chatHistory || [];
+  if (!force && turns.length < SUMMARY_THRESHOLD) return mem.conversationSummary || '';
+
+  const old = turns.slice(0, Math.max(0, turns.length - SUMMARY_RECENT_TURNS));
+  if (!force && old.length === 0) return mem.conversationSummary || '';
+
+  const keys = resolveKeys();
+  if (!keys.groqKey && !keys.geminiKey && !keys.openrouterKey) return mem.conversationSummary || '';
+
+  const prior = mem.conversationSummary ? `Previous running summary:\n${mem.conversationSummary}\n\n` : '';
+  const text = old
+    .map((h) => `${h.role === 'user' ? 'User' : 'JEXI'}: ${String(h.text).slice(0, 800)}`)
+    .join('\n');
+  if (!text.trim()) return mem.conversationSummary || '';
+
+  try {
+    const summary = await generateContent(
+      `${prior}Compress this conversation into a dense running summary (max 400 words, bullet points). Keep: the user's goals, key decisions, facts about the user, open tasks, and anything JEXI promised or built. Drop small talk and repeats.\n\nCONVERSATION TO COMPRESS:\n${text.slice(0, 24000)}`,
+      'You are JEXI OS\'s Context Manager. Output ONLY the compressed summary.'
+    );
+    const clean = String(summary || '').trim().slice(0, 2500);
+    if (clean.length >= 20) {
+      mem.conversationSummary = clean;
+      saveMemory();
+    }
+    return mem.conversationSummary || '';
+  } catch (e) {
+    return mem.conversationSummary || '';
+  }
+}
+
+/** Remember a notable exchange (episodic memory) — capped so it stays focused. */
+export function rememberEpisode(ask, reply) {
+  const mem = loadMemory();
+  mem.episodes.push({
+    ask: String(ask || '').slice(0, 500),
+    reply: String(reply || '').slice(0, 1200),
+    time: new Date().toISOString(),
+  });
+  if (mem.episodes.length > 30) mem.episodes = mem.episodes.slice(-30);
+  saveMemory();
+}
+
+/** The most recent memorable exchanges (for conversation context). */
+export function getRecentEpisodes(n = 4) {
+  return loadMemory().episodes.slice(-n);
 }
 
 export function clearMemory() {

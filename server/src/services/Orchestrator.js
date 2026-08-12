@@ -27,6 +27,7 @@ import {
   addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory, topUserFacts,
   searchInternetKnowledge, searchFreshInternetKnowledge, searchCodingKnowledge,
   saveInternetKnowledge, saveCodingKnowledge, saveKnowledgeFile,
+  getRollingSummary, getRecentEpisodes, rememberEpisode,
 } from './MemoryManager.js';
 import { WORKSPACE_DIR, MANAGER_URL, PUBLIC_URL, MAX_DEBUG_ATTEMPTS } from '../config.js';
 
@@ -48,8 +49,13 @@ I was created by **Lewis Einstein**, an AI & ML Engineer — his most advanced c
 
 I'm free, open-source, and always awake. Ask me to build you an app, study a topic, or remember something — I'll run the whole team for you.`;
 
-/** Build a compact conversation context for JEXI to stay focused. */
-function conversationContext() {
+/**
+ * Build a compact conversation context for JEXI to stay focused (layered
+ * memory, Mem0/DeepAgents pattern): recent turns verbatim → rolling summary
+ * of older turns → episodic memory → long-term semantic recall of anything
+ * JEXI already researched, so she never forgets the thread mid-conversation.
+ */
+function conversationContext(query = '') {
   const history = getChatHistory(12);
   const facts = topUserFacts(4);
   const profile = loadMemory().userProfile || {};
@@ -59,7 +65,30 @@ function conversationContext() {
   if (facts.length) memoryBlock.push(...facts);
   const prefs = recallPreferences(3);
   if (prefs.length) memoryBlock.push(...prefs);
-  const extra = memoryBlock.length ? `\n\nWhat I know about the user (from memory):\n${memoryBlock.map(f => `- ${f}`).join('\n')}` : '';
+
+  // Rolling summary of older turns — JEXI never forgets what happened earlier.
+  const summary = getRollingSummary();
+  if (summary) memoryBlock.push(`Running summary of the earlier conversation:\n${summary.slice(0, 1200)}`);
+
+  // Episodic memory — what happened in past sessions (Archivist).
+  const episodes = getRecentEpisodes(3);
+  if (episodes.length) {
+    memoryBlock.push('Past sessions I remember:' + episodes.map((e) => `\n- User asked \"${String(e.ask).slice(0, 80)}\" → I replied about ${String(e.reply).slice(0, 120)}`).join(''));
+  }
+
+  // Semantic recall — if JEXI already researched/learned this, say so instead
+  // of searching again (Memory Agent). "I remembered this from my mind."
+  try {
+    if (String(query || '').trim().length > 4) {
+      const learned = searchFreshInternetKnowledge(query, 7 * 24 * 60 * 60 * 1000);
+      if (learned.length) {
+        const top = learned[0];
+        memoryBlock.push(`From my mind (I researched this before): ${String(top.topic).slice(0, 120)} — ${String(top.answer).slice(0, 300)}`);
+      }
+    }
+  } catch (e) {}
+
+  const extra = memoryBlock.length ? `\n\nWhat I know (from memory):\n${memoryBlock.map(f => `- ${f}`).join('\n')}` : '';
   return `${history.map(h => `${h.role === 'user' ? 'User' : 'JEXI'}: ${String(h.text).slice(0, 600)}`).join('\n')}${extra}`;
 }
 
@@ -111,6 +140,11 @@ export class Orchestrator {
           const stats = rosterStats();
           sendEvent('log', { agent: 'Planner', message: `🎓 Roster (${stats.agents}+ specialists) → ${plan.steps.length} deployed for this task. Skills: ${plan.skillsLine}` });
         }
+        // AUTO TOOL ROUTING — the tools for this task were selected automatically
+        // from the team (Tool Router). No manual tool instruction is ever needed.
+        if (plan.toolsLine) {
+          sendEvent('log', { agent: 'Tool Router', message: `🛠 Auto-selected tools for this task (${plan.toolCount}): ${plan.toolsLine}` });
+        }
       }
 
       switch (plan.intent) {
@@ -124,7 +158,7 @@ export class Orchestrator {
 
         /* ---------------- CONVERSATION & IDENTITY ---------------- */
         case 'conversation': {
-          const ctx = conversationContext();
+          const ctx = conversationContext(query);
           // No AI key? Still answer identity/origin questions deterministically —
           // JEXI must ALWAYS know her own name, creator and origin, key or no key.
           const keys = resolveKeys();
@@ -134,11 +168,16 @@ export class Orchestrator {
             results.statistics.confidence = 100;
             return results;
           }
-          const reply = await generateContent(
+          let reply = await generateContent(
             `The user just said: "${query}"\n\nRecent conversation:\n${ctx}\n\nRespond naturally as JEXI OS. If they ask who you are or who created you, answer: you are JEXI OS, a sophisticated multi-agent AI operating system built by Lewis Einstein (AI & ML Engineer) to run any task. Be warm and brief.`,
             JEXI_SYSTEM_PROMPT + preferencesBlock()
           );
+          // Anti-hallucination pass on long, fact-bearing replies (Critic / Fact
+          // Checker) — short chit-chat skips it, so replies stay instant.
+          const verified = await verifyAnswer({ query, draft: reply, sendEvent, opts: { minLength: 260 } });
+          if (verified.text) reply = verified.text;
           try { addChat('jexi', reply); } catch (e) {}
+          try { rememberEpisode(query, reply); } catch (e) {}
           results.summary = `### 🧠 JEXI OS\n\n${reply}`;
           results.statistics.confidence = 100;
           return results;
@@ -238,7 +277,7 @@ Try it: say *"build a weather app"* and watch Product → Designer → Engineer 
         /* ---------------- MEMORY QUERY ---------------- */
         case 'memory_query': {
           const { userProfile } = await import('./MemoryManager.js').then(m => ({ userProfile: m.loadMemory().userProfile }));
-          const ctx = conversationContext();
+          const ctx = conversationContext(query);
           const reply = await generateContent(
             `The user asked: "${query}"\n\nUser profile: ${JSON.stringify(userProfile)}\nRecent conversation:\n${ctx}\n\nAnswer what JEXI remembers about the user, naturally.`,
             JEXI_SYSTEM_PROMPT + preferencesBlock()

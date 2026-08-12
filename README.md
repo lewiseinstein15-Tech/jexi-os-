@@ -72,17 +72,21 @@ Open http://localhost:3000 and say *"build an app that tracks my water intake"*.
 
 Env vars always win over values pasted in the Settings panel — ideal for Render/Vercel/serverless.
 
-## 🧠 The 60+ Roster, 100+ Skills, Provider Router & Verification Loop
+## 🧠 The 87-Specialist Roster, 250 Skills, Auto Tool Routing, Provider Router & Verification Loop
 
 Inspired by the research on open-source agent frameworks (OmniRoute's provider auto-fallback, Atomic Agents' role catalog, LangGraph's loop/graph engineering, MetaGPT's SOP teams), JEXI's brain now has four layers:
 
-**1. Agent Roster — 79 specialists.** A catalog of specialist roles (Planner, Product, Designer, Engineer, Coder, QA, Reviewer, Security, Shipper, Researcher, Searcher, Synthesizer, Fact Checker, Critic, Translator, Data Analyst, DevOps, GitHub, Vision, Computer Use and 60+ more). The Planner **composes only the small subset a task needs** — the whole trick of running big rosters is that the catalog is large but the active team is small and focused. Every plan announces it live: `Roster (79+ specialists) → 6 deployed for this task.`
+**1. Agent Roster — 87 specialists.** A catalog of specialist roles (Planner, Product, Designer, Engineer, Coder, QA, Reviewer, Critic, Security, Shipper, Tool Router, Toolsmith, Context Manager, Archivist, Document Analyst, Data Engineer, Guardrail, Researcher, Searcher, Synthesizer, Fact Checker, Translator, Data Analyst, DevOps, GitHub, Vision, Computer Use and more). The Planner **composes only the small subset a task needs** — the whole trick of running big rosters is that the catalog is large but the active team is small and focused. Every plan announces it live: `Roster (87+ specialists) → 6 deployed for this task.`
 
-**2. Skill Registry — 226 skills.** Every specialist masters a set of named skills (web search, citation, fact-grounding, code generation, QA gates, translation reflection loops, math LaTeX, …). The pipeline streams which skills a task will use.
+**2. Skill Registry — 250 skills.** Every specialist masters a set of named skills (web search, citation, fact-grounding, code generation, QA gates, translation reflection loops, math LaTeX, rolling-summary, context-compaction, episodic-memory, document-rag, tool-selection, critical-review, guardrails, …). The pipeline streams which skills a task will use.
+
+**2.5 Auto Tool Routing — 28 tools, picked per task.** JEXI has a first-class **Tool Registry** (Web Search, Deep Read, Browser Control, Memory Recall, Rolling Summary, Knowledge Search, Book Library, Run Code, Write Files, Fix & Re-run, Code Review, Security Scan, Fact Check, GitHub CLI, Data Crunch, Chart Builder, Self Diagnose, Translate, … — the smolagents/OpenAI Agents SDK pattern: tools are atomic actions, skills are workflows). For **every** task the Tool Router derives the exact tool set from the composed team automatically — `Auto-selected tools for this task (6): Web Search · Deep Read · Fact Check · …` — no manual tool instruction is ever needed, and the tool set is kept small on purpose (AutoTool-style pruning so decisions stay reliable).
 
 **3. Provider Router — auto-fallback across every free key.** OmniRoute-style: Groq → Gemini → OpenRouter (Seed vision + free text) → Cerebras → Together AI → DeepInfra → Mistral → HuggingFace (free Inference API) — every provider optional, keyed by `GROQ_API_KEY` / `GEMINI_API_KEY` / `OPENROUTER_API_KEY` / `CEREBRAS_API_KEY` / `TOGETHER_API_KEY` / `DEEPINFRA_API_KEY` / `MISTRAL_API_KEY` / `HF_TOKEN`. If a provider rate-limits or errors 3× it enters a 30s cooldown and the router slides to the next healthy provider automatically — one dead key never kills a task. `get_health`/`/api/health` report live per-provider health (never keys).
 
 **4. Verification Loop — anti-hallucination.** After research/learning/knowledge answers are synthesized, a Critic re-reads the draft against the sources it cites, flags invented or unsupported claims, and a revision pass fixes them — bounded to 2 rounds so it always terminates. With no AI keys or for short answers it no-ops instantly, so it never slows a plain reply.
+
+**5. Layered Conversation Memory — remembers like a real AI.** A three-layer memory (the Mem0 / DeepAgents / OpenAI sessions pattern): recent turns stay verbatim, older turns are compressed into a **rolling running summary** (Context Manager), memorable exchanges are kept as **episodes** (Archivist), and anything JEXI already researched is **recalled from her mind** and injected into the next reply ("I remembered this from my mind."). Long conversation replies also pass the anti-hallucination loop, so JEXI doesn't invent facts while chatting. Run a live per-provider key test at `GET /api/health/providers` to see exactly which AI keys work end-to-end.
 
 ## 🧪 Testing
 

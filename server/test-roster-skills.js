@@ -3,6 +3,8 @@
 import { AGENT_ROSTER, SKILL_REGISTRY, composeTeam, skillsForTeam, rosterSummary, rosterStats, rosterFor, skillsFor, skillsLine, getAgent, getSkill } from './src/services/AgentRoster.js';
 import { providerOrder, recordProviderFailure, recordProviderSuccess, providerInCooldown, resetProviderHealth, providerHealthSnapshot } from './src/services/ProviderRouter.js';
 import { verifyAnswer, shouldVerify } from './src/services/VerificationLoop.js';
+import { TOOL_REGISTRY, toolsForIntent, toolsForTeam, getTool } from './src/services/ToolRegistry.js';
+import { planner } from './src/services/Planner.js';
 
 let failures = 0;
 const check = (label, cond) => {
@@ -66,6 +68,36 @@ check('groq back at the front after recovery', providerOrder()[0] === 'groq');
 // Snapshot shape (no secrets).
 const snap = providerHealthSnapshot();
 check('snapshot lists all 8 providers', snap.length === 8);
+
+/* ---------------- Round 3: Tools, Critics, Memory, Guardrails ---------------- */
+
+// New specialists added from the MetaGPT / CrewAI / DeepAgents / Mem0 research.
+const ROUND3_AGENTS = ['critic', 'tool-router', 'toolsmith', 'context-manager', 'archivist', 'document-analyst', 'data-engineer', 'guardrail'];
+check('round-3 specialists exist in the roster', ROUND3_AGENTS.every((s) => getAgent(s)));
+
+// New skills they master (must all exist — no dangling refs).
+const ROUND3_SKILLS = ['tool-selection', 'function-calling', 'auto-routing', 'tool-building', 'api-integration', 'orchestration', 'rolling-summary', 'context-compaction', 'continuity', 'episodic-memory', 'forgetting-curve', 'memory-consolidation', 'document-rag', 'chunking', 'retrieval', 'data-pipelines', 'etl', 'cleansing', 'critical-review', 'output-quality', 'self-consistency', 'guardrails', 'safety-checks', 'refusal'];
+check('round-3 skills exist in the registry', ROUND3_SKILLS.every((s) => getSkill(s)));
+
+// Tool Registry — first-class catalog of executable tools (smolagents/OpenAI SDK pattern).
+check('tool registry has 20+ tools (got ' + TOOL_REGISTRY.length + ')', TOOL_REGISTRY.length >= 20);
+check('every tool owner is a real roster agent', TOOL_REGISTRY.every((t) => t.agents.every((a) => getAgent(a))));
+check('every tool has a unique slug + description', new Set(TOOL_REGISTRY.map((t) => t.slug)).size === TOOL_REGISTRY.length && TOOL_REGISTRY.every((t) => t.desc.length > 10));
+check('getTool finds tools', getTool('web-search')?.name === 'Web Search' && getTool('nope') === null);
+
+// AUTO TOOL ROUTING — every intent derives a focused tool set from its team.
+const codeTools = toolsForIntent('code_task').map((t) => t.slug);
+check('code_task auto-selects code tools', ['code-run', 'code-write', 'code-fix', 'code-review', 'security-scan', 'fact-check'].every((s) => codeTools.includes(s)));
+check('code_task does NOT dump the whole catalog', codeTools.length <= 12);
+const researchTools = toolsForIntent('research').map((t) => t.slug);
+check('research auto-selects search + fact-check tools', ['web-search', 'deep-read', 'fact-check', 'memory-recall'].every((s) => researchTools.includes(s)));
+const newsTools = toolsForIntent('news_latest').map((t) => t.slug);
+check('news auto-selects the news-feed tool', newsTools.includes('news-feed'));
+const chatTools = toolsForIntent('conversation').map((t) => t.slug);
+check('conversation auto-selects memory + rolling-summary tools', ['memory-recall', 'rolling-summary', 'episode-recall'].every((s) => chatTools.includes(s)));
+const dataTools = toolsForIntent('data').map((t) => t.slug);
+check('data auto-selects data-crunch + chart tools', ['data-crunch', 'chart-builder'].every((s) => dataTools.includes(s)));
+check('toolsForTeam is stable (no dupes)', new Set(toolsForTeam(composeTeam('code_task')).map((t) => t.slug)).size === toolsForTeam(composeTeam('code_task')).length);
 check('snapshot exposes order + health fields', snap.every((p) => typeof p.order === 'number' && 'calls' in p && 'ok' in p));
 check('snapshot never leaks key values', snap.every((p) => !JSON.stringify(p).includes('sk-') && !JSON.stringify(p).includes('AIza')));
 
@@ -81,6 +113,17 @@ check('shouldVerify false for short drafts', shouldVerify('short') === false);
   const r1 = await verifyAnswer({ query: 'test', draft: 'A fairly long draft answer '.repeat(20) });
   check('no keys → verdict skipped (awaited)', r1.verdict === 'skipped');
   check('no keys → changed false', r1.changed === false);
+
+  // The planner auto-attaches the derived tool set to every plan (auto routing).
+  const plan = await planner.analyzeIntent('Build me a weather app');
+  check('plan auto-assigns tools (no manual tool instruction)', Array.isArray(plan.tools) && plan.tools.length > 0);
+  check('plan.toolsLine is a readable string', typeof plan.toolsLine === 'string' && plan.toolsLine.length > 0);
+  check('plan.toolCount matches the tool list', plan.toolCount === plan.tools.length);
+  check('plan tools all exist in the registry', plan.tools.every((s) => getTool(s)));
+  const planChat = await planner.analyzeIntent('hello there');
+  check('conversation plans auto-route memory tools too', Array.isArray(planChat.tools) && planChat.tools.includes('rolling-summary'));
+  const planCompound = await planner.analyzeIntent('research frontend layout then build an app');
+  check('compound plans union tools from both phases', Array.isArray(planCompound.tools) && planCompound.tools.includes('web-search') && planCompound.tools.includes('code-run'));
 
   console.log(failures === 0 ? '\nALL ROSTER/SKILLS/ROUTER/VERIFY TESTS PASSED' : `\n${failures} TEST(S) FAILED`);
   process.exit(failures === 0 ? 0 : 1);

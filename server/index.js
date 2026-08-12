@@ -7,8 +7,9 @@ import fs from 'fs';
 import path from 'path';
 import { planner } from './src/services/Planner.js';
 import { orchestrator } from './src/services/Orchestrator.js';
-import { generateContent, resolveKeys } from './src/services/LLMClient.js';
+import { generateContent, resolveKeys, testAllProviders } from './src/services/LLMClient.js';
 import { learnFromExchange } from './src/services/PreferenceLearner.js';
+import { rollingConversationSummary } from './src/services/MemoryManager.js';
 import {
   recordBoot, recordChat, recordVision, recordError,
   collectSystemStatus, readSourceFile,
@@ -23,6 +24,7 @@ import {
   saveKnowledgeFile, searchKnowledge, getKnowledgeStructure, getKnowledgeStatus,
   hydrateFromRedis, isRedisActive,
 } from './src/services/MemoryManager.js';
+import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
 import { mountMcp } from './mcp-server.js';
 import { PORT, WORKSPACE_DIR, DATA_DIR, SERVER_ROOT } from './src/config.js';
@@ -463,6 +465,10 @@ app.post('/api/chat', async (req, res) => {
       skillsLine: plan.skillsLine || '',
       rosterCatalogSize: plan.rosterCatalogSize || 79,
       skillCatalogSize: plan.skillCatalogSize || 226,
+      // AUTO TOOL ROUTING — the tool set derived for this task (Tool Router).
+      tools: plan.tools || [],
+      toolsLine: plan.toolsLine || '',
+      toolCount: plan.toolCount || 0,
     });
     const results = await orchestrator.executePlan(plan, effectiveQuery, sendEvent, { image });
 
@@ -481,11 +487,27 @@ app.post('/api/chat', async (req, res) => {
     // never delays the reply or breaks the stream. JEXI learns what the user
     // likes and how they like things done, then applies it to every future task.
     learnFromExchange(effectiveQuery).catch(() => {});
+    // Context compaction — compress older turns into the running conversation
+    // summary (Context Manager). Fire-and-forget so the NEXT turn has it ready.
+    rollingConversationSummary().catch(() => {});
   } catch (error) {
     recordError('chat', error.message);
     sendEvent('log', { agent: 'System', message: `Critical Error: ${error.message}` });
     sendEvent('done', { success: false, error: error.message });
   } finally { finished = true; clearTimeout(deadline); finish(); }
+});
+
+// LIVE PROVIDER TEST — fires one tiny request through EVERY configured provider
+// and reports which keys actually work end-to-end (configured ≠ working). Useful
+// right after adding a key on Render: redeploy, then hit /api/health/providers.
+app.get('/api/health/providers', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const result = await testAllProviders();
+    res.json({ ok: true, time: new Date().toISOString(), ...result, catalog: TOOL_REGISTRY.length });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: (e && e.message) || String(e) });
+  }
 });
 
 // Health endpoint used by the load balancer's active probes (and the keep-alive

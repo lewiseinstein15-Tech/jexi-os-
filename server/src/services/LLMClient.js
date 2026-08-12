@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Groq } from 'groq-sdk';
 import { loadSettings } from './SettingsManager.js';
-import { providerOrder, recordProviderSuccess, recordProviderFailure } from './ProviderRouter.js';
+import { providerOrder, recordProviderSuccess, recordProviderFailure, configuredProviders } from './ProviderRouter.js';
 
 /**
  * Keys are resolved in this order:
@@ -327,4 +327,37 @@ export async function verifyWithLLM(prompt) {
   } catch (e) {
     return false;
   }
+}
+
+/**
+ * LIVE provider test — fire one tiny request through a SINGLE provider and
+ * report whether the key actually works end-to-end (configured ≠ working).
+ * Never falls through to other providers: this is a direct probe.
+ */
+export async function testProvider(providerKey) {
+  const call = PROVIDER_CALLS[providerKey];
+  if (!call) return { provider: providerKey, ok: false, error: 'Unknown provider' };
+  const errors = [];
+  try {
+    const text = await call(
+      'Reply with exactly one word: OK',
+      'You are a connectivity test. Reply with exactly one word: OK.',
+      null,
+      { temperature: 0 },
+      errors
+    );
+    if (text) return { provider: providerKey, ok: true, error: '' };
+    return { provider: providerKey, ok: false, error: errors.join(' | ') || 'Empty response' };
+  } catch (e) {
+    return { provider: providerKey, ok: false, error: e.message || String(e) };
+  }
+}
+
+/** Test every provider that has a key configured (one tiny call each). */
+export async function testAllProviders() {
+  const configured = configuredProviders();
+  const results = await Promise.all(configured.map((k) => testProvider(k)));
+  const configuredCount = configured.length;
+  const working = results.filter((r) => r.ok).length;
+  return { tested: results, configured: configuredCount, working, total: Object.keys(PROVIDER_CALLS).length };
 }

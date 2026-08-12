@@ -1,5 +1,6 @@
 import { searchKnowledge } from './MemoryManager.js';
 import { composeTeam, skillsForTeam, rosterSummary, ROSTER_COUNT, SKILL_COUNT, rosterFor, skillsFor, skillsLine, rosterStats } from './AgentRoster.js';
+import { toolsForIntent, toolNames } from './ToolRegistry.js';
 
 /**
  * JEXI's Planner — decides which agents/tools to use and when.
@@ -21,20 +22,20 @@ const TEAM_PLAN = {
   link_analysis: ['Navigator', 'Extractor', 'Reasoner', 'Memory Agent'],
   math_solve: ['Reasoner', 'Memory Agent'],
   self_check: ['SelfDiagnose', 'Reasoner', 'Memory Agent'],
-  code_task: ['Product', 'Designer', 'Engineer', 'Coder', 'Runner', 'Debugger', 'QA Lead', 'Reviewer', 'Security Officer', 'Shipper', 'Reflector'],
+  code_task: ['Product', 'Designer', 'Engineer', 'Coder', 'Runner', 'Debugger', 'QA Lead', 'Reviewer', 'Critic', 'Security Officer', 'Shipper', 'Reflector'],
   computer_use: ['Navigator', 'Vision', 'Reasoner', 'Memory Agent'],
-  study_topic: ['Scholar', 'Researcher', 'Memory Agent'],
-  conversation: ['JEXI'],
-  memory_query: ['Memory Agent'],
-  knowledge_recall: ['Books', 'Reasoner', 'Memory Agent'],
+  study_topic: ['Scholar', 'Researcher', 'Document Analyst', 'Memory Agent'],
+  conversation: ['JEXI', 'Context Manager', 'Archivist'],
+  memory_query: ['Memory Agent', 'Archivist', 'Context Manager'],
+  knowledge_recall: ['Books', 'Document Analyst', 'Reasoner', 'Memory Agent'],
   news_latest: ['News Scout', 'News Filter', 'News Editor', 'Reasoner', 'Memory Agent'],
-  research: ['Query Analyzer', 'Searcher', 'Re-ranker', 'Extractor', 'Synthesizer', 'Memory Agent'],
+  research: ['Query Analyzer', 'Searcher', 'Re-ranker', 'Extractor', 'Synthesizer', 'Critic', 'Memory Agent'],
   learning_research: ['Researcher', 'Reasoner', 'Memory Agent'],
   explain_team: ['Planner'],
   // Specialist team round 2 — the complete JEXI OS roster
   github: ['GitHub Agent', 'Shipper'],
   translate: ['Translator', 'Reviewer'],
-  data: ['Data Analyst', 'Reasoner'],
+  data: ['Data Analyst', 'Data Engineer', 'Reasoner'],
   devops: ['DevOps Agent', 'Shipper'],
   docs: ['Technical Writer', 'Reviewer'],
   perf: ['Performance Engineer', 'Coder', 'Reviewer'],
@@ -94,6 +95,23 @@ export class Planner {
     plan.rosterSummary = rosterSummary(plan.intent);
     plan.rosterCatalogSize = rosterStats().agents;
     plan.skillCatalogSize = rosterStats().skills;
+    // AUTO TOOL ROUTING — every task gets its tool set derived from the team,
+    // with zero manual tool instruction (AutoTool / OpenAI Agents SDK / vLLM
+    // auto-tool-choice pattern: offer the small relevant subset, never the
+    // whole catalog). For compound tasks the tools are the union of both phases.
+    const toolIntents = plan.intent === 'compound_task'
+      ? (plan.phases || []).map((p) => p.intent)
+      : [plan.intent];
+    const seen = new Set();
+    const toolSet = [];
+    for (const ti of toolIntents) {
+      for (const t of toolsForIntent(ti, { steps: plan.steps })) {
+        if (!seen.has(t.slug)) { seen.add(t.slug); toolSet.push(t); }
+      }
+    }
+    plan.tools = toolSet.map((t) => t.slug);
+    plan.toolsLine = toolSet.map((t) => t.name).join(' · ');
+    plan.toolCount = toolSet.length;
     return plan;
   }
 
