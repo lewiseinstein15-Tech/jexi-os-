@@ -1,6 +1,6 @@
 # 🧠 JEXI OS — Multi-Agent AI Operating System
 
-**JEXI OS** turns one AI coding agent into a **virtual team of 20 specialized roles** — each with a focused mandate, strict deliverables, and enforced review gates — all orchestrated through one chat interface.
+**JEXI OS** turns one AI coding agent into a **virtual team of 87 specialized agents (250 skills · 28 tools)** — each with a focused mandate, strict deliverables, and enforced review gates — all orchestrated through one chat interface.
 
 Ask it to **"build an app that tracks my water intake"** and JEXI plans a team, then runs Product → Designer → Engineer → Coder → Runner → QA → Reviewer → Security → Shipper → Reflector in sequence, streaming live logs, writing real files you can preview and download, and reporting a full build report in chat.
 
