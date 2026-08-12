@@ -46,6 +46,8 @@ check('getSkill finds a skill', getSkill('verification')?.name === 'Verification
 check('default order starts with groq', providerOrder()[0] === 'groq');
 check('gemini preference starts with gemini', providerOrder('gemini')[0] === 'gemini');
 check('openrouter preference starts with openrouter', providerOrder('openrouter')[0] === 'openrouter');
+check('extra free providers are in the order', ['cerebras', 'together', 'deepinfra', 'mistral'].every((k) => providerOrder().includes(k)));
+check('huggingface stays last', providerOrder()[providerOrder().length - 1] === 'huggingface');
 
 // Cooldown: 3 failures push a provider to the back.
 resetProviderHealth('groq');
@@ -63,9 +65,9 @@ check('groq back at the front after recovery', providerOrder()[0] === 'groq');
 
 // Snapshot shape (no secrets).
 const snap = providerHealthSnapshot();
-check('snapshot lists all 4 providers', snap.length === 4);
-check('snapshot exposes order + health fields', snap.every(p => typeof p.order === 'number' && typeof p.calls === 'number' && 'inCooldown' in p));
-check('snapshot never leaks key values', JSON.stringify(snap).includes('sk-') === false && JSON.stringify(snap).includes('AIza') === false);
+check('snapshot lists all 8 providers', snap.length === 8);
+check('snapshot exposes order + health fields', snap.every((p) => typeof p.order === 'number' && 'calls' in p && 'ok' in p));
+check('snapshot never leaks key values', snap.every((p) => !JSON.stringify(p).includes('sk-') && !JSON.stringify(p).includes('AIza')));
 
 /* ---------------- VerificationLoop ---------------- */
 

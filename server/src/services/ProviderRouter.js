@@ -63,13 +63,18 @@ export function resetProviderHealth(key) {
  *   default      → Groq first (fast + free), then Gemini, OpenRouter, HF
  * Cooldowned providers are pushed to the END, healthy ones keep priority.
  */
+// Extra free OpenAI-compatible providers — slots in after the big three,
+// before HuggingFace (slow last-resort). Each is optional; a missing key is
+// simply skipped by the router. Adding one only means setting ONE env var.
+const EXTRA_PROVIDERS = ['cerebras', 'together', 'deepinfra', 'mistral'];
+
 export function providerOrder(prefer = '') {
   const base =
     prefer === 'gemini'
-      ? ['gemini', 'groq', 'openrouter', 'huggingface']
+      ? ['gemini', 'groq', 'openrouter', ...EXTRA_PROVIDERS, 'huggingface']
       : prefer === 'openrouter'
-        ? ['openrouter', 'groq', 'gemini', 'huggingface']
-        : ['groq', 'gemini', 'openrouter', 'huggingface'];
+        ? ['openrouter', 'groq', 'gemini', ...EXTRA_PROVIDERS, 'huggingface']
+        : ['groq', 'gemini', 'openrouter', ...EXTRA_PROVIDERS, 'huggingface'];
 
   const healthy = base.filter((k) => !providerInCooldown(k));
   const cooling = base.filter((k) => providerInCooldown(k));
@@ -77,29 +82,36 @@ export function providerOrder(prefer = '') {
 }
 
 /** Which providers have keys configured right now (no secrets exposed). */
+const ENV_MAP = {
+  groq: 'GROQ_API_KEY',
+  gemini: 'GEMINI_API_KEY',
+  openrouter: 'OPENROUTER_API_KEY',
+  huggingface: 'HF_TOKEN',
+  cerebras: 'CEREBRAS_API_KEY',
+  together: 'TOGETHER_API_KEY',
+  deepinfra: 'DEEPINFRA_API_KEY',
+  mistral: 'MISTRAL_API_KEY',
+};
+
+/** Which providers have keys configured right now (no secrets exposed). */
 export function configuredProviders() {
-  const out = [];
-  const keys = {
-    groq: !!process.env.GROQ_API_KEY,
-    gemini: !!process.env.GEMINI_API_KEY,
-    openrouter: !!process.env.OPENROUTER_API_KEY,
-    huggingface: !!process.env.HF_TOKEN,
-  };
-  for (const [k, on] of Object.entries(keys)) if (on) out.push(k);
-  return out;
+  return Object.keys(ENV_MAP).filter((k) => !!process.env[ENV_MAP[k]]);
 }
 
 /** Snapshot for /api/health and the self-check (never leaks key material). */
 export function providerHealthSnapshot() {
   const now = Date.now();
-  const names = { groq: 'Groq', gemini: 'Gemini', openrouter: 'OpenRouter', huggingface: 'HuggingFace' };
+  const names = {
+    groq: 'Groq', gemini: 'Gemini', openrouter: 'OpenRouter', huggingface: 'HuggingFace',
+    cerebras: 'Cerebras', together: 'Together AI', deepinfra: 'DeepInfra', mistral: 'Mistral',
+  };
   return providerOrder().map((k) => {
     const s = h(k);
     return {
       provider: names[k] || k,
       key: k,
       order: providerOrder().indexOf(k) + 1,
-      configured: !!process.env[({ groq: 'GROQ_API_KEY', gemini: 'GEMINI_API_KEY', openrouter: 'OPENROUTER_API_KEY', huggingface: 'HF_TOKEN' })[k]],
+      configured: !!process.env[ENV_MAP[k]],
       calls: s.calls,
       ok: s.ok,
       fails: s.fails,

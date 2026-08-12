@@ -15,6 +15,10 @@ export function resolveKeys() {
     geminiKey: process.env.GEMINI_API_KEY || settings.geminiKey || '',
     openrouterKey: process.env.OPENROUTER_API_KEY || settings.openrouterKey || '',
     hfKey: process.env.HF_TOKEN || settings.hfKey || '',
+    cerebrasKey: process.env.CEREBRAS_API_KEY || settings.cerebrasKey || '',
+    togetherKey: process.env.TOGETHER_API_KEY || settings.togetherKey || '',
+    deepinfraKey: process.env.DEEPINFRA_API_KEY || settings.deepinfraKey || '',
+    mistralKey: process.env.MISTRAL_API_KEY || settings.mistralKey || '',
   };
 }
 
@@ -39,6 +43,14 @@ const OPENROUTER_TEXT_MODELS = ['bytedance-seed/seed-2.0-mini', 'meta-llama/llam
 // Free text models on the HuggingFace Inference API (HF_TOKEN). Free tier is
 // slow — these are a last-resort text provider, gated on the token.
 const HF_TEXT_MODELS = ['microsoft/phi-4', 'HuggingFaceH4/zephyr-7b-beta', 'mistralai/Mistral-7B-Instruct-v0.3'];
+
+// Free / no-card OpenAI-compatible providers (text only). Each is optional —
+// a missing key is skipped entirely by the router; a failing one falls through
+// to the next healthy provider and gets a 30s quarantine after 3 failures.
+const CEREBRAS_MODELS = ['llama-3.3-70b', 'llama-3.1-8b']; // free tier, no card
+const TOGETHER_MODELS = ['meta-llama/Llama-3.3-70B-Instruct-Turbo-Free', 'meta-llama/Llama-3.1-8B-Instruct-Turbo-Free'];
+const DEEPINFRA_MODELS = ['meta-llama/Meta-Llama-3.1-8B-Instruct', 'meta-llama/Meta-Llama-3.3-70B-Instruct-Turbo'];
+const MISTRAL_MODELS = ['open-mistral-7b', 'open-mixtral-8x7b']; // Experiment free tier
 
 const TIMEOUT_MS = 90000;
 
@@ -205,11 +217,71 @@ async function tryHuggingFace(prompt, system, imageBase64, opts, errors) {
   return null;
 }
 
+/**
+ * Generic OpenAI-compatible chat-completions caller — Cerebras, Together AI,
+ * DeepInfra and Mistral all expose the same REST shape, so one helper serves
+ * all four. Text-only (vision stays on Groq/Gemini/OpenRouter).
+ */
+async function tryOpenAICompat({ key, baseUrl, models, label }, prompt, system, imageBase64, opts, errors) {
+  if (imageBase64) return null;
+  if (!key) return null;
+  for (const model of models) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+      try {
+        const res = await fetch(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: prompt },
+            ],
+            temperature: opts.temperature ?? 0.4,
+            max_tokens: 1600,
+          }),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          errors.push(`${label}(${model}): HTTP ${res.status} ${body.slice(0, 120)}`);
+          continue;
+        }
+        const data = await res.json();
+        const text = data?.choices?.[0]?.message?.content || '';
+        if (text) return text.trim();
+        errors.push(`${label}(${model}) returned an empty response`);
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch (e) {
+      errors.push(`${label}(${model}): ${e.message}`);
+      console.error(`[LLMClient] ${label} failed:`, e.message);
+    }
+  }
+  return null;
+}
+
+const tryCerebras = (p, s, img, o, e) =>
+  tryOpenAICompat({ key: resolveKeys().cerebrasKey, baseUrl: 'https://api.cerebras.ai/v1', models: CEREBRAS_MODELS, label: 'Cerebras' }, p, s, img, o, e);
+const tryTogether = (p, s, img, o, e) =>
+  tryOpenAICompat({ key: resolveKeys().togetherKey, baseUrl: 'https://api.together.xyz/v1', models: TOGETHER_MODELS, label: 'Together' }, p, s, img, o, e);
+const tryDeepInfra = (p, s, img, o, e) =>
+  tryOpenAICompat({ key: resolveKeys().deepinfraKey, baseUrl: 'https://api.deepinfra.com/v1/openai', models: DEEPINFRA_MODELS, label: 'DeepInfra' }, p, s, img, o, e);
+const tryMistral = (p, s, img, o, e) =>
+  tryOpenAICompat({ key: resolveKeys().mistralKey, baseUrl: 'https://api.mistral.ai/v1', models: MISTRAL_MODELS, label: 'Mistral' }, p, s, img, o, e);
+
 const PROVIDER_CALLS = {
   groq: tryGroq,
   gemini: tryGemini,
   openrouter: tryOpenRouter,
   huggingface: tryHuggingFace,
+  cerebras: tryCerebras,
+  together: tryTogether,
+  deepinfra: tryDeepInfra,
+  mistral: tryMistral,
 };
 
 /**
@@ -240,11 +312,11 @@ export async function generateContent(prompt, systemInstruction = '', imageBase6
     recordProviderFailure(provider);
   }
 
-  const { groqKey, geminiKey, openrouterKey, hfKey } = resolveKeys();
-  if (groqKey || geminiKey || openrouterKey || hfKey) {
+  const keys = Object.values(resolveKeys()).filter(Boolean);
+  if (keys.length > 0) {
     throw new Error(`All AI providers failed. ${errors.join(' | ')}`);
   }
-  throw new Error('No API keys configured. Add a Groq, Gemini, OpenRouter or HuggingFace key in Settings, or set GROQ_API_KEY/GEMINI_API_KEY/OPENROUTER_API_KEY/HF_TOKEN.');
+  throw new Error('No API keys configured. Add a key in Settings (Groq, Gemini, OpenRouter, Cerebras, Together, DeepInfra, Mistral or HuggingFace), or set the matching env var in Render.');
 }
 
 /** Ask the LLM a yes/no or one-word verification question. */

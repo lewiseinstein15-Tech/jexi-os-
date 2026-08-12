@@ -226,7 +226,7 @@ You type:  "Build me a water-intake tracker"
 
 1. **Gates, not vibes** — QA Lead (PASS/FAIL), Reviewer (APPROVED/CHANGES-REQUESTED), Security Officer (CLEARED/FLAGGED) must all pass before output ships.
 2. **Verification Loop** — after research/learning, a Critic audits the draft against its sources; invented claims get flagged and a revision pass fixes them (capped at 2 rounds so it always terminates).
-3. **Provider Router** — Groq → Gemini → OpenRouter → HuggingFace auto-fallback with 30s cooldowns; one dead key never kills a task.
+3. **Provider Router** — 8 optional free providers: Groq → Gemini → OpenRouter → Cerebras → Together AI → DeepInfra → Mistral → HuggingFace, auto-fallback with 30s cooldowns (quarantine); one dead key never kills a task.
 4. **Strict handoffs** — each agent receives only its predecessor's output, so no context bleed or hallucinated earlier steps.
 5. **Memory** — facts and preferences are scored (tf-idf) and consolidated into long-term memory, so JEXI learns you over time.
 

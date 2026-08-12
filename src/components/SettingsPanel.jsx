@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server, Github, ShieldCheck, Globe, Lock } from 'lucide-react';
+import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server, Github, ShieldCheck, Globe, Lock, Cpu, Layers, Cloud } from 'lucide-react';
 import { getBackendUrl, setBackendUrl, getAccessKey, setAccessKey, jexiFetch } from '../utils/helpers';
 import PanelHeader from './PanelHeader';
 
@@ -48,6 +48,10 @@ export default function SettingsPanel() {
   const [groqKey, setGroqKey] = useState('');
   const [openrouterKey, setOpenrouterKey] = useState('');
   const [hfKey, setHfKey] = useState('');
+  const [cerebrasKey, setCerebrasKey] = useState('');
+  const [togetherKey, setTogetherKey] = useState('');
+  const [deepinfraKey, setDeepinfraKey] = useState('');
+  const [mistralKey, setMistralKey] = useState('');
   const [githubToken, setGithubToken] = useState('');
   const [keyStatus, setKeyStatus] = useState(null); // { groq, gemini, github }
   const [status, setStatus] = useState('idle'); // idle, loading, saved, error
@@ -71,6 +75,10 @@ export default function SettingsPanel() {
         setGroqKey(data.groqKey || '');
         setOpenrouterKey(data.openrouterKey || '');
         setHfKey(data.hfKey || '');
+        setCerebrasKey(data.cerebrasKey || '');
+        setTogetherKey(data.togetherKey || '');
+        setDeepinfraKey(data.deepinfraKey || '');
+        setMistralKey(data.mistralKey || '');
         setGithubToken(data.githubToken || '');
         try { setKeyStatus(await statusRes.json()); } catch (e) { /* status endpoint optional */ }
       } catch (e) {
@@ -98,6 +106,10 @@ export default function SettingsPanel() {
       if (!keyStatus?.groq?.configured) body.groqKey = groqKey;
       if (!keyStatus?.openrouter?.configured) body.openrouterKey = openrouterKey;
       if (!keyStatus?.huggingface?.configured) body.hfKey = hfKey;
+      if (!keyStatus?.cerebras?.configured) body.cerebrasKey = cerebrasKey;
+      if (!keyStatus?.together?.configured) body.togetherKey = togetherKey;
+      if (!keyStatus?.deepinfra?.configured) body.deepinfraKey = deepinfraKey;
+      if (!keyStatus?.mistral?.configured) body.mistralKey = mistralKey;
       if (!keyStatus?.github?.configured) body.githubToken = githubToken;
       const res = await jexiFetch(`${backendUrl}/api/settings`, {
         method: 'POST',
@@ -168,6 +180,54 @@ export default function SettingsPanel() {
             hint="Get free token at huggingface.co/settings/tokens — used as the last-resort text provider when the others rate-limit."
             status={keyStatus?.huggingface}
             envNames={['HF_TOKEN']}
+          />
+
+          {/* Cerebras — free fast inference (like Groq) */}
+          <KeyField
+            label="CEREBRAS KEY (FREE FAST)"
+            icon={<Cpu className="w-3 h-3 text-brand" />}
+            value={cerebrasKey}
+            onChange={(e) => setCerebrasKey(e.target.value)}
+            placeholder="Get free key at cloud.cerebras.ai — no card"
+            hint="Free tier, no credit card — Llama 3.3 70B. Set CEREBRAS_API_KEY in Render and it's automatic."
+            status={keyStatus?.cerebras}
+            envNames={['CEREBRAS_API_KEY']}
+          />
+
+          {/* Together AI — free open-model inference */}
+          <KeyField
+            label="TOGETHER AI KEY (FREE OPEN MODELS)"
+            icon={<Layers className="w-3 h-3 text-violet-400" />}
+            value={togetherKey}
+            onChange={(e) => setTogetherKey(e.target.value)}
+            placeholder="Get free key at together.ai — no card"
+            hint="Free tier, 200+ open models with -Turbo-Free routes. Set TOGETHER_API_KEY in Render and it's automatic."
+            status={keyStatus?.together}
+            envNames={['TOGETHER_API_KEY']}
+          />
+
+          {/* DeepInfra — free open-model inference */}
+          <KeyField
+            label="DEEPINFRA KEY (FREE OPEN MODELS)"
+            icon={<Server className="w-3 h-3 text-sky-400" />}
+            value={deepinfraKey}
+            onChange={(e) => setDeepinfraKey(e.target.value)}
+            placeholder="Get free key at deepinfra.com — no card"
+            hint="Free tier models like Llama 3.1 8B. Set DEEPINFRA_API_KEY in Render and it's automatic."
+            status={keyStatus?.deepinfra}
+            envNames={['DEEPINFRA_API_KEY']}
+          />
+
+          {/* Mistral — free Experiment tier */}
+          <KeyField
+            label="MISTRAL KEY (FREE EXPERIMENT TIER)"
+            icon={<Cloud className="w-3 h-3 text-orange-400" />}
+            value={mistralKey}
+            onChange={(e) => setMistralKey(e.target.value)}
+            placeholder="Get free key at console.mistral.ai — no card"
+            hint="Free Experiment tier for open models. Set MISTRAL_API_KEY in Render and it's automatic."
+            status={keyStatus?.mistral}
+            envNames={['MISTRAL_API_KEY']}
           />
 
           {/* GitHub Token — powers the GitHub Agent (commit, push, PR, issues) */}
