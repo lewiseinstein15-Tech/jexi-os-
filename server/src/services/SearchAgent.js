@@ -48,14 +48,17 @@ export function isComplexQuery(query) {
 }
 
 /** Return 1–3 independent sub-queries that together cover the question. */
-export async function analyzeQuery(query) {
+export async function analyzeQuery(query, context = '') {
   if (!isComplexQuery(query)) {
     return { complex: false, subQueries: [query], reason: 'simple question — single focused search' };
   }
+  const thread = context && String(context).trim()
+    ? `\n\nYou are continuing a conversation. What was just discussed (most recent last):\n${String(context).slice(0, 1200)}\n\nUse it ONLY to resolve references in the question — do not change the topic.`
+    : '';
   try {
     const prompt =
       `Break this research question into 1 to 3 independent sub-queries that together fully cover it. ` +
-      `Return ONLY a JSON array of strings — no markdown, no explanation.\nQuestion: "${query}"`;
+      `Return ONLY a JSON array of strings — no markdown, no explanation.\nQuestion: "${query}"${thread}`;
     const raw = await generateContent(
       prompt,
       'You decompose research questions into focused search sub-queries.',
@@ -218,13 +221,18 @@ function fallbackSummary(query, deep) {
   );
 }
 
-export async function synthesizeGrounded(query, deep) {
+export async function synthesizeGrounded(query, deep, context = '') {
   const sourceText = (deep || [])
     .map((s, i) => `SOURCE [${i + 1}]: ${s.title}\nLink: ${s.link}\n${s.content}`)
     .join('\n\n---\n\n');
+  const thread = context && String(context).trim()
+    ? `\n\nYou are continuing a conversation. The user was just discussing:\n${String(context).slice(0, 1400)}\n\nKeep your answer in that thread — connect it to what came before where it helps.`
+    : '';
 
   const prompt =
     `The user asked: "${query}"\n\n` +
+    thread +
+    `\n\n` +
     `I retrieved these numbered sources from the web:\n\n${sourceText}\n\n` +
     `Write the final answer. RULES:\n` +
     `1. Answer ONLY from the sources above. Never invent facts that are not in them.\n` +
@@ -260,10 +268,13 @@ async function needsMore(deep, summary) {
 // ---------------------------------------------------------------------------
 // THE TEAM — main entry: run all stages and return a grounded, cited answer
 // ---------------------------------------------------------------------------
-export async function runSearchTeam(query, sendEvent) {
+export async function runSearchTeam(query, sendEvent, opts = {}) {
+  // Conversation thread from earlier turns — lets the team resolve references
+  // like "this course" / "the app" / "continue" (continuity pattern).
+  const context = opts?.context || '';
   // 1. Query Analyzer
   sendEvent?.('log', { agent: 'Query Analyzer', message: `🔎 Analyzing the best way to search: "${query}"` });
-  const plan = await analyzeQuery(query);
+  const plan = await analyzeQuery(query, context);
   sendEvent?.('log', {
     agent: 'Query Analyzer',
     message: plan.complex
@@ -301,7 +312,7 @@ export async function runSearchTeam(query, sendEvent) {
 
   // 5. Synthesizer (grounded, cited)
   sendEvent?.('log', { agent: 'Synthesizer', message: '🧠 Synthesizing a cited answer from the sources...' });
-  let summary = await synthesizeGrounded(query, deep);
+  let summary = await synthesizeGrounded(query, deep, context);
 
   // 5.5 Gap-filler — one bounded extra pass if the answer is thin
   if (await needsMore(deep, summary)) {
@@ -312,7 +323,7 @@ export async function runSearchTeam(query, sendEvent) {
       const extraDeep = await deepRead(extraRanked, query, sendEvent);
       const combined = [...deep, ...extraDeep].slice(0, 6);
       if (combined.length > deep.length) {
-        summary = await synthesizeGrounded(query, combined);
+        summary = await synthesizeGrounded(query, combined, context);
         sendEvent?.('log', { agent: 'Synthesizer', message: `↻ Re-synthesized with ${combined.length} sources.` });
       }
     } catch (e) { /* keep the first answer */ }

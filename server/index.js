@@ -23,6 +23,7 @@ import {
   saveInternetKnowledge, saveCodingKnowledge, searchInternetKnowledge, searchCodingKnowledge,
   saveKnowledgeFile, searchKnowledge, getKnowledgeStructure, getKnowledgeStatus,
   hydrateFromRedis, isRedisActive, semanticRecall, backfillEmbeddings,
+  resolveConversationalQuery,
 } from './src/services/MemoryManager.js';
 import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
@@ -470,8 +471,20 @@ app.post('/api/chat', async (req, res) => {
       effectiveQuery = original;
       pendingTask = { at: Date.now(), query: original }; // keep ORIGINAL as the resume target
     } else {
-      plan = await planner.analyzeIntent(query, { image });
-      pendingTask = { at: Date.now(), query: raw };
+      // CONTINUITY — resolve follow-up messages against the recent conversation
+      // before planning, so "give me a roadmap for a beginner in this course"
+      // becomes "…in computer science" (ChatGPT-style context awareness). Only
+      // triggers on context-dependent messages; self-contained ones pass free.
+      const resolved = await resolveConversationalQuery(query);
+      if (resolved.resolved && resolved.query && resolved.query !== raw) {
+        effectiveQuery = resolved.query;
+        sendEvent('log', {
+          agent: 'Context Agent',
+          message: `🧠 Continuity — resolved “${raw.slice(0, 60)}” → “${resolved.query.slice(0, 100)}” (${resolved.reason}).`,
+        });
+      }
+      plan = await planner.analyzeIntent(effectiveQuery, { image });
+      pendingTask = { at: Date.now(), query: effectiveQuery };
     }
 
     sendEvent('log', { agent: 'Planner', message: `Intent: ${plan.intent} — ${plan.reasoning}` });

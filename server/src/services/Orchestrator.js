@@ -28,7 +28,7 @@ import {
   searchInternetKnowledge, searchFreshInternetKnowledge, searchCodingKnowledge,
   saveInternetKnowledge, saveCodingKnowledge, saveKnowledgeFile,
   getRollingSummary, getRecentEpisodes, rememberEpisode,
-  semanticRecall, memoryForAgent,
+  semanticRecall, memoryForAgent, conversationTranscript,
 } from './MemoryManager.js';
 import { WORKSPACE_DIR, MANAGER_URL, PUBLIC_URL, MAX_DEBUG_ATTEMPTS } from '../config.js';
 
@@ -365,7 +365,7 @@ Try it: say *"build a weather app"* and watch Product → Designer → Engineer 
 
           // Fallback: browser produced nothing — use the search team instead.
           sendEvent('log', { agent: 'Navigator', message: '⚠ Browser gave no answer — switching to the search team.' });
-          const team = await runSearchTeam(query, sendEvent);
+          const team = await runSearchTeam(query, sendEvent, { context: conversationTranscript(6) });
           results.sources = team.sources.slice(0, 5).map(s => ({ title: s.title, link: s.link }));
           try { addChat('jexi', team.summary); } catch (e) {}
           results.summary = team.summary;
@@ -650,8 +650,10 @@ Try it: say *"build a weather app"* and watch Product → Designer → Engineer 
           } catch (e) {}
 
           // 3. Search the internet with the specialist Search Team
-          //    (Query Analyzer → Searcher → Re-ranker → Extractor → Synthesizer)
-          const team = await runSearchTeam(query, sendEvent);
+          //    (Query Analyzer → Searcher → Re-ranker → Extractor → Synthesizer).
+          //    Pass the recent thread so references like "this course" resolve
+          //    inside the team too (continuity across turns).
+          const team = await runSearchTeam(query, sendEvent, { context: conversationTranscript(6) });
           results.sources = team.sources.slice(0, 5).map(s => ({ title: s.title, link: s.link }));
 
           if (team.sources.length === 0) {

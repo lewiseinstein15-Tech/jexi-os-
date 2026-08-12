@@ -227,9 +227,12 @@ export class Planner {
     //    Topic words alone (calculus, algebra, geometry) must NOT trigger a solve:
     //    "study calculus" is a study task and "what is calculus" is a research
     //    question — they need a compute verb or an actual expression to be math.
-    const mathCompute = /(calculate|compute|solve|integrate|derivative|differentiate|sum of|multiply|divide|sqrt|square root|equation|formula|percentage|what is \d|\d+\s*[+\-×÷*\/]\s*\d|\^2|\$\$)/i;
+    // Word-bound the verb tokens: /compute/ would otherwise match "comPUTER" and
+    // /solve/ would match "reSOLVED" — sending "how do computers work" to the
+    // math team. No 'ing' ending: "quantum COMPUTING" is a field, not the verb.
+    const mathCompute = /(\bcalculat(?:e|es|ed)\b|\bcomput(?:e|es|ed)\b|\bsolv(?:e|es|ed)\b|integrate|derivative|differentiate|sum of|multiply|divide|sqrt|square root|equation|formula|percentage|what is \d|\d+\s*[+\-×÷*\/]\s*\d|\^2|\$\$)/i;
     const mathTopic = /(math|algebra|calculus|geometry|trigonometry)/i;
-    const mathAsk = /(solve|problem|question|homework|calculate|compute|how (do|can) (i|you) (solve|do|find)|work (out|this) out)/i;
+    const mathAsk = /(\bcalculat(?:e|es|ed)\b|\bcomput(?:e|es|ed)\b|\bsolv(?:e|es|ed)\b|problem|question|homework|how (do|can) (i|you) (solve|do|find)|work (out|this) out)/i;
     if ((mathCompute.test(q) || (mathTopic.test(q) && mathAsk.test(q))) && !this.isCoding(scopedQuery)) {
       return { intent: 'math_solve', tasks: ['reasoning', 'memory'], reasoning: 'Mathematical question — solve with structured LaTeX steps.' };
     }

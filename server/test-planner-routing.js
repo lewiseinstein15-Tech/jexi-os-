@@ -14,6 +14,15 @@ const tests = [
   { q: 'who are you and who built you?', expect: 'conversation' },
   { q: 'what do you remember about me?', expect: 'memory_query' },
   { q: 'calculate 7 * 6', expect: 'math_solve' },
+  // Guard: the math detector must NOT match substrings of ordinary words —
+  // "comPUTEr" tripped /compute/ and "reSOLVEd" tripped /solve/, sending
+  // computer-science questions to the math team.
+  { q: 'give me a roadmap for a beginner in computer science', expect: 'learning_research' },
+  { q: 'how do computers work', expect: 'learning_research' },
+  { q: 'what is computer science', expect: 'research' },
+  { q: 'I resolved this issue with my code', expect: 'code_task' },
+  { q: 'compute 5 plus 7', expect: 'math_solve' },
+  { q: 'solve for x in 2x + 5 = 13', expect: 'math_solve' },
   // Round-2 specialists (GitHub / Data / DevOps / Docs / Translate / Perf)
   { q: 'push my code to github', expect: 'github' },
   { q: 'commit and push to github', expect: 'github' },

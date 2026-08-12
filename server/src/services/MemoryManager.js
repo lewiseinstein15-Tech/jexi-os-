@@ -460,6 +460,76 @@ export function getChatHistory(n = 20) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Conversational continuity — resolve follow-up messages against the  */
+/* recent thread so JEXI never forgets what she was just discussing.   */
+/* (Pattern from Conversational RAG / LlamaIndex condense_question:    */
+/*  the current message is rewritten into a self-contained query using */
+/*  the transcript BEFORE planning/retrieval — ChatGPT-style continuity.) */
+/* ------------------------------------------------------------------ */
+
+/** Words that signal a follow-up message depends on the prior conversation. */
+const ANAPHORA_RE =
+  /\b(this|that|these|those|it|its|it's|the (course|topic|subject|class|lesson|app|application|project|website|site|web ?page|roadmap|plan|schedule|code|script|program|design|theme|layout|article|paper|book|video|song|story|poem|recipe|meal|workout|routine|product|business|idea|concept|problem|bug|error|issue|feature|task|thing|one|same|above|following|question|chapter|field|industry|area|stuff|material|one you (made|built|wrote|said)|answer|solution|result|list|steps|outline|summary|details?)\b)|\b(continue|go on|keep going|keep working|keep it going|carry on|proceed|finish (it|this|that|the)|complete (it|this|that|the)|elaborate|expand|more detail|follow ?up|next step|go deeper|more (on|about|of|like)|what about|how about|and then|also (explain|tell|give|show|make|create|build|write|add)|but then|is that all|anything else|let's (continue|keep going|move on)|take it (further|from here)|pick (it|up) (from here|where we left off))\b/i;
+
+/** True when the message looks like it depends on the conversation thread. */
+export function hasConversationalReference(query) {
+  const q = String(query || '').trim();
+  if (!q) return false;
+  if (q.length < 25) return true; // "continue", "go on", "more", "yes"…
+  return ANAPHORA_RE.test(q);
+}
+
+/** Compact transcript of the last n turns (user + JEXI), truncated. */
+export function conversationTranscript(n = 6, maxChars = 2400) {
+  return getChatHistory(n)
+    .map((h) => `${h.role === 'user' ? 'User' : 'JEXI'}: ${String(h.text).slice(0, 500)}`)
+    .join('\n')
+    .slice(0, maxChars);
+}
+
+/**
+ * Turn a context-dependent message into a self-contained one by rewriting it
+ * against the recent transcript (one cheap LLM call, only when needed).
+ *
+ * Returns { query, resolved, reason, original? }:
+ *  - self-contained messages pass through untouched (zero cost)
+ *  - "give me a roadmap for a beginner in this course" → "give me a roadmap
+ *    for a beginner in computer science" (resolved against prior turns)
+ *  - no API key or LLM failure → deterministic fallback: the message is
+ *    anchored to the last topic discussed, so it never answers in the void.
+ */
+export async function resolveConversationalQuery(query) {
+  const q = String(query || '').trim();
+  const prior = getChatHistory(8).filter((h) => h.role === 'user');
+  const transcript = conversationTranscript(6, 2000);
+  if (!q || prior.length === 0 || transcript.trim().length < 20 || !hasConversationalReference(q)) {
+    return { query: q, resolved: false, reason: 'self-contained' };
+  }
+
+  // Deterministic topic anchor from the previous user turn (fallback path).
+  const lastUser = [...prior].reverse()[0];
+  const topic = String(lastUser.text || '').trim().replace(/\s+/g, ' ').slice(0, 120);
+
+  try {
+    const keys = resolveKeys();
+    if (!keys.groqKey && !keys.geminiKey && !keys.openrouterKey) throw new Error('no key');
+    const rewritten = await generateContent(
+      `The user just said: "${q}"\n\nRecent conversation (most recent last):\n${transcript}\n\nRewrite ONLY the user's latest message into a single self-contained request that an AI with NO memory of this conversation could answer correctly. Resolve every pronoun and reference — "this course", "it", "the app", "that", "the roadmap", "continue", "go on", "more" — using the conversation. Keep the user's exact intent and tone, and do NOT add new instructions to the assistant. If the message is already self-contained, return it unchanged.\n\nReturn ONLY the rewritten text: no quotes, no labels, no markdown, no explanation.`,
+      'You rewrite context-dependent chat messages into self-contained ones. Return only the rewritten text.',
+      null,
+      { temperature: 0.1 }
+    );
+    const out = String(rewritten || '').trim().replace(/^["'`]+|["'`]+$/g, '');
+    if (out && out.length > 3 && out.length < 400 && !/^(rewritten|the rewritten|here('s| is))[:\s]/i.test(out)) {
+      return { query: out, resolved: true, reason: 'rewritten with conversation context', original: q };
+    }
+  } catch (e) { /* fall through to deterministic anchor */ }
+
+  // Deterministic fallback: anchor the message to the last thing discussed.
+  return { query: `${q} (about: ${topic})`, resolved: true, reason: 'anchored to previous topic', original: q };
+}
+
+/* ------------------------------------------------------------------ */
 /* Conversation memory — rolling summary + episodic memory             */
 /* (layered-memory pattern from Mem0 / DeepAgents / OpenAI sessions:    */
 /*  recent turns verbatim → compressed running summary → long-term      */
