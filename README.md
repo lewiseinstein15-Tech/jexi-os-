@@ -94,7 +94,7 @@ Inspired by the research on open-source agent frameworks (OmniRoute's provider a
 ## 🧪 Testing
 
 ```bash
-npm test          # runs all 10 backend test suites (routing, agents, books, perf, PDF…)
+npm test          # runs all 15 backend test suites (routing, agents, books, memory, perf, PDF…)
 ```
 
 See [TEST.md](TEST.md) for the suite list.

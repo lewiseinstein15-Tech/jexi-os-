@@ -10,7 +10,7 @@ npm test              # from the repo root (forwards to server)
 cd server && npm test  # directly
 ```
 
-This runs all 10 suites sequentially — a failure stops the run (exit code 1).
+This runs all 15 suites sequentially — a failure stops the run (exit code 1).
 
 ## The suites
 
@@ -26,6 +26,10 @@ This runs all 10 suites sequentially — a failure stops the run (exit code 1).
 | `test-llm-models.js` | Model name selection & fallbacks |
 | `test-planner-orchestrator.js` | Plan → executePlan handoff |
 | `test-trusted-library.js` | Trusted Library routing |
+| `test-memory-preferences.js` | Mem0-style preference learner |
+| `test-memory-vector.js` | Hybrid vector+keyword memory (TencentDB pattern) |
+| `test-context-resolution.js` | Conversational continuity (anaphora + query rewriting) |
+| `test-roster-skills.js` | Agent/skill/tool catalog integrity + auto tool routing |
 | `test-mcp.js` | MCP endpoint: initialize, tool/resource allowlist, tool call |
 
 ## Notes
