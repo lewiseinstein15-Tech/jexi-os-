@@ -553,6 +553,38 @@ if (fs.existsSync(publicDir)) {
     if (req.path.startsWith('/api') || req.path.startsWith('/desktop-api')) return next();
     res.sendFile(path.join(publicDir, 'index.html'));
   });
+} else {
+  // API-only deployment (Render): give the bare domain a friendly status page
+  // instead of Express's default "Cannot GET /".
+  app.get('/', (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    const providers = providerHealthSnapshot();
+    const configured = providers.filter(p => p.configured).length;
+    const rows = providers.map(p => {
+      const status = p.configured ? (p.inCooldown ? 'cooldown' : 'configured') : 'not set';
+      const color = p.configured ? (p.inCooldown ? '#FBBF24' : '#00FF9D') : '#616166';
+      return `<tr><td style="padding:6px 10px;border-bottom:1px solid #1F1F23;color:#E5E5E7">${p.provider}</td><td style="padding:6px 10px;border-bottom:1px solid #1F1F23;color:${color}">${status}</td></tr>`;
+    }).join('');
+    res.send(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JEXI OS Brain</title></head>
+<body style="margin:0;background:#030303;color:#E5E5E7;font-family:Inter,-apple-system,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh">
+<div style="max-width:560px;padding:40px 24px;width:100%">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+<span style="width:10px;height:10px;border-radius:50%;background:#00FF9D;box-shadow:0 0 12px #00FF9D"></span>
+<span style="font-size:14px;letter-spacing:2px;text-transform:uppercase;color:#00FF9D">JEXI OS Brain</span>
+</div>
+<h1 style="margin:0 0 4px;font-size:28px;color:#F5F5F7">Online</h1>
+<p style="margin:0 0 24px;color:#A1A1AA;font-size:14px">v1.0.0 · up ${Math.round(process.uptime())}s · port ${PORT} · redis ${isRedisActive() ? 'on' : 'off'}</p>
+<p style="margin:0 0 12px;color:#A1A1AA;font-size:13px">${configured} of ${providers.length} AI providers configured</p>
+<table style="border-collapse:collapse;width:100%;background:#0A0A0B;border:1px solid #1F1F23;border-radius:12px;overflow:hidden;font-size:13px">${rows}</table>
+<div style="margin-top:20px;font-size:13px;color:#A1A1AA">
+<a href="/api/health" style="color:#00FF9D;text-decoration:none">/api/health</a> ·
+<a href="/api/roster" style="color:#00FF9D;text-decoration:none">/api/roster</a> ·
+<a href="/api/health/providers" style="color:#00FF9D;text-decoration:none">live key test</a>
+</div>
+</div></body></html>`);
+  });
 }
 
 app.listen(PORT, '0.0.0.0', () => {
