@@ -6,7 +6,9 @@ Ask it to **"build an app that tracks my water intake"** and JEXI plans a team, 
 
 ---
 
-## ✨ The 20 Specialists
+## ✨ The Specialist Team
+
+JEXI runs a **roster of 207 specialists (495 skills · 151 tools)** — the Planner composes a small focused team per task, never all of them at once. Here are the core specialists you'll see most often; the **full 207-agent catalog** (with every skill and tool) is in [AGENT-CATALOG.md](AGENT-CATALOG.md).
 
 | # | Agent | What it does |
 |---|-------|--------------|
@@ -24,13 +26,13 @@ Ask it to **"build an app that tracks my water intake"** and JEXI plans a team, 
 | 12 | **Memory Agent** | Long-term memory: tf-idf, recency×importance×relevance scoring, consolidation |
 | 13 | **Computer Use Agent** | Real browser control — numbered elements, click/type/scroll |
 | 14 | **Vision Agent** | Webcam eyes + on-device face/gesture landmarking |
-| 14b | **Video Analyst** | Watches videos frame-by-frame — timestamped captions, sampled frames, key moments (YouTube, TikTok, Instagram, Vimeo, direct files) |
-| 15 | **GitHub Agent** | Commit, push, PRs, issues — powered by your token |
-| 16 | **Data Agent** | Data analysis, statistics |
-| 17 | **DevOps Agent** | Deploy config, infrastructure |
-| 18 | **Writer Agent** | Long-form writing |
-| 19 | **Translator Agent** | Translation between languages |
-| 20 | **Perf Agent** | Performance analysis & optimization |
+| 15 | **Video Analyst** | Watches videos frame-by-frame — timestamped captions, sampled frames, key moments (YouTube, TikTok, Instagram, Vimeo, direct files) |
+| 16 | **GitHub Agent** | Commit, push, PRs, issues — powered by your token |
+| 17 | **Data Agent** | Data analysis, statistics |
+| 18 | **DevOps Agent** | Deploy config, infrastructure |
+| 19 | **Writer Agent** | Long-form writing |
+| 20 | **Translator Agent** | Translation between languages |
+| 21 | **Perf Agent** | Performance analysis & optimization |
 
 The **Planner** reads your request and picks the right team — including *compound tasks* (e.g. "research X, then build Y" runs the Research team, then hands its findings to the Coding team).
 
