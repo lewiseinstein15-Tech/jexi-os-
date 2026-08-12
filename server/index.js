@@ -28,6 +28,7 @@ import {
 import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
 import { mountMcp } from './mcp-server.js';
+import { taskManager } from './src/services/TaskManager.js';
 import { PORT, WORKSPACE_DIR, DATA_DIR, SERVER_ROOT } from './src/config.js';
 
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
@@ -540,6 +541,59 @@ app.get('/api/health/providers', async (req, res) => {
   } catch (e) {
     res.status(500).json({ ok: false, error: (e && e.message) || String(e) });
   }
+});
+
+// === BACKGROUND TASKS (roadmap stage 8 — the task.* event vocabulary) ===
+// Unlike /api/chat (synchronous — the connection stays open until the mission
+// ends), tasks run in the background and stream `task.*` events to any number
+// of subscribers. The list survives restarts (DATA_DIR/tasks.json).
+app.get('/api/tasks', (req, res) => {
+  res.json({ tasks: taskManager.list().map((t) => taskManager.publicTask(t, false)) });
+});
+
+app.post('/api/tasks', (req, res) => {
+  const { query, image } = req.body || {};
+  if (!query || !String(query).trim()) {
+    return res.status(400).json({ success: false, error: 'No query provided' });
+  }
+  const task = taskManager.createTask(String(query).trim(), image || null);
+  res.json({ success: true, task: taskManager.publicTask(task, false) });
+});
+
+app.get('/api/tasks/:id', (req, res) => {
+  const task = taskManager.get(req.params.id);
+  if (!task) return res.status(404).json({ success: false, error: 'Task not found' });
+  res.json({ success: true, task: taskManager.publicTask(task, true) });
+});
+
+// NDJSON live stream — replays history then pushes live task.* events.
+// Ends when the task reaches a terminal state.
+app.get('/api/tasks/:id/events', (req, res) => {
+  const task = taskManager.get(req.params.id);
+  if (!task) return res.status(404).json({ success: false, error: 'Task not found' });
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  taskManager.subscribe(req.params.id, res);
+});
+
+app.post('/api/tasks/:id/cancel', (req, res) => {
+  const task = taskManager.cancel(req.params.id);
+  if (!task) return res.status(404).json({ success: false, error: 'Task not found' });
+  res.json({ success: true, task: taskManager.publicTask(task, false) });
+});
+
+// Re-run a mission (same query, fresh task) — the honest "continue where it
+// stopped" for tasks that failed, were cancelled, or finished long ago.
+app.post('/api/tasks/:id/rerun', (req, res) => {
+  const old = taskManager.get(req.params.id);
+  if (!old) return res.status(404).json({ success: false, error: 'Task not found' });
+  const task = taskManager.createTask(old.query, old.image);
+  res.json({ success: true, task: taskManager.publicTask(task, false) });
+});
+
+app.delete('/api/tasks/:id', (req, res) => {
+  res.json({ success: taskManager.remove(req.params.id) });
 });
 
 // Health endpoint used by the load balancer's active probes (and the keep-alive

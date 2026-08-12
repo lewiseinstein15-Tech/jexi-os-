@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Globe, Terminal, Cpu, ChevronDown, Radio, ExternalLink } from 'lucide-react';
 
-const AGENT_COLORS = {
+export const AGENT_COLORS = {
   Error: 'text-red-500',
   Output: 'text-blue-400',
   Terminal: 'text-yellow-400',

@@ -13,6 +13,7 @@ import SettingsPanel from './components/SettingsPanel';
 import KnowledgePanel from './components/KnowledgePanel';
 import DownloadPanel from './components/DownloadPanel';
 import UpdateBanner from './components/UpdateBanner';
+import TasksScreen from './components/TasksScreen';
 
 const isDesktopQuery = () =>
   typeof window !== 'undefined' && !!window.matchMedia
@@ -71,7 +72,9 @@ export default function App() {
                 ? 'h-[calc(100dvh-118px)] flex flex-col gap-3'
                 : activeNav === 'agents'
                   ? 'space-y-3 md:max-w-[900px] md:mx-auto'
-                  : 'space-y-3 md:max-w-[640px] md:mx-auto'
+                  : activeNav === 'tasks'
+                    ? 'md:max-w-[1000px] md:mx-auto'
+                    : 'space-y-3 md:max-w-[640px] md:mx-auto'
             }
           >
             {activeNav === 'home' && (
@@ -115,6 +118,7 @@ export default function App() {
                 plan={engine.plan}
               />
             )}
+            {activeNav === 'tasks' && <TasksScreen />}
             {activeNav === 'memory' && <MemoryPanel memory={memory} />}
             {activeNav === 'knowledge' && <KnowledgePanel />}
             {activeNav === 'settings' && <SettingsPanel />}
