@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { getBackendUrl, jexiFetch } from '../utils/helpers';
+import { getBackendUrl, jexiFetch, backendErrorMessage } from '../utils/helpers';
 
 // Backend defaults to same origin (/api is proxied by Vite in dev),
 // VITE_JEXI_BACKEND_URL for hosted frontends (Vercel), or a localStorage override.
@@ -159,11 +159,12 @@ export const useJexiEngine = () => {
     } catch (error) {
       // Aborted by the user (STOP) — don't show a scary network error.
       if (error?.name === 'AbortError') return;
-      // Connection lost mid-task (free host restart, proxy timeout, browser
-      // closed). Honest + actionable: the task may still be running server-side.
+      // Diagnose the failure so the user sees the FIX, not a mystery: 401
+      // (locked server, no access key) and CORS/unreachable get targeted
+      // guidance; anything else stays honest about the drop.
       setMessages(prev => [...prev, {
         role: 'jexi',
-        text: `⚠ The connection to the backend dropped mid-task (${error.message || 'network error'}). The work may still be running on the server — wait a moment, then ask me to continue from where it stopped.`,
+        text: backendErrorMessage(error, backendUrl),
       }]);
     } finally {
       abortRef.current = null;

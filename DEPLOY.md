@@ -98,7 +98,11 @@ The frontend finds the backend in this order:
 3. Redeploy. The chat, memory, knowledge and virtual desktop will now talk to Render.
 
 > No key goes on the frontend host — `GROQ_API_KEY`/`GEMINI_API_KEY` stay server-side on Render.
-> If you set `CORS_ORIGINS` on Render, add your frontend origin (e.g. `https://lewiseinstein15-Tech.github.io`).
+> If you set `CORS_ORIGINS` on Render, it must include your frontend's **exact origin** —
+> `https://lewiseinstein15-tech.github.io` for GitHub Pages, your Vercel URL if you use Vercel,
+> and `http://localhost` for the Android app in dev. If the app says the backend is blocked
+> (CORS) or unreachable, add the origin shown in the message — or clear `CORS_ORIGINS`
+> entirely (unset = open to all browsers).
 > If you set `JEXI_API_KEY` on Render, paste the same key in the app's **Settings → JEXI Access Key** so the UI can unlock the API.
 
 ---
