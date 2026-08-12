@@ -256,7 +256,6 @@ app.get('/api/settings/status', (req, res) => {
     openrouter: statusOf(['OPENROUTER_API_KEY'], 'openrouterKey'),
     huggingface: statusOf(['HF_TOKEN'], 'hfKey'),
     cerebras: statusOf(['CEREBRAS_API_KEY'], 'cerebrasKey'),
-    together: statusOf(['TOGETHER_API_KEY'], 'togetherKey'),
     deepinfra: statusOf(['DEEPINFRA_API_KEY'], 'deepinfraKey'),
     mistral: statusOf(['MISTRAL_API_KEY'], 'mistralKey'),
     github: statusOf(['GITHUB_TOKEN', 'GH_TOKEN'], 'githubToken'),

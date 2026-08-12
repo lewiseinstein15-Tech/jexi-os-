@@ -57,8 +57,7 @@ Open http://localhost:3000 and say *"build an app that tracks my water intake"*.
 | `GROQ_API_KEY` | one of the two | Fast chat/code generation (Groq) |
 | `GEMINI_API_KEY` | one of the two | Code tasks & vision (Gemini, preferred for code) |
 | `OPENROUTER_API_KEY` | optional | **Seed vision + free text** (ByteDance `bytedance-seed/seed-2.0-mini`, Seed 1.6, free Llama/DeepSeek routes) |
-| `CEREBRAS_API_KEY` | optional | **Cerebras free tier** (Llama 3.3 70B, no card) — extra fallback |
-| `TOGETHER_API_KEY` | optional | **Together AI free tier** (`-Turbo-Free` open models, no card) — extra fallback |
+| `CEREBRAS_API_KEY` | optional | **Cerebras free tier** (GPT-OSS 120B, no card) — extra fallback |
 | `DEEPINFRA_API_KEY` | optional | **DeepInfra free tier** (Llama 3.1 8B etc., no card) — extra fallback |
 | `MISTRAL_API_KEY` | optional | **Mistral free Experiment tier** (open models, no card) — extra fallback |
 | `HF_TOKEN` | optional | **HuggingFace free Inference API** (text) — last-resort provider when the others rate-limit |
@@ -82,7 +81,7 @@ Inspired by the research on open-source agent frameworks (OmniRoute's provider a
 
 **2.5 Auto Tool Routing — 28 tools, picked per task.** JEXI has a first-class **Tool Registry** (Web Search, Deep Read, Browser Control, Memory Recall, Rolling Summary, Knowledge Search, Book Library, Run Code, Write Files, Fix & Re-run, Code Review, Security Scan, Fact Check, GitHub CLI, Data Crunch, Chart Builder, Self Diagnose, Translate, … — the smolagents/OpenAI Agents SDK pattern: tools are atomic actions, skills are workflows). For **every** task the Tool Router derives the exact tool set from the composed team automatically — `Auto-selected tools for this task (6): Web Search · Deep Read · Fact Check · …` — no manual tool instruction is ever needed, and the tool set is kept small on purpose (AutoTool-style pruning so decisions stay reliable).
 
-**3. Provider Router — auto-fallback across every free key.** OmniRoute-style: Groq → Gemini → OpenRouter (Seed vision + free text) → Cerebras → Together AI → DeepInfra → Mistral → HuggingFace (free Inference API) — every provider optional, keyed by `GROQ_API_KEY` / `GEMINI_API_KEY` / `OPENROUTER_API_KEY` / `CEREBRAS_API_KEY` / `TOGETHER_API_KEY` / `DEEPINFRA_API_KEY` / `MISTRAL_API_KEY` / `HF_TOKEN`. If a provider rate-limits or errors 3× it enters a 30s cooldown and the router slides to the next healthy provider automatically — one dead key never kills a task. `get_health`/`/api/health` report live per-provider health (never keys).
+**3. Provider Router — auto-fallback across every free key.** OmniRoute-style: Groq → Gemini → OpenRouter (Seed vision + free text) → Cerebras → DeepInfra → Mistral → HuggingFace (free Inference API) — every provider optional, keyed by `GROQ_API_KEY` / `GEMINI_API_KEY` / `OPENROUTER_API_KEY` / `CEREBRAS_API_KEY` / `DEEPINFRA_API_KEY` / `MISTRAL_API_KEY` / `HF_TOKEN`. If a provider rate-limits or errors 3× it enters a 30s cooldown and the router slides to the next healthy provider automatically — one dead key never kills a task. `get_health`/`/api/health` report live per-provider health (never keys).
 
 **4. Verification Loop — anti-hallucination.** After research/learning/knowledge answers are synthesized, a Critic re-reads the draft against the sources it cites, flags invented or unsupported claims, and a revision pass fixes them — bounded to 2 rounds so it always terminates. With no AI keys or for short answers it no-ops instantly, so it never slows a plain reply.
 

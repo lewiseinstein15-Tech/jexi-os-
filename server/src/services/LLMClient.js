@@ -16,7 +16,6 @@ export function resolveKeys() {
     openrouterKey: process.env.OPENROUTER_API_KEY || settings.openrouterKey || '',
     hfKey: process.env.HF_TOKEN || settings.hfKey || '',
     cerebrasKey: process.env.CEREBRAS_API_KEY || settings.cerebrasKey || '',
-    togetherKey: process.env.TOGETHER_API_KEY || settings.togetherKey || '',
     deepinfraKey: process.env.DEEPINFRA_API_KEY || settings.deepinfraKey || '',
     mistralKey: process.env.MISTRAL_API_KEY || settings.mistralKey || '',
   };
@@ -47,8 +46,10 @@ const HF_TEXT_MODELS = ['microsoft/phi-4', 'HuggingFaceH4/zephyr-7b-beta', 'mist
 // Free / no-card OpenAI-compatible providers (text only). Each is optional —
 // a missing key is skipped entirely by the router; a failing one falls through
 // to the next healthy provider and gets a 30s quarantine after 3 failures.
-const CEREBRAS_MODELS = ['llama-3.3-70b', 'llama-3.1-8b']; // free tier, no card
-const TOGETHER_MODELS = ['meta-llama/Llama-3.3-70B-Instruct-Turbo-Free', 'meta-llama/Llama-3.1-8B-Instruct-Turbo-Free'];
+// Current Cerebras free-tier IDs (verified against inference-docs.cerebras.ai):
+// gpt-oss-120b is the production flagship; gemma-4-31b is the multimodal preview.
+// (llama-3.3-70b and llama3.1-8b were deprecated in 2026 → 404.)
+const CEREBRAS_MODELS = ['gpt-oss-120b', 'gemma-4-31b']; // free tier, no card
 const DEEPINFRA_MODELS = ['meta-llama/Meta-Llama-3.1-8B-Instruct', 'meta-llama/Meta-Llama-3.3-70B-Instruct-Turbo'];
 const MISTRAL_MODELS = ['open-mistral-7b', 'open-mixtral-8x7b']; // Experiment free tier
 
@@ -76,12 +77,14 @@ async function tryGroq(prompt, system, imageBase64, opts, errors) {
             : prompt,
         },
       ];
-      const completion = await groq.chat.completions.create({
-        messages,
-        model,
-        temperature: opts.temperature ?? 0.4,
-        timeout: TIMEOUT_MS,
-      });
+      const completion = await groq.chat.completions.create(
+        {
+          messages,
+          model,
+          temperature: opts.temperature ?? 0.4,
+        },
+        { timeout: TIMEOUT_MS } // request option — the API rejects 'timeout' inside the body
+      );
       const text = completion.choices[0]?.message?.content || '';
       if (text) return text.trim();
       errors.push(`Groq(${model}) returned an empty response`);
@@ -218,9 +221,9 @@ async function tryHuggingFace(prompt, system, imageBase64, opts, errors) {
 }
 
 /**
- * Generic OpenAI-compatible chat-completions caller — Cerebras, Together AI,
- * DeepInfra and Mistral all expose the same REST shape, so one helper serves
- * all four. Text-only (vision stays on Groq/Gemini/OpenRouter).
+ * Generic OpenAI-compatible chat-completions caller — Cerebras, DeepInfra and
+ * Mistral all expose the same REST shape, so one helper serves all three.
+ * Text-only (vision stays on Groq/Gemini/OpenRouter).
  */
 async function tryOpenAICompat({ key, baseUrl, models, label }, prompt, system, imageBase64, opts, errors) {
   if (imageBase64) return null;
@@ -266,8 +269,6 @@ async function tryOpenAICompat({ key, baseUrl, models, label }, prompt, system, 
 
 const tryCerebras = (p, s, img, o, e) =>
   tryOpenAICompat({ key: resolveKeys().cerebrasKey, baseUrl: 'https://api.cerebras.ai/v1', models: CEREBRAS_MODELS, label: 'Cerebras' }, p, s, img, o, e);
-const tryTogether = (p, s, img, o, e) =>
-  tryOpenAICompat({ key: resolveKeys().togetherKey, baseUrl: 'https://api.together.xyz/v1', models: TOGETHER_MODELS, label: 'Together' }, p, s, img, o, e);
 const tryDeepInfra = (p, s, img, o, e) =>
   tryOpenAICompat({ key: resolveKeys().deepinfraKey, baseUrl: 'https://api.deepinfra.com/v1/openai', models: DEEPINFRA_MODELS, label: 'DeepInfra' }, p, s, img, o, e);
 const tryMistral = (p, s, img, o, e) =>
@@ -279,7 +280,6 @@ const PROVIDER_CALLS = {
   openrouter: tryOpenRouter,
   huggingface: tryHuggingFace,
   cerebras: tryCerebras,
-  together: tryTogether,
   deepinfra: tryDeepInfra,
   mistral: tryMistral,
 };
@@ -316,7 +316,7 @@ export async function generateContent(prompt, systemInstruction = '', imageBase6
   if (keys.length > 0) {
     throw new Error(`All AI providers failed. ${errors.join(' | ')}`);
   }
-  throw new Error('No API keys configured. Add a key in Settings (Groq, Gemini, OpenRouter, Cerebras, Together, DeepInfra, Mistral or HuggingFace), or set the matching env var in Render.');
+  throw new Error('No API keys configured. Add a key in Settings (Groq, Gemini, OpenRouter, Cerebras, DeepInfra, Mistral or HuggingFace), or set the matching env var in Render.');
 }
 
 /** Ask the LLM a yes/no or one-word verification question. */

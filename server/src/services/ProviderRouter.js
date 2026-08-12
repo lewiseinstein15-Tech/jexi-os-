@@ -66,7 +66,7 @@ export function resetProviderHealth(key) {
 // Extra free OpenAI-compatible providers — slots in after the big three,
 // before HuggingFace (slow last-resort). Each is optional; a missing key is
 // simply skipped by the router. Adding one only means setting ONE env var.
-const EXTRA_PROVIDERS = ['cerebras', 'together', 'deepinfra', 'mistral'];
+const EXTRA_PROVIDERS = ['cerebras', 'deepinfra', 'mistral'];
 
 export function providerOrder(prefer = '') {
   const base =
@@ -88,7 +88,6 @@ const ENV_MAP = {
   openrouter: 'OPENROUTER_API_KEY',
   huggingface: 'HF_TOKEN',
   cerebras: 'CEREBRAS_API_KEY',
-  together: 'TOGETHER_API_KEY',
   deepinfra: 'DEEPINFRA_API_KEY',
   mistral: 'MISTRAL_API_KEY',
 };
@@ -103,7 +102,7 @@ export function providerHealthSnapshot() {
   const now = Date.now();
   const names = {
     groq: 'Groq', gemini: 'Gemini', openrouter: 'OpenRouter', huggingface: 'HuggingFace',
-    cerebras: 'Cerebras', together: 'Together AI', deepinfra: 'DeepInfra', mistral: 'Mistral',
+    cerebras: 'Cerebras', deepinfra: 'DeepInfra', mistral: 'Mistral',
   };
   return providerOrder().map((k) => {
     const s = h(k);
