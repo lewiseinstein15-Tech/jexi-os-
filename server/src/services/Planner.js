@@ -1,6 +1,6 @@
 import { searchKnowledge } from './MemoryManager.js';
-import { composeTeam, skillsForTeam, rosterSummary, ROSTER_COUNT, SKILL_COUNT, rosterFor, skillsFor, skillsLine, rosterStats } from './AgentRoster.js';
-import { toolsForIntent, toolNames } from './ToolRegistry.js';
+import { AGENT_ROSTER, getAgent, skillsForTeam, rosterStats } from './AgentRoster.js';
+import { toolsForTeam } from './ToolRegistry.js';
 
 /**
  * JEXI's Planner — decides which agents/tools to use and when.
@@ -15,30 +15,54 @@ import { toolsForIntent, toolNames } from './ToolRegistry.js';
  *                 so the Orchestrator announces it BEFORE running anything).
  */
 
-/** Which specialists run, in order, for each intent (the "plan first" contract). */
+/** Which specialists run, in order, for each intent (the "plan first" contract).
+ * SLUGS, not display names — resolved to roster entries by getAgent(). */
 const TEAM_PLAN = {
-  image_recognition: ['Vision', 'Reasoner', 'Memory Agent'],
-  clear_memory: ['Memory Agent'],
-  link_analysis: ['Navigator', 'Extractor', 'Reasoner', 'Memory Agent'],
-  math_solve: ['Reasoner', 'Memory Agent'],
-  self_check: ['SelfDiagnose', 'Reasoner', 'Memory Agent'],
-  code_task: ['Product', 'Designer', 'Engineer', 'Coder', 'Runner', 'Debugger', 'QA Lead', 'Reviewer', 'Critic', 'Security Officer', 'Shipper', 'Reflector'],
-  computer_use: ['Navigator', 'Vision', 'Reasoner', 'Memory Agent'],
-  study_topic: ['Scholar', 'Researcher', 'Document Analyst', 'Memory Agent'],
-  conversation: ['JEXI', 'Context Manager', 'Archivist'],
-  memory_query: ['Memory Agent', 'Archivist', 'Context Manager'],
-  knowledge_recall: ['Books', 'Document Analyst', 'Reasoner', 'Memory Agent'],
-  news_latest: ['News Scout', 'News Filter', 'News Editor', 'Reasoner', 'Memory Agent'],
-  research: ['Query Analyzer', 'Searcher', 'Re-ranker', 'Extractor', 'Synthesizer', 'Critic', 'Memory Agent'],
-  learning_research: ['Researcher', 'Reasoner', 'Memory Agent'],
-  explain_team: ['Planner'],
-  // Specialist team round 2 — the complete JEXI OS roster
-  github: ['GitHub Agent', 'Shipper'],
-  translate: ['Translator', 'Reviewer'],
-  data: ['Data Analyst', 'Data Engineer', 'Reasoner'],
-  devops: ['DevOps Agent', 'Shipper'],
-  docs: ['Technical Writer', 'Reviewer'],
-  perf: ['Performance Engineer', 'Coder', 'Reviewer'],
+  image_recognition: ['vision', 'reasoner', 'memory'],
+  clear_memory: ['memory'],
+  link_analysis: ['navigator', 'extractor', 'reasoner', 'memory'],
+  math_solve: ['math', 'reasoner', 'memory'],
+  self_check: ['self-diagnose', 'reasoner', 'memory'],
+  code_task: ['product', 'designer', 'engineer', 'architect', 'coder', 'runner', 'debugger', 'qa', 'reviewer', 'critic', 'security', 'shipper', 'reflector'],
+  computer_use: ['navigator', 'vision', 'reasoner', 'memory'],
+  study_topic: ['scholar', 'researcher', 'document-analyst', 'memory'],
+  conversation: ['jexi', 'context-manager', 'archivist'],
+  memory_query: ['memory', 'archivist', 'context-manager'],
+  knowledge_recall: ['books', 'document-analyst', 'reasoner', 'memory'],
+  news_latest: ['news-scout', 'news-filter', 'news-editor', 'reasoner', 'memory'],
+  research: ['query-analyzer', 'searcher', 'reranker', 'extractor', 'synthesizer', 'fact-checker', 'critic', 'memory'],
+  learning_research: ['researcher', 'reasoner', 'memory'],
+  explain_team: ['planner'],
+  github: ['github', 'shipper'],
+  translate: ['translator', 'reviewer'],
+  data: ['data', 'data-engineer', 'reasoner'],
+  devops: ['devops', 'shipper'],
+  docs: ['writer', 'reviewer'],
+  perf: ['perf', 'coder', 'reviewer'],
+  // Round 4 — deep-domain teams: each new intent routes to its own specialists,
+  // so the 200+ roster is actually USED (AutoGen GroupChatManager / LangGraph
+  // supervisor pattern: the planner names the right team, never all of them).
+  creative_writing: ['novelist', 'screenwriter', 'poet', 'songwriter', 'editor', 'critic'],
+  business_plan: ['business-analyst', 'startup-advisor', 'financial-advisor', 'market-analyst', 'strategist'],
+  marketing_plan: ['market-analyst', 'growth-marketer', 'seo-specialist', 'copywriter', 'brand'],
+  event_planning: ['event-planner', 'wedding-planner', 'travel', 'finance'],
+  meal_plan: ['chef', 'nutrition', 'health'],
+  workout_plan: ['fitness', 'health', 'nutrition'],
+  investing_advice: ['investor', 'financial-advisor', 'tax-advisor'],
+  tech_support: ['support-engineer', 'debugger', 'coder', 'writer'],
+  security_audit: ['pentester', 'security', 'appsec', 'risk-analyst'],
+  content_creation: ['content-strategist', 'blog-writer', 'seo-writer', 'video-script-writer', 'editor'],
+  study_exam: ['exam-coach', 'study', 'teacher', 'flashcard-maker'],
+  career_plan: ['career', 'recruiter', 'resume', 'interviewer'],
+  relationship_advice: ['relationship-coach', 'counselor', 'dating-coach'],
+  startup_advice: ['startup-advisor', 'business-analyst', 'pricing-strategist', 'investor'],
+  productivity: ['task-manager', 'scheduler', 'note-taker', 'email-triage'],
+  data_ml: ['data-scientist', 'ml-engineer', 'ml-ops', 'data-engineer'],
+  cloud_devops: ['cloud-engineer', 'kubernetes-engineer', 'terraform-engineer', 'sre', 'devops'],
+  api_backend: ['api-engineer', 'auth-engineer', 'backend', 'database'],
+  mobile_app: ['mobile-engineer', 'ios-engineer', 'android-engineer', 'react-native-engineer', 'qa'],
+  game_dev: ['game-developer', 'designer', 'coder', 'qa'],
+  home_life: ['home-org', 'interior-designer', 'event-planner', 'gardener'],
 };
 
 /** "gather news/research/study, THEN build" → the compound team, run in phases. */
@@ -78,34 +102,32 @@ export class Planner {
   /** Classify the intent (fast, deterministic, free) then attach the team plan. */
   async analyzeIntent(query, opts = {}) {
     const plan = await this._classify(query, opts);
-    // Decorate every plan with the ordered specialist team ("plan first")
-    if (plan.intent === 'compound_task') {
-      plan.steps = (plan.phases || []).flatMap((p) => p.agents);
-    } else {
-      plan.steps = TEAM_PLAN[plan.intent] || plan.tasks || [];
-    }
+    // Resolve the ordered specialist team — one source of truth for who runs.
+    const teamSlugs = this._teamFor(plan);
+    const team = teamSlugs.map((s) => getAgent(s)).filter(Boolean);
+    plan.teamSlugs = teamSlugs;
+    plan.steps = teamSlugs.map((s) => (getAgent(s)?.name) || s);
     plan.planSummary = plan.steps.join(' → ');
-    // Decorate every plan with the 60+ roster subset + 100+ skills this task
-    // will exercise (Agent Roster & Skill Registry) so the pipeline can
-    // announce the team and stream the skills it is using.
-    plan.roster = rosterFor(plan.intent);
-    plan.skillIds = skillsFor(plan.intent);
-    plan.skillsLine = skillsLine(plan.intent);
+    // Decorate every plan with the roster subset + skills + tools this task
+    // will exercise (Agent Roster & Skill Registry & Tool Registry) so the
+    // pipeline can announce the team, stream the skills, and auto-route the
+    // exact tool set — zero manual tool instruction (AutoTool pattern).
+    plan.roster = team.map((a) => a.name);
+    plan.skillIds = skillsForTeam(team).map((s) => s.slug);
+    plan.skillsLine = skillsForTeam(team).map((s) => s.name).slice(0, 12).join(' · ');
     plan.rosterStats = rosterStats();
-    plan.rosterSummary = rosterSummary(plan.intent);
+    plan.rosterSummary = `${team.length} specialists · ${skillsForTeam(team).length} skills`;
     plan.rosterCatalogSize = rosterStats().agents;
     plan.skillCatalogSize = rosterStats().skills;
-    // AUTO TOOL ROUTING — every task gets its tool set derived from the team,
-    // with zero manual tool instruction (AutoTool / OpenAI Agents SDK / vLLM
-    // auto-tool-choice pattern: offer the small relevant subset, never the
-    // whole catalog). For compound tasks the tools are the union of both phases.
-    const toolIntents = plan.intent === 'compound_task'
-      ? (plan.phases || []).map((p) => p.intent)
-      : [plan.intent];
+    // AUTO TOOL ROUTING — the tool set is derived from the resolved team (for
+    // compound tasks, the union of both phases' teams).
+    const teamSets = plan.intent === 'compound_task'
+      ? (plan.phases || []).map((p) => this._resolveNames(p.agents || []))
+      : [teamSlugs];
     const seen = new Set();
     const toolSet = [];
-    for (const ti of toolIntents) {
-      for (const t of toolsForIntent(ti, { steps: plan.steps })) {
+    for (const set of teamSets) {
+      for (const t of toolsForTeam(set.map((s) => getAgent(s)).filter(Boolean))) {
         if (!seen.has(t.slug)) { seen.add(t.slug); toolSet.push(t); }
       }
     }
@@ -113,6 +135,29 @@ export class Planner {
     plan.toolsLine = toolSet.map((t) => t.name).join(' · ');
     plan.toolCount = toolSet.length;
     return plan;
+  }
+
+  /** Ordered team slugs for a plan: TEAM_PLAN, else any task slugs that are real agents. */
+  _teamFor(plan) {
+    if (plan.intent === 'compound_task') {
+      return (plan.phases || []).flatMap((p) => this._resolveNames(p.agents || []));
+    }
+    const slugs = TEAM_PLAN[plan.intent];
+    if (slugs) return slugs;
+    return (plan.tasks || []).map((t) => (getAgent(t) ? t : null)).filter(Boolean);
+  }
+
+  /** Resolve display names ('QA Lead', 'JEXI', 'Vision') to roster slugs. */
+  _resolveNames(names) {
+    const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const byNorm = new Map(AGENT_ROSTER.map((a) => [norm(a.name), a.slug]));
+    return (names || []).map((n) => {
+      const key = norm(n);
+      if (byNorm.has(key)) return byNorm.get(key);
+      // Prefix fallback: 'Vision' → 'Vision Agent', 'JEXI' → 'JEXI Core'
+      const hit = AGENT_ROSTER.find((a) => norm(a.name).startsWith(key) || key.startsWith(norm(a.name)));
+      return hit ? hit.slug : null;
+    }).filter(Boolean);
   }
 
   /**
@@ -297,8 +342,12 @@ export class Planner {
     }
 
     // 6.5 Study / deep learn (AFTER coding so "study planner" apps aren't hijacked;
-    //    also after math so "study calculus" is a study task, not a math solve)
+    //    also after math so "study calculus" is a study task, not a math solve).
+    //    "study for an exam/test" routes to the exam-prep team, not deep study.
     if (/study|learn everything about|fill knowledge base|master topic|teach me (everything about )?/i.test(q)) {
+      if (/study.*\b(exam|test|sat|act|gcse|ap |boards)\b/i.test(q)) {
+        return { intent: 'study_exam', tasks: ['exam-coach', 'study', 'teacher'], reasoning: 'User wants exam/test preparation — the Exam Coach builds a prep plan.' };
+      }
       const topic = query.replace(/study|learn everything about|fill knowledge base|master topic|teach me/i, '').trim().replace(/^about\s+/i, '');
       return { intent: 'study_topic', tasks: ['scholar', 'research', 'memory'], reasoning: 'User wants JEXI to deep-study and store in the knowledge library.', payload: topic };
     }
@@ -340,6 +389,13 @@ export class Planner {
       return { intent: 'news_latest', tasks: ['news', 'twitter', 'reasoner', 'memory'], reasoning: 'User wants the latest news / social updates.' };
     }
 
+    // 8.8 DEEP-DOMAIN ROUTING — the round-4 roster: domain keywords route to
+    //     their own specialist team instead of the generic research fallback,
+    //     so the 200+ catalog is actually deployed per task (supervisor pattern:
+    //     name the right team, never all of them).
+    const domain = this._domainIntent(q);
+    if (domain) return domain;
+
     // 9. Research / search / facts
     const isResearch = /search|research|find|look up|google|what is|who is|when did|where is|why does|how to|explain|latest|news|history|capital|population|meaning|difference between|benefits of|types of|top \d/i.test(q);
     if (isResearch) {
@@ -362,6 +418,43 @@ export class Planner {
 
     // 10. Default: learning research
     return { intent: 'learning_research', tasks: ['research', 'reasoning', 'memory'], reasoning: 'General question — research and answer.' };
+  }
+
+  /**
+   * Deep-domain routing (round-4 roster): regex → intent for the teams that
+   * handle whole domains autonomously — writing, business, marketing, events,
+   * meals, workouts, investing, support, security, content, exams, careers,
+   * relationships, startups, productivity, ML, cloud, mobile and games.
+   * Build phrasings still flow to the coding team via isCoding() (checked
+   * earlier) — these rules catch the domain requests around them.
+   */
+  _domainIntent(q) {
+    const rules = [
+      [/write (me |a |an )?(story|novel|book|short story)|write (a |an )?(screenplay|poem|song|lyrics)|story (idea|plot|outline)|novel (idea|outline)|poetry|creative writing|book (idea|outline|plot)/i, { intent: 'creative_writing', tasks: ['novelist', 'screenwriter', 'editor', 'critic'], reasoning: 'Creative writing request — the writing team drafts, edits and critiques.' }],
+      [/business plan|business idea|business model|startup pitch|pitch (an |my |the )?idea|company plan|write a (business|company) plan/i, { intent: 'business_plan', tasks: ['business-analyst', 'startup-advisor', 'financial-advisor'], reasoning: 'Business planning — the analyst team builds the plan with financials.' }],
+      [/marketing (plan|strategy|campaign|ideas?)|ad campaign|seo (plan|strategy|campaign)|social media (strategy|plan|campaign)|growth strategy|promote (my|the) (app|business|product|site|website)/i, { intent: 'marketing_plan', tasks: ['market-analyst', 'growth-marketer', 'seo-specialist'], reasoning: 'Marketing planning — the growth team builds the campaign.' }],
+      [/plan (a |an |my |our )?(party|wedding|event|birthday|graduation|conference|dinner|gathering)|organi[sz]e (a |an |my |our )?(party|event|wedding|dinner)|event planning/i, { intent: 'event_planning', tasks: ['event-planner', 'wedding-planner', 'travel'], reasoning: 'Event planning — the events team handles logistics and budget.' }],
+      [/meal (plan|ideas?|prep)|what should (i|we) (cook|eat|make) (for )?(dinner|lunch|breakfast)|dinner ideas|recipe (ideas?|for)|meal prep/i, { intent: 'meal_plan', tasks: ['chef', 'nutrition', 'health'], reasoning: 'Meal planning — the chef and nutritionist build the menu.' }],
+      [/workout (plan|routine|schedule)|exercise (plan|routine)|gym (routine|plan)|training (plan|program|split)|get (in shape|fit)|fitness plan/i, { intent: 'workout_plan', tasks: ['fitness', 'health', 'nutrition'], reasoning: 'Fitness planning — the trainer builds the program.' }],
+      [/invest(ing|ment)? (in|my|money)|portfolio (advice|help|rebalance)|stocks (to buy|advice)|save for retirement|401k|roth ira|should i (buy|invest)/i, { intent: 'investing_advice', tasks: ['investor', 'financial-advisor', 'tax-advisor'], reasoning: 'Investing guidance — the finance team advises on the money.' }],
+      [/my (app|phone|laptop|computer|pc|wifi|printer|tv|camera|speaker|headphones) (is|has|keeps|won['’]?t) (broken|not working|glitch|crash|slow|freez|turn (on|off)|connect|start|charge|install)|help me (fix|troubleshoot)|troubleshoot(ing)? (my|this)|error message when|why (is|does) (my|the) (app|phone|laptop|computer) (not|won['’]?t)|keeps crashing/i, { intent: 'tech_support', tasks: ['support-engineer', 'debugger', 'coder'], reasoning: 'Tech support — the support engineer troubleshoots the problem.' }],
+      [/(hack|pentest|pen[- ]test|security (audit|review|check)|audit (my|the|our) (app|site|code|system)|vulnerabilit(y|ies) (scan|check)|test (my|the|our) security|is (my|the|our) (app|site|code) secure)/i, { intent: 'security_audit', tasks: ['pentester', 'security', 'appsec'], reasoning: 'Security audit — the red-team specialists probe and report.' }],
+      [/content (calendar|plan|strategy|ideas)|blog (post|idea|outline|topic)|youtube (script|idea|outline|video)|newsletter (issue|idea|outline)|write content (for|about)|content ideas/i, { intent: 'content_creation', tasks: ['content-strategist', 'blog-writer', 'seo-writer', 'video-script-writer'], reasoning: 'Content creation — the content team plans and writes it.' }],
+      [/career (advice|plan|change|path|move)|job (search|hunt|application|interview)|find (a |me )?job|career goals|switch careers|get (a |hired for a )?job|career coach/i, { intent: 'career_plan', tasks: ['career', 'recruiter', 'resume'], reasoning: 'Career planning — the career team maps the path.' }],
+      [/relationship (advice|help|problem|issues?)|my (boyfriend|girlfriend|husband|wife|partner|fianc[ée])|marriage advice|dating (advice|help)|how do i (ask|tell|talk to) (my|him|her)|i (like|love) someone/i, { intent: 'relationship_advice', tasks: ['relationship-coach', 'counselor', 'dating-coach'], reasoning: 'Relationship guidance — the coaching team helps.' }],
+      [/my startup|i have a (business|startup) idea|should i (start|found) a company|fundrais(ing|e)|raise (money|funding|capital)|seed round|mvp (for|plan)|product[- ]market[- ]fit/i, { intent: 'startup_advice', tasks: ['startup-advisor', 'business-analyst', 'pricing-strategist'], reasoning: 'Startup advice — the founder team plans the launch.' }],
+      [/organi[sz]e my (day|week|schedule|tasks|todo)|plan my (week|day|schedule)|get organized|productivity (tips|plan|system)|time management|manage my (tasks|time|schedule)|daily (routine|schedule)/i, { intent: 'productivity', tasks: ['task-manager', 'scheduler', 'note-taker'], reasoning: 'Productivity — the ops team organizes the plan.' }],
+      [/(train|build|fine[- ]?tune) (a|an|my|the) (ml|machine learning|ai|model|classifier|recommendation|chatbot model)|machine learning (model|project)|data science (project|model|analysis)|predict(ion)? model/i, { intent: 'data_ml', tasks: ['data-scientist', 'ml-engineer', 'ml-ops'], reasoning: 'ML/data task — the science team builds and evaluates the model.' }],
+      [/(kubernetes|k8s|terraform|aws |gcp |azure |cloud (architecture|setup)|infrastructure (as code|design)|cluster)/i, { intent: 'cloud_devops', tasks: ['cloud-engineer', 'kubernetes-engineer', 'terraform-engineer', 'sre'], reasoning: 'Cloud/infra task — the platform team designs the infrastructure.' }],
+      [/(api (design|architecture|contract|schema|endpoint)|graphql (schema|design)|openapi|rest api (design|structure)|how should i (structure|design) (my|the|an) api)/i, { intent: 'api_backend', tasks: ['api-engineer', 'auth-engineer', 'backend'], reasoning: 'API design — the API team architects the contract.' }],
+      [/(android|iphone|ios|react native|flutter|mobile app|app store|play store|publish (my|the) app)/i, { intent: 'mobile_app', tasks: ['mobile-engineer', 'ios-engineer', 'android-engineer', 'react-native-engineer'], reasoning: 'Mobile task — the mobile team builds for the platform.' }],
+      [/game (design|mechanics|idea|concept|dev)|unity (game|project)|unreal (engine|game)|make (a |my )?game (better|more fun)|game developer/i, { intent: 'game_dev', tasks: ['game-developer', 'designer', 'coder'], reasoning: 'Game task — the game team designs and builds it.' }],
+      [/decorate (my|the) (room|house|home|apartment)|interior design|organi[sz]e (my|the) (room|house|closet|garage)|declutter|home (setup|improvement)|gardening|garden (plan|ideas|design)/i, { intent: 'home_life', tasks: ['home-org', 'interior-designer', 'gardener'], reasoning: 'Home/life task — the home team plans the space.' }],
+    ];
+    for (const [re, res] of rules) {
+      if (re.test(q)) return res;
+    }
+    return null;
   }
 
   isCoding(q) {

@@ -16,7 +16,7 @@ import {
 } from './src/services/SelfMonitor.js';
 import { loadSettings, saveSettings } from './src/services/SettingsManager.js';
 import { providerHealthSnapshot } from './src/services/ProviderRouter.js';
-import { AGENT_ROSTER, SKILL_REGISTRY } from './src/services/AgentRoster.js';
+import { AGENT_ROSTER, SKILL_REGISTRY, ROSTER_COUNT, SKILL_COUNT } from './src/services/AgentRoster.js';
 import { DesktopManager, ensureBrowser, browserStatus, restartBrowser } from './src/services/DesktopManager.js';
 import {
   addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory,
@@ -482,8 +482,8 @@ app.post('/api/chat', async (req, res) => {
       steps: plan.steps || [],
       roster: plan.roster || [],
       skillsLine: plan.skillsLine || '',
-      rosterCatalogSize: plan.rosterCatalogSize || 79,
-      skillCatalogSize: plan.skillCatalogSize || 226,
+      rosterCatalogSize: plan.rosterCatalogSize || ROSTER_COUNT,
+      skillCatalogSize: plan.skillCatalogSize || SKILL_COUNT,
       // AUTO TOOL ROUTING — the tool set derived for this task (Tool Router).
       tools: plan.tools || [],
       toolsLine: plan.toolsLine || '',
