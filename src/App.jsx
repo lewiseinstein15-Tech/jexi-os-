@@ -21,6 +21,7 @@ import PluginsScreen from './components/PluginsScreen';
 import ModelsScreen from './components/ModelsScreen';
 import McpScreen from './components/McpScreen';
 import PlaceholderPage from './components/PlaceholderPage';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const isDesktopQuery = () =>
   typeof window !== 'undefined' && !!window.matchMedia
@@ -140,35 +141,37 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-void text-text-primary flex flex-col">
-      <TopNav activeNav={activeNav} running={engine.isProcessing} onNavigate={navigate} />
-      <UpdateBanner />
+    <ErrorBoundary>
+      <div className="min-h-screen bg-void text-text-primary flex flex-col">
+        <TopNav activeNav={activeNav} running={engine.isProcessing} onNavigate={navigate} />
+        <UpdateBanner />
 
-      <div className="flex flex-1 min-h-0">
-        {/* Desktop rail — the OS navigation column (spec §47) */}
-        {isDesktop && (
-          <aside className="hidden lg:flex w-[216px] flex-shrink-0 border-r border-hairline px-2 py-4 overflow-y-auto">
-            <NavList activeNav={activeNav} onNavigate={navigate} />
-          </aside>
-        )}
+        <div className="flex flex-1 min-h-0">
+          {/* Desktop rail — the OS navigation column (spec §47) */}
+          {isDesktop && (
+            <aside className="hidden lg:flex w-[216px] flex-shrink-0 border-r border-hairline px-2 py-4 overflow-y-auto">
+              <NavList activeNav={activeNav} onNavigate={navigate} />
+            </aside>
+          )}
 
-        <main className="flex-1 min-h-0 overflow-y-auto">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeNav}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.18 }}
-              className={activeNav === 'command'
-                ? 'h-[calc(100dvh-53px)] flex flex-col py-3'
-                : 'min-h-full'}
-            >
-              {renderPage()}
-            </motion.div>
-          </AnimatePresence>
-        </main>
+          <main className="flex-1 min-h-0 overflow-y-auto">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeNav}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18 }}
+                className={activeNav === 'command'
+                  ? 'h-[calc(100dvh-53px)] flex flex-col py-3'
+                  : 'min-h-full'}
+              >
+                {renderPage()}
+              </motion.div>
+            </AnimatePresence>
+          </main>
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }

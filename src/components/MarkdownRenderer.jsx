@@ -182,10 +182,18 @@ export default function MarkdownRenderer({ content }) {
   let cleanContent = content.replace(/\$\$\s*\$\$/g, '').replace(/\$\s*\$/g, '');
 
   // 2. SAFETY NET: Auto-wrap lone LaTeX commands in $$ if the AI forgot them
-  // If a line starts with a backslash (like \int or \frac) and doesn't have $$, wrap it!
+  // Lines inside fenced code blocks are NEVER wrapped — code is full of
+  // backslash-leading lines (\n, \t, \print, \d+) and wrapping them in math
+  // produced invalid LaTeX that crashed the whole render (the "black screen
+  // on code questions" bug). Track fence state while mapping lines.
+  let inFence = false;
   cleanContent = cleanContent.split('\n').map(line => {
     const trimmed = line.trim();
-    if (trimmed.startsWith('\\') && !trimmed.includes('$$') && !trimmed.startsWith('```')) {
+    if (/^```/.test(trimmed)) {
+      inFence = !inFence;
+      return line;
+    }
+    if (!inFence && trimmed.startsWith('\\') && !trimmed.includes('$$') && !trimmed.startsWith('```')) {
       return `$$ ${trimmed} $$`;
     }
     return line;
@@ -195,7 +203,7 @@ export default function MarkdownRenderer({ content }) {
     <div className="markdown-body text-[11px] leading-relaxed">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[rehypeKatex]}
+        rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
         components={{
           h1: ({ node, children, ...props }) => {
             if (SECTION_META[flattenText(children).trim().toUpperCase()]) {
