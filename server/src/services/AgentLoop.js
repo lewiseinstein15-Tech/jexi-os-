@@ -93,6 +93,13 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   const start = Date.now();
   if (typeof sendEvent !== 'function') sendEvent = () => {};
   const emit = (type, payload) => { try { sendEvent(type, payload); } catch (e) {} };
+  const checkCancelled = () => {
+    if (opts.signal && opts.signal.aborted) {
+      emit('agent.done', { answer: '', cancelled: true, stats: { cancelled: true, toolCalls: callsMade, tools: tools.length, durationMs: Date.now() - start } });
+      return true;
+    }
+    return false;
+  };
 
   const plan = await safePlan(query, image);
   const team = plan.teamSlugs || [];
@@ -111,7 +118,10 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   let callsMade = 0;
   let finalText = '';
 
+  if (checkCancelled()) return { answer: '', cancelled: true, stats: { cancelled: true, toolCalls: 0, tools: tools.length, durationMs: Date.now() - start } };
+
   for (let iter = 1; iter <= MAX_ITERATIONS; iter++) {
+    if (checkCancelled()) return { answer: '', cancelled: true, stats: { cancelled: true, toolCalls: callsMade, tools: tools.length, durationMs: Date.now() - start } };
     const canCall = tools.length > 0 && callsMade < MAX_TOOL_CALLS;
 
     const prompt = buildPrompt({ query, image, tools, toolContext, iteration: iter, canCall });

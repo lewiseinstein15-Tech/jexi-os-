@@ -31,6 +31,9 @@ import { runAgentLoop } from './src/services/AgentLoop.js';
 import { listWorkspace, readWorkspace, writeWorkspace, createCheckpoint, listCheckpoints, diffCheckpoint, rollbackCheckpoint } from './src/services/WorkspaceRuntime.js';
 import { listProcesses, getProcessLog, startProcess, stopProcess, deleteProcess, onProcessEvent } from './src/services/ProcessManager.js';
 import { verifyDomainAnswer, detectDomain, deterministicChecks } from './src/services/DomainVerifier.js';
+import { runSubagents, decomposeQuery } from './src/services/SubagentRuntime.js';
+import { listHooks, addHook, updateHook, removeHook } from './src/services/HookEngine.js';
+import { listPlugins, togglePlugin } from './src/services/PluginRegistry.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
 import { mountMcp } from './mcp-server.js';
 import { taskManager } from './src/services/TaskManager.js';
@@ -414,6 +417,55 @@ app.get('/api/processes/:id/logs', (req, res) => {
 
 app.post('/api/processes/:id/stop', (req, res) => res.json(stopProcess(req.params.id)));
 app.delete('/api/processes/:id', (req, res) => res.json(deleteProcess(req.params.id)));
+
+// === PLUGIN SYSTEM (roadmap stage 21 — feature bundles) ===
+// Built-in plugins contribute agents/skills/tools; toggle them at runtime.
+app.get('/api/plugins', (req, res) => res.json({ plugins: listPlugins() }));
+app.post('/api/plugins/:id/toggle', (req, res) => {
+  try { res.json({ success: true, ...togglePlugin(req.params.id) }); }
+  catch (e) { res.status(400).json({ success: false, error: (e && e.message) || String(e) }); }
+});
+
+// === HOOK ENGINE (roadmap stage 22 — lifecycle gates) ===
+// Hooks fire before/after tools and tasks; only an explicit deny blocks.
+app.get('/api/hooks', (req, res) => res.json({ hooks: listHooks() }));
+app.post('/api/hooks', (req, res) => {
+  try { res.json({ success: true, hook: addHook(req.body || {}) }); }
+  catch (e) { res.status(400).json({ success: false, error: (e && e.message) || String(e) }); }
+});
+app.patch('/api/hooks/:id', (req, res) => {
+  try { res.json({ success: true, hook: updateHook(req.params.id, req.body || {}) }); }
+  catch (e) { res.status(404).json({ success: false, error: (e && e.message) || String(e) }); }
+});
+app.delete('/api/hooks/:id', (req, res) => {
+  try { res.json({ success: true, ...removeHook(req.params.id) }); }
+  catch (e) { res.status(404).json({ success: false, error: (e && e.message) || String(e) }); }
+});
+
+// === SUBAGENT RUNTIME (roadmap stage 14 — parallel, cancel, aggregate) ===
+// POST /api/subagents  { tasks: [{name, query}], query?: auto-decompose }
+// Streams subagent.plan/start/done + subagent.aggregate as NDJSON.
+app.post('/api/subagents', async (req, res) => {
+  const { tasks, query } = req.body || {};
+  let jobs = Array.isArray(tasks) && tasks.length ? tasks : [];
+  if (!jobs.length && query) {
+    jobs = decomposeQuery(query).map((q) => ({ name: q.slice(0, 40), query: q }));
+  }
+  if (!jobs.length) return res.status(400).json({ success: false, error: 'Provide tasks or a compound query' });
+
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Cache-Control', 'no-cache');
+  const sendEvent = (type, data) => { try { res.write(JSON.stringify({ type, ...data }) + '\n'); } catch (e) {} };
+  const heartbeat = setInterval(() => { try { res.write('{"type":"heartbeat"}\n'); } catch (e) {} }, 10000);
+  const finish = () => { clearInterval(heartbeat); try { res.end(); } catch (e) {} };
+  try {
+    await runSubagents({ tasks: jobs, sendEvent });
+    finish();
+  } catch (e) {
+    sendEvent('subagent.aggregate', { answer: `Subagent run failed: ${(e && e.message) || e}`, counts: { ok: 0, failed: 1 } });
+    finish();
+  }
+});
 
 // === DOMAIN VERIFICATION (roadmap stage 16) ===
 // Verify a draft answer against its domain's rules: deterministic structural

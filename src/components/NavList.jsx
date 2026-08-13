@@ -31,7 +31,7 @@ export const NAV_SECTIONS = [
   {
     label: 'EXTENSIONS',
     items: [
-      { id: 'plugins', icon: Puzzle, label: 'Plugins', stage: 21 },
+      { id: 'plugins', icon: Puzzle, label: 'Plugins', page: true },
       { id: 'knowledge', icon: BookOpen, label: 'Knowledge', page: true },
     ],
   },

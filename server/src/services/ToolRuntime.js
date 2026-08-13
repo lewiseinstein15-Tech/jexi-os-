@@ -37,6 +37,7 @@ import {
 } from './MemoryManager.js';
 import { collectSystemStatus } from './SelfMonitor.js';
 import { loadSettings, saveSettings } from './SettingsManager.js';
+import { runHooks } from './HookEngine.js';
 
 /* ------------------------------------------------------------------ */
 /* Schemas — argument contracts for the executable tools.              */
@@ -237,6 +238,14 @@ export async function executeTool({ slug, args = {}, profile, sendEvent }) {
 
   emit('tool.start', { tool: slug, name: tool.name, permission: perm, profile: useProfile, args: safeArgs(slug, args) });
 
+  // HOOK ENGINE (stage 22) — PreToolUse gate, fail-open (only deny blocks).
+  const gate = runHooks('beforeTool', { tool: slug, query: args.query || args.url || args.command || '' }, (t, d) => emit(t, d));
+  if (!gate.allowed) {
+    const blocked = { ok: false, blocked: true, byHook: gate.blocked.name, tool: slug, error: `Blocked by hook "${gate.blocked.name}": ${gate.blocked.message || 'denied'}.`, durationMs: Date.now() - started };
+    emit('tool.result', { tool: slug, ok: false, blocked: true, byHook: gate.blocked.name, error: blocked.error, durationMs: blocked.durationMs });
+    return blocked;
+  }
+
   // Permission gate
   const allowed = TOOL_PROFILES[useProfile]?.allow || [];
   if (!allowed.includes(perm)) {
@@ -268,6 +277,7 @@ export async function executeTool({ slug, args = {}, profile, sendEvent }) {
       emit('tool.result', { tool: slug, ok: true, routed: true, durationMs: Date.now() - started });
       return { ...routed, permission: perm, durationMs: Date.now() - started };
     }
+    runHooks('afterTool', { tool: slug, query: args.query || args.url || args.command || '', ok: true }, (t, d) => emit(t, d));
     const ok = { ok: true, tool: slug, permission: perm, result: formatResult(result), durationMs: Date.now() - started };
     emit('tool.result', { tool: slug, ok: true, durationMs: ok.durationMs, preview: String(ok.result).slice(0, 300) });
     return ok;
