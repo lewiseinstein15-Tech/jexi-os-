@@ -14,6 +14,7 @@ import KnowledgePanel from './components/KnowledgePanel';
 import DownloadPanel from './components/DownloadPanel';
 import UpdateBanner from './components/UpdateBanner';
 import TasksScreen from './components/TasksScreen';
+import SkillsScreen from './components/SkillsScreen';
 import PlaceholderPage from './components/PlaceholderPage';
 
 const isDesktopQuery = () =>
@@ -27,7 +28,6 @@ const PLACEHOLDERS = {
   terminal: { title: 'TERMINAL', stage: 11, blurb: 'A persistent, observable terminal — shell commands, background processes, stdout/stderr, exit codes.' },
   research: { title: 'RESEARCH', stage: 5, blurb: 'A dedicated research console. The research team already runs in the backend — try it now in the Command Center.' },
   models: { title: 'MODELS', stage: 24, blurb: 'Per-agent model routing and local inference (llama.cpp / Ollama / vLLM / OpenAI-compatible).' },
-  skills: { title: 'SKILLS', stage: 13, blurb: 'First-class reusable skills: auto-invocation, /commands, discovery tiers.' },
   plugins: { title: 'PLUGINS', stage: 21, blurb: 'Install, enable, disable and update plugins (agents, skills, tools, hooks, MCP).' },
 };
 
@@ -81,6 +81,17 @@ export default function App() {
         );
       case 'tasks':
         return <TasksScreen />;
+      case 'skills':
+        return (
+          <div className="px-3 pt-4 pb-8 space-y-3 max-w-[900px] mx-auto">
+            <SkillsScreen
+              onUseSkill={(query) => {
+                engine.runSearch(query);
+                navigate('home');
+              }}
+            />
+          </div>
+        );
       case 'memory':
         return <MemoryPanel memory={memory} />;
       case 'knowledge':

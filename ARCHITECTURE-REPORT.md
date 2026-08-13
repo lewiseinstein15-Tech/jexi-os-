@@ -204,11 +204,11 @@ Rules: one command input per screen; conversation is a reusable workspace compon
 | 6 | Conversation + high-quality AnswerRenderer (KaTeX, sections, callouts, citations) | ✅ shipped to main (structured GIVEN/FORMULA/WORKING/FINAL-ANSWER + research section chips, GitHub-style `> [!NOTE]` callouts, numbered citation badges, live mermaid diagrams, KaTeX) |
 | 7 | Agent workspace (OS-style list + detail) | ✅ shipped to main (AgentsScreen + roster browser + ActiveAgents) |
 | 8 | Task system + events (`task.*`) | ✅ TaskManager (background execution, `task.*` NDJSON streams, disk persistence, cancel/rerun) + TASKS console in the UI |
-| 9 | Unified tool runtime (schema registry, permission profiles) | later |
+| 9 | Unified tool runtime (schema registry, permission profiles) | ✅ shipped to main (ToolRuntime: schemas, safe/medium/risky permissions, Auto/Ask/Full profiles, validation, timeouts, tool.* events, /api/tools) |
 | 10 | Workspace runtime (projects, checkpoints, diffs, rollback) | later |
 | 11 | Terminal/process subsystem (persistent, observable) | later |
-| 12 | Orchestrator v2 (tool-calling loop, gated stop, retry policy) | later |
-| 13 | First-class skills (auto-invoke, `/commands`, tiers) | later |
+| 12 | Orchestrator v2 (tool-calling loop, gated stop, retry policy) | ✅ shipped to main (AgentLoop: plan → generate → fenced-json tool calls → ToolRuntime → results fed back → final answer; /api/agent NDJSON stream) |
+| 13 | First-class skills (auto-invoke, `/commands`, tiers) | ✅ shipped to main (Skills screen: searchable 495-skill registry by live category, detail sheet, one-click invoke that resolves the plan and runs it in the Command Center; /api/skills + /api/skills/invoke) |
 | 14 | Subagent runtime (spawn, parallel, cancel, aggregate) | later |
 | 15 | Memory surfaces (searchable, editable, exportable) | later |
 | 16 | Verification engine per domain (math/eng/code/research) | later |

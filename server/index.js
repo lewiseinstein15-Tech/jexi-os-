@@ -345,6 +345,39 @@ app.get('/api/roster', (req, res) => {
   });
 });
 
+// === FIRST-CLASS SKILLS (roadmap stage 13) ===
+// The 495-skill registry is user-invocable: browse it (grouped by category,
+// searchable), then invoke one — the invoke call resolves the owning agent and
+// plan so the UI can announce what will run, and returns a ready-to-send
+// query for the pipeline (the "/skill" command, no typing required).
+app.get('/api/skills', (req, res) => {
+  const q = String(req.query.q || '').toLowerCase();
+  const skills = q
+    ? SKILL_REGISTRY.filter((s) => `${s.name} ${s.desc} ${s.slug} ${s.category}`.toLowerCase().includes(q))
+    : SKILL_REGISTRY;
+  const groups = {};
+  for (const s of skills) { (groups[s.category || 'Other'] ||= []).push(s); }
+  const byCategory = Object.entries(groups)
+    .map(([category, items]) => ({ category, count: items.length, skills: items }))
+    .sort((a, b) => b.count - a.count || a.category.localeCompare(b.category));
+  res.json({ skills, byCategory, total: skills.length, catalogSize: SKILL_COUNT });
+});
+
+app.post('/api/skills/invoke', async (req, res) => {
+  const { slug, task } = req.body || {};
+  const skill = SKILL_REGISTRY.find((s) => s.slug === slug);
+  if (!skill) return res.status(404).json({ success: false, error: `Unknown skill: ${slug}` });
+  const query = `Use your "${skill.name}" skill (${skill.desc}). Task: ${String(task || '').trim() || 'run this skill for me'}`;
+  let plan = null;
+  try { plan = await planner.analyzeIntent(query); } catch (e) {}
+  res.json({
+    success: true,
+    skill: { slug: skill.slug, name: skill.name, category: skill.category, desc: skill.desc, agent: skill.agent },
+    query,
+    plan: plan ? { intent: plan.intent, team: plan.teamSlugs || [], steps: plan.steps || [], tools: plan.tools || [] } : null,
+  });
+});
+
 // === MEMORY CORE ENDPOINTS (JEXI's mind) ===
 app.get('/api/memory', (req, res) => res.json(loadMemory()));
 app.post('/api/memory/clear', (req, res) => { clearMemory(); res.json({ success: true }); });

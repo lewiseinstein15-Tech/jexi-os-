@@ -26,7 +26,7 @@ export const NAV_SECTIONS = [
       { id: 'research', icon: Globe, label: 'Research', stage: 5 },
       { id: 'memory', icon: Database, label: 'Memory', page: true },
       { id: 'models', icon: Brain, label: 'Models', stage: 24 },
-      { id: 'skills', icon: Boxes, label: 'Skills', stage: 13 },
+      { id: 'skills', icon: Boxes, label: 'Skills', page: true },
     ],
   },
   {
