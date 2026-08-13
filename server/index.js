@@ -28,6 +28,7 @@ import {
 import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
 import { getToolCatalog, TOOL_PROFILES, activeToolProfile, setToolProfile, executeTool } from './src/services/ToolRuntime.js';
 import { runAgentLoop } from './src/services/AgentLoop.js';
+import { verifyDomainAnswer, detectDomain, deterministicChecks } from './src/services/DomainVerifier.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
 import { mountMcp } from './mcp-server.js';
 import { taskManager } from './src/services/TaskManager.js';
@@ -333,6 +334,17 @@ app.post('/api/agent', async (req, res) => {
     }
     finish();
   }
+});
+
+// === DOMAIN VERIFICATION (roadmap stage 16) ===
+// Verify a draft answer against its domain's rules: deterministic structural
+// checks always run (no AI), and a domain critic runs when keys are present.
+app.post('/api/verify', async (req, res) => {
+  const { query, draft, domain, sources } = req.body || {};
+  if (!draft || !String(draft).trim()) return res.status(400).json({ success: false, error: 'No draft to verify' });
+  const detected = detectDomain(query || '', draft);
+  const result = await verifyDomainAnswer({ query: query || '', draft, domain: domain || detected, sources: sources || [] });
+  res.json({ success: true, detected, ...result });
 });
 
 // === AGENT ROSTER (the 79-specialist catalog + 226-skill registry) ===

@@ -211,7 +211,7 @@ Rules: one command input per screen; conversation is a reusable workspace compon
 | 13 | First-class skills (auto-invoke, `/commands`, tiers) | ✅ shipped to main (Skills screen: searchable 495-skill registry by live category, detail sheet, one-click invoke that resolves the plan and runs it in the Command Center; /api/skills + /api/skills/invoke) |
 | 14 | Subagent runtime (spawn, parallel, cancel, aggregate) | later |
 | 15 | Memory surfaces (searchable, editable, exportable) | ✅ shipped to main (Memory panel: semantic search across all memories, per-entry delete, JSON export via /api/memory/export + /api/memory/delete) |
-| 16 | Verification engine per domain (math/eng/code/research) | later |
+| 16 | Verification engine per domain (math/eng/code/research) | ✅ shipped to main (DomainVerifier: no-AI deterministic checks — balanced math/code fences, FINAL ANSWER, arithmetic spot-check, sources — plus per-domain AI critic; wired into math + research pipeline; /api/verify) |
 | 17 | Sandbox + folder-trust + risk classification | later |
 | 18 | Computer runtime abstraction (provider-independent) | later |
 | 19 | Browser agent improvements (screenshots, UI verification) | later |

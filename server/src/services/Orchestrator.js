@@ -8,6 +8,7 @@ import { reasonAndWrite } from './Reasoner.js';
 import { runSearchTeam } from './SearchAgent.js';
 import { learnHowTo } from './Researcher.js';
 import { generateContent, resolveKeys } from './LLMClient.js';
+import { verifyDomainAnswer } from './DomainVerifier.js';
 import { collectSystemStatus, readSourceFile } from './SelfMonitor.js';
 import { studyTopic, recallKnowledge } from './KnowledgeAgent.js';
 import { runNewsTeam } from './NewsAgent.js';
@@ -404,6 +405,18 @@ Try it: say *"build a weather app"* and watch Product → Designer → Engineer 
           try { saveInternetKnowledge(query, reply, []); } catch (e) {}
           results.summary = reply;
           results.statistics.confidence = 95;
+
+          // DOMAIN VERIFICATION (stage 16) — deterministic math checks first
+          // (balanced LaTeX fences, FINAL ANSWER present, arithmetic spot-check),
+          // then a math critic with keys when something is flagged.
+          try {
+            const verified = await verifyDomainAnswer({ query, draft: reply, domain: 'math', sendEvent });
+            if (verified.changed) {
+              sendEvent('log', { agent: 'Domain Check (math)', message: verified.verdict === 'verified' ? '✓ Math answer verified after revision.' : '✍ Math answer revised — checks now pass.' });
+              results.summary = verified.text;
+              results.statistics.verification = { domain: 'math', rounds: verified.rounds, verdict: verified.verdict };
+            }
+          } catch (e) {}
           return results;
         }
 
@@ -705,6 +718,16 @@ Try it: say *"build a weather app"* and watch Product → Designer → Engineer 
           } else {
             sendEvent('log', { agent: 'Critic', message: '✓ Answer verified clean.' });
           }
+
+          // DOMAIN VERIFICATION (stage 16) — deterministic research checks on
+          // top of the fact-check loop: sources linked, structure present.
+          try {
+            const domainCheck = await verifyDomainAnswer({ query, draft: results.summary, domain: 'research', sources: results.sources, sendEvent });
+            if (domainCheck.changed) {
+              results.summary = domainCheck.text;
+              results.statistics.verification = { ...(results.statistics.verification || {}), domain: 'research', verdict: domainCheck.verdict };
+            }
+          } catch (e) {}
           return results;
         }
 
