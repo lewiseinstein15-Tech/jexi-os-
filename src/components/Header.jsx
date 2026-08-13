@@ -11,6 +11,10 @@ const NAV_ITEMS = [
   { id: 'download', icon: Smartphone, label: 'APP' },
 ];
 
+// Visible build label (bump per release). Pushing a change to src/ also
+// triggers the APK CI workflow, which stamps its own apk-build-<run> number.
+const APP_BUILD = '47';
+
 export default function Header({ plan = null, logs = [], running = false, activeNav = 'home', setActiveNav = () => {} }) {
   // The active agent is the last one that logged — the Core lights its segment.
   let activeAgent = null;
@@ -39,6 +43,9 @@ export default function Header({ plan = null, logs = [], running = false, active
         </div>
 
         <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 bg-white/[0.04] border border-hairline rounded-full px-2.5 py-1.5">
+            <span className="text-[8px] text-text-secondary font-bold tracking-wider">BUILD {APP_BUILD}</span>
+          </div>
           <div className="hidden sm:flex items-center gap-1.5 bg-white/[0.04] border border-hairline rounded-full px-2.5 py-1.5">
             <Sparkles className="w-3 h-3 text-cyan-400" />
             <span className="text-[8px] text-cyan-300 font-bold tracking-wider">
