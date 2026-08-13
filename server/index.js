@@ -39,6 +39,10 @@ import { modelRoutingTable, providerPreferenceForIntent } from './src/services/M
 import { MCP_PORT, MCP_TOOL_ALLOWLIST } from './mcp-server.js';
 import { trustStatus, setTrustMode, allowPattern, denyPattern, removeDecision, clearTrust, trustFolder } from './src/services/RiskGuard.js';
 import { computerStatus, runtimeCall } from './src/services/ComputerRuntime.js';
+import { listTasks, getTask, updateTask, deleteTask, taskStats as taskRegistryStats } from './src/services/TaskRegistry.js';
+import { analyzeMessage } from './src/services/ConversationManager.js';
+import { decide, applyDecision } from './src/services/DecisionEngine.js';
+import { recordDecision, retrieveDecisions, memoryStats as decisionMemoryStats } from './src/services/DecisionMemory.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
 import { mountMcp } from './mcp-server.js';
 import { taskManager } from './src/services/TaskManager.js';
@@ -453,6 +457,25 @@ app.get('/api/processes/:id/logs', (req, res) => {
 app.post('/api/processes/:id/stop', (req, res) => res.json(stopProcess(req.params.id)));
 app.delete('/api/processes/:id', (req, res) => res.json(deleteProcess(req.params.id)));
 
+// === BUILD 47 — CONTEXT / INTELLIGENCE OBSERVABILITY ===
+// The task registry + decision memory behind continuation/topic-switch logic.
+app.get('/api/context', (req, res) => {
+  res.json({
+    tasks: listTasks().slice(0, 30),
+    taskStats: taskRegistryStats(),
+    decisionMemory: retrieveDecisions({ limit: 15 }),
+    decisionStats: decisionMemoryStats(),
+  });
+});
+app.post('/api/context/tasks/:id/status', (req, res) => {
+  const status = String(req.body && req.body.status || '');
+  const t = getTask(req.params.id);
+  if (!t) return res.status(404).json({ error: 'task not found' });
+  if (!['active', 'paused', 'completed', 'failed'].includes(status)) return res.status(400).json({ error: 'bad status' });
+  res.json(updateTask(t.id, { status }));
+});
+app.delete('/api/context/tasks/:id', (req, res) => res.json(deleteTask(req.params.id)));
+
 // === NOTIFICATION CENTER (roadmap stage 23 remainder) ===
 // Scheduled-mission completions land here; the UI bell polls this.
 app.get('/api/notifications', (req, res) => res.json({ notifications: listNotifications(Number(req.query.limit) || 50), unread: unreadCount() }));
@@ -809,6 +832,20 @@ app.post('/api/chat', async (req, res) => {
     const hasPending = pendingTask && Date.now() - pendingTask.at < RESUME_TTL_MS;
     let effectiveQuery = raw;
     let plan;
+    let activeTaskId = null;   // Build 47 — the task this turn belongs to
+    let executionQuery = effectiveQuery; // may gain resume context
+    let intelClassification = null;
+
+    // BUILD 47 — INTELLIGENCE PIPELINE (Conversation Manager).
+    // Before anything runs, decide what this message MEANS: continuation of the
+    // active task, a switch back to an older one, a genuinely new objective, or
+    // an ambiguous reference that needs clarification.
+    const activeTaskNow = (listTasks('active') || [])[0];
+    const currentTaskId = activeTaskNow?.id || null;
+    const analysis = image
+      ? { classification: currentTaskId ? 'continue' : 'new', taskId: currentTaskId, confidence: 0.8, reason: 'image attaches to current context' }
+      : await analyzeMessage(raw, { currentTaskId, image });
+    intelClassification = analysis.classification;
 
     if (!image && DECLINE_RE.test(raw) && hasPending) {
       // "no / cancel" — clear the pending task, answer WITHOUT searching.
@@ -827,6 +864,11 @@ app.post('/api/chat', async (req, res) => {
       plan = await planner.planConfirmed(original);
       effectiveQuery = original;
       pendingTask = { at: Date.now(), query: original }; // keep ORIGINAL as the resume target
+      // Record the resumed task in the registry (continuation of whatever is active).
+      if (currentTaskId) {
+        activeTaskId = currentTaskId;
+        updateTask(currentTaskId, { status: 'active', query: original, plan: plan.steps || [] });
+      }
     } else {
       // CONTINUITY — resolve follow-up messages against the recent conversation
       // before planning, so "give me a roadmap for a beginner in this course"
@@ -840,8 +882,61 @@ app.post('/api/chat', async (req, res) => {
           message: `🧠 Continuity — resolved “${raw.slice(0, 60)}” → “${resolved.query.slice(0, 100)}” (${resolved.reason}).`,
         });
       }
+
+      // BUILD 47 — DECISION ENGINE: continue / switch / new / clarify.
+      const decision = decide({
+        raw,
+        classification: analysis,
+        taskId: analysis.taskId || null,
+        candidates: analysis.candidates || [],
+        currentTaskId,
+        resolvedQuery: effectiveQuery,
+      });
+
+      if (decision.action === 'clarify') {
+        // Never guess — ask a concise question instead of executing.
+        sendEvent('intel', {
+          classification: 'clarify', taskId: null, taskTitle: '',
+          confidence: decision.metadata.confidence, reason: decision.metadata.reason,
+          candidates: decision.clarification.options || [],
+        });
+        const opts = (decision.clarification.options || []).map((o) => `- **${o.id}** — ${o.label}`).join('\n');
+        sendEvent('log', { agent: 'JEXI', message: `🤔 ${decision.clarification.question}` });
+        sendEvent('done', {
+          success: true, query,
+          summary: `### 🤔 One quick thing\n\n${decision.clarification.question}${opts ? `\n\n${opts}` : ''}\n\nTell me which one (or describe it in your own words) and I'll take it from there.`,
+        });
+        return;
+      }
+
       plan = await planner.analyzeIntent(effectiveQuery, { image });
       pendingTask = { at: Date.now(), query: effectiveQuery };
+
+      // BUILD 47 — apply the decision: create or re-activate the task.
+      const applied = applyDecision(decision, {
+        title: raw.slice(0, 90),
+        objective: effectiveQuery,
+        plan: plan.steps || [],
+        entities: [],
+      });
+      activeTaskId = applied.task?.id || decision.taskId || currentTaskId;
+      if (activeTaskId && getTask(activeTaskId)) {
+        updateTask(activeTaskId, { status: 'active', query: effectiveQuery, plan: plan.steps || [] });
+      }
+      // Resume context: continue/switch turns get the task's state injected so
+      // the model plans a STEP, not a restart. (new turns pass through clean)
+      if (decision.contextBlock && (decision.metadata.classification === 'continue' || decision.metadata.classification === 'switch')) {
+        executionQuery = `${decision.contextBlock}\n\nContinue: ${effectiveQuery}`;
+      }
+      sendEvent('intel', {
+        classification: decision.metadata.classification,
+        taskId: activeTaskId || null,
+        taskTitle: applied.task?.title || (activeTaskId ? getTask(activeTaskId)?.title : '') || '',
+        confidence: decision.metadata.confidence,
+        reason: decision.metadata.reason,
+        resumed: !!decision.metadata.resumed,
+        taskCount: taskRegistryStats().total,
+      });
     }
 
     sendEvent('log', { agent: 'Planner', message: `Intent: ${plan.intent} — ${plan.reasoning}` });
@@ -859,7 +954,7 @@ app.post('/api/chat', async (req, res) => {
       toolsLine: plan.toolsLine || '',
       toolCount: plan.toolCount || 0,
     });
-    const results = await orchestrator.executePlan(plan, effectiveQuery, sendEvent, { image });
+    const results = await orchestrator.executePlan(plan, executionQuery || effectiveQuery, sendEvent, { image });
 
     sendEvent('log', { agent: 'JEXI', message: '🎯 Mission complete — here is the result.' });
     // Contract: a successful done ALWAYS carries a readable summary — the
@@ -871,6 +966,27 @@ app.post('/api/chat', async (req, res) => {
         ? '✅ Task completed — the team finished, but returned no readable summary. Check the activity log above to see what ran.'
         : (results.error || 'The task failed — check the activity log for details.');
     sendEvent('done', { success: results.success, query, summary: finalSummary, sources: results.sources || [], statistics: results.statistics, files: results.files || [] });
+
+    // BUILD 47 — TASK STATE UPDATE: record what this turn completed so the next
+    // "continue" resumes from here instead of restarting.
+    if (activeTaskId && getTask(activeTaskId)) {
+      updateTask(activeTaskId, {
+        status: results.success === false ? 'failed' : 'completed',
+        query: effectiveQuery,
+        plan: plan.steps || [],
+        completedSteps: plan.steps || [],
+        result: finalSummary.slice(0, 2000),
+        filesChanged: results.files || [],
+        verified: true,
+      });
+    }
+    // BUILD 47 — MEMORY WRITE POLICY: only substantive user requirements /
+    // corrections / continuations become provenanced memory (never casual chat).
+    if (!image && intelClassification && ['continue', 'switch'].includes(intelClassification) && raw.length > 25 && !DECLINE_RE.test(raw) && !CONFIRM_RE.test(raw)) {
+      try {
+        recordDecision({ type: 'requirement', content: raw.slice(0, 300), source: 'user', taskId: activeTaskId || '', confidence: 'direct' });
+      } catch (e) { /* memory must never break the chat */ }
+    }
 
     // Mem0-style preference learning — fire-and-forget in the background so it
     // never delays the reply or breaks the stream. JEXI learns what the user

@@ -42,6 +42,25 @@ export default function CommandCenter({ engine, isDesktop }) {
             </div>
           )}
 
+          {/* Build 47 — context intelligence chip (continuation / switch / new) */}
+          {plan?.intel && (
+            <div className={`flex items-center gap-1.5 mb-2 rounded-md border px-2 py-1.5 ${plan.intel.classification === 'clarify' ? 'border-acc-automation/40 bg-acc-automation/[0.06]' : 'border-brand-line bg-brand-dim/40'}`}>
+              <span className={`text-[8px] font-black tracking-wider ${plan.intel.classification === 'clarify' ? 'text-acc-automation' : 'text-brand'}`}>
+                {String(plan.intel.classification || '').toUpperCase()}
+              </span>
+              {plan.intel.taskTitle && (
+                <span className="text-[8px] font-mono text-text-secondary truncate">
+                  {plan.intel.taskId ? `${plan.intel.taskId} · ` : ''}{plan.intel.taskTitle}
+                </span>
+              )}
+              {typeof plan.intel.confidence === 'number' && (
+                <span className="ml-auto text-[7px] font-mono text-text-tertiary flex-shrink-0">
+                  {Math.round(plan.intel.confidence * 100)}%
+                </span>
+              )}
+            </div>
+          )}
+
           {steps.length > 0 ? (
             <>
               <div className="flex items-center justify-between mb-1.5">

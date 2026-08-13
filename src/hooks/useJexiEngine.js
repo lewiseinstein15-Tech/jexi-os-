@@ -35,6 +35,8 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan) {
     if (data.type === 'log') setLogs(prev => [...prev, { agent: data.agent, message: data.message }]);
     else if (data.type === 'website') setWebsites(prev => [...prev, data.site]);
     else if (data.type === 'plan') setPlan(prev => ({ ...prev, ...data }));
+    // Build 47 — intelligence metadata (classification, task id, confidence).
+    else if (data.type === 'intel') setPlan(prev => ({ ...prev, intel: data }));
     else if (data.type === 'done') {
       sawDone = true;
       if (data.success) {
