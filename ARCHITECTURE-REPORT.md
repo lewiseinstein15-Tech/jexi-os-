@@ -223,7 +223,7 @@ Rules: one command input per screen; conversation is a reusable workspace compon
 | 25 | Cloud/runtime deployment | later |
 | 26 | Testing (unit + integration + live domain probes) | ✅ 30 suites — incl. new cross-cutting test-api-surface.js: every frontend /api call verified against a real server route (51 endpoints), deterministic planner domain probes, offline tool execution, risk-guard interaction, verification engine verdicts, settings round-trip |
 | 27 | Performance optimization | ✅ memoized static catalogs (/api/roster, /api/skills) + Cache-Control headers; more later |
-| 28 | Final UI polish | later |
+| 28 | Final UI polish | ✅ marching plan pipeline (done ✓ / current pulses), roster stats in Command Center, shimmer planning states on Home + Command Center, verified bundle |
 
 **No fabricated functionality.** Every stage ships only what actually works; unavailable features are marked as such in the UI.
 

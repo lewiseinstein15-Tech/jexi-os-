@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Radio, Loader2 } from 'lucide-react';
+import { Radio, Loader2, Check, Users } from 'lucide-react';
 import ActivityWindow from './ActivityWindow';
 import ChatWindow from './ChatWindow';
 
@@ -13,6 +13,8 @@ export default function CommandCenter({ engine, isDesktop }) {
 
   const steps = plan?.steps || [];
   const domains = plan?.domainNames || [];
+  const rosterCount = plan?.teamSlugs?.length || 0;
+  const activeStep = isProcessing ? steps.length - 1 : -1;
 
   return (
     <div className={isDesktop ? 'flex gap-4 items-stretch justify-center h-full min-h-0 px-4' : 'flex flex-col gap-3 flex-1 min-h-0 px-3'}>
@@ -42,25 +44,48 @@ export default function CommandCenter({ engine, isDesktop }) {
 
           {steps.length > 0 ? (
             <>
-              <p className="eyebrow mb-1.5">Plan</p>
-              <div className="flex flex-wrap gap-1.5">
-                {steps.map((s, i) => (
-                  <span key={`${s}-${i}`} className="flex items-center gap-1 text-[9px] font-mono text-text-secondary">
-                    {i > 0 && <span className="text-text-tertiary">→</span>}
-                    <span className={`px-1.5 py-0.5 rounded border ${i === steps.length - 1 && isProcessing ? 'border-brand-line bg-brand-dim text-brand' : 'border-hairline bg-surface-2'}`}>
-                      {s}
-                    </span>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="eyebrow">Plan</p>
+                {rosterCount > 0 && (
+                  <span className="flex items-center gap-1 text-[8px] font-bold tracking-wider text-text-tertiary">
+                    <Users className="w-2.5 h-2.5" /> {rosterCount} AGENT{rosterCount !== 1 ? 'S' : ''} · {steps.length} STAGE{steps.length !== 1 ? 'S' : ''}
                   </span>
-                ))}
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {steps.map((s, i) => {
+                  const done = isProcessing && i < activeStep;
+                  const current = isProcessing && i === activeStep;
+                  return (
+                    <span key={`${s}-${i}`} className="flex items-center gap-1 text-[9px] font-mono text-text-secondary">
+                      {i > 0 && <span className="text-text-tertiary">→</span>}
+                      <span className={`px-1.5 py-0.5 rounded border flex items-center gap-1 transition-all duration-200 ${
+                        done
+                          ? 'border-hairline bg-surface-2 text-text-tertiary'
+                          : current
+                            ? 'border-brand-line bg-brand-dim text-brand animate-pulse'
+                            : 'border-hairline bg-surface-2'
+                      }`}>
+                        {done && <Check className="w-2.5 h-2.5" />}
+                        {s}
+                      </span>
+                    </span>
+                  );
+                })}
               </div>
               {plan.skillsLine && (
                 <p className="text-[9px] text-text-tertiary font-mono mt-2 truncate">skills: {plan.skillsLine}</p>
               )}
             </>
           ) : (
-            <p className="text-[10px] text-text-tertiary italic">
-              {isProcessing ? 'Planning the team for this task…' : 'Idle — ask JEXI what to build, research, or solve.'}
-            </p>
+            isProcessing ? (
+              <div className="space-y-1.5">
+                <div className="shimmer-bar h-2 rounded-full w-2/3" />
+                <div className="shimmer-bar h-2 rounded-full w-1/3" />
+              </div>
+            ) : (
+              <p className="text-[10px] text-text-tertiary italic">Idle — ask JEXI what to build, research, or solve.</p>
+            )
           )}
         </div>
 

@@ -96,6 +96,18 @@ export default function HomeView({ messages, logs, isProcessing, onSend, onOpenC
         </div>
       )}
 
+      {/* Planning phase — shimmer so the launch never reads as frozen */}
+      {isProcessing && !lastLog && (
+        <div className="rounded-lg border border-hairline bg-surface-1 px-3 py-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <Loader2 className="w-3.5 h-3.5 text-brand animate-spin flex-shrink-0" />
+            <p className="text-[11px] font-mono text-text-secondary">Planning the agent team…</p>
+          </div>
+          <div className="shimmer-bar h-2 rounded-full w-3/4" />
+          <div className="shimmer-bar h-2 rounded-full w-1/2" />
+        </div>
+      )}
+
       {/* Quick actions */}
       <div>
         <p className="eyebrow mb-3">Quick actions</p>
