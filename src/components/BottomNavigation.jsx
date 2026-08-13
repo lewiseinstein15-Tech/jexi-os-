@@ -1,14 +1,13 @@
 import { motion } from 'framer-motion';
-import { Home, Bot, Database, BookOpen, Settings, Smartphone } from 'lucide-react';
+import { Home, Bot, LayoutGrid, ListTodo, Settings } from 'lucide-react';
 
 export default function BottomNavigation({ activeNav, setActiveNav }) {
   const items = [
     { id: 'home', icon: Home, label: 'HOME' },
     { id: 'agents', icon: Bot, label: 'AGENTS' },
-    { id: 'memory', icon: Database, label: 'MEMORY' },
-    { id: 'knowledge', icon: BookOpen, label: 'BOOKS' },
+    { id: 'command', icon: LayoutGrid, label: 'COMMAND' },
+    { id: 'tasks', icon: ListTodo, label: 'TASKS' },
     { id: 'settings', icon: Settings, label: 'SETTINGS' },
-    { id: 'download', icon: Smartphone, label: 'APP' },
   ];
 
   return (
@@ -16,8 +15,8 @@ export default function BottomNavigation({ activeNav, setActiveNav }) {
       initial={{ y: 40 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.35, ease: 'easeOut' }}
-      className="fixed bottom-0 left-0 right-0 bg-surface-1/85 backdrop-blur-xl border-t border-hairline md:hidden"
-      style={{ boxShadow: '0 -10px 34px rgba(0,0,0,0.55)' }}
+      className="flex-shrink-0 bg-surface-1/85 backdrop-blur-xl border-t border-hairline md:hidden"
+      style={{ boxShadow: '0 -10px 34px rgba(0,0,0,0.55)', paddingBottom: 'var(--sab)' }}
     >
       <div className="flex justify-around items-center py-2 px-1">
         {items.map(({ id, icon: Icon, label }) => {

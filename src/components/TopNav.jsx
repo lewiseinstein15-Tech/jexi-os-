@@ -112,7 +112,8 @@ export default function TopNav({ activeNav, running, onNavigate, contextOverride
       <motion.header
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="sticky top-0 z-30 bg-void/85 backdrop-blur-xl border-b border-hairline"
+        className="flex-shrink-0 z-30 bg-void/85 backdrop-blur-xl border-b border-hairline"
+        style={{ paddingTop: 'var(--sat)' }}
       >
         <div className="flex items-center h-[52px] px-3 md:px-5 gap-2">
           {/* Left: hamburger + wordmark (always present on mobile) */}

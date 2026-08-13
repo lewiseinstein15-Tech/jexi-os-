@@ -5,6 +5,7 @@ import { useJexiEngine } from './hooks/useJexiEngine';
 import { useMemory } from './hooks/useMemory';
 import TopNav from './components/TopNav';
 import NavList from './components/NavList';
+import BottomNavigation from './components/BottomNavigation';
 import HomeView from './components/HomeView';
 import CommandCenter from './components/CommandCenter';
 import AgentsScreen from './components/AgentsScreen';
@@ -149,10 +150,13 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-void text-text-primary flex flex-col">
+      <div className="h-dvh overflow-hidden bg-void text-text-primary flex flex-col relative">
+        {/* FIXED TOP BAR — never scrolls */}
         <TopNav activeNav={activeNav} running={engine.isProcessing} onNavigate={navigate} />
         <UpdateBanner />
 
+        {/* MIDDLE ROW — fills the space between top bar and bottom nav; ONLY
+            <main> scrolls. Everything else is pinned. */}
         <div className="flex flex-1 min-h-0">
           {/* Desktop rail — the OS navigation column (spec §47) */}
           {isDesktop && (
@@ -161,7 +165,9 @@ export default function App() {
             </aside>
           )}
 
-          <main className="flex-1 min-h-0 overflow-y-auto">
+          {/* THE ONLY SCROLL CONTAINER — internal content scrolls here, the
+              app shell never moves. */}
+          <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeNav}
@@ -170,7 +176,7 @@ export default function App() {
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.18 }}
                 className={activeNav === 'command'
-                  ? 'h-[calc(100dvh-53px)] flex flex-col py-3'
+                  ? 'h-full flex flex-col py-3'
                   : 'min-h-full'}
               >
                 {renderPage()}
@@ -178,6 +184,9 @@ export default function App() {
             </AnimatePresence>
           </main>
         </div>
+
+        {/* FIXED BOTTOM NAVIGATION — mobile only, always visible */}
+        <BottomNavigation activeNav={activeNav} setActiveNav={navigate} />
       </div>
     </ErrorBoundary>
   );

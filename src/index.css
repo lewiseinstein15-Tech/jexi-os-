@@ -63,6 +63,12 @@
   --text-dim: #7c8794;
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Safe-area insets (notches / gesture bars) — require viewport-fit=cover */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
 }
 
 /* Semantic accent utilities — capability cards, status, agent identity */
@@ -80,6 +86,26 @@
 .tile-automation { background: color-mix(in srgb, var(--acc-automation) 9%, transparent); }
 
 * { box-sizing: border-box; }
+
+/* ============================================================
+   APPLICATION SHELL — fixed viewport (native-app behavior)
+   ------------------------------------------------------------
+   The document NEVER scrolls. html/body/#root are locked to the
+   viewport; the JEXI shell owns 100dvh with overflow hidden, and
+   only the designated main content region scrolls (overflow-y:auto
+   inside App.jsx). No overscroll bounce, no pull-to-refresh on the
+   whole app, no scrollbar-hiding hacks — this is the real
+   architecture, not a workaround.
+   ============================================================ */
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
 
 html { color-scheme: dark; }
 

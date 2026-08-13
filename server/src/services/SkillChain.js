@@ -7,6 +7,7 @@ import { runFile } from './Runner.js';
 import { DesktopManager, ensureBrowser } from './DesktopManager.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { WORKSPACE_DIR } from '../config.js';
+import { getAgent, getSkill } from './AgentRoster.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const SKILLS_DIR = path.resolve(__dirname, '../../skills');
@@ -44,11 +45,76 @@ export function listSkillFiles() {
   return fs.readdirSync(SKILLS_DIR).filter((f) => f.endsWith('.md')).sort();
 }
 
-/** Load a skill's portable Markdown instructions by slug (e.g. 'qa', 'security-officer'). */
+/**
+ * Load a skill's portable Markdown instructions by slug (e.g. 'qa',
+ * 'security-officer'). The on-disk library is OPTIONAL: if the file is
+ * missing, instructions are synthesized from the roster (agent profile +
+ * mastered skills, or a plain skill-registry entry) so the sprint chain
+ * NEVER reports "Skill not found" — every planner-selected skill loads.
+ */
 export function loadSkill(slug) {
   const file = listSkillFiles().find((f) => f.toLowerCase().includes(`-${slug}.md`));
-  if (!file) return null;
-  return { file, md: fs.readFileSync(path.join(SKILLS_DIR, file), 'utf-8') };
+  if (file) return { file, md: fs.readFileSync(path.join(SKILLS_DIR, file), 'utf-8') };
+  const md = synthesizeSkill(slug);
+  if (md) {
+    // Persist the synthesized instructions so future boots read from disk.
+    try {
+      fs.mkdirSync(SKILLS_DIR, { recursive: true });
+      fs.writeFileSync(path.join(SKILLS_DIR, `${slug}.md`), md, 'utf-8');
+    } catch (e) { /* non-fatal */ }
+    return { file: `${slug}.md`, md };
+  }
+  return null;
+}
+
+/** Build portable instructions for a slug from the roster (agent → skill). */
+function synthesizeSkill(slug) {
+  const agent = getAgent(slug);
+  if (agent) {
+    const mastered = (agent.skills || []).map((s) => getSkill(s)).filter(Boolean);
+    const skillLines = mastered.length
+      ? mastered.map((s) => `- ${s.name}: ${s.desc || 'applies to this specialist.'}`).join('\n')
+      : '- (specialist expertise)';
+    return `---
+name: ${agent.name}
+slug: ${agent.slug}
+role: ${agent.role}
+---
+
+# ${agent.name}
+
+${agent.role}
+
+## Your output contract
+
+Produce a clearly-structured markdown section that starts with a heading
+naming your artifact (e.g. "## PRODUCT BRIEF"), containing concrete,
+actionable content only. The next specialist in the chain reads ONLY that
+section — no preamble, no meta-commentary.
+
+## Expertise
+
+${skillLines}
+`;
+  }
+  const skill = getSkill(slug);
+  if (skill) {
+    return `---
+name: ${skill.name}
+slug: ${skill.slug}
+---
+
+# ${skill.name}
+
+${skill.desc || ''}
+
+## Your output contract
+
+Produce a clearly-structured markdown section with concrete, actionable
+content only.
+`;
+  }
+  return null;
 }
 
 const short = (s) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, 80);
@@ -79,7 +145,7 @@ export function gateVerdict(report, allowed) {
  */
 export async function runSkill(slug, input, sendEvent) {
   const skill = loadSkill(slug);
-  const agent = SKILL_META[slug] || slug;
+  const agent = SKILL_META[slug] || getAgent(slug)?.name || slug;
   if (!skill) {
     sendEvent?.('log', { agent, message: `⚠ Skill '${slug}' not found.` });
     return `## ${agent.toUpperCase()}\n(no instructions available)`;
