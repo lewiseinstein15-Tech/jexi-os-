@@ -1,5 +1,10 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { getBackendUrl, jexiFetch, backendErrorMessage } from '../utils/helpers';
+
+// A live agent loop streams events continuously. If the stream stays silent
+// this long (app backgrounded / proxy drop / host restart) the read is stuck
+// — abort so the UI can say so instead of spinning forever.
+const STREAM_STALE_MS = 60000;
 
 // Backend defaults to same origin (/api is proxied by Vite in dev),
 // VITE_JEXI_BACKEND_URL for hosted frontends (Vercel), or a localStorage override.
@@ -13,13 +18,21 @@ import { getBackendUrl, jexiFetch, backendErrorMessage } from '../utils/helpers'
  * exactly why JEXI finished a task in the logs while the chat showed no answer.
  * Buffer partial lines until the newline arrives.
  */
-async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan) {
+async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale } = {}) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
   // Whether a completion event arrived. If the stream just ends (proxy drop,
   // host restart mid-task), the user must never be left hanging with no reply.
   let sawDone = false;
+  let lastSeen = Date.now();
+  // Watchdog: while the task runs, the server streams logs continuously. If the
+  // stream goes silent (app backgrounded and the WebView suspended the socket,
+  // proxy drop, host restart) the read can hang forever — abort after a
+  // generous silence window so the UI recovers instead of spinning.
+  const watchdog = setInterval(() => {
+    if (Date.now() - lastSeen > STREAM_STALE_MS) onStale?.();
+  }, 8000);
 
   const handleLine = (line) => {
     if (!line) return;
@@ -32,6 +45,7 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan) {
       console.error('[JEXI stream] unparseable event:', String(line).slice(0, 300));
       return;
     }
+    if (data.type) { lastSeen = Date.now(); onEvent?.(); }
     if (data.type === 'log') setLogs(prev => [...prev, { agent: data.agent, message: data.message }]);
     else if (data.type === 'website') setWebsites(prev => [...prev, data.site]);
     else if (data.type === 'plan') setPlan(prev => ({ ...prev, ...data }));
@@ -64,29 +78,33 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan) {
     }
   };
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    // { stream: true } keeps multi-byte UTF-8 (emoji!) intact across chunks
-    buffer += decoder.decode(value, { stream: true });
-    let nl;
-    while ((nl = buffer.indexOf('\n')) !== -1) {
-      const line = buffer.slice(0, nl);
-      buffer = buffer.slice(nl + 1);
-      handleLine(line);
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      // { stream: true } keeps multi-byte UTF-8 (emoji!) intact across chunks
+      buffer += decoder.decode(value, { stream: true });
+      let nl;
+      while ((nl = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, nl);
+        buffer = buffer.slice(nl + 1);
+        handleLine(line);
+      }
     }
-  }
-  // Flush anything left (final newline might be missing) + decoder tail bytes
-  buffer += decoder.decode();
-  handleLine(buffer);
+    // Flush anything left (final newline might be missing) + decoder tail bytes
+    buffer += decoder.decode();
+    handleLine(buffer);
 
-  // Stream ended without a completion event — the connection dropped
-  // mid-task (host restart, proxy timeout). Surface it instead of silence.
-  if (!sawDone) {
-    setMessages(prev => [...prev, {
-      role: 'jexi',
-      text: '⚠ The connection dropped before JEXI finished — the task may still be running on the server. Wait a moment, then ask me to continue from where it stopped.',
-    }]);
+    // Stream ended without a completion event — the connection dropped
+    // mid-task (host restart, proxy timeout). Surface it instead of silence.
+    if (!sawDone) {
+      setMessages(prev => [...prev, {
+        role: 'jexi',
+        text: '⚠ The connection dropped before JEXI finished — the task may still be running on the server. Wait a moment, then ask me to continue from where it stopped.',
+      }]);
+    }
+  } finally {
+    clearInterval(watchdog);
   }
 }
 
@@ -97,6 +115,23 @@ export const useJexiEngine = () => {
   const [plan, setPlan] = useState(null); // { intent, steps, roster, skillsLine } from the /api/chat plan event
   const [isProcessing, setIsProcessing] = useState(false);
   const abortRef = useRef(null);
+  const watchdogFiredRef = useRef(false);
+
+  // Return from background / tab switch: nudge a repaint so a stuck surface
+  // redraws, and give a silent-but-alive stream a fresh window to speak.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        window.dispatchEvent(new Event('resize'));
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, []);
 
   // The free Render instance hibernates after ~15 min idle and needs up to a
   // minute to cold-start — the FIRST request after a break can stall or drop.
@@ -127,6 +162,8 @@ export const useJexiEngine = () => {
     setPlan(null);
     const userMsg = { role: 'user', text: query, image };
     setMessages(prev => [...prev, userMsg]);
+    const onEvent = () => { watchdogFiredRef.current = false; };
+    const onStale = () => { watchdogFiredRef.current = true; abortRef.current?.abort(); };
 
     try {
       const backendUrl = getBackendUrl();
@@ -153,14 +190,25 @@ export const useJexiEngine = () => {
           signal: abortRef.current.signal,
         });
         if (!retry.ok) throw new Error(`Backend replied HTTP ${retry.status}`);
-        await consumeStream(retry, setMessages, setLogs, setWebsites, setPlan);
+        await consumeStream(retry, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale });
         return;
       }
       if (!res.ok) throw new Error(`Backend replied HTTP ${res.status}`);
-      await consumeStream(res, setMessages, setLogs, setWebsites, setPlan);
+      await consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale });
     } catch (error) {
       // Aborted by the user (STOP) — don't show a scary network error.
-      if (error?.name === 'AbortError') return;
+      if (error?.name === 'AbortError') {
+        // Watchdog abort: the stream went silent (backgrounded too long / drop)
+        // — the server task kept running; tell the user, don't spin forever.
+        if (watchdogFiredRef.current) {
+          watchdogFiredRef.current = false;
+          setMessages(prev => [...prev, {
+            role: 'jexi',
+            text: '⚠ The connection dropped while you were away — the task kept running on the server and likely finished. Ask me to continue and I\u2019ll pick it up from where it stopped.',
+          }]);
+        }
+        return;
+      }
       // Diagnose the failure so the user sees the FIX, not a mystery: 401
       // (locked server, no access key) and CORS/unreachable get targeted
       // guidance; anything else stays honest about the drop.
@@ -170,6 +218,7 @@ export const useJexiEngine = () => {
       }]);
     } finally {
       abortRef.current = null;
+      watchdogFiredRef.current = false;
       setIsProcessing(false);
     }
   }, [wakeUp]);
