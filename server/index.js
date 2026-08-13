@@ -26,6 +26,8 @@ import {
   resolveConversationalQuery,
 } from './src/services/MemoryManager.js';
 import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
+import { getToolCatalog, TOOL_PROFILES, activeToolProfile, setToolProfile, executeTool } from './src/services/ToolRuntime.js';
+import { runAgentLoop } from './src/services/AgentLoop.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
 import { mountMcp } from './mcp-server.js';
 import { taskManager } from './src/services/TaskManager.js';
@@ -90,7 +92,7 @@ app.use((req, res, next) => {
 // Rate limiting: protects your AI quota from runaway loops / abuse.
 const aiLimiter = rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests — JEXI is throttling to protect your quota. Try again in a minute.' } });
 const generalLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 600, standardHeaders: 'draft-7', legacyHeaders: false });
-app.use(['/api/chat', '/api/vision', '/api/knowledge/search'], aiLimiter);
+app.use(['/api/chat', '/api/vision', '/api/knowledge/search', '/api/agent'], aiLimiter);
 app.use('/api', generalLimiter);
 
 app.use(express.json({ limit: '30mb' })); // Room for base64 book uploads + code files + images
@@ -275,6 +277,62 @@ app.get('/api/settings/status', (req, res) => {
     xai: statusOf(['XAI_API_KEY'], 'xaiKey'),
     github: statusOf(['GITHUB_TOKEN', 'GH_TOKEN'], 'githubToken'),
   });
+});
+
+// === TOOL RUNTIME (roadmap stage 9 — unified tool runtime) ===
+// Catalog: every tool with its schema + permission level. Profiles: how much
+// JEXI may auto-run (Auto = safe+medium, Ask = safe only, Full = everything).
+app.get('/api/tools', (req, res) => {
+  res.json({ tools: getToolCatalog(), profiles: TOOL_PROFILES, activeProfile: activeToolProfile() });
+});
+
+app.post('/api/tools/profile', (req, res) => {
+  try { res.json({ success: true, ...setToolProfile(req.body.profile) }); }
+  catch (e) { res.status(400).json({ success: false, error: (e && e.message) || String(e) }); }
+});
+
+// Execute one tool with full gating (permission profile → validation → engine).
+app.post('/api/tools/execute', async (req, res) => {
+  const { slug, args, profile } = req.body || {};
+  if (!slug) return res.status(400).json({ ok: false, error: 'No tool slug provided' });
+  const result = await executeTool({ slug, args: args || {}, profile });
+  res.json(result);
+});
+
+// === AGENT LOOP (roadmap stage 12 — tool-calling loop) ===
+// Orchestrator v2: plan → generate → call tools → feed results back → final
+// answer. Streams agent.plan / agent.log / tool.start / tool.result / agent.done.
+app.post('/api/agent', async (req, res) => {
+  const { query, image, profile } = req.body || {};
+  if (!query || !String(query).trim()) return res.status(400).json({ success: false, error: 'No query provided' });
+
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Cache-Control', 'no-cache');
+  const sendEvent = (type, data) => { try { res.write(JSON.stringify({ type, ...data }) + '\n'); } catch (e) {} };
+  const heartbeat = setInterval(() => { try { res.write('{"type":"heartbeat"}\n'); } catch (e) {} }, 10000);
+
+  let finished = false;
+  const finish = () => { clearInterval(heartbeat); try { res.end(); } catch (e) {} };
+  const deadline = setTimeout(() => {
+    if (finished) return;
+    finished = true;
+    sendEvent('agent.done', { answer: '⏱ The agent loop exceeded its time budget. Ask me to continue.', stats: { error: 'deadline' } });
+    finish();
+  }, 10 * 60 * 1000);
+
+  try {
+    await runAgentLoop({ query, image, profile, sendEvent });
+    finished = true;
+    clearTimeout(deadline);
+    finish();
+  } catch (e) {
+    if (!finished) {
+      finished = true;
+      clearTimeout(deadline);
+      sendEvent('agent.done', { answer: `The agent loop failed: ${(e && e.message) || e}`, stats: { error: true } });
+    }
+    finish();
+  }
 });
 
 // === AGENT ROSTER (the 79-specialist catalog + 226-skill registry) ===
