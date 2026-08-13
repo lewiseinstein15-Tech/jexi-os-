@@ -157,7 +157,7 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
             >
               <div className={`max-w-[90%] p-3 ${
                 msg.role === 'user'
-                  ? 'rounded-lg rounded-tr-sm bg-gradient-to-br from-brand to-[#00D98A] text-[#04140D] font-medium text-[11px] shadow-[0_4px_18px_rgba(0,255,157,0.28)]'
+                  ? 'rounded-lg rounded-tr-sm bg-gradient-to-br from-brand to-[#00B55C] text-[#04140D] font-medium text-[11px] shadow-[0_4px_18px_rgba(0,210,106,0.28)]'
                   : 'rounded-lg rounded-tl-sm bg-surface-1 text-text-primary border border-hairline'
               }`}>
                 {msg.role === 'user' ? (
@@ -188,7 +188,7 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
       {/* Image attachment preview */}
       {image && (
         <div className="relative inline-block mb-2 flex-shrink-0">
-          <img src={image} alt="attachment" className="w-16 h-16 object-cover rounded-lg border border-[#00FF9D]/40" />
+          <img src={image} alt="attachment" className="w-16 h-16 object-cover rounded-lg border border-[#00D26A]/40" />
           <button
             type="button"
             onClick={() => setImage(null)}

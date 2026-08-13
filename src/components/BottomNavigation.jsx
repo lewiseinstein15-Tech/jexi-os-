@@ -1,11 +1,10 @@
 import { motion } from 'framer-motion';
-import { Home, Bot, ListTodo, Database, BookOpen, Settings, Smartphone } from 'lucide-react';
+import { Home, Bot, Database, BookOpen, Settings, Smartphone } from 'lucide-react';
 
 export default function BottomNavigation({ activeNav, setActiveNav }) {
   const items = [
     { id: 'home', icon: Home, label: 'HOME' },
     { id: 'agents', icon: Bot, label: 'AGENTS' },
-    { id: 'tasks', icon: ListTodo, label: 'TASKS' },
     { id: 'memory', icon: Database, label: 'MEMORY' },
     { id: 'knowledge', icon: BookOpen, label: 'BOOKS' },
     { id: 'settings', icon: Settings, label: 'SETTINGS' },

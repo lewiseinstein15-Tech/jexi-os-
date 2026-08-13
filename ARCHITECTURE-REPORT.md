@@ -197,12 +197,12 @@ Rules: one command input per screen; conversation is a reusable workspace compon
 | Stage | Work | Status |
 |---|---|---|
 | 1 | Research + architecture report | ✅ this report |
-| 2 | Design system (tokens, palette, type, spacing) | ⏭ next |
-| 3 | Application shell (top nav + drawer, desktop 3-pane) | next |
-| 4 | Navigation (Home / Command Center / Agents / Tasks / …) | next |
-| 5 | Command Center (plan + agents + tools + logs, live) | next |
+| 2 | Design system (tokens, palette, type, spacing) | ✅ shipped to main (graphite base, #00D26A brand, semantic accents, 4px rhythm) |
+| 3 | Application shell (top nav + drawer, desktop 3-pane) | ✅ shipped to main (TopNav + hamburger drawer + desktop rail) |
+| 4 | Navigation (Home / Command Center / Agents / Tasks / …) | ✅ shipped to main (NavList sections + real screens incl. Tasks) |
+| 5 | Command Center (plan + agents + tools + logs, live) | ✅ shipped to main (CommandCenter surface) |
 | 6 | Conversation + high-quality AnswerRenderer (KaTeX, sections, callouts, citations) | next |
-| 7 | Agent workspace (OS-style list + detail) | later |
+| 7 | Agent workspace (OS-style list + detail) | ✅ shipped to main (AgentsScreen + roster browser + ActiveAgents) |
 | 8 | Task system + events (`task.*`) | ✅ TaskManager (background execution, `task.*` NDJSON streams, disk persistence, cancel/rerun) + TASKS console in the UI |
 | 9 | Unified tool runtime (schema registry, permission profiles) | later |
 | 10 | Workspace runtime (projects, checkpoints, diffs, rollback) | later |

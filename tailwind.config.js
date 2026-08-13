@@ -3,34 +3,41 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Surfaces (elevation by shade, not shadow)
-        void: '#030303',
-        'surface-1': '#0A0A0B',
-        'surface-2': '#111113',
-        'surface-3': '#18181B',
+        // Surfaces — near-black blue/graphite (elevation by shade)
+        void: '#090A0E',
+        'surface-1': '#0C1117',
+        'surface-2': '#111820',
+        'surface-3': '#161F29',
         hairline: 'rgba(255,255,255,0.06)',
         'hairline-strong': 'rgba(255,255,255,0.10)',
         // Text
-        'text-primary': '#F5F5F7',
-        'text-secondary': '#A1A1AA',
-        'text-tertiary': '#616166',
-        // Brand / signal (single accent)
-        brand: '#00FF9D',
-        'brand-dim': 'rgba(0,255,157,0.20)',
-        'brand-line': 'rgba(0,255,157,0.40)',
-        // Agent / semantic palette — identity + status only
-        'agent-planner': '#22D3EE',
-        'agent-coder': '#00FF9D',
-        'agent-qa': '#FBBF24',
+        'text-primary': '#E8EDF2',
+        'text-secondary': '#7C8794',
+        'text-tertiary': '#46515D',
+        // Brand / signal (single green)
+        brand: '#00D26A',
+        'brand-dim': 'rgba(0,210,106,0.18)',
+        'brand-line': 'rgba(0,210,106,0.38)',
+        // Semantic accents — capability identity + status only
+        'acc-research': '#4A9EFF',
+        'acc-code': '#00D26A',
+        'acc-math': '#B36CFF',
+        'acc-engineering': '#FF9B3D',
+        'acc-analysis': '#22D3EE',
+        'acc-automation': '#D8A83E',
+        // Agent palette — identity + status only
+        'agent-planner': '#4A9EFF',
+        'agent-coder': '#00D26A',
+        'agent-qa': '#FF9B3D',
         'agent-security': '#FB7185',
-        'agent-research': '#A78BFA',
-        'agent-vision': '#F472B6',
+        'agent-research': '#B36CFF',
+        'agent-vision': '#22D3EE',
         // Status
-        'status-online': '#00FF9D',
-        'status-warn': '#FBBF24',
+        'status-online': '#00D26A',
+        'status-warn': '#D8A83E',
         'status-error': '#FB7185',
-        'status-idle': '#616166',
-        jexi: '#00FF9D',
+        'status-idle': '#46515D',
+        jexi: '#00D26A',
       },
       fontFamily: {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],

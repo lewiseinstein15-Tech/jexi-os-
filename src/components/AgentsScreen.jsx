@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Terminal, Globe, Loader2, CheckCircle2, XCircle, Radio } from 'lucide-react';
+import { Terminal, Globe, Loader2, CheckCircle2, XCircle, Radio, Activity } from 'lucide-react';
 import JexiCore, { coreColor } from './JexiCore';
 import RosterPanel from './RosterPanel';
+import ActiveAgents from './ActiveAgents';
 
 function Tab({ active, onClick, children }) {
   return (
@@ -44,8 +45,17 @@ function PipelineTab({ logs, websites, isProcessing, plan }) {
             ? (activeAgent ? `${activeAgent} · ACTIVE` : 'Assembling agents…')
             : order.length > 0 ? `${order.length} of ${roster.length || order.length} specialists ran` : 'Idle — ask JEXI anything'}
         </p>
+        {plan?.domainNames?.length > 0 && (
+          <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+            {plan.domainNames.map((d) => (
+              <span key={d} className="bg-brand-dim/40 border border-brand-line/40 text-brand rounded-full px-2 py-0.5 text-[8px] font-bold tracking-wider">
+                {d.toUpperCase()}
+              </span>
+            ))}
+          </div>
+        )}
         {roster.length > 0 && (
-          <p className="text-[9px] text-text-tertiary mt-1 text-center max-w-[240px] leading-snug">
+          <p className="text-[9px] text-text-tertiary mt-2 text-center max-w-[240px] leading-snug">
             {roster.join(' · ')}
           </p>
         )}
@@ -175,14 +185,12 @@ export default function AgentsScreen({ logs, websites, isProcessing, plan }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-1.5">
+        <Tab active={tab === 'active'} onClick={() => setTab('active')}>ACTIVE</Tab>
         <Tab active={tab === 'pipeline'} onClick={() => setTab('pipeline')}>PIPELINE</Tab>
         <Tab active={tab === 'roster'} onClick={() => setTab('roster')}>ROSTER</Tab>
-        {tab === 'pipeline' && isProcessing && (
+        {tab === 'active' && isProcessing && (
           <span className="ml-auto flex items-center gap-1.5 text-[8px] text-brand font-bold">
-            <span className="relative flex w-1.5 h-1.5">
-              <span className="absolute inline-flex w-full h-full rounded-full bg-brand opacity-60 animate-ping" />
-              <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-brand" />
-            </span>
+            <Activity className="w-3 h-3" />
             LIVE
           </span>
         )}
@@ -195,7 +203,9 @@ export default function AgentsScreen({ logs, websites, isProcessing, plan }) {
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.18 }}
         >
-          {tab === 'pipeline' ? (
+          {tab === 'active' ? (
+            <ActiveAgents logs={logs} isProcessing={isProcessing} plan={plan} />
+          ) : tab === 'pipeline' ? (
             <PipelineTab logs={logs} websites={websites} isProcessing={isProcessing} plan={plan} />
           ) : (
             <RosterPanel />

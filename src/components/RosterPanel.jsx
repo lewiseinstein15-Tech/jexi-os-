@@ -4,15 +4,18 @@ import { Search, X, Users, Zap } from 'lucide-react';
 import { getBackendUrl, jexiFetch } from '../utils/helpers';
 import { coreColor } from './JexiCore';
 
-// Category accents — a fixed palette with a stable hash fallback for any new category.
+// Category accents — a fixed palette with a stable hash fallback for any new
+// category (categories come from the live backend skill registry, never a
+// hardcoded list, so new catalog categories always render).
 const CATEGORY_ACCENTS = {
   Core: '#00FF9D', Research: '#22D3EE', News: '#34D399', Memory: '#F472B6',
   Perception: '#F472B6', Coding: '#A78BFA', DevOps: '#22D3EE', Data: '#22D3EE',
   Writing: '#FBBF24', Teaching: '#FBBF24', Life: '#FB7185', Agent: '#A1A1AA',
-  Product: '#FBBF24', Design: '#F472B6', Math: '#A78BFA',
-  Knowledge: '#34D399', Quality: '#FB7185', Safety: '#FBBF24', Engineering: '#22D3EE',
-  Security: '#A78BFA', Creative: '#F472B6', Media: '#FBBF24', Business: '#34D399',
-  Education: '#22D3EE', Marketing: '#FBBF24', Productivity: '#00FF9D', Platform: '#A1A1AA',
+  Product: '#FBBF24', Design: '#F472B6', Math: '#A78BFA', Science: '#22D3EE',
+  Medicine: '#FB7185', Quant: '#FBBF24', Engineering: '#A78BFA', AI: '#00FF9D',
+  Knowledge: '#34D399', Quality: '#FB7185', Safety: '#FBBF24', Security: '#A78BFA',
+  Creative: '#F472B6', Media: '#FBBF24', Business: '#34D399', Education: '#22D3EE',
+  Marketing: '#FBBF24', Productivity: '#00FF9D', Platform: '#A1A1AA',
 };
 const ACCENT_PALETTE = ['#00FF9D', '#22D3EE', '#34D399', '#F472B6', '#A78BFA', '#FBBF24', '#FB7185', '#A1A1AA'];
 const catAccent = (c) => CATEGORY_ACCENTS[c] || ACCENT_PALETTE[(c || '').length % ACCENT_PALETTE.length];
@@ -106,16 +109,11 @@ export default function RosterPanel() {
         </div>
       </div>
 
-      {/* Category filter chips — every real category from the catalog */}
+      {/* Category filter chips — every real category from the live catalog */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
         <Chip active={cat === ''} onClick={() => setCat('')}>ALL · {agents.length}</Chip>
         {categories.map(({ name, count }) => (
-          <Chip
-            key={name}
-            active={cat === name}
-            onClick={() => setCat(cat === name ? '' : name)}
-            accent={catAccent(name)}
-          >
+          <Chip key={name} active={cat === name} onClick={() => setCat(cat === name ? '' : name)}>
             {name.toUpperCase()} · {count}
           </Chip>
         ))}
@@ -146,13 +144,19 @@ export default function RosterPanel() {
                 <p className="text-[10px] text-text-tertiary mt-0.5 leading-snug line-clamp-2">{agent.role}</p>
               </div>
             </div>
-            <div className="mt-2 flex items-center justify-between">
+            <div className="mt-2 flex items-center justify-between gap-2">
               <span className="flex items-center gap-1 text-[8px] font-bold tracking-wider text-text-tertiary">
                 <Zap className="w-2.5 h-2.5" /> {agent.skills?.length || 0} SKILLS
               </span>
-              <span className="text-[8px] font-bold tracking-wider" style={{ color: catAccent([...agentCategories.get(agent.slug) || []][0]) }}>
-                {[...(agentCategories.get(agent.slug) || [])][0] || ''}
-              </span>
+              {(() => {
+                const cats = agentCategories.get(agent.slug);
+                const primary = cats && [...cats][0];
+                return primary ? (
+                  <span className="text-[8px] font-bold tracking-wider truncate" style={{ color: catAccent(primary) }}>
+                    {primary.toUpperCase()}
+                  </span>
+                ) : null;
+              })()}
             </div>
           </motion.button>
         ))}
@@ -218,14 +222,13 @@ export default function RosterPanel() {
   );
 }
 
-function Chip({ active, onClick, children, accent }) {
+function Chip({ active, onClick, children }) {
   return (
     <button
       onClick={onClick}
       className={`tap-target flex-shrink-0 px-2.5 py-1.5 rounded-full text-[8px] font-bold tracking-wider transition-all duration-200 ${
         active ? 'bg-brand-dim text-brand border border-brand-line' : 'bg-surface-1 text-text-tertiary border border-hairline hover:text-text-secondary'
       }`}
-      style={!active && accent ? { borderColor: `${accent}33`, color: accent } : undefined}
     >
       {children}
     </button>

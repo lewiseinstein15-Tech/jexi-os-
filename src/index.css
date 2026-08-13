@@ -6,56 +6,78 @@
    JEXI OS — design tokens (mission-control dark · Linear school)
    ============================================================ */
 :root {
-  /* Surfaces — elevation by shade, not shadow */
-  --bg-void: #030303;
-  --bg-surface-1: #0a0a0b;
-  --bg-surface-2: #111113;
-  --bg-surface-3: #18181b;
+  /* Surfaces — near-black blue/graphite, elevation by shade */
+  --bg-void: #090a0e;
+  --bg-surface-1: #0c1117;
+  --bg-surface-2: #111820;
+  --bg-surface-3: #161f29;
   --border-hairline: rgba(255, 255, 255, 0.06);
   --border-hairline-strong: rgba(255, 255, 255, 0.10);
 
   /* Text */
-  --text-primary: #f5f5f7;
-  --text-secondary: #a1a1aa;
-  --text-tertiary: #616166;
+  --text-primary: #e8edf2;
+  --text-secondary: #7c8794;
+  --text-tertiary: #46515d;
 
   /* Brand / signal — ONE accent, used sparingly */
-  --brand: #00ff9d;
-  --brand-dim: rgba(0, 255, 157, 0.20);
-  --brand-line: rgba(0, 255, 157, 0.40);
+  --brand: #00d26a;
+  --brand-dim: rgba(0, 210, 106, 0.18);
+  --brand-line: rgba(0, 210, 106, 0.38);
 
-  /* Agent / semantic palette — identity + status only, never brand moments */
-  --agent-planner: #22d3ee;
-  --agent-coder: #00ff9d;
-  --agent-qa: #fbbf24;
+  /* Semantic accents — capability identity + status only */
+  --acc-research: #4a9eff;
+  --acc-code: #00d26a;
+  --acc-math: #b36cff;
+  --acc-engineering: #ff9b3d;
+  --acc-analysis: #22d3ee;
+  --acc-automation: #d8a83e;
+
+  /* Agent palette — identity + status only, never decorative */
+  --agent-planner: #4a9eff;
+  --agent-coder: #00d26a;
+  --agent-qa: #ff9b3d;
   --agent-security: #fb7185;
-  --agent-research: #a78bfa;
-  --agent-vision: #f472b6;
+  --agent-research: #b36cff;
+  --agent-vision: #22d3ee;
 
   /* Status */
-  --status-online: #00ff9d;
-  --status-warn: #fbbf24;
+  --status-online: #00d26a;
+  --status-warn: #d8a83e;
   --status-error: #fb7185;
-  --status-idle: #616166;
+  --status-idle: #46515d;
 
   /* Legacy aliases (markdown + utility classes still reference these) */
-  --bg: #030303;
-  --surface: #0a0a0b;
-  --surface-2: #111113;
-  --surface-3: #18181b;
+  --bg: #090a0e;
+  --surface: #0c1117;
+  --surface-2: #111820;
+  --surface-3: #161f29;
   --border: rgba(255, 255, 255, 0.06);
   --border-strong: rgba(255, 255, 255, 0.10);
-  --accent: #00ff9d;
-  --accent-dim: rgba(0, 255, 157, 0.20);
-  --cyan: #22d3ee;
-  --violet: #a78bfa;
+  --accent: #00d26a;
+  --accent-dim: rgba(0, 210, 106, 0.18);
+  --cyan: #4a9eff;
+  --violet: #b36cff;
   --pink: #f472b6;
-  --amber: #fbbf24;
-  --text: #e9e9ec;
-  --text-dim: #a1a1aa;
+  --amber: #d8a83e;
+  --text: #e8edf2;
+  --text-dim: #7c8794;
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
+
+/* Semantic accent utilities — capability cards, status, agent identity */
+.acc-research { color: var(--acc-research); border-color: color-mix(in srgb, var(--acc-research) 38%, transparent); }
+.acc-code { color: var(--acc-code); border-color: color-mix(in srgb, var(--acc-code) 38%, transparent); }
+.acc-math { color: var(--acc-math); border-color: color-mix(in srgb, var(--acc-math) 38%, transparent); }
+.acc-engineering { color: var(--acc-engineering); border-color: color-mix(in srgb, var(--acc-engineering) 38%, transparent); }
+.acc-analysis { color: var(--acc-analysis); border-color: color-mix(in srgb, var(--acc-analysis) 38%, transparent); }
+.acc-automation { color: var(--acc-automation); border-color: color-mix(in srgb, var(--acc-automation) 38%, transparent); }
+.tile-research { background: color-mix(in srgb, var(--acc-research) 9%, transparent); }
+.tile-code { background: color-mix(in srgb, var(--acc-code) 9%, transparent); }
+.tile-math { background: color-mix(in srgb, var(--acc-math) 9%, transparent); }
+.tile-engineering { background: color-mix(in srgb, var(--acc-engineering) 9%, transparent); }
+.tile-analysis { background: color-mix(in srgb, var(--acc-analysis) 9%, transparent); }
+.tile-automation { background: color-mix(in srgb, var(--acc-automation) 9%, transparent); }
 
 * { box-sizing: border-box; }
 
@@ -65,9 +87,9 @@ body {
   margin: 0;
   font-family: var(--sans);
   background:
-    radial-gradient(900px 520px at 88% -10%, rgba(34, 211, 238, 0.07), transparent 62%),
-    radial-gradient(760px 520px at -12% 8%, rgba(0, 255, 157, 0.055), transparent 62%),
-    radial-gradient(820px 640px at 50% 118%, rgba(167, 139, 250, 0.05), transparent 62%),
+    radial-gradient(900px 520px at 88% -10%, rgba(74, 158, 255, 0.05), transparent 62%),
+    radial-gradient(760px 520px at -12% 8%, rgba(0, 210, 106, 0.04), transparent 62%),
+    radial-gradient(820px 640px at 50% 118%, rgba(179, 108, 255, 0.035), transparent 62%),
     var(--bg-void);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
@@ -106,10 +128,10 @@ body::before {
   color: var(--text-tertiary);
 }
 
-::selection { background: rgba(0, 255, 157, 0.25); color: #fff; }
+::selection { background: rgba(0, 210, 106, 0.28); color: #fff; }
 
 :focus-visible {
-  outline: 2px solid rgba(0, 255, 157, 0.45);
+  outline: 2px solid rgba(0, 210, 106, 0.45);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -155,10 +177,10 @@ body::before {
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(0, 255, 157, 0.28), rgba(34, 211, 238, 0.22));
+  background: linear-gradient(180deg, rgba(0, 210, 106, 0.30), rgba(74, 158, 255, 0.22));
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(0, 255, 157, 0.5); }
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 210, 106, 0.5); }
 
 /* ---------- Motion helpers ---------- */
 @keyframes shimmer {
@@ -166,8 +188,8 @@ body::before {
   to { background-position: 200% 0; }
 }
 @keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 255, 157, 0); }
-  50% { box-shadow: 0 0 16px 0 rgba(0, 255, 157, 0.28); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 210, 106, 0); }
+  50% { box-shadow: 0 0 16px 0 rgba(0, 210, 106, 0.24); }
 }
 @keyframes spinRing {
   to { transform: rotate(360deg); }
@@ -177,7 +199,7 @@ body::before {
   40% { transform: translateY(-3px); opacity: 1; }
 }
 .shimmer-bar {
-  background: linear-gradient(90deg, transparent, rgba(0, 255, 157, 0.55), transparent);
+  background: linear-gradient(90deg, transparent, rgba(0, 210, 106, 0.5), transparent);
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
   height: 2px;
@@ -309,7 +331,7 @@ body::before {
 .markdown-body th {
   border: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 255, 157, 0.06);
+  background: rgba(0, 210, 106, 0.06);
   padding: 6px 8px;
   text-align: left;
   color: var(--accent);
