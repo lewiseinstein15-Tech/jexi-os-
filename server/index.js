@@ -791,8 +791,47 @@ app.post('/api/vision', async (req, res) => {
 //   user: "I want to track my water intake" → JEXI offers to build it
 //   user: "yes"                            → JEXI builds the app (resumes task)
 //   user: "no / never mind"                → pending task cleared, no search
+// P5/P9 — conversation-scoped store replaces the old module-level singleton,
+// so concurrent chats from different users/sessions never race.
+import { saveOffer, loadOffer, clearOffer, saveRun, loadRun, clearRun } from './src/services/SessionStore.js';
+import { preferencesBlock } from './src/services/PreferenceLearner.js';
 const RESUME_TTL_MS = 15 * 60 * 1000;
-let pendingTask = null; // { at, query }
+
+/**
+ * P6 — build the compact memory slice the PLANNER sees before classifying:
+ * profile facts, user facts, learned preferences, and semantic recall hits.
+ * Best-effort; never blocks planning. (Memory is still injected per-specialist
+ * later by the orchestrator's memoryRead node — this is the pre-planner slice.)
+ */
+async function buildPlannerMemory(query) {
+  const mem = loadMemory();
+  const parts = [];
+  const profile = mem.userProfile || {};
+  if (profile.name) parts.push(`User's name: ${profile.name}`);
+  if (profile.location) parts.push(`User's location: ${profile.location}`);
+  const facts = (mem.userFacts || []).slice(0, 4)
+    .map((f) => (typeof f === 'string' ? f : (f && (f.fact || f.text)) || ''))
+    .filter(Boolean);
+  if (facts.length) parts.push(`Known facts: ${facts.join(' | ')}`);
+  try {
+    const prefs = preferencesBlock(3);
+    if (prefs) parts.push(prefs);
+  } catch (e) {}
+  try {
+    if (String(query || '').trim().length > 3) {
+      const learned = await semanticRecall(query, { limit: 2 });
+      if (learned.length) {
+        parts.push('Prior knowledge: ' + learned.map((l) => `${l.label}: ${String(l.text).slice(0, 180)}`).join(' | '));
+      }
+    }
+  } catch (e) {}
+  return parts.join('\n');
+}
+
+/** Stable per-conversation id: explicit header wins, else the client address. */
+function conversationId(req) {
+  return String(req.headers['x-jexi-session'] || req.headers['x-forwarded-for'] || req.ip || 'default').slice(0, 120);
+}
 
 const CONFIRM_RE = /^(yes|yeah|yep|yup|sure|ok|okay|k|go ahead|do it|do that|do it now|please|please do|yes please|absolutely|alright|alrighty|proceed|sounds good|fine|make it|build it|go on|sure do it|yes do it)\b[\s.,!?]*$/i;
 const DECLINE_RE = /^(no|nope|never ?mind|cancel|stop|forget it|skip|don'?t|no thanks)\b[\s.,!?]*$/i;
@@ -829,7 +868,9 @@ app.post('/api/chat', async (req, res) => {
 
   try {
     const raw = String(query || '').trim();
-    const hasPending = pendingTask && Date.now() - pendingTask.at < RESUME_TTL_MS;
+    const convId = conversationId(req);
+    const pendingOffer = loadOffer(convId);
+    const hasPending = Boolean(pendingOffer);
     let effectiveQuery = raw;
     let plan;
     let activeTaskId = null;   // Build 47 — the task this turn belongs to
@@ -849,7 +890,8 @@ app.post('/api/chat', async (req, res) => {
 
     if (!image && DECLINE_RE.test(raw) && hasPending) {
       // "no / cancel" — clear the pending task, answer WITHOUT searching.
-      pendingTask = null;
+      clearOffer(convId);
+      clearRun(convId);
       sendEvent('log', { agent: 'Planner', message: '✖ Declined — pending task cleared, nothing will run.' });
       sendEvent('done', { success: true, query, summary: '### 🧠 JEXI OS\n\n👍 Understood — I won\'t go ahead with that. Tell me what you\'d like next and I\'ll take it from there.' });
       return;
@@ -859,11 +901,26 @@ app.post('/api/chat', async (req, res) => {
       // "yes / go ahead" — resume the ORIGINAL request so the action actually
       // happens (build the app, run the research, etc.) instead of searching
       // the word "yes".
-      const original = pendingTask.query;
+      const original = pendingOffer.query;
+      // P5 — a graph confirmationPause was parked for this conversation: resume
+      // the FULL RunState at the exact paused node (never re-plan from scratch).
+      const pausedRun = loadRun(convId);
+      if (pausedRun && pausedRun.state && pausedRun.plan) {
+        sendEvent('log', { agent: 'Planner', message: `✓ Confirmed — resuming your task from where it paused: “${String(pausedRun.query || original).slice(0, 90)}”` });
+        const resumed = await orchestrator.executePlan(pausedRun.plan, pausedRun.query, sendEvent, { image, resumeState: pausedRun.state, confirmed: true });
+        clearRun(convId);
+        clearOffer(convId);
+        const finalSummary = resumed.summary && String(resumed.summary).trim()
+          ? resumed.summary
+          : (resumed.error || 'The task finished, but produced no readable summary.');
+        sendEvent('done', { success: resumed.success, query, summary: finalSummary, sources: resumed.sources || [], statistics: resumed.statistics, files: resumed.files || [] });
+        return;
+      }
+      // Classic offer flow — re-plan the original request and run it.
       sendEvent('log', { agent: 'Planner', message: `✓ Confirmed — resuming your original task: “${original.slice(0, 90)}”` });
       plan = await planner.planConfirmed(original);
       effectiveQuery = original;
-      pendingTask = { at: Date.now(), query: original }; // keep ORIGINAL as the resume target
+      saveOffer(convId, original); // keep ORIGINAL as the resume target
       // Record the resumed task in the registry (continuation of whatever is active).
       if (currentTaskId) {
         activeTaskId = currentTaskId;
@@ -909,8 +966,12 @@ app.post('/api/chat', async (req, res) => {
         return;
       }
 
-      plan = await planner.analyzeIntent(effectiveQuery, { image });
-      pendingTask = { at: Date.now(), query: effectiveQuery };
+      // P6 — retrieve memory BEFORE classification so the planner sees what
+      // JEXI already knows (preferences, facts, prior research) when deciding
+      // the intent. Compact slice — never the full transcript.
+      const plannerMemory = await buildPlannerMemory(effectiveQuery);
+      plan = await planner.analyzeIntent(effectiveQuery, { image, memoryContext: plannerMemory });
+      saveOffer(convId, effectiveQuery);
 
       // BUILD 47 — apply the decision: create or re-activate the task.
       const applied = applyDecision(decision, {
@@ -954,7 +1015,14 @@ app.post('/api/chat', async (req, res) => {
       toolsLine: plan.toolsLine || '',
       toolCount: plan.toolCount || 0,
     });
-    const results = await orchestrator.executePlan(plan, executionQuery || effectiveQuery, sendEvent, { image });
+    const results = await orchestrator.executePlan(plan, executionQuery || effectiveQuery, sendEvent, {
+      image,
+      // P5 — when a node pauses for approval, persist the FULL RunState so a
+      // later "yes" resumes at the exact paused node, prior results intact.
+      onPause: async (pausedState) => {
+        saveRun(convId, { plan, query: executionQuery || effectiveQuery, state: pausedState });
+      },
+    });
 
     sendEvent('log', { agent: 'JEXI', message: '🎯 Mission complete — here is the result.' });
     // Contract: a successful done ALWAYS carries a readable summary — the

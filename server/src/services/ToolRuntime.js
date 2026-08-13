@@ -70,7 +70,75 @@ export const TOOL_SCHEMAS = {
   'stats-compute': { rows: { type: 'array', desc: 'Data rows' }, columns: { type: 'array', desc: 'Column names' } },
   'self-diagnose': {},
   'trend-scan': { query: { type: 'string', desc: 'Topic to scan trends for' } },
+  'mcp-call': { tool: { type: 'string', required: true, desc: 'MCP tool name (ask_jexi, memory_lookup, knowledge_search, list_books, get_health)' }, args: { type: 'object', desc: 'Arguments for the MCP tool' } },
 };
+
+/* ------------------------------------------------------------------ */
+/* Priority 4 — fail-closed OUTPUT validation. Inputs are already checked  */
+/* against TOOL_SCHEMAS; outputs are now validated too so malformed tool   */
+/* results never silently become an empty/hallucinated reply.              */
+/* ------------------------------------------------------------------ */
+import { z } from 'zod';
+
+/** Per-tool output contracts for the engines whose shape downstream code trusts. */
+export const TOOL_OUTPUT_SCHEMAS = {
+  'web-search': z.object({
+    kind: z.string(),
+    query: z.string(),
+    results: z.array(z.object({ title: z.string().optional().nullable(), url: z.string().optional().nullable(), snippet: z.string().optional().nullable() })).optional(),
+  }).passthrough(),
+  'deep-read': z.object({ kind: z.string(), url: z.string(), text: z.string() }).passthrough(),
+  'pdf-extract': z.object({ kind: z.string(), url: z.string(), text: z.string() }).passthrough(),
+  'stats-compute': z.object({ kind: z.string(), stats: z.unknown() }).passthrough(),
+  'self-diagnose': z.object({ kind: z.string(), status: z.unknown() }).passthrough(),
+  'mcp-call': z.object({ ok: z.boolean(), tool: z.string().optional(), result: z.unknown().optional(), error: z.unknown().optional() }).passthrough(),
+};
+
+/**
+ * P4 — validate tool arguments against the schema, fail closed.
+ * Returns { ok: true, args } or { ok: false, error: { code, message, node, raw } }.
+ */
+export function validateToolArgs(slug, args = {}) {
+  const schema = TOOL_SCHEMAS[slug];
+  if (!schema) return { ok: true, args };
+  const problems = [];
+  for (const [key, spec] of Object.entries(schema)) {
+    if (spec.required && (args[key] === undefined || args[key] === null || args[key] === '')) {
+      problems.push(`missing required arg "${key}"${spec.desc ? ` (${spec.desc})` : ''}`);
+    }
+    if (args[key] !== undefined && spec.type === 'number' && typeof args[key] !== 'number') problems.push(`"${key}" must be a number`);
+    if (args[key] !== undefined && spec.type === 'object' && (typeof args[key] !== 'object' || args[key] === null)) problems.push(`"${key}" must be an object`);
+  }
+  if (problems.length) {
+    return { ok: false, error: { code: 'SCHEMA_VALIDATION_FAILED', message: `Invalid arguments for "${slug}": ${problems.join('; ')}`, node: 'tool', raw: args } };
+  }
+  return { ok: true, args };
+}
+
+/**
+ * P4 — validate a tool's OUTPUT shape, fail closed. Returns the structured
+ * error when malformed so callers route to replanner instead of replying.
+ */
+export function validateToolOutput(slug, result) {
+  const schema = TOOL_OUTPUT_SCHEMAS[slug];
+  if (!schema) return { ok: true };
+  if (result === undefined || result === null) {
+    return { ok: false, error: { code: 'SCHEMA_VALIDATION_FAILED', message: `Tool "${slug}" returned no output`, node: 'tool' } };
+  }
+  const check = schema.safeParse(result);
+  if (!check.success) {
+    return {
+      ok: false,
+      error: {
+        code: 'SCHEMA_VALIDATION_FAILED',
+        message: `Tool "${slug}" returned malformed output: ${check.error.issues.map((i) => i.message).join('; ')}`,
+        node: 'tool',
+        raw: result,
+      },
+    };
+  }
+  return { ok: true };
+}
 
 /* ------------------------------------------------------------------ */
 /* Permissions — safe = read-only, medium = writes JEXI's own data,    */
@@ -210,6 +278,12 @@ async function runEngine(slug, args) {
       const status = await collectSystemStatus();
       return { kind: 'system', status };
     }
+    case 'mcp-call': {
+      // P7 — internal MCP tool path: an internal node reaches an external MCP
+      // tool through the same schema-validated path as internal tools.
+      const { callMcpTool } = await import('../../mcp-server.js');
+      return await callMcpTool(args.tool, args.args || {});
+    }
     default:
       return null; // no engine — caller decides fallback
   }
@@ -287,6 +361,20 @@ export async function executeTool({ slug, args = {}, profile, sendEvent }) {
 
   try {
     const result = await withTimeout(runEngine(slug, args), 60000);
+    // P4 — fail closed on malformed tool OUTPUT (never a silent empty reply).
+    const outCheck = validateToolOutput(slug, result);
+    if (!outCheck.ok) {
+      const invalid = { ok: false, tool: slug, code: outCheck.error.code, error: outCheck.error.message, raw: outCheck.error.raw, durationMs: Date.now() - started };
+      emit('tool.result', { tool: slug, ok: false, error: invalid.error, durationMs: invalid.durationMs });
+      return invalid;
+    }
+    // P8 — engines that honestly report failure (e.g. mcp-call) stay failures.
+    if (result && typeof result === 'object' && result.ok === false) {
+      const msg = result.error?.message || String(result.error || 'tool reported failure');
+      const failed = { ok: false, tool: slug, code: result.error?.code, error: msg, durationMs: Date.now() - started };
+      emit('tool.result', { tool: slug, ok: false, error: msg, durationMs: failed.durationMs });
+      return failed;
+    }
     if (result === null) {
       // Registry tool without a runtime engine — route to its owning agents.
       const routed = { ok: true, routed: true, tool: slug, result: `This tool is planned and routed to: ${(tool.agents || []).slice(0, 3).join(', ')}. It runs during the pipeline execution for this task.` };

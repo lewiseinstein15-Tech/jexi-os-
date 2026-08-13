@@ -1,6 +1,8 @@
+import { z } from 'zod';
 import { searchKnowledge } from './MemoryManager.js';
 import { AGENT_ROSTER, getAgent, skillsForTeam, rosterStats } from './AgentRoster.js';
 import { toolsForTeam } from './ToolRegistry.js';
+import { generateContent, resolveKeys } from './LLMClient.js';
 
 /**
  * JEXI's Planner — decides which agents/tools to use and when.
@@ -98,6 +100,75 @@ const COMPOUND_DETECT = [
   },
 ];
 
+/**
+ * Priority 2 — structured routing. The classification schema is the single
+ * validated contract for the planner's primary (LLM) path; the regex cascade
+ * survives as fast-path/fallback only.
+ */
+export const CLASSIFIER_INTENTS = [
+  'image_recognition', 'clear_memory', 'link_analysis', 'math_solve', 'self_check',
+  'code_task', 'computer_use', 'study_topic', 'conversation', 'memory_query',
+  'knowledge_recall', 'news_latest', 'research', 'learning_research', 'explain_team',
+  'github', 'translate', 'data', 'devops', 'docs', 'perf', 'compound_task',
+  'creative_writing', 'business_plan', 'marketing_plan', 'event_planning', 'meal_plan',
+  'workout_plan', 'investing_advice', 'tech_support', 'security_audit', 'content_creation',
+  'study_exam', 'career_plan', 'relationship_advice', 'startup_advice', 'productivity',
+  'data_ml', 'cloud_devops', 'api_backend', 'mobile_app', 'game_dev', 'home_life',
+];
+
+export const ClassificationSchema = z.object({
+  intent: z.enum(CLASSIFIER_INTENTS),
+  confidence: z.number().min(0).max(1),
+  teamSlugs: z.array(z.string()),
+  reasoning: z.string(),
+});
+
+/** Few-shot positives, incl. the confusable pairs that actually exist here. */
+const CLASSIFIER_FEW_SHOTS = [
+  { q: 'build me a study planner app with reminders', intent: 'code_task', reason: 'An app deliverable — the coding team builds it.' },
+  { q: 'study calculus for my exam', intent: 'study_topic', reason: 'A topic to learn, NOT an app. Study, never code_task.' },
+  { q: 'what is the capital of kenya', intent: 'research', reason: 'A factual question — research answers it.' },
+  { q: 'my book explains photosynthesis — what does it say', intent: 'knowledge_recall', reason: 'Asks about the user\'s own book/library.' },
+  { q: 'commit and push my code to github', intent: 'github', reason: 'A real git operation.' },
+  { q: 'translate this to french: good morning', intent: 'translate', reason: 'A translation request.' },
+  { q: 'latest news about ai regulation', intent: 'news_latest', reason: 'Fresh news gathering.' },
+  { q: 'solve 2x + 5 = 13', intent: 'math_solve', reason: 'A concrete math problem.' },
+  { q: 'who are you', intent: 'conversation', reason: 'Identity question — answer directly.' },
+  { q: 'analyze this csv and chart the results', intent: 'data', reason: 'Data analysis with a chart.' },
+  { q: 'build an app that tracks my water intake', intent: 'code_task', reason: 'An app deliverable even without an explicit build verb.' },
+  { q: 'write a readme for my project', intent: 'docs', reason: 'Documentation for existing work.' },
+  { q: 'make my website load faster', intent: 'perf', reason: 'A performance task, not a build.' },
+];
+
+const CLASSIFIER_SYSTEM = `You are JEXI OS's intent classifier. You read a user request and decide which single specialist pipeline should handle it.
+
+Available intents: ${CLASSIFIER_INTENTS.join(', ')}
+
+Rules:
+- Choose EXACTLY ONE intent. Never invent new intents.
+- "build/ create/ make/ develop + app/ website/ tool/ tracker/ planner/ calculator..." is ALWAYS code_task — even when the subject mentions study, data, news, etc. The DELIVERABLE decides, not the subject.
+- A topic the user wants to LEARN (no app deliverable) is study_topic, study_exam or research — never code_task.
+- Answers about the user's own books/knowledge library are knowledge_recall.
+- Latest/breaking news is news_latest. Facts from the web are research.
+- Concrete math (equations, derivatives, integrals, calculations) is math_solve.
+- Git/GitHub actions (commit, push, PR, issues) are github.
+- Output ONLY a single JSON object — no markdown fences, no prose:
+{"intent":"...","confidence":0.95,"teamSlugs":["coder","qa"],"reasoning":"one short line"}`;
+
+/** Extract the first JSON object from an LLM reply (tolerates prose/fences). */
+function extractJson(text) {
+  if (!text) return null;
+  const trimmed = String(text).trim();
+  if (trimmed.startsWith('{')) {
+    try { return JSON.parse(trimmed); } catch (e) {}
+  }
+  const match = trimmed.match(/\{[\s\S]*\}/);
+  if (match) {
+    try { return JSON.parse(match[0]); } catch (e) {}
+  }
+  return null;
+}
+
 export class Planner {
   /** Classify the intent (fast, deterministic, free) then attach the team plan. */
   async analyzeIntent(query, opts = {}) {
@@ -188,9 +259,17 @@ export class Planner {
     const q = String(query || '').toLowerCase();
     const hasImage = Boolean(opts.image);
 
-    // 0. Image given → vision recognition
+    // FAST PATH (P2) — only unambiguous, deterministic patterns earn a free
+    // regex route (zero AI cost). Everything else goes through the LLM first.
     if (hasImage) {
       return { intent: 'image_recognition', tasks: ['vision', 'reasoning', 'memory'], reasoning: 'User provided an image to analyze.', payload: opts.image };
+    }
+    if (/clear (all )?memory|forget everything|wipe memory|delete memory/i.test(q)) {
+      return { intent: 'clear_memory', tasks: ['memory'], reasoning: 'User wants to wipe memory.' };
+    }
+    const linkMatch = query.match(/https?:\/\/[^\s)'"]+/i);
+    if (linkMatch && !/http:\/\/localhost|127\.0\.0\.1|\.onion/i.test(linkMatch[0])) {
+      return { intent: 'link_analysis', tasks: ['browser', 'extractor', 'reasoning', 'memory'], reasoning: 'User shared a link — JEXI will open it with the browser and summarize.', payload: { url: linkMatch[0], fullQuery: query } };
     }
 
     // 0.5 Agent-team safety controls: /careful, /freeze, /guard <paths>, /unfreeze
@@ -211,16 +290,58 @@ export class Planner {
     }
     const scopedQuery = query.replace(/^\s*\/(careful|freeze|unfreeze|guard|team)\b\s*/i, '').trim();
 
-    // 1. Clear memory
-    if (/clear (all )?memory|forget everything|wipe memory|delete memory/i.test(q)) {
-      return { intent: 'clear_memory', tasks: ['memory'], reasoning: 'User wants to wipe memory.' };
+    // PRIMARY PATH (P2): schema-validated LLM classification — meaning-first
+    // routing the regex cascade cannot express. Priority 6 memory is injected
+    // so a remembered preference/project state can decide the intent.
+    try {
+      const llm = await this._classifyLLM(query, { ...opts, scope, scopedQuery });
+      if (llm) return llm;
+    } catch (e) {
+      // Provider failure must never kill classification — fall through to the
+      // deterministic cascade (fail closed, never crash).
     }
 
-    // 2. Any link in the message → analyze it (YouTube, TikTok, Instagram, article, any site)
-    const linkMatch = query.match(/https?:\/\/[^\s)'"]+/i);
-    if (linkMatch && !/http:\/\/localhost|127\.0\.0\.1|\.onion/i.test(linkMatch[0])) {
-      return { intent: 'link_analysis', tasks: ['browser', 'extractor', 'reasoning', 'memory'], reasoning: 'User shared a link — JEXI will open it with the browser and summarize.', payload: { url: linkMatch[0], fullQuery: query } };
+    // FALLBACK: the deterministic regex cascade (fast, free, no keys needed).
+    return this._classifyRegex(query, { ...opts, scope, scopedQuery });
+  }
+
+  /**
+   * P2 — schema-validated LLM classification (the primary path). Returns null
+   * when no AI key is configured, the model is unsure (< 0.5), or the reply
+   * fails schema validation — the caller then falls back to the regex cascade
+   * (never a crash).
+   */
+  async _classifyLLM(query, opts = {}) {
+    const keys = resolveKeys();
+    if (!keys.groqKey && !keys.geminiKey && !keys.openrouterKey && !keys.xaiKey) return null;
+    try {
+      const memoryContext = opts.memoryContext
+        ? `\n\nRemembered context about the user/project (use it ONLY if it directly decides this request):\n${opts.memoryContext.slice(0, 1500)}`
+        : '';
+      const shots = CLASSIFIER_FEW_SHOTS.map((s) => `User: "${s.q}" → ${s.intent} (${s.reason})`).join('\n');
+      const prompt = `Classify this user request into exactly one JEXI OS intent.${memoryContext}
+
+Examples:\n${shots}
+
+NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" → code_task (an APP!) — never study_topic\n- "study calculus" → study_topic (a TOPIC!) — never code_task\n- "write documentation for my code" → docs — never code_task\n- "make my app faster" → perf — never code_task\n- "latest news about X" → news_latest — never research\n\nUser request: "${query}"\n\nReturn ONLY valid JSON: {"intent": "...", "confidence": 0.0-1.0, "teamSlugs": [...], "reasoning": "..."}`;
+      const raw = await generateContent(prompt, CLASSIFIER_SYSTEM, null, { temperature: 0 });
+      const parsed = extractJson(raw);
+      if (!parsed) return null;
+      const validated = ClassificationSchema.safeParse(parsed);
+      if (!validated.success) return null;
+      const { intent, confidence, teamSlugs, reasoning } = validated.data;
+      if (confidence < 0.5) return null; // unsure → deterministic fallback
+      return { intent, tasks: teamSlugs || [], reasoning, confidence };
+    } catch (e) {
+      return null;
     }
+  }
+
+  /** P2 fallback — the original deterministic regex cascade (unchanged logic). */
+  async _classifyRegex(query, opts = {}) {
+    const q = String(query || '').toLowerCase();
+    const { scope = { mode: 'normal', paths: [] }, scopedQuery = String(query || '') } = opts;
+    const hasImage = Boolean(opts.image);
 
     // 3. Math detection — symbols, formulas, calculations, word problems.
     //    (checked BEFORE coding: "calculate" etc. is math unless it's a build request)

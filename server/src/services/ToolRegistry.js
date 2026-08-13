@@ -61,6 +61,10 @@ export const TOOL_REGISTRY = [
   { slug: 'preference-learn', name: 'Preference Learn', type: 'Memory', desc: 'Extract and store "do it this way" preferences from an exchange.', agents: ['memory', 'context-manager'], engine: 'PreferenceLearner' },
   { slug: 'profile-read', name: 'Profile Read', type: 'Memory', desc: 'Read the stored user profile: name, facts, preferences.', agents: ['memory', 'jexi'], engine: 'MemoryManager' },
   { slug: 'study-notes', name: 'Study Notes', type: 'Memory', desc: 'Create structured study notes saved to the knowledge library.', agents: ['study', 'researcher', 'teacher'], engine: 'MemoryManager' },
+  // P7 — MCP as an INTERNAL tool: lets graph nodes call external MCP tools
+  // (ask_jexi, memory_lookup, knowledge_search, list_books, get_health)
+  // through the same validated tool path as internal tools.
+  { slug: 'mcp-call', name: 'MCP Call', type: 'MCP', desc: 'Call an external MCP tool (ask_jexi, memory_lookup, knowledge_search, list_books, get_health) with schema-validated args.', agents: ['jexi', 'context-manager', 'memory'], engine: 'MCPServer' },
   { slug: 'book-fetch', name: 'Book Fetch', type: 'Knowledge', desc: 'Fetch a free public-domain book or paper from the trusted library.', agents: ['books', 'scholar'], engine: 'TrustedLibrary' },
   { slug: 'knowledge-index', name: 'Knowledge Index', type: 'Knowledge', desc: 'Index studied material so recall is instant and complete.', agents: ['researcher', 'document-analyst', 'scholar'], engine: 'MemoryManager' },
   { slug: 'semantic-search', name: 'Semantic Search', type: 'Memory', desc: 'Hybrid vector + keyword search across all memories.', agents: ['memory', 'document-analyst', 'researcher'], engine: 'MemoryManager' },

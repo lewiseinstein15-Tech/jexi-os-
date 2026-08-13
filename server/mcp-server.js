@@ -92,24 +92,29 @@ async function runJexiQuery(query, opts = {}) {
  *  TOOLS (allowlist)
  * ------------------------------------------------------------------ */
 
-// 1 — the main action: run any task through JEXI's agent team.
-server.tool(
-  'ask_jexi',
-  'Run a task or question through JEXI OS. Returns a structured answer after the agent team finishes. ' +
-    'Use for building apps, research, study, math, coding, news and general questions.',
-  { query: z.string().min(1).describe('The task or question for JEXI, e.g. "build a calculator app" or "latest AI news"') },
-  async ({ query }) => {
+/* ------------------------------------------------------------------ *
+ *  Priority 7 — MCP as an INTERNAL tool, not just an external entry.
+ *  The same handlers below serve both the MCP wire protocol (server.tool)
+ *  and the internal graph (callMcpTool → ToolRuntime 'mcp-call'), so an
+ *  internal agent node can call an MCP tool through the exact same
+ *  schema-validated path as any internal tool.
+ * ------------------------------------------------------------------ */
+const MCP_INPUT_SCHEMAS = {
+  ask_jexi: z.object({ query: z.string().min(1) }),
+  memory_lookup: z.object({ detail: z.enum(['profile', 'facts', 'stats', 'full']).optional() }),
+  knowledge_search: z.object({ query: z.string().min(1), limit: z.number().int().min(1).max(20).optional() }),
+  list_books: z.object({}),
+  get_health: z.object({}),
+};
+
+const MCP_TOOL_HANDLERS = {
+  // 1 — the main action: run any task through JEXI's agent team.
+  ask_jexi: async ({ query }) => {
     const out = await runJexiQuery(query);
     return { content: [{ type: 'text', text: out.summary || '(no summary)' }], structuredContent: out };
-  }
-);
-
-// 2 — read the memory core (profile + facts + stats).
-server.tool(
-  'memory_lookup',
-  'Read what JEXI remembers about the user: profile, learned preferences/facts, memory stats.',
-  { detail: z.enum(['profile', 'facts', 'stats', 'full']).optional().default('full').describe('How much detail to return') },
-  async ({ detail }) => {
+  },
+  // 2 — read the memory core (profile + facts + stats).
+  memory_lookup: async ({ detail }) => {
     const mem = loadMemory();
     const profile = mem.userProfile || {};
     const facts = topUserFacts(8).map(f => (typeof f === 'string' ? f : f?.text || String(f)));
@@ -118,40 +123,22 @@ server.tool(
     if (detail === 'facts') return { content: [{ type: 'text', text: facts.join('\n') || '(no facts yet)' }], structuredContent: { facts } };
     if (detail === 'stats') return { content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }], structuredContent: { stats } };
     return { content: [{ type: 'text', text: JSON.stringify({ profile, facts, stats }, null, 2) }], structuredContent: { profile, facts, stats } };
-  }
-);
-
-// 3 — knowledge library search.
-server.tool(
-  'knowledge_search',
-  'Search JEXI\'s saved knowledge library (books, study notes, solutions) for a topic.',
-  { query: z.string().min(1).describe('Search term, e.g. "calculus" or "quantum computing"'), limit: z.number().int().min(1).max(20).optional().default(10) },
-  async ({ query, limit }) => {
-    const hits = searchKnowledge(query).slice(0, limit);
+  },
+  // 3 — knowledge library search.
+  knowledge_search: async ({ query, limit }) => {
+    const hits = searchKnowledge(query).slice(0, limit || 10);
     const text = hits.length
       ? hits.map((h, i) => `${i + 1}. [${h.category || 'knowledge'}] ${h.filename || h.topic || ''} — ${(h.excerpt || h.content || '').slice(0, 240)}`).join('\n')
       : '(no knowledge matches)';
     return { content: [{ type: 'text', text }], structuredContent: { query, results: hits } };
-  }
-);
-
-// 4 — books in the library.
-server.tool(
-  'list_books',
-  'List the books stored in JEXI\'s library (read-only).',
-  {},
-  async () => {
+  },
+  // 4 — books in the library.
+  list_books: async () => {
     const books = listBooks();
     return { content: [{ type: 'text', text: books.length ? books.map((b, i) => `${i + 1}. ${b.title || b.name}`).join('\n') : '(library is empty)' }], structuredContent: { books } };
-  }
-);
-
-// 5 — health + key status.
-server.tool(
-  'get_health',
-  'Check whether JEXI\'s brain is online and which AI providers are configured (without exposing keys).',
-  {},
-  async () => {
+  },
+  // 5 — health + key status.
+  get_health: async () => {
     const settings = loadSettings();
     const hasEnv = {
       groq: !!process.env.GROQ_API_KEY,
@@ -165,8 +152,50 @@ server.tool(
     };
     const out = { ok: true, name: 'jexi-os', providers, providerHealth: providerHealthSnapshot(), memory: loadMemory() ? 'available' : 'empty' };
     return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], structuredContent: out };
+  },
+};
+
+/**
+ * P7 — internal MCP tool call: schema-validated, fail-closed. Used by the
+ * ToolRuntime 'mcp-call' tool so internal graph nodes reach MCP tools through
+ * the same validated contract as internal tools.
+ */
+export async function callMcpTool(name, args = {}) {
+  const handler = MCP_TOOL_HANDLERS[name];
+  if (!handler) {
+    return { ok: false, error: { code: 'UNKNOWN_MCP_TOOL', message: `No MCP tool named "${name}"`, node: 'mcp-call' } };
   }
-);
+  const schema = MCP_INPUT_SCHEMAS[name];
+  let cleanArgs = args;
+  if (schema) {
+    const parsed = schema.safeParse(args);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: {
+          code: 'SCHEMA_VALIDATION_FAILED',
+          message: `Invalid args for MCP tool "${name}": ${parsed.error.issues.map((i) => i.message).join('; ')}`,
+          node: 'mcp-call',
+          raw: args,
+        },
+      };
+    }
+    cleanArgs = parsed.data;
+  }
+  try {
+    const result = await handler(cleanArgs);
+    return { ok: true, tool: name, result: result.structuredContent !== undefined ? result.structuredContent : result };
+  } catch (e) {
+    return { ok: false, error: { code: 'MCP_TOOL_THREW', message: (e && e.message) || String(e), node: 'mcp-call' } };
+  }
+}
+
+// Register the same handlers on the MCP wire protocol (external entry).
+server.tool('ask_jexi', 'Run a task or question through JEXI OS. Returns a structured answer after the agent team finishes. Use for building apps, research, study, math, coding, news and general questions.', { query: z.string().min(1).describe('The task or question for JEXI, e.g. "build a calculator app" or "latest AI news"') }, (args) => MCP_TOOL_HANDLERS.ask_jexi(args));
+server.tool('memory_lookup', 'Read what JEXI remembers about the user: profile, learned preferences/facts, memory stats.', { detail: z.enum(['profile', 'facts', 'stats', 'full']).optional().default('full').describe('How much detail to return') }, (args) => MCP_TOOL_HANDLERS.memory_lookup(args));
+server.tool('knowledge_search', 'Search JEXI\'s saved knowledge library (books, study notes, solutions) for a topic.', { query: z.string().min(1).describe('Search term, e.g. "calculus" or "quantum computing"'), limit: z.number().int().min(1).max(20).optional().default(10) }, (args) => MCP_TOOL_HANDLERS.knowledge_search(args));
+server.tool('list_books', 'List the books stored in JEXI\'s library (read-only).', {}, () => MCP_TOOL_HANDLERS.list_books({}));
+server.tool('get_health', 'Check whether JEXI\'s brain is online and which AI providers are configured (without exposing keys).', {}, () => MCP_TOOL_HANDLERS.get_health({}));
 
 /* ------------------------------------------------------------------ *
  *  RESOURCES (read-only)

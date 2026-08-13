@@ -18,6 +18,7 @@
 
 import { generateContent, resolveKeys } from './LLMClient.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
+import { buildVerificationPrompt, parseVerificationVerdict, buildRevisionPrompt } from './VerificationPrompt.js';
 
 const MAX_ROUNDS = 2;          // critique → revise, at most twice
 const MIN_LENGTH = 160;        // skip verification for trivial one-liners
@@ -59,24 +60,20 @@ export async function verifyAnswer({ query, draft, sources = [], sendEvent, opts
 
     // 1. CRITIQUE — strict, adversarial. It must say CLEAN or list problems.
     const critique = await generateContent(
-      `You are a strict FACT CHECKER. Your job is to catch hallucinations and unsupported claims — never to praise.\n\n` +
-      `TASK: ${query}\n` +
-      (srcText ? `\nAVAILABLE SOURCES (the ONLY things the answer may rely on):\n${srcText}\n` : `\n(No external sources were provided — flag any specific factual claim the model could not know from the task itself.)\n`) +
-      `\nDRAFT ANSWER TO AUDIT:\n"""\n${current.slice(0, 9000)}\n"""\n\n` +
-      `Audit the draft. Reply with EXACTLY this format:\n` +
-      `VERDICT: CLEAN\n` +
-      `or\n` +
-      `VERDICT: ISSUES\n` +
-      `ISSUES:\n- <one concrete problem per line, e.g. "Claims X but the sources say Y" or "States Z with no source">\n\n` +
-      `Rules: mark ISSUES only for REAL problems (invented facts, contradictions, unsupported specific claims, missing citations for sourced material, off-task content). Do NOT flag style or brevity. If everything is grounded, say CLEAN.`,
-      JEXI_SYSTEM_PROMPT + '\nYou are the Fact Checker agent. Be strict, precise, and brief.',
+      buildVerificationPrompt({
+        role: 'FACT CHECKER',
+        task: query,
+        sources: srcText ? (sources || []) : [],
+        draft: current,
+        rules: 'Your job is to catch hallucinations and unsupported claims — never to praise.',
+      }),
+      JEXI_SYSTEM_PROMPT + '\nYou are the Fact Checker agent. Be strict, precise, and brief. Output the JSON object only.',
       null,
       { temperature: 0.1 }
     );
 
-    const verdictLine = String(critique || '').match(/VERDICT:\s*(CLEAN|ISSUES)/i);
-    const isClean = verdictLine ? verdictLine[1].toUpperCase() === 'CLEAN' : !/VERDICT:\s*ISSUES/i.test(critique || '');
-    issues = String(critique || '').split('\n').filter((l) => l.trim().startsWith('-')).map((l) => l.trim().replace(/^-/, '').trim()).filter(Boolean).slice(0, 8);
+    const { clean: isClean, issues: parsedIssues } = parseVerificationVerdict(critique);
+    issues = parsedIssues;
 
     if (isClean) {
       if (sendEvent) sendEvent('log', { agent: 'Fact Checker', message: '✅ Verified — no unsupported claims found.' });
@@ -87,15 +84,12 @@ export async function verifyAnswer({ query, draft, sources = [], sendEvent, opts
 
     // 2. REVISE — rewrite fixing exactly the listed issues.
     const revised = await generateContent(
-      `Rewrite the answer below so it fixes EVERY issue the fact checker found. Rules:\n` +
-      `- Fix only the listed problems. Keep the structure, tone and length similar.\n` +
-      `- NEVER invent new facts. If a claim cannot be supported by the task or sources, remove it or say it explicitly as an assumption.\n` +
-      `- Keep the same heading/markdown style so the reader sees an improved version, not a different answer.\n\n` +
-      `TASK: ${query}\n` +
-      (srcText ? `\nSOURCES:\n${srcText}\n` : '') +
-      `\nFACT CHECKER'S ISSUES:\n${issues.map((i) => `- ${i}`).join('\n') || '(unspecified — re-check grounding and unsupported claims)'}\n\n` +
-      `DRAFT TO REVISE:\n"""\n${current.slice(0, 9000)}\n"""\n\n` +
-      `Output ONLY the revised answer.`,
+      buildRevisionPrompt({
+        task: query,
+        sources: srcText ? (sources || []) : [],
+        issues,
+        draft: current,
+      }),
       JEXI_SYSTEM_PROMPT + '\nYou are the Fact Checker agent. Output only the corrected answer.',
       null,
       { temperature: 0.2 }

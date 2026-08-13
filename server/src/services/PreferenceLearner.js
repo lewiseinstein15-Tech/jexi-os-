@@ -92,6 +92,12 @@ Rules:
 - Return ONLY a JSON array, no prose, no markdown:
 [{"type": "preference", "content": "..."}]
 
+NEGATIVE EXAMPLES — extract NOTHING from these (they are NOT durable preferences):
+1. "Can you help me write a Python script today?" → [] (a one-off task request, not a stable preference)
+2. "If I ever built a startup, I would focus on retention." → [] (a hypothetical, not a real fact about the user)
+3. "My friend says React is better than Vue." → [] (a quoted third-party statement, not the user's own preference)
+4. "This calculator is really slow." → [] (a one-off complaint about the moment, not a durable preference)
+
 User message: "${String(userQuery).slice(0, 1500)}"`;
 
 async function extractPreferences(userQuery) {

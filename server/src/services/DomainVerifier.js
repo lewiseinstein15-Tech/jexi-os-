@@ -15,6 +15,7 @@
 
 import { generateContent, resolveKeys } from './LLMClient.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
+import { buildVerificationPrompt, parseVerificationVerdict, buildRevisionPrompt } from './VerificationPrompt.js';
 
 export const DOMAINS = ['math', 'code', 'research', 'engineering', 'general'];
 
@@ -130,23 +131,30 @@ export async function verifyDomainAnswer({ query, draft, domain, sources = [], s
     rounds = r + 1;
     emit(`🔍 Domain critic pass ${rounds}/2 (${useDomain})…`);
     const critique = await generateContent(
-      `You are a strict ${useDomain} VERIFIER. Rules: ${rules}\n\nTASK: ${query}\n` +
-      (srcText ? `\nSOURCES:\n${srcText}\n` : '') +
-      `\nDRAFT:\n"""\n${current.slice(0, 9000)}\n"""\n\nReply EXACTLY:\nVERDICT: CLEAN\nor\nVERDICT: ISSUES\nISSUES:\n- <one concrete problem per line>`,
-      JEXI_SYSTEM_PROMPT + `\nYou are the ${useDomain} verifier. Strict and brief.`,
+      buildVerificationPrompt({
+        role: `${useDomain} VERIFIER`,
+        task: query,
+        sources,
+        draft: current,
+        rules,
+      }),
+      JEXI_SYSTEM_PROMPT + `\nYou are the ${useDomain} verifier. Strict and brief. Output the JSON object only.`,
       null,
       { temperature: 0.1 }
     );
-    const clean = /VERDICT:\s*CLEAN/i.test(String(critique || ''));
-    const aiIssues = String(critique || '').split('\n').filter((l) => l.trim().startsWith('-')).map((l) => l.trim().replace(/^-/, '')).filter(Boolean).slice(0, 8);
+    const { clean, issues: aiIssues } = parseVerificationVerdict(critique);
     if (clean) {
       emit('✅ Domain critic: clean.');
       return { text: current, changed: current !== original, verdict: 'verified', domain: useDomain, issues: checks.issues, checks };
     }
     const revised = await generateContent(
-      `Fix EVERY issue below in the ${useDomain} answer. Keep structure and style. Never invent new facts.\n\nTASK: ${query}\n` +
-      (srcText ? `\nSOURCES:\n${srcText}\n` : '') +
-      `\nISSUES:\n${aiIssues.map((i) => `- ${i}`).join('\n')}\n\nDRAFT:\n"""\n${current.slice(0, 9000)}\n"""\n\nOutput ONLY the corrected answer.`,
+      buildRevisionPrompt({
+        task: query,
+        sources,
+        issues: aiIssues,
+        draft: current,
+        extra: `Fix EVERY issue below in the ${useDomain} answer.`,
+      }),
       JEXI_SYSTEM_PROMPT + `\nYou are the ${useDomain} verifier. Output only the corrected answer.`,
       null,
       { temperature: 0.2 }
