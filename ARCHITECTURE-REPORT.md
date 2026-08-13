@@ -97,7 +97,7 @@ The announcement explicitly names the extension system: **skills, plugins, hooks
 
 ## K. Current JEXI architecture (verified from this repo)
 
-JEXI OS today is a **Node.js (Express) agent brain + a Vite/React mobile-first UI**, with a 20-file skill chain, a 207-specialist roster, a 495-skill registry, deep-domain routing, an 8-provider model router with failover, memory (tf-idf + vector), a verification loop (critic + revision), search/news/data/devops/github/vision/video/computer-use agents, an MCP server (`/mcp`), and a browser automator (Playwright).
+JEXI OS today is a **Node.js (Express) agent brain + a Vite/React mobile-first UI**, with a 207-specialist roster, a 495-skill registry, a 151-tool registry with auto tool routing, deep-domain routing, an 8-provider model router (Groq → Gemini → OpenRouter → Cerebras → DeepInfra → Mistral → Grok/xAI → HuggingFace) with failover, memory (tf-idf + vector), a verification loop (critic + revision), search/news/data/devops/github/vision/video/computer-use agents, an MCP server (`/mcp`), and a browser automator (Playwright).
 
 Backend flow: `POST /api/chat` → `Planner.analyzeIntent` (deterministic intent classification + domain detection) → `Orchestrator.executePlan` (runs one specialist at a time, strict handoffs) → NDJSON event stream (`plan`/`log`/`website`/`done`) → UI. Gates: QA PASS / Security CLEAR enforced in `SkillChain`. Provider router: Groq → Gemini → OpenRouter → Cerebras → Together → DeepInfra → Mistral → HuggingFace with cooldowns.
 
@@ -112,7 +112,7 @@ Backend flow: `POST /api/chat` → `Planner.analyzeIntent` (deterministic intent
 
 ## M. Current JEXI backend architecture (verified)
 
-Services under `server/src/services/`: `Planner` (intents + deep-domain routing), `Orchestrator` (pipeline + compound tasks), `SkillChain` (gates), `AgentRoster` (207 agents / 495 skills), `ToolRegistry` + auto tool routing, `LLMClient` + `ProviderRouter` (8-provider failover), `MemoryManager` (memory + knowledge library + layered/vector memory), `SearchAgent`/`SearchEngine`/`Extractor` (research team), `NewsAgent`, `DataAgent`, `GitHubAgent`, `DevOpsAgent`, `ComputerUseAgent` (Playwright), `VisionAgent`, `VideoAnalyst`, `VerificationLoop`, `Reasoner`, `JexiPrompt` (system prompt), `SelfMonitor`, plus `mcp-server.js` (MCP endpoint) and `index.js` (API routes). Skills are markdown files with YAML frontmatter in `server/skills/`.
+Services under `server/src/services/`: `Planner` (intents + deep-domain routing), `Orchestrator` (pipeline + compound tasks), `SkillChain` (gates), `AgentRoster` (207 agents / 495 skills), `ToolRegistry` (151 tools) + auto tool routing, `LLMClient` + `ProviderRouter` (8-provider failover incl. Grok/xAI), `MemoryManager` (memory + knowledge library + layered/vector memory), `SearchAgent`/`SearchEngine`/`Extractor` (research team), `NewsAgent`, `DataAgent`, `GitHubAgent`, `DevOpsAgent`, `ComputerUseAgent` (Playwright), `VisionAgent`, `VideoAnalyst`, `VerificationLoop`, `Reasoner`, `JexiPrompt` (system prompt), `SelfMonitor`, plus `mcp-server.js` (MCP endpoint) and `index.js` (API routes).
 
 ## N. Gap analysis — JEXI vs. Grok Build and modern agentic systems
 
@@ -201,7 +201,7 @@ Rules: one command input per screen; conversation is a reusable workspace compon
 | 3 | Application shell (top nav + drawer, desktop 3-pane) | ✅ shipped to main (TopNav + hamburger drawer + desktop rail) |
 | 4 | Navigation (Home / Command Center / Agents / Tasks / …) | ✅ shipped to main (NavList sections + real screens incl. Tasks) |
 | 5 | Command Center (plan + agents + tools + logs, live) | ✅ shipped to main (CommandCenter surface) |
-| 6 | Conversation + high-quality AnswerRenderer (KaTeX, sections, callouts, citations) | next |
+| 6 | Conversation + high-quality AnswerRenderer (KaTeX, sections, callouts, citations) | ✅ shipped to main (structured GIVEN/FORMULA/WORKING/FINAL-ANSWER + research section chips, GitHub-style `> [!NOTE]` callouts, numbered citation badges, live mermaid diagrams, KaTeX) |
 | 7 | Agent workspace (OS-style list + detail) | ✅ shipped to main (AgentsScreen + roster browser + ActiveAgents) |
 | 8 | Task system + events (`task.*`) | ✅ TaskManager (background execution, `task.*` NDJSON streams, disk persistence, cancel/rerun) + TASKS console in the UI |
 | 9 | Unified tool runtime (schema registry, permission profiles) | later |
