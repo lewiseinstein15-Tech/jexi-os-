@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server, Github, ShieldCheck, Globe, Lock, Cpu, Cloud } from 'lucide-react';
+import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server, Github, ShieldCheck, Shield, Globe, Lock, Cpu, Cloud } from 'lucide-react';
 import { getBackendUrl, setBackendUrl, getAccessKey, setAccessKey, jexiFetch } from '../utils/helpers';
 import PanelHeader from './PanelHeader';
 
@@ -61,14 +61,16 @@ export default function SettingsPanel() {
   const [backendUrl, setBackendUrlState] = useState(getBackendUrl());
   const [backendInput, setBackendInput] = useState(getBackendUrl());
   const [backendStatus, setBackendStatus] = useState('idle'); // idle, saved, error
+  const [trust, setTrust] = useState(null);
 
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         const base = getBackendUrl();
-        const [res, statusRes] = await Promise.all([
+        const [res, statusRes, trustRes] = await Promise.all([
           jexiFetch(`${base}/api/settings`),
           jexiFetch(`${base}/api/settings/status`),
+          jexiFetch(`${base}/api/trust`).catch(() => null),
         ]);
         const data = await res.json();
         setGeminiKey(data.geminiKey || '');
@@ -81,6 +83,7 @@ export default function SettingsPanel() {
         setXaiKey(data.xaiKey || '');
         setGithubToken(data.githubToken || '');
         try { setKeyStatus(await statusRes.json()); } catch (e) { /* status endpoint optional */ }
+        try { if (trustRes) setTrust(await trustRes.json()); } catch (e) { /* trust endpoint optional */ }
       } catch (e) {
         console.error("Failed to fetch settings", e);
       }
@@ -329,6 +332,69 @@ export default function SettingsPanel() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Security / Risk Guard (roadmap stage 17) */}
+      <div className="surface-card p-4">
+        <PanelHeader icon={Shield} title="SECURITY · RISK GUARD" color="text-brand" />
+        <p className="text-[8px] text-text-tertiary mb-3">Every tool call is classified by its actual arguments — destructive commands, path escapes and secret exfiltration are blocked before they run. Decisions persist on the server (DATA_DIR/trust.json).</p>
+
+        {trust ? (
+          <div className="space-y-3">
+            {/* Trust mode */}
+            <div>
+              <p className="text-[9px] font-bold text-text-secondary mb-1.5 tracking-wider">TRUST MODE</p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[['sandbox', 'SANDBOX', 'Block high-risk calls'], ['ask', 'ASK', 'Warn, never block'], ['off', 'OFF', 'No gating']].map(([m, label, hint]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={async () => {
+                      const r = await jexiFetch(`${getBackendUrl()}/api/trust/mode`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: m }) });
+                      setTrust(await r.json());
+                    }}
+                    className={`rounded-md px-2 py-2 border text-left transition-colors ${trust.mode === m ? 'bg-brand-dim border-brand-line' : 'bg-surface-1 border-hairline'}`}
+                  >
+                    <p className={`text-[8px] font-black tracking-wider ${trust.mode === m ? 'text-brand' : 'text-text-secondary'}`}>{label}</p>
+                    <p className="text-[7px] text-text-tertiary mt-0.5">{hint}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Decisions */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[9px] font-bold text-brand mb-1 tracking-wider">ALLOWED ({trust.allowed?.length || 0})</p>
+                <div className="space-y-1 max-h-24 overflow-y-auto">
+                  {trust.allowed?.map((d) => (
+                    <div key={d.id} className="flex items-center gap-1.5 bg-surface-1 border border-hairline rounded px-2 py-1">
+                      <code className="text-[7px] font-mono text-text-secondary flex-1 truncate">{d.slug}: {d.pattern || '*'}</code>
+                      <button type="button" onClick={async () => { const r = await jexiFetch(`${getBackendUrl()}/api/trust/decision/${d.id}`, { method: 'DELETE' }); setTrust(await r.json()); }} className="text-text-tertiary hover:text-status-error text-[8px]">✕</button>
+                    </div>
+                  ))}
+                  {!trust.allowed?.length && <p className="text-[7px] text-text-tertiary">None — everything HIGH is blocked.</p>}
+                </div>
+              </div>
+              <div>
+                <p className="text-[9px] font-bold text-status-error mb-1 tracking-wider">DENIED ({trust.denied?.length || 0})</p>
+                <div className="space-y-1 max-h-24 overflow-y-auto">
+                  {trust.denied?.map((d) => (
+                    <div key={d.id} className="flex items-center gap-1.5 bg-surface-1 border border-hairline rounded px-2 py-1">
+                      <code className="text-[7px] font-mono text-text-secondary flex-1 truncate">{d.slug}: {d.pattern || '*'}</code>
+                      <button type="button" onClick={async () => { const r = await jexiFetch(`${getBackendUrl()}/api/trust/decision/${d.id}`, { method: 'DELETE' }); setTrust(await r.json()); }} className="text-text-tertiary hover:text-status-error text-[8px]">✕</button>
+                    </div>
+                  ))}
+                  {!trust.denied?.length && <p className="text-[7px] text-text-tertiary">No explicit denies.</p>}
+                </div>
+              </div>
+            </div>
+
+            <p className="text-[7px] font-mono text-text-tertiary truncate">workspace: {trust.workspace}</p>
+          </div>
+        ) : (
+          <p className="text-[9px] text-text-tertiary">Risk guard status unavailable (server offline?).</p>
+        )}
       </div>
 
       {/* Info Box */}

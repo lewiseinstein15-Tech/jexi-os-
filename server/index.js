@@ -37,6 +37,7 @@ import { listPlugins, togglePlugin } from './src/services/PluginRegistry.js';
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications } from './src/services/NotificationCenter.js';
 import { modelRoutingTable, providerPreferenceForIntent } from './src/services/ModelRouting.js';
 import { MCP_PORT, MCP_TOOL_ALLOWLIST } from './mcp-server.js';
+import { trustStatus, setTrustMode, allowPattern, denyPattern, removeDecision, clearTrust, trustFolder } from './src/services/RiskGuard.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
 import { mountMcp } from './mcp-server.js';
 import { taskManager } from './src/services/TaskManager.js';
@@ -435,6 +436,19 @@ app.post('/api/notifications/clear', (req, res) => res.json(clearNotifications()
 app.get('/api/models', (req, res) => {
   res.json({ routing: modelRoutingTable(), preferenceFor: (intent) => providerPreferenceForIntent(intent) });
 });
+
+// === RISK GUARD / TRUST (roadmap stage 17) ===
+// Argument-level risk classification + folder-trust store; gates tool calls.
+app.get('/api/trust', (req, res) => res.json(trustStatus()));
+app.post('/api/trust/mode', (req, res) => {
+  try { res.json(setTrustMode(String(req.body && req.body.mode || ''))); }
+  catch (e) { res.status(400).json({ error: (e && e.message) || String(e) }); }
+});
+app.post('/api/trust/allow', (req, res) => res.json(allowPattern(req.body || {})));
+app.post('/api/trust/deny', (req, res) => res.json(denyPattern(req.body || {})));
+app.post('/api/trust/folder', (req, res) => res.json(trustFolder(req.body && req.body.folder)));
+app.delete('/api/trust/decision/:id', (req, res) => res.json(removeDecision(req.params.id)));
+app.post('/api/trust/clear', (req, res) => res.json(clearTrust()));
 
 // === MCP MANAGEMENT (roadmap stage 20) ===
 app.get('/api/mcp/status', (req, res) => {

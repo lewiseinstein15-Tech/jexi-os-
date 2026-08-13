@@ -38,6 +38,7 @@ import {
 import { collectSystemStatus } from './SelfMonitor.js';
 import { loadSettings, saveSettings } from './SettingsManager.js';
 import { runHooks } from './HookEngine.js';
+import { classifyRisk } from './RiskGuard.js';
 
 /* ------------------------------------------------------------------ */
 /* Schemas — argument contracts for the executable tools.              */
@@ -252,6 +253,21 @@ export async function executeTool({ slug, args = {}, profile, sendEvent }) {
     const blocked = { ok: false, blocked: true, permission: perm, profile: useProfile, tool: slug, error: `${tool.name} needs ${perm} permission (profile: ${useProfile}). Switch to Full or Ask in Settings.`, durationMs: Date.now() - started };
     emit('tool.result', { tool: slug, ok: false, blocked: true, permission: perm, profile: useProfile, error: blocked.error, durationMs: blocked.durationMs });
     return blocked;
+  }
+
+  // RISK GUARD (stage 17) — classify the actual call, not just the slug.
+  const risk = classifyRisk(slug, args);
+  if (!risk.canRun) {
+    const blocked = {
+      ok: false, blocked: true, risk: risk.level, tool: slug, byRiskGuard: true,
+      error: `Risk guard blocked this call: ${risk.reason}${risk.reasons.length ? ` (${risk.reasons.join('; ')})` : ''}. You can allow it explicitly in Settings → Security.`,
+      durationMs: Date.now() - started,
+    };
+    emit('tool.result', { tool: slug, ok: false, blocked: true, byRiskGuard: true, risk: risk.level, error: blocked.error, durationMs: blocked.durationMs });
+    return blocked;
+  }
+  if (risk.level === 'medium' || risk.level === 'high') {
+    emit('tool.risk', { tool: slug, level: risk.level, reasons: risk.reasons });
   }
 
   // Argument validation

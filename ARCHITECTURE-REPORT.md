@@ -212,7 +212,7 @@ Rules: one command input per screen; conversation is a reusable workspace compon
 | 14 | Subagent runtime (spawn, parallel, cancel, aggregate) | ✅ shipped to main (SubagentRuntime: bounded-parallel AgentLoop subruns, cancellation, deterministic query decomposition, aggregation synthesis; /api/subagents NDJSON) |
 | 15 | Memory surfaces (searchable, editable, exportable) | ✅ shipped to main (Memory panel: semantic search across all memories, per-entry delete, JSON export via /api/memory/export + /api/memory/delete) |
 | 16 | Verification engine per domain (math/eng/code/research) | ✅ shipped to main (DomainVerifier: no-AI deterministic checks — balanced math/code fences, FINAL ANSWER, arithmetic spot-check, sources — plus per-domain AI critic; wired into math + research pipeline; /api/verify) |
-| 17 | Sandbox + folder-trust + risk classification | later |
+| 17 | Sandbox + folder-trust + risk classification | ✅ RiskGuard — argument-level risk classification (destructive commands, path escapes, secret exfiltration), persisted trust store (allow/deny/mode), gating in ToolRuntime, SECURITY UI in Settings |
 | 18 | Computer runtime abstraction (provider-independent) | later |
 | 19 | Browser agent improvements (screenshots, UI verification) | later |
 | 20 | MCP management UI + permission control | ✅ MCP status screen + allowlisted tools (read-only) |
