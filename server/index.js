@@ -29,6 +29,7 @@ import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
 import { getToolCatalog, TOOL_PROFILES, activeToolProfile, setToolProfile, executeTool } from './src/services/ToolRuntime.js';
 import { runAgentLoop } from './src/services/AgentLoop.js';
 import { listWorkspace, readWorkspace, writeWorkspace, createCheckpoint, listCheckpoints, diffCheckpoint, rollbackCheckpoint } from './src/services/WorkspaceRuntime.js';
+import { listProcesses, getProcessLog, startProcess, stopProcess, deleteProcess, onProcessEvent } from './src/services/ProcessManager.js';
 import { verifyDomainAnswer, detectDomain, deterministicChecks } from './src/services/DomainVerifier.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
 import { mountMcp } from './mcp-server.js';
@@ -371,6 +372,48 @@ app.post('/api/workspace/rollback', (req, res) => {
     res.json({ success: true, ...rollbackCheckpoint(id, file || null) });
   } catch (e) { res.status(400).json({ success: false, error: (e && e.message) || String(e) }); }
 });
+
+// === PROCESS SUBSYSTEM (roadmap stage 11 — persistent, observable terminal) ===
+// Start, list, watch and stop shell processes. Logs are captured server-side
+// and survive restarts; running processes are honestly marked interrupted.
+const processStreams = new Map(); // id → Set of response writers
+onProcessEvent(({ type, ...data }) => {
+  if (!data || !data.id) return;
+  const writers = processStreams.get(data.id);
+  if (!writers) return;
+  for (const w of writers) { try { w.write(JSON.stringify({ type, ...data }) + '\n'); } catch (e) {} }
+});
+
+app.get('/api/processes', (req, res) => res.json({ processes: listProcesses() }));
+
+app.post('/api/processes', (req, res) => {
+  const { command, cwd, label, timeoutMs } = req.body || {};
+  if (!command || !String(command).trim()) return res.status(400).json({ success: false, error: 'No command provided' });
+  const p = startProcess(String(command).trim(), { cwd, label, timeoutMs });
+  res.json({ success: true, process: p });
+});
+
+// NDJSON live stream of process.* events (replays existing log first).
+app.get('/api/processes/:id/stream', (req, res) => {
+  const id = req.params.id;
+  const log = getProcessLog(id);
+  if (log === null) return res.status(404).json({ success: false, error: 'Process not found' });
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.write(JSON.stringify({ type: 'process.log', id, chunk: log }) + '\n');
+  if (!processStreams.has(id)) processStreams.set(id, new Set());
+  processStreams.get(id).add(res);
+  req.on('close', () => { processStreams.get(id)?.delete(res); if (processStreams.get(id)?.size === 0) processStreams.delete(id); });
+});
+
+app.get('/api/processes/:id/logs', (req, res) => {
+  const log = getProcessLog(req.params.id);
+  if (log === null) return res.status(404).json({ success: false, error: 'Process not found' });
+  res.json({ success: true, log });
+});
+
+app.post('/api/processes/:id/stop', (req, res) => res.json(stopProcess(req.params.id)));
+app.delete('/api/processes/:id', (req, res) => res.json(deleteProcess(req.params.id)));
 
 // === DOMAIN VERIFICATION (roadmap stage 16) ===
 // Verify a draft answer against its domain's rules: deterministic structural

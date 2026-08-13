@@ -16,7 +16,7 @@ export const NAV_SECTIONS = [
     items: [
       { id: 'tasks', icon: ListTodo, label: 'Tasks', page: true },
       { id: 'workspace', icon: FolderOpen, label: 'Workspace', page: true },
-      { id: 'terminal', icon: Terminal, label: 'Terminal', stage: 11 },
+      { id: 'terminal', icon: Terminal, label: 'Terminal', page: true },
     ],
   },
   {

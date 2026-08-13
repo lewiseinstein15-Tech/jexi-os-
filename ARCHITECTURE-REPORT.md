@@ -206,7 +206,7 @@ Rules: one command input per screen; conversation is a reusable workspace compon
 | 8 | Task system + events (`task.*`) | ✅ TaskManager (background execution, `task.*` NDJSON streams, disk persistence, cancel/rerun) + TASKS console in the UI |
 | 9 | Unified tool runtime (schema registry, permission profiles) | ✅ shipped to main (ToolRuntime: schemas, safe/medium/risky permissions, Auto/Ask/Full profiles, validation, timeouts, tool.* events, /api/tools) |
 | 10 | Workspace runtime (projects, checkpoints, diffs, rollback) | ✅ shipped to main (WorkspaceRuntime: recursive file list/read/write with path-escape guards, snapshots to DATA_DIR, LCS line diffs, rollback, 30-cp pruning; Workspace screen with file editor, checkpoint history, diff viewer, one-tap rollback; /api/workspace*) |
-| 11 | Terminal/process subsystem (persistent, observable) | later |
+| 11 | Terminal/process subsystem (persistent, observable) | ✅ shipped to main (ProcessManager: spawn with timeouts + cwd scoping, ring-buffered logs, running/exited/stopped/interrupted states, disk persistence, NDJSON process.* streams; Terminal screen with run/stop/delete + live log tail; /api/processes*) |
 | 12 | Orchestrator v2 (tool-calling loop, gated stop, retry policy) | ✅ shipped to main (AgentLoop: plan → generate → fenced-json tool calls → ToolRuntime → results fed back → final answer; /api/agent NDJSON stream) |
 | 13 | First-class skills (auto-invoke, `/commands`, tiers) | ✅ shipped to main (Skills screen: searchable 495-skill registry by live category, detail sheet, one-click invoke that resolves the plan and runs it in the Command Center; /api/skills + /api/skills/invoke) |
 | 14 | Subagent runtime (spawn, parallel, cancel, aggregate) | later |

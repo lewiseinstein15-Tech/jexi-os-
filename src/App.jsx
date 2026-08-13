@@ -16,6 +16,7 @@ import UpdateBanner from './components/UpdateBanner';
 import TasksScreen from './components/TasksScreen';
 import SkillsScreen from './components/SkillsScreen';
 import WorkspaceScreen from './components/WorkspaceScreen';
+import TerminalScreen from './components/TerminalScreen';
 import PlaceholderPage from './components/PlaceholderPage';
 
 const isDesktopQuery = () =>
@@ -24,7 +25,6 @@ const isDesktopQuery = () =>
     : false;
 
 const PLACEHOLDERS = {
-  terminal: { title: 'TERMINAL', stage: 11, blurb: 'A persistent, observable terminal — shell commands, background processes, stdout/stderr, exit codes.' },
   research: { title: 'RESEARCH', stage: 5, blurb: 'A dedicated research console. The research team already runs in the backend — try it now in the Command Center.' },
   models: { title: 'MODELS', stage: 24, blurb: 'Per-agent model routing and local inference (llama.cpp / Ollama / vLLM / OpenAI-compatible).' },
   plugins: { title: 'PLUGINS', stage: 21, blurb: 'Install, enable, disable and update plugins (agents, skills, tools, hooks, MCP).' },
@@ -95,6 +95,12 @@ export default function App() {
         return (
           <div className="px-3 pt-4 pb-8 space-y-3 max-w-[900px] mx-auto">
             <WorkspaceScreen />
+          </div>
+        );
+      case 'terminal':
+        return (
+          <div className="px-3 pt-4 pb-8 space-y-3 max-w-[900px] mx-auto">
+            <TerminalScreen />
           </div>
         );
       case 'memory':
