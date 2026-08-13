@@ -34,6 +34,9 @@ import { verifyDomainAnswer, detectDomain, deterministicChecks } from './src/ser
 import { runSubagents, decomposeQuery } from './src/services/SubagentRuntime.js';
 import { listHooks, addHook, updateHook, removeHook } from './src/services/HookEngine.js';
 import { listPlugins, togglePlugin } from './src/services/PluginRegistry.js';
+import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications } from './src/services/NotificationCenter.js';
+import { modelRoutingTable, providerPreferenceForIntent } from './src/services/ModelRouting.js';
+import { MCP_PORT, MCP_TOOL_ALLOWLIST } from './mcp-server.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
 import { mountMcp } from './mcp-server.js';
 import { taskManager } from './src/services/TaskManager.js';
@@ -418,6 +421,32 @@ app.get('/api/processes/:id/logs', (req, res) => {
 app.post('/api/processes/:id/stop', (req, res) => res.json(stopProcess(req.params.id)));
 app.delete('/api/processes/:id', (req, res) => res.json(deleteProcess(req.params.id)));
 
+// === NOTIFICATION CENTER (roadmap stage 23 remainder) ===
+// Scheduled-mission completions land here; the UI bell polls this.
+app.get('/api/notifications', (req, res) => res.json({ notifications: listNotifications(Number(req.query.limit) || 50), unread: unreadCount() }));
+app.post('/api/notifications/read', (req, res) => {
+  if (req.body && req.body.id) res.json(markRead(req.body.id));
+  else res.json(markAllRead());
+});
+app.post('/api/notifications/clear', (req, res) => res.json(clearNotifications()));
+
+// === MODEL ROUTING (roadmap stage 24 — per-domain provider preference) ===
+// Exposes the intent → provider map; AgentLoop honors it via opts.prefer.
+app.get('/api/models', (req, res) => {
+  res.json({ routing: modelRoutingTable(), preferenceFor: (intent) => providerPreferenceForIntent(intent) });
+});
+
+// === MCP MANAGEMENT (roadmap stage 20) ===
+app.get('/api/mcp/status', (req, res) => {
+  res.json({
+    mounted: true,
+    endpoint: '/mcp',
+    port: MCP_PORT,
+    tools: MCP_TOOL_ALLOWLIST || [],
+    docs: 'Any MCP client can connect to /mcp and call the allowlisted tools.'
+  });
+});
+
 // === PLUGIN SYSTEM (roadmap stage 21 — feature bundles) ===
 // Built-in plugins contribute agents/skills/tools; toggle them at runtime.
 app.get('/api/plugins', (req, res) => res.json({ plugins: listPlugins() }));
@@ -479,13 +508,14 @@ app.post('/api/verify', async (req, res) => {
 });
 
 // === AGENT ROSTER (the 79-specialist catalog + 226-skill registry) ===
+// Static catalog — memoized for 60s (stage 27: performance).
+let rosterCache = { json: null, at: 0 };
 app.get('/api/roster', (req, res) => {
-  res.json({
-    agents: AGENT_ROSTER,
-    skills: SKILL_REGISTRY,
-    agentCount: AGENT_ROSTER.length,
-    skillCount: SKILL_REGISTRY.length,
-  });
+  if (!rosterCache.json || Date.now() - rosterCache.at > 60000) {
+    rosterCache = { json: JSON.stringify({ agents: AGENT_ROSTER, skills: SKILL_REGISTRY, agentCount: AGENT_ROSTER.length, skillCount: SKILL_REGISTRY.length }), at: Date.now() };
+  }
+  res.setHeader('Cache-Control', 'public, max-age=30');
+  res.type('json').send(rosterCache.json);
 });
 
 // === FIRST-CLASS SKILLS (roadmap stage 13) ===
@@ -493,17 +523,24 @@ app.get('/api/roster', (req, res) => {
 // searchable), then invoke one — the invoke call resolves the owning agent and
 // plan so the UI can announce what will run, and returns a ready-to-send
 // query for the pipeline (the "/skill" command, no typing required).
+// Skills + tools catalogs are static after boot — memoized (stage 27).
+let skillsCache = { json: null, at: 0 };
 app.get('/api/skills', (req, res) => {
+  if (!skillsCache.json || Date.now() - skillsCache.at > 60000) {
+    const groups = {};
+    for (const s of SKILL_REGISTRY) { (groups[s.category || 'Other'] ||= []).push(s); }
+    const byCategory = Object.entries(groups)
+      .map(([category, items]) => ({ category, count: items.length, skills: items }))
+      .sort((a, b) => b.count - a.count || a.category.localeCompare(b.category));
+    skillsCache = { json: JSON.stringify({ skills: SKILL_REGISTRY, byCategory, total: SKILL_REGISTRY.length, catalogSize: SKILL_COUNT }), at: Date.now() };
+  }
+  res.setHeader('Cache-Control', 'public, max-age=30');
+  res.type('json').send(skillsCache.json);
+});
+
+app.get('/api/skills/search', (req, res) => {
   const q = String(req.query.q || '').toLowerCase();
-  const skills = q
-    ? SKILL_REGISTRY.filter((s) => `${s.name} ${s.desc} ${s.slug} ${s.category}`.toLowerCase().includes(q))
-    : SKILL_REGISTRY;
-  const groups = {};
-  for (const s of skills) { (groups[s.category || 'Other'] ||= []).push(s); }
-  const byCategory = Object.entries(groups)
-    .map(([category, items]) => ({ category, count: items.length, skills: items }))
-    .sort((a, b) => b.count - a.count || a.category.localeCompare(b.category));
-  res.json({ skills, byCategory, total: skills.length, catalogSize: SKILL_COUNT });
+  res.json({ results: q ? SKILL_REGISTRY.filter((s) => `${s.name} ${s.desc} ${s.slug} ${s.category}`.toLowerCase().includes(q)).slice(0, 30) : [] });
 });
 
 app.post('/api/skills/invoke', async (req, res) => {

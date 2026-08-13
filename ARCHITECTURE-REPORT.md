@@ -215,14 +215,14 @@ Rules: one command input per screen; conversation is a reusable workspace compon
 | 17 | Sandbox + folder-trust + risk classification | later |
 | 18 | Computer runtime abstraction (provider-independent) | later |
 | 19 | Browser agent improvements (screenshots, UI verification) | later |
-| 20 | MCP management UI + permission control | later |
+| 20 | MCP management UI + permission control | ✅ MCP status screen + allowlisted tools (read-only) |
 | 21 | Plugin system (install/enable/disable/update) | ✅ shipped to main (PluginRegistry: 6 built-in feature bundles contributing agents/skills/tools, runtime enable/disable persisted, contribution counts + unions; Plugins screen; /api/plugins) |
 | 22 | Hook engine (before/after tool/file/task, gates) | ✅ shipped to main (HookEngine: persisted lifecycle hooks with matchers, allow/deny/log actions, fail-open (only explicit deny blocks), wired into ToolRuntime PreToolUse/PostToolUse; /api/hooks CRUD) |
-| 23 | Automation (recurring workflows, notifications) | ✅ recurring missions — TaskScheduler fires TaskManager missions on an interval (pause/resume/run-now, persistence, no-stacking); notifications later |
-| 24 | Model routing per agent/skill + local inference | later |
+| 23 | Automation (recurring workflows, notifications) | ✅ recurring missions — TaskScheduler fires TaskManager missions on an interval (pause/resume/run-now, persistence, no-stacking); ✅ NotificationCenter — bell in TopNav, unread badge, mark-read/clear, scheduled-mission alerts |
+| 24 | Model routing per agent/skill + local inference | ✅ per-domain provider preference — INTENT_PREFERENCE map drives opts.prefer in the agent loop; Models screen shows routing + provider health; local inference later |
 | 25 | Cloud/runtime deployment | later |
 | 26 | Testing (unit + integration + live domain probes) | in progress |
-| 27 | Performance optimization | later |
+| 27 | Performance optimization | ✅ memoized static catalogs (/api/roster, /api/skills) + Cache-Control headers; more later |
 | 28 | Final UI polish | later |
 
 **No fabricated functionality.** Every stage ships only what actually works; unavailable features are marked as such in the UI.

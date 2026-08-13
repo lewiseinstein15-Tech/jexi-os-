@@ -23,6 +23,7 @@ import { executeTool, activeToolProfile, TOOL_PROFILES } from './ToolRuntime.js'
 import { generateContent } from './LLMClient.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { preferencesBlock } from './PreferenceLearner.js';
+import { providerPreferenceForIntent } from './ModelRouting.js';
 
 const MAX_ITERATIONS = 4;
 const MAX_TOOL_CALLS = 8;
@@ -105,6 +106,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   const team = plan.teamSlugs || [];
   const tools = (plan.tools || []).map((slug) => getTool(slug)).filter(Boolean).slice(0, 12);
   const profile = opts.profile || activeToolProfile();
+  const prefer = providerPreferenceForIntent(plan.intent); // stage 24: per-domain model routing
 
   emit('agent.plan', {
     query, intent: plan.intent,
@@ -128,7 +130,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
 
     let reply;
     try {
-      reply = await generateContent(prompt, JEXI_SYSTEM_PROMPT + preferencesBlock(), image || null, { temperature: 0.3 });
+      reply = await generateContent(prompt, JEXI_SYSTEM_PROMPT + preferencesBlock(), image || null, { temperature: 0.3, prefer });
     } catch (e) {
       emit('agent.log', { message: `⚠ Generation failed: ${(e && e.message) || e}. Finishing with what we have.` });
       finalText = String(reply || '');
@@ -183,7 +185,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         `The user asked: "${query}"\n\nHere is the real evidence gathered from tools:\n\n${evidence.slice(0, 14000)}\n\nWrite the final answer to the user based ONLY on this evidence, structured with headings, LaTeX for math, and code blocks for code. Do not invent facts not in the evidence.`,
         JEXI_SYSTEM_PROMPT + preferencesBlock(),
         image || null,
-        { temperature: 0.3 }
+        { temperature: 0.3, prefer }
       );
     } catch (e) {
       finalText = `Tool evidence collected (${toolContext.length} calls) but final synthesis failed: ${(e && e.message) || e}`;

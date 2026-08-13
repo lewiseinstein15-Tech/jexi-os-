@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { taskManager } from './TaskManager.js';
+import { notify } from './NotificationCenter.js';
 import { recordError } from './SelfMonitor.js';
 import { DATA_DIR } from '../config.js';
 
@@ -189,6 +190,14 @@ class TaskScheduler {
       taskManager.waitFor(task.id, 90_000)
         .then((t) => {
           if (s.lastTaskId === task.id && t) s.lastStatus = t.status;
+          try {
+            notify({
+              title: `Scheduled mission ${t?.status || 'finished'}`,
+              body: `"${String(s.query || '').slice(0, 90)}" → ${t?.status || 'done'}`,
+              kind: t?.status === 'failed' ? 'warn' : 'success',
+              link: '/tasks',
+            });
+          } catch (e) {}
           this._saveSoon();
         })
         .catch(() => {});

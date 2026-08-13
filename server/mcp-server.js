@@ -36,6 +36,9 @@ import { providerHealthSnapshot } from './src/services/ProviderRouter.js';
 
 export const MCP_PORT = Number(process.env.MCP_PORT) || 3457;
 
+/** The 5-tool allowlist exposed to MCP clients (used by /api/mcp/status). */
+export const MCP_TOOL_ALLOWLIST = ['ask_jexi', 'memory_lookup', 'knowledge_search', 'list_books', 'get_health'];
+
 /** Optional per-request MCP key (JEXI_MCP_KEY). When set, every MCP request
  *  must carry it as the Authorization: Bearer <key> header. */
 const MCP_KEY = process.env.JEXI_MCP_KEY || '';

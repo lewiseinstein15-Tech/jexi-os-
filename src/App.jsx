@@ -18,6 +18,8 @@ import SkillsScreen from './components/SkillsScreen';
 import WorkspaceScreen from './components/WorkspaceScreen';
 import TerminalScreen from './components/TerminalScreen';
 import PluginsScreen from './components/PluginsScreen';
+import ModelsScreen from './components/ModelsScreen';
+import McpScreen from './components/McpScreen';
 import PlaceholderPage from './components/PlaceholderPage';
 
 const isDesktopQuery = () =>
@@ -27,7 +29,6 @@ const isDesktopQuery = () =>
 
 const PLACEHOLDERS = {
   research: { title: 'RESEARCH', stage: 5, blurb: 'A dedicated research console. The research team already runs in the backend — try it now in the Command Center.' },
-  models: { title: 'MODELS', stage: 24, blurb: 'Per-agent model routing and local inference (llama.cpp / Ollama / vLLM / OpenAI-compatible).' },
 };
 
 export default function App() {
@@ -107,6 +108,18 @@ export default function App() {
         return (
           <div className="px-3 pt-4 pb-8 space-y-3 max-w-[900px] mx-auto">
             <PluginsScreen />
+          </div>
+        );
+      case 'models':
+        return (
+          <div className="px-3 pt-4 pb-8 space-y-3 max-w-[900px] mx-auto">
+            <ModelsScreen />
+          </div>
+        );
+      case 'mcp':
+        return (
+          <div className="px-3 pt-4 pb-8 space-y-3 max-w-[900px] mx-auto">
+            <McpScreen />
           </div>
         );
       case 'memory':
