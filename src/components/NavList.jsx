@@ -22,7 +22,7 @@ export const NAV_SECTIONS = [
   {
     label: 'INTELLIGENCE',
     items: [
-      { id: 'research', icon: Globe, label: 'Research', stage: 5 },
+      { id: 'research', icon: Globe, label: 'Research', page: true },
       { id: 'memory', icon: Database, label: 'Memory', page: true },
       { id: 'models', icon: Brain, label: 'Models', page: true },
       { id: 'skills', icon: Boxes, label: 'Skills', page: true },

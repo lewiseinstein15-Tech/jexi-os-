@@ -5,7 +5,7 @@ import { Send, Search, Code2, Sigma, Ruler, BarChart3, Workflow, ArrowRight, Loa
 // Semantic accent quick actions (spec §49) — small icon + name + description,
 // tinted via the CSS accent utilities, never dominating the screen.
 const QUICK_ACTIONS = [
-  { id: 'research', icon: Search, label: 'Research', desc: 'deep-dive any topic', accent: 'acc-research', tile: 'tile-research', query: 'Research the latest developments in this field and give me a sourced summary' },
+  { id: 'research', icon: Search, label: 'Research', desc: 'deep-dive any topic', accent: 'acc-research', tile: 'tile-research', query: 'Research the latest developments in open-source AI agents and give me a sourced summary' },
   { id: 'code', icon: Code2, label: 'Code', desc: 'build an app or fix a bug', accent: 'acc-code', tile: 'tile-code', query: 'Build me a complete web application' },
   { id: 'math', icon: Sigma, label: 'Mathematics', desc: 'solve with full LaTeX', accent: 'acc-math', tile: 'tile-math', query: 'Solve this step by step with full working: x² − 5x + 6 = 0' },
   { id: 'engineering', icon: Ruler, label: 'Engineering', desc: 'calculations with units', accent: 'acc-engineering', tile: 'tile-engineering', query: 'A 10 kg mass accelerates at 4 m/s² — find the force, with full working and verification' },

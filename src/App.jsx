@@ -20,6 +20,7 @@ import TerminalScreen from './components/TerminalScreen';
 import PluginsScreen from './components/PluginsScreen';
 import ModelsScreen from './components/ModelsScreen';
 import McpScreen from './components/McpScreen';
+import ResearchScreen from './components/ResearchScreen';
 import PlaceholderPage from './components/PlaceholderPage';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -28,9 +29,8 @@ const isDesktopQuery = () =>
     ? window.matchMedia('(min-width: 1024px)').matches
     : false;
 
-const PLACEHOLDERS = {
-  research: { title: 'RESEARCH', stage: 5, blurb: 'A dedicated research console. The research team already runs in the backend — try it now in the Command Center.' },
-};
+// Future roadmap surfaces land here; every current nav item now has a real page.
+const PLACEHOLDERS = {};
 
 export default function App() {
   const [activeNav, setActiveNav] = useState('home');
@@ -92,6 +92,13 @@ export default function App() {
               }}
             />
           </div>
+        );
+      case 'research':
+        return (
+          <ResearchScreen
+            engine={engine}
+            onResearch={(query) => engine.runSearch(query)}
+          />
         );
       case 'workspace':
         return (
