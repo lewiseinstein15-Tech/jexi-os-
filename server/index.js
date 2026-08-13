@@ -204,6 +204,36 @@ app.post('/api/desktop/coder/screenshot-json', async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Stage 19 — UI verification + persistent screenshots.
+app.post('/api/desktop/coder/snapshot', async (req, res) => {
+  try { res.json({ success: true, snapshot: await dm.snapshot('coder') }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/desktop/coder/verify', async (req, res) => {
+  try { res.json({ success: true, ...(await dm.verifyChange('coder', req.body && req.body.before)) }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/desktop/coder/save-screenshot', async (req, res) => {
+  try { res.json(await dm.saveScreenshot('coder')); }
+  catch (e) { res.status(500).json({ saved: false, error: e.message }); }
+});
+
+app.get('/api/desktop/screenshots', (req, res) => {
+  try { res.json({ screenshots: dm.listScreenshots('coder', Number(req.query.limit) || 12) }); }
+  catch (e) { res.status(500).json({ screenshots: [] }); }
+});
+
+// Serve saved screenshots (used by the Tasks/terminal detail views).
+app.get('/api/desktop/screenshots/:file', (req, res) => {
+  const safe = String(req.params.file).replace(/[^a-zA-Z0-9._-]/g, '');
+  const p = path.join(DATA_DIR, 'screenshots', safe);
+  if (!safe || !p.startsWith(path.join(DATA_DIR, 'screenshots'))) return res.status(400).json({ error: 'bad file' });
+  if (!fs.existsSync(p)) return res.status(404).json({ error: 'not found' });
+  res.sendFile(p);
+});
+
 app.get('/api/desktop/status', (req, res) => res.json({ ok: true, ...browserStatus() }));
 
 // Alias under /coder/ — ComputerUseAgent pings this path. Without it the agent

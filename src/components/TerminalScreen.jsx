@@ -28,6 +28,7 @@ export default function TerminalScreen() {
   const [status, setStatus] = useState(''); // '', loading, streaming
   const [toast, setToast] = useState('');
   const [runtime, setRuntime] = useState(null);
+  const [shots, setShots] = useState([]);
   const logRef = useRef(null);
   const abortRef = useRef(null);
 
@@ -41,6 +42,10 @@ export default function TerminalScreen() {
       const r = await jexiFetch(`${getBackendUrl()}/api/computer/status`);
       setRuntime(await r.json());
     } catch (e) { /* runtime status optional */ }
+    try {
+      const s = await jexiFetch(`${getBackendUrl()}/api/desktop/screenshots?limit=8`);
+      setShots((await s.json()).screenshots || []);
+    } catch (e) { /* screenshots optional */ }
   }, []);
 
   useEffect(() => {
@@ -137,6 +142,20 @@ export default function TerminalScreen() {
           <span className="text-[8px] text-text-tertiary font-mono">browser {runtime.capabilities?.browser ? '✓' : '✗'}</span>
           <span className="text-[8px] text-text-tertiary font-mono">screenshot {runtime.capabilities?.screenshot ? '✓' : '✗'}</span>
           <span className="ml-auto text-[7px] font-mono text-text-tertiary truncate max-w-[45%]">{runtime.endpoint}</span>
+        </div>
+      )}
+
+      {/* Browser eyes gallery (stage 19) */}
+      {shots.length > 0 && (
+        <div className="surface-card p-3">
+          <p className="eyebrow mb-1.5">BROWSER EYES · RECENT SCREENSHOTS</p>
+          <div className="grid grid-cols-4 gap-1.5">
+            {shots.map((s) => (
+              <a key={s.file} href={`${getBackendUrl()}/api/desktop/screenshots/${s.file}`} target="_blank" rel="noreferrer" className="relative rounded-md overflow-hidden border border-hairline group">
+                <img src={`${getBackendUrl()}/api/desktop/screenshots/${s.file}`} alt={s.file} className="w-full aspect-video object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy" />
+              </a>
+            ))}
+          </div>
         </div>
       )}
 

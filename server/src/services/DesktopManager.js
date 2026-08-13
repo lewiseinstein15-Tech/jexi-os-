@@ -3,7 +3,9 @@ import { promisify } from 'util';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
-import { WORKSPACE_DIR } from '../config.js';
+import { WORKSPACE_DIR, DATA_DIR } from '../config.js';
+
+const SCREENSHOTS_DIR = path.join(DATA_DIR, 'screenshots');
 
 const execAsync = promisify(exec);
 
@@ -214,6 +216,66 @@ export class DesktopManager {
     return screenshotWithHeal();
   }
 
+  /** Persist the current view as a JPEG in DATA_DIR/screenshots and return the file path. */
+  async saveScreenshot(agentId) {
+    const ready = await ensureBrowser();
+    if (!ready.ok) return { saved: false, error: ready.error };
+    try {
+      const shot = await screenshotWithHeal();
+      const b64 = String(shot).replace(/^data:image\/jpeg;base64,/, '');
+      fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
+      const name = `shot-${Date.now()}.jpg`;
+      fs.writeFileSync(path.join(SCREENSHOTS_DIR, name), Buffer.from(b64, 'base64'));
+      return { saved: true, file: name, path: path.join(SCREENSHOTS_DIR, name) };
+    } catch (e) {
+      return { saved: false, error: (e && e.message) || String(e) };
+    }
+  }
+
+  /** Saved screenshot gallery (newest first). */
+  listScreenshots(agentId, limit = 12) {
+    try {
+      if (!fs.existsSync(SCREENSHOTS_DIR)) return [];
+      return fs.readdirSync(SCREENSHOTS_DIR)
+        .filter((f) => /^shot-.*\.jpg$/.test(f))
+        .sort((a, b) => (a < b ? 1 : -1))
+        .slice(0, limit)
+        .map((f) => {
+          const st = fs.statSync(path.join(SCREENSHOTS_DIR, f));
+          return { file: f, size: st.size, at: st.mtimeMs };
+        });
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /**
+   * UI verification (stage 19): capture a lightweight page snapshot, then after
+   * an action, call verifyChange(before) to honestly report whether the page
+   * actually changed — URL, title, element count, or body text hash.
+   */
+  async snapshot(agentId) {
+    const ready = await ensureBrowser();
+    if (!ready.ok) throw new Error(ready.error);
+    const url = page.url();
+    const title = await page.title();
+    const elements = await this.interactiveMap(agentId);
+    const text = await page.evaluate(() => document.body ? document.body.innerText.slice(0, 4000) : '');
+    return {
+      url, title,
+      elementCount: elements.elements ? elements.elements.length : 0,
+      textHash: hashText(text),
+      textLength: text.length,
+      at: Date.now(),
+    };
+  }
+
+  /** Compare a before-snapshot to the current page. Pure, testable. */
+  async verifyChange(agentId, before) {
+    const after = await this.snapshot(agentId);
+    return diffSnapshots(before, after);
+  }
+
   async extractText(agentId) {
     return await this.pageText(agentId);
   }
@@ -385,4 +447,33 @@ export class DesktopManager {
     await new Promise(r => setTimeout(r, 1200));
     return { url: page.url() };
   }
+}
+
+/** Cheap deterministic hash of page text (used for change detection). */
+export function hashText(text) {
+  let h = 5381;
+  const s = String(text || '');
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+/**
+ * Pure snapshot diff — the heart of UI verification. Compares two page
+ * snapshots and reports WHICH signals changed (url / title / elements / text)
+ * and a verdict. `changed:false` means the action had no observable effect.
+ */
+export function diffSnapshots(before, after) {
+  const b = before || {};
+  const a = after || {};
+  const signals = [];
+  if (b.url !== a.url) signals.push('url');
+  if (b.title !== a.title) signals.push('title');
+  if (b.elementCount !== a.elementCount) signals.push('elements');
+  if (b.textHash !== a.textHash) signals.push('text');
+  return {
+    changed: signals.length > 0,
+    signals,
+    before: { url: b.url, title: b.title, elementCount: b.elementCount, textLength: b.textLength },
+    after: { url: a.url, title: a.title, elementCount: a.elementCount, textLength: a.textLength },
+  };
 }

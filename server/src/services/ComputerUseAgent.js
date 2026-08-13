@@ -175,9 +175,22 @@ export class ComputerUseAgent {
           switch (action.action) {
             case 'goto': {
               if (!desktopOk.ok) throw new Error('Browser unavailable');
+              let before = null;
+              try { before = await this.api('snapshot', {}); } catch { /* first nav — no before */ }
               const r = await this.api('goto', { url: action.url });
               sendEvent?.('log', { agent: 'Vision', message: `🌐 Opened: ${r.title || action.url}` });
               await new Promise(r2 => setTimeout(r2, 1200));
+              // Stage 19: verify the navigation actually happened.
+              if (before && before.snapshot) {
+                try {
+                  const v = await this.api('verify', { before: before.snapshot });
+                  if (v && v.changed === false) {
+                    sendEvent?.('log', { agent: 'Navigator', message: `⚠ Navigation verified: page unchanged (${r.title || 'same page'}) — continuing with what is on screen.` });
+                  } else if (v && v.signals?.length) {
+                    sendEvent?.('log', { agent: 'Navigator', message: `✓ Navigation verified: ${v.signals.join(', ')} changed` });
+                  }
+                } catch {}
+              }
               const { lines, count } = await this.currentElements();
               if (count > 0) {
                 stepOutput.text += `\n[SCREEN ELEMENTS]:\n${lines}\n`;
@@ -209,9 +222,22 @@ export class ComputerUseAgent {
                 sendEvent?.('log', { agent: 'Navigator', message: '✗ click_index needs an index number — re-read the page and use the [N] numbers' });
                 break;
               }
+              let before = null;
+              try { before = await this.api('snapshot', {}); } catch {}
               const r = await this.api('click-index', { index: action.index });
               sendEvent?.('log', { agent: 'Navigator', message: r.ok ? `✓ Clicked element [${action.index}]` : `✗ Element [${action.index}] not found` });
               await new Promise(r2 => setTimeout(r2, 1200));
+              // Stage 19: did the click actually change the page?
+              if (before && before.snapshot) {
+                try {
+                  const v = await this.api('verify', { before: before.snapshot });
+                  if (v && v.changed === false) {
+                    sendEvent?.('log', { agent: 'Navigator', message: `⚠ Click [${action.index}] had no observable effect — page unchanged. Re-read and pick a different element if that was unexpected.` });
+                  } else if (v && v.signals?.length) {
+                    sendEvent?.('log', { agent: 'Navigator', message: `✓ Click verified: ${v.signals.join(', ')} changed` });
+                  }
+                } catch {}
+              }
               break;
             }
             case 'type_index': {
