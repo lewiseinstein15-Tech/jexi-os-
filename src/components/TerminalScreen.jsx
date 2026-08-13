@@ -27,6 +27,7 @@ export default function TerminalScreen() {
   const [logs, setLogs] = useState('');
   const [status, setStatus] = useState(''); // '', loading, streaming
   const [toast, setToast] = useState('');
+  const [runtime, setRuntime] = useState(null);
   const logRef = useRef(null);
   const abortRef = useRef(null);
 
@@ -36,6 +37,10 @@ export default function TerminalScreen() {
       const data = await res.json();
       setProcs(data.processes || []);
     } catch (e) { /* backend down */ }
+    try {
+      const r = await jexiFetch(`${getBackendUrl()}/api/computer/status`);
+      setRuntime(await r.json());
+    } catch (e) { /* runtime status optional */ }
   }, []);
 
   useEffect(() => {
@@ -123,6 +128,17 @@ export default function TerminalScreen() {
         <h2 className="text-[10px] font-bold text-brand tracking-wider flex-1">TERMINAL · PROCESSES</h2>
         <button type="button" onClick={refresh} className="p-1.5 text-text-tertiary hover:text-brand"><RefreshCw className="w-3.5 h-3.5" /></button>
       </div>
+
+      {/* Computer runtime (stage 18) */}
+      {runtime && (
+        <div className="surface-card px-3 py-2 flex items-center gap-2 flex-wrap">
+          <span className={`text-[8px] font-black tracking-wider ${runtime.capabilities?.browser ? 'text-brand' : 'text-acc-automation'}`}>RUNTIME · {String(runtime.provider || 'auto').toUpperCase()}</span>
+          <span className="text-[8px] text-text-tertiary font-mono">terminal {runtime.capabilities?.terminal ? '✓' : '✗'}</span>
+          <span className="text-[8px] text-text-tertiary font-mono">browser {runtime.capabilities?.browser ? '✓' : '✗'}</span>
+          <span className="text-[8px] text-text-tertiary font-mono">screenshot {runtime.capabilities?.screenshot ? '✓' : '✗'}</span>
+          <span className="ml-auto text-[7px] font-mono text-text-tertiary truncate max-w-[45%]">{runtime.endpoint}</span>
+        </div>
+      )}
 
       {/* Run command */}
       <form onSubmit={run} className="surface-float flex gap-2 items-center rounded-xl p-1.5 pl-3 focus-within:border-brand-line focus-within:shadow-[0_0_0_3px_var(--brand-dim)]">

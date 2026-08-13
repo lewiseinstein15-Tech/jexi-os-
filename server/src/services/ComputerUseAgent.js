@@ -9,6 +9,7 @@ import { WORKSPACE_DIR, MANAGER_URL, MAX_DEBUG_ATTEMPTS } from '../config.js';
 import { extractContent } from './Extractor.js';
 import { aggregateSearch } from './SearchEngine.js';
 import { saveInternetKnowledge, saveCodingKnowledge } from './MemoryManager.js';
+import { runtimeCall, activeProvider } from './ComputerRuntime.js';
 
 const VIRTUAL_API = process.env.VIRTUAL_API || MANAGER_URL;
 const MAX_ATTEMPTS = Number(process.env.COMPUTER_USE_MAX_ATTEMPTS) || MAX_DEBUG_ATTEMPTS;
@@ -366,15 +367,18 @@ export class ComputerUseAgent {
   }
 
   async api(endpoint, payload) {
-    const res = await fetch(`${VIRTUAL_API}/api/desktop/coder/${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json().catch(() => ({}));
+    // Stage 18: dispatch through the provider-independent runtime layer.
+    // remote (VIRTUAL_API) behaves exactly like the old direct call.
+    const data = await runtimeCall(endpoint, payload);
+    if (data.unavailable) throw new Error(data.reason || 'runtime unavailable');
     if (endpoint === 'page-text') return data.text || '';
     if (endpoint === 'click-text') return data.success;
     return data;
+  }
+
+  /** Which runtime provider this agent is executing on. */
+  provider() {
+    return activeProvider();
   }
 
   async serverSideRead(task, sendEvent, intent) {

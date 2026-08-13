@@ -38,6 +38,7 @@ import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNot
 import { modelRoutingTable, providerPreferenceForIntent } from './src/services/ModelRouting.js';
 import { MCP_PORT, MCP_TOOL_ALLOWLIST } from './mcp-server.js';
 import { trustStatus, setTrustMode, allowPattern, denyPattern, removeDecision, clearTrust, trustFolder } from './src/services/RiskGuard.js';
+import { computerStatus, runtimeCall } from './src/services/ComputerRuntime.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
 import { mountMcp } from './mcp-server.js';
 import { taskManager } from './src/services/TaskManager.js';
@@ -449,6 +450,19 @@ app.post('/api/trust/deny', (req, res) => res.json(denyPattern(req.body || {})))
 app.post('/api/trust/folder', (req, res) => res.json(trustFolder(req.body && req.body.folder)));
 app.delete('/api/trust/decision/:id', (req, res) => res.json(removeDecision(req.params.id)));
 app.post('/api/trust/clear', (req, res) => res.json(clearTrust()));
+
+// === COMPUTER RUNTIME (roadmap stage 18) ===
+// Provider-independent computer layer: local / remote (in-process or VIRTUAL_API) / docker / mock.
+app.get('/api/computer/status', (req, res) => res.json(computerStatus()));
+app.post('/api/computer/call', async (req, res) => {
+  try {
+    const { endpoint, payload, provider } = req.body || {};
+    if (!endpoint) return res.status(400).json({ error: 'endpoint required' });
+    res.json(await runtimeCall(String(endpoint), payload || {}, provider));
+  } catch (e) {
+    res.status(500).json({ error: (e && e.message) || String(e) });
+  }
+});
 
 // === MCP MANAGEMENT (roadmap stage 20) ===
 app.get('/api/mcp/status', (req, res) => {
