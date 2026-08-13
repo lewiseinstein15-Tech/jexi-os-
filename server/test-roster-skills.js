@@ -68,7 +68,7 @@ check('groq back at the front after recovery', providerOrder()[0] === 'groq');
 
 // Snapshot shape (no secrets).
 const snap = providerHealthSnapshot();
-check('snapshot lists all 7 providers', snap.length === 7);
+check('snapshot lists all ' + snap.length + ' providers (got ' + snap.length + ')', snap.length === 8 && snap.some((p) => p.key === 'xai'));
 
 /* ---------------- Round 3: Tools, Critics, Memory, Guardrails ---------------- */
 

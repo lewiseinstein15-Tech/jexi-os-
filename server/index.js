@@ -272,6 +272,7 @@ app.get('/api/settings/status', (req, res) => {
     cerebras: statusOf(['CEREBRAS_API_KEY'], 'cerebrasKey'),
     deepinfra: statusOf(['DEEPINFRA_API_KEY'], 'deepinfraKey'),
     mistral: statusOf(['MISTRAL_API_KEY'], 'mistralKey'),
+    xai: statusOf(['XAI_API_KEY'], 'xaiKey'),
     github: statusOf(['GITHUB_TOKEN', 'GH_TOKEN'], 'githubToken'),
   });
 });

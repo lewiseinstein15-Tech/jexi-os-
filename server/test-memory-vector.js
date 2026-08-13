@@ -64,6 +64,9 @@ const found = await searchInternetKnowledge('quantum computing');
 ok(found && typeof found.answer === 'string' && found.answer.includes('qubit'), 'searchInternetKnowledge returns the entry object');
 const fresh = await searchFreshInternetKnowledge('quantum computing', 60 * 60 * 1000);
 ok(fresh && typeof fresh === 'object' && typeof fresh.answer === 'string', 'searchFreshInternetKnowledge returns an entry OBJECT (not an array)');
+// The stale check needs the save to be visibly older than the 1ms window — the
+// whole save+search sequence can otherwise complete inside one millisecond.
+await new Promise((r) => setTimeout(r, 10));
 const stale = await searchFreshInternetKnowledge('quantum computing', 1); // 1ms — too old
 ok(stale === null, 'searchFreshInternetKnowledge respects maxAgeMs');
 const miss = await searchInternetKnowledge('making pizza from scratch');

@@ -18,6 +18,7 @@ export function resolveKeys() {
     cerebrasKey: process.env.CEREBRAS_API_KEY || settings.cerebrasKey || '',
     deepinfraKey: process.env.DEEPINFRA_API_KEY || settings.deepinfraKey || '',
     mistralKey: process.env.MISTRAL_API_KEY || settings.mistralKey || '',
+    xaiKey: process.env.XAI_API_KEY || settings.xaiKey || '',
   };
 }
 
@@ -52,6 +53,11 @@ const HF_TEXT_MODELS = ['microsoft/phi-4', 'HuggingFaceH4/zephyr-7b-beta', 'mist
 const CEREBRAS_MODELS = ['gpt-oss-120b', 'gemma-4-31b']; // free tier, no card
 const DEEPINFRA_MODELS = ['meta-llama/Meta-Llama-3.1-8B-Instruct', 'meta-llama/Meta-Llama-3.3-70B-Instruct-Turbo'];
 const MISTRAL_MODELS = ['open-mistral-7b', 'open-mixtral-8x7b']; // Experiment free tier
+
+// Grok (xAI) — OpenAI-compatible at https://api.x.ai/v1. Current flagship
+// grok-4.6 (verified against docs.x.ai/developers/models, Aug 2026); aliases
+// like grok-4 auto-migrate, and grok-3 stays as a fallback for older keys.
+const XAI_MODELS = ['grok-4.6', 'grok-4', 'grok-3'];
 
 const TIMEOUT_MS = 90000;
 
@@ -311,6 +317,8 @@ const tryDeepInfra = (p, s, img, o, e) =>
   tryOpenAICompat({ key: resolveKeys().deepinfraKey, baseUrl: 'https://api.deepinfra.com/v1/openai', models: DEEPINFRA_MODELS, label: 'DeepInfra', providerKey: 'deepinfra' }, p, s, img, o, e);
 const tryMistral = (p, s, img, o, e) =>
   tryOpenAICompat({ key: resolveKeys().mistralKey, baseUrl: 'https://api.mistral.ai/v1', models: MISTRAL_MODELS, label: 'Mistral', providerKey: 'mistral' }, p, s, img, o, e);
+const tryXai = (p, s, img, o, e) =>
+  tryOpenAICompat({ key: resolveKeys().xaiKey, baseUrl: 'https://api.x.ai/v1', models: XAI_MODELS, label: 'Grok', providerKey: 'xai' }, p, s, img, o, e);
 
 const PROVIDER_CALLS = {
   groq: tryGroq,
@@ -320,6 +328,7 @@ const PROVIDER_CALLS = {
   cerebras: tryCerebras,
   deepinfra: tryDeepInfra,
   mistral: tryMistral,
+  xai: tryXai,
 };
 
 /**
@@ -354,7 +363,7 @@ export async function generateContent(prompt, systemInstruction = '', imageBase6
   if (keys.length > 0) {
     throw new Error(`All AI providers failed. ${errors.join(' | ')}`);
   }
-  throw new Error('No API keys configured. Add a key in Settings (Groq, Gemini, OpenRouter, Cerebras, DeepInfra, Mistral or HuggingFace), or set the matching env var in Render.');
+  throw new Error('No API keys configured. Add a key in Settings (Groq, Gemini, OpenRouter, Cerebras, DeepInfra, Mistral, Grok or HuggingFace), or set the matching env var in Render.');
 }
 
 /** Ask the LLM a yes/no or one-word verification question. */

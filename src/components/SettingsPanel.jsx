@@ -51,6 +51,7 @@ export default function SettingsPanel() {
   const [cerebrasKey, setCerebrasKey] = useState('');
   const [deepinfraKey, setDeepinfraKey] = useState('');
   const [mistralKey, setMistralKey] = useState('');
+  const [xaiKey, setXaiKey] = useState('');
   const [githubToken, setGithubToken] = useState('');
   const [keyStatus, setKeyStatus] = useState(null); // { groq, gemini, github }
   const [status, setStatus] = useState('idle'); // idle, loading, saved, error
@@ -77,6 +78,7 @@ export default function SettingsPanel() {
         setCerebrasKey(data.cerebrasKey || '');
         setDeepinfraKey(data.deepinfraKey || '');
         setMistralKey(data.mistralKey || '');
+        setXaiKey(data.xaiKey || '');
         setGithubToken(data.githubToken || '');
         try { setKeyStatus(await statusRes.json()); } catch (e) { /* status endpoint optional */ }
       } catch (e) {
@@ -107,6 +109,7 @@ export default function SettingsPanel() {
       if (!keyStatus?.cerebras?.configured) body.cerebrasKey = cerebrasKey;
       if (!keyStatus?.deepinfra?.configured) body.deepinfraKey = deepinfraKey;
       if (!keyStatus?.mistral?.configured) body.mistralKey = mistralKey;
+      if (!keyStatus?.xai?.configured) body.xaiKey = xaiKey;
       if (!keyStatus?.github?.configured) body.githubToken = githubToken;
       const res = await jexiFetch(`${backendUrl}/api/settings`, {
         method: 'POST',
@@ -213,6 +216,18 @@ export default function SettingsPanel() {
             hint="Free Experiment tier for open models. Set MISTRAL_API_KEY in Render and it's automatic."
             status={keyStatus?.mistral}
             envNames={['MISTRAL_API_KEY']}
+          />
+
+          {/* Grok (xAI) — frontier models (grok-4.6) */}
+          <KeyField
+            label="GROK KEY (XAI FRONTIER MODELS)"
+            icon={<Sparkles className="w-3 h-3 text-brand" />}
+            value={xaiKey}
+            onChange={(e) => setXaiKey(e.target.value)}
+            placeholder="Get key at console.x.ai — api.x.ai/v1"
+            hint="grok-4.6 flagship, OpenAI-compatible. Set XAI_API_KEY in Render and it's automatic."
+            status={keyStatus?.xai}
+            envNames={['XAI_API_KEY']}
           />
 
           {/* GitHub Token — powers the GitHub Agent (commit, push, PR, issues) */}
