@@ -19,7 +19,7 @@ import { providerHealthSnapshot } from './src/services/ProviderRouter.js';
 import { AGENT_ROSTER, SKILL_REGISTRY, ROSTER_COUNT, SKILL_COUNT } from './src/services/AgentRoster.js';
 import { DesktopManager, ensureBrowser, browserStatus, restartBrowser } from './src/services/DesktopManager.js';
 import {
-  addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory,
+  addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory, saveMemory,
   saveInternetKnowledge, saveCodingKnowledge, searchInternetKnowledge, searchCodingKnowledge,
   saveKnowledgeFile, searchKnowledge, getKnowledgeStructure, getKnowledgeStatus,
   hydrateFromRedis, isRedisActive, semanticRecall, backfillEmbeddings,
@@ -382,6 +382,31 @@ app.post('/api/skills/invoke', async (req, res) => {
 app.get('/api/memory', (req, res) => res.json(loadMemory()));
 app.post('/api/memory/clear', (req, res) => { clearMemory(); res.json({ success: true }); });
 app.post('/api/memory/user', (req, res) => { updateUserProfile(req.body); res.json({ success: true }); });
+
+// Stage 15: exportable + editable memory surfaces.
+// Export the whole memory core as a downloadable JSON file.
+app.get('/api/memory/export', (req, res) => {
+  const mem = loadMemory();
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', `attachment; filename="jexi-memory-${stamp}.json"`);
+  res.send(JSON.stringify(mem, null, 2));
+});
+
+// Delete ONE memory entry: { kind, index } — kind must be a known array field.
+const MEMORY_ARRAY_KINDS = ['userFacts', 'chatHistory', 'internetKnowledge', 'codingKnowledge', 'learnedAnswers', 'bookLibrary', 'episodes'];
+app.post('/api/memory/delete', (req, res) => {
+  const { kind, index } = req.body || {};
+  if (!MEMORY_ARRAY_KINDS.includes(kind)) return res.status(400).json({ success: false, error: `Unknown memory kind: ${kind}` });
+  const mem = loadMemory();
+  const list = mem[kind];
+  if (!Array.isArray(list) || index < 0 || index >= list.length) {
+    return res.status(400).json({ success: false, error: `Invalid index ${index} for ${kind}` });
+  }
+  const removed = list.splice(index, 1)[0];
+  saveMemory();
+  res.json({ success: true, kind, index, removed: String((removed && (removed.fact || removed.topic || removed.question || removed.text)) || '').slice(0, 80) });
+});
 
 // Semantic memory search — hybrid vector + keyword recall across everything
 // JEXI remembers (TencentDB-Agent-Memory pattern). Requires ?q= (min 3 chars).

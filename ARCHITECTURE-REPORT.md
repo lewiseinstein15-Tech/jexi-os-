@@ -210,7 +210,7 @@ Rules: one command input per screen; conversation is a reusable workspace compon
 | 12 | Orchestrator v2 (tool-calling loop, gated stop, retry policy) | ✅ shipped to main (AgentLoop: plan → generate → fenced-json tool calls → ToolRuntime → results fed back → final answer; /api/agent NDJSON stream) |
 | 13 | First-class skills (auto-invoke, `/commands`, tiers) | ✅ shipped to main (Skills screen: searchable 495-skill registry by live category, detail sheet, one-click invoke that resolves the plan and runs it in the Command Center; /api/skills + /api/skills/invoke) |
 | 14 | Subagent runtime (spawn, parallel, cancel, aggregate) | later |
-| 15 | Memory surfaces (searchable, editable, exportable) | later |
+| 15 | Memory surfaces (searchable, editable, exportable) | ✅ shipped to main (Memory panel: semantic search across all memories, per-entry delete, JSON export via /api/memory/export + /api/memory/delete) |
 | 16 | Verification engine per domain (math/eng/code/research) | later |
 | 17 | Sandbox + folder-trust + risk classification | later |
 | 18 | Computer runtime abstraction (provider-independent) | later |
