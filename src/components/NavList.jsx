@@ -15,8 +15,7 @@ export const NAV_SECTIONS = [
     label: 'SYSTEM',
     items: [
       { id: 'tasks', icon: ListTodo, label: 'Tasks', page: true },
-      { id: 'workspace', icon: FolderOpen, label: 'Workspace', stage: 10 },
-      { id: 'files', icon: FileText, label: 'Files', stage: 10 },
+      { id: 'workspace', icon: FolderOpen, label: 'Workspace', page: true },
       { id: 'terminal', icon: Terminal, label: 'Terminal', stage: 11 },
     ],
   },

@@ -28,6 +28,7 @@ import {
 import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
 import { getToolCatalog, TOOL_PROFILES, activeToolProfile, setToolProfile, executeTool } from './src/services/ToolRuntime.js';
 import { runAgentLoop } from './src/services/AgentLoop.js';
+import { listWorkspace, readWorkspace, writeWorkspace, createCheckpoint, listCheckpoints, diffCheckpoint, rollbackCheckpoint } from './src/services/WorkspaceRuntime.js';
 import { verifyDomainAnswer, detectDomain, deterministicChecks } from './src/services/DomainVerifier.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
 import { mountMcp } from './mcp-server.js';
@@ -334,6 +335,41 @@ app.post('/api/agent', async (req, res) => {
     }
     finish();
   }
+});
+
+// === WORKSPACE RUNTIME (roadmap stage 10 — checkpoints, diffs, rollback) ===
+app.get('/api/workspace', (req, res) => {
+  res.json({ files: listWorkspace(1000), checkpoints: listCheckpoints() });
+});
+
+app.get('/api/workspace/file', (req, res) => {
+  try { res.json({ success: true, name: req.query.name, content: readWorkspace(req.query.name) }); }
+  catch (e) { res.status(404).json({ success: false, error: (e && e.message) || String(e) }); }
+});
+
+app.put('/api/workspace/file', (req, res) => {
+  try {
+    const { name, content } = req.body || {};
+    if (!name) return res.status(400).json({ success: false, error: 'No file name' });
+    res.json({ success: true, ...writeWorkspace(name, content) });
+  } catch (e) { res.status(400).json({ success: false, error: (e && e.message) || String(e) }); }
+});
+
+app.post('/api/workspace/checkpoint', (req, res) => {
+  res.json({ success: true, ...createCheckpoint((req.body || {}).label) });
+});
+
+app.get('/api/workspace/diff', (req, res) => {
+  try { res.json({ success: true, id: req.query.id, diffs: diffCheckpoint(req.query.id) }); }
+  catch (e) { res.status(404).json({ success: false, error: (e && e.message) || String(e) }); }
+});
+
+app.post('/api/workspace/rollback', (req, res) => {
+  try {
+    const { id, file } = req.body || {};
+    if (!id) return res.status(400).json({ success: false, error: 'No checkpoint id' });
+    res.json({ success: true, ...rollbackCheckpoint(id, file || null) });
+  } catch (e) { res.status(400).json({ success: false, error: (e && e.message) || String(e) }); }
 });
 
 // === DOMAIN VERIFICATION (roadmap stage 16) ===

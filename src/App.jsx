@@ -15,6 +15,7 @@ import DownloadPanel from './components/DownloadPanel';
 import UpdateBanner from './components/UpdateBanner';
 import TasksScreen from './components/TasksScreen';
 import SkillsScreen from './components/SkillsScreen';
+import WorkspaceScreen from './components/WorkspaceScreen';
 import PlaceholderPage from './components/PlaceholderPage';
 
 const isDesktopQuery = () =>
@@ -23,8 +24,6 @@ const isDesktopQuery = () =>
     : false;
 
 const PLACEHOLDERS = {
-  workspace: { title: 'WORKSPACE', stage: 10, blurb: 'Projects, files, git checkpoints, diffs and rollback — every AI modification traceable.' },
-  files: { title: 'FILES', stage: 10, blurb: 'Browse and manage the JEXI workspace filesystem. Lands with the Workspace runtime.' },
   terminal: { title: 'TERMINAL', stage: 11, blurb: 'A persistent, observable terminal — shell commands, background processes, stdout/stderr, exit codes.' },
   research: { title: 'RESEARCH', stage: 5, blurb: 'A dedicated research console. The research team already runs in the backend — try it now in the Command Center.' },
   models: { title: 'MODELS', stage: 24, blurb: 'Per-agent model routing and local inference (llama.cpp / Ollama / vLLM / OpenAI-compatible).' },
@@ -90,6 +89,12 @@ export default function App() {
                 navigate('home');
               }}
             />
+          </div>
+        );
+      case 'workspace':
+        return (
+          <div className="px-3 pt-4 pb-8 space-y-3 max-w-[900px] mx-auto">
+            <WorkspaceScreen />
           </div>
         );
       case 'memory':

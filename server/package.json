@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "test": "node test-planner-routing.js && node test-new-agents.js && node test-books.js && node test-preview.js && node test-pdf.js && node test-perf.js && node test-llm-models.js && node test-planner-orchestrator.js && node test-chat-books.js && node test-trusted-library.js && node test-memory-preferences.js && node test-memory-vector.js && node test-context-resolution.js && node test-mcp.js && node test-roster-skills.js && node test-video-analyzer.js && node test-tasks.js && node test-scheduler.js && node test-tools.js && node test-domain-verify.js"
+    "test": "node test-planner-routing.js && node test-new-agents.js && node test-books.js && node test-preview.js && node test-pdf.js && node test-perf.js && node test-llm-models.js && node test-planner-orchestrator.js && node test-chat-books.js && node test-trusted-library.js && node test-memory-preferences.js && node test-memory-vector.js && node test-context-resolution.js && node test-mcp.js && node test-roster-skills.js && node test-video-analyzer.js && node test-tasks.js && node test-scheduler.js && node test-tools.js && node test-domain-verify.js && node test-workspace.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
