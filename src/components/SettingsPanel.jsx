@@ -62,15 +62,24 @@ export default function SettingsPanel() {
   const [backendInput, setBackendInput] = useState(getBackendUrl());
   const [backendStatus, setBackendStatus] = useState('idle'); // idle, saved, error
   const [trust, setTrust] = useState(null);
+  const [tiers, setTiers] = useState(null); // B55 OpenWorker risk tiers: { tools, counts }
+
+  const TIER_DEFS = [
+    ['read', 'READ', 'Search & lookup — no side effects, always autonomous, never asks', 'text-[#34D399] border-[#34D399]/30 bg-[#34D399]/10'],
+    ['write_local', 'WRITE LOCAL', 'Drafts / edits / saves your own data — always autonomous', 'text-[#34D399] border-[#34D399]/30 bg-[#34D399]/10'],
+    ['exec', 'EXEC', 'Runs code & commands — autonomous by default, logged, reversible only', 'text-status-warn border-[#FBBF24]/30 bg-[#FBBF24]/10'],
+    ['external', 'EXTERNAL', 'Spends money / sends / irreversible — ALWAYS asks you once with real finalized details', 'text-status-error border-[#f87171]/40 bg-[#f87171]/10'],
+  ];
 
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         const base = getBackendUrl();
-        const [res, statusRes, trustRes] = await Promise.all([
+        const [res, statusRes, trustRes, toolsRes] = await Promise.all([
           jexiFetch(`${base}/api/settings`),
           jexiFetch(`${base}/api/settings/status`),
           jexiFetch(`${base}/api/trust`).catch(() => null),
+          jexiFetch(`${base}/api/tools`).catch(() => null),
         ]);
         const data = await res.json();
         setGeminiKey(data.geminiKey || '');
@@ -84,6 +93,21 @@ export default function SettingsPanel() {
         setGithubToken(data.githubToken || '');
         try { setKeyStatus(await statusRes.json()); } catch (e) { /* status endpoint optional */ }
         try { if (trustRes) setTrust(await trustRes.json()); } catch (e) { /* trust endpoint optional */ }
+        try {
+          if (toolsRes) {
+            const toolsData = await toolsRes.json();
+            const tools = toolsData.tools || [];
+            setTiers({
+              tools,
+              counts: {
+                read: tools.filter((t) => t.tier === 'read').length,
+                write_local: tools.filter((t) => t.tier === 'write_local').length,
+                exec: tools.filter((t) => t.tier === 'exec').length,
+                external: tools.filter((t) => t.tier === 'external').length,
+              },
+            });
+          }
+        } catch (e) { /* tools endpoint optional */ }
       } catch (e) {
         console.error("Failed to fetch settings", e);
       }
@@ -338,6 +362,22 @@ export default function SettingsPanel() {
       <div className="surface-card p-4">
         <PanelHeader icon={Shield} title="SECURITY · RISK GUARD" color="text-brand" />
         <p className="text-[8px] text-text-tertiary mb-3">Every tool call is classified by its actual arguments — destructive commands, path escapes and secret exfiltration are blocked before they run. Decisions persist on the server (DATA_DIR/trust.json).</p>
+
+        {/* B55 OpenWorker risk tiers — what runs autonomously vs. what asks first */}
+        {tiers && (
+          <div className="mb-3 rounded-md bg-surface-1 border border-hairline p-2.5">
+            <p className="text-[8px] font-black text-text-secondary tracking-wider mb-1.5">RISK TIERS — WHAT JEXI RUNS ON ITS OWN ({tiers.tools.length} TOOLS)</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {TIER_DEFS.map(([key, label, hint, color]) => (
+                <div key={key} className={`rounded-md border px-2 py-1.5 ${color}`}>
+                  <p className="text-[8px] font-black tracking-wider">{label} · {tiers.counts[key] || 0}</p>
+                  <p className="text-[7px] text-text-tertiary mt-0.5 leading-snug">{hint}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-[7px] text-text-tertiary mt-1.5">EXTERNAL actions always pause for ONE explicit approval showing the real finalized details — never a placeholder, never auto-run.</p>
+          </div>
+        )}
 
         {trust ? (
           <div className="space-y-3">
