@@ -27,6 +27,8 @@ import {
   resolveConversationalQuery,
 } from './src/services/MemoryManager.js';
 import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
+import { skillFolder, SKILL_META } from './src/services/SkillChain.js'; // B50 P1 — progressive skill folders
+import { knowledgeStatus, loadProjectKnowledge, knowledgeLoad } from './src/services/KnowledgeBase.js'; // B50 P2 — project knowledge
 import { getToolCatalog, TOOL_PROFILES, activeToolProfile, setToolProfile, executeTool } from './src/services/ToolRuntime.js';
 import { runAgentLoop } from './src/services/AgentLoop.js';
 import { listWorkspace, readWorkspace, writeWorkspace, createCheckpoint, listCheckpoints, diffCheckpoint, rollbackCheckpoint } from './src/services/WorkspaceRuntime.js';
@@ -621,10 +623,28 @@ app.get('/api/skills', (req, res) => {
     const byCategory = Object.entries(groups)
       .map(([category, items]) => ({ category, count: items.length, skills: items }))
       .sort((a, b) => b.count - a.count || a.category.localeCompare(b.category));
-    skillsCache = { json: JSON.stringify({ skills: SKILL_REGISTRY, byCategory, total: SKILL_REGISTRY.length, catalogSize: SKILL_COUNT }), at: Date.now() };
+    // B50 P1 — progressive-disclosure pipeline skills (folders with SKILL.md +
+    // reference.md; planning sees name+description only, body loads on execution).
+    const progressiveSlugs = Object.keys(SKILL_META).filter((slug) => !!skillFolder(slug));
+    skillsCache = { json: JSON.stringify({ skills: SKILL_REGISTRY, byCategory, total: SKILL_REGISTRY.length, catalogSize: SKILL_COUNT, progressiveSlugs }), at: Date.now() };
   }
   res.setHeader('Cache-Control', 'public, max-age=30');
   res.type('json').send(skillsCache.json);
+});
+
+// === B50 P2 — PROJECT KNOWLEDGE (always-on JEXI.md + progressive folders) ===
+app.get('/api/knowledge/project', (req, res) => {
+  const status = knowledgeStatus();
+  const alwaysOn = loadProjectKnowledge();
+  const categories = (status.categories || []).map((c) => {
+    const loaded = knowledgeLoad(c);
+    const head = String(loaded?.md || '').split('\n').find((l) => /^#/.test(l)) || '';
+    return { name: c, head: head.replace(/^#+\s*/, '').slice(0, 90), chars: (loaded?.md || '').length };
+  });
+  res.json({
+    alwaysOn: { chars: status.alwaysOn, head: String(alwaysOn).split('\n').find((l) => /^#/.test(l)) || 'Project Knowledge', preview: String(alwaysOn).slice(0, 400) },
+    categories,
+  });
 });
 
 app.get('/api/skills/search', (req, res) => {

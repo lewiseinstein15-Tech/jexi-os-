@@ -93,6 +93,19 @@ export default function SkillsScreen({ onUseSkill }) {
         </div>
       </div>
 
+      {/* B50 P1 — progressive-disclosure pipeline skills */}
+      {data?.progressiveSlugs?.length > 0 && (
+        <div className="rounded-lg border border-brand-line/50 bg-brand-dim/40 px-3 py-2">
+          <div className="flex items-center gap-1.5">
+            <Zap className="w-3 h-3 text-brand" />
+            <p className="text-[9px] font-bold tracking-[0.14em] text-brand">PROGRESSIVE SKILLS · {data.progressiveSlugs.length}</p>
+          </div>
+          <p className="text-[9px] text-text-secondary leading-snug mt-0.5">
+            The pipeline skills ({data.progressiveSlugs.join(' · ')}) are disclosure folders — the planner sees only the description; full instructions + reference load when the skill actually runs.
+          </p>
+        </div>
+      )}
+
       {/* Category chips — live from the registry */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
         <Chip active={cat === ''} onClick={() => setCat('')}>ALL · {data?.catalogSize || 0}</Chip>
@@ -133,7 +146,12 @@ export default function SkillsScreen({ onUseSkill }) {
                   {s.name[0]}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[12px] font-semibold text-text-primary truncate">{s.name}</p>
+                  <p className="text-[12px] font-semibold text-text-primary truncate flex items-center gap-1.5">
+                    {s.name}
+                    {data?.progressiveSlugs?.includes(s.slug) && (
+                      <span className="text-[7px] font-bold text-brand bg-brand-dim border border-brand-line rounded-full px-1.5 py-0.5">PROGRESSIVE</span>
+                    )}
+                  </p>
                   <p className="text-[10px] text-text-tertiary leading-snug line-clamp-1">{s.desc}</p>
                 </div>
                 {s.agent && (
@@ -175,8 +193,18 @@ export default function SkillsScreen({ onUseSkill }) {
                   {selected.name[0]}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-[15px] font-semibold text-text-primary">{selected.name}</h3>
+                  <h3 className="text-[15px] font-semibold text-text-primary flex items-center gap-2">
+                    {selected.name}
+                    {data?.progressiveSlugs?.includes(selected.slug) && (
+                      <span className="text-[7px] font-bold text-brand bg-brand-dim border border-brand-line rounded-full px-1.5 py-0.5">PROGRESSIVE</span>
+                    )}
+                  </h3>
                   <p className="text-[11px] text-text-secondary mt-0.5 leading-snug">{selected.desc}</p>
+                  {data?.progressiveSlugs?.includes(selected.slug) && (
+                    <p className="mt-1 text-[9px] text-brand/80 leading-snug">
+                      📂 Disclosure folder — short description at planning time; full instructions + reference.md load on execution.
+                    </p>
+                  )}
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     <span className="bg-surface-2 border border-hairline text-text-secondary rounded-full px-2 py-0.5 text-[8px] font-bold tracking-wider">
                       {selected.category.toUpperCase()}

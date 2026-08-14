@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { BookOpen, Folder, Brain, RefreshCw, CheckCircle2, Circle, Upload, Link2, Trash2, FileText, Loader2, AlertTriangle } from 'lucide-react';
+import { BookOpen, Folder, Brain, RefreshCw, CheckCircle2, Circle, Upload, Link2, Trash2, FileText, Loader2, AlertTriangle, Database, Layers } from 'lucide-react';
 import { getBackendUrl, jexiFetch } from '../utils/helpers';
 import PanelHeader from './PanelHeader';
 
@@ -9,6 +9,7 @@ export default function KnowledgePanel() {
   const [structure, setStructure] = useState(null);
   const [status, setStatus] = useState(null);
   const [books, setBooks] = useState([]);
+  const [project, setProject] = useState(null); // B50 P2 — project knowledge (JEXI.md + progressive folders)
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null); // { type: 'ok' | 'err', text }
@@ -19,14 +20,16 @@ export default function KnowledgePanel() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [structRes, statusRes, booksRes] = await Promise.all([
+      const [structRes, statusRes, booksRes, projectRes] = await Promise.all([
         jexiFetch(`${backendUrl}/api/knowledge/structure`),
         jexiFetch(`${backendUrl}/api/knowledge/status`),
-        jexiFetch(`${backendUrl}/api/knowledge/books`)
+        jexiFetch(`${backendUrl}/api/knowledge/books`),
+        jexiFetch(`${backendUrl}/api/knowledge/project`)
       ]);
       setStructure(await structRes.json());
       setStatus(await statusRes.json());
       setBooks(await booksRes.json());
+      setProject(await projectRes.json());
     } catch (e) {
       console.error('Failed to fetch knowledge', e);
     }
@@ -195,6 +198,57 @@ export default function KnowledgePanel() {
         <p className="text-[8px] text-gray-600 mt-2 leading-relaxed">
           💡 Ask JEXI anything about these books — she reads them and answers with citations, before touching the internet.
         </p>
+      </div>
+
+      {/* ---------- B50 P2 — PROJECT KNOWLEDGE (always-on + progressive) ---------- */}
+      <div className="surface-card p-4">
+        <PanelHeader
+          icon={Database}
+          title="PROJECT KNOWLEDGE — ALWAYS-ON"
+          color="text-brand"
+          right={
+            project?.alwaysOn ? (
+              <span className="text-[8px] text-text-tertiary bg-surface-2 px-2 py-1 rounded-full border border-hairline font-mono">
+                {fmtKB(project.alwaysOn.chars)}
+              </span>
+            ) : null
+          }
+        />
+        {project?.alwaysOn ? (
+          <>
+            <p className="text-[10px] text-text-secondary leading-snug mt-2">
+              JEXI.md — the project's non-negotiable rules & conventions, injected into every single session.
+            </p>
+            <div className="mt-2 rounded-md border border-hairline bg-surface-2 px-3 py-2 max-h-24 overflow-y-auto">
+              <p className="text-[9px] text-text-tertiary font-mono leading-relaxed whitespace-pre-wrap">{project.alwaysOn.preview}</p>
+            </div>
+            {project.categories?.length > 0 && (
+              <>
+                <div className="flex items-center gap-2 mt-3 mb-1.5">
+                  <Layers className="w-3 h-3 text-cyan-400" />
+                  <p className="text-[9px] font-bold tracking-[0.14em] text-text-secondary">PROGRESSIVE FOLDERS — LOADED ON DEMAND</p>
+                </div>
+                <div className="space-y-1.5">
+                  {project.categories.map((c) => (
+                    <div key={c.name} className="flex items-center gap-2 bg-surface-2 border border-hairline rounded-md px-2.5 py-2">
+                      <Folder className="w-3 h-3 text-cyan-400 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-semibold text-text-primary capitalize truncate">{c.name}</p>
+                        <p className="text-[8px] text-text-tertiary truncate">{c.head}</p>
+                      </div>
+                      <span className="text-[8px] text-text-tertiary font-mono shrink-0">{fmtKB(c.chars)}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[8px] text-text-tertiary mt-2 leading-relaxed">
+                  🧠 Deep guidance lives in these folders and is pulled in by the <span className="font-mono text-brand">knowledge-load</span> tool only when a task needs it — keeping the always-on prompt small.
+                </p>
+              </>
+            )}
+          </>
+        ) : (
+          <p className="text-center text-gray-600 text-[10px] py-3">Project knowledge unavailable.</p>
+        )}
       </div>
 
       {/* ---------- KNOWLEDGE CORE STATS ---------- */}

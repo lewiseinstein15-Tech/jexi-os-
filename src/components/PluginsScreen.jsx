@@ -52,8 +52,12 @@ export default function PluginsScreen() {
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="text-[12px] font-semibold text-text-primary">{p.name}</p>
-                  {p.builtin && <span className="text-[7px] font-bold text-text-tertiary bg-surface-2 border border-hairline rounded-full px-1.5 py-0.5">BUILT-IN</span>}
+                  <p className="text-[12px] font-semibold text-text-primary flex items-center gap-1.5">{p.name}</p>
+                  {p.builtin ? (
+                    <span className="text-[7px] font-bold text-text-tertiary bg-surface-2 border border-hairline rounded-full px-1.5 py-0.5">BUILT-IN</span>
+                  ) : (
+                    <span className="text-[7px] font-bold text-brand bg-brand-dim border border-brand-line rounded-full px-1.5 py-0.5">📦 PACKAGE</span>
+                  )}
                   <span className="text-[8px] font-mono text-text-tertiary">v{p.version}</span>
                 </div>
                 <p className="text-[10px] text-text-secondary leading-snug mt-0.5">{p.desc}</p>
@@ -61,7 +65,15 @@ export default function PluginsScreen() {
                   <span className="flex items-center gap-1"><Bot className="w-2.5 h-2.5" /> {p.live.agents} AGENTS</span>
                   <span className="flex items-center gap-1"><Boxes className="w-2.5 h-2.5" /> {p.live.skills} SKILLS</span>
                   <span className="flex items-center gap-1"><Wrench className="w-2.5 h-2.5" /> {p.live.tools} TOOLS</span>
+                  {p.live.packagedSkills > 0 && (
+                    <span className="flex items-center gap-1 text-brand"><Boxes className="w-2.5 h-2.5" /> {p.live.packagedSkills} SKILL FOLDERS</span>
+                  )}
                 </div>
+                {!p.builtin && (
+                  <p className="text-[8px] text-text-tertiary leading-snug mt-1">
+                    On-disk package — progressive skill folders shipped with the plugin; toggling controls its contributions.
+                  </p>
+                )}
               </div>
               <button
                 type="button"
