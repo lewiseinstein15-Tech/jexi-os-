@@ -53,7 +53,7 @@ export async function analyzeQuery(query, context = '') {
     return { complex: false, subQueries: [query], reason: 'simple question — single focused search' };
   }
   const thread = context && String(context).trim()
-    ? `\n\nYou are continuing a conversation. What was just discussed (most recent last):\n${String(context).slice(0, 1200)}\n\nUse it ONLY to resolve references in the question — do not change the topic.`
+    ? `\n\nYou are continuing a conversation. What was just discussed (most recent last):\n${String(context).slice(0, 1200)}\n\nUse it ONLY to resolve references in the question — do not change the topic, and never announce that this continues a conversation (no "continuing our conversation", no recap of what was said before) — just answer.`
     : '';
   try {
     const prompt =
@@ -226,7 +226,7 @@ export async function synthesizeGrounded(query, deep, context = '') {
     .map((s, i) => `SOURCE [${i + 1}]: ${s.title}\nLink: ${s.link}\n${s.content}`)
     .join('\n\n---\n\n');
   const thread = context && String(context).trim()
-    ? `\n\nYou are continuing a conversation. The user was just discussing:\n${String(context).slice(0, 1400)}\n\nKeep your answer in that thread — connect it to what came before where it helps.`
+    ? `\n\nYou are continuing a conversation. The user was just discussing:\n${String(context).slice(0, 1400)}\n\nKeep your answer in that thread — connect it to what came before where it helps, but never announce that this continues a conversation (no "continuing our conversation", no recap) — just answer.`
     : '';
 
   const prompt =

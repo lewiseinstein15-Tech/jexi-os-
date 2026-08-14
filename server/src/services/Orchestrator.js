@@ -22,6 +22,8 @@ import { runPerfAgent } from './PerfAgent.js';
 import { ComputerUseAgent } from './ComputerUseAgent.js';
 import { DesktopManager, ensureBrowser } from './DesktopManager.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
+import { IDENTITY_ANSWER } from './JexiIdentity.js';
+import { groundednessCheck } from './Groundedness.js'; // B48 P2a — strip ungrounded memory claims before they reach the user
 import { preferencesBlock, recallPreferences } from './PreferenceLearner.js';
 import { verifyAnswer } from './VerificationLoop.js';
 import { rosterStats } from './AgentRoster.js';
@@ -45,54 +47,70 @@ function listWorkspaceFiles() {
   return fs.readdirSync(WORKSPACE_DIR).filter(f => fs.statSync(path.join(WORKSPACE_DIR, f)).isFile());
 }
 
-/** Deterministic identity answer — always available, even with NO AI key. */
-const IDENTITY_ANSWER = `I'm **JEXI OS** — a sophisticated multi-agent AI operating system.
+/** Build 48, P1 — the canonical deterministic identity answer now comes from
+ * JexiIdentity.js (the single source of truth), not a hardcoded copy here.
+ * Always available, even with NO AI key. rosterStats stays imported for the
+ * planner log events below. */
 
-I was created by **Lewis Einstein**, an AI & ML Engineer — his most advanced creation. I run a **${rosterStats().agents}+ specialist roster** with a **${rosterStats().skills}+ skill registry** (Product, Designer, Engineer, Coder, QA, Reviewer, Security, Shipper, GitHub, Memory, Vision, Computer Use, Fact Checker, Critic and more). For every task I compose the exact team it needs, run them one-by-one with gates and verification loops, and stream what I'm doing live.
-
-I'm free, open-source, and always awake. Ask me to build you an app, study a topic, or remember something — I'll run the whole team for you.`;
+/** Trivial small talk that must NOT drag the fact/preference loadout into
+ * context — the root cause of fabricated-memory replies ("Hello" → "your
+ * favorite color"). Greetings, thanks and affirmatives pass through with only
+ * the recent transcript. Identity questions are covered by JexiIdentity.js
+ * (Build 48, P1), so they need no memory block either. */
+const TRIVIAL_QUERY_RE = /^(hi+|hii+|hey+|hello+|yo+|hiya+|howdy+|good (morning|afternoon|evening)|what'?s up|sup|how (are|r) you|thanks|thank you|thx|ty|ok+|okay+|k+|kk+|yes+|yeah+|yep+|yup+|sure+|alright|right|cool|nice|great|bye+|goodbye|see (ya|you)|later|no+|nope+|haha|lol)\b[\s.,!?]*$/i;
 
 /**
  * Build a compact conversation context for JEXI to stay focused (layered
  * memory, Mem0/DeepAgents pattern): recent turns verbatim → rolling summary
  * of older turns → episodic memory → long-term semantic recall of anything
  * JEXI already researched, so she never forgets the thread mid-conversation.
+ *
+ * Build 48, P2 — memory honesty: the fact/preference/episode loadout is only
+ * injected for substantive queries, the block is labeled as silently-usable
+ * background (never "what I remember"), and an explicit rule forbids surfacing
+ * irrelevant memories or narrating their use.
  */
-async function conversationContext(query = '') {
+export async function conversationContext(query = '') {
   const history = getChatHistory(12);
-  const facts = topUserFacts(4);
-  const profile = loadMemory().userProfile || {};
   const memoryBlock = [];
-  if (profile.name) memoryBlock.push(`User's name: ${profile.name}`);
-  if (profile.location) memoryBlock.push(`User's location: ${profile.location}`);
-  if (facts.length) memoryBlock.push(...facts);
-  const prefs = recallPreferences(3);
-  if (prefs.length) memoryBlock.push(...prefs);
+  const trivial = TRIVIAL_QUERY_RE.test(String(query || '').trim());
 
-  // Rolling summary of older turns — JEXI never forgets what happened earlier.
-  const summary = getRollingSummary();
-  if (summary) memoryBlock.push(`Running summary of the earlier conversation:\n${summary.slice(0, 1200)}`);
+  if (!trivial) {
+    const facts = topUserFacts(4);
+    const profile = loadMemory().userProfile || {};
+    if (profile.name) memoryBlock.push(`User's name: ${profile.name}`);
+    if (profile.location) memoryBlock.push(`User's location: ${profile.location}`);
+    if (facts.length) memoryBlock.push(...facts);
+    const prefs = recallPreferences(3);
+    if (prefs.length) memoryBlock.push(...prefs);
 
-  // Episodic memory — what happened in past sessions (Archivist).
-  const episodes = getRecentEpisodes(3);
-  if (episodes.length) {
-    memoryBlock.push('Past sessions I remember:' + episodes.map((e) => `\n- User asked \"${String(e.ask).slice(0, 80)}\" → I replied about ${String(e.reply).slice(0, 120)}`).join(''));
+    // Rolling summary of older turns — JEXI never forgets what happened earlier.
+    const summary = getRollingSummary();
+    if (summary) memoryBlock.push(`Earlier conversation summary:\n${summary.slice(0, 1200)}`);
+
+    // Episodic memory — what happened in past sessions (Archivist).
+    const episodes = getRecentEpisodes(3);
+    if (episodes.length) {
+      memoryBlock.push('Earlier sessions:' + episodes.map((e) => `\n- User asked \"${String(e.ask).slice(0, 80)}\" → I replied about ${String(e.reply).slice(0, 120)}`).join(''));
+    }
   }
 
-  // Semantic recall — if JEXI already researched/learned this, say so instead
-  // of searching again (Memory Agent). Hybrid vector + keyword retrieval
-  // (TencentDB-Agent-Memory pattern). "I remembered this from my mind."
+  // Semantic recall — hybrid vector + keyword retrieval (TencentDB pattern),
+  // relevance-scored so only actually-related prior work is surfaced. Skipped
+  // for trivial small talk.
   try {
-    if (String(query || '').trim().length > 4) {
+    if (!trivial && String(query || '').trim().length > 4) {
       const learned = await semanticRecall(query, { limit: 1 });
       if (learned.length) {
         const top = learned[0];
-        memoryBlock.push(`From my mind (I researched this before): ${top.label} — ${String(top.text).slice(0, 300)}`);
+        memoryBlock.push(`Previously researched: ${top.label} — ${String(top.text).slice(0, 300)}`);
       }
     }
   } catch (e) {}
 
-  const extra = memoryBlock.length ? `\n\nWhat I know (from memory):\n${memoryBlock.map(f => `- ${f}`).join('\n')}` : '';
+  const extra = memoryBlock.length
+    ? `\n\nBackground context (use silently — never say you remembered it, and only use it when it is directly relevant to the current question; if nothing here is relevant, ignore it entirely):\n${memoryBlock.map(f => `- ${f}`).join('\n')}`
+    : '';
   return `${history.map(h => `${h.role === 'user' ? 'User' : 'JEXI'}: ${String(h.text).slice(0, 600)}`).join('\n')}${extra}`;
 }
 
@@ -319,6 +337,17 @@ export class Orchestrator {
         `The user just said: \"${query}\"\n\nRecent conversation:\n${ctx}\n\nRespond naturally as JEXI OS. If they ask who you are or who created you, answer: you are JEXI OS, a sophisticated multi-agent AI operating system built by Lewis Einstein (AI & ML Engineer) to run any task. Be warm and brief.`,
         JEXI_SYSTEM_PROMPT + preferencesBlock()
       );
+      // B48 P2a — GROUNDEDNESS CHECK (confabulation defense): any memory-claim
+      // sentence must be grounded in the context ACTUALLY injected this turn.
+      // Ungrounded claims are stripped and counted; narration phrases are
+      // removed even when the claim is grounded (P2b). This is the hard
+      // guarantee that "hello" can never produce "I remember your favorite
+      // color…" — the loadout for a greeting contains no memory to ground it.
+      const grounded = groundednessCheck({ draft: reply, context: ctx, query });
+      if (grounded.caught > 0) {
+        sendEvent('log', { agent: 'Critic', message: `🛡 Groundedness check: caught ${grounded.caught} ungrounded memory claim(s) in the draft and removed them.` });
+      }
+      if (grounded.changed) reply = grounded.clean;
       // Anti-hallucination pass on long, fact-bearing replies (Critic / Fact
       // Checker) — short chit-chat skips it, so replies stay instant.
       const verified = await verifyAnswer({ query, draft: reply, sendEvent, opts: { minLength: 260 } });
@@ -422,8 +451,14 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
         `The user asked: \"${query}\"\n\nUser profile: ${JSON.stringify(userProfile)}\nRecent conversation:\n${ctx}\n\nAnswer what JEXI remembers about the user, naturally.`,
         JEXI_SYSTEM_PROMPT + preferencesBlock()
       );
-      try { addChat('jexi', reply); } catch (e) {}
-      results.summary = `### 🧠 JEXI OS\n\n${reply}`;
+      // B48 P2a — groundedness check with the exact context injected this turn.
+      const grounded = groundednessCheck({ draft: reply, context: ctx, query });
+      if (grounded.caught > 0) {
+        sendEvent('log', { agent: 'Critic', message: `🛡 Groundedness check: caught ${grounded.caught} ungrounded memory claim(s) in the draft and removed them.` });
+      }
+      const finalReply = grounded.changed ? grounded.clean : reply;
+      try { addChat('jexi', finalReply); } catch (e) {}
+      results.summary = `### 🧠 JEXI OS\n\n${finalReply}`;
       results.statistics.confidence = 100;
       return results;
     });
@@ -556,7 +591,7 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
       try {
         const remembered = await searchInternetKnowledge(query);
         if (remembered) {
-          sendEvent('log', { agent: 'Memory Agent', message: '✓ I already know this — retrieving from my mind.' });
+          sendEvent('log', { agent: 'Memory Agent', message: '✓ Found this in my memory — serving it directly.' });
           results.summary = `### 🧠 JEXI OS — FROM MEMORY\n\n${remembered.answer}`;
           if (remembered.sources?.length) results.sources = remembered.sources.map(s => ({ title: s, link: s }));
           results.statistics.confidence = 92;
@@ -651,7 +686,7 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
       try {
         const fresh = await searchFreshInternetKnowledge(query, 30 * 60 * 1000);
         if (fresh) {
-          sendEvent('log', { agent: 'Memory Agent', message: '✓ Fresh news on this from earlier — returning instantly from memory.' });
+          sendEvent('log', { agent: 'Memory Agent', message: '✓ Already gathered fresh news on this — serving it instantly.' });
           results.summary = `### 🧠 JEXI OS — FROM MEMORY (news I just gathered)\n\n${fresh.answer}`;
           if (fresh.sources?.length) results.sources = fresh.sources.map(s => ({ title: s, link: s }));
           results.statistics.confidence = 90;
@@ -810,9 +845,16 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
           return results;
         }
       } catch (e) {}
-      const { summary } = await reasonAndWrite(query, [], { memoryContext: await conversationContext() });
-      try { addChat('jexi', summary); } catch (e) {}
-      results.summary = summary;
+      const ctx = await conversationContext();
+      const { summary } = await reasonAndWrite(query, [], { memoryContext: ctx });
+      // B48 P2a — groundedness check with the exact context injected this turn.
+      const grounded = groundednessCheck({ draft: summary, context: ctx, query });
+      if (grounded.caught > 0) {
+        sendEvent('log', { agent: 'Critic', message: `🛡 Groundedness check: caught ${grounded.caught} ungrounded memory claim(s) in the draft and removed them.` });
+      }
+      const finalSummary = grounded.changed ? grounded.clean : summary;
+      try { addChat('jexi', finalSummary); } catch (e) {}
+      results.summary = finalSummary;
       results.statistics.confidence = 70;
       return results;
     });
@@ -838,7 +880,7 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
       try {
         const remembered = await searchCodingKnowledge(effQuery);
         if (remembered) {
-          sendEvent('log', { agent: 'Memory Agent', message: '✓ Found a solution I built before — recalling from memory.' });
+          sendEvent('log', { agent: 'Memory Agent', message: '✓ Found a solution I built before — reusing it.' });
           results.summary = `### 🧠 JEXI OS — RECALLED FROM MEMORY\n\nI solved this before, so I'm giving you the verified solution.\n\n${remembered.solution}\n\n${remembered.files?.length ? `**Files:** ${remembered.files.join(', ')}` : ''}`;
           results.statistics.confidence = 95;
           c.done = true;

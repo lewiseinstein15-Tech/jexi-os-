@@ -22,7 +22,7 @@ export async function reasonAndWrite(query, sources, opts = {}) {
   } else if (isSummarization) {
     prompt = `Synthesize the following into a structured, directly-answering response for the question: "${query}"\n\n${opts.rawText || ''}`;
   } else {
-    prompt = `Answer the user's question clearly and completely: "${query}"\n\n${memoryContext ? `Context from previous conversation:\n${memoryContext}` : ''}\nFollow JEXI OS formatting rules.`;
+    prompt = `Answer the user's question clearly and completely: "${query}"\n\n${memoryContext ? `Context from previous conversation (use it only to resolve references — never announce that this continues a conversation, just answer):\n${memoryContext}` : ''}\nFollow JEXI OS formatting rules.`;
   }
 
   const summary = await generateContent(prompt, JEXI_SYSTEM_PROMPT + preferencesBlock());

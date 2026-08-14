@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { getBackendUrl, jexiFetch, backendErrorMessage } from '../utils/helpers';
+import { getBackendUrl, jexiFetch, backendErrorMessage, delay } from '../utils/helpers';
 
 // A live agent loop streams events continuously. If the stream stays silent
 // this long (app backgrounded / proxy drop / host restart) the read is stuck
@@ -18,7 +18,7 @@ const STREAM_STALE_MS = 60000;
  * exactly why JEXI finished a task in the logs while the chat showed no answer.
  * Buffer partial lines until the newline arrives.
  */
-async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale } = {}) {
+async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable } = {}) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -69,6 +69,16 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
         if (data.sources?.length) bits.push(`${data.sources.length} sources`);
         const footer = bits.length ? `\n\n---\n⚙️ ${bits.join(' · ')}` : '';
         setMessages(prev => [...prev, { role: 'jexi', text: summary + footer, sources: data.sources, files: data.files }]);
+      } else if (data.recoverable) {
+        // Build 48, P5 — the 15-min safety deadline fired, but the server-side
+        // mission is STILL running and will persist its real outcome. Show the
+        // interim notice, then keep polling automatically for the real result.
+        const why = data.error || 'the task hit an unexpected error';
+        setMessages(prev => [...prev, {
+          role: 'jexi',
+          text: `⏱ ${why}\n\nI'm still running it server-side — the result will appear here automatically when it finishes.`,
+        }]);
+        onRecoverable?.();
       } else {
         // Honest, actionable failure — never a confusing "is the backend
         // running?" (the backend is online; the TASK failed mid-flight).
@@ -96,12 +106,18 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
     handleLine(buffer);
 
     // Stream ended without a completion event — the connection dropped
-    // mid-task (host restart, proxy timeout). Surface it instead of silence.
+    // mid-task (host restart, proxy timeout). Build 48, P5: recovery is
+    // AUTOMATIC — poll the server-side result store until the mission's real
+    // outcome lands (the Express handler keeps running after the client
+    // disconnects). The user is never told to manually "continue".
     if (!sawDone) {
-      setMessages(prev => [...prev, {
-        role: 'jexi',
-        text: '⚠ The connection dropped before JEXI finished — the task may still be running on the server. Wait a moment, then ask me to continue from where it stopped.',
-      }]);
+      if (onDrop) await onDrop();
+      else {
+        setMessages(prev => [...prev, {
+          role: 'jexi',
+          text: '⚠ The connection dropped before JEXI finished — the task may still be running on the server. Wait a moment, then ask me to continue from where it stopped.',
+        }]);
+      }
     }
   } finally {
     clearInterval(watchdog);
@@ -116,6 +132,7 @@ export const useJexiEngine = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const abortRef = useRef(null);
   const watchdogFiredRef = useRef(false);
+  const recoverRef = useRef(null); // AbortController for the auto-recovery poll
 
   // Return from background / tab switch: nudge a repaint so a stuck surface
   // redraws, and give a silent-but-alive stream a fresh window to speak.
@@ -132,6 +149,57 @@ export const useJexiEngine = () => {
       window.removeEventListener('focus', onVisible);
     };
   }, []);
+
+  /**
+   * Build 48, P5 — AUTOMATIC recovery after a dropped stream.
+   * The server-side mission keeps running after the client disconnects and
+   * persists its real outcome to the per-session result store. Poll
+   * /api/chat/result (same x-jexi-session) until it appears, then surface the
+   * finished answer — no "ask me to continue" step required from the user.
+   */
+  const recoverResult = useCallback(async () => {
+    const backendUrl = getBackendUrl();
+    const ctrl = new AbortController();
+    recoverRef.current = ctrl;
+    const deadlineMs = Date.now() + 180000; // up to 3 minutes of recovery
+    let found = false;
+    try {
+      while (!ctrl.signal.aborted && Date.now() < deadlineMs) {
+        await delay(4000);
+        if (ctrl.signal.aborted) break;
+        try {
+          const res = await jexiFetch(`${backendUrl}/api/chat/result`, { signal: ctrl.signal });
+          if (!res.ok) continue;
+          const { result } = await res.json();
+          if (result && ((result.summary && String(result.summary).trim()) || result.error)) {
+            found = true;
+            const summary = (result.summary && String(result.summary).trim())
+              ? result.summary
+              : `⚠ ${result.error || 'the task hit an unexpected error'}`;
+            setMessages(prev => [...prev, {
+              role: 'jexi',
+              text: summary,
+              sources: result.sources,
+              files: result.files,
+            }]);
+            break;
+          }
+        } catch (e) {
+          if (ctrl.signal.aborted) break;
+          // transient network blip — keep polling
+        }
+      }
+    } finally {
+      recoverRef.current = null;
+    }
+    // Never leave the user hanging — honest fallback after the recovery window.
+    if (!found && !ctrl.signal.aborted) {
+      setMessages(prev => [...prev, {
+        role: 'jexi',
+        text: '⚠ The connection dropped mid-task and the result did not return within the recovery window. The task may still be running server-side — tap STOP and retry, or say \"continue\" and I will pick it up from where it stopped.',
+      }]);
+    }
+  }, [setMessages]);
 
   // The free Render instance hibernates after ~15 min idle and needs up to a
   // minute to cold-start — the FIRST request after a break can stall or drop.
@@ -153,8 +221,10 @@ export const useJexiEngine = () => {
   }, []);
 
   const runSearch = useCallback(async (query, image = null) => {
-    // Halt any previous run before starting a new one.
+    // Halt any previous run AND any pending recovery before starting a new one.
     abortRef.current?.abort();
+    recoverRef.current?.abort();
+    recoverRef.current = null;
 
     setIsProcessing(true);
     setLogs([]);
@@ -164,6 +234,9 @@ export const useJexiEngine = () => {
     setMessages(prev => [...prev, userMsg]);
     const onEvent = () => { watchdogFiredRef.current = false; };
     const onStale = () => { watchdogFiredRef.current = true; abortRef.current?.abort(); };
+    // Dropped stream / interim deadline notice → auto-poll for the real result.
+    const onDrop = async () => { await recoverResult(); };
+    const onRecoverable = () => { setTimeout(() => { recoverResult(); }, 1500); };
 
     try {
       const backendUrl = getBackendUrl();
@@ -190,22 +263,20 @@ export const useJexiEngine = () => {
           signal: abortRef.current.signal,
         });
         if (!retry.ok) throw new Error(`Backend replied HTTP ${retry.status}`);
-        await consumeStream(retry, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale });
+        await consumeStream(retry, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable });
         return;
       }
       if (!res.ok) throw new Error(`Backend replied HTTP ${res.status}`);
-      await consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale });
+      await consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable });
     } catch (error) {
       // Aborted by the user (STOP) — don't show a scary network error.
       if (error?.name === 'AbortError') {
         // Watchdog abort: the stream went silent (backgrounded too long / drop)
-        // — the server task kept running; tell the user, don't spin forever.
+        // — the server task kept running. Build 48, P5: recover AUTOMATICALLY
+        // by polling the persisted result; never ask the user to continue.
         if (watchdogFiredRef.current) {
           watchdogFiredRef.current = false;
-          setMessages(prev => [...prev, {
-            role: 'jexi',
-            text: '⚠ The connection dropped while you were away — the task kept running on the server and likely finished. Ask me to continue and I\u2019ll pick it up from where it stopped.',
-          }]);
+          await recoverResult();
         }
         return;
       }
@@ -221,12 +292,15 @@ export const useJexiEngine = () => {
       watchdogFiredRef.current = false;
       setIsProcessing(false);
     }
-  }, [wakeUp]);
+  }, [wakeUp, recoverResult]);
 
   const stopGeneration = useCallback(() => {
     const wasRunning = abortRef.current != null;
     abortRef.current?.abort();
     abortRef.current = null;
+    // Also stop any in-flight recovery poll.
+    recoverRef.current?.abort();
+    recoverRef.current = null;
     setIsProcessing(false);
     if (!wasRunning) return; // nothing was running — don't inject a phantom message
     // An agent never leaves you hanging — acknowledge the halt and propose the next move.

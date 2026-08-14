@@ -155,20 +155,25 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
               transition={{ duration: 0.2 }}
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              <div className={`max-w-[90%] p-3 ${
-                msg.role === 'user'
-                  ? 'rounded-lg rounded-tr-sm bg-gradient-to-br from-brand to-[#00B55C] text-[#04140D] font-medium text-[11px] shadow-[0_4px_18px_rgba(0,210,106,0.28)]'
-                  : 'rounded-lg rounded-tl-sm bg-surface-1 text-text-primary border border-hairline'
-              }`}>
-                {msg.role === 'user' ? (
+              {msg.role === 'user' ? (
+                <div className="max-w-[85%] p-3 rounded-lg rounded-tr-sm bg-gradient-to-br from-brand to-[#00B55C] text-[#04140D] font-medium text-[11px] shadow-[0_4px_18px_rgba(0,210,106,0.28)]">
                   <div className="whitespace-pre-wrap break-words">
                     {msg.image && <img src={msg.image} alt="attachment" className="max-w-[220px] rounded-lg mb-2 border border-black/20" />}
                     {msg.text}
                   </div>
-                ) : (
-                  <TypedMessage text={msg.text} />
-                )}
-              </div>
+                </div>
+              ) : (
+                // Build 48, P4 — JEXI's answers live in a large open reading
+                // area, NOT a small boxed bubble: full width, no border/panel,
+                // larger type. Only the sender chip marks who is talking.
+                <div className="w-full">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand shadow-[0_0_8px_rgba(0,255,157,0.8)]" />
+                    <span className="text-[9px] font-bold tracking-[0.18em] text-brand">JEXI</span>
+                  </div>
+                  <TypedMessage text={msg.text} size="text-[13px]" />
+                </div>
+              )}
             </motion.div>
           ))
         )}

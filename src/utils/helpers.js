@@ -23,11 +23,29 @@ export const onAccessKeyChange = (cb) => {
   return () => window.removeEventListener('jexi:access-key', h);
 };
 
-/** fetch() wrapper that attaches the JEXI access key header when one is set. */
+/**
+ * Stable per-browser session id (Build 48, P5). The backend keys its
+ * per-conversation state (pending runs, persisted results) by the
+ * `x-jexi-session` header; without it every client from the same IP shares
+ * one conversation and dropped-stream recovery would mix sessions.
+ */
+export const getSessionId = () => {
+  let id = localStorage.getItem('jexi_session_id');
+  if (!id) {
+    id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `j-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem('jexi_session_id', id);
+  }
+  return id;
+};
+
+/** fetch() wrapper that attaches the JEXI access key + session headers. */
 export const jexiFetch = (url, opts = {}) => {
   const key = getAccessKey();
   const headers = new Headers(opts.headers || {});
   if (key) headers.set('x-jexi-key', key);
+  if (!headers.has('x-jexi-session')) headers.set('x-jexi-session', getSessionId());
   return fetch(url, { ...opts, headers });
 };
 

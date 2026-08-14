@@ -78,6 +78,36 @@ export async function runWriterAgent({ query, sendEvent, saveToDisk = false }) {
   }
   if (!doc) doc = templateReadme(files, entry);
 
+  // B48 P6 — LOOP ENGINEERING: self-critique coverage pass. Does the doc
+  // actually cover what was asked? Key nouns from the request must appear in
+  // the generated doc; if any are missing, ONE bounded regeneration runs with
+  // the gap called out (or an honest ## COVERAGE GAP note is appended when no
+  // AI key is available).
+  const STOP = new Set(['about', 'with', 'this', 'that', 'from', 'have', 'they', 'them', 'would', 'could', 'should', 'what', 'when', 'where', 'which', 'your', 'write', 'readme', 'docs', 'documentation', 'document', 'please', 'make', 'give', 'tell', 'want', 'need', 'like', 'know', 'project', 'app', 'application', 'workspace']);
+  const keyTerms = [...new Set((String(query).toLowerCase().match(/[a-z]{4,}/g) || []))].filter((w) => !STOP.has(w)).slice(0, 5);
+  const missing = keyTerms.filter((t) => !doc.toLowerCase().includes(t));
+  if (missing.length > 0) {
+    sendEvent?.('log', { agent: 'Technical Writer', message: `🔎 Self-critique: the ${docType} doesn't yet cover: ${missing.join(', ')}.` });
+    if (keys.groqKey || keys.geminiKey) {
+      try {
+        const revised = await generateContent(
+          `You are writing a ${docType}. The draft below is missing coverage of: ${missing.join(', ')}.\n\nReturn the FULL ${docType} (keep everything useful) with a new or expanded section covering each missing item, using the workspace files as the source of truth.\n\nDRAFT:\n${doc.slice(0, 6000)}`,
+          JEXI_SYSTEM_PROMPT,
+          null,
+          { temperature: 0.3 }
+        );
+        if (revised && revised.trim().length > doc.length * 0.5) {
+          doc = revised;
+          sendEvent?.('log', { agent: 'Technical Writer', message: `✓ Self-critique fixed the gap — ${missing.join(', ')} now covered.` });
+        }
+      } catch (e) {}
+    } else {
+      doc = `${doc}\n\n## COVERAGE GAP\n- This draft does not yet cover: ${missing.join(', ')} — say \"expand the docs\" and I will fill these in.`;
+    }
+  } else {
+    sendEvent?.('log', { agent: 'Technical Writer', message: '✓ Self-critique: the doc covers the requested topics.' });
+  }
+
   const name = docType === 'README' ? 'README.md' : `docs-${Date.now()}.md`;
   let link = '';
   if (saveToDisk || /write|save|create the (readme|doc)/i.test(query)) {

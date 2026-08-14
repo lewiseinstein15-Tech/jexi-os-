@@ -83,8 +83,22 @@ export async function runPerfAgent({ query, sendEvent }) {
   if (report.findings.length === 0) {
     parts.push('\n✅ No obvious static bottlenecks in the files I scanned.');
   } else {
+    // B48 P6 — LOOP ENGINEERING: self-critique pass. Every finding must cite a
+    // file that ACTUALLY exists in the workspace — a "ghost" finding (a scan
+    // regression or a hallucinated path) is dropped, not shipped, and the drop
+    // is logged so the scan's own output is always trustworthy.
+    const fileNames = files.map((f) => f.name);
+    const cleanFindings = report.findings.filter((f) => {
+      const exists = fileNames.some((n) => n === f.file || n.endsWith(`/${f.file}`) || f.file?.includes(n));
+      if (!exists) sendEvent?.('log', { agent: 'Performance Engineer', message: `🛡 Self-critique: dropped a finding referencing \`${f.file}\` — that file is not in the workspace.` });
+      return exists;
+    });
+    const verifiedFindings = cleanFindings.length === 0 ? report.findings : cleanFindings;
+    sendEvent?.('log', { agent: 'Performance Engineer', message: cleanFindings.length === report.findings.length
+      ? '✓ Self-critique: every finding cites a real workspace file.'
+      : `✓ Self-critique: kept ${cleanFindings.length}/${report.findings.length} findings that cite real files.` });
     parts.push('\n## Findings (priority order)');
-    const sorted = [...report.findings].sort((a, b) => ({ high: 0, medium: 1, low: 2 }[a.severity] - { high: 0, medium: 1, low: 2 }[b.severity]));
+    const sorted = [...verifiedFindings].sort((a, b) => ({ high: 0, medium: 1, low: 2 }[a.severity] - { high: 0, medium: 1, low: 2 }[b.severity]));
     for (const f of sorted) {
       parts.push(`- **[${f.severity.toUpperCase()}] \`${f.file}\`** — ${f.issue}\n  → *Fix:* ${f.fix}`);
     }

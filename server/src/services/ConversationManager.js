@@ -51,6 +51,17 @@ export async function analyzeMessage(query, { currentTaskId = null, image = fals
     return { classification: id ? 'continue' : 'new', taskId: id, confidence: 0.8, reason: 'image attaches to current context' };
   }
 
+  // B48 P3 — a bare greeting/thanks is a FRESH TURN, never a continuation.
+  // No task context may be injected, no prior memory may be forced. The
+  // "hello → fabricated prior-conversation reply" failure mode starts exactly
+  // here at the classification level: if a greeting were classified as
+  // 'continue', the decision engine would inject the active task's context
+  // block and the model would be tempted to "remember" things it never said.
+  const GREETING_RE = /^(?:hi+|hii+|hey+|hello+|yo+|hiya+|howdy+|good (?:morning|afternoon|evening)|what'?s up|sup|how (?:are|r) you|thanks|thank you|thx|ty|bye+|goodbye|see (?:ya|you)|later|haha|lol)\b[\s.,!?]*$/i;
+  if (GREETING_RE.test(raw)) {
+    return { classification: 'new', taskId: null, confidence: 1, reason: 'greeting — fresh turn, no continuation context' };
+  }
+
   // Short fragments ("continue", "make it faster", "add auth") are continuations
   // ONLY when they carry no topic signal — a question or switch word means the
   // short-cut must not swallow it ("What is the derivative of x³?" is new).

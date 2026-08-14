@@ -177,7 +177,7 @@ function MermaidBlock({ code }) {
 /* ------------------------------------------------------------------ */
 /* Main renderer                                                       */
 /* ------------------------------------------------------------------ */
-export default function MarkdownRenderer({ content }) {
+export default function MarkdownRenderer({ content, size = 'text-[11px]' }) {
   // 1. Clean up empty math blocks
   let cleanContent = content.replace(/\$\$\s*\$\$/g, '').replace(/\$\s*\$/g, '');
 
@@ -200,7 +200,7 @@ export default function MarkdownRenderer({ content }) {
   }).join('\n');
 
   return (
-    <div className="markdown-body text-[11px] leading-relaxed">
+    <div className={`markdown-body ${size} leading-relaxed`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}

@@ -4,12 +4,18 @@
  * Replaces the old module-level `pendingTask` singleton with a conversation-scoped
  * in-memory store, so concurrent chats from different users/sessions never race.
  *
- * Two kinds of per-conversation state live here:
+ * Three kinds of per-conversation state live here:
  *   - OFFER  : the classic "I want to build X" → "yes?" → resume flow
  *              ({ at, query } — kept for backward compatibility).
  *   - RUN    : a FULL RunState captured at a graph `confirmationPause`
  *              (Priority 5) — the graph resumes at the exact paused node with
  *              prior intermediate results intact, never from the planner.
+ *   - RESULT : the LAST completed run's final summary (Build 48, P5). When the
+ *              NDJSON stream drops mid-task (proxy drop, backgrounded app, host
+ *              restart) the server-side mission keeps running and this store
+ *              captures its outcome, so the frontend can AUTO-RECOVER by
+ *              polling /api/chat/result instead of telling the user to ask JEXI
+ *              to continue.
  *
  * In-memory by design (single-instance deploy). If JEXI ever runs multi-instance,
  * swap the Maps for Redis with the same API — call that out in FIXLOG.md.
@@ -64,12 +70,72 @@ export function clearRun(convId) {
   if (convId) runSessions.delete(convId);
 }
 
+/** @type {Map<string, { at: number, result: Object }>} */
+const resultSessions = new Map();
+
+const RESULT_TTL_MS = 10 * 60 * 1000; // long enough for the frontend to poll back
+
+/** Persist the last completed run's outcome (B48 P5 — dropped-stream recovery). */
+export function saveResult(convId, result) {
+  if (!convId) return;
+  resultSessions.set(convId, { at: Date.now(), result });
+}
+
+export function loadResult(convId) {
+  if (!convId) return null;
+  const entry = resultSessions.get(convId);
+  if (!entry) return null;
+  if (Date.now() - entry.at > RESULT_TTL_MS) {
+    resultSessions.delete(convId);
+    return null;
+  }
+  return entry.result;
+}
+
+export function clearResult(convId) {
+  if (convId) resultSessions.delete(convId);
+}
+
+/* ------------------------------------------------------------------ */
+/* B48 P7.2 — dropped-connection / recovery observability.             */
+/* Every recovery-path touchpoint records an event (cause, whether a   */
+/* result was actually recovered) so the timeout/heartbeat fix can be  */
+/* validated in practice, not just in synthetic tests.                 */
+/* ------------------------------------------------------------------ */
+const recoveryEvents = [];
+
+/** Record a recovery touchpoint: a poll hit, a deadline fire, a resume. */
+export function recordRecoveryEvent({ convId = '', cause = 'unknown', recovered = false, detail = '' } = {}) {
+  recoveryEvents.push({
+    at: Date.now(),
+    convId: String(convId || '').slice(0, 80),
+    cause: String(cause || 'unknown').slice(0, 40),
+    recovered: Boolean(recovered),
+    detail: String(detail || '').slice(0, 200),
+  });
+  if (recoveryEvents.length > 500) recoveryEvents.shift();
+}
+
+/** Current recovery observability stats (B48 P7.2). */
+export function recoveryStats() {
+  const byCause = {};
+  for (const e of recoveryEvents) byCause[e.cause] = (byCause[e.cause] || 0) + 1;
+  return {
+    total: recoveryEvents.length,
+    recovered: recoveryEvents.filter((e) => e.recovered).length,
+    byCause,
+    last: recoveryEvents.length ? { ...recoveryEvents[recoveryEvents.length - 1] } : null,
+  };
+}
+
 /** Test/observability helpers. */
 export function clearAllSessions() {
   offerSessions.clear();
   runSessions.clear();
+  resultSessions.clear();
+  recoveryEvents.length = 0;
 }
 
 export function sessionCounts() {
-  return { offers: offerSessions.size, runs: runSessions.size };
+  return { offers: offerSessions.size, runs: runSessions.size, results: resultSessions.size };
 }

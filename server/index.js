@@ -793,9 +793,15 @@ app.post('/api/vision', async (req, res) => {
 //   user: "no / never mind"                → pending task cleared, no search
 // P5/P9 — conversation-scoped store replaces the old module-level singleton,
 // so concurrent chats from different users/sessions never race.
-import { saveOffer, loadOffer, clearOffer, saveRun, loadRun, clearRun } from './src/services/SessionStore.js';
+import { saveOffer, loadOffer, clearOffer, saveRun, loadRun, clearRun, saveResult, loadResult, clearResult, recordRecoveryEvent } from './src/services/SessionStore.js';
 import { preferencesBlock } from './src/services/PreferenceLearner.js';
 const RESUME_TTL_MS = 15 * 60 * 1000;
+
+/** Trivial small talk — never feed the fact/preference loadout to the planner
+ * for greetings/thanks (Build 48, P2: the root cause of fabricated-memory
+ * answers is irrelevant memory reaching the model). Same rule as the
+ * orchestrator's conversationContext. */
+const TRIVIAL_QUERY_RE = /^(hi+|hii+|hey+|hello+|yo+|hiya+|howdy+|good (morning|afternoon|evening)|what'?s up|sup|how (are|r) you|thanks|thank you|thx|ty|ok+|okay+|k+|kk+|yes+|yeah+|yep+|yup+|sure+|alright|right|cool|nice|great|bye+|goodbye|see (ya|you)|later|no+|nope+|haha|lol)\b[\s.,!?]*$/i;
 
 /**
  * P6 — build the compact memory slice the PLANNER sees before classifying:
@@ -806,19 +812,22 @@ const RESUME_TTL_MS = 15 * 60 * 1000;
 async function buildPlannerMemory(query) {
   const mem = loadMemory();
   const parts = [];
-  const profile = mem.userProfile || {};
-  if (profile.name) parts.push(`User's name: ${profile.name}`);
-  if (profile.location) parts.push(`User's location: ${profile.location}`);
-  const facts = (mem.userFacts || []).slice(0, 4)
-    .map((f) => (typeof f === 'string' ? f : (f && (f.fact || f.text)) || ''))
-    .filter(Boolean);
-  if (facts.length) parts.push(`Known facts: ${facts.join(' | ')}`);
+  const trivial = TRIVIAL_QUERY_RE.test(String(query || '').trim());
+  if (!trivial) {
+    const profile = mem.userProfile || {};
+    if (profile.name) parts.push(`User's name: ${profile.name}`);
+    if (profile.location) parts.push(`User's location: ${profile.location}`);
+    const facts = (mem.userFacts || []).slice(0, 4)
+      .map((f) => (typeof f === 'string' ? f : (f && (f.fact || f.text)) || ''))
+      .filter(Boolean);
+    if (facts.length) parts.push(`Known facts: ${facts.join(' | ')}`);
+    try {
+      const prefs = preferencesBlock(3);
+      if (prefs) parts.push(prefs);
+    } catch (e) {}
+  }
   try {
-    const prefs = preferencesBlock(3);
-    if (prefs) parts.push(prefs);
-  } catch (e) {}
-  try {
-    if (String(query || '').trim().length > 3) {
+    if (!trivial && String(query || '').trim().length > 3) {
       const learned = await semanticRecall(query, { limit: 2 });
       if (learned.length) {
         parts.push('Prior knowledge: ' + learned.map((l) => `${l.label}: ${String(l.text).slice(0, 180)}`).join(' | '));
@@ -836,6 +845,19 @@ function conversationId(req) {
 const CONFIRM_RE = /^(yes|yeah|yep|yup|sure|ok|okay|k|go ahead|do it|do that|do it now|please|please do|yes please|absolutely|alright|alrighty|proceed|sounds good|fine|make it|build it|go on|sure do it|yes do it)\b[\s.,!?]*$/i;
 const DECLINE_RE = /^(no|nope|never ?mind|cancel|stop|forget it|skip|don'?t|no thanks)\b[\s.,!?]*$/i;
 
+// Build 48, P5 — when the NDJSON stream drops (proxy drop, backgrounded app,
+// host restart), the server-side mission keeps running. The frontend polls this
+// endpoint to AUTO-RECOVER the finished result instead of asking the user to
+// manually say "continue".
+app.get('/api/chat/result', (req, res) => {
+  // B48 P7.2 — every recovery poll is observable: did the stream actually drop
+  // (poll with no fresh task running) and did the result exist to be recovered?
+  const convId = conversationId(req);
+  const result = loadResult(convId);
+  recordRecoveryEvent({ convId, cause: 'poll', recovered: !!result });
+  res.json({ result });
+});
+
 app.post('/api/chat', async (req, res) => {
   const { query, image } = req.body;
   recordChat();
@@ -844,7 +866,23 @@ app.post('/api/chat', async (req, res) => {
   res.setHeader('Content-Type', 'application/x-ndjson');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  const sendEvent = (type, data) => { try { res.write(JSON.stringify({ type, ...data }) + '\n'); } catch (e) {} };
+  // Any done event is ALSO persisted to the result store (B48 P5) — so every
+  // real terminal path (success, deadline-overshoot finish, catch) is
+  // recoverable after a stream drop, regardless of which call site emits it.
+  // Interim markers (recoverable: true, e.g. the 15-min deadline notice) are
+  // NOT persisted — the store only ever holds a REAL outcome.
+  const sendEvent = (type, data) => {
+    if (type === 'done' && data && !data.recoverable) { try { saveResult(convId, data); } catch (e) {} }
+    try { res.write(JSON.stringify({ type, ...data }) + '\n'); } catch (e) {}
+  };
+
+  // Stable per-conversation id for this request (hoisted so the deadline and
+  // the result store can use it too).
+  const convId = conversationId(req);
+  // A fresh run must never serve a stale previous result during recovery.
+  clearResult(convId);
+  // done = emit the terminal event; persistence is handled by sendEvent above.
+  const done = (payload) => sendEvent('done', payload);
 
   // Heartbeat: Cloudflare's proxy in front of Render kills streams that stay
   // silent too long (deep-reads and LLM calls pause for 10-30s). A tiny event
@@ -861,14 +899,16 @@ app.post('/api/chat', async (req, res) => {
     if (finished) return;
     finished = true;
     recordError('chat', 'request exceeded 15min deadline');
-    sendEvent('log', { agent: 'System', message: '⏱ Deadline reached (15 min) — the task is still running server-side. Ask me to continue and I will pick it up.' });
-    sendEvent('done', { success: false, error: 'The task exceeded the 15-minute safety deadline. It may still be running server-side — ask me to continue.', summary: '⏱ **Deadline reached.** This task ran longer than 15 minutes, so the connection was closed as a safety valve. The work may still be completing on the server — send **"continue"** and I will resume it.' });
+    // B48 P7.2 — observable deadline event: a recovery poll should follow and
+    // find the real outcome once the server-side mission finishes.
+    recordRecoveryEvent({ convId, cause: 'deadline', recovered: false, detail: 'request exceeded 15min deadline — result store keeps the terminal outcome' });
+    sendEvent('log', { agent: 'System', message: '⏱ Deadline reached (15 min) — the task is still running server-side. The result will appear here automatically when it finishes.' });
+    done({ recoverable: true, success: false, error: 'The task exceeded the 15-minute safety deadline. It may still be running server-side — the result will appear here automatically when it finishes.', summary: '⏱ **Deadline reached.** This task ran longer than 15 minutes, so the connection was closed as a safety valve. The work is still completing on the server — the result will appear here automatically.' });
     finish();
   }, CHAT_DEADLINE_MS);
 
   try {
     const raw = String(query || '').trim();
-    const convId = conversationId(req);
     const pendingOffer = loadOffer(convId);
     const hasPending = Boolean(pendingOffer);
     let effectiveQuery = raw;
@@ -893,7 +933,7 @@ app.post('/api/chat', async (req, res) => {
       clearOffer(convId);
       clearRun(convId);
       sendEvent('log', { agent: 'Planner', message: '✖ Declined — pending task cleared, nothing will run.' });
-      sendEvent('done', { success: true, query, summary: '### 🧠 JEXI OS\n\n👍 Understood — I won\'t go ahead with that. Tell me what you\'d like next and I\'ll take it from there.' });
+      done({ success: true, query, summary: '### 🧠 JEXI OS\n\n👍 Understood — I won\'t go ahead with that. Tell me what you\'d like next and I\'ll take it from there.' });
       return;
     }
 
@@ -913,7 +953,7 @@ app.post('/api/chat', async (req, res) => {
         const finalSummary = resumed.summary && String(resumed.summary).trim()
           ? resumed.summary
           : (resumed.error || 'The task finished, but produced no readable summary.');
-        sendEvent('done', { success: resumed.success, query, summary: finalSummary, sources: resumed.sources || [], statistics: resumed.statistics, files: resumed.files || [] });
+        done({ success: resumed.success, query, summary: finalSummary, sources: resumed.sources || [], statistics: resumed.statistics, files: resumed.files || [] });
         return;
       }
       // Classic offer flow — re-plan the original request and run it.
@@ -936,7 +976,7 @@ app.post('/api/chat', async (req, res) => {
         effectiveQuery = resolved.query;
         sendEvent('log', {
           agent: 'Context Agent',
-          message: `🧠 Continuity — resolved “${raw.slice(0, 60)}” → “${resolved.query.slice(0, 100)}” (${resolved.reason}).`,
+          message: `✓ Resolved “${raw.slice(0, 60)}” → “${resolved.query.slice(0, 100)}” (${resolved.reason}).`,
         });
       }
 
@@ -959,7 +999,7 @@ app.post('/api/chat', async (req, res) => {
         });
         const opts = (decision.clarification.options || []).map((o) => `- **${o.id}** — ${o.label}`).join('\n');
         sendEvent('log', { agent: 'JEXI', message: `🤔 ${decision.clarification.question}` });
-        sendEvent('done', {
+        done({
           success: true, query,
           summary: `### 🤔 One quick thing\n\n${decision.clarification.question}${opts ? `\n\n${opts}` : ''}\n\nTell me which one (or describe it in your own words) and I'll take it from there.`,
         });
@@ -985,9 +1025,12 @@ app.post('/api/chat', async (req, res) => {
         updateTask(activeTaskId, { status: 'active', query: effectiveQuery, plan: plan.steps || [] });
       }
       // Resume context: continue/switch turns get the task's state injected so
-      // the model plans a STEP, not a restart. (new turns pass through clean)
+      // the model plans a STEP, not a restart. (new turns pass through clean.)
+      // Build 48, P3 — the label is neutral ("User's follow-up"), never the word
+      // "Continue:", so the model acts on the context without narrating that
+      // this continues a previous conversation.
       if (decision.contextBlock && (decision.metadata.classification === 'continue' || decision.metadata.classification === 'switch')) {
-        executionQuery = `${decision.contextBlock}\n\nContinue: ${effectiveQuery}`;
+        executionQuery = `${decision.contextBlock}\n\nUser's follow-up: ${effectiveQuery}`;
       }
       sendEvent('intel', {
         classification: decision.metadata.classification,

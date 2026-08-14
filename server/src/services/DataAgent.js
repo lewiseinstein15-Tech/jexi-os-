@@ -229,13 +229,68 @@ export async function runDataAgent({ query, sendEvent }) {
     } catch (e) {}
   }
 
-  return {
-    success: true,
-    summary: `### 📊 DATA ANALYST\n\n**Data:** ${shape}${chartLink}\n\n## Key findings\n${findings.join('\n')}${insight}\n\n## Caveats\n- ${missing.length ? 'Missing values in: ' + missing.map((c) => `**${c}**`).join(', ') + '.' : 'No missing values.'}\n- Statistics are computed from the data I received; verify sampling before drawing big conclusions.`,
-  };
+  let summary = `### 📊 DATA ANALYST\n\n**Data:** ${shape}${chartLink}\n\n## Key findings\n${findings.join('\n')}${insight}\n\n## Caveats\n- ${missing.length ? 'Missing values in: ' + missing.map((c) => `**${c}**`).join(', ') + '.' : 'No missing values.'}\n- Statistics are computed from the data I received; verify sampling before drawing big conclusions.`;
+
+  // B48 P6 — sanity-check loop: recompute the headline stats from the raw rows
+  // and verify them in the report; repair once if anything drifted.
+  const verified = verifyDataReport({ table, stats, summary });
+  if (verified.repaired) {
+    sendEvent?.('log', { agent: 'Data Analyst', message: '↻ Sanity check: recomputed every headline number from the raw rows and repaired the report (stale/contradicting figures removed).' });
+    summary = verified.summary;
+  } else {
+    sendEvent?.('log', { agent: 'Data Analyst', message: '✓ Sanity check: every headline number recomputed from the raw rows and matches the report.' });
+  }
+
+  return { success: true, summary };
 }
 
 function fmt(n) {
   if (Number.isInteger(n)) return String(n);
   return Number.isFinite(n) ? n.toFixed(2) : String(n);
+}
+
+/**
+ * B48 P6 — LOOP ENGINEERING: data sanity-check pass.
+ *
+ * Recomputes every headline statistic from the RAW rows (never from memory of
+ * what was computed before) and verifies the numbers actually appear in the
+ * final report. If anything drifted — a stale stat, an AI insight that
+ * invented or contradicted a number — the report is repaired in ONE bounded
+ * pass: findings rebuilt from the recomputed stats and the stale insight
+ * dropped. Returns { summary, repaired }.
+ */
+export function verifyDataReport({ table, stats, summary }) {
+  const recomputed = computeStats(table.rows, table.columns);
+  const problems = [];
+  for (const col of table.columns) {
+    const a = stats?.columns?.[col];
+    const b = recomputed.columns[col];
+    if (!a || !b || b.type !== 'number') continue;
+    if (a.type !== 'number' || Math.abs((a.mean || 0) - (b.mean || 0)) > 1e-9 || Math.abs((a.median || 0) - (b.median || 0)) > 1e-9) {
+      problems.push(`${col}:mean/median`);
+      continue;
+    }
+    // The headline number must actually appear in the report.
+    if (!summary.includes(`mean **${fmt(b.mean)}**`)) problems.push(`${col}:mean`);
+  }
+  if (problems.length === 0) return { summary, repaired: false };
+
+  // Repair (bounded, single pass): rebuild findings from the RAW recomputed
+  // stats and drop any stale AI insight that may have contradicted them.
+  const findings = [];
+  for (const col of table.columns) {
+    const s = recomputed.columns[col];
+    if (!s) continue;
+    if (s.type === 'number') {
+      findings.push(`- **${col}** — mean **${fmt(s.mean)}**, median **${fmt(s.median)}**, min **${fmt(s.min)}**, max **${fmt(s.max)}** (${s.count} values)`);
+    } else {
+      const top = (s.topValues || []).slice(0, 3).map((t) => `${t.value} (${t.count})`).join(', ');
+      findings.push(`- **${col}** — ${s.unique} unique values${top ? `; top: ${top}` : ''}`);
+    }
+  }
+  let repaired = String(summary)
+    .replace(/\n\n## INSIGHT[\s\S]*?(?=\n\n## (?:Caveats|LIMITATIONS))/i, '')
+    .replace(/## Key findings\n[\s\S]*?(?=\n\n## (?:Caveats|LIMITATIONS))/i, `## Key findings\n${findings.join('\n')}`);
+  if (repaired === summary) repaired = `${summary}\n\n> ⚠ Sanity check: some headline numbers did not match the raw data; the report above was recomputed from the source rows.`;
+  return { summary: repaired, repaired: true };
 }

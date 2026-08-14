@@ -79,8 +79,35 @@ Then add ## CHANGED with 2-4 bullets on what you fixed and why.
 
 Rules: never translate code, file names, URLs, or proper nouns; never invent meaning — if ambiguous, translate once and note the alternative in ## CHANGED.`;
   try {
-    const reply = await generateContent(prompt, JEXI_SYSTEM_PROMPT, null, { temperature: 0.2 });
-    return { success: true, summary: `### 🌍 TRANSLATOR — into ${target}\n\n${reply.slice(0, 8000)}` };
+    let reply = await generateContent(prompt, JEXI_SYSTEM_PROMPT, null, { temperature: 0.2 });
+
+    // B48 P6 — LOOP ENGINEERING: bounded back-translation / reflection check.
+    // The draft→critique→revise pass must actually COMPLETE (a REVISE section
+    // plus a CHANGED note proving the critique ran). If the model truncated or
+    // skipped the loop, run ONE bounded follow-up that forces the missing
+    // sections instead of silently shipping a first-draft translation.
+    const MAX_TRANSLATE_PASSES = 2;
+    for (let attempt = 1; attempt < MAX_TRANSLATE_PASSES; attempt++) {
+      const hasRevise = /##\s*REVISE/i.test(reply);
+      const hasChanged = /##\s*CHANGED/i.test(reply);
+      if (hasRevise && hasChanged) break;
+      sendEvent?.('log', { agent: 'Translator', message: `↻ Reflection loop incomplete (pass ${attempt}) — forcing the critique + revise pass.` });
+      const completion = await generateContent(
+        `You are translating into ${target}. Complete the reflection loop for this draft:\n\nDRAFT:\n${reply.slice(0, 6000)}\n\nAppend exactly:\n## CRITIQUE\n(what a bilingual editor would fix: literalisms, culture-specific references, numbers/dates/units that must carry over, anything a native speaker would never say)\n## REVISE\n(the full corrected translation)\n## CHANGED\n(2-4 bullets on what you fixed and why)\n\nRules: never translate code, file names, URLs, or proper nouns; never invent meaning.`,
+        JEXI_SYSTEM_PROMPT,
+        null,
+        { temperature: 0.2 }
+      );
+      reply = `${reply}\n\n${completion}`;
+      if (/##\s*REVISE/i.test(reply) && /##\s*CHANGED/i.test(reply)) break;
+    }
+
+    // Post-loop faithfulness sanity: the FINAL translation must not be empty
+    // or identical to the source text (a no-op "translation" is a failure).
+    const finalSection = (reply.match(/##\s*REVISE([\s\S]*?)(?:##|$)/) || [null, reply])[1].trim();
+    const produced = finalSection.length > 2 && finalSection !== text.trim() ? finalSection : reply;
+    sendEvent?.('log', { agent: 'Translator', message: '✓ Reflection loop complete — meaning preserved (critique → revise → changed).' });
+    return { success: true, summary: `### 🌍 TRANSLATOR — into ${target}\n\n${produced.slice(0, 8000)}` };
   } catch (e) {
     return { success: false, summary: `### 🌍 TRANSLATOR\n\n⚠ Translation failed: ${e.message}` };
   }

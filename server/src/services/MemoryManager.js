@@ -431,11 +431,40 @@ const FACT_PATTERNS = [
   { re: /\bi (?:love|like|hate|prefer|enjoy)\s+["']?([^"'.,!?]{2,80})/i, build: (m) => `User likes ${m[1]}`, label: 'preference', importance: IMPORTANCE.fact },
 ];
 
+/** Skip fact extraction when the match sits inside a quoted third-party span
+ * (someone else's statement must never become the user's learned fact). */
+function insideQuotedSpan(s, idx) {
+  let inSpan = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '"' || c === '\u201c' || c === '\u201d') {
+      if (i > idx) return false;
+      inSpan = !inSpan;
+    }
+    if (i === idx && inSpan) return true;
+  }
+  return false;
+}
+
+/**
+ * Extract durable user facts — with anti-fabrication guards (Build 48, P2).
+ * A learned "fact" that was only hypothetical, a question, or a quote is a
+ * fabricated memory; err toward learning nothing over learning a lie.
+ *   - hypotheticals / counterfactuals ("if my favorite color were teal…") → skip
+ *   - questions ("is my favorite color teal?") → skip
+ *   - quoted third-party statements ("she said 'my favorite color is teal'") → skip
+ */
 function extractFactsFromMessage(text) {
+  const s = String(text || '').trim();
   const facts = [];
+  if (s.length < 6) return facts;
+  if (/\b(if|imagine|suppose|what if|let'?s say|for example|for instance|pretend|hypothetically|wish|maybe|could be|would be)\b/i.test(s)) return facts;
+  if (/\?\s*$/.test(s) || /^(what|which|when|where|who|why|how|is|are|am|do|does|did|can|could|should|would)\b/i.test(s)) return facts;
   for (const p of FACT_PATTERNS) {
-    const m = String(text || '').match(p.re);
+    const m = s.match(p.re);
     if (!m) continue;
+    const idx = m.index || s.search(p.re);
+    if (insideQuotedSpan(s, idx)) continue;
     const fact = p.build(m).replace(/\s+/g, ' ').trim();
     if (fact.length > 8) facts.push({ fact, label: p.label, importance: p.importance });
   }
