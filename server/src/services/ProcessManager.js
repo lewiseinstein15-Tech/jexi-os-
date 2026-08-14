@@ -82,6 +82,9 @@ export function getProcessLog(id) {
 export function startProcess(command, { cwd, label = '', timeoutMs = 90000 } = {}) {
   const id = `proc-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
   const runCwd = cwd || WORKSPACE_DIR;
+  // Fresh checkouts / clean containers don't ship the (gitignored) workspace
+  // dir; ensure the cwd exists so spawn() doesn't fail with ENOENT.
+  try { fs.mkdirSync(runCwd, { recursive: true }); } catch (e) { /* best effort */ }
   const record = {
     id, command, label: label || command.slice(0, 60), cwd: runCwd,
     status: 'running', createdAt: Date.now(), startedAt: Date.now(),
