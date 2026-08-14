@@ -30,7 +30,9 @@ const results = await orchestrator.executePlan(
   () => {}
 );
 ok(results.success, 'orchestrator succeeds without AI keys');
-ok(results.summary.includes('FROM YOUR BOOKS'), 'answer is labeled FROM YOUR BOOKS');
+// B51 P1 — the "FROM YOUR BOOKS" pipeline label is GONE; the answer is titled
+// by the book and cites it directly, with zero process narration.
+ok(!results.summary.includes('FROM YOUR BOOKS'), 'answer has NO pipeline label (B51 no-narration)');
 ok(results.summary.includes('My Biology Book.txt'), 'answer cites the book');
 ok(results.summary.toLowerCase().includes('photosynthesis'), 'answer contains the book content');
 

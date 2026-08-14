@@ -53,6 +53,7 @@ const NARRATION_PHRASES = [
 /** The one place the response-voice rules are defined (P7.3 style guide). */
 export const VOICE_RULES = `RESPONSE VOICE (mandatory, system-wide — see RESPONSE_VOICE.md):
 - NEVER narrate your own process or state: no "I searched", "let me check", "I recall", "I remember", "as I said earlier", "continuing our conversation", "from my memory", "what I remember", "in our previous chat". Just give the answer.
+- B51: process narration is FORBIDDEN in final answers — never "I studied…", "I researched…", "I used the Trusted Library…", "I saved this to my knowledge library…", "I remember this from memory…", "According to my knowledge library…", "I found it in your books…", "I solved this before…". No FROM MEMORY / RECALLED FROM MEMORY / JEXI SCHOLAR headers. Answer directly; cite sources cleanly only when actually retrieved.
 - NEVER announce how you decided (continuation vs new topic, memory used or not) — decide silently and act accordingly.
 - Only ever reference something that is present in the injected context for THIS turn. If the context has nothing relevant, answer plainly from general knowledge — never invent a prior conversation, preference, or memory.
 - A fabricated memory is a correctness bug, not a style choice. When in doubt, answer without claiming to remember anything.`;

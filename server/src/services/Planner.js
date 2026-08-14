@@ -33,6 +33,9 @@ export const TEAM_PLAN = {
   code_task: ['product', 'designer', 'engineer', 'ux-researcher', 'accessibility', 'architect', 'coder', 'runner', 'sandbox', 'debugger', 'qa', 'reviewer', 'critic', 'security', 'shipper', 'reflector', 'ui-developer', 'frontend', 'landing-page-builder', 'email-developer'],
   computer_use: ['navigator', 'vision', 'computer-use', 'reasoner', 'memory'],
   study_topic: ['scholar', 'researcher', 'history', 'science', 'document-analyst', 'memory'],
+  // B51 P2 — simple definitional/factual questions: model knowledge + optional
+  // memory, NO web/browser/study agents (cheapest correct tool first).
+  direct_answer: ['jexi', 'context-manager'],
   conversation: ['jexi', 'context-manager', 'archivist'],
   memory_query: ['memory', 'archivist', 'context-manager'],
   knowledge_recall: ['books', 'document-analyst', 'reasoner', 'memory'],
@@ -130,7 +133,7 @@ export const COMPOUND_DETECT = [
  */
 export const CLASSIFIER_INTENTS = [
   'image_recognition', 'clear_memory', 'link_analysis', 'math_solve', 'self_check',
-  'code_task', 'computer_use', 'study_topic', 'conversation', 'memory_query',
+  'code_task', 'computer_use', 'study_topic', 'direct_answer', 'conversation', 'memory_query',
   'knowledge_recall', 'news_latest', 'research', 'learning_research', 'explain_team',
   'github', 'translate', 'data', 'devops', 'docs', 'perf', 'compound_task',
   'creative_writing', 'business_plan', 'marketing_plan', 'event_planning', 'meal_plan',
@@ -151,7 +154,8 @@ export const ClassificationSchema = z.object({
 const CLASSIFIER_FEW_SHOTS = [
   { q: 'build me a study planner app with reminders', intent: 'code_task', reason: 'An app deliverable — the coding team builds it.' },
   { q: 'study calculus for my exam', intent: 'study_topic', reason: 'A topic to learn, NOT an app. Study, never code_task.' },
-  { q: 'what is the capital of kenya', intent: 'research', reason: 'A factual question — research answers it.' },
+  { q: 'what is the capital of kenya', intent: 'direct_answer', reason: 'A simple fact — answer directly, no web/study pipeline (B51 P2).' },
+  { q: 'what is computer science', intent: 'direct_answer', reason: 'Definitional — answer from knowledge, never study_topic/research (B51 P2).' },
   { q: 'my book explains photosynthesis — what does it say', intent: 'knowledge_recall', reason: 'Asks about the user\'s own book/library.' },
   { q: 'commit and push my code to github', intent: 'github', reason: 'A real git operation.' },
   { q: 'translate this to french: good morning', intent: 'translate', reason: 'A translation request.' },
@@ -172,6 +176,7 @@ Rules:
 - Choose EXACTLY ONE intent. Never invent new intents.
 - "build/ create/ make/ develop + app/ website/ tool/ tracker/ planner/ calculator..." is ALWAYS code_task — even when the subject mentions study, data, news, etc. The DELIVERABLE decides, not the subject.
 - A topic the user wants to LEARN (no app deliverable) is study_topic, study_exam or research — never code_task.
+- Simple "what is X" / definitional / one-line factual questions are direct_answer — answered from knowledge, NEVER research or study_topic. Research is only for questions needing current or multi-source external evidence.
 - Answers about the user's own books/knowledge library are knowledge_recall.
 - Latest/breaking news is news_latest. Facts from the web are research.
 - Concrete math (equations, derivatives, integrals, calculations) is math_solve.
@@ -347,7 +352,7 @@ export class Planner {
 
 Examples:\n${shots}
 
-NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" → code_task (an APP!) — never study_topic\n- "study calculus" → study_topic (a TOPIC!) — never code_task\n- "write documentation for my code" → docs — never code_task\n- "make my app faster" → perf — never code_task\n- "latest news about X" → news_latest — never research\n\nUser request: "${query}"\n\nReturn ONLY valid JSON: {"intent": "...", "confidence": 0.0-1.0, "teamSlugs": [...], "reasoning": "..."}`;
+NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" → code_task (an APP!) — never study_topic\n- "study calculus" → study_topic (a TOPIC!) — never code_task\n- "write documentation for my code" → docs — never code_task\n- "make my app faster" → perf — never code_task\n- "latest news about X" → news_latest — never research\n- "what is computer science" → direct_answer (definitional — answer from knowledge, NO study/research pipeline)\n- "what is the capital of Kenya" → direct_answer (simple fact — no web/study)\n- "study computer science for my exam" → study_topic (explicit learning request)\n\nUser request: "${query}"\n\nReturn ONLY valid JSON: {"intent": "...", "confidence": 0.0-1.0, "teamSlugs": [...], "reasoning": "..."}`;
       const raw = await generateContent(prompt, CLASSIFIER_SYSTEM, null, { temperature: 0 });
       const parsed = extractJson(raw);
       if (!parsed) return null;
@@ -591,6 +596,19 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
       };
     }
 
+    // 8.95 DIRECT ANSWER (B51 P2) — simple definitional / factual questions
+    //     that need no external evidence are answered directly from model
+    //     knowledge + optional memory: NO web search, NO browser, NO study
+    //     pipeline. Kept BEFORE the research fallback. Excluded when the
+    //     question needs current/external data or explicitly asks to learn.
+    const directAnswerQ = /^(what is|what are|what'?s|define|what does|what do|explain (briefly )?what|who is|who was|where is)\b/i.test(q.trim())
+      || /\b(meaning of|definition of|capital of|what is the capital of|difference between)\b/i.test(q);
+    const needsExternal = /weather|forecast|temperature|price|cost of|stock|share price|latest|breaking|news|score|result|election|president|prime minister|current (time|date)|traffic|live\b/i.test(q);
+    const wantsLearning = /study|master|learn (everything|about|to)|research|search|find|look up|compare sources/i.test(q);
+    if (directAnswerQ && !needsExternal && !wantsLearning) {
+      return { intent: 'direct_answer', tasks: ['jexi', 'context-manager'], reasoning: 'Simple definitional/factual question — answered directly from knowledge, no web or study pipeline needed.' };
+    }
+
     // 9. Research / search / facts
     const isResearch = /search|research|find|look up|google|what is|who is|when did|where is|why does|how to|explain|latest|news|history|capital|population|meaning|difference between|benefits of|types of|top \d/i.test(q);
     if (isResearch) {
@@ -645,7 +663,7 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
       [/(android|iphone|ios|react native|flutter|mobile app|app store|play store|publish (my|the) app)/i, { intent: 'mobile_app', tasks: ['mobile-engineer', 'ios-engineer', 'android-engineer', 'react-native-engineer'], reasoning: 'Mobile task — the mobile team builds for the platform.' }],
       [/game (design|mechanics|idea|concept|dev)|unity (game|project)|unreal (engine|game)|make (a |my )?game (better|more fun)|game developer/i, { intent: 'game_dev', tasks: ['game-developer', 'designer', 'coder'], reasoning: 'Game task — the game team designs and builds it.' }],
       [/decorate (my|the) (room|house|home|apartment)|interior design|organi[sz]e (my|the) (room|house|closet|garage)|declutter|home (setup|improvement)|gardening|garden (plan|ideas|design)/i, { intent: 'home_life', tasks: ['home-org', 'interior-designer', 'gardener'], reasoning: 'Home/life task — the home team plans the space.' }],
-      [/(legal|contract|agreement|terms of service|privacy policy|non[- ]disclosure|nda|lease|draft (a|an|my|the) (contract|agreement|lease|terms)|compliance review|intellectual property|trademark|copyright)/i, { intent: 'legal_task', tasks: ['legal-drafter', 'negotiator', 'legal'], reasoning: 'Legal task — the legal team drafts documents and gives plain-language guidance.' }],
+      [/(legal|contract|agreement|terms of service|privacy policy|non[- ]disclosure|\bnda\b|lease|draft (a|an|my|the) (contract|agreement|lease|terms)|compliance review|intellectual property|trademark|copyright)/i, { intent: 'legal_task', tasks: ['legal-drafter', 'negotiator', 'legal'], reasoning: 'Legal task — the legal team drafts documents and gives plain-language guidance.' }],
     ];
     for (const [re, res] of rules) {
       if (re.test(q)) return res;

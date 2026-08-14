@@ -66,11 +66,15 @@ check('function predicate is used as-is', successPredicateFromCriterion((code) =
   check('runs reflect 3 executions', runs.length === 3);
 }
 
-// 3. Hard budget: a fixer that never fixes → loop stops at maxAttempts, fails.
+// 3. Hard budget: a fixer that never fixes, with a DIFFERENT error every run,
+// → the loop grinds to maxAttempts and fails (the identical-error escalation
+// guard must NOT trip here, since the errors vary — that path is covered by
+// test-b51.js P5).
 {
   const store = new Map();
   store.set('never.js', 'throw new Error("always");');
-  const runCommand = async () => ({ exitCode: 1, output: 'Error: always' });
+  let n = 0;
+  const runCommand = async () => ({ exitCode: 1, output: `Error: attempt-variant-${++n}` });
   const writeFiles = async () => {};
   const fixer = async () => ({ files: [{ name: 'never.js', code: 'throw new Error("always");' }], entryPoint: 'never.js' });
   const res = await runCodingLoop({
@@ -78,6 +82,7 @@ check('function predicate is used as-is', successPredicateFromCriterion((code) =
     runCommand, writeFiles, fixer, successCriterion: 'exit-zero', maxAttempts: 4, sendEvent: () => {},
   });
   check('budget exhausted at 4 attempts', res.attempts === 4);
+  check('budget exhaustion did not trip escalation (errors varied)', res.escalated !== true);
   check('budget exhaustion reports failure', res.success === false);
 }
 

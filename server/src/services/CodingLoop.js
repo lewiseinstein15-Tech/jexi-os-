@@ -122,6 +122,14 @@ export async function runCodingLoop(opts) {
   let attempts = 0;
   const attemptsLog = [];
 
+  // B51 P5 — repeated-failure guard: the SAME error text seen IDENTICAL_STREAK
+  // times means blind re-fixing is wasting attempts → escalate (change strategy)
+  // instead of re-running the exact same step again.
+  const IDENTICAL_STREAK = 3;
+  let lastErrorSig = null;
+  let identicalStreak = 0;
+  const errorSignature = (output) => String(output || '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 500);
+
   for (let i = 1; i <= maxAttempts; i++) {
     attempts = i;
     // Attempt 1 runs the given code; later attempts run after a fix.
@@ -135,6 +143,20 @@ export async function runCodingLoop(opts) {
     if (ok) {
       emit('log', { agent: 'Runner', message: `✅ Success predicate PASSED on attempt ${i}.` });
       return { attempts, success: true, lastOutput, lastExitCode, files, entryPoint, attemptsLog };
+    }
+
+    // Repeated-failure guard: identical error N times → escalate, don't re-run
+    // the exact same step blindly (B51 P5).
+    const sig = errorSignature(run.output);
+    if (sig && sig === lastErrorSig) {
+      identicalStreak += 1;
+    } else {
+      identicalStreak = 1;
+    }
+    lastErrorSig = sig;
+    if (identicalStreak >= IDENTICAL_STREAK) {
+      emit('log', { agent: 'Debugger', message: `⚠ Same error repeated ${IDENTICAL_STREAK}x — escalating instead of re-fixing blindly.` });
+      return { attempts, success: false, escalated: true, repeatedError: String(run.output).slice(0, 1200), lastOutput, lastExitCode, files, entryPoint, attemptsLog };
     }
 
     if (i >= maxAttempts) {

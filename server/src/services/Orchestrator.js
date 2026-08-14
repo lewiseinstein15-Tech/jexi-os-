@@ -27,6 +27,7 @@ import { IDENTITY_ANSWER } from './JexiIdentity.js';
 import { groundednessCheck } from './Groundedness.js'; // B48 P2a — strip ungrounded memory claims before they reach the user
 import { preferencesBlock, recallPreferences } from './PreferenceLearner.js';
 import { verifyAnswer } from './VerificationLoop.js';
+import { sanitizeFinalAnswer } from './AnswerSanitizer.js'; // B51 P1/P7 — no process narration reaches the user
 import { rosterStats } from './AgentRoster.js';
 import {
   addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory, topUserFacts,
@@ -153,7 +154,7 @@ export class Orchestrator {
     const keys = resolveKeys();
     if (!keys.groqKey && !keys.geminiKey) {
       const top = items[0];
-      return `### 📚 JEXI OS — FROM YOUR BOOKS\n\nI found this in **${top.title}** (direct quote — no AI key needed):\n\n> ${top.content.slice(0, 2500)}`;
+      return `## ${top.title}\n\n> ${top.content.slice(0, 2500)}`;
     }
 
     const reply = await generateContent(
@@ -162,7 +163,8 @@ export class Orchestrator {
       null,
       { temperature: 0.3 }
     );
-    return `### 📚 JEXI OS — FROM YOUR BOOKS\n\n${reply}`;
+    // B51 P1 — no "FROM YOUR BOOKS" pipeline header; just the grounded answer.
+    return reply;
   }
 
   /** Wrap an original switch-case body into a graph node (P1/P3/P8). */
@@ -171,7 +173,9 @@ export class Orchestrator {
       const { results, sendEvent, opts } = state.context;
       const query = state.query;
       const plan = state.plan;
-      await body({ results, sendEvent, query, plan, opts });
+      // B51 P5 — bodies get `state` so they can set outcome/retry + failure
+      // history for real correction paths (backward compatible: extra arg).
+      await body({ results, sendEvent, query, plan, opts, state });
       // P5 — the body requested confirmation. The confirm callback writes to
       // the SHARED opts handle (same reference the runner copied), so the
       // pause request is detected here and the graph parks at confirmationPause
@@ -309,6 +313,12 @@ export class Orchestrator {
     N.responder = async (state) => {
       // Finalize the normalized AgentResult every caller receives.
       const results = state.context.results;
+      // B51 P1/P7 — belt-and-braces: strip any narration that still leaked
+      // through before the summary becomes the final user-facing answer.
+      if (typeof results.summary === 'string' && results.summary.length) {
+        const clean = sanitizeFinalAnswer(results.summary);
+        if (clean && clean.length) results.summary = clean;
+      }
       state.agentResult = normalizeAgentResult(results);
       state.status = 'done';
       return state;
@@ -573,6 +583,39 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
       return results;
     });
 
+    // B51 P2 — DIRECT ANSWER: simple definitional / factual questions answered
+    // from model knowledge + optional short memory recall. NO web search, NO
+    // browser, NO Trusted Library, NO study pipeline (cheapest correct tool).
+    N.directAnswer = this.wrapCase('directAnswer', async ({ results, sendEvent, query, plan }) => {
+      // 1. A short memory/knowledge recall can enrich the direct answer without
+      //    any external tooling. Never blocks; never narrates (B51 P1).
+      let memoryCtx = '';
+      try {
+        const ctx = await conversationContext(query);
+        if (ctx) memoryCtx = ctx;
+      } catch (e) {}
+
+      // 2. Answer directly from knowledge.
+      const reply = await generateContent(
+        `Answer this directly and completely: "${query}"\n\n${memoryCtx ? `Use this conversation context ONLY to resolve references — never announce it:\n${memoryCtx}` : ''}\nLead with the answer. Keep it proportionate: a definition gets a clear, well-structured explanation (short paragraphs, headings where helpful) — not a research report.`,
+        JEXI_SYSTEM_PROMPT + preferencesBlock()
+      );
+      let draft = String(reply || '').trim() || `I don't have a solid answer for that right now — try rephrasing or ask for a deeper study of the topic.`;
+
+      // 3. B51 P4 — verification gate: a bad/unsupported draft is revised
+      //    before it becomes the final summary.
+      try {
+        const verified = await verifyAnswer({ query, draft, sources: [], sendEvent, opts: { minLength: 160 } });
+        if (verified.changed) draft = verified.text;
+        if (verified.verdict === 'verified' || verified.changed) results.statistics.verification = { rounds: verified.rounds, verdict: verified.verdict };
+      } catch (e) {}
+
+      try { addChat('jexi', draft); } catch (e) {}
+      results.summary = draft;
+      results.statistics.confidence = 92;
+      return results;
+    });
+
     N.research = this.wrapCase('research', async ({ results, sendEvent, query, plan }) => {
       // 1. The user's own books/library come FIRST — grounded answers from their materials
       try {
@@ -593,7 +636,8 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
         const remembered = await searchInternetKnowledge(query);
         if (remembered) {
           sendEvent('log', { agent: 'Memory Agent', message: '✓ Found this in my memory — serving it directly.' });
-          results.summary = `### 🧠 JEXI OS — FROM MEMORY\n\n${remembered.answer}`;
+          // B51 P1 — no "FROM MEMORY" header; just the answer.
+          results.summary = remembered.answer;
           if (remembered.sources?.length) results.sources = remembered.sources.map(s => ({ title: s, link: s }));
           results.statistics.confidence = 92;
           return results;
@@ -604,7 +648,13 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
       //    (Query Analyzer → Searcher → Re-ranker → Extractor → Synthesizer).
       //    Pass the recent thread so references like "this course" resolve
       //    inside the team too (continuity across turns).
-      const team = await runSearchTeam(query, sendEvent, { context: conversationTranscript(6) });
+      //    B51 P5 — a previous verification failure injects the SPECIFIC
+      //    missing claims so the re-entry fixes them, not a generic re-run.
+      const retryClaims = state.context.retryWithClaims;
+      const effectiveQuery = retryClaims && retryClaims.length
+        ? `${query}\n\n[Verification follow-up — these specific claims were flagged as unsupported, verify each with a real source: ${retryClaims.join(' | ')}]`
+        : query;
+      const team = await runSearchTeam(effectiveQuery, sendEvent, { context: conversationTranscript(6) });
       results.sources = team.sources.slice(0, 5).map(s => ({ title: s.title, link: s.link }));
 
       if (team.sources.length === 0) {
@@ -637,6 +687,21 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
         sendEvent('log', { agent: 'Critic', message: '✓ Answer verified clean.' });
       }
 
+      // B51 P5 — correction path: the fact-checker still reports issues after
+      // revision → re-enter THIS node with the specific missing claims (bounded
+      // to one re-entry; the second failure escalates to an honest answer).
+      if (verified.verdict === 'best-effort' && verified.issues && verified.issues.length) {
+        const prior = state.context.failureHistory || [];
+        if (!prior.some((f) => f.node === 'research')) {
+          state.context.failureHistory = [...prior, { node: 'research', issues: verified.issues.slice(0, 5), query }];
+          state.context.retryWithClaims = verified.issues.slice(0, 5);
+          state.outcome = 'retry';
+          sendEvent('log', { agent: 'Fact Checker', message: `↻ Re-entering research with ${verified.issues.length} specific missing claim(s) to fix.` });
+          return results;
+        }
+        sendEvent('log', { agent: 'Fact Checker', message: '⚠ Verification still flagged issues after retry — shipping the best-effort honest answer.' });
+      }
+
       // DOMAIN VERIFICATION (stage 16) — deterministic research checks on
       // top of the fact-check loop: sources linked, structure present.
       try {
@@ -652,7 +717,18 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
     N.studyTopic = this.wrapCase('studyTopic', async ({ results, sendEvent, query, plan }) => {
       const topic = plan.payload || query;
       const content = await studyTopic('07_GENERAL_KNOWLEDGE', topic, sendEvent);
-      results.summary = `### 📚 JEXI SCHOLAR\n\nI studied **${topic}** using the Trusted Library (Wikipedia, Project Gutenberg, arXiv, Open Library) and saved it to my knowledge library.\n\n${content.slice(0, 4000)}`;
+      // B51 P1 — NO process narration. The user gets the study content, titled
+      // only, never "I studied … using the Trusted Library … saved it".
+      let draft = content && String(content).trim().length
+        ? `## ${topic}\n\n${content.slice(0, 4000)}`
+        : `## ${topic}\n\nI could not gather enough material on this topic right now — try again in a moment.`;
+      // B51 P4 — study drafts go through the verification gate before final.
+      try {
+        const verified = await verifyAnswer({ query, draft, sources: [], sendEvent });
+        if (verified.changed) draft = verified.text;
+        if (verified.verdict === 'verified' || verified.changed) results.statistics.verification = { rounds: verified.rounds, verdict: verified.verdict };
+      } catch (e) {}
+      results.summary = draft;
       results.statistics.confidence = 100;
       return results;
     });
@@ -688,7 +764,8 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
         const fresh = await searchFreshInternetKnowledge(query, 30 * 60 * 1000);
         if (fresh) {
           sendEvent('log', { agent: 'Memory Agent', message: '✓ Already gathered fresh news on this — serving it instantly.' });
-          results.summary = `### 🧠 JEXI OS — FROM MEMORY (news I just gathered)\n\n${fresh.answer}`;
+          // B51 P1 — no memory/process header; just the news.
+          results.summary = fresh.answer;
           if (fresh.sources?.length) results.sources = fresh.sources.map(s => ({ title: s, link: s }));
           results.statistics.confidence = 90;
           return results;
@@ -882,7 +959,8 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
         const remembered = await searchCodingKnowledge(effQuery);
         if (remembered) {
           sendEvent('log', { agent: 'Memory Agent', message: '✓ Found a solution I built before — reusing it.' });
-          results.summary = `### 🧠 JEXI OS — RECALLED FROM MEMORY\n\nI solved this before, so I'm giving you the verified solution.\n\n${remembered.solution}\n\n${remembered.files?.length ? `**Files:** ${remembered.files.join(', ')}` : ''}`;
+          // B51 P1 — no "RECALLED FROM MEMORY / I solved this before" narration.
+          results.summary = `## ${effQuery}\n\n${remembered.solution}${remembered.files?.length ? `\n\n**Files:** ${remembered.files.join(', ')}` : ''}`;
           results.statistics.confidence = 95;
           c.done = true;
           return state; // edge → responder
@@ -1144,9 +1222,8 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
         ? `\n\n**🔗 LIVE PREVIEW:** [Open ${c.entryPoint}](${c.previewUrl})\n*(hosted for free — works in any browser, share the link with anyone)*`
         : '';
 
-      const teamLine = c.teamPlan
-        ? '\n\n**🏢 Team:** Product → Designer → Engineer → Coder → QA Lead → Reviewer → Security Officer → Shipper → Reflector'
-        : '\n\n**🏢 Team:** Coder → QA Lead → Reviewer → Security Officer → Shipper → Reflector';
+      // B51 P1 — no process narration: the build result is the files, real
+      // test output, and links. The pipeline sentence + team list are gone.
       const qaSection = c.qaReport ? `\n\n**🧪 QA REPORT**\n${c.qaReport}` : '';
       const reviewSection = c.reviewNotes ? `\n\n**🔍 REVIEW NOTES**\n${c.reviewNotes}` : '';
       const securitySection = c.securityNotes ? `\n\n**🛡 SECURITY REVIEW**\n${c.securityNotes}` : '';
@@ -1158,7 +1235,7 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
         : c.qaVerdict === 'NEEDS FIX'
           ? '\n\n> ⚠ **QA verdict: NEEDS FIX.** The app runs, but QA found issues — ask me to fix them.'
           : '';
-      results.summary = `### 💻 JEXI TEAM — PLANNED, BUILT, TESTED & SHIPPED\n\n✅ The full agent team worked together: planned, wrote, ran, QA-tested, security-checked and reviewed your app.${teamLine}${previewLine}${qaSection}${reviewSection}${securitySection}${shipSection}${reflectSection}${gateNote}${planSection}\n\n${fileSections}\n\n**Test Output:**\n${finalOutput || '✓ Ran successfully.'}\n\n**Download the files:**\n${workspaceLinks}`;
+      results.summary = `### 💻 BUILD READY\n\n${previewLine}${qaSection}${reviewSection}${securitySection}${shipSection}${gateNote}${planSection}\n\n${fileSections}\n\n**Test Output:**\n${finalOutput || '✓ Ran successfully.'}\n\n**Download the files:**\n${workspaceLinks}`;
       results.files = files;
       results.previewUrl = c.previewUrl || undefined;
       results.statistics.confidence = 100;
@@ -1198,6 +1275,7 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
         case 'link_analysis': return 'linkAnalysis';
         case 'computer_use': return 'computerUse';
         case 'math_solve': return 'mathSolve';
+        case 'direct_answer': return 'directAnswer'; // B51 P2
         case 'code_task': return 'codePipeline';
         case 'research':
         case 'learning_research': return 'research';

@@ -9,7 +9,12 @@ const tests = [
   { q: 'run a system health check and monitor yourself for any errors', expect: 'self_check' },
   { q: 'Build me a python script that prints hello world', expect: 'code_task' },
   { q: 'fix this code, it has errors and it does not work', expect: 'code_task' },
-  { q: 'What is the capital of Kenya?', expect: 'research' },
+  // B51 P2 — simple factual questions answer directly, no web/study pipeline.
+  { q: 'What is the capital of Kenya?', expect: 'direct_answer' },
+  { q: 'define photosynthesis', expect: 'domain:biology' },
+  { q: 'who is albert einstein', expect: 'direct_answer' },
+  { q: 'what is the meaning of life', expect: 'direct_answer' },
+  { q: 'what does the standard deviation tell us', expect: 'domain:statistics' },
   { q: 'hello there', expect: 'conversation' },
   { q: 'who are you and who built you?', expect: 'conversation' },
   { q: 'what do you remember about me?', expect: 'memory_query' },
@@ -78,7 +83,7 @@ const confirmTests = [
   { q: 'I want an app that reminds me to drink water', expect: 'code_task' },
   { q: 'tell me about solar panels', expect: 'domain:energy-engineering' },
   { q: 'I want to understand quantum physics', expect: 'domain:physics' },
-  { q: 'what is the capital of Kenya', expect: 'research' },
+  { q: 'what is the capital of Kenya', expect: 'direct_answer' },
   // Math topic words alone are NOT a solve request (regression for the trusted-library test)
   { q: 'study calculus', expect: 'study_topic' },
   { q: 'what is calculus', expect: 'domain:mathematics' },
@@ -151,7 +156,8 @@ for (const { q, expect } of computerUseTests) {
 // ...but plain research and coding must NOT grab the visible browser.
 const notComputerUseTests = [
   { q: 'search the internet for quantum computing news', expect: 'domain:quantum-computing' },
-  { q: 'what is the capital of France', expect: 'research' },
+  // B51 P2 — direct answer (no browser), matching the block's name/intent.
+  { q: 'what is the capital of France', expect: 'direct_answer' },
   { q: 'build me a browser game', expect: 'code_task' },
 ];
 for (const { q, expect } of notComputerUseTests) {

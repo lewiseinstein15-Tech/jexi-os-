@@ -90,7 +90,8 @@ check('"run offline via ollama" → offline_mode', (await cls('run this offline 
 check('"speak this out loud" → voice_command', (await cls('speak this out loud')) === 'voice_command');
 check('"install a plugin" → plugin_task', (await cls('install a plugin for github')) === 'plugin_task');
 check('chaos only with flag', (await cls('inject a provider timeout', { chaos: true })) === 'chaos_test' && (await cls('inject a provider timeout')) !== 'chaos_test');
-check('ordinary questions unchanged', (await cls('what is the capital of france')) === 'research');
+// B51 P2 — simple facts answer directly (no web/study pipeline).
+check('simple factual question → direct_answer', (await cls('what is the capital of france')) === 'direct_answer');
 check('code still routes to code_task', (await cls('build me a calculator app')) === 'code_task');
 
 /* ---------------- Observability Agent ---------------- */

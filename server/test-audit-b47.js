@@ -125,7 +125,9 @@ const ok = (cond, label) => { console.log(`${cond ? '✅' : '❌'} ${label}`); i
   planner._classifyLLM = async () => { throw new Error('provider down'); };
   const plan = await planner.analyzeIntent('what is the capital of kenya', {});
   planner._classifyLLM = original;
-  ok(plan.intent === 'research', 'P2: LLM classification failure routes to the fallback, never a crash');
+  // B51 P2 — the deterministic fallback for a simple fact is now direct_answer
+  // (no web/study pipeline). The contract under test is: fallback, never crash.
+  ok(plan.intent === 'direct_answer', 'P2: LLM classification failure routes to the fallback, never a crash');
 }
 
 // 2d. The confusable pair stays distinct through the deterministic path.
