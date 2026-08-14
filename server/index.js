@@ -39,7 +39,7 @@ import { listHooks, addHook, updateHook, removeHook } from './src/services/HookE
 import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services/PluginRegistry.js';
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications } from './src/services/NotificationCenter.js';
 import { modelRoutingTable, providerPreferenceForIntent } from './src/services/ModelRouting.js';
-import { MCP_PORT, MCP_TOOL_ALLOWLIST } from './mcp-server.js';
+import { MCP_PORT, MCP_TOOL_ALLOWLIST, listMcpTools } from './mcp-server.js';
 import { trustStatus, setTrustMode, allowPattern, denyPattern, removeDecision, clearTrust, trustFolder } from './src/services/RiskGuard.js';
 import { computerStatus, runtimeCall } from './src/services/ComputerRuntime.js';
 import { listTasks, getTask, updateTask, deleteTask, taskStats as taskRegistryStats } from './src/services/TaskRegistry.js';
@@ -534,8 +534,11 @@ app.get('/api/mcp/status', (req, res) => {
     mounted: true,
     endpoint: '/mcp',
     port: MCP_PORT,
-    tools: MCP_TOOL_ALLOWLIST || [],
-    docs: 'Any MCP client can connect to /mcp and call the allowlisted tools.'
+    // B55 P4 — built-in allowlist + any generic MCP tools attached via
+    // registerMcpTool() (each carries its risk tier).
+    tools: listMcpTools(),
+    allowlist: MCP_TOOL_ALLOWLIST || [],
+    docs: 'Any MCP client can connect to /mcp and call the allowlisted tools. Generic MCP tools can be attached via registerMcpTool (EXTERNAL tier only — approval required).'
   });
 });
 

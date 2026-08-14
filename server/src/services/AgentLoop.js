@@ -19,7 +19,7 @@
 
 import { Planner } from './Planner.js';
 import { getTool } from './ToolRegistry.js';
-import { executeTool, activeToolProfile, TOOL_PROFILES } from './ToolRuntime.js';
+import { executeTool, activeToolProfile, TOOL_PROFILES, isToolDone } from './ToolRuntime.js';
 import { generateContent } from './LLMClient.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { preferencesBlock } from './PreferenceLearner.js';
@@ -166,9 +166,21 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         toolContext.push({ tool: call.tool, args: call.args, error: 'Tool not in allowed set' });
         continue;
       }
-      const res = await executeTool({ slug: call.tool, args: call.args || {}, profile, sendEvent: emit });
-      toolContext.push({ tool: call.tool, args: call.args || {}, ok: res.ok, result: res.result, error: res.error });
-      if (res.ok) allFailed = false;
+      // B55 P1/P5 — thread the graph's confirm callback so an EXTERNAL-tier
+      // tool pauses for ONE human approval with real finalized details, and
+      // only a REAL completed execution counts as a done step (a routed/
+      // pending/blocked result is never reported as finished).
+      const res = await executeTool({ slug: call.tool, args: call.args || {}, profile, sendEvent: emit, confirm: opts.confirm });
+      const done = isToolDone(res);
+      toolContext.push({ tool: call.tool, args: call.args || {}, ok: res.ok, done, routed: res.routed === true, pending: res.paused === true || res.approvalRequired === true, result: res.result, error: res.error });
+      if (done) allFailed = false;
+      if (res.paused || res.approvalRequired) {
+        emit('agent.log', { message: `⏸ ${call.tool} is an external action and needs your approval (real finalized details shown) — waiting for your yes/no before it can run.` });
+        break; // the graph parks at confirmationPause; nothing runs until approved
+      }
+      if (res.routed) {
+        emit('agent.log', { message: `🧭 ${call.tool} is routed to its owning agents for the pipeline — it did NOT execute here, so it is not counted as a completed step.` });
+      }
       if (res.blocked) {
         emit('agent.log', { message: `⛔ ${call.tool} blocked by permission profile "${profile}".` });
         break;

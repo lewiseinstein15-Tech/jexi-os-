@@ -162,6 +162,72 @@ export function toolPermission(slug) {
   return 'medium'; // writes to JEXI's own data (memory, knowledge) or external reads
 }
 
+/* ------------------------------------------------------------------ */
+/* B55 P1 — OpenWorker risk-tiered execution (layered on top of the    */
+/* existing permission system; nothing here replaces it).              */
+/*                                                                     */
+/*   read        — no side effects (search, lookup, comparison)        */
+/*                 → ALWAYS autonomous, never confirm                  */
+/*   write_local — scoped mutation of the user's own data/workspace    */
+/*                 (drafting, editing, saving) → ALWAYS autonomous     */
+/*   exec        — running code / commands → autonomous by default,    */
+/*                 logged, reversible only (RiskGuard already blocks   */
+/*                 HIGH/irreversible calls)                            */
+/*   external    — spends money, sends something externally, or is     */
+/*                 irreversible → ALWAYS requires ONE explicit human   */
+/*                 approval showing REAL finalized details             */
+/* ------------------------------------------------------------------ */
+
+/** Static tier per tool slug (args can refine it, e.g. mcp-call). */
+const TOOL_TIERS = {
+  // read
+  'web-search': 'read', 'wikipedia-lookup': 'read', 'arxiv-search': 'read', 'market-research': 'read',
+  'competitor-scan': 'read', 'deep-read': 'read', 'pdf-extract': 'read', 'trusted-library': 'read',
+  'book-fetch': 'read', 'news-feed': 'read', 'trend-scan': 'read', 'memory-recall': 'read',
+  'knowledge-search': 'read', 'profile-read': 'read', 'semantic-search': 'read', 'summarize-doc': 'read',
+  'video-analyze': 'read', 'video-transcript': 'read', 'data-crunch': 'read', 'stats-compute': 'read',
+  'self-diagnose': 'read',
+  // write_local
+  'memory-write': 'write_local', 'knowledge-save': 'write_local', 'episode-save': 'write_local',
+  'code-write': 'write_local', 'memory-clear': 'write_local',
+  // exec
+  'code-run': 'exec', 'git-status': 'exec', 'branch-manage': 'exec', 'issue-track': 'exec',
+  'tab-manage': 'exec',
+  // external
+  'github-cli': 'external', 'browser-drive': 'external', 'form-fill': 'external',
+  'mcp-call': 'external', // refined by args below — the default is CONFIRM, per OpenWorker
+};
+
+/**
+ * Built-in MCP tools on JEXI's allowlist are read-only by its MCP safety
+ * model (ask_jexi writes only into WORKSPACE_DIR through the same safe
+ * pipeline; the rest are pure reads). Any OTHER mcp-call target defaults to
+ * 'external' — conservative: unknown/registered-external tools require the
+ * one-time human approval before they can run.
+ */
+const BUILTIN_MCP_READ_TOOLS = new Set(['ask_jexi', 'memory_lookup', 'knowledge_search', 'list_books', 'get_health']);
+
+/** Refine the tier from the actual call args (call-level, not just slug). */
+export function toolTier(slug, args = {}) {
+  if (slug === 'mcp-call') {
+    const name = String(args.tool || '');
+    return BUILTIN_MCP_READ_TOOLS.has(name) ? 'read' : 'external';
+  }
+  return TOOL_TIERS[slug] || 'read';
+}
+
+/**
+ * B55 P5 — is this tool result a REAL completed execution? A tool call is
+ * only "done" when the actual tool response confirms it: routed (planned but
+ * not executed), paused (awaiting approval) and blocked results are NOT done.
+ */
+export function isToolDone(res) {
+  if (!res || res.ok !== true) return false;
+  if (res.routed === true) return false; // registry-only: never claimed as done
+  if (res.paused === true || res.approvalRequired === true) return false;
+  return true;
+}
+
 /** Permission profiles the user can pick in Settings. */
 export const TOOL_PROFILES = {
   auto: { label: 'Auto', desc: 'Auto-run safe + medium tools; risky tools are blocked', allow: ['safe', 'medium'] },
@@ -303,7 +369,7 @@ function formatResult(result) {
  * Execute a tool by slug with full gating + observability.
  * Returns { ok, permission, profile, durationMs, result, error, approvalRequired }.
  */
-export async function executeTool({ slug, args = {}, profile, intent, sendEvent }) {
+export async function executeTool({ slug, args = {}, profile, intent, sendEvent, confirm }) {
   const started = Date.now();
   const emit = (type, payload) => { try { if (typeof sendEvent === 'function') sendEvent(type, payload); } catch (e) {} };
   const tool = getTool(slug);
@@ -324,8 +390,9 @@ export async function executeTool({ slug, args = {}, profile, intent, sendEvent 
 
   const perm = toolPermission(slug);
   const useProfile = profile || activeToolProfile();
+  const tier = toolTier(slug, args); // B55 P1 — OpenWorker risk tier
 
-  emit('tool.start', { tool: slug, name: tool.name, permission: perm, profile: useProfile, args: safeArgs(slug, args) });
+  emit('tool.start', { tool: slug, name: tool.name, permission: perm, tier, profile: useProfile, args: safeArgs(slug, args) });
 
   // HOOK ENGINE (stage 22) — PreToolUse gate, fail-open (only deny blocks).
   const gate = runHooks('beforeTool', { tool: slug, query: args.query || args.url || args.command || '' }, (t, d) => emit(t, d));
@@ -373,6 +440,41 @@ export async function executeTool({ slug, args = {}, profile, intent, sendEvent 
     return invalid;
   }
 
+  // B55 P1 — EXTERNAL tier gate (OpenWorker): anything that spends money,
+  // sends something externally, or is irreversible ALWAYS requires ONE
+  // explicit human approval showing the REAL finalized details (never
+  // placeholders). read / write_local / exec run autonomously by default.
+  if (tier === 'external') {
+    const details = buildFinalizedDetails(slug, args);
+    const payload = {
+      risk: 'irreversible',
+      tier: 'external',
+      node: 'tool',
+      tool: slug,
+      action: slug,
+      details,
+      question: `⚠ This is an **external** action (spends money, sends something out, or is irreversible).\n\n**Finalized details:** ${details}\n\nSay **yes** to run it exactly as shown, or **no** to cancel.`,
+    };
+    if (typeof confirm === 'function') {
+      const decision = await confirm(payload);
+      if (decision === false) {
+        const declined = { ok: false, declined: true, tool: slug, tier, approvalRequired: false, error: `Cancelled — I won't run ${slug}. Tell me if you change your mind.`, durationMs: Date.now() - started };
+        emit('tool.result', { tool: slug, ok: false, declined: true, error: declined.error, durationMs: declined.durationMs });
+        return declined;
+      }
+      if (decision === 'paused') {
+        const paused = { ok: false, paused: true, approvalRequired: true, tool: slug, tier, error: 'Approval requested — resuming after the user confirms.', durationMs: Date.now() - started };
+        emit('tool.result', { tool: slug, ok: false, paused: true, approvalRequired: true, durationMs: paused.durationMs });
+        return paused;
+      }
+      // decision === true → approved, run below.
+    } else {
+      const needApproval = { ok: false, approvalRequired: true, tool: slug, tier, error: `${slug} is an external action and needs your approval before it can run. ${details}`, details, durationMs: Date.now() - started };
+      emit('tool.result', { tool: slug, ok: false, approvalRequired: true, error: needApproval.error, durationMs: needApproval.durationMs });
+      return needApproval;
+    }
+  }
+
   try {
     const result = await withTimeout(runEngine(slug, args), 60000);
     // P4 — fail closed on malformed tool OUTPUT (never a silent empty reply).
@@ -396,7 +498,7 @@ export async function executeTool({ slug, args = {}, profile, intent, sendEvent 
       return { ...routed, permission: perm, durationMs: Date.now() - started };
     }
     runHooks('afterTool', { tool: slug, query: args.query || args.url || args.command || '', ok: true }, (t, d) => emit(t, d));
-    const ok = { ok: true, tool: slug, permission: perm, result: formatResult(result), durationMs: Date.now() - started };
+    const ok = { ok: true, tool: slug, permission: perm, tier, result: formatResult(result), durationMs: Date.now() - started };
     emit('tool.result', { tool: slug, ok: true, durationMs: ok.durationMs, preview: String(ok.result).slice(0, 300) });
     return ok;
   } catch (e) {
@@ -404,6 +506,24 @@ export async function executeTool({ slug, args = {}, profile, intent, sendEvent 
     emit('tool.result', { tool: slug, ok: false, error: failed.error, durationMs: failed.durationMs });
     return failed;
   }
+}
+
+/**
+ * B55 P1 — human-readable FINALIZED details for an EXTERNAL approval prompt.
+ * Built from the validated args so the user approves the real call, never a
+ * placeholder.
+ */
+export function buildFinalizedDetails(slug, args = {}) {
+  if (slug === 'code-run') return `$ ${args.command || '(no command)'}`;
+  if (slug === 'mcp-call') {
+    const safe = safeArgs(slug, args.args || {});
+    return `MCP tool: ${args.tool || '(none)'}${Object.keys(safe).length ? ` with ${JSON.stringify(safe)}` : ''}`;
+  }
+  const safe = safeArgs(slug, args);
+  const parts = Object.entries(safe)
+    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    .map(([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`);
+  return parts.length ? parts.join(' · ') : `${slug} (no arguments)`;
 }
 
 /** Full catalog: registry + schema + permission, for the /api/tools UI. */
@@ -416,6 +536,7 @@ export function getToolCatalog() {
     agents: t.agents,
     engine: t.engine,
     permission: toolPermission(t.slug),
+    tier: toolTier(t.slug),
     schema: TOOL_SCHEMAS[t.slug] || null,
     executable: !!TOOL_SCHEMAS[t.slug],
   }));

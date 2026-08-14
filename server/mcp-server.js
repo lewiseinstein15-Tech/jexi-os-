@@ -39,6 +39,47 @@ export const MCP_PORT = Number(process.env.MCP_PORT) || 3457;
 /** The 5-tool allowlist exposed to MCP clients (used by /api/mcp/status). */
 export const MCP_TOOL_ALLOWLIST = ['ask_jexi', 'memory_lookup', 'knowledge_search', 'list_books', 'get_health'];
 
+/* ------------------------------------------------------------------ *
+ *  B55 P4 — attach generic MCP-compliant tools as an ADDITIONAL        *
+ *  capability, alongside JEXI's existing custom connectors (which are  *
+ *  untouched). External MCP tools register through registerMcpTool()   *
+ *  and are callable via the internal `mcp-call` tool (ToolRuntime)     *
+ *  through the same schema-validated, fail-closed path as the built-in *
+ *  allowlist. Registered tools default to the EXTERNAL risk tier, so   *
+ *  they always require ONE explicit human approval (B55 P1) before     *
+ *  they can run — registering code may not silently downgrade that.    *
+ * ------------------------------------------------------------------ */
+
+const externalMcpTools = new Map(); // name → { description, inputSchema, handler, tier }
+
+/**
+ * Attach a generic MCP-compliant tool. `tier` may only be 'external'
+ * (money / send / irreversible) — anything else is rejected, keeping the
+ * B55 risk model hard-enforced for third-party capabilities.
+ */
+export function registerMcpTool({ name, description = '', inputSchema = null, handler, tier = 'external' }) {
+  if (!name || typeof handler !== 'function') throw new Error('registerMcpTool: name and handler are required');
+  if (MCP_TOOL_HANDLERS[name] || MCP_INPUT_SCHEMAS[name]) throw new Error(`registerMcpTool: "${name}" is a built-in MCP tool — choose another name`);
+  if (tier !== 'external') throw new Error(`registerMcpTool: "${name}" may only register as the EXTERNAL tier (money/send/irreversible actions need approval)`);
+  externalMcpTools.set(name, { name, description, inputSchema, handler, tier });
+  return { ok: true, name, tier };
+}
+
+/** List all MCP tools (built-in allowlist + registered external) for /api/mcp/status. */
+export function listMcpTools() {
+  return [
+    ...MCP_TOOL_ALLOWLIST.map((name) => ({ name, tier: 'read', builtin: true })),
+    ...[...externalMcpTools.values()].map((t) => ({ name: t.name, tier: t.tier, builtin: false, description: t.description })),
+  ];
+}
+
+/** B55 P1 — tier lookup used by ToolRuntime's toolTier for mcp-call. */
+export function mcpToolTier(name) {
+  const ext = externalMcpTools.get(name);
+  if (ext) return ext.tier;
+  return MCP_TOOL_ALLOWLIST.includes(name) ? 'read' : 'external';
+}
+
 /** Optional per-request MCP key (JEXI_MCP_KEY). When set, every MCP request
  *  must carry it as the Authorization: Bearer <key> header. */
 const MCP_KEY = process.env.JEXI_MCP_KEY || '';
@@ -161,11 +202,16 @@ const MCP_TOOL_HANDLERS = {
  * the same validated contract as internal tools.
  */
 export async function callMcpTool(name, args = {}) {
-  const handler = MCP_TOOL_HANDLERS[name];
+  // B55 P4 — registered external tools resolve after the built-in allowlist
+  // (never replaces it). They are schema-validated and fail-closed exactly
+  // like the built-ins; their EXTERNAL tier approval happens in ToolRuntime
+  // before the call ever reaches here.
+  const external = externalMcpTools.get(name);
+  const handler = MCP_TOOL_HANDLERS[name] || external?.handler;
   if (!handler) {
     return { ok: false, error: { code: 'UNKNOWN_MCP_TOOL', message: `No MCP tool named "${name}"`, node: 'mcp-call' } };
   }
-  const schema = MCP_INPUT_SCHEMAS[name];
+  const schema = MCP_INPUT_SCHEMAS[name] || external?.inputSchema || null;
   let cleanArgs = args;
   if (schema) {
     const parsed = schema.safeParse(args);

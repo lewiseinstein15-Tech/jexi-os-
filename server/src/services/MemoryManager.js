@@ -508,6 +508,56 @@ export function hasConversationalReference(query) {
   return ANAPHORA_RE.test(q);
 }
 
+/* ------------------------------------------------------------------ */
+/* B55 P2 — never re-ask for details the user already gave.            */
+/*                                                                     */
+/* Root cause found: any message under 25 chars was treated as         */
+/* conversational and REWRITTEN against the transcript by an LLM. A    */
+/* short but complete message that already carried its own concrete    */
+/* details ("remind me friday 3pm" = 21 chars) could come back from    */
+/* the rewrite with the date dropped — the plan then ran without it,   */
+/* and JEXI asked "what date?" for information already provided.      */
+/*                                                                     */
+/* Fix (minimal, targeted):                                            */
+/*  1) short messages that already contain their own details AND have  */
+/*     no pronoun/reference are never rewritten (already self-contained)
+/*  2) ANY rewrite that drops a concrete detail token from the         */
+/*     original (date, time, number, amount) is rejected — the user's  */
+/*     original message wins, so no detail can be lost in translation. */
+/* ------------------------------------------------------------------ */
+
+const DETAIL_TOKEN_RE =
+  /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|yesterday|tonight)\b|\b(next|this|last)\s+(week|month|weekend|year)\b|\b\d{1,2}(:\d{2})?\s*(am|pm|a\.?m\.?|p\.?m\.?|o'?clock)?\b|[$€£]\s?\d+(\.\d+)?|\b\d{1,2}[/-]\d{1,2}([/-]\d{2,4})?\b|\b\d+(\.\d+)?%/i;
+
+/** True when the message carries its own concrete details (date/time/number/amount). */
+export function hasOwnDetails(query) {
+  return DETAIL_TOKEN_RE.test(String(query || ''));
+}
+
+function normDetail(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * True when the rewrite keeps every concrete detail the user originally gave
+ * (dates, times, numbers, amounts — normalized). A rewrite that drops any of
+ * them is rejected so the original message is used instead.
+ */
+export function rewritePreservesDetails(original, rewrite) {
+  const s = String(original || '').toLowerCase();
+  const rw = normDetail(rewrite);
+  if (!s || !rw) return true; // nothing to compare → don't block
+  const tokens = [];
+  const re = /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|yesterday|tonight)\b|\b(next|this|last)\s+(week|month|weekend|year)\b|\b\d{1,2}(:\d{2})?\s*(am|pm|a\.?m\.?|p\.?m\.?|o'?clock)?\b|[$€£]\s?\d+(\.\d+)?|\b\d{1,2}[/-]\d{1,2}([/-]\d{2,4})?\b|\b\d+(\.\d+)?%/gi;
+  let m;
+  while ((m = re.exec(s))) {
+    const t = normDetail(m[0]);
+    if (t) tokens.push(t);
+  }
+  if (!tokens.length) return true;
+  return tokens.every((t) => rw.includes(t));
+}
+
 /** Compact transcript of the last n turns (user + JEXI), truncated. */
 export function conversationTranscript(n = 6, maxChars = 2400) {
   return getChatHistory(n)
@@ -535,6 +585,14 @@ export async function resolveConversationalQuery(query) {
     return { query: q, resolved: false, reason: 'self-contained' };
   }
 
+  // B55 P2 — a short message that already carries its own concrete details
+  // (date/time/number/amount) AND has no pronoun/reference is already
+  // self-contained: never rewrite it against the transcript. A lossy rewrite
+  // here is exactly what made JEXI re-ask for a date the user already gave.
+  if (q.length < 25 && hasOwnDetails(q) && !ANAPHORA_RE.test(q)) {
+    return { query: q, resolved: false, reason: 'self-contained — already carries its own details' };
+  }
+
   // Deterministic topic anchor from the previous user turn (fallback path).
   const lastUser = [...prior].reverse()[0];
   const topic = String(lastUser.text || '').trim().replace(/\s+/g, ' ').slice(0, 120);
@@ -550,7 +608,13 @@ export async function resolveConversationalQuery(query) {
     );
     const out = String(rewritten || '').trim().replace(/^["'`]+|["'`]+$/g, '');
     if (out && out.length > 3 && out.length < 400 && !/^(rewritten|the rewritten|here('s| is))[:\s]/i.test(out)) {
-      return { query: out, resolved: true, reason: 'rewritten with conversation context', original: q };
+      // B55 P2 — the rewrite must PRESERVE every concrete detail the user
+      // already gave (date, time, number, amount). A rewrite that dropped one
+      // is worse than no rewrite: keep the user's original message so the
+      // plan still carries the date and JEXI never re-asks for it.
+      if (rewritePreservesDetails(q, out)) {
+        return { query: out, resolved: true, reason: 'rewritten with conversation context', original: q };
+      }
     }
   } catch (e) { /* fall through to deterministic anchor */ }
 
