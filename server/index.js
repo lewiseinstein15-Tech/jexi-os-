@@ -34,7 +34,7 @@ import { listProcesses, getProcessLog, startProcess, stopProcess, deleteProcess,
 import { verifyDomainAnswer, detectDomain, deterministicChecks } from './src/services/DomainVerifier.js';
 import { runSubagents, decomposeQuery } from './src/services/SubagentRuntime.js';
 import { listHooks, addHook, updateHook, removeHook } from './src/services/HookEngine.js';
-import { listPlugins, togglePlugin } from './src/services/PluginRegistry.js';
+import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services/PluginRegistry.js';
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications } from './src/services/NotificationCenter.js';
 import { modelRoutingTable, providerPreferenceForIntent } from './src/services/ModelRouting.js';
 import { MCP_PORT, MCP_TOOL_ALLOWLIST } from './mcp-server.js';
@@ -44,6 +44,13 @@ import { listTasks, getTask, updateTask, deleteTask, taskStats as taskRegistrySt
 import { analyzeMessage } from './src/services/ConversationManager.js';
 import { decide, applyDecision } from './src/services/DecisionEngine.js';
 import { recordDecision, retrieveDecisions, memoryStats as decisionMemoryStats } from './src/services/DecisionMemory.js';
+import { metricsSummary, startTrace, endTrace, emitMetric, scoreProviderHealth } from './src/services/ObservabilityAgent.js';
+import { scanPromptSafety, forceSafeMode, toolAllowed, blockExplanation, isSafeMode } from './src/services/GuardrailAgent.js';
+import { routeDecision, checkLocalBackend } from './src/services/OfflineAgent.js';
+import { voiceStatus } from './src/services/VoiceAgent.js';
+import { listPlugins as listPluginPackages, pluginSkillSlugs, pluginToolSlugs } from './src/services/PluginAgent.js';
+import { listLocks, getWorkspaceId } from './src/services/ConcurrencyAgent.js';
+import { chaosEnabled, listInjections } from './src/services/ChaosAgent.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
 import { mountMcp } from './mcp-server.js';
 import { taskManager } from './src/services/TaskManager.js';
@@ -96,7 +103,7 @@ app.use(cors({ origin: CORS_ALLOWLIST }));
 // else under /api/* (chat, vision, knowledge, memory, desktop, settings write,
 // APK proxy) is gated when JEXI_API_KEY is set.
 // NOTE: mounted on the app root (not '/api') so req.path keeps its full form.
-const OPEN_PATHS = ['/api/health', '/api/settings/status'];
+const OPEN_PATHS = ['/api/health', '/api/settings/status', '/api/metrics'];
 app.use((req, res, next) => {
   if (!API_KEY || req.method === 'OPTIONS') return next();
   if (!req.path.startsWith('/api')) return next();
@@ -1044,6 +1051,20 @@ app.post('/api/chat', async (req, res) => {
       });
     }
 
+    // GUARDRAIL — continuous prompt-injection / jailbreak / tool-abuse scan
+    // on every message before anything runs. Blocked → abort with a clear
+    // explanation instead of executing (safe-mode enforcement, Guardrail Agent).
+    const safety = scanPromptSafety(effectiveQuery || raw);
+    if (!safety.safe) {
+      sendEvent('log', { agent: 'Guardrail', message: `🛡 ${safety.reason}` });
+      sendEvent('done', { success: false, blocked: true, query, summary: blockExplanation(safety), statistics: { executionTime: 0, agentsUsed: 0, confidence: 0 } });
+      return;
+    }
+
+    // OBSERVABILITY — trace the whole task (Observability Agent side-channel).
+    const taskStart = Date.now();
+    startTrace('chat.task', { intent: plan.intent, queryLen: (effectiveQuery || '').length });
+
     sendEvent('log', { agent: 'Planner', message: `Intent: ${plan.intent} — ${plan.reasoning}` });
     // Structured plan event — the frontend's agent Core needs the composed
     // team (roster) to draw its orbital ring segments before agents start.
@@ -1075,6 +1096,12 @@ app.post('/api/chat', async (req, res) => {
         saveRun(convId, { plan, query: executionQuery || effectiveQuery, state: pausedState });
       },
     });
+
+    // OBSERVABILITY — close the trace with real latency + outcome metrics.
+    endTrace('chat.task', results.success ? 'ok' : 'error', { intent: plan.intent });
+    emitMetric('chat.latencyMs', Date.now() - taskStart, { intent: plan.intent, ok: results.success });
+    emitMetric('chat.agents', plan.steps?.length || 0, { intent: plan.intent });
+    emitMetric('chat.gate.result', results.success ? 1 : 0, { intent: plan.intent });
 
     sendEvent('log', { agent: 'JEXI', message: '🎯 Mission complete — here is the result.' });
     // Contract: a successful done ALWAYS carries a readable summary — the
@@ -1238,7 +1265,31 @@ app.get('/api/health', (req, res) => {
     redis: isRedisActive(),
     port: PORT,
     providers: providerHealthSnapshot(),
+    // Round-6 platform & reliability status (aggregates only — no secrets)
+    platform: {
+      observability: { spans: metricsSummary().spans.total, running: metricsSummary().spans.running },
+      guardrail: { safeMode: isSafeMode() },
+      offline: { configured: !!(process.env.OLLAMA_BASE_URL || process.env.OLLAMA_HOST) },
+      voice: { active: voiceStatus().active, state: voiceStatus().state },
+      plugins: listPlugins().length,
+      locks: listLocks().length,
+      chaos: chaosEnabled(),
+    },
     time: new Date().toISOString(),
+  });
+});
+
+// Live metrics (Observability Agent) — aggregates + recent trace metadata only,
+// never request payloads or secrets. Open (uptime monitors can poll it).
+app.get('/api/metrics', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const m = metricsSummary();
+  res.json({
+    ok: true,
+    instanceId: INSTANCE_ID,
+    uptime: Math.round(process.uptime()),
+    providerHealth: scoreProviderHealth(providerHealthSnapshot()),
+    ...m,
   });
 });
 

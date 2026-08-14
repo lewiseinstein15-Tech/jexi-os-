@@ -29,7 +29,7 @@ export const TEAM_PLAN = {
   link_analysis: ['video-analyst', 'navigator', 'extractor', 'reasoner', 'memory'],
   math_solve: ['math', 'reasoner', 'memory'],
   self_check: ['self-diagnose', 'reasoner', 'memory', 'tool-router', 'toolsmith', 'agent-builder', 'prompt', 'guardrail'],
-  code_task: ['product', 'designer', 'engineer', 'ux-researcher', 'accessibility', 'architect', 'coder', 'runner', 'debugger', 'qa', 'reviewer', 'critic', 'security', 'shipper', 'reflector', 'ui-developer', 'frontend', 'landing-page-builder', 'email-developer'],
+  code_task: ['product', 'designer', 'engineer', 'ux-researcher', 'accessibility', 'architect', 'coder', 'runner', 'sandbox', 'debugger', 'qa', 'reviewer', 'critic', 'security', 'shipper', 'reflector', 'ui-developer', 'frontend', 'landing-page-builder', 'email-developer'],
   computer_use: ['navigator', 'vision', 'computer-use', 'reasoner', 'memory'],
   study_topic: ['scholar', 'researcher', 'history', 'science', 'document-analyst', 'memory'],
   conversation: ['jexi', 'context-manager', 'archivist'],
@@ -62,6 +62,15 @@ export const TEAM_PLAN = {
   content_creation: ['content-strategist', 'blog-writer', 'seo-writer', 'video-script-writer', 'editor', 'technical-editor', 'ux-writer', 'copyeditor', 'white-paper-writer', 'case-study-writer', 'api-docs-writer', 'podcaster', 'speech-writer', 'essayist', 'grant-writer', 'newsletter-writer', 'ad-copywriter', 'ghostwriter', 'illustrator', 'motion-designer', 'sound-designer'],
   study_exam: ['exam-coach', 'study', 'teacher', 'flashcard-maker', 'homework-helper', 'grader', 'curriculum-designer', 'lab-assistant', 'research-mentor', 'academic-writer', 'coding-tutor', 'languages', 'tutor'],
   career_plan: ['career', 'recruiter', 'resume', 'interviewer', 'hr-specialist'],
+  // Round 6 — platform & reliability teams (pulled in only when the intent
+  // requires them: observability for metrics, sandbox for code, offline only
+  // when providers are down, voice when speaking, plugin for packages,
+  // chaos only behind the test flag).
+  observability: ['observability', 'reasoner', 'memory'],
+  offline_mode: ['offline', 'reasoner', 'memory'],
+  voice_command: ['voice-orchestrator', 'reasoner', 'memory'],
+  plugin_task: ['plugin-manager', 'reasoner'],
+  chaos_test: ['chaos-agent', 'orchestrator', 'reflector'],
   relationship_advice: ['relationship-coach', 'counselor', 'dating-coach'],
   startup_advice: ['startup-advisor', 'business-analyst', 'pricing-strategist', 'investor'],
   productivity: ['task-manager', 'scheduler', 'note-taker', 'email-triage', 'meeting-planner', 'expense-tracker', 'operations-manager', 'executive-assistant'],
@@ -373,6 +382,37 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
     //    get misrouted to the coding pipeline.
     if (/self[- ]?check|check yourself|diagnos(e|tic)|run (a )?(system|self) check|system status|are you (ok|okay|healthy|fine)|monitor yourself|what'?s wrong|any errors|health check/i.test(q)) {
       return { intent: 'self_check', tasks: ['self', 'reasoning', 'memory'], reasoning: 'JEXI runs a full self-diagnosis and reports system health with root causes.' };
+    }
+
+    // 5.1 OBSERVABILITY — metrics, latency, tokens, traces, provider health.
+    //     The Observability Agent answers from the live metrics store.
+    if (/(metrics|latency|token (usage|count|spend)|traces?|spans?|provider (health|status)|how (much|many) tokens|uptime|response times?|request counts?)/i.test(q)) {
+      return { intent: 'observability', tasks: ['observability', 'reasoning'], reasoning: 'User asks about live system metrics/observability — the Observability Agent reports from the real metrics store.' };
+    }
+
+    // 5.15 OFFLINE MODE — explicit offline/local-model requests, or the caller
+    //     signaling that providers are unhealthy (opts.offline). The Offline Agent
+    //     routes to Ollama / llama.cpp when available.
+    if (opts.offline || /offline (mode|llm|model)|local (llm|model|ai)|ollama|llama\.cpp|run (it |this )?(offline|locally|without (the )?internet)/i.test(q)) {
+      return { intent: 'offline_mode', tasks: ['offline', 'reasoning'], reasoning: 'User wants an offline/local run — the Offline Agent routes to a local LLM backend.' };
+    }
+
+    // 5.2 VOICE COMMAND — voice input (opts.audio) or explicit speak/listen
+    //     requests. The Voice Orchestrator owns the speech pipeline.
+    if (opts.audio || /(use|enable|turn on) (voice|speech)|voice (command|input|mode)|(say|speak|read|play|listen to) (it|this|that|out loud|aloud)|read (it|this|that) (to|out loud|aloud) me|talk to me/i.test(q)) {
+      return { intent: 'voice_command', tasks: ['voice-orchestrator', 'reasoning'], reasoning: 'Voice/speech request — the Voice Orchestrator runs the STT/TTS pipeline.' };
+    }
+
+    // 5.25 PLUGIN TASK — install/add/load an external skill/tool package.
+    //     The Plugin Manager validates and loads it into the registry.
+    if (/(install|add|load|enable|update|remove|unload|uninstall) (a |an |the |new )?(plugin|extension|add-?on|skill pack|tool pack)|(plugin|skill pack|tool pack) (for|manager)|what plugins? (are|do) (there|you|i) (have|use|need)|list (my |the |your )?plugins?/i.test(q)) {
+      return { intent: 'plugin_task', tasks: ['plugin-manager', 'reasoning'], reasoning: 'Plugin management request — the Plugin Manager validates and loads the package.' };
+    }
+
+    // 5.3 CHAOS TEST — test-only, feature-flagged. Only fires when the caller
+    //     passes opts.chaos (JEXI_CHAOS=1 in the host env enables the agent).
+    if (opts.chaos && /(chaos|inject (a |an |the )?(provider |tool )?(failure|timeout|error)|failure injection|hardening test|break (the )?system)/i.test(q)) {
+      return { intent: 'chaos_test', tasks: ['chaos-agent', 'orchestrator'], reasoning: 'Chaos-engineering request behind the JEXI_CHAOS flag — the Chaos Agent injects controlled failures.' };
     }
 
     // 5.2 EXPLAIN THE TEAM — "how do you decide which agents to use" is a question

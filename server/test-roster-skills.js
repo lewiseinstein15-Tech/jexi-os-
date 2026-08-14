@@ -89,7 +89,10 @@ check('getTool finds tools', getTool('web-search')?.name === 'Web Search' && get
 // AUTO TOOL ROUTING — every intent derives a focused tool set from its team.
 const codeTools = toolsForIntent('code_task').map((t) => t.slug);
 check('code_task auto-selects code tools', ['code-run', 'code-write', 'code-fix', 'code-review', 'security-scan', 'fact-check'].every((s) => codeTools.includes(s)));
-check('code_task does NOT dump the whole catalog', codeTools.length <= 12);
+// Focused routing, not a catalog dump: the code team (14 specialists incl. sandbox
+// for safe execution + critic/security gates) unions to 18 tools out of a 174-tool
+// catalog. Assert it stays a small focused subset (never the whole catalog).
+check('code_task does NOT dump the whole catalog (' + codeTools.length + '/' + TOOL_REGISTRY.length + ')', codeTools.length <= 20 && codeTools.length <= TOOL_REGISTRY.length / 3);
 const researchTools = toolsForIntent('research').map((t) => t.slug);
 check('research auto-selects search + fact-check tools', ['web-search', 'deep-read', 'fact-check', 'memory-recall'].every((s) => researchTools.includes(s)));
 const newsTools = toolsForIntent('news_latest').map((t) => t.slug);

@@ -121,7 +121,7 @@ export const AGENT_ROSTER = [
   { slug: 'archivist', name: 'Archivist', role: 'Episodic memory: remembers past sessions and consolidates them with a forgetting curve.', skills: ['episodic-memory', 'forgetting-curve', 'memory-consolidation'] },
   { slug: 'document-analyst', name: 'Document Analyst', role: 'Chunks uploaded documents and answers from the retrieved passages (RAG).', skills: ['document-rag', 'chunking', 'retrieval'] },
   { slug: 'data-engineer', name: 'Data Engineer', role: 'Builds data pipelines: extract, transform, load and cleanse messy datasets.', skills: ['data-pipelines', 'etl', 'cleansing'] },
-  { slug: 'guardrail', name: 'Guardrail', role: 'Input/output safety: declines unsafe or destructive requests with a clear reason.', skills: ['guardrails', 'safety-checks', 'refusal'] },
+  { slug: 'guardrail', name: 'Guardrail', role: 'Input/output safety: declines unsafe or destructive requests with a clear reason; continuous prompt-injection, jailbreak and tool-abuse detection with safe-mode enforcement.', skills: ['guardrails', 'safety-checks', 'refusal', 'prompt-injection-detection', 'safe-mode-enforcement'] },
 
   // ── Round 4 — platform/stack depth (VoltAgent/TestMu/Composio-informed) ──
   { slug: 'mobile-engineer', name: 'Mobile Engineer', role: 'Cross-platform mobile apps — React Native, Flutter, Capacitor — tested on real devices.', skills: ['mobile', 'flutter', 'react-native', 'performance', 'testing'] },
@@ -261,6 +261,53 @@ export const AGENT_ROSTER = [
   { slug: 'ui-developer', name: 'UI Developer', role: 'Builds pixel-perfect interfaces fast.', skills: ['frontend', 'react', 'ui-design', 'responsive'] },
   { slug: 'landing-page-builder', name: 'Landing Page Builder', role: 'Conversion-focused landing pages.', skills: ['frontend', 'react', 'conversion', 'ui-design'] },
   { slug: 'email-developer', name: 'Email Developer', role: 'HTML emails that render everywhere.', skills: ['email', 'frontend', 'api', 'testing'] },
+
+  // ── Platform & reliability (round 6) ─────────────────────────
+  { slug: 'observability', name: 'Observability Agent', role: 'Streams structured traces, latency, token usage, gate results and provider health for every task.', skills: ['structured-tracing', 'metrics-aggregation', 'provider-health-scoring'] },
+  { slug: 'sandbox', name: 'Sandbox Agent', role: 'Creates and runs isolated execution workspaces with strict CPU/memory/network limits and timeouts.', skills: ['sandbox-lifecycle', 'workspace-snapshot'] },
+  { slug: 'offline', name: 'Offline Agent', role: 'Detects cloud-provider unavailability and routes suitable tasks to a local LLM backend (Ollama / llama.cpp).', skills: ['local-llm-routing', 'provider-health-scoring'] },
+  { slug: 'concurrency', name: 'Concurrency Agent', role: 'Multi-user / multi-workspace isolation, locking, and concurrent memory access without bleed between sessions.', skills: ['workspace-isolation'] },
+  { slug: 'voice-orchestrator', name: 'Voice Orchestrator', role: 'Owns the full speech pipeline: streaming STT, barge-in, interruption handling, TTS selection, wake-word readiness.', skills: ['streaming-stt-tts'] },
+  { slug: 'plugin-manager', name: 'Plugin Manager', role: 'Discovers, validates and loads external skill/tool packages at runtime; keeps a versioned registry.', skills: ['plugin-discovery'] },
+  { slug: 'chaos-agent', name: 'Chaos Agent', role: 'Injects controlled failures (provider timeouts, tool errors, memory pressure) during test runs to harden the system.', skills: ['chaos-injection'] },
+  { slug: 'applied-mathematician', name: 'Applied Mathematician', role: 'Numerical analysis, optimization, differential equations, modeling.', skills: ["math","calculations","step-by-step","modeling"] },
+  { slug: 'theoretical-cs', name: 'Theoretical Computer Scientist', role: 'Computability, complexity, algorithms, formal methods, proofs.', skills: ["coding","reasoning","architecture","system-prompt"] },
+  { slug: 'physicist', name: 'Physicist', role: 'Physics from classical mechanics to quantum field theory.', skills: ["science","math","calculations","explanation"] },
+  { slug: 'statistician', name: 'Statistician', role: 'Experimental design, inference, distributions, hypothesis testing.', skills: ["statistics","data-analysis","insights","calculations"] },
+  { slug: 'economist', name: 'Economist', role: 'Micro and macro economics, markets, policy, econometric analysis.', skills: ["strategy","data-analysis","statistics","financial-planning"] },
+  { slug: 'industrial-engineer', name: 'Industrial Engineer', role: 'Process optimization, operations, logistics, workflow design.', skills: ["process","workflow","optimization","data-analysis"] },
+  { slug: 'systems-scientist', name: 'Systems Scientist', role: 'Systems thinking, feedback loops, emergence, complex dynamics.', skills: ["architecture","process","reasoning","deep-research"] },
+  { slug: 'cognitive-scientist', name: 'Cognitive Scientist', role: 'Cognition, perception, language, learning and decision models.', skills: ["reasoning","explanation","teaching","deep-research"] },
+  { slug: 'computational-scientist', name: 'Computational Scientist', role: 'Scientific computing, simulation, HPC and numerical methods.', skills: ["coding","math","data-analysis","modeling"] },
+  { slug: 'robotics-engineer', name: 'Robotics Engineer', role: 'Robots: kinematics, control, perception, navigation, ROS.', skills: ["embedded","iot","hardware","coding"] },
+  { slug: 'computer-engineer', name: 'Computer Engineer', role: 'Hardware-software co-design, processors, embedded systems.', skills: ["embedded","hardware","coding","architecture"] },
+  { slug: 'electrical-engineer', name: 'Electrical Engineer', role: 'Circuits, power systems, electronics, control, signal analysis.', skills: ["embedded","hardware","iot","calculations"] },
+  { slug: 'distributed-systems-engineer', name: 'Distributed Systems Engineer', role: 'Scale-out architectures, consensus, sharding, reliability.', skills: ["architecture","cloud","networking","reliability"] },
+  { slug: 'quantum-engineer', name: 'Quantum Engineer', role: 'Quantum devices, qubits, error correction, quantum hardware stacks.', skills: ["math","calculations","modeling","deep-research"] },
+  { slug: 'mechanical-engineer', name: 'Mechanical Engineer', role: 'Mechanics, thermofluids, machine design, materials selection.', skills: ["calculations","math","modeling","process"] },
+  { slug: 'deep-tech-scientist', name: 'Deep Tech Scientist', role: 'Frontier R and D: physics, materials, chemistry, biotech moonshots.', skills: ["deep-research","modeling","science","academic-writing"] },
+  { slug: 'chemist', name: 'Chemist', role: 'Chemistry across organic, inorganic, physical and analytical.', skills: ["science","labs","experiments","calculations"] },
+  { slug: 'materials-scientist', name: 'Materials Scientist', role: 'Materials: structure, properties, processing, performance.', skills: ["science","labs","deep-research","modeling"] },
+  { slug: 'chemical-engineer', name: 'Chemical Engineer', role: 'Process engineering, reactors, separations, thermo for industry.', skills: ["process","calculations","labs","modeling"] },
+  { slug: 'optical-engineer', name: 'Optical Engineer', role: 'Optics, photonics, lenses, lasers, imaging systems.', skills: ["calculations","modeling","hardware","math"] },
+  { slug: 'biologist', name: 'Biologist', role: 'Life science: cells, organisms, evolution, ecosystems.', skills: ["science","labs","experiments","research-mentoring"] },
+  { slug: 'biochemist', name: 'Biochemist', role: 'Biomolecules, metabolism, enzymology, molecular mechanisms.', skills: ["science","labs","experiments","calculations"] },
+  { slug: 'microbiologist', name: 'Microbiologist', role: 'Microbes: bacteriology, virology, immunology, microbial ecology.', skills: ["science","labs","experiments","deep-research"] },
+  { slug: 'medical-scientist', name: 'Medical Scientist', role: 'Medicine, physiology, pharmacology, clinical research.', skills: ["science","health","research-mentoring","deep-research"] },
+  { slug: 'computational-biologist', name: 'Computational Biologist', role: 'Genomics, proteomics, modeling of biological systems.', skills: ["coding","data-analysis","modeling","science"] },
+  { slug: 'neuroscientist', name: 'Neuroscientist', role: 'Nervous system: structure, function, circuits, disorders.', skills: ["science","health","deep-research","explanation"] },
+  { slug: 'environmental-scientist', name: 'Environmental Scientist', role: 'Ecosystems, pollution, remediation, environmental assessment.', skills: ["science","deep-research","data-analysis","reporting"] },
+  { slug: 'public-health-specialist', name: 'Public Health Specialist', role: 'Population health, epidemiology, prevention, health policy.', skills: ["health","data-analysis","reporting","statistics"] },
+  { slug: 'health-tech-engineer', name: 'Health Tech Engineer', role: 'Digital health: EHR, telehealth, devices, health AI.', skills: ["backend","api","data-pipelines","mobile"] },
+  { slug: 'biomedical-engineer', name: 'Biomedical Engineer', role: 'Medical devices, imaging, prosthetics, biomechanics.', skills: ["hardware","embedded","modeling","labs"] },
+  { slug: 'security-engineer', name: 'Security Engineer', role: 'Defensive security: network defense, identity, hardening.', skills: ["security","appsec","networking","cryptography"] },
+  { slug: 'civil-engineer', name: 'Civil Engineer', role: 'Structures, foundations, materials for buildings and infra.', skills: ["calculations","modeling","math","process"] },
+  { slug: 'aerospace-engineer', name: 'Aerospace Engineer', role: 'Aircraft and spacecraft: aerodynamics, structures, propulsion.', skills: ["calculations","modeling","math","deep-research"] },
+  { slug: 'astronomer', name: 'Astronomer', role: 'Stars, galaxies, exoplanets, observational and theoretical astro.', skills: ["science","deep-research","data-analysis","math"] },
+  { slug: 'nuclear-engineer', name: 'Nuclear Engineer', role: 'Reactors, radiation, nuclear energy, safety, fuel cycle.', skills: ["calculations","modeling","math","science"] },
+  { slug: 'petroleum-engineer', name: 'Petroleum Engineer', role: 'Reservoirs, drilling, production, subsurface engineering.', skills: ["calculations","modeling","process","data-analysis"] },
+  { slug: 'geoscientist', name: 'Geoscientist', role: 'Earth: geology, geophysics, resources, hazards.', skills: ["science","deep-research","data-analysis","modeling"] },
+  { slug: 'marine-engineer', name: 'Marine Engineer', role: 'Ships, offshore systems, propulsion, marine structures.', skills: ["calculations","modeling","hardware","process"] },
 ];
 
 /**
@@ -833,6 +880,21 @@ export const SKILL_REGISTRY = [
   { slug: 'gtd', name: 'GTD', category: 'Productivity', desc: 'Getting Things Done.', agent: 'task-manager' },
   { slug: 'email-triage', name: 'Email Triage', category: 'Productivity', desc: 'Inbox zero.', agent: 'email-triage' },
   { slug: 'inbox', name: 'Inbox', category: 'Productivity', desc: 'Inbox management.', agent: 'email-triage' },
+
+
+  // Platform & reliability
+  { slug: 'structured-tracing', name: 'Structured Tracing', category: 'Platform', desc: 'OpenTelemetry-style trace spans with latency and status.', agent: 'observability' },
+  { slug: 'metrics-aggregation', name: 'Metrics Aggregation', category: 'Platform', desc: 'Aggregate counters and gauges per task and provider.', agent: 'observability' },
+  { slug: 'provider-health-scoring', name: 'Provider Health Scoring', category: 'Platform', desc: 'Score provider availability from real call outcomes.', agent: 'observability' },
+  { slug: 'sandbox-lifecycle', name: 'Sandbox Lifecycle', category: 'Platform', desc: 'Create, run, tear down and snapshot isolated workspaces.', agent: 'sandbox' },
+  { slug: 'workspace-snapshot', name: 'Workspace Snapshot', category: 'Platform', desc: 'Capture a workspace state for rollback or reuse.', agent: 'sandbox' },
+  { slug: 'local-llm-routing', name: 'Local LLM Routing', category: 'Platform', desc: 'Route to Ollama / llama.cpp when cloud providers are down.', agent: 'offline' },
+  { slug: 'prompt-injection-detection', name: 'Prompt Injection Detection', category: 'Platform', desc: 'Detect prompt injection, jailbreak and tool-abuse attempts.', agent: 'guardrail' },
+  { slug: 'safe-mode-enforcement', name: 'Safe Mode Enforcement', category: 'Platform', desc: 'Force read-only tools or abort a risky task with a clear reason.', agent: 'guardrail' },
+  { slug: 'workspace-isolation', name: 'Workspace Isolation', category: 'Platform', desc: 'Lock and isolate concurrent sessions so memory never bleeds.', agent: 'concurrency' },
+  { slug: 'streaming-stt-tts', name: 'Streaming STT/TTS', category: 'Platform', desc: 'Streaming speech-to-text, TTS selection, barge-in and wake-word.', agent: 'voice-orchestrator' },
+  { slug: 'plugin-discovery', name: 'Plugin Discovery', category: 'Platform', desc: 'Discover, validate and load external skill/tool packages.', agent: 'plugin-manager' },
+  { slug: 'chaos-injection', name: 'Chaos Injection', category: 'Platform', desc: 'Inject controlled failures to harden the system (test-only).', agent: 'chaos-agent' },
 ];
 
 /** Counts for the "60+ agents, 100+ skills" claim — computed, never hardcoded. */
@@ -870,8 +932,7 @@ export function composeTeam(intent, extra = {}) {
         const agent = getAgent(String(s).toLowerCase().replace(/[^a-z]/g, '-').replace(/-+/g, '-'));
         return agent ? [agent.slug] : [];
       })
-    : TEAM_PLAN[intent] || [];
-  const seen = new Set();
+    : TEAM_PLAN[intent] || [];  const seen = new Set();
   const team = [];
   for (const slug of slugs) {
     const agent = getAgent(slug);

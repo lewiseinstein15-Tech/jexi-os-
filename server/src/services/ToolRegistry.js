@@ -203,6 +203,45 @@ export const TOOL_REGISTRY = [
   { slug: 'video-analyze', name: 'Video Analyze', type: 'Media', desc: 'Watch any video link frame-by-frame: timestamped captions, sampled frames, key moments.', agents: ['video-analyst'], engine: 'VideoAnalyzer' },
   { slug: 'video-transcript', name: 'Video Transcript', type: 'Media', desc: 'Pull the full timestamped transcript of a YouTube/TikTok/Instagram video.', agents: ['video-analyst'], engine: 'VideoAnalyzer' },
   { slug: 'video-frames', name: 'Video Frames', type: 'Media', desc: 'Sample visual frames across a video timeline for vision analysis.', agents: ['video-analyst', 'vision'], engine: 'VideoAnalyzer' },
+
+  // ── Observability ────────────────────────────────────────────
+  { slug: 'start_trace', name: 'Start Trace', type: 'Observability', desc: 'Open an OpenTelemetry-style trace span for a task with latency and status tracking.', agents: ['observability'], engine: 'ObservabilityAgent' },
+  { slug: 'end_trace', name: 'End Trace', type: 'Observability', desc: 'Close a trace span, recording duration and success/failure.', agents: ['observability'], engine: 'ObservabilityAgent' },
+  { slug: 'emit_metric', name: 'Emit Metric', type: 'Observability', desc: 'Record a counter or gauge (latency, tokens, gate results) into the metrics store.', agents: ['observability'], engine: 'ObservabilityAgent' },
+
+  // ── Sandbox ──────────────────────────────────────────────────
+  { slug: 'create_sandbox', name: 'Create Sandbox', type: 'Sandbox', desc: 'Create an isolated execution workspace with CPU/memory/timeout limits.', agents: ['sandbox', 'runner'], engine: 'SandboxAgent' },
+  { slug: 'run_in_sandbox', name: 'Run in Sandbox', type: 'Sandbox', desc: 'Execute a command inside an isolated workspace with strict limits.', agents: ['sandbox', 'runner'], engine: 'SandboxAgent' },
+  { slug: 'destroy_sandbox', name: 'Destroy Sandbox', type: 'Sandbox', desc: 'Tear down a sandbox workspace and release its resources.', agents: ['sandbox', 'runner'], engine: 'SandboxAgent' },
+  { slug: 'snapshot_workspace', name: 'Snapshot Workspace', type: 'Sandbox', desc: 'Capture a workspace state for rollback or reuse.', agents: ['sandbox'], engine: 'SandboxAgent' },
+
+  // ── Offline / local LLM ──────────────────────────────────────
+  { slug: 'query_local_llm', name: 'Query Local LLM', type: 'Offline', desc: 'Ask a local LLM backend (Ollama / llama.cpp) for an answer.', agents: ['offline'], engine: 'OfflineAgent' },
+  { slug: 'list_local_models', name: 'List Local Models', type: 'Offline', desc: 'List models available on the local LLM backend.', agents: ['offline'], engine: 'OfflineAgent' },
+  { slug: 'warmup_model', name: 'Warmup Model', type: 'Offline', desc: 'Pre-load a local model so later queries are fast.', agents: ['offline'], engine: 'OfflineAgent' },
+
+  // ── Guardrail & safe mode ────────────────────────────────────
+  { slug: 'scan_prompt_safety', name: 'Scan Prompt Safety', type: 'Guardrail', desc: 'Scan a prompt for injection, jailbreak or tool-abuse attempts.', agents: ['guardrail', 'security'], engine: 'GuardrailAgent' },
+  { slug: 'force_safe_mode', name: 'Force Safe Mode', type: 'Guardrail', desc: 'Restrict the task to read-only tools or abort with a clear explanation.', agents: ['guardrail', 'security'], engine: 'GuardrailAgent' },
+
+  // ── Concurrency ──────────────────────────────────────────────
+  { slug: 'acquire_lock', name: 'Acquire Lock', type: 'Concurrency', desc: 'Take a named lock so concurrent sessions cannot write the same memory.', agents: ['concurrency', 'memory'], engine: 'ConcurrencyAgent' },
+  { slug: 'release_lock', name: 'Release Lock', type: 'Concurrency', desc: 'Release a previously acquired named lock.', agents: ['concurrency', 'memory'], engine: 'ConcurrencyAgent' },
+  { slug: 'get_workspace_id', name: 'Get Workspace ID', type: 'Concurrency', desc: 'Return the current session/workspace ID for isolation checks.', agents: ['concurrency', 'memory'], engine: 'ConcurrencyAgent' },
+
+  // ── Voice ────────────────────────────────────────────────────
+  { slug: 'start_voice_stream', name: 'Start Voice Stream', type: 'Voice', desc: 'Begin a streaming speech-to-text session with barge-in enabled.', agents: ['voice-orchestrator'], engine: 'VoiceAgent' },
+  { slug: 'stop_voice_stream', name: 'Stop Voice Stream', type: 'Voice', desc: 'End the active speech stream cleanly.', agents: ['voice-orchestrator'], engine: 'VoiceAgent' },
+  { slug: 'speak', name: 'Speak', type: 'Voice', desc: 'Synthesize and play TTS audio for a message.', agents: ['voice-orchestrator'], engine: 'VoiceAgent' },
+  { slug: 'listen', name: 'Listen', type: 'Voice', desc: 'Capture the next utterance and transcribe it.', agents: ['voice-orchestrator'], engine: 'VoiceAgent' },
+
+  // ── Plugin manager ───────────────────────────────────────────
+  { slug: 'load_plugin', name: 'Load Plugin', type: 'Plugin', desc: 'Validate and load an external skill/tool plugin package.', agents: ['plugin-manager'], engine: 'PluginAgent' },
+  { slug: 'unload_plugin', name: 'Unload Plugin', type: 'Plugin', desc: 'Unload a plugin and remove its tools from the registry.', agents: ['plugin-manager'], engine: 'PluginAgent' },
+  { slug: 'list_plugins', name: 'List Plugins', type: 'Plugin', desc: 'List loaded plugins with their versions and capabilities.', agents: ['plugin-manager'], engine: 'PluginAgent' },
+
+  // ── Chaos (test-only, feature-flagged) ───────────────────────
+  { slug: 'inject_failure', name: 'Inject Failure', type: 'Chaos', desc: 'Inject a controlled failure (provider timeout, tool error) — only when the chaos flag is on.', agents: ['chaos-agent'], engine: 'ChaosAgent' },
 ];
 
 export const TOOL_COUNT = TOOL_REGISTRY.length;
