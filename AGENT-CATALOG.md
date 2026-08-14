@@ -1,6 +1,6 @@
 # JEXI OS — Agent & Skill Catalog
 
-**251 specialist agents · 507 skills · 176 tools · 1 orchestrator.** One plain-language request in,
+**251 specialist agents · 507 skills · 177 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
 > ⚙️ GENERATED FILE — updated 2026-08-14 by `cd server && npm run audit-roster`. Do not edit by hand.
@@ -14,8 +14,8 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 |---|---|
 | Agents | 251 (251 reachable — 100%) |
 | Skills | 507 |
-| Tools | 176 |
-| Intents / teams | 153 |
+| Tools | 177 |
+| Intents / teams | 154 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
 | Orphaned tools | 0 |
@@ -81,6 +81,7 @@ You type:  "Build me a water-intake tracker"
 | `code_task` | Product Manager → Designer → Engineer → UX Researcher → Accessibility Auditor → Architect → Coder → Runner → Sandbox Agent → Debugger → QA Lead → Reviewer → Critic → Security Officer → Shipper → Reflector → UI Developer → Frontend Engineer → Landing Page Builder → Email Developer | 13 independent · 7 bundled |
 | `computer_use` | Navigator → Vision Agent → Computer Use Agent → Reasoner → Memory Agent | 0 independent · 5 bundled |
 | `study_topic` | Scholar → Researcher → Historian → Science Explainer → Document Analyst → Memory Agent | 0 independent · 6 bundled |
+| `direct_answer` | JEXI Core → Context Manager | 0 independent · 2 bundled |
 | `conversation` | JEXI Core → Context Manager → Archivist | 0 independent · 3 bundled |
 | `memory_query` | Memory Agent → Archivist → Context Manager | 0 independent · 3 bundled |
 | `knowledge_recall` | Books Agent → Document Analyst → Reasoner → Memory Agent | 0 independent · 4 bundled |
@@ -1219,7 +1220,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 176 tools (grouped by type)
+## The 177 tools (grouped by type)
 
 ### Browser (6)
 | Tool | Allowed agents | Engine | What it does |
@@ -1256,6 +1257,11 @@ This section and every table below are GENERATED from the live registries by `cd
 | `acquire_lock` | Concurrency Agent, Memory Agent | ConcurrencyAgent | Take a named lock so concurrent sessions cannot write the same memory. |
 | `get_workspace_id` | Concurrency Agent, Memory Agent | ConcurrencyAgent | Return the current session/workspace ID for isolation checks. |
 | `release_lock` | Concurrency Agent, Memory Agent | ConcurrencyAgent | Release a previously acquired named lock. |
+
+### Connectors (1)
+| Tool | Allowed agents | Engine | What it does |
+|---|---|---|---|
+| `connector-call` | JEXI Core, GitHub Agent, Email Composer, Context Manager | Connectors | Send an outbound action or read inbound events through a registered connector (whatsapp, github, email, telegram) — send_whatsapp, create_github_issue, send_email, send_telegram. |
 
 ### Creative (6)
 | Tool | Allowed agents | Engine | What it does |

@@ -1,4 +1,4 @@
-import { Home, LayoutGrid, Bot, ListTodo, FolderOpen, Globe, FileText, Database, Brain, Boxes, Puzzle, BookOpen, Settings, Smartphone, Terminal, Plug } from 'lucide-react';
+import { Home, LayoutGrid, Bot, ListTodo, FolderOpen, Globe, FileText, Database, Brain, Boxes, Puzzle, BookOpen, Settings, Smartphone, Terminal, Plug, Cable } from 'lucide-react';
 
 /** Every destination in the OS — `page` marks ones with real screens; the rest
  *  are roadmap stages (rendered as honest "planned" placeholders, never faked). */
@@ -33,6 +33,7 @@ export const NAV_SECTIONS = [
     label: 'EXTENSIONS',
     items: [
       { id: 'plugins', icon: Puzzle, label: 'Plugins', page: true },
+      { id: 'connectors', icon: Cable, label: 'Connectors', page: true },
       { id: 'knowledge', icon: BookOpen, label: 'Knowledge', page: true },
     ],
   },

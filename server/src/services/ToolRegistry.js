@@ -92,6 +92,11 @@ export const TOOL_REGISTRY = [
   // (ask_jexi, memory_lookup, knowledge_search, list_books, get_health)
   // through the same validated tool path as internal tools.
   { slug: 'mcp-call', name: 'MCP Call', type: 'MCP', desc: 'Call an external MCP tool (ask_jexi, memory_lookup, knowledge_search, list_books, get_health) with schema-validated args.', agents: ['jexi', 'context-manager', 'memory'], engine: 'MCPServer' },
+  // B56 — CONNECTORS as an INTERNAL tool: agents reach WhatsApp / GitHub /
+  // Email / Telegram through the registry via this one gated tool. It is
+  // EXTERNAL-tier, so a send always pauses for ONE explicit human approval
+  // with the finalized details (the OpenWorker risk model).
+  { slug: 'connector-call', name: 'Connector Call', type: 'Connectors', desc: 'Send an outbound action or read inbound events through a registered connector (whatsapp, github, email, telegram) — send_whatsapp, create_github_issue, send_email, send_telegram.', agents: ['jexi', 'github', 'email', 'context-manager'], engine: 'Connectors' },
   { slug: 'book-fetch', name: 'Book Fetch', type: 'Knowledge', desc: 'Fetch a free public-domain book or paper from the trusted library.', agents: ['books', 'scholar'], engine: 'TrustedLibrary' },
   { slug: 'knowledge-index', name: 'Knowledge Index', type: 'Knowledge', desc: 'Index studied material so recall is instant and complete.', agents: ['researcher', 'document-analyst', 'scholar'], engine: 'MemoryManager' },
   { slug: 'semantic-search', name: 'Semantic Search', type: 'Memory', desc: 'Hybrid vector + keyword search across all memories.', agents: ['memory', 'document-analyst', 'researcher'], engine: 'MemoryManager' },
@@ -298,7 +303,15 @@ export function toolsForTeam(team) {
 export function toolsForIntent(intent, extra = {}) {
   // Reuse the roster's team composition — one source of truth for "who runs".
   const team = composeTeam(intent, extra);
-  return toolsForTeam(team);
+  const tools = toolsForTeam(team);
+  // B52 hard enforcement, now at the OFFER layer too: intents with a code
+  // allowlist (direct_answer / conversation / self_check) are only OFFERED
+  // the tools they may actually call — the planning-time set matches the
+  // runtime gate, so heavy tools (web, browser, study, connectors) can never
+  // leak into a lightweight intent's tool list.
+  const allowlist = TOOL_INTENT_ALLOWLIST[intent];
+  if (allowlist) return tools.filter((t) => allowlist.includes(t.slug));
+  return tools;
 }
 
 /** Pretty one-line summary: "6 tools". */

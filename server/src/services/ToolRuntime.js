@@ -71,6 +71,7 @@ export const TOOL_SCHEMAS = {
   'self-diagnose': {},
   'trend-scan': { query: { type: 'string', desc: 'Topic to scan trends for' } },
   'mcp-call': { tool: { type: 'string', required: true, desc: 'MCP tool name (ask_jexi, memory_lookup, knowledge_search, list_books, get_health)' }, args: { type: 'object', desc: 'Arguments for the MCP tool' } },
+  'connector-call': { name: { type: 'string', required: true, desc: 'Connector name (whatsapp, github, email, telegram)' }, method: { type: 'string', desc: "Method: 'send' (default) | 'receive' | 'health'" }, payload: { type: 'object', desc: 'Payload for the connector method (see the generated send_<connector> tool schemas)' } },
 };
 
 /* ------------------------------------------------------------------ */
@@ -92,6 +93,7 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'stats-compute': z.object({ kind: z.string(), stats: z.unknown() }).passthrough(),
   'self-diagnose': z.object({ kind: z.string(), status: z.unknown() }).passthrough(),
   'mcp-call': z.object({ ok: z.boolean(), tool: z.string().optional(), result: z.unknown().optional(), error: z.unknown().optional() }).passthrough(),
+  'connector-call': z.object({ ok: z.boolean(), connector: z.string().optional(), method: z.string().optional(), result: z.unknown().optional(), events: z.unknown().optional(), error: z.unknown().optional(), code: z.string().optional() }).passthrough(),
 };
 
 /**
@@ -196,6 +198,7 @@ const TOOL_TIERS = {
   // external
   'github-cli': 'external', 'browser-drive': 'external', 'form-fill': 'external',
   'mcp-call': 'external', // refined by args below — the default is CONFIRM, per OpenWorker
+  'connector-call': 'external', // refined by method below — send = CONFIRM
 };
 
 /**
@@ -212,6 +215,12 @@ export function toolTier(slug, args = {}) {
   if (slug === 'mcp-call') {
     const name = String(args.tool || '');
     return BUILTIN_MCP_READ_TOOLS.has(name) ? 'read' : 'external';
+  }
+  if (slug === 'connector-call') {
+    // Sending anything out is EXTERNAL (one human approval). Reading inbound
+    // events or checking health has no side effects → read tier.
+    const method = String(args.method || 'send');
+    return method === 'receive' || method === 'health' ? 'read' : 'external';
   }
   return TOOL_TIERS[slug] || 'read';
 }
@@ -349,6 +358,17 @@ async function runEngine(slug, args) {
       // tool through the same schema-validated path as internal tools.
       const { callMcpTool } = await import('../../mcp-server.js');
       return await callMcpTool(args.tool, args.args || {});
+    }
+    case 'connector-call': {
+      // B56 — connectors through the same gated tool path. send() is
+      // EXTERNAL-tier (approval happens above in executeTool); the connector
+      // module resolves the registered instance by name.
+      const { callConnector } = await import('../connectors/index.js');
+      const res = await callConnector(args.name, { method: args.method || 'send', payload: args.payload || {} });
+      if (!res.ok) {
+        return { ok: false, connector: args.name, error: { code: res.code || 'CONNECTOR_FAILED', message: res.error || 'connector call failed' }, ...(res.retryAfter ? { retryAfter: res.retryAfter } : {}) };
+      }
+      return res;
     }
     default:
       return null; // no engine — caller decides fallback
@@ -518,6 +538,10 @@ export function buildFinalizedDetails(slug, args = {}) {
   if (slug === 'mcp-call') {
     const safe = safeArgs(slug, args.args || {});
     return `MCP tool: ${args.tool || '(none)'}${Object.keys(safe).length ? ` with ${JSON.stringify(safe)}` : ''}`;
+  }
+  if (slug === 'connector-call') {
+    const safe = safeArgs(slug, args.payload || {});
+    return `Connector: ${args.name || '(none)'} · method: ${args.method || 'send'}${Object.keys(safe).length ? ` · ${JSON.stringify(safe)}` : ''}`;
   }
   const safe = safeArgs(slug, args);
   const parts = Object.entries(safe)

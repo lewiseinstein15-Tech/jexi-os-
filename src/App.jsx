@@ -21,6 +21,7 @@ import TerminalScreen from './components/TerminalScreen';
 import PluginsScreen from './components/PluginsScreen';
 import ModelsScreen from './components/ModelsScreen';
 import McpScreen from './components/McpScreen';
+import ConnectorsScreen from './components/ConnectorsScreen';
 import ResearchScreen from './components/ResearchScreen';
 import PlaceholderPage from './components/PlaceholderPage';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -129,6 +130,12 @@ export default function App() {
         return (
           <div className="px-3 pt-4 pb-8 space-y-3 max-w-[900px] mx-auto">
             <McpScreen />
+          </div>
+        );
+      case 'connectors':
+        return (
+          <div className="px-3 pt-4 pb-8 space-y-3 max-w-[900px] mx-auto">
+            <ConnectorsScreen />
           </div>
         );
       case 'memory':

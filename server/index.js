@@ -40,6 +40,9 @@ import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications } from './src/services/NotificationCenter.js';
 import { modelRoutingTable, providerPreferenceForIntent } from './src/services/ModelRouting.js';
 import { MCP_PORT, MCP_TOOL_ALLOWLIST, listMcpTools } from './mcp-server.js';
+import {
+  registerConnectors, getConnectorStatus, saveConnectorConfig, callConnector, handleConnectorWebhook, getConnectorToolSchemas,
+} from './src/connectors/index.js'; // B56 — connector system
 import { trustStatus, setTrustMode, allowPattern, denyPattern, removeDecision, clearTrust, trustFolder } from './src/services/RiskGuard.js';
 import { computerStatus, runtimeCall } from './src/services/ComputerRuntime.js';
 import { listTasks, getTask, updateTask, deleteTask, taskStats as taskRegistryStats } from './src/services/TaskRegistry.js';
@@ -72,6 +75,11 @@ backfillEmbeddings().catch((e) => { recordError('memory', (e && e.message) || St
 recordBoot();
 process.on('uncaughtException', (e) => { recordError('process', e.message, e.stack); console.error('[FATAL]', e); process.exit(1); });
 process.on('unhandledRejection', (e) => { recordError('process', (e && e.message) || String(e)); });
+
+// B56 — register every connector (whatsapp / github / email / telegram) from
+// saved config + env. Agents reach them through the gated `connector-call`
+// tool; providers reach JEXI through /webhooks/connectors/<name>.
+registerConnectors();
 
 const app = express();
 
@@ -120,6 +128,42 @@ const aiLimiter = rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 'dra
 const generalLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 600, standardHeaders: 'draft-7', legacyHeaders: false });
 app.use(['/api/chat', '/api/vision', '/api/knowledge/search', '/api/agent'], aiLimiter);
 app.use('/api', generalLimiter);
+
+// B56 — CONNECTOR WEBHOOKS. Mounted BEFORE express.json because WhatsApp /
+// GitHub signatures are HMACs over the RAW request body — parsing it first
+// would break verification. Mounted OUTSIDE /api so provider webhooks (Meta,
+// GitHub, SendGrid, Telegram) are not gated by JEXI_API_KEY or the API
+// rate limiter. Each provider's POST returns 200 immediately after
+// verification + normalization; failures are logged, never fabricated.
+const connectorWebhooks = express.Router();
+connectorWebhooks.use(express.raw({ type: () => true, limit: '10mb' }));
+const webhookFor = (name) => async (req, res) => {
+  let body = null;
+  if (req.body && req.body.length) {
+    const ct = req.headers['content-type'] || '';
+    if (!/multipart\/form-data/i.test(ct)) {
+      try { body = JSON.parse(req.body.toString('utf8')); } catch (e) { body = null; }
+    }
+  }
+  const result = await handleConnectorWebhook(name, {
+    rawBody: req.body ? req.body.toString('utf8') : '',
+    headers: req.headers,
+    query: req.query,
+    body,
+  });
+  if (result.kind === 'handshake') {
+    if (result.verified) return res.status(200).send(result.challenge);
+    return res.status(403).send(result.reason || 'Verification failed');
+  }
+  if (result.kind === 'rejected') return res.status(403).json({ ok: false, error: result.error });
+  return res.status(200).json({ ok: true, events: result.events || [], verified: true });
+};
+connectorWebhooks.get('/webhooks/connectors/whatsapp', webhookFor('whatsapp'));
+connectorWebhooks.post('/webhooks/connectors/whatsapp', webhookFor('whatsapp'));
+connectorWebhooks.post('/webhooks/connectors/github', webhookFor('github'));
+connectorWebhooks.post('/webhooks/connectors/email', webhookFor('email'));
+connectorWebhooks.post('/webhooks/connectors/telegram', webhookFor('telegram'));
+app.use(connectorWebhooks);
 
 app.use(express.json({ limit: '30mb' })); // Room for base64 book uploads + code files + images
 
@@ -541,6 +585,51 @@ app.get('/api/mcp/status', (req, res) => {
     docs: 'Any MCP client can connect to /mcp and call the allowlisted tools. Generic MCP tools can be attached via registerMcpTool (EXTERNAL tier only — approval required).'
   });
 });
+
+// === CONNECTOR SYSTEM (B56 — whatsapp / github / email / telegram) ===
+// User-initiated sends from the Connectors UI are themselves the human
+// approval; agent-initiated sends go through the `connector-call` tool which
+// is EXTERNAL-tier and always pauses for ONE explicit approval first.
+app.get('/api/connectors', async (req, res) => {
+  try { res.json({ connectors: await getConnectorStatus(), tools: getConnectorToolSchemas() }); }
+  catch (e) { res.status(500).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+
+// Save connector config (auth keys + enabled). Keys are stored in settings
+// and masked in every response; env vars always win at call time.
+app.post('/api/connectors/:name/config', (req, res) => {
+  try {
+    const saved = saveConnectorConfig(req.params.name, req.body || {});
+    res.json({ ok: true, connector: saved.name, enabled: saved.enabled, auth: maskConnectorAuth(saved.auth) });
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+
+// Toggle a connector on/off without touching its saved keys.
+app.post('/api/connectors/:name/toggle', (req, res) => {
+  try {
+    const enabled = !!(req.body && req.body.enabled);
+    const saved = saveConnectorConfig(req.params.name, { enabled });
+    res.json({ ok: true, name: saved.name, enabled: saved.enabled });
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+
+// User-initiated connector action (send / receive / health / authenticate).
+// The human clicked the button = the approval for outbound sends.
+app.post('/api/connectors/:name/call', async (req, res) => {
+  try {
+    const { method = 'send', payload = {} } = req.body || {};
+    const result = await callConnector(req.params.name, { method, payload });
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (e) { res.status(500).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+
+function maskConnectorAuth(auth = {}) {
+  const out = {};
+  for (const [k, v] of Object.entries(auth)) {
+    out[k] = /token|secret|key|password|private/i.test(k) && v ? `••••${String(v).slice(-4)}` : v;
+  }
+  return out;
+}
 
 // === PLUGIN SYSTEM (roadmap stage 21 — feature bundles) ===
 // Built-in plugins contribute agents/skills/tools; toggle them at runtime.
