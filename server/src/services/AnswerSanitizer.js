@@ -34,15 +34,24 @@ const FORBIDDEN_PHRASES = [
   /as an AI( language model)?[,.]/gi,
   /as a language model[,.]/gi,
   /I will now /gi,
+  // B53 P4 — zero process garbage in the final answer:
+  /this was a bug I corrected/gi,
+  /this is a bug I (fixed|corrected)/gi,
+  /I (fixed|corrected) the bug (for|that) (you|we)/gi,
+  /(the )?(QA|Security|Reviewer|Critic|Reflector) (team )?(found|flagged|reported)/gi,
+  /all agents (completed|finished|passed|succeeded)/gi,
+  /the full (agent )?(team|pipeline) (completed|finished|worked)/gi,
+  /pipeline (completed|finished) successfully/gi,
+  /mission complete[.!]/gi,
 ];
 
 /** Headers / banners that are pure process narration — remove the whole line.
  * NOTE: emoji bullets are matched via \p{Extended_Pictographic} (u flag) — a
  * literal emoji character class matches UTF-16 code units and never hits. */
-const NARRATION_HEADER_RE = /^\s*(#{1,6}\s*)?(?:\p{Extended_Pictographic}\s*)?(JEXI SCHOLAR|FROM MEMORY|RECALLED FROM MEMORY|FROM YOUR BOOKS|JEXI TEAM — PLANNED, BUILT, TESTED & SHIPPED|JEXI OS — FROM MEMORY[^\n]*)\s*$/gimu;
+const NARRATION_HEADER_RE = /^\s*(#{1,6}\s*)?(?:\p{Extended_Pictographic}\s*)?(JEXI SCHOLAR|FROM MEMORY|RECALLED FROM MEMORY|FROM YOUR BOOKS|JEXI TEAM — PLANNED, BUILT, TESTED & SHIPPED|JEXI OS — FROM MEMORY[^\n]*|JEXI TEAM —[^\n]*|AGENT PIPELINE[^\n]*)\s*$/gimu;
 
 /** Whole-line narration paragraphs (with optional leading bullet/dash/emoji). */
-const NARRATION_LINE_RE = /^\s*(?:\p{Extended_Pictographic}\s*)?(?:[-*>]\s*)?(I studied [^\n]+|I researched [^\n]+|I used the Trusted Library[^\n]*|I saved (this|it) to my knowledge library[^\n]*|I remember this from memory[^\n]*|I found (this|it) in your books[^\n]*|The full agent team worked together[^\n]*|I solved this before[^\n]*)\s*$/gimu;
+const NARRATION_LINE_RE = /^\s*(?:\p{Extended_Pictographic}\s*)?(?:[-*>]\s*)?(I studied [^\n]+|I researched [^\n]+|I used the Trusted Library[^\n]*|I saved (this|it) to my knowledge library[^\n]*|I remember this from memory[^\n]*|I found (this|it) in your books[^\n]*|The full agent team worked together[^\n]*|I solved this before[^\n]*|(Completed|Done|Finished|Team|Pipeline):[^\n]*→[^\n]*|(Critic|Reflector|Reviewer|QA|Security)[ '']?(notes|verdict|review|report|essay|reflection)[:\s][^\n]*)\s*$/gimu;
 
 /**
  * Strip forbidden narration from a final answer.

@@ -6,13 +6,22 @@
  * WORKSPACE_DIR: every meaningful state can be snapshotted, diffed and rolled
  * back — so an AI edit is never a one-way door.
  *
- *   list()          — workspace files with metadata
- *   read()          — file content (bounded)
- *   write()         — write a workspace file (path-escape safe)
- *   checkpoint()    — snapshot every workspace file → DATA_DIR/workspace-cps/
- *   listCheckpoints()— newest first, with file counts
- *   diff()          — line diff between a checkpoint and the current workspace
- *   rollback()      — restore every file (or one file) from a checkpoint
+ * B53 P2 — TASK-SCOPED WORKSPACES (hard product isolation):
+ * WORKSPACE_DIR stays the ACTIVE task's staging area (so preview links and
+ * /api/files/* keep working unchanged), but every task gets its own archived
+ * snapshot under DATA_DIR/task-workspaces/<taskId>/. Switching to a different
+ * task archives the current files and restores (or starts empty for) the new
+ * task — a new product objective NEVER inherits the previous product's files.
+ *
+ *   list()                  — workspace files with metadata
+ *   read()                  — file content (bounded)
+ *   write()                 — write a workspace file (path-escape safe)
+ *   checkpoint()            — snapshot every workspace file → DATA_DIR/workspace-cps/
+ *   listCheckpoints()       — newest first, with file counts
+ *   diff()                  — line diff between a checkpoint and the current workspace
+ *   rollback()              — restore every file (or one file) from a checkpoint
+ *   activateTaskWorkspace() — switch the active staging area to a task (B53 P2)
+ *   archiveTaskWorkspace()  — snapshot the active staging area for a task (B53 P2)
  */
 
 import fs from 'fs';
@@ -20,7 +29,82 @@ import path from 'path';
 import { WORKSPACE_DIR, DATA_DIR } from '../config.js';
 
 const CP_DIR = path.join(DATA_DIR, 'workspace-cps');
+const TASK_WS_ROOT = path.join(DATA_DIR, 'task-workspaces');
 const MAX_FILE_CHARS = 50000;
+
+/* ---------------- B53 P2 — per-task workspace isolation ---------------- */
+
+/** Which task owns the current WORKSPACE_DIR contents (module state). */
+let activeWorkspaceTask = null;
+
+export function taskWorkspaceDir(taskId) {
+  return path.join(TASK_WS_ROOT, String(taskId || 'unknown').replace(/[^a-zA-Z0-9_-]/g, ''));
+}
+
+function clearDir(dir) {
+  if (!fs.existsSync(dir)) return;
+  for (const ent of fs.readdirSync(dir)) {
+    const p = path.join(dir, ent);
+    try {
+      if (fs.statSync(p).isDirectory()) fs.rmSync(p, { recursive: true, force: true });
+      else fs.unlinkSync(p);
+    } catch (e) { /* skip locked files */ }
+  }
+}
+
+function copyDir(src, dst) {
+  if (!fs.existsSync(src)) return;
+  fs.mkdirSync(dst, { recursive: true });
+  for (const ent of fs.readdirSync(src)) {
+    const from = path.join(src, ent);
+    const to = path.join(dst, ent);
+    try {
+      if (fs.statSync(from).isDirectory()) copyDir(from, to);
+      else fs.copyFileSync(from, to);
+    } catch (e) { /* skip */ }
+  }
+}
+
+/** Snapshot the CURRENT staging area (WORKSPACE_DIR) under a task id. */
+export function archiveTaskWorkspace(taskId) {
+  const dir = taskWorkspaceDir(taskId);
+  if (!fs.existsSync(WORKSPACE_DIR)) return { taskId, archived: false };
+  const files = fs.readdirSync(WORKSPACE_DIR);
+  if (!files.length) return { taskId, archived: false };
+  clearDir(dir);
+  fs.mkdirSync(dir, { recursive: true });
+  copyDir(WORKSPACE_DIR, dir);
+  return { taskId, archived: true, fileCount: files.length };
+}
+
+/**
+ * Switch the active staging area to a task: archive the CURRENT owner's
+ * files (if any), clear the staging area, and restore the target task's
+ * archived snapshot (or leave it empty for a brand-new product). Returns
+ * { taskId, restored } where restored = the previous files were cleared and
+ * this task's snapshot was brought back.
+ */
+export function activateTaskWorkspace(taskId) {
+  if (!taskId) return { taskId: null, restored: false };
+  if (activeWorkspaceTask && activeWorkspaceTask !== taskId) {
+    archiveTaskWorkspace(activeWorkspaceTask);
+  }
+  const dir = taskWorkspaceDir(taskId);
+  clearDir(WORKSPACE_DIR);
+  fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
+  let restored = false;
+  if (fs.existsSync(dir)) {
+    copyDir(dir, WORKSPACE_DIR);
+    restored = true;
+  }
+  activeWorkspaceTask = taskId;
+  return { taskId, restored, fresh: !restored };
+}
+
+/** Which task currently owns the staging area (for tests / diagnostics). */
+export function activeTaskIdNow() {
+  return activeWorkspaceTask;
+}
 
 function ensureWorkspace() {
   if (!fs.existsSync(WORKSPACE_DIR)) fs.mkdirSync(WORKSPACE_DIR, { recursive: true });

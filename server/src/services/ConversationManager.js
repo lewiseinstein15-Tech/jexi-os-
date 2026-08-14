@@ -31,7 +31,35 @@ const NEW_TOPIC_WORDS = /\b(what is|what's|define|explain|calculate|solve|derive
 const QUESTION_WORDS = /\b(what|why|how|when|where|who|which|is|are|does|can|should|could)\b/i;
 
 /** Bare "just keep going" fragments (no new subject named). */
-const PURE_CONTINUE_RE = /^(continue|resume|go on|keep (going|working|it up)|proceed|carry on|pick (it |things )?up|yes|yeah|ok(ay)?|more|go ahead|next|and|then|please|sure|alright|great|perfect|do it|make it|finish (it|this|that)|complete (it|this|that))\b/i;
+const PURE_CONTINUE_RE = /^(continue|resume|go on|keep (going|working|it up)|proceed|carry on|pick (it |things )?up|yes|yeah|ok(ay)?|more|go ahead|next|and|then|please|sure|alright|great|perfect|do it|make it|finish (it|this|that)|complete (it|this|that))\b/i; // P4-OK
+
+/** B53 P2 — a FRESH product objective: build/create/make/write/develop +
+ * deliverable noun. These must NEVER silently continue the active task — a
+ * different product gets its own taskId and its own workspace. */
+const NEW_PRODUCT_RE = /\b(build|create|make|write|develop|code|implement)\b[^.!?\n]{0,100}\b(app(lication)?|website|web ?app|web ?page|game|quiz|calculator|tracker|planner|dashboard|tool|bot|extension|plugin|landing page|portfolio|template|scraper|script|notes?|todo|habit|budget|timer|stopwatch|converter|generator|monitor|panel|form|screen|component)\b/i;
+
+/** B53 P3 — MODIFICATION language on the active product: "add dark mode",
+ * "change the button color", "make the header sticky", "now also …". With an
+ * active product task these are CONTINUE (same taskId, apply the edit), never
+ * research on the word "change" and never a brand-new task. */
+const MODIFY_RE = /^(?:can you |please |now |let'?s |also )?(add|change|update|fix|modify|improve|remove|restyle|redesign|restructure|tweak|polish|restyle|style|make the|make it|make my|make this|now also|also make)\b/i;
+
+/** True when the message references the active task's own product framing
+ * (its title or its specific deliverable noun), so NEW_PRODUCT_RE doesn't
+ * misfire on "build the calculator app" style continuations. */
+function refersToActiveTask(query, taskId) {
+  if (!taskId) return false;
+  const t = getTask(taskId);
+  if (!t) return false;
+  const ql = String(query || '').toLowerCase();
+  const title = String(t.title || '').toLowerCase().trim();
+  const obj = String(t.objective || '').toLowerCase().trim();
+  const chunk = title.length >= 8 ? title.slice(0, Math.min(24, title.length)) : title;
+  if (chunk.length >= 5 && ql.includes(chunk)) return true;
+  const product = (obj.match(/\b(calculator|tracker|planner|dashboard|portfolio|timer|stopwatch|converter|generator|todo|habit|budget|notes|monitor|game|quiz|bot|extension|plugin|template|scraper)\b/) || [null])[0];
+  if (product && new RegExp(`\\b${product}\\b`).test(ql)) return true;
+  return false;
+}
 
 /**
  * Analyze a message against conversation + task state.
@@ -95,7 +123,16 @@ export async function analyzeMessage(query, { currentTaskId = null, image = fals
 
   // 1) Explicit task-id / strong named reference ("task 2", "the dashboard").
   const ref = resolveTaskRef(raw);
-  if (ref.confidence >= 0.55 && ref.taskId) {
+  // B53 P2 — a FRESH build request ("build an app that tracks my calendar
+  // events") must never be hijacked by a LOOSE generic-noun match ("app",
+  // "website" appear in both messages) against the old product task. Only a
+  // strong reference (verbatim title / entity, conf >= 0.85) or an explicit
+  // mention of the active task's own product counts as a continuation.
+  const refIsStrong = ref.confidence >= 0.85;
+  const refNamesActiveProduct = ref.taskId ? refersToActiveTask(raw, ref.taskId) : false;
+  const freshBuild = NEW_PRODUCT_RE.test(raw);
+  const looseGenericRef = freshBuild && !refIsStrong && !refNamesActiveProduct && ref.confidence >= 0.55;
+  if (ref.confidence >= 0.55 && ref.taskId && !looseGenericRef) {
     const t = getTask(ref.taskId);
     const isCurrent = t?.id === currentTaskId;
     return {
@@ -117,6 +154,22 @@ export async function analyzeMessage(query, { currentTaskId = null, image = fals
       reason: ref.reason,
       candidates: ref.candidates,
     };
+  }
+
+  // 2.5) B53 P3 — MODIFICATION of the active product task. Runs after explicit
+  //      refs ("add X to the calculator" resolves above) but before any
+  //      question/new-topic logic, so "change the button color" with a live
+  //      product NEVER becomes a research pass or a fresh task.
+  if (MODIFY_RE.test(raw) && currentTaskId && getTask(currentTaskId)) {
+    const t = getTask(currentTaskId);
+    return { classification: 'continue', taskId: t.id, confidence: 0.85, reason: 'modification of the active product task', topic: t.title, contextBlock: '' };
+  }
+
+  // 2.6) B53 P2 — a FRESH product objective ("build an app that tracks my
+  //      calendar events" after a calculator) is a NEW task with its OWN
+  //      workspace — the previous product's files must not bleed into it.
+  if (NEW_PRODUCT_RE.test(raw) && !refersToActiveTask(raw, currentTaskId)) {
+    return { classification: 'new', taskId: null, confidence: 0.8, reason: 'new product objective — isolated from the previous task' };
   }
 
   // 3) Questions / new-topic language. Named refs were handled above; a

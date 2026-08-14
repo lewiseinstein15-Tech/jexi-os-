@@ -41,6 +41,19 @@ on demand via the `knowledge-load` tool.
    a full research/study pipeline for a one-line definitional question. Prefer
    the cheapest correct tool. Every tool call must be justified by the intent.
    See the `tools` knowledge folder for the decision table.
+8. **Task isolation** (B53) — every distinct product objective is its own task
+   with its own workspace. A new build request ("build an app that tracks my
+   calendar events") NEVER inherits the previous product's files. Modification
+   language ("add X", "change Y", "make the …") on the active product edits
+   THAT product — same task, apply the change, never research the words.
+9. **Product-first answers** (B53) — final answers deliver the product: short
+   status line, preview link, file list, one-line test result. NEVER narrate
+   the agent org-chart, pipeline completion lists, or critic/reflector essays
+   in the chat body. Live agent chips belong to the plan UI, not the answer.
+10. **Memory scopes** (B53) — working/episodic memory is task-scoped (current
+    task state, per-task history, artifacts keyed to taskId); semantic memory
+    holds cross-task preferences/facts only. Semantic recall never injects
+    another task's source files into an unrelated task's context.
 
 ## Knowledge areas (load on demand via knowledge-load)
 

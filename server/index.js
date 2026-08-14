@@ -44,6 +44,7 @@ import { trustStatus, setTrustMode, allowPattern, denyPattern, removeDecision, c
 import { computerStatus, runtimeCall } from './src/services/ComputerRuntime.js';
 import { listTasks, getTask, updateTask, deleteTask, taskStats as taskRegistryStats } from './src/services/TaskRegistry.js';
 import { analyzeMessage } from './src/services/ConversationManager.js';
+import { activateTaskWorkspace, archiveTaskWorkspace } from './src/services/WorkspaceRuntime.js'; // B53 P2 — per-task workspace isolation
 import { decide, applyDecision } from './src/services/DecisionEngine.js';
 import { recordDecision, retrieveDecisions, memoryStats as decisionMemoryStats } from './src/services/DecisionMemory.js';
 import { metricsSummary, startTrace, endTrace, emitMetric, scoreProviderHealth } from './src/services/ObservabilityAgent.js';
@@ -856,7 +857,7 @@ async function buildPlannerMemory(query) {
   }
   try {
     if (!trivial && String(query || '').trim().length > 3) {
-      const learned = await semanticRecall(query, { limit: 2 });
+      const learned = await semanticRecall(query, { limit: 2, noCode: true }); // B53 P5 — planner sees preferences/facts, never another task's code
       if (learned.length) {
         parts.push('Prior knowledge: ' + learned.map((l) => `${l.label}: ${String(l.text).slice(0, 180)}`).join(' | '));
       }
@@ -1038,7 +1039,9 @@ app.post('/api/chat', async (req, res) => {
       // JEXI already knows (preferences, facts, prior research) when deciding
       // the intent. Compact slice — never the full transcript.
       const plannerMemory = await buildPlannerMemory(effectiveQuery);
-      plan = await planner.analyzeIntent(effectiveQuery, { image, memoryContext: plannerMemory });
+      // B53 P3 — the planner sees whether an active product task exists so
+      // add/change/update/fix language routes to code modify, never research.
+      plan = await planner.analyzeIntent(effectiveQuery, { image, memoryContext: plannerMemory, activeTaskId: currentTaskId || null });
       saveOffer(convId, effectiveQuery);
 
       // BUILD 47 — apply the decision: create or re-activate the task.
@@ -1069,6 +1072,16 @@ app.post('/api/chat', async (req, res) => {
         resumed: !!decision.metadata.resumed,
         taskCount: taskRegistryStats().total,
       });
+    }
+
+    // B53 P2 — HARD TASK/PRODUCT ISOLATION: switch the staging area to this
+    // task BEFORE any file-touching node runs. Code/compound turns archive the
+    // previous task's workspace, restore this task's snapshot (or start empty
+    // for a brand-new product) — a calendar app NEVER sees the calculator's files.
+    const CODE_INTENTS = new Set(['code_task', 'compound_task']);
+    const isCodeTurn = CODE_INTENTS.has(plan.intent);
+    if (activeTaskId && getTask(activeTaskId) && isCodeTurn) {
+      try { activateTaskWorkspace(activeTaskId); } catch (e) {}
     }
 
     // GUARDRAIL — continuous prompt-injection / jailbreak / tool-abuse scan
@@ -1110,12 +1123,25 @@ app.post('/api/chat', async (req, res) => {
     });
     const results = await orchestrator.executePlan(plan, executionQuery || effectiveQuery, sendEvent, {
       image,
+      // B53 P2 — task scope for the run: the orchestrator gates memory reuse
+      // and writes durable checkpoints keyed to this taskId.
+      taskId: activeTaskId || null,
+      // B53 P2 — continuation turns (continue/switch/resume) may reuse the
+      // task's saved coding memory; brand-new product tasks must not.
+      isContinuation: hasPending || ['continue', 'switch'].includes(intelClassification),
       // P5 — when a node pauses for approval, persist the FULL RunState so a
       // later "yes" resumes at the exact paused node, prior results intact.
       onPause: async (pausedState) => {
         saveRun(convId, { plan, query: executionQuery || effectiveQuery, state: pausedState });
       },
     });
+
+    // B53 P2 — snapshot the finished task's workspace so a later "go back to
+    // the calculator" restores the exact artifacts, and the NEXT product task
+    // never inherits them.
+    if (activeTaskId && getTask(activeTaskId) && isCodeTurn && results.files?.length) {
+      try { archiveTaskWorkspace(activeTaskId); } catch (e) {}
+    }
 
     // OBSERVABILITY — close the trace with real latency + outcome metrics.
     endTrace('chat.task', results.success ? 'ok' : 'error', { intent: plan.intent });

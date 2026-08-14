@@ -71,6 +71,8 @@ export function createTask({ title, objective, project = '', entities = [], plan
     decisions: [],
     recentQueries: [],
     filesChanged: [],
+    entryPoint: '', // B53 P2/P6 — the file to run for this task (code resume)
+    checkpoint: null, // B53 P6 — durable { node, attempt, lastError, files, at }
     result: '',
     lastVerified: null,
     createdAt: now(),
@@ -116,12 +118,36 @@ export function updateTask(id, patch = {}) {
   }
   if (patch.result) t.result = String(patch.result).slice(0, 4000);
   if (patch.filesChanged) t.filesChanged = [...new Set([...t.filesChanged, ...(Array.isArray(patch.filesChanged) ? patch.filesChanged : [patch.filesChanged])].values())].slice(-40);
+  if (patch.entryPoint) t.entryPoint = String(patch.entryPoint).slice(0, 300);
+  if (patch.checkpoint) t.checkpoint = patch.checkpoint; // durable checkpoint object
   if (patch.verified !== undefined) t.lastVerified = patch.verified ? now() : t.lastVerified;
   t.turnCount += 1;
   t.updatedAt = now();
   t.lastActivity = now();
   persist();
   return { ...t };
+}
+
+/**
+ * B53 P6 — DURABLE CHECKPOINT: persist where a task's execution stopped
+ * (graph node, attempt counter, last error, files touched). Written after
+ * major graph nodes so a disconnect → resume never restarts from zero or
+ * invents completed steps. Survives restarts (task-registry.json).
+ */
+export function setTaskCheckpoint(id, { node = '', attempt = 0, lastError = null, files = [] } = {}) {
+  const t = getTask(id);
+  if (!t) return null;
+  t.checkpoint = {
+    node: String(node || ''),
+    attempt: Number(attempt) || 0,
+    lastError: lastError ? String(lastError).slice(0, 500) : null,
+    files: Array.isArray(files) ? files.map(String).slice(-40) : [],
+    at: now(),
+  };
+  t.updatedAt = now();
+  t.lastActivity = now();
+  persist();
+  return { ...t.checkpoint };
 }
 
 /** Add a decision to a task's decision log (with provenance, see DecisionMemory). */
@@ -312,5 +338,33 @@ export function taskContextBlock(task, { maxSteps = 12, maxDecisions = 4 } = {})
   }
   if (task.filesChanged.length) lines.push(`Files touched: ${task.filesChanged.slice(-8).join(', ')}`);
   if (task.lastVerified) lines.push(`Last verified: ${new Date(task.lastVerified).toISOString()}`);
+  // B53 P6 — checkpoint state (where execution stopped) is part of the resume
+  // context so a retry/continue knows exactly where it is instead of guessing.
+  if (task.checkpoint) {
+    lines.push(`Checkpoint: ${task.checkpoint.node}${task.checkpoint.attempt ? ` (attempt ${task.checkpoint.attempt})` : ''}${task.checkpoint.lastError ? ` — last error: ${task.checkpoint.lastError.slice(0, 160)}` : ''}`);
+  }
   return lines.join('\n');
+}
+
+/** B53 P5 — episodic/working summary for a task (used for continue/switch
+ * recall). Never includes other tasks' state — strictly taskId-scoped. */
+export function taskEpisodicSummary(id) {
+  const t = getTask(id);
+  if (!t) return null;
+  return {
+    taskId: t.id,
+    title: t.title,
+    status: t.status,
+    project: t.project,
+    objective: t.objective,
+    completedSteps: t.completedSteps.slice(-12),
+    pendingSteps: t.pendingSteps.slice(0, 12),
+    filesChanged: t.filesChanged.slice(-20),
+    entryPoint: t.entryPoint || null,
+    result: String(t.result || '').slice(0, 800),
+    decisions: t.decisions.slice(-6).map((d) => String(d.content || d).slice(0, 140)),
+    recentQueries: t.recentQueries.slice(-6),
+    checkpoint: t.checkpoint,
+    updatedAt: t.updatedAt,
+  };
 }

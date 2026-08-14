@@ -74,10 +74,13 @@ export async function runOnce({ entryPoint, runCommand, sendEvent }) {
  * The default fixer: feed goal + the EXACT last error into the model as the
  * Coder and get back files to write. Injectable for tests/determinism.
  */
-export async function defaultFixer({ goal, errorOutput, files, attempt, sendEvent }) {
+export async function defaultFixer({ goal, errorOutput, files, attempt, sendEvent, failureHistory = [] }) {
   const emit = typeof sendEvent === 'function' ? sendEvent : () => {};
   const existing = (files || []).map((f) => `## ${f.name}\n${f.code}`).join('\n\n').slice(0, 12000);
-  const prompt = `Goal: ${goal}\n\nCurrent code:\n${existing || '(none)'}\n\nEXACT ERROR FROM THE LAST RUN (attempt ${attempt}):\n${String(errorOutput || '(no output)').slice(-3000)}\n\nFix the code so the run succeeds. Reply with a fenced json block:\n{"files": [{"name": "<path>", "code": "<complete fixed file>"}], "entryPoint": "<file to run>"}`;
+  // B53 P7 — every retry sees the EXACT last error + the failure-history tail,
+  // and is told to fix ONLY that error (no scope creep, no invented features).
+  const historyTail = (failureHistory || []).slice(-4).map((f) => `- ${String(f).slice(0, 200)}`).join('\n');
+  const prompt = `Goal: ${goal}\n\nCurrent code:\n${existing || '(none)'}\n\nEXACT ERROR FROM THE LAST RUN (attempt ${attempt}):\n${String(errorOutput || '(no output)').slice(-3000)}${historyTail ? `\n\nFailure history (recent):\n${historyTail}` : ''}\n\nFix THE ERROR ABOVE and nothing else. Do not expand scope, do not add unrelated features, do not rewrite working parts. Reply with a fenced json block:\n{"files": [{"name": "<path>", "code": "<complete fixed file>"}], "entryPoint": "<file to run>"}`;
   emit('log', { agent: 'Debugger', message: `✍ Attempt ${attempt}: reading the error and rewriting…` });
   const reply = await generateContent(prompt, JEXI_SYSTEM_PROMPT + '\nYou are the Coder in a fix loop. Output the fenced json block only.', null, { temperature: 0.2 });
   try {
@@ -164,8 +167,10 @@ export async function runCodingLoop(opts) {
       return { attempts, success: false, lastOutput, lastExitCode, files, entryPoint, attemptsLog };
     }
 
-    // Feed the EXACT error back and let the fixer rewrite.
-    const fixed = await fixer({ goal: opts.goal, errorOutput: run.output, files, attempt: i + 1, sendEvent: emit });
+    // Feed the EXACT error back and let the fixer rewrite (B53 P7 — the
+    // failure-history tail travels with it so the fix learns, not repeats).
+    const failureHistory = attemptsLog.map((a) => `attempt ${a.attempt}: ${String(a.outputHead).slice(0, 200)}`);
+    const fixed = await fixer({ goal: opts.goal, errorOutput: run.output, files, attempt: i + 1, sendEvent: emit, failureHistory });
     if (fixed.parseError) {
       emit('log', { agent: 'Debugger', message: `⚠ Fixer output unparseable: ${fixed.parseError}` });
       return { attempts, success: false, lastOutput, lastExitCode, files, entryPoint, attemptsLog };

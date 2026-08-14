@@ -799,15 +799,21 @@ export async function searchCodingKnowledge(query) {
  * (TencentDB caps retrieval so memory never overwhelms the context window).
  * Returns [{ kind, label, text, score }].
  */
-export async function semanticRecall(query, { limit = 3, maxChars = 1200 } = {}) {
+export async function semanticRecall(query, { limit = 3, maxChars = 1200, noCode = false } = {}) {
+  // B53 P5 — MEMORY SCOPES: semantic recall is the cross-task store (facts,
+  // preferences, researched topics). When noCode is set (planner + conversation
+  // context) it EXCLUDES codingKnowledge — product source trees stay task-scoped
+  // and never leak into an unrelated task's context.
   const mem = loadMemory();
   const q = String(query || '').trim();
   if (q.length < 4) return [];
   const results = [];
   const internet = await hybridSearch(mem.internetKnowledge || [], q, { relevanceFloor: 0.12, limit });
   for (const h of internet) results.push({ kind: 'research', label: String(h.entry.topic || '').slice(0, 120), text: String(h.entry.answer || '').slice(0, 600), score: h.score });
-  const coding = await hybridSearch(mem.codingKnowledge || [], q, { relevanceFloor: 0.25, limit });
-  for (const h of coding) results.push({ kind: 'code', label: String(h.entry.topic || '').slice(0, 120), text: String(h.entry.solution || '').slice(0, 600), score: h.score });
+  if (!noCode) {
+    const coding = await hybridSearch(mem.codingKnowledge || [], q, { relevanceFloor: 0.25, limit });
+    for (const h of coding) results.push({ kind: 'code', label: String(h.entry.topic || '').slice(0, 120), text: String(h.entry.solution || '').slice(0, 600), score: h.score });
+  }
   const facts = await hybridSearch(mem.userFacts || [], q, { relevanceFloor: 0.15, limit });
   for (const h of facts) results.push({ kind: 'fact', label: String(h.entry.fact || '').slice(0, 200), text: '', score: h.score });
   results.sort((a, b) => b.score - a.score);

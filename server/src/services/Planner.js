@@ -348,11 +348,14 @@ export class Planner {
         ? `\n\nRemembered context about the user/project (use it ONLY if it directly decides this request):\n${opts.memoryContext.slice(0, 1500)}`
         : '';
       const shots = CLASSIFIER_FEW_SHOTS.map((s) => `User: "${s.q}" → ${s.intent} (${s.reason})`).join('\n');
-      const prompt = `Classify this user request into exactly one JEXI OS intent.${memoryContext}
+      const activeTaskNote = opts.activeTaskId
+        ? `\nAn ACTIVE product task exists (${opts.activeTaskId}). Modification language — \"add …\", \"change …\", \"update …\", \"fix …\", \"make the …\", \"now also …\" — means the user wants to EDIT that product: classify code_task, never research/direct_answer.`
+        : '';
+      const prompt = `Classify this user request into exactly one JEXI OS intent.${memoryContext}${activeTaskNote}
 
 Examples:\n${shots}
 
-NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" → code_task (an APP!) — never study_topic\n- "study calculus" → study_topic (a TOPIC!) — never code_task\n- "write documentation for my code" → docs — never code_task\n- "make my app faster" → perf — never code_task\n- "latest news about X" → news_latest — never research\n- "what is computer science" → direct_answer (definitional — answer from knowledge, NO study/research pipeline)\n- "what is the capital of Kenya" → direct_answer (simple fact — no web/study)\n- "study computer science for my exam" → study_topic (explicit learning request)\n\nUser request: "${query}"\n\nReturn ONLY valid JSON: {"intent": "...", "confidence": 0.0-1.0, "teamSlugs": [...], "reasoning": "..."}`;
+NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" → code_task (an APP!) — never study_topic\n- "study calculus" → study_topic (a TOPIC!) — never code_task\n- "write documentation for my code" → docs — never code_task\n- "make my app faster" → perf — never code_task\n- "latest news about X" → news_latest — never research\n- "what is computer science" → direct_answer (definitional — answer from knowledge, NO study/research pipeline)\n- "what is the capital of Kenya" → direct_answer (simple fact — no web/study)\n- "study computer science for my exam" → study_topic (explicit learning request)\n- "add dark mode to the calculator" → code_task (MODIFY an existing product — never research)\n- "change the button color" → code_task (modification — never research)\n\nUser request: "${query}"\n\nReturn ONLY valid JSON: {"intent": "...", "confidence": 0.0-1.0, "teamSlugs": [...], "reasoning": "..."}`;
       const raw = await generateContent(prompt, CLASSIFIER_SYSTEM, null, { temperature: 0 });
       const parsed = extractJson(raw);
       if (!parsed) return null;
@@ -474,6 +477,14 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
     //    (slash commands are stripped first — isCoding tests the scopedQuery).
     if (this.isCoding(scopedQuery)) {
       return { intent: 'code_task', tasks: ['architect', 'coder', 'runner', 'debugger', 'qa', 'reviewer', 'memory'], reasoning: 'Coding task — the team: product → designer → engineer → coder → QA → reviewer → shipper.', scope, query: scopedQuery };
+    }
+
+    // 6.1 B53 P3 — MODIFY an existing product: with an active product task,
+    //     add/change/update/fix language is a CODE CONTINUE that applies the
+    //     edit to the existing workspace — never research the word "change".
+    const MODIFY_LANG = /^(?:can you |please |now |let'?s |also )?(add|change|update|fix|modify|improve|remove|restyle|redesign|restructure|tweak|polish|style|make the|make it|make my|make this|now also|also make)\b/i;
+    if (opts.activeTaskId && MODIFY_LANG.test(q)) {
+      return { intent: 'code_task', tasks: ['coder', 'runner', 'debugger', 'qa', 'reviewer', 'memory'], reasoning: 'Modification request on the active product task — apply the change to the existing workspace.', scope, query: scopedQuery };
     }
 
     // 6.3 TRANSLATE — meaning-first translation with a reflection loop. Checked after

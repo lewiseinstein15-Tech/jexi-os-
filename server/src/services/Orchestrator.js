@@ -39,6 +39,7 @@ import {
   semanticRecall, memoryForAgent, conversationTranscript,
 } from './MemoryManager.js';
 import { WORKSPACE_DIR, MANAGER_URL, PUBLIC_URL, MAX_DEBUG_ATTEMPTS } from '../config.js';
+import { setTaskCheckpoint } from './TaskRegistry.js'; // B53 P6 — durable task checkpoints
 
 function readWorkspaceFile(name) {
   const filePath = path.join(WORKSPACE_DIR, name);
@@ -104,7 +105,7 @@ export async function conversationContext(query = '') {
   // for trivial small talk.
   try {
     if (!trivial && String(query || '').trim().length > 4) {
-      const learned = await semanticRecall(query, { limit: 1 });
+      const learned = await semanticRecall(query, { limit: 1, noCode: true }); // B53 P5 — semantic scope: no other task's code
       if (learned.length) {
         const top = learned[0];
         memoryBlock.push(`Previously researched: ${top.label} — ${String(top.text).slice(0, 300)}`);
@@ -949,6 +950,14 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
       sendEvent('log', { agent: 'Coder', message: '💻 Entering coding pipeline...' });
 
       // 1. Do we already know this from memory?
+      // B53 P2 — hard product isolation: the memory shortcut may only fire for
+      // a CONTINUATION of the same task (or direct executor calls with no task
+      // at all). A brand-new product objective never inherits another task's
+      // saved solution/artifacts — the coder starts from the fresh workspace.
+      const isContinuation = Boolean(state.context.opts?.isContinuation);
+      const hasTaskScope = Boolean(state.context.opts?.taskId);
+      const memoryReuseAllowed = !hasTaskScope || isContinuation;
+      if (memoryReuseAllowed) {
       try {
         const remembered = await searchCodingKnowledge(effQuery);
         if (remembered) {
@@ -959,6 +968,13 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
           c.done = true;
           return state; // edge → responder
         }
+      } catch (e) {}
+      }
+
+      // B53 P6 — durable checkpoint after the plan/generate stage so a
+      // disconnect mid-build resumes here, not from zero.
+      try {
+        if (state.context.opts?.taskId) setTaskCheckpoint(state.context.opts.taskId, { node: 'codePipeline', attempt: c.debugAttempts, files: listWorkspaceFiles().slice(0, 20) });
       } catch (e) {}
 
       // 1.5 THINK + PLAN — the team's Product → Designer → Engineer pass
@@ -1041,6 +1057,18 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
       c.debugAttempts = loop.attempts;
       c.lastOutput = loop.lastOutput;
       c.runSuccess = loop.success;
+
+      // B53 P6 — durable checkpoint after the debug loop: exact attempt count +
+      // the last observed error, so the next iteration knows precisely where
+      // the loop stopped (never invents completion).
+      try {
+        if (state.context.opts?.taskId) setTaskCheckpoint(state.context.opts.taskId, {
+          node: 'debugger',
+          attempt: c.debugAttempts,
+          lastError: loop.success ? null : String(loop.lastOutput || '').slice(0, 500),
+          files: listWorkspaceFiles().slice(0, 20),
+        });
+      } catch (e) {}
 
       if (loop.success) {
         sendEvent('log', { agent: 'Runner', message: `✅ Code ran clean on attempt ${loop.attempts} (predicate passed).` });
@@ -1203,48 +1231,75 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
       const { results, sendEvent } = state.context;
       const c = state.context.code;
       if (c.done) return state;
-      const files = listWorkspaceFiles();
-      const fileSections = files.map(name => {
-        const code = readWorkspaceFile(name);
-        const lang = name.endsWith('.py') ? 'python' : name.endsWith('.js') ? 'javascript' : name.endsWith('.html') ? 'html' : name.endsWith('.css') ? 'css' : 'bash';
-        return `#### 📄 ${name}\n\n\`\`\`${lang}\n${code.slice(0, 12000)}\n\`\`\``;
-      }).join('\n\n');
-
+            // B53 P4 — PRODUCT-FIRST final message (mandatory template): short status
+      // line → preview link → file list → one-line test result. NO agent roster
+      // play-by-play, NO QA/review/security/reflection essays, NO inline dumps.
       const linkBase = PUBLIC_URL || MANAGER_URL;
       const workspaceLinks = files.map(name => `- [${name}](${linkBase}/api/files/${name})`).join('\n');
-      const finalOutput = c.lastOutput && c.lastOutput.trim() ? `\`\`\`bash\n${c.lastOutput.trim().slice(0, 1500)}\n\`\`\`` : '';
-
       const previewLine = c.previewUrl
-        ? `\n\n**🔗 LIVE PREVIEW:** [Open ${c.entryPoint}](${c.previewUrl})\n*(hosted for free — works in any browser, share the link with anyone)*`
+        ? `**🔗 Live preview:** [Open ${c.entryPoint}](${c.previewUrl})`
         : '';
-
-      // B51 P1 — no process narration: the build result is the files, real
-      // test output, and links. The pipeline sentence + team list are gone.
-      const qaSection = c.qaReport ? `\n\n**🧪 QA REPORT**\n${c.qaReport}` : '';
-      const reviewSection = c.reviewNotes ? `\n\n**🔍 REVIEW NOTES**\n${c.reviewNotes}` : '';
-      const securitySection = c.securityNotes ? `\n\n**🛡 SECURITY REVIEW**\n${c.securityNotes}` : '';
-      const shipSection = c.shipNotes ? `\n\n**📦 SHIPPED**\n${c.shipNotes}` : '';
-      const reflectSection = c.reflectionNotes ? `\n\n**♻ REFLECTION**\n${c.reflectionNotes}` : '';
-      const planSection = c.teamPlan ? `\n\n**🛠 BUILD PLAN** (Product + Designer + Engineer)\n${c.teamPlan.split('\n').slice(0, 42).join('\n')}` : '';
+      const statusLine = c.runSuccess
+        ? '✓ Runs clean.'
+        : c.secVerdict === 'BLOCKED'
+          ? '⚠ Built, but the security review flagged issues to fix before relying on it.'
+          : c.qaVerdict === 'NEEDS FIX'
+            ? '⚠ Built and runs, but QA flagged issues to polish.'
+            : '✓ Built.';
       const gateNote = c.secVerdict === 'BLOCKED'
-        ? '\n\n> ⛔ **Security gate BLOCKED shipping.** The app ran and is usable, but the Security Officer found issues that must be fixed before you rely on it. Ask me to fix the findings and re-ship.'
+        ? '\n\n> Ask me to fix the security findings and re-ship.'
         : c.qaVerdict === 'NEEDS FIX'
-          ? '\n\n> ⚠ **QA verdict: NEEDS FIX.** The app runs, but QA found issues — ask me to fix them.'
+          ? '\n\n> Ask me to fix the QA findings and re-ship.'
           : '';
+      // Derive a clean product title from the request ("Build me a calculator
+      // web app" → "Calculator web app").
+      const title = String(c.effQuery || 'Your app')
+        .replace(/^(please\s+)?(can you\s+)?(build|create|make|write|develop|code|implement)\s+(me\s+)?(a|an|the)\s+/i, '')
+        .replace(/^build me\s+/i, '')
+        .replace(/\s+for me\s*$/i, '')
+        .replace(/\s*[.!?]+$/, '')
+        .trim()
+        .slice(0, 90) || 'Your app';
+      const draft = `### ✅ ${title.charAt(0).toUpperCase() + title.slice(1)} is ready.\n\n${statusLine}${previewLine ? `\n\n${previewLine}` : ''}${files.length ? `\n\n**Files:**\n${workspaceLinks}` : ''}${gateNote}\n`;
       // B52 P5 — single completion gate for the build report: the code itself
       // was verified by tests + QA/security gates, so this is sanitize-only
       // (verify: false) — no prose re-verification of a build report.
-      const finalized = await finalizeAnswer({ query: c.effQuery, draft: `### 💻 BUILD READY\n\n${previewLine}${qaSection}${reviewSection}${securitySection}${shipSection}${gateNote}${planSection}\n\n${fileSections}\n\n**Test Output:**\n${finalOutput || '✓ Ran successfully.'}\n\n**Download the files:**\n${workspaceLinks}`, sources: [], domain: 'code', verify: false, sendEvent });
+      const finalized = await finalizeAnswer({ query: c.effQuery, draft, sources: [], domain: 'code', verify: false, sendEvent });
       results.summary = finalized.summary;
       results.files = files;
       results.previewUrl = c.previewUrl || undefined;
       results.statistics.confidence = 100;
 
-      // 5. Store the verified solution in memory
+      // B53 P6 — durable checkpoint at the terminal node (shipped).
       try {
-        const codeSummary = fileSections.replace(/```[\s\S]*?```/g, '```code```').slice(0, 8000);
+        if (state.context.opts?.taskId) setTaskCheckpoint(state.context.opts.taskId, {
+          node: 'shipper',
+          attempt: c.debugAttempts,
+          lastError: null,
+          files: files.slice(0, 20),
+        });
+      } catch (e) {}
+
+      // Remember the entry point on the task so a "continue / go back" turn
+      // can resume the exact artifact (B53 P2/P3).
+      try {
+        if (state.context.opts?.taskId && c.entryPoint) {
+          const { updateTask } = await import('./TaskRegistry.js');
+          updateTask(state.context.opts.taskId, { entryPoint: c.entryPoint });
+        }
+      } catch (e) {}
+
+      // 5. Store the verified solution in memory (file bodies are truncated to
+      //    a code-summary shape — the full artifacts live in the task workspace,
+      //    B53 P2/P5: semantic memory never carries another task's source tree).
+      try {
+        const codeSummary = files.map((name) => {
+          const code = readWorkspaceFile(name) || '';
+          return `#### ${name}\n\n\`\`\`code\n${code.slice(0, 6000)}\n\`\`\``;
+        }).join('\n\n').slice(0, 8000);
         saveCodingKnowledge(c.effQuery, 'code', codeSummary, files);
       } catch (e) {}
+
 
       // 5.5 Remember the team's reflection so future builds start smarter
       try {

@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Radio, Loader2, Check, Users } from 'lucide-react';
+import { Radio, Loader2, Check, Users, ChevronDown, ChevronUp } from 'lucide-react';
 import ActivityWindow from './ActivityWindow';
 import ChatWindow from './ChatWindow';
 
@@ -15,11 +16,17 @@ export default function CommandCenter({ engine, isDesktop }) {
   const domains = plan?.domainNames || [];
   const rosterCount = plan?.teamSlugs?.length || 0;
   const activeStep = isProcessing ? steps.length - 1 : -1;
+  // B53 P1 — the plan header must stay compact: collapsed to the first few
+  // stages by default so the chat owns the surface; expand on demand.
+  const [planExpanded, setPlanExpanded] = useState(false);
+  const COLLAPSED_STAGES = 5;
+  const visibleSteps = planExpanded ? steps : steps.slice(0, COLLAPSED_STAGES);
+  const hiddenCount = steps.length - visibleSteps.length;
 
   return (
-    <div className={isDesktop ? 'flex gap-4 items-stretch justify-center h-full min-h-0 px-4' : 'flex flex-col gap-3 flex-1 min-h-0 px-3'}>
-      {/* Main column */}
-      <div className={isDesktop ? 'flex flex-col gap-3 w-full max-w-[680px] min-h-0' : 'flex flex-col gap-3 flex-1 min-h-0'}>
+    <div className={isDesktop ? 'flex gap-4 items-stretch h-full min-h-0 px-4' : 'flex flex-col gap-3 flex-1 min-h-0 px-3'}>
+      {/* Main column — full work surface width (B53 P1: no 680px center strip) */}
+      <div className={isDesktop ? 'flex flex-col gap-3 w-full min-w-0 min-h-0' : 'flex flex-col gap-3 flex-1 min-h-0'}>
         {/* Task / plan header */}
         <div className="surface-card p-3.5 rounded-xl flex-shrink-0">
           <div className="flex items-center gap-2 mb-2">
@@ -71,29 +78,39 @@ export default function CommandCenter({ engine, isDesktop }) {
                   </span>
                 )}
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {steps.map((s, i) => {
+              <div className="flex flex-wrap gap-1">
+                {visibleSteps.map((s, i) => {
                   const done = isProcessing && i < activeStep;
                   const current = isProcessing && i === activeStep;
                   return (
-                    <span key={`${s}-${i}`} className="flex items-center gap-1 text-[9px] font-mono text-text-secondary">
+                    <span key={`${s}-${i}`} className="flex items-center gap-1 text-[8px] font-mono text-text-secondary">
                       {i > 0 && <span className="text-text-tertiary">→</span>}
-                      <span className={`px-1.5 py-0.5 rounded border flex items-center gap-1 transition-all duration-200 ${
+                      <span className={`px-1 py-0.5 rounded border flex items-center gap-1 transition-all duration-200 ${
                         done
                           ? 'border-hairline bg-surface-2 text-text-tertiary'
                           : current
                             ? 'border-brand-line bg-brand-dim text-brand animate-pulse'
                             : 'border-hairline bg-surface-2'
                       }`}>
-                        {done && <Check className="w-2.5 h-2.5" />}
+                        {done && <Check className="w-2 h-2" />}
                         {s}
                       </span>
                     </span>
                   );
                 })}
+                {hiddenCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setPlanExpanded((v) => !v)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-brand-line/50 bg-brand-dim/30 text-[8px] font-bold text-brand hover:bg-brand-dim transition-colors"
+                  >
+                    {planExpanded ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
+                    {planExpanded ? 'SHOW LESS' : `+${hiddenCount} MORE`}
+                  </button>
+                )}
               </div>
-              {plan.skillsLine && (
-                <p className="text-[9px] text-text-tertiary font-mono mt-2 truncate">skills: {plan.skillsLine}</p>
+              {plan.skillsLine && !planExpanded && (
+                <p className="text-[8px] text-text-tertiary font-mono mt-1.5 truncate">skills: {plan.skillsLine}</p>
               )}
             </>
           ) : (
