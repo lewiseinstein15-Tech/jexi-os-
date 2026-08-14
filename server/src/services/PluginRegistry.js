@@ -69,6 +69,46 @@ export const PLUGINS = [
   },
 ];
 
+/* ------------------------------------------------------------------ */
+/* B50 P5 — ON-DISK PLUGIN PACKAGES: server/plugins/<id>/plugin.json    */
+/* ------------------------------------------------------------------ */
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
+export const PLUGINS_DIR = path.resolve(__dirname, '../../plugins');
+
+/** Discover installable plugin packages from server/plugins/ (plugin.json manifests). */
+export function discoverPlugins() {
+  if (!fs.existsSync(PLUGINS_DIR)) return [];
+  const out = [];
+  for (const entry of fs.readdirSync(PLUGINS_DIR, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const jsonPath = path.join(PLUGINS_DIR, entry.name, 'plugin.json');
+    if (!fs.existsSync(jsonPath)) continue;
+    try {
+      const m = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
+      if (!m.id || !m.name) continue;
+      out.push({
+        id: m.id,
+        name: m.name,
+        version: m.version || '0.0.0',
+        desc: m.description || m.desc || m.name,
+        builtin: false,
+        packageDir: path.join(PLUGINS_DIR, entry.name),
+        contributes: {
+          agents: m.contributes?.agents || [],
+          skills: m.contributes?.skills || [],
+          tools: m.contributes?.tools || [],
+          skillsDir: m.contributes?.skillsDir || 'skills',
+          hooks: 0,
+        },
+      });
+    } catch (e) { /* malformed manifest — skip, log */ }
+  }
+  return out;
+}
+
+/** The full catalog: built-in plugins + discovered on-disk packages. */
+export const ALL_PLUGINS = [...PLUGINS, ...discoverPlugins()];
+
 const registry = new Map(AGENT_ROSTER.map((a) => [a.slug, a]));
 const skillMap = new Map(SKILL_REGISTRY.map((s) => [s.slug, s]));
 const toolMap = new Map(TOOL_REGISTRY.map((t) => [t.slug, t]));
@@ -93,7 +133,7 @@ export function isPluginEnabled(id) {
 }
 
 export function enablePlugin(id) {
-  if (!PLUGINS.some((p) => p.id === id)) throw new Error(`Unknown plugin: ${id}`);
+  if (!ALL_PLUGINS.some((p) => p.id === id)) throw new Error(`Unknown plugin: ${id}`);
   if (id === 'core') return { id, enabled: true }; // core cannot be disabled
   if (!state.enabled.includes(id)) state.enabled.push(id);
   persist();
@@ -101,7 +141,7 @@ export function enablePlugin(id) {
 }
 
 export function disablePlugin(id) {
-  if (!PLUGINS.some((p) => p.id === id)) throw new Error(`Unknown plugin: ${id}`);
+  if (!ALL_PLUGINS.some((p) => p.id === id)) throw new Error(`Unknown plugin: ${id}`);
   if (id === 'core') throw new Error('JEXI Core cannot be disabled');
   state.enabled = state.enabled.filter((x) => x !== id);
   persist();
@@ -114,15 +154,25 @@ export function togglePlugin(id) {
 
 /** Full plugin catalog with live contribution counts + enabled state. */
 export function listPlugins() {
-  return PLUGINS.map((p) => {
+  return ALL_PLUGINS.map((p) => {
     const agents = (p.contributes.agents || []).filter((s) => registry.has(s));
-    const skills = (p.contributes.agents || []).flatMap((slug) => registry.get(slug)?.skills || [])
-      .filter((s, i, arr) => skillMap.has(s) && arr.indexOf(s) === i);
+    // Skills: declared list, plus whatever folders the package ships.
+    const declaredSkills = (p.contributes.skills || []).filter((s) => skillMap.has(s));
+    let packagedSkills = 0;
+    if (p.packageDir && p.contributes.skillsDir) {
+      const skillsBase = path.join(p.packageDir, p.contributes.skillsDir);
+      if (fs.existsSync(skillsBase)) {
+        packagedSkills = fs.readdirSync(skillsBase, { withFileTypes: true })
+          .filter((e) => e.isDirectory() && fs.existsSync(path.join(skillsBase, e.name, 'SKILL.md'))).length;
+      }
+    }
+    const skills = [...new Set([...declaredSkills, ...(p.contributes.agents || []).flatMap((slug) => registry.get(slug)?.skills || [])
+      .filter((s) => skillMap.has(s))])];
     const tools = (p.contributes.tools || []).filter((s) => toolMap.has(s));
     return {
       ...p,
       enabled: isPluginEnabled(p.id),
-      live: { agents: agents.length, skills: skills.length, tools: tools.length },
+      live: { agents: agents.length, skills: skills.length, tools: tools.length, packagedSkills },
     };
   });
 }
@@ -130,7 +180,7 @@ export function listPlugins() {
 /** Union of agent slugs contributed by the currently enabled plugins. */
 export function enabledPluginAgents() {
   const set = new Set();
-  for (const p of PLUGINS) {
+  for (const p of ALL_PLUGINS) {
     if (isPluginEnabled(p.id)) for (const a of p.contributes.agents || []) set.add(a);
   }
   return set;

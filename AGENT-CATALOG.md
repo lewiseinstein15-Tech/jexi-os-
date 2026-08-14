@@ -1,6 +1,6 @@
 # JEXI OS — Agent & Skill Catalog
 
-**251 specialist agents · 507 skills · 175 tools · 1 orchestrator.** One plain-language request in,
+**251 specialist agents · 507 skills · 176 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
 > ⚙️ GENERATED FILE — updated 2026-08-14 by `cd server && npm run audit-roster`. Do not edit by hand.
@@ -14,7 +14,7 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 |---|---|
 | Agents | 251 (251 reachable — 100%) |
 | Skills | 507 |
-| Tools | 175 |
+| Tools | 176 |
 | Intents / teams | 153 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
@@ -1219,7 +1219,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 175 tools (grouped by type)
+## The 176 tools (grouped by type)
 
 ### Browser (6)
 | Tool | Allowed agents | Engine | What it does |
@@ -1335,13 +1335,14 @@ This section and every table below are GENERATED from the live registries by `cd
 | `force_safe_mode` | Guardrail, Security Officer | GuardrailAgent | Restrict the task to read-only tools or abort with a clear explanation. |
 | `scan_prompt_safety` | Guardrail, Security Officer | GuardrailAgent | Scan a prompt for injection, jailbreak or tool-abuse attempts. |
 
-### Knowledge (6)
+### Knowledge (7)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
 | `book-fetch` | Books Agent, Scholar | TrustedLibrary | Fetch a free public-domain book or paper from the trusted library. |
 | `book-library` | Books Agent, Scholar | BookLibrary | Answer strictly from the user's own uploaded books with citations and quotes. |
 | `document-rag` | Document Analyst, Books Agent | MemoryManager/knowledge | Chunk uploaded documents and answer from the retrieved passages. |
 | `knowledge-index` | Researcher, Document Analyst, Scholar | MemoryManager | Index studied material so recall is instant and complete. |
+| `knowledge-load` | JEXI Core, Context Manager, Archivist, Coder, Engineer, Researcher | KnowledgeBase | Load a progressive project-knowledge folder (e.g. conventions, architecture) on demand — the always-on JEXI.md only carries pointers. |
 | `knowledge-save` | Researcher, Study Coach, Scholar, Document Analyst | MemoryManager | Save studied topics and notes into the knowledge library. |
 | `knowledge-search` | Books Agent, Scholar, Researcher, Document Analyst | MemoryManager | Search the saved knowledge library and studied topics. |
 

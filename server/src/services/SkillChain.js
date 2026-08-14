@@ -58,16 +58,115 @@ export function listSkillFiles() {
   return fs.readdirSync(SKILLS_DIR).filter((f) => f.endsWith('.md')).sort();
 }
 
+/** B50 P1 — progressive-disclosure folders: server/skills/<slug>/{SKILL.md, reference.md}.
+ *  Only name + description are exposed at planning time (planningSkillSummaries);
+ *  the full body (SKILL.md + reference.md) loads only when the skill executes. */
+export const PLUGINS_DIR = path.resolve(__dirname, '../../plugins');
+
+/** All plugin skill directories: server/plugins/<id>/<contributes.skillsDir>. */
+export function pluginSkillDirs() {
+  if (!fs.existsSync(PLUGINS_DIR)) return [];
+  const out = [];
+  for (const entry of fs.readdirSync(PLUGINS_DIR, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const jsonPath = path.join(PLUGINS_DIR, entry.name, 'plugin.json');
+    if (!fs.existsSync(jsonPath)) continue;
+    try {
+      const manifest = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
+      const sub = (manifest.contributes && manifest.contributes.skillsDir) || 'skills';
+      out.push(path.join(PLUGINS_DIR, entry.name, sub));
+    } catch (e) { /* skip malformed plugin */ }
+  }
+  return out;
+}
+
+export function skillFolder(slug) {
+  // Raw slug first (folder is named after the skill, e.g. security-officer),
+  // then the alias-resolved slug (security-officer -> security).
+  const candidates = [slug, resolveSkillSlug(slug)];
+  // 1. Core skills dir: server/skills/<slug>/
+  for (const candidate of candidates) {
+    const dir = path.join(SKILLS_DIR, candidate);
+    if (fs.existsSync(path.join(dir, 'SKILL.md'))) return dir;
+  }
+  // 2. Plugin-provided skills: server/plugins/<id>/skills/<slug>/
+  for (const base of pluginSkillDirs()) {
+    for (const candidate of candidates) {
+      const dir = path.join(base, candidate);
+      if (fs.existsSync(path.join(dir, 'SKILL.md'))) return dir;
+    }
+  }
+  return null;
+}
+
+/** Parse YAML frontmatter (---\nkey: value\n---) from a markdown skill body. */
+export function parseFrontmatter(md) {
+  const m = String(md || '').match(/^---\s*\n([\s\S]*?)\n---\s*\n?/);
+  if (!m) return {};
+  const meta = {};
+  for (const line of m[1].split('\n')) {
+    const kv = line.match(/^([a-zA-Z-]+):\s*(.*)$/);
+    if (!kv) continue;
+    const val = kv[2].trim();
+    meta[kv[1]] = val.startsWith('[') ? val.replace(/^\[|\]$/g, '').split(',').map((s) => s.trim()).filter(Boolean) : val;
+  }
+  return meta;
+}
+
+/** Planning-time metadata for a skill slug — name + description ONLY (cheap
+ *  tokens). Full body is deliberately NOT loaded here. Falls back to flat-file
+ *  frontmatter, then to the roster. */
+export function skillMeta(slug) {
+  const dir = skillFolder(slug);
+  if (dir) {
+    const fm = parseFrontmatter(fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf-8'));
+    return { slug, name: fm.name || slug, description: fm.description || '', allowedTools: fm['allowed-tools'] || [], context: fm.context || '', full: false };
+  }
+  const file = listSkillFiles().find((f) => f.toLowerCase().includes(`-${resolveSkillSlug(slug)}.md`));
+  if (file) {
+    const fm = parseFrontmatter(fs.readFileSync(path.join(SKILLS_DIR, file), 'utf-8'));
+    return { slug, name: fm.name || slug, description: fm.description || '', allowedTools: fm['allowed-tools'] || [], context: fm.context || '', full: false };
+  }
+  const agent = getAgent(resolveSkillSlug(slug));
+  if (agent) return { slug, name: agent.name, description: agent.role || '', allowedTools: [], context: '', full: false };
+  const skill = getSkill(slug);
+  if (skill) return { slug, name: skill.name, description: skill.desc || '', allowedTools: [], context: '', full: false };
+  return { slug, name: slug, description: '', allowedTools: [], context: '', full: false };
+}
+
+/** Does a skill's frontmatter declare `context: fork` (isolated execution)? */
+export function skillWantsIsolation(slug) {
+  return String(skillMeta(slug).context || '').toLowerCase() === 'fork';
+}
+
+/** Planning-time list: every skill the chain can run, with name + description only. */
+export function planningSkillSummaries() {
+  return Object.keys(SKILL_META).map((s) => skillMeta(s));
+}
+
 /**
  * Load a skill's portable Markdown instructions by slug (e.g. 'qa',
- * 'security-officer'). The on-disk library is OPTIONAL: if the file is
- * missing, instructions are synthesized from the roster (agent profile +
+ * 'security-officer'). B50: a progressive folder server/skills/<slug>/ is
+ * preferred over a flat .md file — its SKILL.md + reference.md are merged
+ * into the execution body. The on-disk library is OPTIONAL: if neither
+ * exists, instructions are synthesized from the roster (agent profile +
  * mastered skills, or a plain skill-registry entry) so the sprint chain
  * NEVER reports "Skill not found" — every planner-selected skill loads.
  */
 export function loadSkill(slug) {
+  // 1. Progressive-disclosure folder (SKILL.md + reference.md).
+  const dir = skillFolder(slug);
+  if (dir) {
+    const skillMd = fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf-8');
+    const refPath = path.join(dir, 'reference.md');
+    const refMd = fs.existsSync(refPath) ? fs.readFileSync(refPath, 'utf-8') : '';
+    const summary = skillMeta(slug);
+    return { file: path.join(dir, 'SKILL.md'), md: refMd ? `${skillMd}\n\n${refMd}` : skillMd, summary, progressive: true };
+  }
+  // 2. Flat .md file (legacy / non-folder skills).
   const file = listSkillFiles().find((f) => f.toLowerCase().includes(`-${resolveSkillSlug(slug)}.md`));
-  if (file) return { file, md: fs.readFileSync(path.join(SKILLS_DIR, file), 'utf-8') };
+  if (file) return { file, md: fs.readFileSync(path.join(SKILLS_DIR, file), 'utf-8'), summary: skillMeta(slug), progressive: false };
+  // 3. Roster synthesis — kept as a LOGGED fallback (never "Skill not found").
   const md = synthesizeSkill(slug);
   if (md) {
     // Persist the synthesized instructions so future boots read from disk.
@@ -75,7 +174,7 @@ export function loadSkill(slug) {
       fs.mkdirSync(SKILLS_DIR, { recursive: true });
       fs.writeFileSync(path.join(SKILLS_DIR, `${slug}.md`), md, 'utf-8');
     } catch (e) { /* non-fatal */ }
-    return { file: `${slug}.md`, md };
+    return { file: `${slug}.md`, md, summary: skillMeta(slug), progressive: false, synthesized: true };
   }
   return null;
 }

@@ -4,6 +4,7 @@ import { createGraph } from './GraphRunner.js';
 import { generateCode, applyFix } from './Architect.js';
 import { planForBuild, qaWebApp, qaScripted, runReviewerPass, runSecurityPass, runCriticPass, runShipperPass, runReflectorPass, fixFromQA, isDebugQuery, gateVerdict } from './SkillChain.js';
 import { runFile } from './Runner.js';
+import { runCodingLoop } from './CodingLoop.js'; // B50 P3 — first-class fix loop
 import { analyzeLink } from './Extractor.js';
 import { reasonAndWrite } from './Reasoner.js';
 import { runSearchTeam } from './SearchAgent.js';
@@ -934,62 +935,65 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
     };
 
     N.debugger = async (state) => {
-      // P1 — the DEBUG LOOP as a real graph cycle: debugger → debugger until
-      // the code runs clean or the attempt budget is exhausted.
+      // P3 — the DEBUG LOOP now runs through the first-class CodingLoop
+      // (server/src/services/CodingLoop.js): write → run → observe the EXACT
+      // error → fix → re-run, with a machine-checkable success predicate
+      // (exit 0 + no error-class markers) and a hard attempt budget.
+      // The graph cycle (debugger → debugger) remains for structure, but the
+      // actual run/observe/fix iterations live in one bounded loop.
       const { sendEvent } = state.context;
       const c = state.context.code;
       if (c.done) return state;
       const scope = c.scope;
       const allowedWrite = (name) => !scope.paths || !scope.paths.length || scope.paths.some(p => name.includes(p));
-      c.debugAttempts += 1;
       const entryPoint = c.entryPoint;
-      sendEvent('log', { agent: 'Runner', message: `▶ Attempt ${c.debugAttempts}/${MAX_DEBUG_ATTEMPTS}: Running ${entryPoint}...` });
-      const runResult = await runFile(entryPoint, (stream, data) => sendEvent('log', { agent: 'Terminal', message: String(data).slice(0, 200) }));
-      c.lastOutput = runResult.output || '';
+      const existingCode = readWorkspaceFile(entryPoint);
+      const initialFiles = existingCode ? [{ name: entryPoint, code: existingCode }] : [];
 
-      const looksLikeError = /traceback|exception|syntaxerror|errno|no such file|modulenotfound|nameerror|importerror|attributeerror|typeerror|referenceerror|cannot find module|is not defined|command not found|failed/i.test(c.lastOutput);
+      const loop = await runCodingLoop({
+        goal: c.effQuery,
+        entryPoint,
+        files: initialFiles,
+        successCriterion: 'exit-zero-no-error-text',
+        maxAttempts: MAX_DEBUG_ATTEMPTS,
+        sendEvent,
+        writeFiles: async (files) => {
+          files.forEach((f) => {
+            if (!allowedWrite(f.name)) { sendEvent('log', { agent: 'Coder', message: `⛔ /guard: skipping ${f.name} (outside allowed scope)` }); return; }
+            fs.writeFileSync(path.join(WORKSPACE_DIR, f.name), f.code, 'utf-8');
+          });
+          c.entryPoint = loop && loop.entryPoint ? loop.entryPoint : entryPoint;
+        },
+      });
 
-      if (runResult.success && !looksLikeError) {
-        sendEvent('log', { agent: 'Runner', message: '✅ Code ran successfully with no errors!' });
-        if (runResult.url) c.previewUrl = runResult.url;
-        c.runSuccess = true;
+      c.debugAttempts = loop.attempts;
+      c.lastOutput = loop.lastOutput;
+      c.runSuccess = loop.success;
+
+      if (loop.success) {
+        sendEvent('log', { agent: 'Runner', message: `✅ Code ran clean on attempt ${loop.attempts} (predicate passed).` });
         // 3.5 SHOW HER WORK: open the finished web app in the virtual
         //     desktop's Chromium so the user watches it render live.
-        if (c.previewUrl && /\.html$/i.test(entryPoint || '')) {
+        if (/\.html$/i.test(c.entryPoint || '')) {
           try {
+            const url = `${PUBLIC_URL || MANAGER_URL}/preview/${c.entryPoint}`;
+            c.previewUrl = url;
             await ensureBrowser();
-            await new DesktopManager().goto('coder', c.previewUrl);
-            sendEvent('log', { agent: 'Vision', message: `🖥 Showing the app in my virtual desktop: ${c.previewUrl}` });
+            await new DesktopManager().goto('coder', url);
+            sendEvent('log', { agent: 'Vision', message: `🖥 Showing the app in my virtual desktop: ${url}` });
           } catch (e) {
             sendEvent('log', { agent: 'Vision', message: `⚠ Could not open the app in the virtual desktop (the preview link still works): ${e.message}` });
           }
+        } else {
+          // Non-HTML entry points: re-run once to capture the clean preview URL.
+          const fresh = await runFile(c.entryPoint, (s, d) => {});
+          if (fresh.url) c.previewUrl = fresh.url;
         }
         return state; // edge → qaGate
       }
 
-      if (c.debugAttempts >= MAX_DEBUG_ATTEMPTS) {
-        sendEvent('log', { agent: 'Debugger', message: `⚠ Max attempts reached (${MAX_DEBUG_ATTEMPTS}). Showing best effort.` });
-        return state; // edge → qaGate (best effort)
-      }
-
-      sendEvent('log', { agent: 'Debugger', message: `⚠ Error on attempt ${c.debugAttempts}. Reading error and fixing...` });
-      const errorContext = c.lastOutput.slice(-2000);
-      const existingCode = readWorkspaceFile(entryPoint);
-
-      try {
-        const fixed = await applyFix(c.effQuery, errorContext, existingCode, c.debugAttempts + 1, sendEvent);
-        if (fixed && fixed.files && fixed.files.length > 0) {
-          fixed.files.forEach(f => {
-            if (!allowedWrite(f.name)) { sendEvent('log', { agent: 'Coder', message: `⛔ /guard: skipping ${f.name} (outside allowed scope)` }); return; }
-            fs.writeFileSync(path.join(WORKSPACE_DIR, f.name), f.code, 'utf-8');
-          });
-          c.entryPoint = fixed.entryPoint || entryPoint;
-          sendEvent('log', { agent: 'Debugger', message: '✍ Rewrote code with fixes. Re-running...' });
-        }
-      } catch (e) {
-        sendEvent('log', { agent: 'Debugger', message: `✗ Fix failed: ${e.message}` });
-      }
-      return state; // edge → debugger (the cycle)
+      sendEvent('log', { agent: 'Debugger', message: `⚠ Predicate never passed in ${loop.attempts} attempts — best effort continues. Last output: ${String(loop.lastOutput).slice(0, 160)}` });
+      return state; // edge → qaGate (best effort)
     };
 
     N.qaGate = async (state) => {

@@ -1,0 +1,12 @@
+{
+  "id": "coding-pipeline",
+  "name": "Coding Pipeline",
+  "version": "2.0.0",
+  "description": "The end-to-end build pipeline: product → engineer → coder → qa → reviewer → security-officer → reflector, with progressive skill folders and the first-class coding loop.",
+  "contributes": {
+    "agents": ["product", "designer", "engineer", "coder", "qa", "reviewer", "security", "shipper", "reflector", "debugger"],
+    "skills": ["product", "engineer", "coder", "qa", "reviewer", "security-officer", "reflector"],
+    "tools": ["code-run", "code-write", "code-fix", "code-review", "security-scan", "test-automation", "lint-check", "build-check"],
+    "skillsDir": "skills"
+  }
+}

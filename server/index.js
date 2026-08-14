@@ -538,7 +538,7 @@ app.get('/api/mcp/status', (req, res) => {
 
 // === PLUGIN SYSTEM (roadmap stage 21 — feature bundles) ===
 // Built-in plugins contribute agents/skills/tools; toggle them at runtime.
-app.get('/api/plugins', (req, res) => res.json({ plugins: listPlugins() }));
+app.get('/api/plugins', (req, res) => res.json({ plugins: listRegistryPlugins() }));
 app.post('/api/plugins/:id/toggle', (req, res) => {
   try { res.json({ success: true, ...togglePlugin(req.params.id) }); }
   catch (e) { res.status(400).json({ success: false, error: (e && e.message) || String(e) }); }
@@ -1271,7 +1271,7 @@ app.get('/api/health', (req, res) => {
       guardrail: { safeMode: isSafeMode() },
       offline: { configured: !!(process.env.OLLAMA_BASE_URL || process.env.OLLAMA_HOST) },
       voice: { active: voiceStatus().active, state: voiceStatus().state },
-      plugins: listPlugins().length,
+      plugins: listPluginPackages().length,
       locks: listLocks().length,
       chaos: chaosEnabled(),
     },

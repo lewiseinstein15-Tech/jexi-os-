@@ -329,7 +329,11 @@ const ok = (cond, label) => { console.log(`${cond ? '✅' : '❌'} ${label}`); i
   const jexiSrc = await import('node:fs').then((fs) => fs.promises.readFile('./src/services/JexiPrompt.js', 'utf8'));
   ok(memSrc.includes('NEGATIVE EXAMPLES') && memSrc.includes('nothing else'), 'PROMPT: context resolution forces bare rewrite + negative examples');
   ok(prefSrc.includes('NEGATIVE EXAMPLES'), 'PROMPT: preference extraction has negative few-shots');
-  ok(jexiSrc.includes('NEVER invent sources') && jexiSrc.includes('OUTPUT FORMAT BY INTENT'), 'PROMPT: JEXI_SYSTEM_PROMPT has never-invent-sources + per-intent output formats');
+  // B50 P7 — per-intent output formats MOVED OUT of the always-on prompt into
+  // the progressive knowledge folder; the prompt keeps the rules + a pointer.
+  ok(jexiSrc.includes('NEVER invent sources'), 'PROMPT: JEXI_SYSTEM_PROMPT has never-invent-sources');
+  ok(jexiSrc.includes('knowledge-load') && jexiSrc.includes('formatting'), 'PROMPT: JEXI_SYSTEM_PROMPT points at the formatting knowledge folder');
+  ok(jexiSrc.includes('# PROJECT KNOWLEDGE'), 'PROMPT: always-on project knowledge section present');
 }
 
 console.log(failures === 0 ? '\nAUDIT BUILD 47 TESTS PASSED ✅' : `\n${failures} AUDIT TEST(S) FAILED ❌`);

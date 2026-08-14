@@ -94,6 +94,13 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   const start = Date.now();
   if (typeof sendEvent !== 'function') sendEvent = () => {};
   const emit = (type, payload) => { try { sendEvent(type, payload); } catch (e) {} };
+  // Test seam: a caller may inject a deterministic final answer (no LLM keys
+  // needed) so isolation/loop behaviour is provable without network calls.
+  if (opts.__mockAnswer !== undefined) {
+    const mock = String(opts.__mockAnswer);
+    emit('agent.done', { answer: mock, stats: { iterations: 1, toolCalls: 0, tools: 0, durationMs: Date.now() - start } });
+    return { answer: mock, stats: { toolCalls: 0, tools: 0, durationMs: Date.now() - start } };
+  }
   const checkCancelled = () => {
     if (opts.signal && opts.signal.aborted) {
       emit('agent.done', { answer: '', cancelled: true, stats: { cancelled: true, toolCalls: callsMade, tools: tools.length, durationMs: Date.now() - start } });

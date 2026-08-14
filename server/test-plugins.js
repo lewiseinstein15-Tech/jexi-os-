@@ -8,7 +8,7 @@ import os from 'os';
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'jexi-plugin-test-'));
 process.env.DATA_DIR = path.join(tmp, 'data');
 
-const { listPlugins, togglePlugin, enablePlugin, disablePlugin, isPluginEnabled, enabledPluginAgents, PLUGINS } =
+const { listPlugins, togglePlugin, enablePlugin, disablePlugin, isPluginEnabled, enabledPluginAgents, PLUGINS, ALL_PLUGINS, discoverPlugins } =
   await import('./src/services/PluginRegistry.js');
 
 let passed = 0, failed = 0;
@@ -19,6 +19,18 @@ function check(name, ok) {
 
 /* ---------------- Catalog ---------------- */
 check('catalog has 6 bundled plugins', PLUGINS.length === 6);
+
+/* ---------------- B50 P5: on-disk plugin packages ---------------- */
+const discovered = discoverPlugins();
+check('on-disk coding-pipeline plugin discovered', discovered.some((p) => p.id === 'coding-pipeline' && p.builtin === false));
+check('full catalog includes discovered plugin (7 total)', ALL_PLUGINS.length === 7);
+const cp = listPlugins().find((p) => p.id === 'coding-pipeline');
+check('coding-pipeline reports 7 packaged skills', cp && cp.live.packagedSkills === 7);
+check('coding-pipeline contributes the pipeline skills', cp && cp.contributes.skills.includes('coder') && cp.contributes.skills.includes('security-officer'));
+togglePlugin('coding-pipeline');
+check('discovered plugin can be enabled', isPluginEnabled('coding-pipeline') === true);
+togglePlugin('coding-pipeline');
+check('discovered plugin can be disabled', isPluginEnabled('coding-pipeline') === false);
 const catalog = listPlugins();
 check('every plugin reports live contribution counts', catalog.every((p) => p.live && typeof p.live.agents === 'number'));
 check('core is enabled by default', catalog.find((p) => p.id === 'core')?.enabled === true);
