@@ -124,11 +124,18 @@ export default function ActiveAgents({ logs, isProcessing, plan }) {
             <div>
               <p className="eyebrow mb-1.5">Queued by the planner</p>
               <div className="flex flex-wrap gap-1.5">
-                {waiting.map((s) => (
-                  <span key={s} className="flex items-center gap-1.5 border border-hairline bg-surface-2 rounded-full px-2.5 py-1 text-[9px] text-text-tertiary font-mono">
-                    <span className="w-1.5 h-1.5 rounded-full bg-text-tertiary" /> {s}
-                  </span>
-                ))}
+                {waiting.map((s) => {
+                  // B49 P4 — honest execution: personas folded into a composite
+                  // pass are tagged "composed" so the PLAN view never implies
+                  // an independent agent ran when one did not.
+                  const bundled = (plan?.execution?.bundled || []).some((n) => String(n).toLowerCase() === String(s).toLowerCase());
+                  return (
+                    <span key={s} className="flex items-center gap-1.5 border border-hairline bg-surface-2 rounded-full px-2.5 py-1 text-[9px] text-text-tertiary font-mono">
+                      <span className="w-1.5 h-1.5 rounded-full bg-text-tertiary" /> {s}
+                      {bundled && <span className="text-[7.5px] uppercase tracking-wide opacity-55">· composed</span>}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}

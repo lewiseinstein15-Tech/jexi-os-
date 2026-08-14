@@ -18,57 +18,66 @@ import { generateContent, resolveKeys } from './LLMClient.js';
  */
 
 /** Which specialists run, in order, for each intent (the "plan first" contract).
- * SLUGS, not display names — resolved to roster entries by getAgent(). */
-const TEAM_PLAN = {
+ * SLUGS, not display names — resolved to roster entries by getAgent().
+ * B49 P1 — every roster entry must appear in at least one team below (or a
+ * COMPOUND_DETECT phase / SkillChain runSkill pass); the audit script
+ * (scripts/audit-roster.js) fails CI on any orphan. Exported so the audit
+ * can verify reachability programmatically. */
+export const TEAM_PLAN = {
   image_recognition: ['vision', 'reasoner', 'memory'],
   clear_memory: ['memory'],
   link_analysis: ['video-analyst', 'navigator', 'extractor', 'reasoner', 'memory'],
   math_solve: ['math', 'reasoner', 'memory'],
-  self_check: ['self-diagnose', 'reasoner', 'memory'],
-  code_task: ['product', 'designer', 'engineer', 'architect', 'coder', 'runner', 'debugger', 'qa', 'reviewer', 'critic', 'security', 'shipper', 'reflector'],
-  computer_use: ['navigator', 'vision', 'reasoner', 'memory'],
-  study_topic: ['scholar', 'researcher', 'document-analyst', 'memory'],
+  self_check: ['self-diagnose', 'reasoner', 'memory', 'tool-router', 'toolsmith', 'agent-builder', 'prompt', 'guardrail'],
+  code_task: ['product', 'designer', 'engineer', 'ux-researcher', 'accessibility', 'architect', 'coder', 'runner', 'debugger', 'qa', 'reviewer', 'critic', 'security', 'shipper', 'reflector', 'ui-developer', 'frontend', 'landing-page-builder', 'email-developer'],
+  computer_use: ['navigator', 'vision', 'computer-use', 'reasoner', 'memory'],
+  study_topic: ['scholar', 'researcher', 'history', 'science', 'document-analyst', 'memory'],
   conversation: ['jexi', 'context-manager', 'archivist'],
   memory_query: ['memory', 'archivist', 'context-manager'],
   knowledge_recall: ['books', 'document-analyst', 'reasoner', 'memory'],
-  news_latest: ['news-scout', 'news-filter', 'news-editor', 'reasoner', 'memory'],
+  news_latest: ['news-scout', 'news-filter', 'news-editor', 'reporter', 'reasoner', 'memory'],
   research: ['query-analyzer', 'searcher', 'reranker', 'extractor', 'synthesizer', 'fact-checker', 'critic', 'memory'],
   learning_research: ['researcher', 'reasoner', 'memory'],
-  explain_team: ['planner'],
+  explain_team: ['planner', 'orchestrator'],
   github: ['github', 'shipper'],
-  translate: ['translator', 'reviewer'],
-  data: ['data', 'data-engineer', 'reasoner'],
+  translate: ['translator', 'translator-v2', 'reviewer', 'editor', 'proofreader'],
+  data: ['data', 'data-engineer', 'data-viz', 'scraper', 'sql', 'regex', 'reasoner'],
   devops: ['devops', 'shipper'],
-  docs: ['writer', 'reviewer'],
+  docs: ['writer', 'reviewer', 'summarizer'],
   perf: ['perf', 'coder', 'reviewer'],
   // Round 4 — deep-domain teams: each new intent routes to its own specialists,
   // so the 200+ roster is actually USED (AutoGen GroupChatManager / LangGraph
   // supervisor pattern: the planner names the right team, never all of them).
-  creative_writing: ['novelist', 'screenwriter', 'poet', 'songwriter', 'editor', 'critic'],
-  business_plan: ['business-analyst', 'startup-advisor', 'financial-advisor', 'market-analyst', 'strategist'],
-  marketing_plan: ['market-analyst', 'growth-marketer', 'seo-specialist', 'copywriter', 'brand'],
+  // B49 P1 — every specialist added below was previously an ORPHAN (defined
+  // but never composed into any team); wiring it in makes the catalog honest.
+  creative_writing: ['novelist', 'screenwriter', 'poet', 'songwriter', 'editor', 'critic', 'summarizer'],
+  business_plan: ['business-analyst', 'startup-advisor', 'financial-advisor', 'market-analyst', 'strategist', 'sales-rep', 'crm-specialist', 'customer-success'],
+  marketing_plan: ['market-analyst', 'growth-marketer', 'seo-specialist', 'copywriter', 'brand', 'product-marketer', 'lifecycle-marketer', 'community-manager', 'devrel-engineer', 'social', 'email', 'ad-copywriter', 'newsletter-writer', 'brand-designer'],
   event_planning: ['event-planner', 'wedding-planner', 'travel', 'finance'],
   meal_plan: ['chef', 'nutrition', 'health'],
-  workout_plan: ['fitness', 'health', 'nutrition'],
+  workout_plan: ['fitness', 'health', 'nutrition', 'sleep-coach', 'meditation-coach'],
   investing_advice: ['investor', 'financial-advisor', 'tax-advisor'],
   tech_support: ['support-engineer', 'debugger', 'coder', 'writer'],
-  security_audit: ['pentester', 'security', 'appsec', 'risk-analyst'],
-  content_creation: ['content-strategist', 'blog-writer', 'seo-writer', 'video-script-writer', 'editor'],
-  study_exam: ['exam-coach', 'study', 'teacher', 'flashcard-maker'],
-  career_plan: ['career', 'recruiter', 'resume', 'interviewer'],
+  security_audit: ['pentester', 'security', 'appsec', 'risk-analyst', 'red-team', 'blue-team', 'cryptographer', 'privacy-officer', 'compliance-officer', 'forensic-analyst', 'security-trainer', 'guardrail'],
+  content_creation: ['content-strategist', 'blog-writer', 'seo-writer', 'video-script-writer', 'editor', 'technical-editor', 'ux-writer', 'copyeditor', 'white-paper-writer', 'case-study-writer', 'api-docs-writer', 'podcaster', 'speech-writer', 'essayist', 'grant-writer', 'newsletter-writer', 'ad-copywriter', 'ghostwriter', 'illustrator', 'motion-designer', 'sound-designer'],
+  study_exam: ['exam-coach', 'study', 'teacher', 'flashcard-maker', 'homework-helper', 'grader', 'curriculum-designer', 'lab-assistant', 'research-mentor', 'academic-writer', 'coding-tutor', 'languages', 'tutor'],
+  career_plan: ['career', 'recruiter', 'resume', 'interviewer', 'hr-specialist'],
   relationship_advice: ['relationship-coach', 'counselor', 'dating-coach'],
   startup_advice: ['startup-advisor', 'business-analyst', 'pricing-strategist', 'investor'],
-  productivity: ['task-manager', 'scheduler', 'note-taker', 'email-triage'],
-  data_ml: ['data-scientist', 'ml-engineer', 'ml-ops', 'data-engineer'],
-  cloud_devops: ['cloud-engineer', 'kubernetes-engineer', 'terraform-engineer', 'sre', 'devops'],
-  api_backend: ['api-engineer', 'auth-engineer', 'backend', 'database'],
+  productivity: ['task-manager', 'scheduler', 'note-taker', 'email-triage', 'meeting-planner', 'expense-tracker', 'operations-manager', 'executive-assistant'],
+  data_ml: ['data-scientist', 'ml-engineer', 'ml-ops', 'data-engineer', 'data-quality', 'bi-analyst', 'reporting-analyst', 'database-admin'],
+  cloud_devops: ['cloud-engineer', 'kubernetes-engineer', 'terraform-engineer', 'sre', 'devops', 'network-engineer', 'log-analyst', 'monitoring-engineer', 'deploy-engineer', 'infra-auditor', 'database-ops', 'backup-engineer', 'release-engineer', 'ci-engineer', 'cost-optimizer', 'incident-commander'],
+  api_backend: ['api-engineer', 'auth-engineer', 'backend', 'database', 'devtools-engineer'],
   mobile_app: ['mobile-engineer', 'ios-engineer', 'android-engineer', 'react-native-engineer', 'qa'],
   game_dev: ['game-developer', 'designer', 'coder', 'qa'],
-  home_life: ['home-org', 'interior-designer', 'event-planner', 'gardener'],
+  home_life: ['home-org', 'interior-designer', 'event-planner', 'gardener', 'fashion-stylist', 'beauty-advisor', 'pet-care', 'parenting'],
+  // B49 P1 — new intent for previously-orphaned legal specialists.
+  legal_task: ['legal-drafter', 'negotiator', 'legal', 'privacy-officer', 'compliance-officer'],
 };
 
-/** "gather news/research/study, THEN build" → the compound team, run in phases. */
-const COMPOUND_DETECT = [
+/** "gather news/research/study, THEN build" → the compound team, run in phases.
+ * Exported so the roster audit can verify phase names resolve to roster slugs. */
+export const COMPOUND_DETECT = [
   {
     re: /(build|create|make|write|code|develop)\b[^.!?\n]{0,80}\b(news|headlines?|latest stories|breaking stories|today['’]?s (stories|news)|current events)\b/i,
     phases: [
@@ -114,6 +123,7 @@ export const CLASSIFIER_INTENTS = [
   'workout_plan', 'investing_advice', 'tech_support', 'security_audit', 'content_creation',
   'study_exam', 'career_plan', 'relationship_advice', 'startup_advice', 'productivity',
   'data_ml', 'cloud_devops', 'api_backend', 'mobile_app', 'game_dev', 'home_life',
+  'legal_task',
 ];
 
 export const ClassificationSchema = z.object({
@@ -574,6 +584,7 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
       [/(android|iphone|ios|react native|flutter|mobile app|app store|play store|publish (my|the) app)/i, { intent: 'mobile_app', tasks: ['mobile-engineer', 'ios-engineer', 'android-engineer', 'react-native-engineer'], reasoning: 'Mobile task — the mobile team builds for the platform.' }],
       [/game (design|mechanics|idea|concept|dev)|unity (game|project)|unreal (engine|game)|make (a |my )?game (better|more fun)|game developer/i, { intent: 'game_dev', tasks: ['game-developer', 'designer', 'coder'], reasoning: 'Game task — the game team designs and builds it.' }],
       [/decorate (my|the) (room|house|home|apartment)|interior design|organi[sz]e (my|the) (room|house|closet|garage)|declutter|home (setup|improvement)|gardening|garden (plan|ideas|design)/i, { intent: 'home_life', tasks: ['home-org', 'interior-designer', 'gardener'], reasoning: 'Home/life task — the home team plans the space.' }],
+      [/(legal|contract|agreement|terms of service|privacy policy|non[- ]disclosure|nda|lease|draft (a|an|my|the) (contract|agreement|lease|terms)|compliance review|intellectual property|trademark|copyright)/i, { intent: 'legal_task', tasks: ['legal-drafter', 'negotiator', 'legal'], reasoning: 'Legal task — the legal team drafts documents and gives plain-language guidance.' }],
     ];
     for (const [re, res] of rules) {
       if (re.test(q)) return res;

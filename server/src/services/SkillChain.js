@@ -12,8 +12,9 @@ import { getAgent, getSkill } from './AgentRoster.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const SKILLS_DIR = path.resolve(__dirname, '../../skills');
 
-/** Skill slug → agent name shown in the live pipeline. */
-const SKILL_META = {
+/** Skill slug → agent name shown in the live pipeline. Exported so the roster
+ *  audit (Reachability.js) can treat runSkill slugs as a reachability source. */
+export const SKILL_META = {
   product: 'Product',
   designer: 'Designer',
   engineer: 'Engineer',
@@ -23,7 +24,19 @@ const SKILL_META = {
   'security-officer': 'Security Officer',
   shipper: 'Shipper',
   reflector: 'Reflector',
+  critic: 'Critic',
 };
+
+/** B49 — runSkill slugs that are NOT roster slugs get resolved here, so the
+ *  chain never reports "Skill not found" and the roster audit can verify
+ *  every execution-layer slug resolves. 'security-officer' is the historical
+ *  name of the roster's 'security' agent. */
+export const SLUG_ALIASES = { 'security-officer': 'security' };
+
+/** Resolve a runSkill slug through the alias table (exported for the audit). */
+export function resolveSkillSlug(slug) {
+  return SLUG_ALIASES[slug] || slug;
+}
 
 /** Think → Plan → Build → Test → Review → Ship → Reflect (gstack sprint). */
 const PHASE = {
@@ -53,7 +66,7 @@ export function listSkillFiles() {
  * NEVER reports "Skill not found" — every planner-selected skill loads.
  */
 export function loadSkill(slug) {
-  const file = listSkillFiles().find((f) => f.toLowerCase().includes(`-${slug}.md`));
+  const file = listSkillFiles().find((f) => f.toLowerCase().includes(`-${resolveSkillSlug(slug)}.md`));
   if (file) return { file, md: fs.readFileSync(path.join(SKILLS_DIR, file), 'utf-8') };
   const md = synthesizeSkill(slug);
   if (md) {
@@ -69,7 +82,7 @@ export function loadSkill(slug) {
 
 /** Build portable instructions for a slug from the roster (agent → skill). */
 function synthesizeSkill(slug) {
-  const agent = getAgent(slug);
+  const agent = getAgent(resolveSkillSlug(slug));
   if (agent) {
     const mastered = (agent.skills || []).map((s) => getSkill(s)).filter(Boolean);
     const skillLines = mastered.length
@@ -226,68 +239,116 @@ export async function qaScripted({ query, files, lastOutput, sendEvent }) {
   );
 }
 
+/** B49 P2 — build the code sample the Reviewer / Security Officer must see. */
+export function buildCodePeek(files) {
+  try {
+    const first = (files || [])[0];
+    if (!first) return '(no files)';
+    const p = path.join(WORKSPACE_DIR, first);
+    if (!fs.existsSync(p)) return '(file missing)';
+    const code = fs.readFileSync(p, 'utf-8');
+    // The Security Officer must see the real logic: full HTML head/markup +
+    // the complete <script> body (truncating at N chars hid the JS before).
+    const scriptMatch = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+    const js = scriptMatch ? scriptMatch[1] : '';
+    if (js.length > 0) return `${code.slice(0, 2500)}\n\n--- FULL <script> BODY (${js.length} chars) ---\n${js.slice(0, 30000)}`;
+    return code.slice(0, 30000);
+  } catch { return '(could not read)'; }
+}
+
 /**
- * REVIEW + SECURITY GATE + SHIP + REFLECT.
- * Runs the remaining specialists in order, feeding each only the previous
- * outputs. Returns all sections so the caller can enforce the gates:
- *   - qaVerdict  NEEDS FIX  → caller re-runs the fix loop before shipping
- *   - secVerdict BLOCKED    → caller must NOT ship
- *   - reviewVerdict NEEDS WORK → included in the summary so the user sees it
+ * B49 P2 — INDEPENDENT GATE PASSES. Each gate (Reviewer, Security Officer,
+ * Critic, Shipper, Reflector) is now its own runSkill call with its own
+ * system prompt built from that agent's roster role, and each is executed as
+ * its OWN graph node in the orchestrator (codeReview / securityGate /
+ * criticGate / shipper / reflector). No gate is bundled into another node's
+ * prompt — every verdict is independently observable.
  */
-export async function reviewAndShip({ query, plan, files, lastOutput, previewUrl, qaReport, sendEvent }) {
+
+/** REVIEWER pass — APPROVED / NEEDS WORK verdict from its own call. */
+export async function runReviewerPass({ query, plan, files, qaReport, sendEvent }) {
   const fileList = (files || []).map((n) => `- ${n}`).join('\n');
-  const codePeek = (() => {
-    try {
-      const first = (files || [])[0];
-      if (!first) return '(no files)';
-      const p = path.join(WORKSPACE_DIR, first);
-      if (!fs.existsSync(p)) return '(file missing)';
-      const code = fs.readFileSync(p, 'utf-8');
-      // The Security Officer must see the real logic: full HTML head/markup +
-      // the complete <script> body (truncating at N chars hid the JS before).
-      const scriptMatch = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-      const js = scriptMatch ? scriptMatch[1] : '';
-      if (js.length > 0) return `${code.slice(0, 2500)}\n\n--- FULL <script> BODY (${js.length} chars) ---\n${js.slice(0, 30000)}`;
-      return code.slice(0, 30000);
-    } catch { return '(could not read)'; }
-  })();
-
-  const reviewFull = await runSkill(
+  const full = await runSkill(
     'reviewer',
-    `QUERY: ${query}\n${plan ? `BUILD PLAN:\n${plan.slice(0, 1500)}` : ''}\nFILES:\n${fileList}\nCODE SAMPLE:\n${codePeek}\n\nQA REPORT:\n${qaReport}`,
+    `QUERY: ${query}\n${plan ? `BUILD PLAN:\n${plan.slice(0, 1500)}` : ''}\nFILES:\n${fileList}\nCODE SAMPLE:\n${buildCodePeek(files)}\n\nQA REPORT:\n${qaReport}`,
     sendEvent,
   );
-  const review = extractSection(reviewFull, 'REVIEW NOTES') || reviewFull;
+  return {
+    review: extractSection(full, 'REVIEW NOTES') || full,
+    verdict: gateVerdict(full, ['APPROVED', 'NEEDS WORK']),
+  };
+}
 
-  const secFull = await runSkill(
+/** SECURITY OFFICER pass — CLEARED / BLOCKED verdict from its own call. */
+export async function runSecurityPass({ files, qaReport, review, sendEvent }) {
+  const fileList = (files || []).map((n) => `- ${n}`).join('\n');
+  const full = await runSkill(
     'security-officer',
-    `FILES:\n${fileList}\nCODE SAMPLE:\n${codePeek}\n\nQA REPORT:\n${String(qaReport).slice(0, 1500)}\n\nREVIEW NOTES:\n${String(review).slice(0, 1200)}`,
+    `FILES:\n${fileList}\nCODE SAMPLE:\n${buildCodePeek(files)}\n\nQA REPORT:\n${String(qaReport).slice(0, 1500)}\n\nREVIEW NOTES:\n${String(review).slice(0, 1200)}`,
     sendEvent,
   );
-  const security = extractSection(secFull, 'SECURITY REVIEW') || secFull;
+  return {
+    security: extractSection(full, 'SECURITY REVIEW') || full,
+    verdict: gateVerdict(full, ['CLEARED', 'BLOCKED']),
+  };
+}
 
-  const shippedFull = await runSkill(
+/** CRITIC pass — MetaGPT-style critique with its own SHIP / REVISE verdict. */
+export async function runCriticPass({ query, files, qaReport, review, security, sendEvent }) {
+  const fileList = (files || []).map((n) => `- ${n}`).join('\n');
+  const full = await runSkill(
+    'critic',
+    `QUERY: ${query}\nFILES:\n${fileList}\n\nQA REPORT:\n${String(qaReport).slice(0, 1500)}\nREVIEW NOTES:\n${String(review).slice(0, 1500)}\nSECURITY REVIEW:\n${String(security).slice(0, 1200)}\n\nCritique the final output with the strictness of a senior reviewer: is it complete, correct, and shipping-quality? Verdict: SHIP or REVISE.`,
+    sendEvent,
+  );
+  return {
+    critique: extractSection(full, 'CRITIQUE') || full,
+    verdict: gateVerdict(full, ['SHIP', 'REVISE']),
+  };
+}
+
+/** SHIPPER pass — release notes / handoff from its own call. */
+export async function runShipperPass({ query, files, previewUrl, qaReport, review, security, sendEvent }) {
+  const fileList = (files || []).map((n) => `- ${n}`).join('\n');
+  const full = await runSkill(
     'shipper',
     `QUERY: ${query}\nFILES:\n${fileList}\nLIVE PREVIEW: ${previewUrl || 'n/a'}\nQA REPORT:\n${String(qaReport).slice(0, 1500)}\nREVIEW NOTES:\n${String(review).slice(0, 1500)}\nSECURITY REVIEW:\n${String(security).slice(0, 1200)}`,
     sendEvent,
   );
-  const shipped = extractSection(shippedFull, 'SHIPPED') || shippedFull;
+  return { shipped: extractSection(full, 'SHIPPED') || full };
+}
 
-  const reflectFull = await runSkill(
+/** REFLECTOR pass — retrospective from its own call. */
+export async function runReflectorPass({ plan, qaReport, review, security, sendEvent }) {
+  const full = await runSkill(
     'reflector',
     `PRODUCT BRIEF:\n${String(plan).slice(0, 800)}\nQA REPORT:\n${String(qaReport).slice(0, 1200)}\nREVIEW NOTES:\n${String(review).slice(0, 1000)}\nSECURITY REVIEW:\n${String(security).slice(0, 800)}`,
     sendEvent,
   );
-  const reflection = extractSection(reflectFull, 'REFLECTION') || reflectFull;
+  return { reflection: extractSection(full, 'REFLECTION') || full };
+}
 
+/**
+ * REVIEW + SECURITY GATE + SHIP + REFLECT — the BUNDLED convenience version,
+ * kept for backward compatibility; the orchestrator's graph now runs the five
+ * pass functions above as separate nodes (B49 P2). Returns the same shape.
+ *   - qaVerdict  NEEDS FIX  → caller re-runs the fix loop before shipping
+ *   - secVerdict BLOCKED    → caller must NOT ship
+ *   - reviewVerdict NEEDS WORK → included in the summary so the user sees it
+ */
+export async function reviewAndShip({ query, plan, files, previewUrl, qaReport, sendEvent }) {
+  const r = await runReviewerPass({ query, plan, files, qaReport, sendEvent });
+  const s = await runSecurityPass({ files, qaReport, review: r.review, sendEvent });
+  const sh = await runShipperPass({ query, files, previewUrl, qaReport, review: r.review, security: s.security, sendEvent });
+  const rf = await runReflectorPass({ plan, qaReport, review: r.review, security: s.security, sendEvent });
   return {
-    review,
-    security,
-    shipped,
-    reflection,
+    review: r.review,
+    security: s.security,
+    shipped: sh.shipped,
+    reflection: rf.reflection,
     qaVerdict: gateVerdict(qaReport, ['PASS', 'NEEDS FIX']),
-    reviewVerdict: gateVerdict(review, ['APPROVED', 'NEEDS WORK']),
-    secVerdict: gateVerdict(security, ['CLEARED', 'BLOCKED']),
+    reviewVerdict: r.verdict,
+    secVerdict: s.verdict,
   };
 }
 

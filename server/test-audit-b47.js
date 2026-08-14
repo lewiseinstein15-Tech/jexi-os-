@@ -80,7 +80,7 @@ const ok = (cond, label) => { console.log(`${cond ? '✅' : '❌'} ${label}`); i
   const needsFix = await edges.get('qaGate')({ context: { code: { qaVerdict: 'NEEDS FIX', qaRounds: 0, debugAsk: false } } });
   ok(needsFix === 'debugger', 'P1: QA NEEDS FIX routes back through debugger (gate → fix → re-run)');
   const pass = await edges.get('qaGate')({ context: { code: { qaVerdict: 'PASS', qaRounds: 0 } } });
-  ok(pass === 'reviewShip', 'P1: QA PASS proceeds to review + ship');
+  ok(pass === 'codeReview', 'P1: QA PASS proceeds to the independent Review gate (B49 split of reviewShip)');
 }
 
 // 1d. executePlan delegates to the graph runner — no switch on intent in its body.

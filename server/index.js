@@ -16,7 +16,8 @@ import {
 } from './src/services/SelfMonitor.js';
 import { loadSettings, saveSettings } from './src/services/SettingsManager.js';
 import { providerHealthSnapshot } from './src/services/ProviderRouter.js';
-import { AGENT_ROSTER, SKILL_REGISTRY, ROSTER_COUNT, SKILL_COUNT } from './src/services/AgentRoster.js';
+import { AGENT_ROSTER, SKILL_REGISTRY, ROSTER_COUNT, SKILL_COUNT, getAgent } from './src/services/AgentRoster.js';
+import { executionModel } from './src/services/Reachability.js';
 import { DesktopManager, ensureBrowser, browserStatus, restartBrowser } from './src/services/DesktopManager.js';
 import {
   addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory, saveMemory,
@@ -1057,6 +1058,14 @@ app.post('/api/chat', async (req, res) => {
       tools: plan.tools || [],
       toolsLine: plan.toolsLine || '',
       toolCount: plan.toolCount || 0,
+      // B49 P2/P4 — honest execution model: which composed agents ran as their
+      // own observable pass (independent) vs personas folded into a composite
+      // prompt (bundled). The frontend PLAN view can dim bundled members.
+      execution: (() => {
+        const m = executionModel(plan.intent, { steps: (plan.phases || []).flatMap((ph) => ph.agents || []) });
+        const name = (slug) => getAgent(slug)?.name || slug;
+        return { independent: m.independent.map(name), bundled: m.bundled.map(name) };
+      })(),
     });
     const results = await orchestrator.executePlan(plan, executionQuery || effectiveQuery, sendEvent, {
       image,

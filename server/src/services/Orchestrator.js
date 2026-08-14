@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { createGraph } from './GraphRunner.js';
 import { generateCode, applyFix } from './Architect.js';
-import { planForBuild, qaWebApp, qaScripted, reviewAndShip, fixFromQA, isDebugQuery, gateVerdict } from './SkillChain.js';
+import { planForBuild, qaWebApp, qaScripted, runReviewerPass, runSecurityPass, runCriticPass, runShipperPass, runReflectorPass, fixFromQA, isDebugQuery, gateVerdict } from './SkillChain.js';
 import { runFile } from './Runner.js';
 import { analyzeLink } from './Extractor.js';
 import { reasonAndWrite } from './Reasoner.js';
@@ -859,7 +859,7 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
       return results;
     });
 
-    // ---- coding subgraph: codePipeline → debugger ↺ → qaGate → reviewShip → shipper
+    // ---- coding subgraph: codePipeline → debugger ↺ → qaGate → codeReview → securityGate → criticGate → reflector → shipper
 
     N.codePipeline = async (state) => {
       const { results, sendEvent } = state.context;
@@ -1033,44 +1033,89 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
           c.qaVerdict = gateVerdict(c.qaReport, ['PASS', 'NEEDS FIX']);
         } catch (e) {}
       }
-      return state; // edge → reviewShip
+      return state; // edge → codeReview
     };
 
-    N.reviewShip = async (state) => {
-      // REVIEW + SECURITY GATE + SHIP + REFLECT (each output feeds the next).
+    // B49 P2 — each gate is its OWN graph node with its OWN LLM pass and
+    // verdict (codeReview → securityGate → criticGate → reflector → shipper),
+    // so no gate is bundled into another node's prompt: every verdict is an
+    // independently observable turn with its own outcome.
+    N.codeReview = async (state) => {
       const { sendEvent } = state.context;
       const c = state.context.code;
       if (c.done) return state;
       try {
-        const shipped = await reviewAndShip({ query: c.effQuery, plan: c.teamPlan, files: listWorkspaceFiles(), lastOutput: c.lastOutput, previewUrl: c.previewUrl, qaReport: c.qaReport, sendEvent });
-        c.reviewNotes = shipped.review;
-        c.securityNotes = shipped.security;
-        c.shipNotes = shipped.shipped;
-        c.reflectionNotes = shipped.reflection;
-        c.qaVerdict = shipped.qaVerdict || c.qaVerdict;
-        c.secVerdict = shipped.secVerdict;
+        const r = await runReviewerPass({ query: c.effQuery, plan: c.teamPlan, files: listWorkspaceFiles(), qaReport: c.qaReport, sendEvent });
+        c.reviewNotes = r.review;
+        c.reviewVerdict = r.verdict;
+        sendEvent('log', { agent: 'Reviewer', message: `🔍 Review verdict: ${r.verdict}` });
+      } catch (e) {
+        sendEvent('log', { agent: 'Reviewer', message: `⚠ Review pass issue: ${e.message}` });
+      }
+      return state; // edge → securityGate
+    };
+
+    N.securityGate = async (state) => {
+      const { sendEvent } = state.context;
+      const c = state.context.code;
+      if (c.done) return state;
+      try {
+        const s = await runSecurityPass({ files: listWorkspaceFiles(), qaReport: c.qaReport, review: c.reviewNotes, sendEvent });
+        c.securityNotes = s.security;
+        c.secVerdict = s.verdict;
 
         // SECURITY GATE enforcement: BLOCKED → one enforced fix round
         // (coder rewrites, runner re-tests, Security Officer re-reviews),
         // then the verdict is final for this run.
         if (c.secVerdict === 'BLOCKED') {
           sendEvent('log', { agent: 'Security Officer', message: '⛔ SECURITY GATE BLOCKED — sending findings to the coder for a fix round.' });
-          const secFix = await fixFromQA({ query: c.effQuery, qaReport: c.securityNotes, entryPoint: c.entryPoint, sendEvent });
-          if (secFix) {
-            sendEvent('log', { agent: 'Runner', message: '↻ Re-running after security fix...' });
-            const rerun = await runFile(secFix.entryPoint, (s, d) => sendEvent('log', { agent: 'Terminal', message: String(d).slice(0, 160) }));
-            if (rerun.url) c.previewUrl = rerun.url;
-            const shipped2 = await reviewAndShip({ query: c.effQuery, plan: c.teamPlan, files: listWorkspaceFiles(), lastOutput: c.lastOutput, previewUrl: c.previewUrl, qaReport: c.qaReport, sendEvent });
-            c.reviewNotes = shipped2.review;
-            c.securityNotes = shipped2.security;
-            c.shipNotes = shipped2.shipped;
-            c.reflectionNotes = shipped2.reflection;
-            c.secVerdict = shipped2.secVerdict || c.secVerdict;
-            sendEvent('log', { agent: 'Security Officer', message: c.secVerdict === 'BLOCKED' ? '⛔ Still BLOCKED after the fix round — issues need human attention.' : '✅ SECURITY GATE CLEARED after fix round.' });
+          try {
+            const secFix = await fixFromQA({ query: c.effQuery, qaReport: c.securityNotes, entryPoint: c.entryPoint, sendEvent });
+            if (secFix) {
+              sendEvent('log', { agent: 'Runner', message: '↻ Re-running after security fix...' });
+              const rerun = await runFile(secFix.entryPoint, (s, d) => sendEvent('log', { agent: 'Terminal', message: String(d).slice(0, 160) }));
+              if (rerun.url) c.previewUrl = rerun.url;
+              const s2 = await runSecurityPass({ files: listWorkspaceFiles(), qaReport: c.qaReport, review: c.reviewNotes, sendEvent });
+              c.securityNotes = s2.security;
+              c.secVerdict = s2.verdict;
+              sendEvent('log', { agent: 'Security Officer', message: c.secVerdict === 'BLOCKED' ? '⛔ Still BLOCKED after the fix round — issues need human attention.' : '✅ SECURITY GATE CLEARED after fix round.' });
+            }
+          } catch (e) {
+            sendEvent('log', { agent: 'Security Officer', message: `⚠ Security fix round issue: ${e.message}` });
           }
         }
+        sendEvent('log', { agent: 'Security Officer', message: `🛡 Security verdict: ${c.secVerdict}` });
       } catch (e) {
-        sendEvent('log', { agent: 'Shipper', message: `⚠ Team pass issue: ${e.message}` });
+        sendEvent('log', { agent: 'Security Officer', message: `⚠ Security pass issue: ${e.message}` });
+      }
+      return state; // edge → criticGate
+    };
+
+    N.criticGate = async (state) => {
+      const { sendEvent } = state.context;
+      const c = state.context.code;
+      if (c.done) return state;
+      try {
+        const cr = await runCriticPass({ query: c.effQuery, files: listWorkspaceFiles(), qaReport: c.qaReport, review: c.reviewNotes, security: c.securityNotes, sendEvent });
+        c.critiqueNotes = cr.critique;
+        c.criticVerdict = cr.verdict;
+        sendEvent('log', { agent: 'Critic', message: `🎭 Critic verdict: ${cr.verdict}` });
+      } catch (e) {
+        sendEvent('log', { agent: 'Critic', message: `⚠ Critic pass issue: ${e.message}` });
+      }
+      return state; // edge → reflector
+    };
+
+    N.reflector = async (state) => {
+      const { sendEvent } = state.context;
+      const c = state.context.code;
+      if (c.done) return state;
+      try {
+        const rf = await runReflectorPass({ plan: c.teamPlan, qaReport: c.qaReport, review: c.reviewNotes, security: c.securityNotes, sendEvent });
+        c.reflectionNotes = rf.reflection;
+        sendEvent('log', { agent: 'Reflector', message: '🌐 Retrospective captured.' });
+      } catch (e) {
+        sendEvent('log', { agent: 'Reflector', message: `⚠ Reflection pass issue: ${e.message}` });
       }
       return state; // edge → shipper
     };
@@ -1195,9 +1240,12 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
       qaGate: (state) => {
         const c = state.context.code;
         if (c.qaVerdict === 'NEEDS FIX' && c.qaRounds < 1 && !c.debugAsk) return 'debugger'; // ← QA NEEDS FIX → re-run
-        return 'reviewShip';
+        return 'codeReview';
       },
-      reviewShip: () => 'shipper',
+      codeReview: () => 'securityGate',
+      securityGate: () => 'criticGate',
+      criticGate: () => 'reflector',
+      reflector: () => 'shipper',
       shipper: () => 'responder',
     };
 

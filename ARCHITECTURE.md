@@ -166,3 +166,31 @@ to `replanner`.
   (P2).
 - Every verifier call site shares one structured `{ verdict, issues, revised }`
   prompt pattern via `server/src/services/VerificationPrompt.js`.
+
+## 9. Roster honesty + execution model (B49)
+
+- **One team map, one source of truth:** TEAM_PLAN (Planner.js, re-exported) is
+  the only place that says which agents run per intent; composeTeam() delegates
+  to it, so the plan UI and the planner cannot drift apart.
+- **Zero orphans enforced in CI:** every AGENT_ROSTER entry must appear in a
+  TEAM_PLAN value, a COMPOUND_DETECT phase, or a SkillChain runSkill pass;
+  every SKILL_REGISTRY entry must be mastered by a real agent; every
+  TOOL_REGISTRY entry must list a real, reachable agent. scripts/audit-roster.js
+  runs this inside npm test (--check) and regenerates AGENT-CATALOG.md from the
+  live registries, so the published numbers can never drift either.
+- **Tier metadata:** every roster entry carries tier = core | pipeline | team
+  (queryable via getAgent(slug).tier; no ad-hoc greps needed).
+- **Execution model (who actually reasons):** the catalog and the PLAN view
+  distinguish *independent* agents (their own observable pass/verdict) from
+  *bundled* personas (expertise injected into a composite prompt). Today:
+  - code_task — Option A: REAL independent execution. Product/Designer/Engineer
+    (planForBuild three sequential calls), Architect/Coder/Debugger (codegen
+    + fix calls), Runner (real sandbox execution), and the QA / Reviewer /
+    Security Officer / Critic / Shipper / Reflector gates are their own graph
+    nodes (qaGate → codeReview → securityGate → criticGate → reflector →
+    shipper) with their own calls and verdicts. Composed personas
+    (ux-researcher, accessibility, ui-developer, frontend, landing-page-builder,
+    email-developer) are honestly tagged composed in the UI.
+  - every other team — Option B: deliberately bundled. Their specialist node
+    makes one well-constructed composite pass; the catalog and UI mark those
+    members as composed so the PLAN view never implies an independent agent ran.

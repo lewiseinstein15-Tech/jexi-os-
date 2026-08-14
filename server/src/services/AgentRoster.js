@@ -14,6 +14,8 @@
  * instructions (the Atomic Agents "atomic" pattern).
  */
 
+import { TEAM_PLAN } from './Planner.js'; // single team map — composeTeam delegates to it (B49 P1/P3)
+
 /** Agent roster: slug → mandate + the skills that specialist masters. */
 export const AGENT_ROSTER = [
   // ── Core brain ──────────────────────────────────────────────
@@ -62,7 +64,7 @@ export const AGENT_ROSTER = [
   { slug: 'news-editor', name: 'News Editor', role: 'Writes the final brief from verified headlines.', skills: ['news-writing', 'briefing', 'summarization'] },
 
   // ── Memory team ─────────────────────────────────────────────
-  { slug: 'memory', name: 'Memory Agent', role: 'Long-term memory: facts, preferences, tf-idf scoring, consolidation.', skills: ['memory', 'facts', 'preferences', 'consolidation'] },
+  { slug: 'memory', name: 'Memory Agent', role: 'Long-term memory: facts, preferences, tf-idf scoring, consolidation.', skills: ['memory', 'facts', 'preferences', 'consolidation', 'recall'] },
   { slug: 'books', name: 'Books Agent', role: 'Answers strictly from the user\'s own books and library with citations.', skills: ['books', 'citation', 'quote'] },
 
   // ── Perception team ─────────────────────────────────────────
@@ -130,7 +132,6 @@ export const AGENT_ROSTER = [
   { slug: 'ml-engineer', name: 'ML Engineer', role: 'Trains, fine-tunes and serves machine-learning models.', skills: ['ml', 'model-training', 'fine-tuning', 'embeddings', 'evaluation'] },
   { slug: 'data-scientist', name: 'Data Scientist', role: 'Modeling, experiments and evaluation on real datasets.', skills: ['ml', 'modeling', 'statistics', 'evaluation', 'data-analysis'] },
   { slug: 'devtools-engineer', name: 'DevTools Engineer', role: 'CLIs, SDKs and developer tooling.', skills: ['cli', 'sdk', 'api-design', 'tool-building'] },
-  { slug: 'embedded-engineer', name: 'Embedded Engineer', role: 'Firmware, microcontrollers and IoT hardware.', skills: ['embedded', 'iot', 'hardware', 'coding'] },
   { slug: 'cloud-engineer', name: 'Cloud Engineer', role: 'AWS/GCP/Azure architecture, services and security.', skills: ['cloud', 'aws', 'gcp', 'azure', 'infrastructure'] },
   { slug: 'kubernetes-engineer', name: 'Kubernetes Engineer', role: 'Clusters, Helm charts and container orchestration.', skills: ['kubernetes', 'containers', 'helm', 'deployment'] },
   { slug: 'terraform-engineer', name: 'Terraform Engineer', role: 'Infrastructure as code with Terraform/OpenTofu.', skills: ['terraform', 'iac', 'infrastructure', 'cloud'] },
@@ -261,6 +262,36 @@ export const AGENT_ROSTER = [
   { slug: 'landing-page-builder', name: 'Landing Page Builder', role: 'Conversion-focused landing pages.', skills: ['frontend', 'react', 'conversion', 'ui-design'] },
   { slug: 'email-developer', name: 'Email Developer', role: 'HTML emails that render everywhere.', skills: ['email', 'frontend', 'api', 'testing'] },
 ];
+
+/**
+ * B49 P3 — explicit execution tier, attached to every roster entry so
+ * `getAgent(slug).tier` is a queryable fact (no ad-hoc grep needed):
+ *
+ *   core     = the always-present brain agents (run on every request)
+ *   pipeline = agents that execute as their OWN graph node with an
+ *              independent pass and an observable verdict/output
+ *   team     = composed into a team for an intent; may be bundled into a
+ *              composite reasoning pass (see AGENT-CATALOG.md execution model)
+ *
+ * Reachability (zero orphans) is enforced by server/scripts/audit-roster.js
+ * via server/src/services/Reachability.js — every entry must appear in a
+ * team, a compound phase, or an execution-layer pass.
+ */
+const TIER = {
+  core: ['planner', 'orchestrator', 'jexi', 'reasoner', 'reflector'],
+  pipeline: [
+    // graph-node primary agents (Orchestrator nodes with independent execution)
+    'architect', 'coder', 'runner', 'debugger', 'qa', 'reviewer', 'critic',
+    'security', 'shipper', 'math', 'self-diagnose', 'vision', 'navigator',
+    'computer-use', 'video-analyst', 'translator', 'data', 'devops', 'writer',
+    'perf', 'github', 'memory', 'news-scout', 'news-filter', 'news-editor',
+    'query-analyzer', 'searcher', 'reranker', 'extractor', 'synthesizer',
+    'researcher', 'scholar', 'fact-checker', 'books', 'document-analyst',
+  ],
+};
+const TIER_OF = new Map();
+for (const [tier, slugs] of Object.entries(TIER)) for (const s of slugs) TIER_OF.set(s, tier);
+for (const a of AGENT_ROSTER) a.tier = TIER_OF.get(a.slug) || 'team';
 
 /** Skill registry: slug → name, category, what it does, who masters it. */
 export const SKILL_REGISTRY = [
@@ -561,9 +592,6 @@ export const SKILL_REGISTRY = [
   { slug: 'evaluation', name: 'Evaluation', category: 'Engineering', desc: 'Benchmarks and quality metrics.', agent: 'data-scientist' },
   { slug: 'cli', name: 'CLI', category: 'Engineering', desc: 'Command-line tools.', agent: 'devtools-engineer' },
   { slug: 'sdk', name: 'SDK', category: 'Engineering', desc: 'Developer SDKs.', agent: 'devtools-engineer' },
-  { slug: 'embedded', name: 'Embedded', category: 'Engineering', desc: 'Firmware and microcontrollers.', agent: 'embedded-engineer' },
-  { slug: 'iot', name: 'IoT', category: 'Engineering', desc: 'Connected devices.', agent: 'embedded-engineer' },
-  { slug: 'hardware', name: 'Hardware', category: 'Engineering', desc: 'Physical systems.', agent: 'embedded-engineer' },
   { slug: 'cloud', name: 'Cloud', category: 'Engineering', desc: 'Cloud platforms and services.', agent: 'cloud-engineer' },
   { slug: 'aws', name: 'AWS', category: 'Engineering', desc: 'AWS services.', agent: 'cloud-engineer' },
   { slug: 'gcp', name: 'GCP', category: 'Engineering', desc: 'Google Cloud services.', agent: 'cloud-engineer' },
@@ -831,36 +859,18 @@ export function agentSkills(slug) {
 }
 
 /** Compose the roster of specialists for an intent (a small, focused subset —
- *  that is the whole trick: catalog big, team small, per task). */
+ *  that is the whole trick: catalog big, team small, per task). Delegates to
+ *  TEAM_PLAN (Planner.js) — the single team map — so the plan UI helpers and
+ *  the planner use the exact same composition and can never drift. Every roster
+ *  entry must be reachable via a TEAM_PLAN value, a COMPOUND_DETECT phase, or a
+ *  SkillChain runSkill pass; scripts/audit-roster.js enforces zero orphans. */
 export function composeTeam(intent, extra = {}) {
-  const map = {
-    image_recognition: ['vision', 'reasoner', 'memory'],
-    clear_memory: ['memory'],
-    link_analysis: ['video-analyst', 'navigator', 'extractor', 'reasoner', 'memory'],
-    math_solve: ['math', 'reasoner', 'memory'],
-    self_check: ['self-diagnose', 'reasoner', 'memory'],
-    code_task: ['product', 'designer', 'engineer', 'architect', 'coder', 'runner', 'debugger', 'qa', 'reviewer', 'critic', 'security', 'shipper', 'reflector'],
-    computer_use: ['navigator', 'vision', 'reasoner', 'memory'],
-    study_topic: ['scholar', 'researcher', 'document-analyst', 'memory'],
-    conversation: ['jexi', 'context-manager', 'archivist'],
-    memory_query: ['memory', 'archivist', 'context-manager'],
-    knowledge_recall: ['books', 'document-analyst', 'reasoner', 'memory'],
-    news_latest: ['news-scout', 'news-filter', 'news-editor', 'reasoner', 'memory'],
-    research: ['query-analyzer', 'searcher', 'reranker', 'extractor', 'synthesizer', 'fact-checker', 'critic', 'memory'],
-    learning_research: ['researcher', 'reasoner', 'memory'],
-    explain_team: ['planner'],
-    github: ['github', 'shipper'],
-    translate: ['translator', 'reviewer'],
-    data: ['data', 'data-engineer', 'reasoner'],
-    devops: ['devops', 'shipper'],
-    docs: ['writer', 'reviewer'],
-    perf: ['perf', 'coder', 'reviewer'],
-    compound_task: (extra.steps || []).flatMap((s) => {
-      const agent = getAgent(String(s).toLowerCase().replace(/[^a-z]/g, '-').replace(/-+/g, '-'));
-      return agent ? [agent.slug] : [];
-    }),
-  };
-  const slugs = map[intent] || [];
+  const slugs = intent === 'compound_task'
+    ? (extra.steps || []).flatMap((s) => {
+        const agent = getAgent(String(s).toLowerCase().replace(/[^a-z]/g, '-').replace(/-+/g, '-'));
+        return agent ? [agent.slug] : [];
+      })
+    : TEAM_PLAN[intent] || [];
   const seen = new Set();
   const team = [];
   for (const slug of slugs) {

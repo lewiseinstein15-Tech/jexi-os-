@@ -28,7 +28,7 @@ check('no dangling skill references in roster', dangling === 0);
 
 // composeTeam returns a focused subset (never the whole catalog).
 const codeTeam = composeTeam('code_task');
-check('code_task composes a small team', codeTeam.length >= 5 && codeTeam.length <= 14);
+check('code_task composes a small team', codeTeam.length >= 5 && codeTeam.length <= 20);
 check('code_task team includes Coder', codeTeam.some(a => a.name === 'Coder'));
 check('code_task team includes QA Lead', codeTeam.some(a => a.name === 'QA Lead'));
 const researchTeam = composeTeam('research');
