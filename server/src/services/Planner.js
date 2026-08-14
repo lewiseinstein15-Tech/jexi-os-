@@ -584,8 +584,12 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
     //     "domain prompts" / MasRouter field-routing pattern): a question about
     //     structural analysis, gene editing or orbital mechanics routes to the
     //     field's own specialist team instead of the generic research fallback.
+    //     B52 P3 — EXPLICIT research/current-events cues beat field routing:
+    //     "research the history of computer science" must run the RESEARCH
+    //     pipeline, not collapse into a direct field answer.
+    const strongResearchCue = /research|search|latest|breaking|news|sources|compare|deep dive|investigate|report on|current/i.test(q);
     const fields = matchDomains(q);
-    if (fields.length) {
+    if (fields.length && !strongResearchCue) {
       const primary = fields[0];
       const cross = fields.slice(1).filter((f) => f.family !== primary.family).slice(0, 3).map((f) => f.name);
       return {
@@ -609,8 +613,12 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
       return { intent: 'direct_answer', tasks: ['jexi', 'context-manager'], reasoning: 'Simple definitional/factual question — answered directly from knowledge, no web or study pipeline needed.' };
     }
 
-    // 9. Research / search / facts
-    const isResearch = /search|research|find|look up|google|what is|who is|when did|where is|why does|how to|explain|latest|news|history|capital|population|meaning|difference between|benefits of|types of|top \d/i.test(q);
+    // 9. Research / search / facts (B52 P3 — narrowed: bare definitional
+    //    questions are already direct_answer at 8.95 and must NEVER fall back
+    //    into research. Research now requires real research cues: explicit
+    //    search/research/current-events/multi-source language. Plain "what
+    //    is…", "explain…", "meaning of…" without such cues are NOT research.)
+    const isResearch = /search|research|find out|look up|google|when did|why does|how to|latest|breaking|news|current (events|affairs)|history of|deep dive|investigate|report on|sources|compare|compare sources|trends?|analy[sz]e|benefits of|types of|top \d|who was (the|a)|capital of [a-z ]+ \d/i.test(q);
     if (isResearch) {
       return { intent: 'research', tasks: ['search', 'browser', 'extractor', 'reasoner', 'memory'], reasoning: 'Needs current/verified information from the internet.' };
     }

@@ -59,7 +59,7 @@ const tests = [
   // holds the topic — answering from the library is even better than a web search).
   { q: 'go research on x and then apply it', expectAny: ['research', 'knowledge_recall'] },
   { q: 'research how to bake a cake and then make it', expectAny: ['research', 'knowledge_recall'] },
-  { q: 'research solar panels and explain how they work', expect: 'domain:energy-engineering' },
+  { q: 'research solar panels and explain how they work', expect: 'research' }, // B52 P3 — explicit "research" beats field routing
   { q: 'research the best diet and tell me the top tips', expectAny: ['research', 'knowledge_recall'] },
 ];
 
@@ -81,6 +81,9 @@ const confirmTests = [
   { q: 'I want to track my water intake', expect: 'code_task' },
   { q: 'track my expenses', expect: 'code_task' },
   { q: 'I want an app that reminds me to drink water', expect: 'code_task' },
+  // B52 P3 — explicit "research" language routes to the RESEARCH pipeline;
+  // the domain router yields to strong research cues.
+  { q: 'research solar panels and explain how they work', expect: 'research' },
   { q: 'tell me about solar panels', expect: 'domain:energy-engineering' },
   { q: 'I want to understand quantum physics', expect: 'domain:physics' },
   { q: 'what is the capital of Kenya', expect: 'direct_answer' },
@@ -155,7 +158,9 @@ for (const { q, expect } of computerUseTests) {
 
 // ...but plain research and coding must NOT grab the visible browser.
 const notComputerUseTests = [
-  { q: 'search the internet for quantum computing news', expect: 'domain:quantum-computing' },
+  // B52 P3 — explicit research/current-events cues route to RESEARCH, not a
+  // direct field answer (the domain matcher yields to strong research cues).
+  { q: 'search the internet for quantum computing news', expect: 'research' },
   // B51 P2 — direct answer (no browser), matching the block's name/intent.
   { q: 'what is the capital of France', expect: 'direct_answer' },
   { q: 'build me a browser game', expect: 'code_task' },

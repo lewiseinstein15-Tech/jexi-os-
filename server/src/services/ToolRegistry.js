@@ -21,6 +21,32 @@
 
 import { composeTeam } from './AgentRoster.js';
 
+/**
+ * B52 P4 — CODE-LEVEL TOOL ALLOWLIST for lightweight intents.
+ * direct_answer / conversation (and friends) are MEMORY-ONLY: no web search,
+ * no browser, no Trusted Library study, no bulk research tools — enforced in
+ * code by enforceToolAllowlist() and by executeTool() (ToolRuntime), not just
+ * by prompt rules. Intents NOT listed here are unrestricted (their composed
+ * team already routes the right tools).
+ */
+export const TOOL_INTENT_ALLOWLIST = {
+  direct_answer: ['memory-recall', 'rolling-summary', 'episode-recall', 'knowledge-load', 'preference-learn', 'profile-read', 'mcp-call', 'settings', 'knowledge-save', 'semantic-search'],
+  conversation: ['memory-recall', 'memory-write', 'rolling-summary', 'episode-recall', 'episode-save', 'knowledge-load', 'preference-learn', 'profile-read', 'mcp-call', 'settings'],
+  self_check: ['self-diagnose', 'settings'],
+};
+
+/**
+ * Enforce the allowlist: refuse tools outside the intent's set. Unlisted
+ * intents are unrestricted (returns { allowed: true }).
+ * @returns {{allowed: boolean, reason?: string}}
+ */
+export function enforceToolAllowlist(intent, slug) {
+  const allowed = TOOL_INTENT_ALLOWLIST[intent];
+  if (!allowed) return { allowed: true };
+  if (allowed.includes(slug)) return { allowed: true };
+  return { allowed: false, reason: `Tool "${slug}" is outside the ${intent} allowlist — lightweight intents use memory/knowledge tools only (B52 P4).` };
+}
+
 /** slug → the JEXI engine (service module) that actually executes this tool. */
 export const TOOL_REGISTRY = [
   // ── Search & research ─────────────────────────────────────────

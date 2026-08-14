@@ -22,7 +22,7 @@
  * fake success.
  */
 
-import { TOOL_REGISTRY, getTool } from './ToolRegistry.js';
+import { TOOL_REGISTRY, getTool, enforceToolAllowlist } from './ToolRegistry.js';
 import { aggregateSearch } from './SearchEngine.js';
 import { extractContent, extractPdfText, downloadBookFromUrl } from './Extractor.js';
 import { runNewsTeam } from './NewsAgent.js';
@@ -303,11 +303,25 @@ function formatResult(result) {
  * Execute a tool by slug with full gating + observability.
  * Returns { ok, permission, profile, durationMs, result, error, approvalRequired }.
  */
-export async function executeTool({ slug, args = {}, profile, sendEvent }) {
+export async function executeTool({ slug, args = {}, profile, intent, sendEvent }) {
   const started = Date.now();
   const emit = (type, payload) => { try { if (typeof sendEvent === 'function') sendEvent(type, payload); } catch (e) {} };
   const tool = getTool(slug);
   if (!tool) return { ok: false, error: `Unknown tool: ${slug}`, durationMs: 0 };
+
+  // B52 P4 — hard enforcement: lightweight intents (direct_answer,
+  // conversation, …) may only call their memory/knowledge allowlist. This is
+  // a CODE gate, not a prompt rule — a web/browser/study tool outside the
+  // allowlist is refused before it can execute.
+  if (intent) {
+    const en = enforceToolAllowlist(intent, slug);
+    if (!en.allowed) {
+      const refused = { ok: false, blocked: true, byAllowlist: intent, tool: slug, error: en.reason, durationMs: Date.now() - started };
+      emit('tool.refused', { tool: slug, intent, reason: en.reason });
+      return refused;
+    }
+  }
+
   const perm = toolPermission(slug);
   const useProfile = profile || activeToolProfile();
 

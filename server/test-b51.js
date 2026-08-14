@@ -134,8 +134,13 @@ Working app. I solved this before, so here is the verified solution.`;
 // ---------------------------------------------------------------------------
 {
   const src = read('src/services/Orchestrator.js');
-  check('P4 directAnswer draft runs through verification', /N\.directAnswer[\s\S]{0,4000}verifyAnswer/.test(src));
-  check('P4 research retry feeds specific missing claims', src.includes('retryWithClaims'));
+  // B52 P5 — directAnswer now runs through the single completion gate
+  // (Finalizer → verifyAnswer internally).
+  check('P4 directAnswer draft runs through the completion gate', /N\.directAnswer[\s\S]{0,4000}finalizeAnswer/.test(src));
+  // B52 P2 — research retry with specific claims now lives in the
+  // researchVerifyGraph (revise node feeds the missing claims back in).
+  const pg = read('src/services/PipelineGraphs.js');
+  check('P4 research retry feeds specific missing claims', pg.includes('missingClaims'));
 }
 
 // ---------------------------------------------------------------------------
@@ -165,7 +170,11 @@ Working app. I solved this before, so here is the verified solution.`;
   check('P5 fixer was NOT allowed to loop forever (fixCalls=' + fixCalls + ')', fixCalls === 2);
 
   const src = read('src/services/Orchestrator.js');
-  check('P5 research re-enters itself with specific claims on retry', src.includes("state.outcome = 'retry'") && src.includes('state.context.retryWithClaims'));
+  // B52 P2 — the research correction loop now lives in the researchVerifyGraph
+  // (revise node re-enters the verifier with the specific missing claims).
+  const pgSrc = read('src/services/PipelineGraphs.js');
+  check('P5 research re-enters itself with specific claims on retry', pgSrc.includes("state.outcome = 'verify'") && pgSrc.includes('missingClaims'));
+  check('P5 Orchestrator merges graph failure history into state', src.includes('failureHistory'));
   const loopSrc = read('src/services/CodingLoop.js');
   check('P5 CodingLoop carries the identical-streak guard', /IDENTICAL_STREAK = 3/.test(loopSrc));
 }

@@ -4,6 +4,7 @@
 // reference.md body loads only at execution time (loadSkill).
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { loadSkill, skillMeta, skillFolder, planningSkillSummaries } from './src/services/SkillChain.js';
 
 let passed = 0;
@@ -56,6 +57,20 @@ for (const s of ['coder', 'qa', 'reflector']) {
   const sk = loadSkill(s);
   check(`loadSkill(${s}) no longer synthesized (progressive from disk)`, !!sk && sk.progressive === true && !sk.synthesized);
 }
+
+// 5. B52 P1 — the legacy flat pipeline files are GONE: no pipeline skill may
+//    resolve as a flat server/skills/<slug>.md file. Progressive folders
+//    (plugin or server/skills/<slug>/) are the only source.
+const FLAT_PIPELINE_FILES = ['engineer.md', 'product.md', 'reviewer.md', 'security-officer.md', 'coder.md', 'qa.md', 'reflector.md'];
+for (const f of FLAT_PIPELINE_FILES) {
+  check(`no legacy flat file ${f} in server/skills/`, !fs.existsSync(path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), 'skills', f)));
+}
+for (const s of FOLDERS) {
+  const sk = loadSkill(s);
+  check(`B52 ${s} loads ONLY as a progressive folder (never flat/synthesized)`, !!sk && sk.progressive === true && !sk.synthesized);
+}
+// platform-reliability (the non-pipeline team skill) also lives in a folder now.
+check('B52 platform-reliability resolves as a progressive folder', !!loadSkill('platform-reliability') && loadSkill('platform-reliability').progressive === true);
 
 console.log(`\n=== RESULT: ${passed} passed, ${failed} failed ===`);
 process.exit(failed ? 1 : 0);

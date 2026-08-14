@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { createGraph } from './GraphRunner.js';
+import { runCodeGateGraph, runResearchVerifyGraph, runReviewSecurityGraph } from './PipelineGraphs.js'; // B52 P2 — graph-driven gates/verification
 import { generateCode, applyFix } from './Architect.js';
 import { planForBuild, qaWebApp, qaScripted, runReviewerPass, runSecurityPass, runCriticPass, runShipperPass, runReflectorPass, fixFromQA, isDebugQuery, gateVerdict } from './SkillChain.js';
 import { runFile } from './Runner.js';
@@ -28,6 +29,7 @@ import { groundednessCheck } from './Groundedness.js'; // B48 P2a — strip ungr
 import { preferencesBlock, recallPreferences } from './PreferenceLearner.js';
 import { verifyAnswer } from './VerificationLoop.js';
 import { sanitizeFinalAnswer } from './AnswerSanitizer.js'; // B51 P1/P7 — no process narration reaches the user
+import { finalizeAnswer } from './Finalizer.js'; // B52 P5 — single completion gate for every user-facing answer
 import { rosterStats } from './AgentRoster.js';
 import {
   addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory, topUserFacts,
@@ -602,16 +604,12 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
       );
       let draft = String(reply || '').trim() || `I don't have a solid answer for that right now — try rephrasing or ask for a deeper study of the topic.`;
 
-      // 3. B51 P4 — verification gate: a bad/unsupported draft is revised
-      //    before it becomes the final summary.
-      try {
-        const verified = await verifyAnswer({ query, draft, sources: [], sendEvent, opts: { minLength: 160 } });
-        if (verified.changed) draft = verified.text;
-        if (verified.verdict === 'verified' || verified.changed) results.statistics.verification = { rounds: verified.rounds, verdict: verified.verdict };
-      } catch (e) {}
-
-      try { addChat('jexi', draft); } catch (e) {}
-      results.summary = draft;
+      // 3. B52 P5 — the SINGLE completion gate: verify + strip forbidden
+      //    narration in one shared helper before the answer reaches the user.
+      const finalized = await finalizeAnswer({ query, draft, sources: [], domain: 'direct_answer', sendEvent, opts: { minLength: 160 } });
+      results.summary = finalized.summary;
+      if (finalized.verification) results.statistics.verification = finalized.verification;
+      try { addChat('jexi', results.summary); } catch (e) {}
       results.statistics.confidence = 92;
       return results;
     });
@@ -673,33 +671,29 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
       results.summary = team.summary;
       results.statistics.confidence = team.confidence;
 
-      // VERIFICATION LOOP (reflection engineering): a cheap Critic re-reads
-      // the grounded answer against the sources and fixes invented/unsupported
-      // claims before it reaches the user. Bounded to MAX 2 rounds.
-      sendEvent('log', { agent: 'Critic', message: '🔎 Verifying the answer against its sources (fact-check pass)...' });
-      const verified = await verifyAnswer({ query, draft: results.summary, sources: results.sources });
-      if (verified.changed) {
-        sendEvent('log', { agent: 'Critic', message: verified.verdict === 'verified' ? '✓ Answer verified clean after revision.' : '✍ Fixed unsupported claims — revised answer ready.' });
-        results.summary = verified.text;
+      // B52 P2 — the verification + correction path is a REAL GraphRunner run:
+      // draft → verifier → (revise WITH the specific missing claims → verifier,
+      // bounded) → final. Durable failure history flows back into state so the
+      // next iteration reads the last error + reasons (P7).
+      const g = await runResearchVerifyGraph({
+        query,
+        draft: results.summary,
+        sources: results.sources || [],
+        sendEvent,
+      }).catch((e) => null);
+      if (g && g.context) {
+        // B52 P5 — single completion gate: the graph already verified the
+        // draft, so finalizeAnswer runs sanitize-only here (verify: false) —
+        // no double verification pass, one shared finalization path.
+        const finalized = await finalizeAnswer({ query, draft: g.context.finalDraft || results.summary, sources: g.context.sources || results.sources || [], domain: 'research', verify: false, sendEvent });
+        results.summary = finalized.summary;
+        if (g.context.sources && g.context.sources.length) results.sources = g.context.sources;
+        results.statistics.verification = g.context.verification || finalized.verification || results.statistics.verification;
+        state.context.failureHistory = (state.context.failureHistory || []).concat(g.context.failureHistory || []).slice(-8);
+        state.context.lastError = g.context.lastError || state.context.lastError;
+        state.context.attempt = (state.context.attempt || 0) + (g.context.attempt || 0);
+        sendEvent('log', { agent: 'GraphRunner', message: `researchVerifyGraph visited: ${(g.history || []).join(' → ')}` });
         try { addChat('jexi', results.summary); } catch (e) {}
-        results.statistics.verification = { rounds: verified.rounds, verdict: verified.verdict };
-      } else {
-        sendEvent('log', { agent: 'Critic', message: '✓ Answer verified clean.' });
-      }
-
-      // B51 P5 — correction path: the fact-checker still reports issues after
-      // revision → re-enter THIS node with the specific missing claims (bounded
-      // to one re-entry; the second failure escalates to an honest answer).
-      if (verified.verdict === 'best-effort' && verified.issues && verified.issues.length) {
-        const prior = state.context.failureHistory || [];
-        if (!prior.some((f) => f.node === 'research')) {
-          state.context.failureHistory = [...prior, { node: 'research', issues: verified.issues.slice(0, 5), query }];
-          state.context.retryWithClaims = verified.issues.slice(0, 5);
-          state.outcome = 'retry';
-          sendEvent('log', { agent: 'Fact Checker', message: `↻ Re-entering research with ${verified.issues.length} specific missing claim(s) to fix.` });
-          return results;
-        }
-        sendEvent('log', { agent: 'Fact Checker', message: '⚠ Verification still flagged issues after retry — shipping the best-effort honest answer.' });
       }
 
       // DOMAIN VERIFICATION (stage 16) — deterministic research checks on
@@ -722,13 +716,10 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
       let draft = content && String(content).trim().length
         ? `## ${topic}\n\n${content.slice(0, 4000)}`
         : `## ${topic}\n\nI could not gather enough material on this topic right now — try again in a moment.`;
-      // B51 P4 — study drafts go through the verification gate before final.
-      try {
-        const verified = await verifyAnswer({ query, draft, sources: [], sendEvent });
-        if (verified.changed) draft = verified.text;
-        if (verified.verdict === 'verified' || verified.changed) results.statistics.verification = { rounds: verified.rounds, verdict: verified.verdict };
-      } catch (e) {}
-      results.summary = draft;
+      // B52 P5 — single completion gate (verify + sanitize) for study answers.
+      const finalized = await finalizeAnswer({ query, draft, sources: [], domain: 'study', sendEvent });
+      results.summary = finalized.summary;
+      if (finalized.verification) results.statistics.verification = finalized.verification;
       results.statistics.confidence = 100;
       return results;
     });
@@ -738,15 +729,15 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
       if (kb) {
         let summary = await this.answerFromKnowledge(kb, query);
         const sources = (Array.isArray(kb) ? kb : [kb]).map(k => ({ title: k.title, link: '' }));
-        // VERIFICATION LOOP — keep book answers grounded in the actual passages.
+        // B52 P5 — single completion gate (verify against the book passages +
+        // sanitize) before the answer reaches the user.
         sendEvent('log', { agent: 'Critic', message: '🔎 Checking the answer stays true to your book...' });
-        const verified = await verifyAnswer({ query, draft: summary, sources });
-        if (verified.changed) summary = verified.text;
-        try { addChat('jexi', summary); } catch (e) {}
-        results.summary = summary;
+        const finalized = await finalizeAnswer({ query, draft: summary, sources, domain: 'knowledge_recall', sendEvent });
+        try { addChat('jexi', finalized.summary); } catch (e) {}
+        results.summary = finalized.summary;
         results.sources = sources;
         results.statistics.confidence = 95;
-        if (verified.changed) results.statistics.verification = { rounds: verified.rounds, verdict: verified.verdict };
+        if (finalized.verification) results.statistics.verification = finalized.verification;
         return results;
       }
       // Fall through to research if the library has nothing
@@ -776,8 +767,11 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
       //    (News Scout → News Filter → News Editor — free feeds, no API key)
       const team = await runNewsTeam(query, sendEvent);
       results.sources = team.sources;
-      try { addChat('jexi', team.summary); } catch (e) {}
-      results.summary = team.summary;
+      // B52 P5 — single completion gate (sanitize; news freshness is the
+      // verification, prose re-verification is skipped).
+      const finalized = await finalizeAnswer({ query, draft: team.summary, sources: team.sources || [], domain: 'news', verify: false, sendEvent });
+      try { addChat('jexi', finalized.summary); } catch (e) {}
+      results.summary = finalized.summary;
       results.statistics.confidence = team.confidence;
       return results;
     });
@@ -1095,25 +1089,33 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
         }
       }
 
-      // QA gate enforcement: NEEDS FIX → the debug loop re-runs once and QA re-verifies.
+      // B52 P2 — QA gate enforcement runs as a REAL GraphRunner pipeline:
+      // runner → gate → (NEEDS FIX → fix → re-run → re-verify, bounded) →
+      // accept. The graph records node history + durable failure history and
+      // stops after one fix round (no blind infinite retry).
       if (c.qaVerdict === 'NEEDS FIX' && c.qaRounds < 1 && !c.debugAsk) {
         sendEvent('log', { agent: 'QA Lead', message: '⛔ QA gate: NEEDS FIX — sending back to the coder.' });
-        try {
-          const fixedOnce = await fixFromQA({ query: c.effQuery, qaReport: c.qaReport, entryPoint: c.entryPoint, sendEvent });
-          if (fixedOnce) {
-            c.entryPoint = fixedOnce.entryPoint || c.entryPoint;
-            c.qaRounds = 1;
-            return state; // edge → debugger (re-run), then back here for re-verification
+        const g = await runCodeGateGraph({
+          query: c.effQuery,
+          entryPoint: c.entryPoint,
+          previewUrl: c.previewUrl,
+          teamBrief: c.teamBrief || '',
+          scope,
+          qaReport: c.qaReport,
+          sendEvent,
+        }).catch((e) => null);
+        if (g && g.context) {
+          c.qaRounds = 1;
+          if (g.context.gate) {
+            c.qaVerdict = g.context.gate.verdict;
+            c.qaReport = g.context.gate.report || c.qaReport;
           }
-        } catch (e) {}
-      }
-
-      // Second visit after the fix round — re-verify once.
-      if (c.qaRounds >= 1 && c.previewUrl && /\.html$/i.test(c.entryPoint || '')) {
-        try {
-          c.qaReport = await qaWebApp({ previewUrl: c.previewUrl, brief: c.teamBrief || c.effQuery, scope, sendEvent });
-          c.qaVerdict = gateVerdict(c.qaReport, ['PASS', 'NEEDS FIX']);
-        } catch (e) {}
+          if (g.context.entryPoint) c.entryPoint = g.context.entryPoint;
+          if (g.context.previewUrl) c.previewUrl = g.context.previewUrl;
+          if (g.context.lastOutput) c.lastOutput = g.context.lastOutput;
+          state.context.failureHistory = (state.context.failureHistory || []).concat(g.context.failureHistory || []).slice(-8);
+          sendEvent('log', { agent: 'GraphRunner', message: `codeGateGraph visited: ${(g.history || []).join(' → ')} (final verdict ${c.qaVerdict})` });
+        }
       }
       return state; // edge → codeReview
     };
@@ -1142,29 +1144,23 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
       const c = state.context.code;
       if (c.done) return state;
       try {
-        const s = await runSecurityPass({ files: listWorkspaceFiles(), qaReport: c.qaReport, review: c.reviewNotes, sendEvent });
-        c.securityNotes = s.security;
-        c.secVerdict = s.verdict;
-
-        // SECURITY GATE enforcement: BLOCKED → one enforced fix round
-        // (coder rewrites, runner re-tests, Security Officer re-reviews),
-        // then the verdict is final for this run.
-        if (c.secVerdict === 'BLOCKED') {
-          sendEvent('log', { agent: 'Security Officer', message: '⛔ SECURITY GATE BLOCKED — sending findings to the coder for a fix round.' });
-          try {
-            const secFix = await fixFromQA({ query: c.effQuery, qaReport: c.securityNotes, entryPoint: c.entryPoint, sendEvent });
-            if (secFix) {
-              sendEvent('log', { agent: 'Runner', message: '↻ Re-running after security fix...' });
-              const rerun = await runFile(secFix.entryPoint, (s, d) => sendEvent('log', { agent: 'Terminal', message: String(d).slice(0, 160) }));
-              if (rerun.url) c.previewUrl = rerun.url;
-              const s2 = await runSecurityPass({ files: listWorkspaceFiles(), qaReport: c.qaReport, review: c.reviewNotes, sendEvent });
-              c.securityNotes = s2.security;
-              c.secVerdict = s2.verdict;
-              sendEvent('log', { agent: 'Security Officer', message: c.secVerdict === 'BLOCKED' ? '⛔ Still BLOCKED after the fix round — issues need human attention.' : '✅ SECURITY GATE CLEARED after fix round.' });
-            }
-          } catch (e) {
-            sendEvent('log', { agent: 'Security Officer', message: `⚠ Security fix round issue: ${e.message}` });
-          }
+        // B52 P2 — the review + security gate path is a REAL GraphRunner run:
+        // reviewer → security-gate → (BLOCKED → fix → re-run → re-review,
+        // bounded) → final verdict. History + failure history are recorded.
+        const g = await runReviewSecurityGraph({
+          query: c.effQuery,
+          entryPoint: c.entryPoint,
+          teamPlan: c.teamPlan || '',
+          qaReport: c.qaReport || '',
+          files: listWorkspaceFiles(),
+          sendEvent,
+        }).catch((e) => null);
+        if (g && g.context && g.context.reviewSecurity) {
+          c.reviewNotes = g.context.reviewSecurity.review || c.reviewNotes;
+          c.securityNotes = g.context.reviewSecurity.security;
+          c.secVerdict = g.context.reviewSecurity.verdict;
+          state.context.failureHistory = (state.context.failureHistory || []).concat(g.context.failureHistory || []).slice(-8);
+          sendEvent('log', { agent: 'GraphRunner', message: `reviewSecurityGraph visited: ${(g.history || []).join(' → ')} (verdict ${c.secVerdict})` });
         }
         sendEvent('log', { agent: 'Security Officer', message: `🛡 Security verdict: ${c.secVerdict}` });
       } catch (e) {
@@ -1235,7 +1231,11 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
         : c.qaVerdict === 'NEEDS FIX'
           ? '\n\n> ⚠ **QA verdict: NEEDS FIX.** The app runs, but QA found issues — ask me to fix them.'
           : '';
-      results.summary = `### 💻 BUILD READY\n\n${previewLine}${qaSection}${reviewSection}${securitySection}${shipSection}${gateNote}${planSection}\n\n${fileSections}\n\n**Test Output:**\n${finalOutput || '✓ Ran successfully.'}\n\n**Download the files:**\n${workspaceLinks}`;
+      // B52 P5 — single completion gate for the build report: the code itself
+      // was verified by tests + QA/security gates, so this is sanitize-only
+      // (verify: false) — no prose re-verification of a build report.
+      const finalized = await finalizeAnswer({ query: c.effQuery, draft: `### 💻 BUILD READY\n\n${previewLine}${qaSection}${reviewSection}${securitySection}${shipSection}${gateNote}${planSection}\n\n${fileSections}\n\n**Test Output:**\n${finalOutput || '✓ Ran successfully.'}\n\n**Download the files:**\n${workspaceLinks}`, sources: [], domain: 'code', verify: false, sendEvent });
+      results.summary = finalized.summary;
       results.files = files;
       results.previewUrl = c.previewUrl || undefined;
       results.statistics.confidence = 100;
