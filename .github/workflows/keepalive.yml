@@ -15,7 +15,9 @@ on:
     # every 10 minutes (GitHub cron can be delayed a couple of minutes —
     # still well inside Render's 15-minute sleep window)
     - cron: '*/10 * * * *'
-  workflow_dispatch:  jobs:
+  workflow_dispatch:
+
+jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
