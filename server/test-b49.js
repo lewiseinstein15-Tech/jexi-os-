@@ -31,7 +31,9 @@ check('P1: zero orphaned skills (got ' + report.orphanSkills.length + ')', repor
 check('P1: zero orphaned tools (got ' + report.orphanTools.length + ')', report.orphanTools.length === 0);
 check('P1: zero dangling refs in any direction', report.danglingTeamRefs.length === 0 && report.danglingSkillRefs.length === 0 && report.danglingToolRefs.length === 0 && report.danglingAgentSkills.length === 0);
 check('P1: 100% of agents reachable (got ' + report.counts.reachablePct + '%)', report.counts.reachablePct === 100);
-check('P1: 206 agents · 492 skills · 152 tools', report.counts.agents === 206 && report.counts.skills === 492 && report.counts.tools === 152);
+// B50 added the academic DomainRegistry: +38 domain-specialist agents,
+// +13 skills (hardware/embedded/iot + 10 domain skills), +23 round-6 tools.
+check('P1: 251 agents · 507 skills · 175 tools (got ' + report.counts.agents + '/' + report.counts.skills + '/' + report.counts.tools + ')', report.counts.agents === 251 && report.counts.skills === 507 && report.counts.tools === 175);
 
 // The investigation's 32 orphaned agents must now all be reachable (wired or removed).
 const orphanList = ['accessibility', 'agent-builder', 'api-docs-writer', 'brand-designer', 'coding-tutor', 'deploy-engineer', 'devrel-engineer', 'devtools-engineer', 'email-developer', 'embedded-engineer', 'forensic-analyst', 'infra-auditor', 'landing-page-builder', 'languages', 'legal-drafter', 'lifecycle-marketer', 'log-analyst', 'monitoring-engineer', 'motion-designer', 'negotiator', 'network-engineer', 'operations-manager', 'parenting', 'prompt', 'red-team', 'regex', 'security-trainer', 'sound-designer', 'technical-editor', 'tool-router', 'toolsmith', 'ui-developer', 'ux-researcher', 'ux-writer'];

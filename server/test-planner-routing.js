@@ -14,12 +14,15 @@ const tests = [
   { q: 'who are you and who built you?', expect: 'conversation' },
   { q: 'what do you remember about me?', expect: 'memory_query' },
   { q: 'calculate 7 * 6', expect: 'math_solve' },
+  { q: 'what is calculus', expect: 'domain:mathematics' },
   // Guard: the math detector must NOT match substrings of ordinary words —
   // "comPUTEr" tripped /compute/ and "reSOLVEd" tripped /solve/, sending
-  // computer-science questions to the math team.
-  { q: 'give me a roadmap for a beginner in computer science', expect: 'learning_research' },
+  // computer-science questions to the math team. Since B50 the academic
+  // DomainRegistry routes CS questions to the computer-science specialist
+  // team — even better than the old generic fallback.
+  { q: 'give me a roadmap for a beginner in computer science', expect: 'domain:computer-science' },
   { q: 'how do computers work', expect: 'learning_research' },
-  { q: 'what is computer science', expect: 'research' },
+  { q: 'what is computer science', expect: 'domain:computer-science' },
   { q: 'I resolved this issue with my code', expect: 'code_task' },
   { q: 'compute 5 plus 7', expect: 'math_solve' },
   { q: 'solve for x in 2x + 5 = 13', expect: 'math_solve' },
@@ -51,7 +54,7 @@ const tests = [
   // holds the topic — answering from the library is even better than a web search).
   { q: 'go research on x and then apply it', expectAny: ['research', 'knowledge_recall'] },
   { q: 'research how to bake a cake and then make it', expectAny: ['research', 'knowledge_recall'] },
-  { q: 'research solar panels and explain how they work', expectAny: ['research', 'knowledge_recall'] },
+  { q: 'research solar panels and explain how they work', expect: 'domain:energy-engineering' },
   { q: 'research the best diet and tell me the top tips', expectAny: ['research', 'knowledge_recall'] },
 ];
 
@@ -73,12 +76,12 @@ const confirmTests = [
   { q: 'I want to track my water intake', expect: 'code_task' },
   { q: 'track my expenses', expect: 'code_task' },
   { q: 'I want an app that reminds me to drink water', expect: 'code_task' },
-  { q: 'tell me about solar panels', expect: 'learning_research' },
-  { q: 'I want to understand quantum physics', expect: 'learning_research' },
+  { q: 'tell me about solar panels', expect: 'domain:energy-engineering' },
+  { q: 'I want to understand quantum physics', expect: 'domain:physics' },
   { q: 'what is the capital of Kenya', expect: 'research' },
   // Math topic words alone are NOT a solve request (regression for the trusted-library test)
   { q: 'study calculus', expect: 'study_topic' },
-  { q: 'what is calculus', expect: 'research' },
+  { q: 'what is calculus', expect: 'domain:mathematics' },
   { q: 'solve this calculus problem', expect: 'math_solve' },
   { q: 'build a dashboard of today\'s news', expect: 'compound_task' },
 ];
@@ -147,7 +150,7 @@ for (const { q, expect } of computerUseTests) {
 
 // ...but plain research and coding must NOT grab the visible browser.
 const notComputerUseTests = [
-  { q: 'search the internet for quantum computing news', expect: 'research' },
+  { q: 'search the internet for quantum computing news', expect: 'domain:quantum-computing' },
   { q: 'what is the capital of France', expect: 'research' },
   { q: 'build me a browser game', expect: 'code_task' },
 ];
@@ -167,9 +170,9 @@ const autonomousTests = [
   { q: 'remind me to drink water every hour', expect: 'code_task' },
   { q: 'I want a calorie counter app', expect: 'code_task' },
   { q: 'manage my monthly budget', expect: 'code_task' },
-  { q: 'I want to learn about quantum physics', expect: 'learning_research' },
+  { q: 'I want to learn about quantum physics', expect: 'domain:physics' },
   { q: 'I want the latest news on AI', expect: 'news_latest' },
-  { q: 'I want to find out about black holes', expect: 'research' },
+  { q: 'I want to find out about black holes', expect: 'domain:astrophysics' },
   { q: 'tell me about the moon', expect: 'learning_research' },
 ];
 for (const { q, expect } of autonomousTests) {

@@ -77,7 +77,7 @@ check('duplicate calls are deduped', deduped.length === 1);
 
 /* ---------------- Registry sanity (used by the loop) ---------------- */
 check('getTool finds web-search', getTool('web-search')?.name === 'Web Search');
-check('registry count is 152', TOOL_COUNT === 152); // +1: mcp-call (Priority 7)
+check('registry count is 175', TOOL_COUNT === 175); // +1: mcp-call (P7) +23: round-6 platform/reliability/domain tools (sandbox, guardrail, observability, voice, plugin, chaos)
 
 console.log(`\n=== RESULT: ${passed} passed, ${failed} failed ===`);
 process.exit(failed ? 1 : 0);

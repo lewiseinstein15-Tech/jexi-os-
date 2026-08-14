@@ -3,6 +3,7 @@ import { searchKnowledge } from './MemoryManager.js';
 import { AGENT_ROSTER, getAgent, skillsForTeam, rosterStats } from './AgentRoster.js';
 import { toolsForTeam } from './ToolRegistry.js';
 import { generateContent, resolveKeys } from './LLMClient.js';
+import { DOMAINS, matchDomains } from './DomainRegistry.js';
 
 /**
  * JEXI's Planner — decides which agents/tools to use and when.
@@ -66,7 +67,7 @@ export const TEAM_PLAN = {
   // requires them: observability for metrics, sandbox for code, offline only
   // when providers are down, voice when speaking, plugin for packages,
   // chaos only behind the test flag).
-  observability: ['observability', 'reasoner', 'memory'],
+  observability: ['observability', 'concurrency', 'reasoner', 'memory'],
   offline_mode: ['offline', 'reasoner', 'memory'],
   voice_command: ['voice-orchestrator', 'reasoner', 'memory'],
   plugin_task: ['plugin-manager', 'reasoner'],
@@ -82,6 +83,10 @@ export const TEAM_PLAN = {
   home_life: ['home-org', 'interior-designer', 'event-planner', 'gardener', 'fashion-stylist', 'beauty-advisor', 'pet-care', 'parenting'],
   // B49 P1 — new intent for previously-orphaned legal specialists.
   legal_task: ['legal-drafter', 'negotiator', 'legal', 'privacy-officer', 'compliance-officer'],
+  // B50 — academic/scientific field routing: every field in the Domain
+  // registry maps to its specialist team, data-driven (a new field only
+  // needs a registry entry to become a routable intent + reachable agents).
+  ...Object.fromEntries(DOMAINS.map((d) => [`domain:${d.id}`, d.team])),
 };
 
 /** "gather news/research/study, THEN build" → the compound team, run in phases.
@@ -569,6 +574,22 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
     //     name the right team, never all of them).
     const domain = this._domainIntent(q);
     if (domain) return domain;
+
+    // 8.9 FIELD ROUTING — the academic/scientific DomainRegistry (agentUniverse
+    //     "domain prompts" / MasRouter field-routing pattern): a question about
+    //     structural analysis, gene editing or orbital mechanics routes to the
+    //     field's own specialist team instead of the generic research fallback.
+    const fields = matchDomains(q);
+    if (fields.length) {
+      const primary = fields[0];
+      const cross = fields.slice(1).filter((f) => f.family !== primary.family).slice(0, 3).map((f) => f.name);
+      return {
+        intent: `domain:${primary.id}`,
+        tasks: [...primary.team],
+        reasoning: `Field recognized: ${primary.name} (${primary.family})${cross.length ? ' + ' + cross.join(', ') : ''} — the ${primary.name} specialist team takes it.`,
+        domains: fields.map((f) => f.id),
+      };
+    }
 
     // 9. Research / search / facts
     const isResearch = /search|research|find|look up|google|what is|who is|when did|where is|why does|how to|explain|latest|news|history|capital|population|meaning|difference between|benefits of|types of|top \d/i.test(q);

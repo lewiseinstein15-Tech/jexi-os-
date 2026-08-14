@@ -1,6 +1,6 @@
 # JEXI OS — Agent & Skill Catalog
 
-**206 specialist agents · 492 skills · 152 tools · 1 orchestrator.** One plain-language request in,
+**251 specialist agents · 507 skills · 175 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
 > ⚙️ GENERATED FILE — updated 2026-08-14 by `cd server && npm run audit-roster`. Do not edit by hand.
@@ -12,10 +12,10 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 
 | Metric | Value |
 |---|---|
-| Agents | 206 (206 reachable — 100%) |
-| Skills | 492 |
-| Tools | 152 |
-| Intents / teams | 43 |
+| Agents | 251 (251 reachable — 100%) |
+| Skills | 507 |
+| Tools | 175 |
+| Intents / teams | 153 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
 | Orphaned tools | 0 |
@@ -39,12 +39,12 @@ You type:  "Build me a water-intake tracker"
 ┌──────────────┴──────────────┐
 │ 2. composeTeam() picks the  │  Product → Designer → Engineer → Architect →
 │    exact specialists needed │  Coder → Runner → Debugger → QA → Reviewer →
-│    (never all 206)          │  Security → Critic → Shipper → Reflector
+│    (never all 251)          │  Security → Critic → Shipper → Reflector
 └──────────────┬──────────────┘
                ▼
 ┌──────────────┴──────────────┐
 │ 3. SKILLS expand per agent  │  team skills = each agent's registry entry
-│    (492-skill registry)       │  → streamed live in the UI as she works
+│    (507-skill registry)       │  → streamed live in the UI as she works
 └──────────────┬──────────────┘
                ▼
 ┌──────────────┴──────────────┐
@@ -78,7 +78,7 @@ You type:  "Build me a water-intake tracker"
 | `link_analysis` | Video Analyst → Navigator → Extractor → Reasoner → Memory Agent | 0 independent · 5 bundled |
 | `math_solve` | Math Solver → Reasoner → Memory Agent | 0 independent · 3 bundled |
 | `self_check` | Self-Diagnose → Reasoner → Memory Agent → Tool Router → Toolsmith → Agent Builder → Prompt Engineer → Guardrail | 0 independent · 8 bundled |
-| `code_task` | Product Manager → Designer → Engineer → UX Researcher → Accessibility Auditor → Architect → Coder → Runner → Debugger → QA Lead → Reviewer → Critic → Security Officer → Shipper → Reflector → UI Developer → Frontend Engineer → Landing Page Builder → Email Developer | 13 independent · 6 bundled |
+| `code_task` | Product Manager → Designer → Engineer → UX Researcher → Accessibility Auditor → Architect → Coder → Runner → Sandbox Agent → Debugger → QA Lead → Reviewer → Critic → Security Officer → Shipper → Reflector → UI Developer → Frontend Engineer → Landing Page Builder → Email Developer | 13 independent · 7 bundled |
 | `computer_use` | Navigator → Vision Agent → Computer Use Agent → Reasoner → Memory Agent | 0 independent · 5 bundled |
 | `study_topic` | Scholar → Researcher → Historian → Science Explainer → Document Analyst → Memory Agent | 0 independent · 6 bundled |
 | `conversation` | JEXI Core → Context Manager → Archivist | 0 independent · 3 bundled |
@@ -106,6 +106,11 @@ You type:  "Build me a water-intake tracker"
 | `content_creation` | Content Strategist → Blog Writer → SEO Writer → Video Script Writer → Editor → Technical Editor → UX Writer → Copyeditor → White Paper Writer → Case Study Writer → API Docs Writer → Podcaster → Speech Writer → Essayist → Grant Writer → Newsletter Writer → Ad Copywriter → Ghostwriter → Illustrator → Motion Designer → Sound Designer | 0 independent · 21 bundled |
 | `study_exam` | Exam Coach → Study Coach → Teacher → Flashcard Maker → Homework Helper → Grader → Curriculum Designer → Lab Assistant → Research Mentor → Academic Writer → Coding Tutor → Language Coach → Tutor | 0 independent · 13 bundled |
 | `career_plan` | Career Coach → Recruiter → Resume Writer → Interviewer → HR Specialist | 0 independent · 5 bundled |
+| `observability` | Observability Agent → Concurrency Agent → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `offline_mode` | Offline Agent → Reasoner → Memory Agent | 0 independent · 3 bundled |
+| `voice_command` | Voice Orchestrator → Reasoner → Memory Agent | 0 independent · 3 bundled |
+| `plugin_task` | Plugin Manager → Reasoner | 0 independent · 2 bundled |
+| `chaos_test` | Chaos Agent → Orchestrator → Reflector | 1 independent · 2 bundled |
 | `relationship_advice` | Relationship Coach → Counselor → Dating Coach | 0 independent · 3 bundled |
 | `startup_advice` | Startup Advisor → Business Analyst → Pricing Strategist → Investment Analyst | 0 independent · 4 bundled |
 | `productivity` | Task Manager → Scheduler → Note Taker → Email Triage → Meeting Planner → Expense Tracker → Operations Manager → Executive Assistant | 0 independent · 8 bundled |
@@ -116,6 +121,111 @@ You type:  "Build me a water-intake tracker"
 | `game_dev` | Game Developer → Designer → Coder → QA Lead | 3 independent · 1 bundled |
 | `home_life` | Home Organizer → Interior Designer → Event Planner → Gardener → Fashion Stylist → Beauty Advisor → Pet Care Advisor → Parenting Guide | 0 independent · 8 bundled |
 | `legal_task` | Legal Drafter → Negotiator → Legal Guide → Privacy Officer → Compliance Officer | 0 independent · 5 bundled |
+| `domain:mathematics` | Math Solver → Applied Mathematician → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:applied-mathematics` | Applied Mathematician → Math Solver → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:theoretical-mathematics` | Math Solver → Theoretical Computer Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:mathematical-physics` | Physicist → Applied Mathematician → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:statistics` | Statistician → Data Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:probability-theory` | Statistician → Applied Mathematician → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:econometrics` | Economist → Statistician → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:actuarial-science` | Economist → Statistician → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:operations-research` | Applied Mathematician → Industrial Engineer → Data Scientist → Reasoner → Memory Agent | 0 independent · 5 bundled |
+| `domain:decision-science` | Systems Scientist → Cognitive Scientist → Applied Mathematician → Reasoner → Memory Agent | 0 independent · 5 bundled |
+| `domain:computational-mathematics` | Applied Mathematician → Computational Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:computer-science` | Theoretical Computer Scientist → Engineer → Reasoner → Memory Agent | 1 independent · 3 bundled |
+| `domain:artificial-intelligence` | ML Engineer → Systems Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:machine-learning` | ML Engineer → Data Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:computer-vision` | ML Engineer → Vision Agent → Robotics Engineer → Reasoner → Memory Agent | 0 independent · 5 bundled |
+| `domain:nlp` | ML Engineer → Computational Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:software-engineering` | Engineer → Architect → Coder → Reasoner → Memory Agent | 3 independent · 2 bundled |
+| `domain:computer-graphics` | Computer Engineer → Designer → Game Developer → Reasoner → Memory Agent | 1 independent · 4 bundled |
+| `domain:virtual-reality` | Computer Engineer → Designer → Game Developer → Reasoner → Memory Agent | 1 independent · 4 bundled |
+| `domain:game-technology` | Game Developer → Computer Engineer → Designer → Reasoner → Memory Agent | 1 independent · 4 bundled |
+| `domain:internet-of-things` | Electrical Engineer → Electrical Engineer → Computer Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:cloud-computing` | Cloud Engineer → Distributed Systems Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:distributed-systems` | Distributed Systems Engineer → Cloud Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:hpc` | Computational Scientist → Distributed Systems Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:quantum-computing` | Quantum Engineer → Physicist → Computational Scientist → Reasoner → Memory Agent | 0 independent · 5 bundled |
+| `domain:quantum-information` | Quantum Engineer → Theoretical Computer Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:computational-science` | Computational Scientist → Applied Mathematician → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:theoretical-cs` | Theoretical Computer Scientist → Math Solver → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:multi-agent-systems` | Systems Scientist → ML Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:cyber-physical-systems` | Robotics Engineer → Electrical Engineer → Systems Scientist → Reasoner → Memory Agent | 0 independent · 5 bundled |
+| `domain:digital-twin` | Systems Scientist → Computational Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:autonomous-systems` | Robotics Engineer → Systems Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:ai-for-science` | ML Engineer → Computational Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:ai-for-engineering` | ML Engineer → Mechanical Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:ai-for-mathematics` | Applied Mathematician → ML Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:ai-research` | ML Engineer → Deep Tech Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:scientific-machine-learning` | ML Engineer → Computational Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:physics` | Physicist → Reasoner → Memory Agent | 0 independent · 3 bundled |
+| `domain:engineering-physics` | Physicist → Mechanical Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:chemistry` | Chemist → Reasoner → Memory Agent | 0 independent · 3 bundled |
+| `domain:physical-chemistry` | Chemist → Physicist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:materials-science` | Materials Scientist → Chemical Engineer → Mechanical Engineer → Reasoner → Memory Agent | 0 independent · 5 bundled |
+| `domain:nanotechnology` | Materials Scientist → Chemist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:optical-engineering` | Optical Engineer → Physicist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:quantum-engineering` | Quantum Engineer → Electrical Engineer → Physicist → Reasoner → Memory Agent | 0 independent · 5 bundled |
+| `domain:biology` | Biologist → Reasoner → Memory Agent | 0 independent · 3 bundled |
+| `domain:biochemistry` | Biochemist → Chemist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:biophysics` | Biochemist → Physicist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:molecular-biology` | Biochemist → Microbiologist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:microbiology` | Microbiologist → Medical Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:genetics-genomics` | Microbiologist → Computational Biologist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:neuroscience` | Neuroscientist → Cognitive Scientist → Medical Scientist → Reasoner → Memory Agent | 0 independent · 5 bundled |
+| `domain:cognitive-science` | Cognitive Scientist → Neuroscientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:psychology` | Cognitive Scientist → Neuroscientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:computational-biology` | Computational Biologist → Data Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:ecology` | Biologist → Environmental Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:medical-science` | Medical Scientist → Public Health Specialist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:pharmaceutical-science` | Medical Scientist → Chemist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:public-health` | Public Health Specialist → Statistician → Medical Scientist → Reasoner → Memory Agent | 0 independent · 5 bundled |
+| `domain:health-informatics` | Health Tech Engineer → Data Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:biomedical-engineering` | Biomedical Engineer → Medical Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:biotechnology` | Biomedical Engineer → Microbiologist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:computational-medicine` | Medical Scientist → Computational Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:tissue-regenerative` | Biomedical Engineer → Materials Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:neurotechnology` | Neuroscientist → Biomedical Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:electrical-engineering` | Electrical Engineer → Physicist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:electronics-engineering` | Electrical Engineer → Electrical Engineer → Reasoner → Memory Agent | 0 independent · 3 bundled |
+| `domain:computer-engineering` | Computer Engineer → Electrical Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:telecommunications` | Electrical Engineer → Network Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:network-engineering` | Network Engineer → Security Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:mechanical-engineering` | Mechanical Engineer → Engineer → Reasoner → Memory Agent | 1 independent · 3 bundled |
+| `domain:civil-engineering` | Civil Engineer → Mechanical Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:structural-engineering` | Civil Engineer → Mechanical Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:chemical-engineering` | Chemical Engineer → Mechanical Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:aerospace-engineering` | Aerospace Engineer → Mechanical Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:astronautical-engineering` | Aerospace Engineer → Astronomer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:astrophysics` | Astronomer → Physicist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:cosmology` | Astronomer → Physicist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:planetary-science` | Astronomer → Geoscientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:astronomy` | Astronomer → Physicist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:automotive-engineering` | Mechanical Engineer → Electrical Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:industrial-engineering` | Industrial Engineer → Data Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:manufacturing-engineering` | Mechanical Engineer → Industrial Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:systems-engineering` | Systems Scientist → Industrial Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:mechatronics-engineering` | Robotics Engineer → Electrical Engineer → Mechanical Engineer → Reasoner → Memory Agent | 0 independent · 5 bundled |
+| `domain:robotics-engineering` | Robotics Engineer → Computer Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:control-engineering` | Robotics Engineer → Applied Mathematician → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:energy-engineering` | Environmental Scientist → Electrical Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:nuclear-engineering` | Nuclear Engineer → Physicist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:petroleum-engineering` | Petroleum Engineer → Geoscientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:ocean-marine-engineering` | Marine Engineer → Mechanical Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:data-science` | Data Scientist → Statistician → ML Engineer → Reasoner → Memory Agent | 0 independent · 5 bundled |
+| `domain:hci` | Designer → UX Researcher → Cognitive Scientist → Reasoner → Memory Agent | 1 independent · 4 bundled |
+| `domain:augmented-reality` | Game Developer → Computer Engineer → Designer → Reasoner → Memory Agent | 1 independent · 4 bundled |
+| `domain:environmental-engineering` | Environmental Scientist → Civil Engineer → Chemical Engineer → Reasoner → Memory Agent | 0 independent · 5 bundled |
+| `domain:geological-geotechnical` | Civil Engineer → Geoscientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:transportation-engineering` | Civil Engineer → Industrial Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:water-resources-engineering` | Civil Engineer → Environmental Scientist → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:architectural-engineering` | Civil Engineer → Mechanical Engineer → Electrical Engineer → Reasoner → Memory Agent | 0 independent · 5 bundled |
+| `domain:construction-engineering` | Civil Engineer → Industrial Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:agricultural-engineering` | Biologist → Environmental Scientist → Mechanical Engineer → Reasoner → Memory Agent | 0 independent · 5 bundled |
+| `domain:food-engineering` | Biochemist → Chemical Engineer → Reasoner → Memory Agent | 0 independent · 4 bundled |
+| `domain:bioinformatics` | Computational Biologist → Biologist → Data Scientist → Reasoner → Memory Agent | 0 independent · 5 bundled |
+| `domain:synthetic-biology` | Computational Biologist → Biochemist → Biologist → Reasoner → Memory Agent | 0 independent · 5 bundled |
+| `domain:epidemiology` | Public Health Specialist → Statistician → Data Scientist → Reasoner → Memory Agent | 0 independent · 5 bundled |
 
 ---
 ## How execution actually works
@@ -129,7 +239,7 @@ Today's verified independent passes live in the coding pipeline (`code_task`): P
 This section and every table below are GENERATED from the live registries by `cd server && npm run audit-roster` — they cannot drift from the code.
 
 ---
-## The 206 agents (grouped by primary skill category)
+## The 251 agents (grouped by primary skill category)
 
 ### Agent (5)
 | Agent | Tier | What it does |
@@ -140,14 +250,16 @@ This section and every table below are GENERATED from the live registries by `cd
 | **Tool Router** | team | Auto-selects the exact tool set for every task — no manual tool instruction ever needed. |
 | **Toolsmith** | team | Designs new reusable tools and wires external APIs into the tool registry. |
 
-### Business (14)
+### Business (16)
 | Agent | Tier | What it does |
 |---|---|---|
 | **Business Analyst** | team | Requirements, processes and business cases. |
+| **Chemical Engineer** | team | Process engineering, reactors, separations, thermo for industry. |
 | **CRM Specialist** | team | Leads, records and follow-up systems. |
 | **Customer Success Manager** | team | Onboarding, retention and expansion. |
 | **Financial Advisor** | team | Financial planning, retirement, net worth. |
 | **HR Specialist** | team | Hiring, onboarding and people ops. |
+| **Industrial Engineer** | team | Process optimization, operations, logistics, workflow design. |
 | **Investment Analyst** | team | Portfolios, stocks and risk-adjusted returns. |
 | **Market Analyst** | team | Market sizing, demand and competitive analysis. |
 | **Operations Manager** | team | Workflows, processes and execution cadence. |
@@ -158,30 +270,38 @@ This section and every table below are GENERATED from the live registries by `cd
 | **Support Engineer** | team | Diagnoses and resolves user issues fast. |
 | **Tax Advisor** | team | Taxes, deductions and filing strategy. |
 
-### Coding (17)
+### Coding (24)
 | Agent | Tier | What it does |
 |---|---|---|
 | **Architect** | pipeline | Generates project structure and code from the plan. |
 | **Backend Engineer** | team | APIs, routes, middleware, auth, server logic. |
 | **Coder** | pipeline | Writes actual code, fixes debug loops. |
 | **Coding Tutor** | team | Teaches programming step-by-step with examples. |
+| **Computational Biologist** | team | Genomics, proteomics, modeling of biological systems. |
+| **Computational Scientist** | team | Scientific computing, simulation, HPC and numerical methods. |
 | **Database Architect** | team | Schema design, queries, migrations, indexing. |
 | **Debugger** | pipeline | Reads errors and applies fixes until it runs clean. |
+| **Distributed Systems Engineer** | team | Scale-out architectures, consensus, sharding, reliability. |
 | **Engineer** | team | Architecture, build plan, technical approach. |
 | **Frontend Engineer** | team | Component builds, responsive layout, styling. |
+| **Health Tech Engineer** | team | Digital health: EHR, telehealth, devices, health AI. |
 | **Landing Page Builder** | team | Conversion-focused landing pages. |
 | **Performance Engineer** | pipeline | Measures and fixes speed, memory, and bundle issues. |
 | **QA Lead** | pipeline | Runs the app, verifies against spec, PASS/FAIL gate. |
 | **Regex Specialist** | team | Patterns, parsing, text transformations. |
 | **Reviewer** | pipeline | Code review with APPROVED / CHANGES-REQUESTED gate. |
 | **Runner** | pipeline | Executes the code, captures real output and errors. |
+| **Security Engineer** | team | Defensive security: network defense, identity, hardening. |
 | **Security Officer** | pipeline | Security review with CLEARED / FLAGGED gate. |
 | **SQL Analyst** | team | Queries, joins, aggregations, data questions. |
+| **Systems Scientist** | team | Systems thinking, feedback loops, emergence, complex dynamics. |
+| **Theoretical Computer Scientist** | team | Computability, complexity, algorithms, formal methods, proofs. |
 | **UI Developer** | team | Builds pixel-perfect interfaces fast. |
 
-### Core (5)
+### Core (6)
 | Agent | Tier | What it does |
 |---|---|---|
+| **Cognitive Scientist** | team | Cognition, perception, language, learning and decision models. |
 | **JEXI Core** | core | Identity, conversation, and the system prompt every agent inherits. |
 | **Orchestrator** | core | Runs the chosen specialists one-by-one, enforcing strict handoffs and gates. |
 | **Planner** | core | Classifies every request and composes the right team before anything runs. |
@@ -257,23 +377,27 @@ This section and every table below are GENERATED from the live registries by `cd
 | **Lab Assistant** | team | Experiments, lab safety and write-ups. |
 | **Research Mentor** | team | Mentors research projects and papers. |
 
-### Engineering (15)
+### Engineering (19)
 | Agent | Tier | What it does |
 |---|---|---|
 | **Android Engineer** | team | Native Android apps with Kotlin/Jetpack Compose, APK builds. |
 | **API Engineer** | team | REST/GraphQL API design, OpenAPI specs, versioning. |
 | **Auth Engineer** | team | OAuth, JWT, session security and identity flows. |
 | **Backup Engineer** | team | Backup and disaster-recovery plans that actually restore. |
+| **Biomedical Engineer** | team | Medical devices, imaging, prosthetics, biomechanics. |
 | **Cloud Engineer** | team | AWS/GCP/Azure architecture, services and security. |
+| **Computer Engineer** | team | Hardware-software co-design, processors, embedded systems. |
 | **Data Scientist** | team | Modeling, experiments and evaluation on real datasets. |
 | **Database Ops** | team | Postgres/Redis administration, backups, failover. |
 | **DevTools Engineer** | team | CLIs, SDKs and developer tooling. |
+| **Electrical Engineer** | team | Circuits, power systems, electronics, control, signal analysis. |
 | **Game Developer** | team | Games with Unity/Unreal — mechanics, graphics, playtesting. |
 | **iOS Engineer** | team | Native iOS apps with Swift/SwiftUI, App Store packaging. |
 | **Kubernetes Engineer** | team | Clusters, Helm charts and container orchestration. |
 | **ML Engineer** | team | Trains, fine-tunes and serves machine-learning models. |
 | **Mobile Engineer** | team | Cross-platform mobile apps — React Native, Flutter, Capacitor — tested on real devices. |
 | **React Native Engineer** | team | React Native apps with native modules and perf tuning. |
+| **Robotics Engineer** | team | Robots: kinematics, control, perception, navigation, ROS. |
 | **Terraform Engineer** | team | Infrastructure as code with Terraform/OpenTofu. |
 
 ### Knowledge (1)
@@ -281,7 +405,7 @@ This section and every table below are GENERATED from the live registries by `cd
 |---|---|---|
 | **Document Analyst** | pipeline | Chunks uploaded documents and answers from the retrieved passages (RAG). |
 
-### Life (26)
+### Life (28)
 | Agent | Tier | What it does |
 |---|---|---|
 | **Beauty Advisor** | team | Skincare and beauty routines. |
@@ -289,6 +413,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | **Chef** | team | Recipes, techniques and meal ideas. |
 | **Counselor** | team | Empathetic listening and grounded support. |
 | **Dating Coach** | team | Dating profiles and first-date confidence. |
+| **Economist** | team | Micro and macro economics, markets, policy, econometric analysis. |
 | **Event Planner** | team | Events — logistics, budgets, coordination. |
 | **Fashion Stylist** | team | Style, wardrobe and personal image. |
 | **Fitness Trainer** | team | Workout plans, form guidance, progress tracking. |
@@ -305,6 +430,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | **Nutritionist** | team | Meal plans, macros, dietary advice. |
 | **Parenting Guide** | team | Family advice, routines, age-appropriate guidance. |
 | **Pet Care Advisor** | team | Pet care, training and routines. |
+| **Public Health Specialist** | team | Population health, epidemiology, prevention, health policy. |
 | **Relationship Coach** | team | Communication and conflict in relationships. |
 | **Sleep Coach** | team | Sleep routines and recovery. |
 | **Strategy Analyst** | team | Frameworks, SWOT, decision analysis, planning. |
@@ -321,13 +447,34 @@ This section and every table below are GENERATED from the live registries by `cd
 | **Product Marketer** | team | Positioning, messaging and launches. |
 | **SEO Specialist** | team | Ranking strategy and search analytics. |
 
-### Math (4)
+### Math (25)
 | Agent | Tier | What it does |
 |---|---|---|
+| **Aerospace Engineer** | team | Aircraft and spacecraft: aerodynamics, structures, propulsion. |
+| **Applied Mathematician** | team | Numerical analysis, optimization, differential equations, modeling. |
+| **Astronomer** | team | Stars, galaxies, exoplanets, observational and theoretical astro. |
+| **Biochemist** | team | Biomolecules, metabolism, enzymology, molecular mechanisms. |
+| **Biologist** | team | Life science: cells, organisms, evolution, ecosystems. |
+| **Chemist** | team | Chemistry across organic, inorganic, physical and analytical. |
+| **Civil Engineer** | team | Structures, foundations, materials for buildings and infra. |
+| **Environmental Scientist** | team | Ecosystems, pollution, remediation, environmental assessment. |
 | **Finance Analyst** | team | Budgeting, financial calculations, money questions. |
+| **Geoscientist** | team | Earth: geology, geophysics, resources, hazards. |
+| **Marine Engineer** | team | Ships, offshore systems, propulsion, marine structures. |
+| **Materials Scientist** | team | Materials: structure, properties, processing, performance. |
 | **Math Solver** | pipeline | LaTeX-structured math solving with given/formula/working/final. |
+| **Mechanical Engineer** | team | Mechanics, thermofluids, machine design, materials selection. |
+| **Medical Scientist** | team | Medicine, physiology, pharmacology, clinical research. |
+| **Microbiologist** | team | Microbes: bacteriology, virology, immunology, microbial ecology. |
 | **Motion Designer** | team | Animation and motion for interfaces and video. |
+| **Neuroscientist** | team | Nervous system: structure, function, circuits, disorders. |
+| **Nuclear Engineer** | team | Reactors, radiation, nuclear energy, safety, fuel cycle. |
+| **Optical Engineer** | team | Optics, photonics, lenses, lasers, imaging systems. |
+| **Petroleum Engineer** | team | Reservoirs, drilling, production, subsurface engineering. |
+| **Physicist** | team | Physics from classical mechanics to quantum field theory. |
+| **Quantum Engineer** | team | Quantum devices, qubits, error correction, quantum hardware stacks. |
 | **Science Explainer** | team | Physics, chemistry, biology — accurate, visual explanations. |
+| **Statistician** | team | Experimental design, inference, distributions, hypothesis testing. |
 
 ### Media (1)
 | Agent | Tier | What it does |
@@ -355,6 +502,17 @@ This section and every table below are GENERATED from the live registries by `cd
 | **Navigator** | pipeline | Drives the browser — navigate, click, type, scroll. |
 | **Vision Agent** | pipeline | Image analysis — describe, read text, solve from photos. |
 
+### Platform (7)
+| Agent | Tier | What it does |
+|---|---|---|
+| **Chaos Agent** | team | Injects controlled failures (provider timeouts, tool errors, memory pressure) during test runs to harden the system. |
+| **Concurrency Agent** | team | Multi-user / multi-workspace isolation, locking, and concurrent memory access without bleed between sessions. |
+| **Observability Agent** | team | Streams structured traces, latency, token usage, gate results and provider health for every task. |
+| **Offline Agent** | team | Detects cloud-provider unavailability and routes suitable tasks to a local LLM backend (Ollama / llama.cpp). |
+| **Plugin Manager** | team | Discovers, validates and loads external skill/tool packages at runtime; keeps a versioned registry. |
+| **Sandbox Agent** | team | Creates and runs isolated execution workspaces with strict CPU/memory/network limits and timeouts. |
+| **Voice Orchestrator** | team | Owns the full speech pipeline: streaming STT, barge-in, interruption handling, TTS selection, wake-word readiness. |
+
 ### Product (1)
 | Agent | Tier | What it does |
 |---|---|---|
@@ -376,10 +534,11 @@ This section and every table below are GENERATED from the live registries by `cd
 |---|---|---|
 | **Critic** | pipeline | MetaGPT-style strict critique of plans and outputs — the quality gate before anything ships. |
 
-### Research (10)
+### Research (11)
 | Agent | Tier | What it does |
 |---|---|---|
 | **Books Agent** | pipeline | Answers strictly from the user's own books and library with citations. |
+| **Deep Tech Scientist** | team | Frontier R and D: physics, materials, chemistry, biotech moonshots. |
 | **Extractor** | pipeline | Deep-reads pages and pulls out the real content. |
 | **Fact Checker** | pipeline | Verifies claims against sources before an answer ships. |
 | **Query Analyzer** | pipeline | Splits a research question into precise search queries. |
@@ -393,7 +552,7 @@ This section and every table below are GENERATED from the live registries by `cd
 ### Safety (1)
 | Agent | Tier | What it does |
 |---|---|---|
-| **Guardrail** | team | Input/output safety: declines unsafe or destructive requests with a clear reason. |
+| **Guardrail** | team | Input/output safety: declines unsafe or destructive requests with a clear reason; continuous prompt-injection, jailbreak and tool-abuse detection with safe-mode enforcement. |
 
 ### Security (10)
 | Agent | Tier | What it does |
@@ -442,7 +601,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | **White Paper Writer** | team | Long-form authority documents. |
 
 
-## The 492 skills (grouped by category)
+## The 507 skills (grouped by category)
 
 ### Agent (14)
 | Skill | Owner agent | What it does |
@@ -690,7 +849,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `standards` | Curriculum Designer | Learning standards. |
 | `test-prep` | Exam Coach | Test strategy. |
 
-### Engineering (37)
+### Engineering (40)
 | Skill | Owner agent | What it does |
 |---|---|---|
 | `android` | Android Engineer | Native Android development. |
@@ -702,6 +861,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `cloud` | Cloud Engineer | Cloud platforms and services. |
 | `containers` | Kubernetes Engineer | Docker and container runtimes. |
 | `database` | Database Ops | Database design and ops. |
+| `embedded` | Electrical Engineer | Embedded software, firmware, and microcontroller systems. |
 | `embeddings` | ML Engineer | Vector representations and search. |
 | `evaluation` | Data Scientist | Benchmarks and quality metrics. |
 | `fine-tuning` | ML Engineer | Adapt pretrained models. |
@@ -710,9 +870,11 @@ This section and every table below are GENERATED from the live registries by `cd
 | `gcp` | Cloud Engineer | Google Cloud services. |
 | `graphics` | Game Developer | Rendering, shaders, animation. |
 | `graphql` | API Engineer | GraphQL APIs. |
+| `hardware` | Electrical Engineer | PCB, firmware, electronics, and embedded systems design. |
 | `helm` | Kubernetes Engineer | Kubernetes packaging. |
 | `iac` | Terraform Engineer | Infrastructure automation. |
 | `ios` | iOS Engineer | Native iPhone/iPad development. |
+| `iot` | Electrical Engineer | Internet of Things: sensors, connectivity, edge devices, and device clouds. |
 | `kotlin` | Android Engineer | Kotlin and Jetpack Compose. |
 | `kubernetes` | Kubernetes Engineer | Container orchestration. |
 | `ml` | ML Engineer | Model design and training. |
@@ -879,6 +1041,22 @@ This section and every table below are GENERATED from the live registries by `cd
 | `typing` | Computer Use Agent | Type into inputs. |
 | `vision` | Vision Agent | Understand images. |
 
+### Platform (12)
+| Skill | Owner agent | What it does |
+|---|---|---|
+| `chaos-injection` | Chaos Agent | Inject controlled failures to harden the system (test-only). |
+| `local-llm-routing` | Offline Agent | Route to Ollama / llama.cpp when cloud providers are down. |
+| `metrics-aggregation` | Observability Agent | Aggregate counters and gauges per task and provider. |
+| `plugin-discovery` | Plugin Manager | Discover, validate and load external skill/tool packages. |
+| `prompt-injection-detection` | Guardrail | Detect prompt injection, jailbreak and tool-abuse attempts. |
+| `provider-health-scoring` | Observability Agent | Score provider availability from real call outcomes. |
+| `safe-mode-enforcement` | Guardrail | Force read-only tools or abort a risky task with a clear reason. |
+| `sandbox-lifecycle` | Sandbox Agent | Create, run, tear down and snapshot isolated workspaces. |
+| `streaming-stt-tts` | Voice Orchestrator | Streaming speech-to-text, TTS selection, barge-in and wake-word. |
+| `structured-tracing` | Observability Agent | OpenTelemetry-style trace spans with latency and status. |
+| `workspace-isolation` | Concurrency Agent | Lock and isolate concurrent sessions so memory never bleeds. |
+| `workspace-snapshot` | Sandbox Agent | Capture a workspace state for rollback or reuse. |
+
 ### Product (3)
 | Skill | Owner agent | What it does |
 |---|---|---|
@@ -1041,7 +1219,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 152 tools (grouped by type)
+## The 175 tools (grouped by type)
 
 ### Browser (6)
 | Tool | Allowed agents | Engine | What it does |
@@ -1066,6 +1244,18 @@ This section and every table below are GENERATED from the live registries by `cd
 | `pricing-model` | Pricing Strategist, Financial Advisor, Market Analyst | DataAgent | Build pricing tiers and revenue models. |
 | `sales-outreach` | Sales Representative, Email Composer, CRM Specialist | SkillChain | Write outreach sequences that get replies. |
 | `support-ticket` | Support Engineer, Customer Success Manager | SkillChain | Draft support replies and resolutions. |
+
+### Chaos (1)
+| Tool | Allowed agents | Engine | What it does |
+|---|---|---|---|
+| `inject_failure` | Chaos Agent | ChaosAgent | Inject a controlled failure (provider timeout, tool error) — only when the chaos flag is on. |
+
+### Concurrency (3)
+| Tool | Allowed agents | Engine | What it does |
+|---|---|---|---|
+| `acquire_lock` | Concurrency Agent, Memory Agent | ConcurrencyAgent | Take a named lock so concurrent sessions cannot write the same memory. |
+| `get_workspace_id` | Concurrency Agent, Memory Agent | ConcurrencyAgent | Return the current session/workspace ID for isolation checks. |
+| `release_lock` | Concurrency Agent, Memory Agent | ConcurrencyAgent | Release a previously acquired named lock. |
 
 ### Creative (6)
 | Tool | Allowed agents | Engine | What it does |
@@ -1139,6 +1329,12 @@ This section and every table below are GENERATED from the live registries by `cd
 | `code-run` | Runner, Debugger, Coder, QA Lead | Runner | Execute generated code and capture real stdout and errors. |
 | `code-write` | Architect, Coder, Technical Writer, Shipper, Backend Engineer, Frontend Engineer | Architect | Generate and write project files into the workspace. |
 
+### Guardrail (2)
+| Tool | Allowed agents | Engine | What it does |
+|---|---|---|---|
+| `force_safe_mode` | Guardrail, Security Officer | GuardrailAgent | Restrict the task to read-only tools or abort with a clear explanation. |
+| `scan_prompt_safety` | Guardrail, Security Officer | GuardrailAgent | Scan a prompt for injection, jailbreak or tool-abuse attempts. |
+
 ### Knowledge (6)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
@@ -1208,12 +1404,33 @@ This section and every table below are GENERATED from the live registries by `cd
 | `study-notes` | Study Coach, Researcher, Teacher | MemoryManager | Create structured study notes saved to the knowledge library. |
 | `vector-embed` | Memory Agent, Document Analyst | LLMClient | Embed a memory so semantic recall can find it. |
 
+### Observability (3)
+| Tool | Allowed agents | Engine | What it does |
+|---|---|---|---|
+| `emit_metric` | Observability Agent | ObservabilityAgent | Record a counter or gauge (latency, tokens, gate results) into the metrics store. |
+| `end_trace` | Observability Agent | ObservabilityAgent | Close a trace span, recording duration and success/failure. |
+| `start_trace` | Observability Agent | ObservabilityAgent | Open an OpenTelemetry-style trace span for a task with latency and status tracking. |
+
+### Offline (3)
+| Tool | Allowed agents | Engine | What it does |
+|---|---|---|---|
+| `list_local_models` | Offline Agent | OfflineAgent | List models available on the local LLM backend. |
+| `query_local_llm` | Offline Agent | OfflineAgent | Ask a local LLM backend (Ollama / llama.cpp) for an answer. |
+| `warmup_model` | Offline Agent | OfflineAgent | Pre-load a local model so later queries are fast. |
+
 ### Perception (3)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
 | `audio-transcribe` | Podcaster, Reporter, Document Analyst | LLMClient | Transcribe spoken audio to text. |
 | `ocr-read` | Vision Agent | Gemini vision | Extract text from an image or screenshot. |
 | `vision-analyze` | Vision Agent | Gemini/Groq vision | Analyze images: describe, OCR text, and solve what is shown. |
+
+### Plugin (3)
+| Tool | Allowed agents | Engine | What it does |
+|---|---|---|---|
+| `list_plugins` | Plugin Manager | PluginAgent | List loaded plugins with their versions and capabilities. |
+| `load_plugin` | Plugin Manager | PluginAgent | Validate and load an external skill/tool plugin package. |
+| `unload_plugin` | Plugin Manager | PluginAgent | Unload a plugin and remove its tools from the registry. |
 
 ### Productivity (6)
 | Tool | Allowed agents | Engine | What it does |
@@ -1250,6 +1467,14 @@ This section and every table below are GENERATED from the live registries by `cd
 | `trusted-library` | Scholar, Researcher, News Scout | TrustedLibrary | Read free, trusted books, papers and overviews (Wikipedia, Gutenberg, arXiv, Open Library). |
 | `wikipedia-lookup` | Scholar, Searcher, Researcher | SearchEngine | Pull the trusted overview for any topic. |
 
+### Sandbox (4)
+| Tool | Allowed agents | Engine | What it does |
+|---|---|---|---|
+| `create_sandbox` | Sandbox Agent, Runner | SandboxAgent | Create an isolated execution workspace with CPU/memory/timeout limits. |
+| `destroy_sandbox` | Sandbox Agent, Runner | SandboxAgent | Tear down a sandbox workspace and release its resources. |
+| `run_in_sandbox` | Sandbox Agent, Runner | SandboxAgent | Execute a command inside an isolated workspace with strict limits. |
+| `snapshot_workspace` | Sandbox Agent | SandboxAgent | Capture a workspace state for rollback or reuse. |
+
 ### Search (1)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
@@ -1272,6 +1497,14 @@ This section and every table below are GENERATED from the live registries by `cd
 |---|---|---|---|
 | `self-diagnose` | Self-Diagnose | SelfMonitor | Read own health, memory, errors and source code to report root causes. |
 | `settings` | JEXI Core, Context Manager | SettingsManager | Read and update JEXI's settings and provider keys. |
+
+### Voice (4)
+| Tool | Allowed agents | Engine | What it does |
+|---|---|---|---|
+| `listen` | Voice Orchestrator | VoiceAgent | Capture the next utterance and transcribe it. |
+| `speak` | Voice Orchestrator | VoiceAgent | Synthesize and play TTS audio for a message. |
+| `start_voice_stream` | Voice Orchestrator | VoiceAgent | Begin a streaming speech-to-text session with barge-in enabled. |
+| `stop_voice_stream` | Voice Orchestrator | VoiceAgent | End the active speech stream cleanly. |
 
 ### Writing (10)
 | Tool | Allowed agents | Engine | What it does |

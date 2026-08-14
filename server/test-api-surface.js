@@ -90,7 +90,7 @@ const probes = [
   ['write a python script to parse csv files', 'code_task'],
   ['what is the latest news about ai', 'news_latest'],
   ['analyze this dataset: rows=[1,2,3]', 'data'],
-  ['help me understand quantum entanglement', 'learning_research'],
+  ['help me understand quantum entanglement', 'domain:quantum-computing'],
   ['hello, how are you?', 'conversation'],
 ];
 let planMisses = 0;

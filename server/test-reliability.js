@@ -60,7 +60,8 @@ check('every tool agent exists in roster', badToolAgents === 0);
 // Include: sandbox ONLY for code tasks.
 const codeTeam = composeTeam('code_task');
 check('code_task team includes Sandbox Agent', codeTeam.some((a) => a.slug === 'sandbox'));
-check('code_task team stays small (≤15)', codeTeam.length <= 15);
+// 20 = 19 B49 coding specialists + sandbox (round 6) — still ≪ the 251-agent catalog.
+check('code_task team stays small (≤22)', codeTeam.length <= 22);
 const researchTeam = composeTeam('research');
 check('research team does NOT include Sandbox Agent', !researchTeam.some((a) => a.slug === 'sandbox'));
 check('conversation team does NOT include Sandbox/Chaos', !composeTeam('conversation').some((a) => a.slug === 'sandbox' || a.slug === 'chaos-agent'));
