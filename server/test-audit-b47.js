@@ -267,14 +267,17 @@ const ok = (cond, label) => { console.log(`${cond ? '✅' : '❌'} ${label}`); i
   ok(runs === 3 && out.responded === true, 'P8: a node can re-enter itself (retry) up to its budget, then proceed');
 }
 
-// ask_user: the github node pauses for approval through the real graph.
+// B54 P4/P5 — autonomy by default: github actions the user EXPLICITLY asked
+// for run directly (no per-step sign-off). The SINGLE checkpoint fires only
+// for irreversible actions (money / destructive repo ops) — one confirmation
+// right before commit, never per-step.
 {
   const { saveSettings } = await import('./src/services/SettingsManager.js');
-  saveSettings({ githubToken: 'fake-token-for-audit-test' }); // auth passes → confirm fires
+  saveSettings({ githubToken: 'fake-token-for-audit-test' }); // auth passes
   const graph = orchestrator.buildGraph();
   const results = { success: true, query: '', intent: 'github', tasks: [], steps: [], agentResults: {}, summary: '', sources: [], statistics: { executionTime: 0, agentsUsed: 0, confidence: 0 } };
-  const state = {
-    query: 'create a pull request', plan: { intent: 'github' }, resolvedQuery: '', memoryLoadout: {},
+  const mkState = (query) => ({
+    query, plan: { intent: 'github' }, resolvedQuery: '', memoryLoadout: {},
     intermediateResults: {}, currentNode: '', status: 'running', retryCount: 0, lastError: null, outcome: null,
     needsConfirmation: false, confirmationPayload: null, history: [], agentResult: null,
     context: {
@@ -283,10 +286,20 @@ const ok = (cond, label) => { console.log(`${cond ? '✅' : '❌'} ${label}`); i
       // wrapCase reads — mirror that exactly here.
       opts: (() => { const o = {}; o.confirm = async (payload) => { o._pendingConfirmation = payload; return 'paused'; }; return o; })(),
     },
-  };
-  const out = await graph.run({ ...state, startNode: 'contextResolve' });
-  ok(out.needsConfirmation === true && out.status === 'paused' && out.confirmationPayload?.risk === 'high',
-    'P8: ask_user routes to confirmationPause with a structured payload (github mutating action)');
+  });
+
+  // Case A — explicitly requested, reversible: runs directly, no confirmation.
+  const outA = await graph.run({ ...mkState('check my github connection'), startNode: 'contextResolve' });
+  ok(outA.needsConfirmation === false && outA.status !== 'paused',
+    'B54 P4: an explicitly requested, reversible github action runs directly — no per-step sign-off');
+
+  // Case B — irreversible (destructive repo op): ONE checkpoint with risk 'irreversible'.
+  // "force push to main" parses to a mutating action (push) AND matches the
+  // irreversible regex (force-push rewriting remote history) — the only path
+  // that must still pause, exactly once.
+  const outB = await graph.run({ ...mkState('force push to main'), startNode: 'contextResolve' });
+  ok(outB.needsConfirmation === true && outB.status === 'paused' && outB.confirmationPayload?.risk === 'irreversible',
+    'B54 P5: irreversible actions pause once with risk=irreversible (single checkpoint, never per-step)');
   saveSettings({ githubToken: '' });
 }
 

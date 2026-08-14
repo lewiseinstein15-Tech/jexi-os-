@@ -1042,7 +1042,11 @@ app.post('/api/chat', async (req, res) => {
       // B53 P3 — the planner sees whether an active product task exists so
       // add/change/update/fix language routes to code modify, never research.
       plan = await planner.analyzeIntent(effectiveQuery, { image, memoryContext: plannerMemory, activeTaskId: currentTaskId || null });
-      saveOffer(convId, effectiveQuery);
+      // B54 P1 — an offer is ONLY created when a run genuinely pauses for
+      // confirmation (the onPause callback below). Never on every turn: that
+      // made trivial acknowledgments ("ok", "sure", "please", "fine") re-plan
+      // and re-execute the previous task, and re-ask for information already
+      // given earlier in the conversation.
 
       // BUILD 47 — apply the decision: create or re-activate the task.
       const applied = applyDecision(decision, {
@@ -1133,6 +1137,10 @@ app.post('/api/chat', async (req, res) => {
       // later "yes" resumes at the exact paused node, prior results intact.
       onPause: async (pausedState) => {
         saveRun(convId, { plan, query: executionQuery || effectiveQuery, state: pausedState });
+        // B54 P1 — the pending offer is created HERE (only for real pauses),
+        // so "yes" resumes the actual paused action and nothing else can
+        // re-trigger a previous task.
+        saveOffer(convId, executionQuery || effectiveQuery);
       },
     });
 
@@ -1170,7 +1178,9 @@ app.post('/api/chat', async (req, res) => {
         completedSteps: plan.steps || [],
         result: finalSummary.slice(0, 2000),
         filesChanged: results.files || [],
-        verified: true,
+        // B54 P6 — a task is only "verified" when the code actually ran clean;
+        // best-effort builds that never passed the success predicate stay honest.
+        verified: results.success === true && results.statistics?.runClean !== false,
       });
     }
     // BUILD 47 — MEMORY WRITE POLICY: only substantive user requirements /

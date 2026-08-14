@@ -13,7 +13,7 @@
  * verified facts get stored. Deterministic and cheap; no extra LLM call.
  */
 
-import { createTask, getTask, updateTask, taskContextBlock } from './TaskRegistry.js';
+import { createTask, getTask, updateTask, taskContextBlock, listTasks } from './TaskRegistry.js';
 import { retrieveDecisions, recordDecision, findConflict } from './DecisionMemory.js';
 
 /** Decide what to do with a message. Returns { action, taskId, executionQuery, contextBlock, clarification, metadata }. */
@@ -24,11 +24,30 @@ export function decide({ raw, classification, taskId = null, candidates = [], cu
   const reason = typeof classification === 'string' ? '' : classification?.reason || '';
   const confidence = typeof classification === 'string' ? 0 : classification?.confidence || 0;
 
-  // Clarify: never guess on ambiguous references.
+  // Clarify — B54 P2: only a true last resort. The Conversation Manager now
+  // defaults ambiguous references to the most recent task, so this branch is
+  // reachable only when NO usable state exists anywhere — and even then it
+  // lists the real candidate tasks instead of asking an empty question.
   if (cls === 'clarify') {
     const options = (candidates || []).length
       ? candidates
       : listTaskOptions(currentTaskId);
+    if (options && options.length) {
+      // There IS known state — default to the most recent task and keep
+      // moving, never stall on a question the state can answer.
+      const ranked = [...options].sort((a, b) => (b.at || 0) - (a.at || 0));
+      const top = ranked[0];
+      if (top && top.id && getTask(top.id)) {
+        const t = getTask(top.id);
+        return {
+          action: 'execute',
+          taskId: t.id,
+          executionQuery: raw,
+          contextBlock: taskContextBlock(t),
+          metadata: { classification: cls === 'continue' ? 'continue' : 'switch', confidence, reason: `${reason} — defaulted to the most recent task (${t.title})` },
+        };
+      }
+    }
     return {
       action: 'clarify',
       taskId: null,
@@ -89,10 +108,20 @@ function newTaskDecision(raw, resolvedQuery) {
   };
 }
 
+/** B54 P2 — real candidate tasks for a (now rare) defensive clarify: the
+ * most-recently-active tasks, so the question is never an empty prompt.
+ * The Conversation Manager already defaults ambiguous references instead of
+ * asking, so this branch only fires when there is genuinely no signal at all. */
 function listTaskOptions(currentTaskId) {
-  // lazy import to avoid cycles
-  return [];
+  try {
+    return listTasks()
+      .slice(0, 4)
+      .map((t) => ({ id: t.id, title: t.title, status: t.status, at: t.lastActivity }));
+  } catch (e) {
+    return [];
+  }
 }
+
 
 /** Apply the decision: create/activate tasks, record decisions, return the task. */
 export function applyDecision(decision, { title, objective, plan = [], entities = [] }) {

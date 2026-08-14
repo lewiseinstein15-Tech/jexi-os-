@@ -616,32 +616,34 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
     });
 
     N.research = this.wrapCase('research', async ({ results, sendEvent, query, plan }) => {
-      // 1. The user's own books/library come FIRST — grounded answers from their materials
-      try {
-        const fromBooks = await recallKnowledge(query, sendEvent, 1);
-        if (fromBooks) {
-          sendEvent('log', { agent: 'Books', message: '📚 Found it in your books / knowledge library — answering from there.' });
-          const summary = await this.answerFromKnowledge(fromBooks, query);
-          try { addChat('jexi', summary); } catch (e) {}
-          results.summary = summary;
-          results.sources = fromBooks.map(k => ({ title: k.title, link: '' }));
-          results.statistics.confidence = 95;
-          return results;
-        }
-      } catch (e) {}
+      // B54 P3 — the two independent knowledge probes (books/library recall and
+      // the semantic-memory check) run CONCURRENTLY, not one-after-the-other:
+      // both are read-only lookups and either one can short-circuit the search.
+      const [fromBooks, remembered] = await Promise.all([
+        recallKnowledge(query, sendEvent, 1).catch(() => null),
+        searchInternetKnowledge(query).catch(() => null),
+      ]);
 
-      // 2. Check memory first — did we already learn this?
-      try {
-        const remembered = await searchInternetKnowledge(query);
-        if (remembered) {
-          sendEvent('log', { agent: 'Memory Agent', message: '✓ Found this in my memory — serving it directly.' });
-          // B51 P1 — no "FROM MEMORY" header; just the answer.
-          results.summary = remembered.answer;
-          if (remembered.sources?.length) results.sources = remembered.sources.map(s => ({ title: s, link: s }));
-          results.statistics.confidence = 92;
-          return results;
-        }
-      } catch (e) {}
+      // 1. The user's own books/library come FIRST — grounded answers from their materials
+      if (fromBooks) {
+        sendEvent('log', { agent: 'Books', message: '📚 Found it in your books / knowledge library — answering from there.' });
+        const summary = await this.answerFromKnowledge(fromBooks, query);
+        try { addChat('jexi', summary); } catch (e) {}
+        results.summary = summary;
+        results.sources = fromBooks.map(k => ({ title: k.title, link: '' }));
+        results.statistics.confidence = 95;
+        return results;
+      }
+
+      // 2. Check memory — did we already learn this?
+      if (remembered) {
+        sendEvent('log', { agent: 'Memory Agent', message: '✓ Found this in my memory — serving it directly.' });
+        // B51 P1 — no "FROM MEMORY" header; just the answer.
+        results.summary = remembered.answer;
+        if (remembered.sources?.length) results.sources = remembered.sources.map(s => ({ title: s, link: s }));
+        results.statistics.confidence = 92;
+        return results;
+      }
 
       // 3. Search the internet with the specialist Search Team
       //    (Query Analyzer → Searcher → Re-ranker → Extractor → Synthesizer).
@@ -806,17 +808,24 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
           return results;
         }
 
-        // BUILD 47 — CONFIRMATION-RESUME (P5): mutating git actions pause for
-        // approval when a confirm callback is provided (session-scoped).
-        if (opts.confirm) {
+        // B54 P4/P5 — autonomy by default: the user EXPLICITLY asked for this
+        // action, so it runs directly (no per-step sign-off). The SINGLE
+        // checkpoint is reserved for irreversible actions — money moving or
+        // destructive repo operations (delete, force push to main) — where
+        // JEXI presents the finalized plan and requires ONE confirmation
+        // right before the action, never per-step.
+        const IRREVERSIBLE_RE = /\b(pay|payment|buy|purchase|order|subscribe|checkout|deposit|withdraw|transfer|wire|send money|donate|refund)\b|\$\s?\d[\d,.]*|\b\d+(?:k|m|b)?\s?(?:usd|dollars?|euros?|pounds?)\b|\b(delete|destroy|wipe|erase|drop|force ?push)\b[\s\S]{0,60}\b(repo(?:sitory)?|database|account|branch|main|production|prod)\b|\b(repo(?:sitory)?|database|account|branch|main)\b[\s\S]{0,60}\b(delete|destroy|wipe|erase|drop)\b/i;
+        if (opts.confirm && IRREVERSIBLE_RE.test(query)) {
           const decision = await opts.confirm({
-            risk: 'high',
+            risk: 'irreversible',
             node: 'github',
             action: req.action,
-            question: `I'm about to **${req.action}** on your GitHub repository. OK to proceed?`,
+            question: `This is an **irreversible** action (money or permanently destructive). Plan: I will run \`${req.action}\` on your GitHub repository${req.action === 'push' ? ' — rewriting remote branch history' : ''}. Say **yes** to proceed exactly as planned, or **no** to cancel.`,
           });
           if (decision === false) {
-            results.summary = `### 🔗 GITHUB AGENT\n\n👍 Cancelled — I won't ${req.action}. Tell me if you change your mind.`;
+            results.summary = `### 🔗 GITHUB AGENT
+
+👍 Cancelled — I won't ${req.action}. Tell me if you change your mind.`;
             results.statistics.confidence = 100;
             return results;
           }
@@ -1153,18 +1162,23 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
     // so no gate is bundled into another node's prompt: every verdict is an
     // independently observable turn with its own outcome.
     N.codeReview = async (state) => {
+      // B54 P3 — Reviewer and Security Officer are INDEPENDENT read-only passes
+      // over the same files, so they run CONCURRENTLY (GraphRunner runParallel
+      // pattern) instead of back-to-back; each still logs its own verdict. The
+      // security verdict is ready for the shipper without an extra serial pass.
       const { sendEvent } = state.context;
       const c = state.context.code;
       if (c.done) return state;
-      try {
-        const r = await runReviewerPass({ query: c.effQuery, plan: c.teamPlan, files: listWorkspaceFiles(), qaReport: c.qaReport, sendEvent });
-        c.reviewNotes = r.review;
-        c.reviewVerdict = r.verdict;
-        sendEvent('log', { agent: 'Reviewer', message: `🔍 Review verdict: ${r.verdict}` });
-      } catch (e) {
-        sendEvent('log', { agent: 'Reviewer', message: `⚠ Review pass issue: ${e.message}` });
-      }
-      return state; // edge → securityGate
+      const files = listWorkspaceFiles();
+      const [r, s] = await Promise.all([
+        runReviewerPass({ query: c.effQuery, plan: c.teamPlan, files, qaReport: c.qaReport, sendEvent })
+          .catch((e) => { sendEvent('log', { agent: 'Reviewer', message: `⚠ Review pass issue: ${e.message}` }); return null; }),
+        runSecurityPass({ files, qaReport: c.qaReport, sendEvent })
+          .catch((e) => { sendEvent('log', { agent: 'Security Officer', message: `⚠ Security pass issue: ${e.message}` }); return null; }),
+      ]);
+      if (r) { c.reviewNotes = r.review; c.reviewVerdict = r.verdict; sendEvent('log', { agent: 'Reviewer', message: `🔍 Review verdict: ${r.verdict}` }); }
+      if (s) { c.securityNotes = s.security; c.secVerdict = s.verdict; sendEvent('log', { agent: 'Security Officer', message: `🛡 Security verdict: ${s.verdict}` }); }
+      return state; // edge → securityGate (pass-through — verdict already computed)
     };
 
     N.securityGate = async (state) => {
@@ -1172,23 +1186,34 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
       const c = state.context.code;
       if (c.done) return state;
       try {
-        // B52 P2 — the review + security gate path is a REAL GraphRunner run:
-        // reviewer → security-gate → (BLOCKED → fix → re-run → re-review,
-        // bounded) → final verdict. History + failure history are recorded.
-        const g = await runReviewSecurityGraph({
-          query: c.effQuery,
-          entryPoint: c.entryPoint,
-          teamPlan: c.teamPlan || '',
-          qaReport: c.qaReport || '',
-          files: listWorkspaceFiles(),
-          sendEvent,
-        }).catch((e) => null);
-        if (g && g.context && g.context.reviewSecurity) {
-          c.reviewNotes = g.context.reviewSecurity.review || c.reviewNotes;
-          c.securityNotes = g.context.reviewSecurity.security;
-          c.secVerdict = g.context.reviewSecurity.verdict;
-          state.context.failureHistory = (state.context.failureHistory || []).concat(g.context.failureHistory || []).slice(-8);
-          sendEvent('log', { agent: 'GraphRunner', message: `reviewSecurityGraph visited: ${(g.history || []).join(' → ')} (verdict ${c.secVerdict})` });
+        // B54 P3 — the security verdict was already computed in PARALLEL with
+        // the review pass (codeReview). Only a BLOCKED verdict needs the
+        // B52 P2 graph fix round: reviewer (reuses the parallel review) →
+        // security-gate → (BLOCKED → fix → re-run → re-review, bounded).
+        if (c.secVerdict === 'BLOCKED' && !c.secFixRounds) {
+          c.secFixRounds = 1;
+          const g = await runReviewSecurityGraph({
+            query: c.effQuery,
+            entryPoint: c.entryPoint,
+            teamPlan: c.teamPlan || '',
+            qaReport: c.qaReport || '',
+            files: listWorkspaceFiles(),
+            sendEvent,
+            // Reviewer result comes from the parallel pass — never re-run it.
+            reviewFn: () => ({ review: c.reviewNotes || '', verdict: c.reviewVerdict || 'APPROVED' }),
+          }).catch((e) => null);
+          if (g && g.context && g.context.reviewSecurity) {
+            c.reviewNotes = g.context.reviewSecurity.review || c.reviewNotes;
+            c.securityNotes = g.context.reviewSecurity.security;
+            c.secVerdict = g.context.reviewSecurity.verdict;
+            state.context.failureHistory = (state.context.failureHistory || []).concat(g.context.failureHistory || []).slice(-8);
+            sendEvent('log', { agent: 'GraphRunner', message: `reviewSecurityGraph visited: ${(g.history || []).join(' → ')} (verdict ${c.secVerdict})` });
+          }
+        } else if (!c.secVerdict) {
+          // Non-standard path (no parallel pass ran) — run the security pass once.
+          const s = await runSecurityPass({ files: listWorkspaceFiles(), qaReport: c.qaReport || '', review: c.reviewNotes, sendEvent }).catch(() => null) || { security: '', verdict: 'CLEARED' };
+          c.securityNotes = s.security;
+          c.secVerdict = s.verdict;
         }
         sendEvent('log', { agent: 'Security Officer', message: `🛡 Security verdict: ${c.secVerdict}` });
       } catch (e) {
@@ -1234,18 +1259,27 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
             // B53 P4 — PRODUCT-FIRST final message (mandatory template): short status
       // line → preview link → file list → one-line test result. NO agent roster
       // play-by-play, NO QA/review/security/reflection essays, NO inline dumps.
+      // B54 P6 — `files` is the REAL list of workspace files written this run
+      // (this was previously an undefined reference that crashed the shipper
+      // and turned every finished build into an error message).
+      const files = listWorkspaceFiles();
       const linkBase = PUBLIC_URL || MANAGER_URL;
       const workspaceLinks = files.map(name => `- [${name}](${linkBase}/api/files/${name})`).join('\n');
       const previewLine = c.previewUrl
         ? `**🔗 Live preview:** [Open ${c.entryPoint}](${c.previewUrl})`
         : '';
+      // B54 P6 — honest status: if the success predicate NEVER passed, say so
+      // with the real attempt count + last observed error. Never claim a clean
+      // run (or even "Built.") for code that did not run clean.
       const statusLine = c.runSuccess
         ? '✓ Runs clean.'
-        : c.secVerdict === 'BLOCKED'
-          ? '⚠ Built, but the security review flagged issues to fix before relying on it.'
-          : c.qaVerdict === 'NEEDS FIX'
-            ? '⚠ Built and runs, but QA flagged issues to polish.'
-            : '✓ Built.';
+        : !c.runSuccess && c.debugAttempts >= MAX_DEBUG_ATTEMPTS
+          ? `⚠ Built, but the code did not run clean after ${c.debugAttempts} attempts — the last output was: ${String(c.lastOutput || '').slice(0, 180)}`
+          : c.secVerdict === 'BLOCKED'
+            ? '⚠ Built, but the security review flagged issues to fix before relying on it.'
+            : c.qaVerdict === 'NEEDS FIX'
+              ? '⚠ Built and runs, but QA flagged issues to polish.'
+              : '⚠ Built, but not verified to run clean — check the log above.';
       const gateNote = c.secVerdict === 'BLOCKED'
         ? '\n\n> Ask me to fix the security findings and re-ship.'
         : c.qaVerdict === 'NEEDS FIX'
@@ -1268,14 +1302,20 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
       results.summary = finalized.summary;
       results.files = files;
       results.previewUrl = c.previewUrl || undefined;
-      results.statistics.confidence = 100;
+      // B54 P6 — report the REAL run outcome to callers (index.js marks the
+      // task verified only when runClean is true).
+      results.statistics.runClean = c.runSuccess;
+      results.statistics.attempts = c.debugAttempts;
+      results.statistics.confidence = c.runSuccess ? 100 : 60;
 
       // B53 P6 — durable checkpoint at the terminal node (shipped).
       try {
         if (state.context.opts?.taskId) setTaskCheckpoint(state.context.opts.taskId, {
           node: 'shipper',
           attempt: c.debugAttempts,
-          lastError: null,
+          // B54 P6 — an unclean build records the real last error at the terminal
+          // checkpoint instead of pretending the run was clean.
+          lastError: c.runSuccess ? null : String(c.lastOutput || '').slice(0, 300),
           files: files.slice(0, 20),
         });
       } catch (e) {}
@@ -1289,16 +1329,20 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
         }
       } catch (e) {}
 
-      // 5. Store the verified solution in memory (file bodies are truncated to
+      // 5. B54 P6 — store the solution in memory ONLY when the code actually
+      //    ran clean: an unverified build is never saved as a "known solution"
+      //    that later tasks would blindly reuse. (File bodies are truncated to
       //    a code-summary shape — the full artifacts live in the task workspace,
-      //    B53 P2/P5: semantic memory never carries another task's source tree).
-      try {
-        const codeSummary = files.map((name) => {
-          const code = readWorkspaceFile(name) || '';
-          return `#### ${name}\n\n\`\`\`code\n${code.slice(0, 6000)}\n\`\`\``;
-        }).join('\n\n').slice(0, 8000);
-        saveCodingKnowledge(c.effQuery, 'code', codeSummary, files);
-      } catch (e) {}
+      //    B53 P2/P5: semantic memory never carries another task's source tree.)
+      if (c.runSuccess) {
+        try {
+          const codeSummary = files.map((name) => {
+            const code = readWorkspaceFile(name) || '';
+            return `#### ${name}\n\n\`\`\`code\n${code.slice(0, 6000)}\n\`\`\``;
+          }).join('\n\n').slice(0, 8000);
+          saveCodingKnowledge(c.effQuery, 'code', codeSummary, files);
+        } catch (e) {}
+      }
 
 
       // 5.5 Remember the team's reflection so future builds start smarter

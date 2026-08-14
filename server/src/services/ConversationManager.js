@@ -105,8 +105,16 @@ export async function analyzeMessage(query, { currentTaskId = null, image = fals
       const t = getTask(ref.taskId);
       return { classification: 'switch', taskId: t.id, confidence: 0.8, reason: ref.reason, topic: t.title, contextBlock: taskContextBlock(t) };
     }
+    // B54 P2 — an ambiguous reference never stalls the conversation: default
+    // to the most-recently-active candidate (LangGraph "thread = most recent"
+    // pattern). Only a total lack of usable state would justify a question,
+    // and that case is handled as a plain new turn instead.
     if (ref.confidence >= 0.4 && ref.candidates?.length) {
-      return { classification: 'clarify', taskId: null, confidence: 0.4, reason: ref.reason, candidates: ref.candidates };
+      const pick = bestCandidate(ref.candidates);
+      if (pick) {
+        const t = getTask(pick.id);
+        return { classification: 'switch', taskId: t.id, confidence: 0.6, reason: `${ref.reason} — defaulted to the most recent match (${t.title})`, topic: t.title, contextBlock: taskContextBlock(t) };
+      }
     }
     if (PURE_CONTINUE_RE.test(raw)) {
       const st = taskStats();
@@ -145,15 +153,24 @@ export async function analyzeMessage(query, { currentTaskId = null, image = fals
     };
   }
 
-  // 2) Ambiguous reference → clarification (never guess).
+  // 2) B54 P2 — ambiguous reference → DEFAULT, never clarify. The candidates
+  //    are known tasks; the most-recently-active one is the right thread to
+  //    continue (LangGraph picks the most recent thread the same way). The
+  //    decision is logged so the user can correct it in one turn if wrong.
   if (ref.confidence >= 0.4 && ref.candidates?.length) {
-    return {
-      classification: 'clarify',
-      taskId: null,
-      confidence: 0.4,
-      reason: ref.reason,
-      candidates: ref.candidates,
-    };
+    const pick = bestCandidate(ref.candidates);
+    if (pick) {
+      const t = getTask(pick.id);
+      const isCurrent = t.id === currentTaskId;
+      return {
+        classification: isCurrent ? 'continue' : 'switch',
+        taskId: t.id,
+        confidence: 0.6,
+        reason: `${ref.reason} — defaulted to the most recent match (${t.title})`,
+        topic: t.title,
+        contextBlock: isCurrent ? '' : taskContextBlock(t),
+      };
+    }
   }
 
   // 2.5) B53 P3 — MODIFICATION of the active product task. Runs after explicit
@@ -218,6 +235,22 @@ export async function analyzeMessage(query, { currentTaskId = null, image = fals
 
   // 7) Default: self-contained new instruction.
   return { classification: 'new', taskId: null, confidence: 0.6, reason: 'self-contained message' };
+}
+
+/** B54 P2 — pick the best candidate among ambiguous task matches: the one
+ * with the most recent activity (the "current thread" by LangGraph semantics).
+ * Falls back to the first candidate only if lastActivity is missing. */
+function bestCandidate(candidates) {
+  const list = Array.isArray(candidates) ? candidates : [];
+  if (!list.length) return null;
+  const scored = list
+    .map((c) => {
+      const t = getTask(c && c.id);
+      return { c, t, at: (t && t.lastActivity) || 0 };
+    })
+    .sort((a, b) => b.at - a.at);
+  const top = scored[0];
+  return top && top.t ? top.t : (list[0] ? getTask(list[0].id) : null);
 }
 
 /** Standalone question heuristics: math/engineering/factual — not the current project. */

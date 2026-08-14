@@ -99,13 +99,13 @@ ok(!live.some((e) => e.content.includes('Express')), 'superseded fact no longer 
 ok(memoryStats().superseded >= 1, 'supersession counted in stats');
 
 /* ------------------------------------------------------------------ */
-console.log('\n== TEST 10 — AMBIGUITY (ask, don\'t guess) ==');
+console.log('\n== TEST 10 — AMBIGUITY (default to the most recent task, never stall) ==');
 /* ------------------------------------------------------------------ */
-createTask({ title: 'Fix the JEXI backend server', objective: 'Fix the JEXI backend server', entities: ['server', 'backend'], plan: ['diagnose', 'fix'] });
+const fixServer = createTask({ title: 'Fix the JEXI backend server', objective: 'Fix the JEXI backend server', entities: ['server', 'backend'], plan: ['diagnose', 'fix'] });
 an = await analyzeMessage('Fix the server', { currentTaskId: null });
-ok(an.classification === 'clarify', '"Fix the server" with two server tasks → CLARIFY (never guess)', an.reason);
-const decision = decide({ raw: 'Fix the server', classification: an, candidates: an.candidates, currentTaskId: null });
-ok(decision.action === 'clarify' && decision.clarification.options.length >= 2, 'clarify decision includes candidate options');
+ok(an.classification === 'switch' && an.taskId === fixServer.id, '"Fix the server" with two server tasks → defaults to the most recent match (never stalls)', an.reason);
+const decision = decide({ raw: 'Fix the server', classification: an, taskId: an.taskId || null, candidates: an.candidates, currentTaskId: null });
+ok(decision.action === 'execute' && decision.taskId === fixServer.id && decision.contextBlock.length > 0, 'ambiguity decision executes the chosen task with its context block');
 
 /* ------------------------------------------------------------------ */
 console.log('\n== TEST 11 — FAILURE RECOVERY ==');
