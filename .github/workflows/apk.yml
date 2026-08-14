@@ -98,18 +98,29 @@ jobs:
       # Publish to a Release so there is a permanent public download link:
       #   https://github.com/lewiseinstein15-Tech/jexi-os-/releases/latest/download/app-debug.apk
       # Every build becomes the new "Latest" release. No login needed to download.
+      # Done with the preinstalled `gh` CLI (auto-authenticated via GITHUB_TOKEN)
+      # instead of a third-party action: a softprops/action-gh-release tarball
+      # download failure once killed builds at the "Prepare actions" stage before
+      # any code ran (codeload flake), so this step has no external action dep.
       - name: Publish APK to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: apk-build-${{ github.run_number }}
-          name: JEXI OS Android App — build #${{ github.run_number }}
-          body: |
-            Latest **JEXI OS** Android app. Free, no Play Store, no credit card.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="apk-build-${{ github.run_number }}"
+          # Reruns reuse the same run_number → clean a previous release/tag first.
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          cat > /tmp/release-notes.md <<'EOF'
+          Latest **JEXI OS** Android app. Free, no Play Store, no credit card.
 
-            **Install:** download `app-debug.apk`, open it on your phone, allow
-            "install from this source", tap Install. Supports Android 7.0+.
+          **Install:** download `app-debug.apk`, open it on your phone, allow
+          "install from this source", tap Install. Supports Android 7.0+.
 
-            Direct link (always the newest build):
-            https://github.com/lewiseinstein15-Tech/jexi-os-/releases/latest/download/app-debug.apk
-          files: android/app/build/outputs/apk/debug/app-debug.apk
-          make_latest: true
+          Direct link (always the newest build):
+          https://github.com/lewiseinstein15-Tech/jexi-os-/releases/latest/download/app-debug.apk
+          EOF
+          gh release create "$TAG" \
+            android/app/build/outputs/apk/debug/app-debug.apk \
+            --title "JEXI OS Android App — build #${{ github.run_number }}" \
+            --notes-file /tmp/release-notes.md \
+            --latest
