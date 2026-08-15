@@ -123,14 +123,31 @@ So the fix has two parts, both now in the code:
    URL → `configured: true`, `connected: false`, actionable error, `isRedisActive()
    false`).
 
+## Final live evidence (after the normalization deploy)
+
+```
+/api/health/memory → redis: { configured: true, connected: false,
+  error: "REDIS_URL does not start with redis:// or rediss:// — current value starts
+         with \"(the value is not a URL)\" …" }
+```
+
+The stored value is **not a URL at all** — it contains no `scheme:` at all (not
+`https:`, not a quote-wrapped `redis://`). It looks like a bare hostname, a service
+name, or a similar placeholder.
+
 ## What the user must do (the remaining live blocker)
 
-The **code** is fixed and deployed; the **value** is not. Fix the `REDIS_URL` env
-var in the Render dashboard — it must be a full `redis://` or `rediss://` connection
-string with a hostname (e.g. Upstash's "Redis" tab connection string, not its REST
-URL), with no leading space. After that, the endpoint will show `connected: true`
-and the second restart proves persistence (`persistent: true`, note: **"Redis-backed
-persistence PROVEN"**).
+The **code** is fixed, deployed, and proven; the **value** is the only blocker.
+Replace the `REDIS_URL` env var in the Render dashboard with the full connection
+string from the Redis provider:
+- **Upstash:** Console → Database → **Connect** → **Redis** tab → connection string
+  (e.g. `rediss://default:XXXX@…upstash.io:6379`) — *not* the REST tab URL.
+- **Any other Redis:** `redis://<user>:<password>@<host>:<port>` (or `rediss://`
+  for TLS).
+
+No quotes, no spaces. After the redeploy the endpoint will show `connected: true`,
+and after the following restart it proves persistence (`persistent: true`, note:
+**"Redis-backed persistence PROVEN"**) — without any persistent disk.
 
 ### Live-vs-mock disclosure
 
