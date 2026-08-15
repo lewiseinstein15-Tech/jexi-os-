@@ -96,7 +96,13 @@ export async function httpJson(url, { method = 'GET', headers = {}, body, timeou
     || (data && (data.retry_after ?? data.retryAfter))
     || (data && data.parameters && (data.parameters.retry_after ?? data.parameters.retryAfter)); // Telegram nests it under parameters
   if (res.status === 401) throw new ConnectorError(ERROR_CODES.AUTH_FAILED, `Auth failed for ${provider || url} (HTTP 401)`, { status: 401, provider });
-  if (res.status === 403) throw new ConnectorError(ERROR_CODES.PERMISSION_DENIED, `${provider || url} refused the request (HTTP 403)`, { status: 403, provider });
+  if (res.status === 403) {
+    // Keep the provider's own words (GitHub: "Resource not accessible by
+    // integration" vs "token does not have permission to create issues" vs
+    // rate limit) — a bare 403 hides which one this is.
+    const detail = data && (data.message || (data.error && data.error.message));
+    throw new ConnectorError(ERROR_CODES.PERMISSION_DENIED, `${provider || url} refused the request (HTTP 403)${detail ? `: ${String(detail).slice(0, 200)}` : ''}`, { status: 403, provider, cause: data });
+  }
   if (res.status === 429) throw new ConnectorError(ERROR_CODES.RATE_LIMITED, `${provider || url} rate-limited (HTTP 429)`, { status: 429, retryAfter: retryAfter != null ? Number(retryAfter) : null, provider });
   if (!res.ok) {
     const msg = data?.error?.message || data?.message || data?.raw || `HTTP ${res.status}`;

@@ -91,6 +91,7 @@ export function startMockGitHub() {
     if (token.startsWith('ratelimit-')) return json(res, 429, { message: 'Too many requests' }, { 'retry-after': '30' });
     if (token.startsWith('fail-')) return json(res, 500, { message: 'Server error' });
     if (token.startsWith('malformed-')) return json(res, 200, { unexpected: true });
+    if (token.startsWith('denied-')) return json(res, 403, { message: 'Resource not accessible by integration' });
     if (issues && req.method === 'POST') return json(res, 201, { number: 101, html_url: `https://github.com/${issues[1]}/${issues[2]}/issues/101` });
     if (comment && req.method === 'POST') return json(res, 201, { id: 4242, html_url: `https://github.com/${comment[1]}/${comment[2]}/issues/${comment[3]}#issuecomment-4242` });
     if (pulls && req.method === 'POST') return json(res, 201, { number: 7, html_url: `https://github.com/${pulls[1]}/${pulls[2]}/pull/7` });

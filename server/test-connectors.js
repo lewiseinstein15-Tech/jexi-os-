@@ -189,6 +189,10 @@ ok(commit.ok === true && commit.sha === 'commitsha1', 'create_commit → blob→
 await expectError(() => gh.send({ action: 'create_issue', owner: 'o', repo: 'r' }), ERROR_CODES.PROVIDER_ERROR, 'create_issue without title fails cleanly');
 const ghRate = new GitHubConnector(new ConnectorConfig({ name: 'github', auth: { token: 'ratelimit-token', baseUrl: mocks.github.url } }));
 await expectError(() => ghRate.send({ action: 'create_issue', owner: 'o', repo: 'r', title: 't' }), ERROR_CODES.RATE_LIMITED, 'send() rate-limited (429 path executed)');
+const ghDenied = new GitHubConnector(new ConnectorConfig({ name: 'github', auth: { token: 'denied-token', baseUrl: mocks.github.url } }));
+let ghDeniedErr = null;
+try { await ghDenied.send({ action: 'create_issue', owner: 'o', repo: 'r', title: 't' }); } catch (e) { ghDeniedErr = e; }
+ok(ghDeniedErr && ghDeniedErr.code === ERROR_CODES.PERMISSION_DENIED && /Resource not accessible/.test(ghDeniedErr.message), '403 keeps the provider\'s own words (scope diagnosis)', ghDeniedErr && ghDeniedErr.message);
 
 // Webhook verification + normalization.
 const ghBody = { ref: 'refs/heads/main', repository: { full_name: 'o/r' }, pusher: { name: 'ada' }, commits: [{ id: 'c1', message: 'fix stuff', author: { name: 'ada' } }], head_commit: { id: 'c1' } };
