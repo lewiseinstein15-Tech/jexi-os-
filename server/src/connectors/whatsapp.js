@@ -62,7 +62,28 @@ export class WhatsAppConnector extends Connector {
     if (!data || !data.id) {
       throw new ConnectorError(ERROR_CODES.MALFORMED_RESPONSE, 'WhatsApp auth returned a response without a phone-number id', { provider: this.label, cause: data });
     }
-    return true;
+    // B62b — surface WHICH number Meta actually has registered for this phone
+    // id: health now names it, so "I messaged the wrong number" is instantly
+    // visible instead of a bare "authenticated".
+    return {
+      ok: true,
+      display_phone_number: data.display_phone_number || null,
+      verified_name: data.verified_name || null,
+    };
+  }
+
+  async healthCheck() {
+    try {
+      const info = await this.authenticate();
+      const num = info && info.display_phone_number ? ` · ${info.display_phone_number}` : '';
+      const name = info && info.verified_name ? ` (${info.verified_name})` : '';
+      return {
+        status: info && info.ok ? 'ok' : 'error',
+        detail: `authenticated with the provider${num}${name}`,
+      };
+    } catch (e) {
+      return { status: 'error', detail: (e && e.message) || String(e), code: e && e.code };
+    }
   }
 
   /**
