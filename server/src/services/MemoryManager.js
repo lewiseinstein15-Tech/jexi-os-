@@ -221,10 +221,14 @@ async function getRedis() {
     // throws a bare "Invalid URL" TypeError for e.g. `redis://:6379` (empty
     // host) or leading whitespace — turn that into an actionable message the
     // probe/health endpoint can show. Never echo the value (it may contain a
-    // password); only the shape is described.
-    const rawUrl = String(process.env.REDIS_URL || '').trim();
+    // password); only its shape/scheme is described.
+    let rawUrl = String(process.env.REDIS_URL || '').trim();
+    // Strip wrapping quotes ("rediss://…" / 'rediss://…' / `rediss://…`) — a
+    // classic paste artifact from env files that makes the URL unparseable.
+    rawUrl = rawUrl.replace(/^(['"`])([\s\S]*)\1$/, '$2').trim();
     if (!/^rediss?:\/\//i.test(rawUrl)) {
-      throw new Error('REDIS_URL does not start with redis:// or rediss:// — it is not a Redis connection string');
+      const scheme = rawUrl.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:/)?.[0] || '(the value is not a URL)'; // scheme only, never credentials
+      throw new Error(`REDIS_URL does not start with redis:// or rediss:// — current value starts with "${scheme}" (expected redis://<user>:<password>@<host>:<port>)`);
     }
     if (!/^rediss?:\/\/.+/i.test(rawUrl) || rawUrl.includes('://:')) {
       throw new Error('REDIS_URL is missing its hostname — expected redis://<user>:<password>@<host>:<port>');

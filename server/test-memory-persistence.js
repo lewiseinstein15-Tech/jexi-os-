@@ -118,6 +118,11 @@ try {
   // Leading whitespace around the URL (a classic mis-paste) must be tolerated.
   const spaced = await runBoot({ REDIS_URL: `  ${mock.url}`, RENDER_INSTANCE_ID: 'redis-boot-space' });
   ok(spaced.redis.connected === true, 'REDIS_URL with leading whitespace is normalized (trimmed) before use', spaced.redis.error || '');
+
+  // Wrapping quotes around the URL (the classic env-file paste artifact) must
+  // be tolerated too.
+  const quoted = await runBoot({ REDIS_URL: `"${mock.url}"`, RENDER_INSTANCE_ID: 'redis-boot-quoted' });
+  ok(quoted.redis.connected === true, 'REDIS_URL wrapped in quotes is normalized (stripped) before use', quoted.redis.error || '');
 } finally {
   await mock.close();
 }
@@ -152,6 +157,14 @@ ok(malformed.redis.configured === true && malformed.redis.connected === false,
 ok(String(malformed.redis.error).includes('hostname'), 'malformed REDIS_URL → actionable error names the cause', String(malformed.redis.error).slice(0, 120));
 ok(malformed.note.includes('connection failed'), 'malformed REDIS_URL → note names the failure, not a generic message', malformed.note);
 ok(malformed._isRedisActive === false, 'malformed REDIS_URL → isRedisActive()=false');
+
+// Non-Redis URL (e.g. a provider REST/dashboard URL pasted by mistake) — the
+// error must say what the value actually starts with, without leaking it.
+const notRedis = await runBoot({ REDIS_URL: 'https://xxx.upstash.io/rest/v1', RENDER_INSTANCE_ID: 'bad-scheme' });
+ok(notRedis.redis.configured === true && notRedis.redis.connected === false,
+  'https:// REDIS_URL → configured=true + connected=false');
+ok(String(notRedis.redis.error).includes('https:'), 'https:// REDIS_URL → error names the actual scheme', String(notRedis.redis.error).slice(0, 140));
+ok(notRedis.note.includes('connection failed'), 'https:// REDIS_URL → note names the failure');
 
 // Auth failure — mock answers every command with WRONGPASS.
 const authMock = await startMockRedis({ mode: 'authfail' });
