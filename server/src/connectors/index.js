@@ -219,12 +219,23 @@ export async function handleConnectorWebhook(name, { rawBody, headers = {}, quer
     return { kind: 'handshake', ...handshake };
   }
 
-  // Signature verification per provider (raw body HMAC / Svix Ed25519).
+  // Signature verification per provider (raw body HMAC / Svix HMAC-SHA256).
+  // B64: email rejections carry the exact reason (missing header, timestamp
+  // outside tolerance, signature mismatch…) so a failed delivery is
+  // diagnosable from the inbound log instead of a generic message.
   if (name === 'whatsapp' || name === 'github' || name === 'email') {
-    const verified = connector.verifyWebhookSignature(rawBody, headers);
+    let verified = false;
+    let reason = 'Webhook signature verification failed';
+    if (name === 'email' && typeof connector.verifyWebhookSignatureResult === 'function') {
+      const result = connector.verifyWebhookSignatureResult(rawBody, headers);
+      verified = result.ok;
+      if (!result.ok && result.reason) reason = `Webhook signature verification failed — ${result.reason}`;
+    } else {
+      verified = connector.verifyWebhookSignature(rawBody, headers);
+    }
     if (!verified) {
-      recordWebhookEvents(name, [{ provider: name, type: 'rejected', error: 'Webhook signature verification failed' }]);
-      return { kind: 'rejected', error: 'Webhook signature verification failed' };
+      recordWebhookEvents(name, [{ provider: name, type: 'rejected', error: reason }]);
+      return { kind: 'rejected', error: reason };
     }
   }
 

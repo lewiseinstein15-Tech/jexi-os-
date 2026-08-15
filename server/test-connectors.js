@@ -15,7 +15,7 @@
  *   - failure paths EXECUTED, not just coded: auth failure (401), rate limit
  *     (429), network timeout, malformed response
  *   - webhook signature verification (WhatsApp X-Hub-Signature-256, GitHub
- *     sha256/sha1, Resend Svix Ed25519) + Meta hub.challenge
+ *     sha256/sha1, Resend Svix HMAC-SHA256) + Meta hub.challenge
  *   - B61: GitHub create_file / update_file (Contents API with SHA read),
  *     Resend inbound (Svix verify + Received-emails fetch) + reply() with
  *     Re:/threading headers, WhatsApp auto-reply loop (JEXI answers inbound
@@ -42,7 +42,7 @@ import { ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, withTimeout, ma
 import { recordWebhookEvents, recordHandshake, listInbound, listConversations, resetConnectorInbox } from './src/services/ConnectorInbox.js';
 import { registerWhatsAppConnector, WhatsAppConnector } from './src/connectors/whatsapp.js';
 import { registerGitHubConnector, GitHubConnector } from './src/connectors/github.js';
-import { registerEmailConnector, ResendConnector, verifySvixSignature } from './src/connectors/email.js';
+import { registerEmailConnector, ResendConnector, verifySvixSignature, verifySvixSignatureDetailed } from './src/connectors/email.js';
 import { registerConnectors, getConnectorStatus, saveConnectorConfig, callConnector, handleConnectorWebhook, setInboundReplyGenerator } from './src/connectors/index.js';
 import { connectorToToolSchema, listConnectorTools, introspectSendSignature } from './src/connectors/toolBridge.js';
 import { executeTool, toolTier, getToolCatalog } from './src/services/ToolRuntime.js';
@@ -276,24 +276,40 @@ ok(resendInbound.length === 1 && resendInbound[0].provider === 'resend' && resen
 console.log('\n== B61 EMAIL INBOUND (Svix verify + Received-emails fetch + reply) ==');
 /* ------------------------------------------------------------------ */
 
-// Real Ed25519 round-trip: sign with the PKCS8-derived key (exactly what the
-// connector does to VERIFY), using a whsec_ secret like Resend's.
-const seed = crypto.randomBytes(32);
-const svixSecret = 'whsec_' + seed.toString('base64');
-const PKCS8_PREFIX = Buffer.from('302e020100300506032b657004220420', 'hex');
-const svixPriv = crypto.createPrivateKey({ key: Buffer.concat([PKCS8_PREFIX, seed]), format: 'der', type: 'pkcs8' });
+// B64 FIX — Resend (via Svix) signs with HMAC-SHA256 over
+// `${svix-id}.${svix-timestamp}.${rawBody}` using the base64-decoded whsec_
+// secret — NOT Ed25519 (the B61 build got that wrong and 403'd every real
+// delivery). First regression-test against Svix's OWN published example
+// (docs.svix.com → verifying-payloads/how-manual), then real round-trips.
+ok(
+  verifySvixSignature('whsec_plJ3nmyCDGBKInavdOK15jsl', '{"event_type":"ping","data":{"success":true}}',
+    { 'svix-id': 'msg_loFOjxBNrRLzqYUf', 'svix-timestamp': '1731705121', 'svix-signature': 'v1,rAvfW3dJ/X/qxhsaXPOyyCGmRKsaKWcsNccKXlIktD0=' },
+    { toleranceSeconds: 1e9 }) === true,
+  'Svix official example signature verifies (HMAC-SHA256, matches published docs)'
+);
+const svixSecret = 'whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw';
+const svixKey = Buffer.from('MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw', 'base64');
 const emailPayload = JSON.stringify({ type: 'email.received', data: { email_id: 'inbound-1', from: 'user@example.com', to: ['jexi@yourdomain.com'], subject: 'Testing JEXI inbound', created_at: '2026-08-15T12:00:00.000Z' } });
-const svixContent = `msg_1.1691785099.${emailPayload}`;
-const svixSig = crypto.sign(null, Buffer.from(svixContent, 'utf8'), svixPriv).toString('base64url');
-const svixHeaders = { 'svix-id': 'msg_1', 'svix-timestamp': '1691785099', 'svix-signature': `v1,${svixSig}` };
-ok(verifySvixSignature(svixSecret, emailPayload, svixHeaders) === true, 'Svix webhook signature verified (Ed25519, real sign/verify, no new dependency)');
+const nowTs = String(Math.floor(Date.now() / 1000)); // inside the 300s tolerance
+const svixContent = `msg_1.${nowTs}.${emailPayload}`;
+const svixSig = crypto.createHmac('sha256', svixKey).update(svixContent, 'utf8').digest('base64');
+const svixHeaders = { 'svix-id': 'msg_1', 'svix-timestamp': nowTs, 'svix-signature': `v1,${svixSig}` };
+ok(verifySvixSignature(svixSecret, emailPayload, svixHeaders) === true, 'Svix webhook signature verified (HMAC-SHA256, real sign/verify)');
 ok(verifySvixSignature(svixSecret, emailPayload + 'tampered', svixHeaders) === false, 'Svix webhook rejected when the body is tampered');
 ok(verifySvixSignature(svixSecret, emailPayload, { ...svixHeaders, 'svix-signature': 'v1,c2lnbmF0dXJl' }) === false, 'Svix webhook rejected on a bad signature');
 ok(verifySvixSignature('', emailPayload, svixHeaders) === false, 'Svix webhook rejected with no secret');
+ok(verifySvixSignature(svixSecret, emailPayload, { ...svixHeaders, 'svix-timestamp': '1691785099' }) === false, 'Svix webhook rejected when the timestamp is outside tolerance (replay guard)');
+ok(verifySvixSignature(svixSecret, emailPayload, { ...svixHeaders, 'svix-signature': 'v2,' + svixSig }) === false, 'Svix webhook rejected for an unsupported version prefix');
+const svixDet = verifySvixSignatureDetailed(svixSecret, emailPayload + 'tampered', svixHeaders);
+ok(svixDet.ok === false && typeof svixDet.reason === 'string' && svixDet.reason.length > 0, 'detailed verification returns a human-readable rejection reason (B64)', svixDet.reason);
+const svixDetOk = verifySvixSignatureDetailed(svixSecret, emailPayload, svixHeaders);
+ok(svixDetOk.ok === true && /HMAC/.test(svixDetOk.reason), 'detailed verification confirms the HMAC-SHA256 match');
 
 const emWeb = new ResendConnector(new ConnectorConfig({ name: 'email', auth: { apiKey: 'ok-key', webhookSecret: svixSecret, baseUrl: mocks.resend.url } }));
 ok(emWeb.verifyWebhookSignature(emailPayload, svixHeaders) === true, 'connector.verifyWebhookSignature() validates the Svix headers');
 ok(emWeb.verifyWebhookSignature(emailPayload, { ...svixHeaders, 'svix-signature': 'v1,bad' }) === false, 'connector rejects a tampered Svix signature');
+const emWebDet = emWeb.verifyWebhookSignatureResult(emailPayload, { ...svixHeaders, 'svix-signature': 'v1,bad' });
+ok(emWebDet.ok === false && /no svix v1 signature/.test(emWebDet.reason), 'connector exposes the exact rejection reason (B64)', emWebDet.reason);
 
 // Inbound receive: the webhook carries metadata only; the body is fetched
 // from the Received-emails API and normalized into the internal shape.

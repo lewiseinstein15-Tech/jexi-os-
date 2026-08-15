@@ -10,7 +10,7 @@ The connector layer gives JEXI OS real outbound + inbound channels with
 | `send(payload)` | Fires a **real** outbound action (message / email / issue / file commit) and returns the provider's raw response |
 | `receive(body)` | Parses an inbound webhook payload into a flat, structured event shape |
 | `reply(payload)` | Email only (B61) — answers a specific inbound email on the **same thread** (Re: subject, In-Reply-To + References, quoted original) |
-| `verifyWebhookSignature()` | Per-provider inbound verification (HMAC / Svix Ed25519) over the raw body |
+| `verifyWebhookSignature()` | Per-provider inbound verification (HMAC / Svix HMAC-SHA256) over the raw body |
 
 Source: `server/src/connectors/` — `ConnectorBase.js`, `ConnectorRegistry.js`,
 `whatsapp.js`, `github.js`, `email.js` (Resend), `toolBridge.js`, `index.js`
@@ -33,7 +33,7 @@ routes, tests, docs — zero references remain).
 | `GET /webhooks/connectors/whatsapp` | none (Meta) | Meta verification handshake (`hub.challenge` + verify token) |
 | `POST /webhooks/connectors/whatsapp` | HMAC (`x-hub-signature-256` with app secret) | Inbound WhatsApp messages → JEXI auto-replies (B61) |
 | `POST /webhooks/connectors/github` | HMAC (`x-hub-signature-256`/`sha1` with `GITHUB_WEBHOOK_SECRET`) | GitHub webhook events |
-| `POST /webhooks/connectors/email` | Svix Ed25519 (`RESEND_WEBHOOK_SECRET`) | Resend inbound (`email.received`) + delivery events |
+| `POST /webhooks/connectors/email` | Svix HMAC-SHA256 (`RESEND_WEBHOOK_SECRET`) | Resend inbound (`email.received`) + delivery events |
 
 Status + health are deliberately open (same class as `/api/health`) so you can
 verify connectors **from a browser with zero shell access** — the checks run
@@ -180,7 +180,7 @@ Per-connector `health_check()`:
    events are classified separately and never reported as deliveries).
 5. Copy the webhook **signing secret** (Svix `whsec_…`) into
    `RESEND_WEBHOOK_SECRET` on Render — every delivery is verified with the
-   Svix Ed25519 scheme before `receive()` parses it.
+   Svix HMAC-SHA256 scheme before `receive()` parses it (B64: corrected from the Ed25519 misread in B61).
 6. Every `email.received` webhook carries metadata only; the connector then
    calls Resend's **Received-emails API** (`GET /emails/{email_id}`) for the
    full body and normalizes it into the internal message shape.

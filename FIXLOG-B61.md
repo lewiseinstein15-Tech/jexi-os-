@@ -110,3 +110,15 @@ update-on-missing → clean failure, missing content → clean failure.
 - Boot smoke test: server starts clean; `GET /api/connectors` lists exactly
   whatsapp / github / email.
 - Frontend: `bun run build` → **exit 0** (23s).
+
+---
+
+**⚠️ B64 CORRECTION (do not skip):** the B61 claim that email webhook
+verification is "real Ed25519… verified with real Ed25519 sign/verify
+round-trips" was **wrong for Resend**. Resend (via Svix) signs webhooks with
+**HMAC-SHA256** over `svix-id.svix-timestamp.rawBody` using the base64-decoded
+`whsec_` secret — not Ed25519. The B61 verifier passed its own self-generated
+Ed25519 round-trips but rejected every real Resend delivery with HTTP 403
+(proven live 2026-08-15). Fixed in **B64** (`server/src/connectors/email.js`,
+`verifySvixSignature` → HMAC-SHA256 + timestamp tolerance, regression-tested
+against Svix's published example). See `FIXLOG-B64.md`.

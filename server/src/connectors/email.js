@@ -10,11 +10,15 @@
  *              "variable exists")
  *   receive  → Resend INBOUND webhook (email.received), verified with the
  *              Svix signature scheme (svix-id / svix-timestamp /
- *              svix-signature + RESEND_WEBHOOK_SECRET, Ed25519 — verified in
- *              B61 with real Ed25519 round-trips, no new dependency). The
- *              webhook only carries metadata, so the full body is fetched
- *              from the Received-emails API (GET /emails/{email_id}) and
- *              normalized into the internal message shape.
+ *              svix-signature + RESEND_WEBHOOK_SECRET). B64 FIX: Resend signs
+ *              with HMAC-SHA256 over `${svix-id}.${svix-timestamp}.${rawBody}`
+ *              using the base64-decoded secret after the whsec_ prefix — the
+ *              B61 build wrongly used Ed25519 and rejected every real
+ *              delivery (HTTP 403), which the first real Resend event proved.
+ *              Now matches Svix's documented scheme exactly. The webhook only
+ *              carries metadata, so the full body is fetched from the
+ *              Received-emails API (GET /emails/{email_id}) and normalized
+ *              into the internal message shape.
  *   reply    → respond to a specific inbound email on the SAME thread:
  *              "Re: <subject>", In-Reply-To + References threading headers,
  *              quoted original, reply_to set to our receiving address so the
@@ -53,45 +57,66 @@ export function normalizeTo(to) {
 
 /**
  * Verify a Svix-signed webhook body using only Node's crypto (no `svix`
- * dependency): the webhook secret is the base64 of a 32-byte Ed25519 seed;
- * the public key is derived from that seed via the standard PKCS8-DER trick
- * (Node's createPrivateKey accepts a raw Ed25519 seed as PKCS8, and
- * exporting its JWK reveals the derived public key). Verified with real
- * Ed25519 sign/verify round-trips before shipping (B61).
+ * dependency), per Svix's official manual-verification scheme — which is
+ * exactly what Resend uses:
+ *
+ *   signed_content = `${svix-id}.${svix-timestamp}.${rawBody}`   (raw body)
+ *   key            = base64-decode(secret after the `whsec_` prefix)
+ *   expected       = base64(HMAC-SHA256(key, signed_content))
+ *
+ * and match it against each `v1,<sig>` entry in svix-signature with a
+ * constant-time comparison. The svix-timestamp must be within
+ * `toleranceSeconds` of now (Svix default 5 minutes) to block replay.
+ *
+ * B64 FIX: B61 shipped an Ed25519 verifier (misread of the Svix scheme)
+ * that passed self-generated round-trips but rejected every real Resend
+ * delivery with HTTP 403. This matches Svix's documented HMAC scheme and is
+ * regression-tested against Svix's own published example signature.
  */
-export function verifySvixSignature(secret, rawBody, headers = {}) {
+export function verifySvixSignature(secret, rawBody, headers = {}, { toleranceSeconds = 300 } = {}) {
+  return verifySvixSignatureDetailed(secret, rawBody, headers, { toleranceSeconds }).ok;
+}
+
+/** Like verifySvixSignature but returns { ok, reason } so rejections are diagnosable. */
+export function verifySvixSignatureDetailed(secret, rawBody, headers = {}, { toleranceSeconds = 300 } = {}) {
   const seedRaw = String(secret || '').replace(/^whsec_/, '').trim();
-  if (!seedRaw) return false;
-  let seed;
-  try { seed = Buffer.from(seedRaw, 'base64'); } catch (e) { return false; }
-  if (!seed || seed.length !== 32) return false;
+  if (!seedRaw) return { ok: false, reason: 'no signing secret configured (RESEND_WEBHOOK_SECRET)' };
+  let key;
+  try { key = Buffer.from(seedRaw, 'base64'); } catch (e) { return { ok: false, reason: 'signing secret is not valid base64' }; }
+  if (!key || !key.length) return { ok: false, reason: 'signing secret is empty after base64 decode' };
 
   const svixId = headers['svix-id'];
   const svixTs = headers['svix-timestamp'];
   const svixSig = headers['svix-signature'];
-  if (!svixId || !svixTs || !svixSig) return false;
+  if (!svixId) return { ok: false, reason: 'missing svix-id header' };
+  if (!svixTs) return { ok: false, reason: 'missing svix-timestamp header' };
+  if (!svixSig) return { ok: false, reason: 'missing svix-signature header' };
+
+  const ts = Number(svixTs);
+  if (!Number.isFinite(ts)) return { ok: false, reason: `svix-timestamp "${svixTs}" is not a number` };
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - ts) > toleranceSeconds) {
+    return { ok: false, reason: `svix-timestamp ${ts} is outside the ${toleranceSeconds}s tolerance (now ${now})` };
+  }
 
   const signedContent = `${svixId}.${svixTs}.${rawBody}`;
-  // PKCS8 DER header for an Ed25519 private key: the 32-byte seed follows.
-  const PKCS8_PREFIX = Buffer.from('302e020100300506032b657004220420', 'hex');
-  let publicKey;
-  try {
-    const priv = crypto.createPrivateKey({ key: Buffer.concat([PKCS8_PREFIX, seed]), format: 'der', type: 'pkcs8' });
-    const jwk = priv.export({ format: 'jwk' });
-    publicKey = crypto.createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: jwk.x }, format: 'jwk' });
-  } catch (e) { return false; }
-
+  const expected = crypto.createHmac('sha256', key).update(signedContent, 'utf8').digest('base64');
   // svix-signature may carry several signatures: "v1,<sig1> v1,<sig2>"
   const entries = String(svixSig).split(/\s+/).filter(Boolean);
   for (const entry of entries) {
-    const [version, sigB64] = entry.split(',');
-    if (version !== 'v1' || !sigB64) continue;
-    try {
-      const sig = Buffer.from(sigB64, 'base64');
-      if (crypto.verify(null, Buffer.from(signedContent, 'utf8'), publicKey, sig)) return true;
-    } catch (e) { /* try the next signature */ }
+    const [version, sig] = entry.split(',');
+    if (version !== 'v1' || !sig) continue;
+    if (constantTimeEqual(expected, sig)) return { ok: true, reason: 'signature verified (HMAC-SHA256)' };
   }
-  return false;
+  return { ok: false, reason: 'no svix v1 signature matched the HMAC-SHA256 expected value' };
+}
+
+/** Constant-time ASCII comparison for base64 signatures (length check leaks only length). */
+function constantTimeEqual(a, b) {
+  const ba = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
 }
 
 /** Extract one header value from Resend's headers: [{name, value}] list. */
@@ -215,6 +240,13 @@ export class ResendConnector extends Connector {
     const auth = this.resolveAuth();
     if (!auth.webhookSecret) throw new ConnectorError(ERROR_CODES.NOT_CONFIGURED, 'Resend webhook verification needs RESEND_WEBHOOK_SECRET', { provider: this.label });
     return verifySvixSignature(auth.webhookSecret, rawBody, headers);
+  }
+
+  /** B64 — detailed variant for diagnosable rejections: { ok, reason }. */
+  verifyWebhookSignatureResult(rawBody, headers = {}) {
+    const auth = this.resolveAuth();
+    if (!auth.webhookSecret) return { ok: false, reason: 'RESEND_WEBHOOK_SECRET is not set' };
+    return verifySvixSignatureDetailed(auth.webhookSecret, rawBody, headers);
   }
 
   /** Fetch the full received email (webhook events carry metadata only). */
