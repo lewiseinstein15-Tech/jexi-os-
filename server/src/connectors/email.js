@@ -60,11 +60,23 @@ export class ResendConnector extends Connector {
   async authenticate() {
     const auth = this.resolveAuth();
     this.assertAuth(auth);
-    const { status, data } = await httpJson(`${this.baseUrl}/domains`, {
-      headers: { Authorization: `Bearer ${auth.apiKey}` },
-      provider: 'Resend API',
-      timeout: this.requestTimeoutMs,
-    });
+    let status;
+    let data;
+    try {
+      ({ status, data } = await httpJson(`${this.baseUrl}/domains`, {
+        headers: { Authorization: `Bearer ${auth.apiKey}` },
+        provider: 'Resend API',
+        timeout: this.requestTimeoutMs,
+      }));
+    } catch (e) {
+      // B58: a send-only ("Sending access") key gets 401 on GET /domains even
+      // though POST /emails works — surface the real cause instead of a bare
+      // "auth failed".
+      if (e instanceof ConnectorError && e.code === ERROR_CODES.AUTH_FAILED) {
+        throw new ConnectorError(ERROR_CODES.AUTH_FAILED, 'Resend rejected the key on GET /domains (HTTP 401) — if this key was created with "Sending access", regenerate it with Full access (sending already works; the domains check needs Full access)', { status: 401, provider: this.label });
+      }
+      throw e;
+    }
     if (!data || !Array.isArray(data.data)) {
       throw new ConnectorError(ERROR_CODES.MALFORMED_RESPONSE, 'Resend auth returned a response without a domains list', { status, provider: this.label, cause: data });
     }
