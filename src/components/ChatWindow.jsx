@@ -58,6 +58,14 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
   useEffect(() => {
     const el = qaRef.current;
     if (!el) return;
+    // Feature-guard: ResizeObserver needs Chrome 64+; on older WebViews fall
+    // back to a window resize listener so the app still boots.
+    if (typeof ResizeObserver === 'undefined') {
+      const onResize = () => setNarrowQA(el.clientWidth < 340);
+      window.addEventListener('resize', onResize);
+      onResize();
+      return () => window.removeEventListener('resize', onResize);
+    }
     const ro = new ResizeObserver(() => setNarrowQA(el.clientWidth < 340));
     ro.observe(el);
     return () => ro.disconnect();

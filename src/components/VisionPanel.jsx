@@ -88,19 +88,31 @@ const grayFrame = (video) => {
 };
 
 const dHashOf = (gray) => {
-  let hash = 0n;
+  // 56-bit fingerprint as two 32-bit halves (hi/lo) — Number arithmetic,
+  // no BigInt literals (BigInt needs Chrome 67+ to even PARSE the bundle,
+  // which blank-screens the app on older Android WebViews).
+  let hi = 0;
+  let lo = 0;
+  let bits = 0;
   for (let y = 0; y < HASH_N; y++) {
     for (let x = 0; x < HASH_N - 1; x++) {
-      hash = (hash << 1n) | (gray[y * HASH_N + x] > gray[y * HASH_N + x + 1] ? 1n : 0n);
+      const bit = gray[y * HASH_N + x] > gray[y * HASH_N + x + 1] ? 1 : 0;
+      if (bits < 32) lo = (lo << 1) | bit;
+      else hi = (hi << 1) | bit;
+      bits++;
     }
   }
-  return hash;
+  return { hi, lo };
 };
 
 const hamming = (a, b) => {
-  let x = a ^ b, n = 0;
-  while (x) { n += Number(x & 1n); x >>= 1n; }
-  return n;
+  // Popcount of the XOR of both 32-bit halves.
+  const popcount = (n) => {
+    n = n - ((n >> 1) & 0x55555555);
+    n = (n & 0x33333333) + ((n >> 2) & 0x33333333);
+    return (((n + (n >> 4)) & 0x0f0f0f0f) * 0x01010101) >> 24;
+  };
+  return popcount(a.hi ^ b.hi) + popcount(a.lo ^ b.lo);
 };
 
 // --- GESTURES (MediaPipe GestureRecognizer categories) ---
@@ -135,7 +147,7 @@ export default function VisionPanel({ open, onClose, onVision }) {
   const lastGestureRef = useRef('');
   const lastGestureAtRef = useRef(0);
   const quietUntilRef = useRef(0);
-  const sceneHashRef = useRef(0n);
+  const sceneHashRef = useRef(null);
   const facePresentRef = useRef(false);
   const waveTraceRef = useRef([]); // [{ x, t }] — wrist trajectory for wave detection
   const [lastGesture, setLastGesture] = useState(null); // { emoji, label }
@@ -501,7 +513,7 @@ export default function VisionPanel({ open, onClose, onVision }) {
           // --- SCENE GATE: dHash of the frame; narrate only on real change ---
           if (sceneReady && v && v.videoWidth > 0 && continuous) {
             const hash = dHashOf(grayFrame(v));
-            if (sceneHashRef.current !== 0n) {
+            if (sceneHashRef.current) {
               const bits = hamming(sceneHashRef.current, hash);
               if (bits >= SCENE_CHANGE_BITS) {
                 setSceneChanged(true);

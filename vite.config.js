@@ -5,6 +5,15 @@ export default defineConfig({
   plugins: [react()],
   // Relative base: works on Vercel (root) and GitHub Pages (subpath)
   base: './',
+  // Conservative JS target so the bundle PARSES on older Android WebViews
+  // (the app ships as an APK with minSdk 24 = Android 7.0+, whose WebView can
+  // be far older than the Vite default of Chrome 87+). Transpiles `??`, `?.()`
+  // etc. down to ES2017 syntax; BigInt literals were removed from the source
+  // because esbuild cannot down-level them. No behavior change on modern
+  // browsers — they just get slightly more verbose code.
+  build: {
+    target: 'es2017',
+  },
   server: {
     host: true,
     port: 3000,
