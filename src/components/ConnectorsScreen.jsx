@@ -29,8 +29,12 @@ const TESTS = {
   email: [{ key: 'to', label: 'TO', ph: 'you@example.com' }, { key: 'subject', label: 'SUBJECT', ph: 'Test from JEXI OS' }, { key: 'text', label: 'TEXT', ph: 'Hello!' }],
 };
 
+// B62 — the user's personal WhatsApp number is the default test recipient, so
+// testing doesn't require typing it every time (type any number to override).
+const DEFAULT_WHATSAPP_TEST_TO = '+254117977415';
+
 const buildTestPayload = (name, v) => {
-  if (name === 'whatsapp') return { to: v.to, type: 'text', text: v.text || 'Hello from JEXI OS' };
+  if (name === 'whatsapp') return { to: v.to || DEFAULT_WHATSAPP_TEST_TO, type: 'text', text: v.text || 'Hello from JEXI OS' };
   if (name === 'github') return { action: 'create_issue', owner: v.owner, repo: v.repo, title: v.title || 'Test issue from JEXI' };
   if (name === 'email') return { to: [{ email: v.to }], subject: v.subject || 'Test from JEXI OS', text: v.text || 'Hello!' };
   return {};
@@ -53,6 +57,8 @@ export default function ConnectorsScreen() {
       const next = {};
       for (const c of r.connectors || []) next[c.name] = { ...(c.auth || {}) };
       setAuth(next);
+      // B62 — prefill the WhatsApp test recipient with the personal number.
+      setTests((prev) => ({ ...prev, whatsapp: { ...(prev.whatsapp || {}), to: DEFAULT_WHATSAPP_TEST_TO } }));
     } catch (e) { console.error('Connectors fetch failed', e); }
     setLoading(false);
   };

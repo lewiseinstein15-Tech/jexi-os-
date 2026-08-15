@@ -43,7 +43,7 @@ import { MCP_PORT, MCP_TOOL_ALLOWLIST, listMcpTools } from './mcp-server.js';
 import {
   registerConnectors, getConnectorStatus, saveConnectorConfig, callConnector, handleConnectorWebhook, getConnectorToolSchemas, setInboundReplyGenerator,
 } from './src/connectors/index.js'; // B56 — connector system (B61 adds the WhatsApp reply loop)
-import { listInbound } from './src/services/ConnectorInbox.js'; // B59 — provable inbound webhook log
+import { listInbound, listConversations } from './src/services/ConnectorInbox.js'; // B59 — provable inbound webhook log (B62 adds chat-thread conversations)
 import { trustStatus, setTrustMode, allowPattern, denyPattern, removeDecision, clearTrust, trustFolder } from './src/services/RiskGuard.js';
 import { computerStatus, runtimeCall } from './src/services/ComputerRuntime.js';
 import { listTasks, getTask, updateTask, deleteTask, taskStats as taskRegistryStats } from './src/services/TaskRegistry.js';
@@ -82,20 +82,24 @@ process.on('unhandledRejection', (e) => { recordError('process', (e && e.message
 // tool; providers reach JEXI through /webhooks/connectors/<name>.
 registerConnectors();
 
-// B61 — WhatsApp auto-reply loop: when a real inbound text arrives, JEXI
-// generates the reply (LLM; falls back to no reply when no AI keys are set)
-// and sends it back automatically via the connector's send().
+// B61/B62 — WhatsApp auto-reply loop: when a real inbound text arrives, JEXI
+// generates the reply and sends it back automatically via the connector's
+// send(). B62 makes it FAST: Groq leads the provider order and the whole
+// generation is capped at 12s — if the LLM is slow or down, a short fallback
+// ack is sent instead of silence, so every sender always gets a response.
 setInboundReplyGenerator(async (event) => {
   const keys = resolveKeys();
   if (!keys.groqKey && !keys.geminiKey && !process.env.OPENROUTER_API_KEY) return null;
+  const prompt = `Reply to this WhatsApp message from ${event.from || 'the sender'}. Be concise (max 3 short sentences), plain text, no markdown, no emojis:\n\n"${String(event.text || '').slice(0, 500)}"`;
+  const system = 'You are JEXI OS, Lewis Einstein\'s personal AI assistant. Reply in the first person as JEXI. Keep it short and helpful.';
   try {
-    const text = await generateContent(
-      `Reply to this WhatsApp message from ${event.from || 'the sender'}. Be concise (max 3 short sentences), plain text, no markdown, no emojis:\n\n"${String(event.text || '').slice(0, 500)}"`,
-      'You are JEXI OS, Lewis Einstein\'s personal AI assistant. Reply in the first person as JEXI. Keep it short and helpful.'
-    );
-    return text;
+    return await Promise.race([
+      generateContent(prompt, system, null, { prefer: 'groq', temperature: 0.4 }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('reply generation exceeded 12s budget')), 12000)),
+    ]);
   } catch (e) {
-    return null;
+    // Never leave a sender unanswered — graceful fallback ack (B62).
+    return 'Thanks for messaging JEXI OS! I got your message — a proper reply is on the way shortly.';
   }
 });
 
@@ -664,6 +668,15 @@ app.get('/api/connectors/:name/health', async (req, res) => {
 app.get('/api/connectors/:name/inbound', (req, res) => {
   try {
     res.json({ ok: true, name: req.params.name, ...listInbound(req.params.name, req.query.limit) });
+  } catch (e) { res.status(500).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+
+// B62 — open chat-thread conversations (GET, read-only): the same inbox
+// grouped per partner with both sides of the exchange (inbound + our replies)
+// so the app can render a real WhatsApp-style chat view.
+app.get('/api/connectors/:name/conversations', (req, res) => {
+  try {
+    res.json({ ok: true, name: req.params.name, ...listConversations(req.params.name, req.query.limit) });
   } catch (e) { res.status(500).json({ ok: false, error: (e && e.message) || String(e) }); }
 });
 

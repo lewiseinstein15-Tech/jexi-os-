@@ -74,6 +74,49 @@ export function listInbound(name, limit = 50) {
   return { events, handshakes, total: (db.events[name] || []).length };
 }
 
+/**
+ * B62 — group the inbox into conversations (chat-thread shape for the app).
+ *
+ * Inbound events (text/button/media…) become direction 'in' messages keyed by
+ * the sender; our recorded auto-replies (type 'reply') become direction 'out'
+ * messages keyed by the recipient — so each partner's thread shows both sides
+ * of the conversation, newest last, exactly like a chat app.
+ */
+export function listConversations(name, limit = 30) {
+  const db = load();
+  const events = db.events[name] || [];
+  const byPartner = new Map();
+  for (const ev of events) {
+    if (!ev || ev.type === 'rejected' || ev.type === 'handshake') continue;
+    let partner;
+    let msg;
+    if (ev.type === 'reply') {
+      partner = ev.to;
+      msg = { direction: 'out', at: ev.at, text: ev.text || '', ok: ev.ok !== false, error: ev.error || null, wamid: ev.id || null, in_reply_to: ev.in_reply_to || null };
+    } else {
+      partner = ev.from;
+      msg = { direction: 'in', at: ev.at, text: ev.text || '', id: ev.id || null, type: ev.type || 'unknown', media: ev.media || null, from: ev.from || null, to: ev.to || null };
+    }
+    if (!partner) continue;
+    if (!byPartner.has(partner)) byPartner.set(partner, []);
+    byPartner.get(partner).push(msg);
+  }
+  const conversations = [];
+  for (const [partner, messages] of byPartner) {
+    messages.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+    const last = messages[messages.length - 1];
+    conversations.push({
+      partner,
+      lastAt: last.at,
+      lastText: (last.text || (last.error ? `⚠ ${last.error}` : '')).slice(0, 140),
+      messages: messages.slice(-80),
+    });
+  }
+  conversations.sort((a, b) => String(b.lastAt).localeCompare(String(a.lastAt)));
+  const cap = Math.max(1, Math.min(Number(limit) || 30, 100));
+  return { conversations: conversations.slice(0, cap), total: conversations.length };
+}
+
 /** Test hook — wipe the inbox (memory + file). */
 export function resetConnectorInbox() {
   cache = { events: {}, handshakes: {} };

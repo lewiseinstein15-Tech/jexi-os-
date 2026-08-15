@@ -26,6 +26,7 @@ routes, tests, docs — zero references remain).
 | `GET /api/connectors` | open (GET) | Masked status for every connector (no values) |
 | `GET /api/connectors/:name/health` | open (GET) | Real health check (calls the provider; read-only, no secrets) |
 | `GET /api/connectors/:name/inbound` | open (GET) | B59 — recent verified inbound webhook events + Meta handshake records (newest first, no secrets) |
+| `GET /api/connectors/:name/conversations` | open (GET) | B62 — per-partner chat threads (inbound + our replies, both directions) for the in-app Chats screen |
 | `POST /api/connectors/:name/call` | API key (`x-jexi-key`) | Real action: body `{ "method": "send"\|"receive"\|"reply"\|"health", "payload": {...} }` |
 | `POST /api/connectors/:name/config` | API key | Save Settings-stored keys (env always wins at call time) |
 | `POST /api/connectors/:name/toggle` | API key | Enable/disable a connector |
@@ -145,12 +146,15 @@ Per-connector `health_check()`:
    token matches.
 5. Subscribe to the `messages` field. Inbound texts are HMAC-verified with the
    app secret and parsed by `receive()`.
-6. **Auto-reply (B61):** every verified inbound text is answered automatically
-   — JEXI generates a reply (LLM, when AI keys are set) and sends it back via
-   `send()` on the business number. The reply is recorded in the inbox
-   (`type: "reply"`, with the wamid + the inbound message it answers), so the
-   full loop phone → Meta → JEXI → Meta → phone is provable at
-   `GET /api/connectors/whatsapp/inbound`.
+6. **Auto-reply (B61/B62):** every verified inbound text is answered
+   automatically — JEXI generates a reply (LLM, Groq-first, **12s budget**;
+   a short acknowledgment is sent instead of silence if the LLM is slow/down)
+   and sends it back via `send()` on the business number. The reply is
+   recorded in the inbox (`type: "reply"`, with the wamid + the inbound
+   message it answers), so the full loop phone → Meta → JEXI → Meta → phone
+   is provable at `GET /api/connectors/whatsapp/inbound` and viewable as
+   chat threads at `GET /api/connectors/whatsapp/conversations` — which the
+   in-app **Chats** screen renders (list + bubbles + compose-to-anyone).
 
 ### GitHub
 
@@ -209,7 +213,7 @@ event **and** the recorded `type: "reply"` are both there.
   match provider docs, handshake + HMAC/Svix verification, `receive()` parsing
   (including fetching the received email body), `reply()` threading headers,
   GitHub Contents-API create/update (SHA read), the WhatsApp auto-reply loop,
-  error paths executed (401/429/500/malformed/timeout), and zero Telegram
-  references. No network, no keys.
+  conversation-thread grouping, error paths executed (401/429/500/malformed/
+  timeout), and zero Telegram references. No network, no keys.
 - `server/scripts/test-connectors-live.js` — live end-to-end proof, run on the
   host that holds the keys (see above).

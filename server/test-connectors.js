@@ -39,7 +39,7 @@ for (const key of [
 
 import { ConnectorRegistry } from './src/connectors/ConnectorRegistry.js';
 import { ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, withTimeout, maskSecret, createHmacSha256, createHmacSha1, assertAsciiSecret } from './src/connectors/ConnectorBase.js';
-import { recordWebhookEvents, recordHandshake, listInbound, resetConnectorInbox } from './src/services/ConnectorInbox.js';
+import { recordWebhookEvents, recordHandshake, listInbound, listConversations, resetConnectorInbox } from './src/services/ConnectorInbox.js';
 import { registerWhatsAppConnector, WhatsAppConnector } from './src/connectors/whatsapp.js';
 import { registerGitHubConnector, GitHubConnector } from './src/connectors/github.js';
 import { registerEmailConnector, ResendConnector, verifySvixSignature } from './src/connectors/email.js';
@@ -465,6 +465,26 @@ await tick(100);
 const failReply = listInbound('whatsapp', 10).events.find((e) => e.type === 'reply');
 ok(!!failReply && failReply.ok === false && /LLM down/.test(failReply.error || ''), 'generator failure → honest reply-failure record (no fake success)');
 setInboundReplyGenerator(null); // clean up — the real generator is registered by index.js
+
+/* ------------------------------------------------------------------ */
+console.log('\n== B62 CONVERSATIONS (chat-thread grouping for the app) ==');
+/* ------------------------------------------------------------------ */
+
+resetConnectorInbox();
+recordWebhookEvents('whatsapp', [
+  { id: 'in1', provider: 'whatsapp', from: '15551234567', to: 'PHONE_ID', type: 'text', text: 'Hello JEXI' },
+  { id: 'in2', provider: 'whatsapp', from: '15550999999', to: 'PHONE_ID', type: 'text', text: 'Hi there' },
+  { id: 'r1', provider: 'whatsapp', type: 'reply', from: 'PHONE_ID', to: '15551234567', text: 'Hi! How can I help?', ok: true, in_reply_to: 'in1' },
+]);
+const convs = listConversations('whatsapp', 10);
+ok(convs.total === 2, 'conversations grouped per partner', `${convs.total}`);
+const thread = convs.conversations.find((c) => c.partner === '15551234567');
+ok(!!thread && thread.messages.length === 2 && thread.messages[0].direction === 'in' && thread.messages[1].direction === 'out', 'thread shows inbound then our reply in order');
+ok(thread && thread.messages[1].text === 'Hi! How can I help?' && thread.lastText === 'Hi! How can I help?', 'thread carries both sides + last-message preview');
+ok(thread && thread.messages[0].id === 'in1' && thread.messages[1].in_reply_to === 'in1', 'inbound id + reply linkage preserved');
+ok(convs.conversations.every((c) => c.messages.every((m) => m.direction === 'in' || m.direction === 'out')), 'every message carries a direction');
+ok(!convs.conversations.some((c) => c.partner === '15550999999' ? c.messages[0].direction !== 'in' : false), 'second partner thread is inbound-only');
+resetConnectorInbox();
 
 await mocks.closeAll();
 await hanging.close();
