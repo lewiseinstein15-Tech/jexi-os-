@@ -142,7 +142,12 @@ app.use('/api', generalLimiter);
 // rate limiter. Each provider's POST returns 200 immediately after
 // verification + normalization; failures are logged, never fabricated.
 const connectorWebhooks = express.Router();
-connectorWebhooks.use(express.raw({ type: () => true, limit: '10mb' }));
+// B57 fix: scope the raw-body parser to the webhook paths ONLY. Unscoped, the
+// router-level `type: () => true` consumed EVERY request body on the server
+// (including /api/* POSTs), so express.json() below could never parse chat /
+// task / connector-call bodies. Webhook HMAC verification still gets the
+// untouched raw body; everything else parses normally.
+connectorWebhooks.use('/webhooks/connectors', express.raw({ type: () => true, limit: '10mb' }));
 const webhookFor = (name) => async (req, res) => {
   let body = null;
   if (req.body && req.body.length) {
@@ -151,12 +156,19 @@ const webhookFor = (name) => async (req, res) => {
       try { body = JSON.parse(req.body.toString('utf8')); } catch (e) { body = null; }
     }
   }
-  const result = await handleConnectorWebhook(name, {
-    rawBody: req.body ? req.body.toString('utf8') : '',
-    headers: req.headers,
-    query: req.query,
-    body,
-  });
+  let result;
+  try {
+    result = await handleConnectorWebhook(name, {
+      rawBody: req.body ? req.body.toString('utf8') : '',
+      headers: req.headers,
+      query: req.query,
+      body,
+    });
+  } catch (e) {
+    // E.g. a webhook arrives but no secret is configured — answer with a real
+    // HTTP status instead of hanging the provider's retry.
+    return res.status(500).json({ ok: false, error: (e && e.message) || String(e) });
+  }
   if (result.kind === 'handshake') {
     if (result.verified) return res.status(200).send(result.challenge);
     return res.status(403).send(result.reason || 'Verification failed');
