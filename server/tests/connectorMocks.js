@@ -170,7 +170,10 @@ export function startMockResend() {
       const raw = await readBody(req);
       let parsed = null;
       try { parsed = JSON.parse(raw); } catch (e) { /* keep null */ }
-      if (parsed && parsed.headers && parsed.headers['In-Reply-To']) lastSentHeaders = parsed.headers;
+      if (parsed) {
+        lastSentFrom = parsed.from || null;
+        if (parsed.headers && parsed.headers['In-Reply-To']) lastSentHeaders = parsed.headers;
+      }
       return json(res, 200, { id: `resend-mock-${Date.now()}` });
     }
     // B61/B65 — Received-emails API: GET /emails/receiving/:email_id (the
@@ -203,7 +206,8 @@ export function startMockResend() {
 
 /** B61 — test hook: last threaded-reply headers the Resend mock captured. */
 export let lastSentHeaders = null;
-export function resetLastSentHeaders() { lastSentHeaders = null; }
+export let lastSentFrom = null;
+export function resetLastSentHeaders() { lastSentHeaders = null; lastSentFrom = null; }
 
 /** Start every mock at once. Returns { whatsapp, github, resend, closeAll }. */
 export async function startMockConnectorApis() {

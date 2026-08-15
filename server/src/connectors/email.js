@@ -393,11 +393,16 @@ export class ResendConnector extends Connector {
     const clean = origSubject.replace(/^(re|fwd?|aw|sv|antw):\s*/i, '');
     const finalSubject = subject || (clean ? `Re: ${clean}` : 'Re: your message');
 
-    // To = original sender (unless overridden); From = our receiving address.
+    // To = original sender (unless overridden). From chain: explicit from →
+    // RESEND_FROM (verified sender) → RESEND_RECEIVING_ADDRESS (when set to a
+    // VERIFIED domain) → Resend's documented test sender. B65 fix: the
+    // resend.app receiving address must NOT be the From — that domain is not
+    // verified for sending, so it 403s (proven live). Thread continuity is
+    // preserved via reply_to instead.
     const toAddr = to || (original && original.from) || '';
     if (!toAddr) throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, 'Email reply could not resolve the original sender', { provider: this.label });
     const originalRecipient = Array.isArray(original && original.to) && original.to.length ? original.to[0] : null;
-    const fromAddr = from || auth.receivingAddress || (originalRecipient || auth.from || this.config.auth.defaultFrom || 'JEXI OS <onboarding@resend.dev>');
+    const fromAddr = from || auth.from || auth.receivingAddress || 'JEXI OS <onboarding@resend.dev>';
 
     // Threading headers: continue the same thread, not a new one.
     const headers = {};

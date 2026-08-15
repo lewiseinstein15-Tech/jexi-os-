@@ -46,7 +46,7 @@ import { registerEmailConnector, ResendConnector, verifySvixSignature, verifySvi
 import { registerConnectors, getConnectorStatus, saveConnectorConfig, callConnector, handleConnectorWebhook, setInboundReplyGenerator } from './src/connectors/index.js';
 import { connectorToToolSchema, listConnectorTools, introspectSendSignature } from './src/connectors/toolBridge.js';
 import { executeTool, toolTier, getToolCatalog } from './src/services/ToolRuntime.js';
-import { startMockConnectorApis, startHangingServer, lastSentHeaders, resetLastSentHeaders } from './tests/connectorMocks.js';
+import { startMockConnectorApis, startHangingServer, lastSentHeaders, lastSentFrom, resetLastSentHeaders } from './tests/connectorMocks.js';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -338,6 +338,18 @@ ok(lastSentHeaders && lastSentHeaders['In-Reply-To'] === '<orig-msg-1@example.co
 ok(lastSentHeaders && /older-msg@example\.com/.test(lastSentHeaders.References || ''), 'reply() appends to References (thread continuity)');
 const replyNoEmailId = await emWeb.reply({ to: 'user@example.com', subject: 'Standalone', text: 'hi' });
 ok(replyNoEmailId.ok === true && replyNoEmailId.subject === 'Standalone', 'reply() works with explicit to/subject (no email_id needed)');
+
+// B65 — RESEND_FROM (verified sender) wins over the unverified receiving
+// address as the reply From (the resend.app domain 403s on send — proven
+// live). reply_to still points at the receiving address for thread continuity.
+const emFrom = new ResendConnector(new ConnectorConfig({ name: 'email', auth: { apiKey: 'ok-key', webhookSecret: svixSecret, from: 'JEXI OS <hello@verified.dev>', baseUrl: mocks.resend.url } }));
+resetLastSentHeaders();
+await emFrom.reply({ email_id: 'inbound-1', text: 'Using the configured sender' });
+ok(lastSentFrom === 'JEXI OS <hello@verified.dev>', 'reply() uses RESEND_FROM as the From when configured (B65)', lastSentFrom);
+const emNoFrom = new ResendConnector(new ConnectorConfig({ name: 'email', auth: { apiKey: 'ok-key', webhookSecret: svixSecret, baseUrl: mocks.resend.url } }));
+resetLastSentHeaders();
+await emNoFrom.reply({ email_id: 'inbound-1', text: 'Falling back' });
+ok(lastSentFrom === 'JEXI OS <onboarding@resend.dev>', 'reply() falls back to the documented test sender when RESEND_FROM is unset', lastSentFrom);
 
 /* ------------------------------------------------------------------ */
 console.log('\n== B56 TOOL BRIDGE — introspected agent tool schemas ==');
