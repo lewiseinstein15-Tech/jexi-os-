@@ -55,6 +55,10 @@ export const TOOL_REGISTRY = [
   { slug: 'episode-recall', name: 'Episode Recall', type: 'Memory', desc: 'Remember what happened in past sessions, not just the last few turns.', agents: ['archivist', 'context-manager', 'memory'], engine: 'MemoryManager' },
   { slug: 'knowledge-search', name: 'Knowledge Search', type: 'Knowledge', desc: 'Search the saved knowledge library and studied topics.', agents: ['books', 'scholar', 'researcher', 'document-analyst'], engine: 'MemoryManager' },
   { slug: 'knowledge-save', name: 'Knowledge Save', type: 'Knowledge', desc: 'Save studied topics and notes into the knowledge library.', agents: ['researcher', 'study', 'scholar', 'document-analyst'], engine: 'MemoryManager' },
+  // B50 P2 — progressive knowledge folders (CLAUDE.md pattern): load a category
+  // from server/knowledge/ ONLY when the task needs it. Slug uses the registry's
+  // hyphen convention; the tool handler also accepts 'knowledge_load'.
+  { slug: 'knowledge-load', name: 'Knowledge Load', type: 'Knowledge', desc: 'Load a progressive knowledge folder (conventions, architecture, …) from server/knowledge/ — returns the full category content on demand.', agents: ['researcher', 'scholar', 'document-analyst', 'memory', 'jexi', 'context-manager'], engine: 'KnowledgeFiles' },
   { slug: 'book-library', name: 'Book Library', type: 'Knowledge', desc: "Answer strictly from the user's own uploaded books with citations and quotes.", agents: ['books', 'scholar'], engine: 'BookLibrary' },
   { slug: 'document-rag', name: 'Document RAG', type: 'Knowledge', desc: 'Chunk uploaded documents and answer from the retrieved passages.', agents: ['document-analyst', 'books'], engine: 'MemoryManager/knowledge' },
   { slug: 'memory-clear', name: 'Memory Clear', type: 'Memory', desc: 'Wipe all or selected parts of the memory core.', agents: ['memory'], engine: 'MemoryManager' },
@@ -206,6 +210,10 @@ export const TOOL_REGISTRY = [
 ];
 
 export const TOOL_COUNT = TOOL_REGISTRY.length;
+
+/** B50 P2 — aliases so a tool can be called by its documented name too
+ *  (knowledge_load is the directive's name; the registry slug uses hyphens). */
+export const TOOL_ALIASES = { knowledge_load: 'knowledge-load' };
 
 const toolBySlug = new Map(TOOL_REGISTRY.map((t) => [t.slug, t]));
 

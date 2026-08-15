@@ -1,6 +1,6 @@
 # JEXI OS — Agent & Skill Catalog
 
-**206 specialist agents · 492 skills · 152 tools · 1 orchestrator.** One plain-language request in,
+**206 specialist agents · 492 skills · 153 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
 > ⚙️ GENERATED FILE — updated 2026-08-14 by `cd server && npm run audit-roster`. Do not edit by hand.
@@ -14,7 +14,7 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 |---|---|
 | Agents | 206 (206 reachable — 100%) |
 | Skills | 492 |
-| Tools | 152 |
+| Tools | 153 |
 | Intents / teams | 43 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
@@ -1041,7 +1041,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 152 tools (grouped by type)
+## The 153 tools (grouped by type)
 
 ### Browser (6)
 | Tool | Allowed agents | Engine | What it does |
@@ -1139,13 +1139,14 @@ This section and every table below are GENERATED from the live registries by `cd
 | `code-run` | Runner, Debugger, Coder, QA Lead | Runner | Execute generated code and capture real stdout and errors. |
 | `code-write` | Architect, Coder, Technical Writer, Shipper, Backend Engineer, Frontend Engineer | Architect | Generate and write project files into the workspace. |
 
-### Knowledge (6)
+### Knowledge (7)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
 | `book-fetch` | Books Agent, Scholar | TrustedLibrary | Fetch a free public-domain book or paper from the trusted library. |
 | `book-library` | Books Agent, Scholar | BookLibrary | Answer strictly from the user's own uploaded books with citations and quotes. |
 | `document-rag` | Document Analyst, Books Agent | MemoryManager/knowledge | Chunk uploaded documents and answer from the retrieved passages. |
 | `knowledge-index` | Researcher, Document Analyst, Scholar | MemoryManager | Index studied material so recall is instant and complete. |
+| `knowledge-load` | Researcher, Scholar, Document Analyst, Memory Agent, JEXI Core, Context Manager | KnowledgeFiles | Load a progressive knowledge folder (conventions, architecture, …) from server/knowledge/ — returns the full category content on demand. |
 | `knowledge-save` | Researcher, Study Coach, Scholar, Document Analyst | MemoryManager | Save studied topics and notes into the knowledge library. |
 | `knowledge-search` | Books Agent, Scholar, Researcher, Document Analyst | MemoryManager | Search the saved knowledge library and studied topics. |
 

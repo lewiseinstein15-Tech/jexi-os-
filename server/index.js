@@ -49,6 +49,7 @@ import { mountMcp } from './mcp-server.js';
 import { taskManager } from './src/services/TaskManager.js';
 import { taskScheduler } from './src/services/TaskScheduler.js';
 import { PORT, WORKSPACE_DIR, DATA_DIR, SERVER_ROOT } from './src/config.js';
+import { mountConnectorWebhooks, connectorStatus, runHealthCheck, runSend } from './src/services/connectors/index.js';
 
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
 // everything across restarts/redeploys (non-blocking).
@@ -101,6 +102,11 @@ app.use((req, res, next) => {
   if (!API_KEY || req.method === 'OPTIONS') return next();
   if (!req.path.startsWith('/api')) return next();
   if (OPEN_PATHS.includes(req.path)) return next();
+  // Read-only connector status + health checks stay open (like /api/health) so
+  // connector health can be verified from a browser with no shell/curl and no
+  // key. They reveal only PASS/FAIL + provider responses — never secret values.
+  // Connector SENDS (/api/connectors/:name/send) remain API-key gated.
+  if (req.method === 'GET' && /^\/api\/connectors(\/[\w-]+\/health)?$/.test(req.path)) return next();
   if (keyMatches(req.headers['x-jexi-key'])) return next();
   res.status(401).json({ error: 'Unauthorized — this server is locked. Set the JEXI access key in Settings → System.' });
 });
@@ -110,6 +116,13 @@ const aiLimiter = rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 'dra
 const generalLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 600, standardHeaders: 'draft-7', legacyHeaders: false });
 app.use(['/api/chat', '/api/vision', '/api/knowledge/search', '/api/agent'], aiLimiter);
 app.use('/api', generalLimiter);
+
+// === CONNECTOR WEBHOOKS (WhatsApp / GitHub) ===
+// Mounted BEFORE express.json: HMAC verification needs the untouched raw body
+// (express.raw consumes the stream, so it must run first). /webhooks/* is not
+// under /api, so it bypasses the API-key gate — Meta and GitHub cannot send an
+// x-jexi-key header. Each handler verifies its own HMAC signature instead.
+mountConnectorWebhooks(app);
 
 app.use(express.json({ limit: '30mb' })); // Room for base64 book uploads + code files + images
 
@@ -322,7 +335,29 @@ app.get('/api/settings/status', (req, res) => {
     mistral: statusOf(['MISTRAL_API_KEY'], 'mistralKey'),
     xai: statusOf(['XAI_API_KEY'], 'xaiKey'),
     github: statusOf(['GITHUB_TOKEN', 'GH_TOKEN'], 'githubToken'),
+    whatsapp: statusOf(['WHATSAPP_ACCESS_TOKEN'], 'whatsappToken'),
+    resend: statusOf(['RESEND_API_KEY'], 'resendKey'),
   });
+});
+
+// === CONNECTOR LAYER (WhatsApp / GitHub / Email) ===
+// health checks make REAL calls to each provider's API (never presence-only);
+// send fires a real test message/issue/email. All gated by the API key.
+app.get('/api/connectors', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ ok: true, connectors: connectorStatus() });
+});
+
+app.get('/api/connectors/:name/health', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const result = await runHealthCheck(req.params.name);
+  res.status(result.ok === false && result.error ? 404 : 200).json(result);
+});
+
+app.post('/api/connectors/:name/send', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const result = await runSend(req.params.name, req.body || {});
+  res.status(result.ok === false && result.error ? 400 : 200).json(result);
 });
 
 // === TOOL RUNTIME (roadmap stage 9 — unified tool runtime) ===

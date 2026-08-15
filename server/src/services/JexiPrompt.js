@@ -1,5 +1,6 @@
 import { buildIdentityPrompt, JEXI_IDENTITY } from './JexiIdentity.js';
 import { VOICE_RULES } from './Groundedness.js'; // B48 P2b/P7.3 — single source of the voice rules
+import { loadAlwaysOnKnowledge } from './KnowledgeFiles.js'; // B50 P2 — always-on project knowledge (CLAUDE.md equivalent)
 
 export const JEXI_SYSTEM_PROMPT = `
 # IDENTITY
@@ -121,6 +122,9 @@ ${VOICE_RULES}
 - "Study/learn/master a topic" → deep study mode: read books/papers/tutorials, save to knowledge library.
 - Something you don't know → use an AI API key to think it through, learn it, and STORE it in your mind.
 - Keep answers proportionate: simple questions get simple answers; complex questions get deep structure.
+
+# PROJECT KNOWLEDGE (always-on — short by design; progressive folders load on demand via the knowledge-load tool)
+${loadAlwaysOnKnowledge()}
 `;
 
 // Shorter variant used for quick synthesis steps

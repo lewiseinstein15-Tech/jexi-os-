@@ -22,7 +22,7 @@
  * fake success.
  */
 
-import { TOOL_REGISTRY, getTool } from './ToolRegistry.js';
+import { TOOL_REGISTRY, getTool, TOOL_ALIASES } from './ToolRegistry.js';
 import { aggregateSearch } from './SearchEngine.js';
 import { extractContent, extractPdfText, downloadBookFromUrl } from './Extractor.js';
 import { runNewsTeam } from './NewsAgent.js';
@@ -58,6 +58,7 @@ export const TOOL_SCHEMAS = {
   'memory-write': { fact: { type: 'string', required: true, desc: 'Fact/preference to store' }, label: { type: 'string', desc: 'Optional label' } },
   'knowledge-search': { query: { type: 'string', required: true, desc: 'Search the knowledge library' } },
   'knowledge-save': { category: { type: 'string', required: true, desc: 'Category folder' }, filename: { type: 'string', required: true, desc: 'File name' }, content: { type: 'string', required: true, desc: 'Content to save' } },
+  'knowledge-load': { category: { type: 'string', required: true, desc: 'Knowledge category folder (conventions, architecture, …)' } },
   'profile-read': {},
   'semantic-search': { query: { type: 'string', required: true, desc: 'Semantic query' }, limit: { type: 'number' } },
   'episode-save': { ask: { type: 'string', required: true }, reply: { type: 'string', required: true } },
@@ -147,7 +148,7 @@ export function validateToolOutput(slug, result) {
 const SAFE_TOOLS = new Set([
   'web-search', 'wikipedia-lookup', 'arxiv-search', 'market-research', 'competitor-scan',
   'deep-read', 'pdf-extract', 'trusted-library', 'book-fetch', 'news-feed', 'trend-scan',
-  'memory-recall', 'knowledge-search', 'profile-read', 'semantic-search', 'summarize-doc',
+  'memory-recall', 'knowledge-search', 'knowledge-load', 'knowledge_load', 'profile-read', 'semantic-search', 'summarize-doc',
   'video-analyze', 'video-transcript', 'data-crunch', 'stats-compute', 'self-diagnose',
 ]);
 
@@ -239,6 +240,11 @@ async function runEngine(slug, args) {
       await saveKnowledgeFile(args.category, args.filename, args.content);
       return { kind: 'stored', file: `${args.category}/${args.filename}` };
     }
+    case 'knowledge-load':
+    case 'knowledge_load': {
+      const { knowledgeLoad } = await import('./KnowledgeFiles.js');
+      return knowledgeLoad(args.category);
+    }
     case 'profile-read': {
       const m = loadMemory();
       return { kind: 'profile', profile: m.userProfile || {}, facts: (m.userFacts || []).slice(0, 6) };
@@ -306,9 +312,10 @@ function formatResult(result) {
 export async function executeTool({ slug, args = {}, profile, sendEvent }) {
   const started = Date.now();
   const emit = (type, payload) => { try { if (typeof sendEvent === 'function') sendEvent(type, payload); } catch (e) {} };
-  const tool = getTool(slug);
+  const realSlug = TOOL_ALIASES[slug] || slug;
+  const tool = getTool(realSlug);
   if (!tool) return { ok: false, error: `Unknown tool: ${slug}`, durationMs: 0 };
-  const perm = toolPermission(slug);
+  const perm = toolPermission(realSlug);
   const useProfile = profile || activeToolProfile();
 
   emit('tool.start', { tool: slug, name: tool.name, permission: perm, profile: useProfile, args: safeArgs(slug, args) });
@@ -330,7 +337,7 @@ export async function executeTool({ slug, args = {}, profile, sendEvent }) {
   }
 
   // RISK GUARD (stage 17) — classify the actual call, not just the slug.
-  const risk = classifyRisk(slug, args);
+  const risk = classifyRisk(realSlug, args);
   if (!risk.canRun) {
     const blocked = {
       ok: false, blocked: true, risk: risk.level, tool: slug, byRiskGuard: true,
@@ -345,7 +352,7 @@ export async function executeTool({ slug, args = {}, profile, sendEvent }) {
   }
 
   // Argument validation
-  const schema = TOOL_SCHEMAS[slug] || {};
+  const schema = TOOL_SCHEMAS[realSlug] || {};
   const problems = [];
   for (const [key, spec] of Object.entries(schema)) {
     if (spec.required && (args[key] === undefined || args[key] === null || args[key] === '')) {
@@ -360,7 +367,7 @@ export async function executeTool({ slug, args = {}, profile, sendEvent }) {
   }
 
   try {
-    const result = await withTimeout(runEngine(slug, args), 60000);
+    const result = await withTimeout(runEngine(realSlug, args), 60000);
     // P4 — fail closed on malformed tool OUTPUT (never a silent empty reply).
     const outCheck = validateToolOutput(slug, result);
     if (!outCheck.ok) {
