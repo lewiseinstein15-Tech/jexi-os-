@@ -182,7 +182,7 @@ Per-connector `health_check()`:
    `RESEND_WEBHOOK_SECRET` on Render — every delivery is verified with the
    Svix HMAC-SHA256 scheme before `receive()` parses it (B64: corrected from the Ed25519 misread in B61).
 6. Every `email.received` webhook carries metadata only; the connector then
-   calls Resend's **Received-emails API** (`GET /emails/{email_id}`) for the
+   calls Resend's **Received-emails API** (`GET /emails/receiving/{email_id}`, B65 fix) for the
    full body and normalizes it into the internal message shape.
 7. **`reply()`** answers on the same thread: `Re: <subject>`, `In-Reply-To` +
    `References` headers, quoted original, `reply_to` = our receiving address —

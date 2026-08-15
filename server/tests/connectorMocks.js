@@ -173,22 +173,27 @@ export function startMockResend() {
       if (parsed && parsed.headers && parsed.headers['In-Reply-To']) lastSentHeaders = parsed.headers;
       return json(res, 200, { id: `resend-mock-${Date.now()}` });
     }
-    // B61 — Received-emails API: full email for one inbound event.
-    const received = req.url.match(/^\/emails\/([^/]+)$/);
+    // B61/B65 — Received-emails API: GET /emails/receiving/:email_id (the
+    // REAL endpoint per api-reference/emails/retrieve-received-email), with
+    // the REAL response shape: top-level text/html + headers OBJECT with
+    // lowercase keys. B65 fixed the connector to match this exactly.
+    const received = req.url.match(/^\/emails\/receiving\/([^/]+)$/);
     if (received && req.method === 'GET') {
       if (token.startsWith('bad-')) return json(res, 401, { message: 'Invalid API key' });
       return json(res, 200, {
+        object: 'email',
         id: received[1],
         from: 'user@example.com',
         to: ['jexi@yourdomain.com'],
         subject: 'Testing JEXI inbound',
         message_id: '<orig-msg-1@example.com>',
         created_at: '2026-08-15T12:00:00.000Z',
-        body: { text: 'Hello JEXI, can you reply?', html: '<p>Hello JEXI, can you reply?</p>' },
-        headers: [
-          { name: 'Message-ID', value: '<orig-msg-1@example.com>' },
-          { name: 'References', value: '<older-msg@example.com>' },
-        ],
+        text: 'Hello JEXI, can you reply?',
+        html: '<p>Hello JEXI, can you reply?</p>',
+        headers: {
+          'message-id': '<orig-msg-1@example.com>',
+          references: '<older-msg@example.com>',
+        },
         attachments: [],
       });
     }

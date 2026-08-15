@@ -119,12 +119,23 @@ function constantTimeEqual(a, b) {
   return crypto.timingSafeEqual(ba, bb);
 }
 
-/** Extract one header value from Resend's headers: [{name, value}] list. */
+/**
+ * Extract one header from Resend's received-email response. Real shape
+ * (B65 fix, per api-reference/emails/retrieve-received-email): headers is an
+ * OBJECT with lowercase keys, e.g. { "message-id": "<…>", references: "<…>" }.
+ * The B61 mock shape ([{name, value}]) is also tolerated for tests/back-compat.
+ */
 function headerValue(headers, name) {
-  if (!Array.isArray(headers)) return null;
+  if (!headers) return null;
   const wanted = String(name).toLowerCase();
-  const found = headers.find((h) => h && String(h.name || '').toLowerCase() === wanted);
-  return found ? found.value : null;
+  if (Array.isArray(headers)) {
+    const found = headers.find((h) => h && String(h.name || '').toLowerCase() === wanted);
+    return found ? found.value : null;
+  }
+  if (typeof headers === 'object') {
+    return headers[wanted] != null ? headers[wanted] : (headers[name] != null ? headers[name] : null);
+  }
+  return null;
 }
 
 export class ResendConnector extends Connector {
@@ -249,12 +260,18 @@ export class ResendConnector extends Connector {
     return verifySvixSignatureDetailed(auth.webhookSecret, rawBody, headers);
   }
 
-  /** Fetch the full received email (webhook events carry metadata only). */
+  /**
+   * Fetch the full received email (webhook events carry metadata only).
+   * B65 FIX: the Received-emails endpoint is GET /emails/receiving/:email_id
+   * — B61 used /emails/:email_id (the SENT-email endpoint), which 404s for
+   * received ids, so the body was never fetched (silently swallowed by
+   * receive()). Matches api-reference/emails/retrieve-received-email.
+   */
   async fetchEmail(emailId) {
     const auth = this.resolveAuth();
     this.assertAuth(auth);
     if (!emailId) throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, 'fetchEmail requires an email id', { provider: this.label });
-    const { data } = await httpJson(`${this.baseUrl}/emails/${encodeURIComponent(emailId)}`, {
+    const { data } = await httpJson(`${this.baseUrl}/emails/receiving/${encodeURIComponent(emailId)}`, {
       headers: { Authorization: `Bearer ${auth.apiKey}` },
       provider: 'Resend API',
       timeout: this.requestTimeoutMs,
@@ -278,6 +295,10 @@ export class ResendConnector extends Connector {
     const references = headerValue(headers, 'References') || null;
     const to = Array.isArray(f.to) ? f.to : Array.isArray(data.to) ? data.to : (data.to ? [data.to] : []);
     const isReceived = ev.type === 'email.received';
+    // B65: Resend's received-email response carries text/html at TOP LEVEL
+    // (the B61 mock's body:{} nesting was wrong — tolerate both).
+    const text = f.text || (f.body && f.body.text) || (data.body && data.body.plain) || null;
+    const html = f.html || (f.body && f.body.html) || null;
     return {
       id: f.id || data.email_id || null,
       provider: 'resend',
@@ -285,8 +306,8 @@ export class ResendConnector extends Connector {
       from: f.from || data.from || null,
       to,
       subject: f.subject || data.subject || null,
-      text: (f.body && f.body.text) || (data.body && data.body.plain) || null,
-      html: (f.body && f.body.html) || null,
+      text,
+      html,
       messageId,
       inReplyTo,
       references,
@@ -386,8 +407,11 @@ export class ResendConnector extends Connector {
     }
 
     let finalText = text;
-    if (quoteOriginal && original && (original.body && (original.body.text || original.body.html))) {
-      const quoted = (original.body.text || original.body.html || '').split('\n').map((l) => `> ${l}`).join('\n');
+    // B65: quote the original from top-level text/html (real Resend shape);
+    // tolerate the old nested body shape for back-compat.
+    const origBody = original && (original.text || original.html || (original.body && (original.body.text || original.body.html)) || '');
+    if (quoteOriginal && original && origBody) {
+      const quoted = String(origBody).split('\n').map((l) => `> ${l}`).join('\n');
       finalText = `${text}\n\n${quoted}`;
     }
 
