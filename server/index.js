@@ -119,6 +119,12 @@ app.use((req, res, next) => {
   if (!API_KEY || req.method === 'OPTIONS') return next();
   if (!req.path.startsWith('/api')) return next();
   if (OPEN_PATHS.includes(req.path)) return next();
+  // B57 — connector status + per-connector health are GET-only, read-only,
+  // never return secrets (masked), and fire the real provider call inside the
+  // deployed process where the env vars live — same class as /api/health, so
+  // they stay open for browser verification with no shell access. Connector
+  // sends/config/toggle stay API-key gated.
+  if (req.method === 'GET' && req.path.startsWith('/api/connectors')) return next();
   if (keyMatches(req.headers['x-jexi-key'])) return next();
   res.status(401).json({ error: 'Unauthorized — this server is locked. Set the JEXI access key in Settings → System.' });
 });
@@ -132,7 +138,7 @@ app.use('/api', generalLimiter);
 // B56 — CONNECTOR WEBHOOKS. Mounted BEFORE express.json because WhatsApp /
 // GitHub signatures are HMACs over the RAW request body — parsing it first
 // would break verification. Mounted OUTSIDE /api so provider webhooks (Meta,
-// GitHub, SendGrid, Telegram) are not gated by JEXI_API_KEY or the API
+// GitHub, Resend, Telegram) are not gated by JEXI_API_KEY or the API
 // rate limiter. Each provider's POST returns 200 immediately after
 // verification + normalization; failures are logged, never fabricated.
 const connectorWebhooks = express.Router();
@@ -611,6 +617,16 @@ app.post('/api/connectors/:name/toggle', (req, res) => {
     const saved = saveConnectorConfig(req.params.name, { enabled });
     res.json({ ok: true, name: saved.name, enabled: saved.enabled });
   } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+
+// Open per-connector health check (GET, read-only, no secrets) — lets the
+// owner verify connectors from a browser without shell access; the real
+// provider call runs inside this process where the env vars live.
+app.get('/api/connectors/:name/health', async (req, res) => {
+  try {
+    const result = await callConnector(req.params.name, { method: 'health' });
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (e) { res.status(500).json({ ok: false, error: (e && e.message) || String(e) }); }
 });
 
 // User-initiated connector action (send / receive / health / authenticate).

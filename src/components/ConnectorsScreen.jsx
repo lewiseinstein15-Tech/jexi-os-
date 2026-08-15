@@ -7,17 +7,17 @@ import { getBackendUrl, jexiFetch } from '../utils/helpers';
 const FIELDS = {
   whatsapp: [
     { key: 'accessToken', label: 'ACCESS TOKEN', ph: 'EAA…', hint: 'env: WHATSAPP_ACCESS_TOKEN' },
-    { key: 'phoneNumberId', label: 'PHONE NUMBER ID', ph: '10-digit id', hint: 'env: WHATSAPP_PHONE_NUMBER_ID' },
-    { key: 'appSecret', label: 'APP SECRET', ph: '…', hint: 'webhook verify · env: WHATSAPP_APP_SECRET' },
-    { key: 'verifyToken', label: 'VERIFY TOKEN', ph: 'your own token', hint: 'Meta hub.challenge · env: WHATSAPP_VERIFY_TOKEN' },
+    { key: 'phoneNumberId', label: 'PHONE NUMBER ID', ph: '10-digit id', hint: 'env: WHATSAPP_PHONE_NUMBER_ID / PHONE_NUMBER_ID' },
+    { key: 'appSecret', label: 'APP SECRET', ph: '…', hint: 'webhook verify · env: WHATSAPP_APP_SECRET / APP_SECRET' },
+    { key: 'verifyToken', label: 'VERIFY TOKEN', ph: 'your own token', hint: 'Meta hub.challenge · env: WHATSAPP_VERIFY_TOKEN / VERIFY_TOKEN' },
   ],
   github: [
     { key: 'token', label: 'TOKEN (PAT)', ph: 'ghp_…', hint: 'env: GITHUB_TOKEN / GH_TOKEN — or GitHub App via GITHUB_APP_ID + PRIVATE KEY' },
     { key: 'webhookSecret', label: 'WEBHOOK SECRET', ph: '…', hint: 'X-Hub-Signature verify · env: GITHUB_WEBHOOK_SECRET' },
   ],
   email: [
-    { key: 'apiKey', label: 'SENDGRID API KEY', ph: 'SG.…', hint: 'env: SENDGRID_API_KEY' },
-    { key: 'defaultFrom', label: 'DEFAULT FROM (email)', ph: 'jexi@yourdomain.com', hint: 'used when send() has no from' },
+    { key: 'apiKey', label: 'RESEND API KEY', ph: 're_…', hint: 'env: RESEND_API_KEY' },
+    { key: 'defaultFrom', label: 'DEFAULT FROM (email)', ph: 'jexi@yourdomain.com', hint: 'used when send() has no from (falls back to Resend onboarding test sender)' },
   ],
   telegram: [
     { key: 'botToken', label: 'BOT TOKEN', ph: '123:ABC…', hint: 'env: TELEGRAM_BOT_TOKEN (from @BotFather)' },

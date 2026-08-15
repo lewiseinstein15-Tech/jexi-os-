@@ -11,6 +11,10 @@
  * Credentials (env wins over Settings-stored values):
  *   WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_APP_SECRET,
  *   WHATSAPP_VERIFY_TOKEN, WHATSAPP_API_VERSION (default v21.0)
+ *
+ * B57: the un-prefixed names (PHONE_NUMBER_ID, APP_SECRET, VERIFY_TOKEN)
+ * are accepted as fallbacks for the WHATSAPP_* forms, so Render setups that
+ * already export the short names work unchanged.
  */
 
 import { Connector, ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, createHmacSha256 } from './ConnectorBase.js';
@@ -28,9 +32,9 @@ export class WhatsAppConnector extends Connector {
   resolveAuth() {
     const env = {
       accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
-      phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
-      appSecret: process.env.WHATSAPP_APP_SECRET || '',
-      verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || '',
+      phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || process.env.PHONE_NUMBER_ID || '',
+      appSecret: process.env.WHATSAPP_APP_SECRET || process.env.APP_SECRET || '',
+      verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || process.env.VERIFY_TOKEN || '',
       apiVersion: process.env.WHATSAPP_API_VERSION || this.config.auth.apiVersion || 'v21.0',
     };
     // Env wins ONLY when actually set — an unset env var must never clobber
@@ -41,8 +45,8 @@ export class WhatsAppConnector extends Connector {
   }
 
   assertAuth(auth) {
-    if (!auth.accessToken) throw new ConnectorError(ERROR_CODES.NOT_CONFIGURED, 'WhatsApp is not configured — set WHATSAPP_ACCESS_TOKEN (and WHATSAPP_PHONE_NUMBER_ID)', { provider: this.label });
-    if (!auth.phoneNumberId) throw new ConnectorError(ERROR_CODES.NOT_CONFIGURED, 'WhatsApp is not configured — set WHATSAPP_PHONE_NUMBER_ID', { provider: this.label });
+    if (!auth.accessToken) throw new ConnectorError(ERROR_CODES.NOT_CONFIGURED, 'WhatsApp is not configured — set WHATSAPP_ACCESS_TOKEN (and WHATSAPP_PHONE_NUMBER_ID / PHONE_NUMBER_ID)', { provider: this.label });
+    if (!auth.phoneNumberId) throw new ConnectorError(ERROR_CODES.NOT_CONFIGURED, 'WhatsApp is not configured — set WHATSAPP_PHONE_NUMBER_ID / PHONE_NUMBER_ID', { provider: this.label });
   }
 
   /** Actually call the Graph API — a key being present is not enough. */

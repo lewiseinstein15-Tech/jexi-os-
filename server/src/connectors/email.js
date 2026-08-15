@@ -1,57 +1,50 @@
 /**
- * JEXI OS — Email Connector (Build 56).
+ * JEXI OS — Email Connector (Build 57: SendGrid → Resend).
  *
- * SendGrid via REST (chosen over SMTP/IMAP so the server needs no new
- * dependencies and no socket plumbing):
- *   send    → POST https://api.sendgrid.com/v3/mail/send (202 Accepted)
- *   auth    → GET  https://api.sendgrid.com/v3/scopes
- *   receive → Inbound Parse webhook (multipart/form-data) normalized into the
- *             internal message shape; the Event Webhook (JSON array) is
- *             handled distinctly so bounces/drops/failures are never reported
- *             as deliveries.
+ * B56 shipped this connector on SendGrid, but the SendGrid account was
+ * rejected during provider vetting — JEXI does not use SendGrid at all. This
+ * build replaces it with Resend (same connector contract, no new deps):
  *
- * Credentials: SENDGRID_API_KEY (env wins over the Settings-stored value).
+ *   send    → POST https://api.resend.com/emails
+ *             { from: "Name <email>", to: ["a@b.com"], subject, html | text }
+ *             → 200 { "id": "uuid" }        (schema confirmed against
+ *               https://resend.com/docs/api-reference/emails/send-email)
+ *   auth    → GET  https://api.resend.com/domains   (200 = key valid;
+ *             a REAL call — never just "variable exists")
+ *   receive → Resend delivery webhook (JSON events: email.delivered /
+ *             email.bounced / email.dropped / email.complained / email.sent)
+ *             normalized into the internal message shape.
+ *
+ * Credentials: RESEND_API_KEY (env wins over the Settings-stored value);
+ * optional RESEND_FROM for a verified sender (defaults to Resend's built-in
+ * onboarding@resend.dev, which works for testing).
  */
 
 import { Connector, ConnectorConfig, ConnectorError, ERROR_CODES, httpJson } from './ConnectorBase.js';
 import { ConnectorRegistry } from './ConnectorRegistry.js';
 
-/**
- * Minimal multipart/form-data parser (SendGrid Inbound Parse posts
- * multipart). Extracts named text fields + flags binary attachments.
- * Dependency-free and unit-tested against a realistic payload.
- */
-export function parseMultipartForm(body, contentType) {
-  const m = String(contentType || '').match(/boundary=([^;]+)/i);
-  if (!m) return { fields: {}, attachments: [] };
-  const boundary = m[1].trim().replace(/^"|"$/g, '');
-  const parts = String(body).split(`--${boundary}`);
-  const fields = {};
-  const attachments = [];
-  for (const part of parts) {
-    if (!part.includes('\r\n\r\n') && !part.includes('\n\n')) continue;
-    const sep = part.includes('\r\n\r\n') ? '\r\n\r\n' : '\n\n';
-    const idx = part.indexOf(sep);
-    const head = part.slice(0, idx);
-    const raw = part.slice(idx + sep.length).replace(/\r\n$/, '');
-    const nameMatch = head.match(/name="([^"]+)"/);
-    if (!nameMatch) continue;
-    const name = nameMatch[1];
-    const filenameMatch = head.match(/filename="([^"]+)"/);
-    if (filenameMatch) { attachments.push({ name, filename: filenameMatch[1] }); continue; }
-    fields[name] = raw;
-  }
-  return { fields, attachments };
+/** Normalize a from value: "Name <email>" | { email, name? } → Resend string. */
+export function normalizeFrom(from, fallback) {
+  if (!from) return fallback || '';
+  if (typeof from === 'string') return from.trim();
+  if (from.email) return from.name ? `${from.name} <${from.email}>` : String(from.email).trim();
+  return '';
 }
 
-export class SendGridConnector extends Connector {
+/** Normalize to: string | array of {email} | array of strings → string[]. */
+export function normalizeTo(to) {
+  const list = Array.isArray(to) ? to : [to];
+  return list.map((t) => (typeof t === 'string' ? t.trim() : (t && t.email) || '')).filter(Boolean);
+}
+
+export class ResendConnector extends Connector {
   static toolName = 'email';
   static toolLabel = 'Email';
 
-  get defaultBaseUrl() { return 'https://api.sendgrid.com'; }
+  get defaultBaseUrl() { return 'https://api.resend.com'; }
 
   resolveAuth() {
-    const env = { apiKey: process.env.SENDGRID_API_KEY || '' };
+    const env = { apiKey: process.env.RESEND_API_KEY || '', from: process.env.RESEND_FROM || '' };
     // Env wins ONLY when actually set — an unset env var must never clobber
     // a configured value.
     const merged = { ...this.config.auth };
@@ -60,136 +53,131 @@ export class SendGridConnector extends Connector {
   }
 
   assertAuth(auth) {
-    if (!auth.apiKey) throw new ConnectorError(ERROR_CODES.NOT_CONFIGURED, 'Email is not configured — set SENDGRID_API_KEY', { provider: this.label });
+    if (!auth.apiKey) throw new ConnectorError(ERROR_CODES.NOT_CONFIGURED, 'Email is not configured — set RESEND_API_KEY', { provider: this.label });
   }
 
-  /** Actually call SendGrid — verify the key against /v3/scopes. */
+  /** Actually call Resend — verify the key against GET /domains (200 = valid). */
   async authenticate() {
     const auth = this.resolveAuth();
     this.assertAuth(auth);
-    const { status } = await httpJson(`${this.baseUrl}/v3/scopes`, { headers: { Authorization: `Bearer ${auth.apiKey}` }, provider: 'SendGrid API' });
+    const { status, data } = await httpJson(`${this.baseUrl}/domains`, {
+      headers: { Authorization: `Bearer ${auth.apiKey}` },
+      provider: 'Resend API',
+      timeout: this.requestTimeoutMs,
+    });
+    if (!data || !Array.isArray(data.data)) {
+      throw new ConnectorError(ERROR_CODES.MALFORMED_RESPONSE, 'Resend auth returned a response without a domains list', { status, provider: this.label, cause: data });
+    }
     return status === 200;
   }
 
   /**
    * send(payload):
-   *   { from: { email, name? }, to: [{ email, name? }] | 'a@b.com',
-   *     subject, text, html?, attachments?: [{ filename, content: base64, type? }] }
-   * Returns { ok: true, message_id } — SendGrid answers 202 with an empty
-   * body, so the id comes from the X-Message-Id header.
+   *   { from?: "Name <email>" | { email, name? }, to: 'a@b.c' | ['a@b.c'] | [{email}],
+   *     subject, text?, html? }
+   * Returns { ok: true, provider: 'resend', message_id } — Resend's real
+   * response body id.
    */
   async send(payload = {}) {
     const auth = this.resolveAuth();
     this.assertAuth(auth);
-    const from = payload.from || this.config.auth.defaultFrom;
-    if (!from || !from.email) throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, 'Email send requires from.email (or configure defaultFrom)', { provider: this.label });
-    const tos = Array.isArray(payload.to) ? payload.to : [{ email: payload.to }];
-    if (!tos.length || !tos[0].email) throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, 'Email send requires to', { provider: this.label });
+    // From-chain: payload.from → RESEND_FROM → settings defaultFrom → Resend's
+    // documented test sender (works without a verified domain for testing).
+    const from = normalizeFrom(payload.from, auth.from || this.config.auth.defaultFrom) || 'JEXI OS <onboarding@resend.dev>';
+    const to = normalizeTo(payload.to);
+    if (!to.length) throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, 'Email send requires to', { provider: this.label });
     if (!payload.subject) throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, 'Email send requires subject', { provider: this.label });
+    if (!payload.text && !payload.html) throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, 'Email send requires text or html', { provider: this.label });
 
     const body = {
-      personalizations: [{ to: tos }],
       from,
+      to,
       subject: String(payload.subject),
-      content: [
-        { type: 'text/plain', value: String(payload.text || '') },
-        ...(payload.html ? [{ type: 'text/html', value: String(payload.html) }] : []),
-      ],
-      ...(Array.isArray(payload.attachments) && payload.attachments.length
-        ? { attachments: payload.attachments.map((a) => ({ content: a.content, filename: a.filename, ...(a.type ? { type: a.type } : {}) })) }
-        : {}),
+      ...(payload.text ? { text: String(payload.text) } : {}),
+      ...(payload.html ? { html: String(payload.html) } : {}),
     };
 
-    const res = await withTimeoutSafe(
-      fetch(`${this.baseUrl}/v3/mail/send`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${auth.apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }),
-      this.requestTimeoutMs
-    );
-    const messageId = (res.headers && res.headers.get && res.headers.get('x-message-id')) || null;
-    if (res.status === 401) throw new ConnectorError(ERROR_CODES.AUTH_FAILED, 'SendGrid auth failed (HTTP 401)', { provider: this.label });
-    if (res.status === 429) throw new ConnectorError(ERROR_CODES.RATE_LIMITED, 'SendGrid rate-limited (HTTP 429)', { status: 429, provider: this.label });
-    if (!res.ok) {
-      const raw = await res.text().catch(() => '');
-      throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, `SendGrid failed (HTTP ${res.status}): ${raw.slice(0, 300)}`, { status: res.status, provider: this.label });
+    const { status, data } = await httpJson(`${this.baseUrl}/emails`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${auth.apiKey}`, 'Content-Type': 'application/json' },
+      body,
+      provider: 'Resend API',
+      timeout: this.requestTimeoutMs,
+    });
+    if (!data || !data.id) {
+      throw new ConnectorError(ERROR_CODES.MALFORMED_RESPONSE, 'Resend send returned a response without an email id', { status, provider: this.label, cause: data });
     }
-    return { ok: true, provider: 'sendgrid', message_id: messageId, status: res.status };
+    return { ok: true, provider: 'resend', message_id: data.id, status };
   }
 
   /* ------------------------- webhook / receive ------------------------- */
 
-  /** Distinguish bounce/drop/failure from delivery (SendGrid Event Webhook). */
+  /**
+   * Classify Resend delivery webhook events — bounces/drops/complaints are
+   * NEVER reported as deliveries. Accepts one webhook body or an array.
+   * Resend event types: email.sent | email.delivered | email.delivery_delayed
+   * | email.complained | email.bounced | email.opened | email.clicked |
+   * email.dropped.
+   */
   handleEvents(eventList) {
-    const events = Array.isArray(eventList) ? eventList : [];
-    const outcome = { delivered: [], bounced: [], dropped: [], failed: [], other: [] };
+    const events = Array.isArray(eventList) ? eventList : [eventList];
+    const outcome = { delivered: [], bounced: [], dropped: [], complained: [], sent: [], other: [] };
     for (const ev of events) {
-      const base = { email: ev.email, timestamp: ev.timestamp ? new Date(Number(ev.timestamp) * 1000).toISOString() : null };
-      if (ev.event === 'delivered') outcome.delivered.push(base);
-      else if (ev.event === 'bounce') outcome.bounced.push({ ...base, reason: ev.reason || null, type: ev.type || null });
-      else if (ev.event === 'dropped') outcome.dropped.push({ ...base, reason: ev.reason || null });
-      else if (ev.event === 'failed') outcome.failed.push({ ...base, reason: ev.reason || null, response: ev.response || null });
-      else outcome.other.push({ ...base, event: ev.event });
+      const type = ev.type || (ev.event ? `email.${ev.event}` : '');
+      const data = ev.data || {};
+      const base = {
+        email: data.to || ev.email || null,
+        id: data.email_id || ev.id || null,
+        timestamp: data.created_at || ev.timestamp ? new Date(String(data.created_at || ev.timestamp)).toISOString() : null,
+      };
+      if (type === 'email.delivered') outcome.delivered.push(base);
+      else if (type === 'email.bounced') outcome.bounced.push({ ...base, reason: data.bounce?.description || data.reason || null, type: data.bounce?.category || null });
+      else if (type === 'email.dropped') outcome.dropped.push({ ...base, reason: data.dropped?.description || data.reason || null });
+      else if (type === 'email.complained') outcome.complained.push(base);
+      else if (type === 'email.sent' || type === 'email.opened' || type === 'email.clicked' || type === 'email.delivery_delayed') outcome.sent.push({ ...base, event: type });
+      else outcome.other.push({ ...base, event: type });
     }
     return outcome;
   }
 
-  /** Normalize an inbound-parse payload ({ fields, attachments }) → message. */
-  normalizeInbound({ fields = {}, attachments = [] } = {}) {
-    return [{
-      id: fields['Message-Id'] || fields.message_id || null,
-      provider: 'sendgrid',
-      from: fields.from || null,
-      to: fields.to || null,
-      subject: fields.subject || null,
-      text: fields.text || null,
-      html: fields.html || null,
-      attachments: attachments.map((a) => ({ filename: a.filename })),
-      spamReport: fields.spam_report || null,
-      timestamp: fields.timestamp ? new Date(Number(fields.timestamp) * 1000).toISOString() : null,
-    }];
+  /** Normalize a Resend webhook body → internal event shape (array). */
+  normalizeInbound(body) {
+    if (!body) return [];
+    const events = [];
+    const list = Array.isArray(body) ? body : [body];
+    for (const ev of list) {
+      const data = ev.data || {};
+      events.push({
+        id: data.email_id || null,
+        provider: 'resend',
+        type: ev.type || ev.event || 'unknown',
+        from: data.from || null,
+        to: data.to || null,
+        subject: data.subject || null,
+        text: (data.body && data.body.plain) || null,
+        timestamp: data.created_at ? new Date(data.created_at).toISOString() : null,
+        raw: ev,
+      });
+    }
+    return events;
   }
 
+  /** receive(): normalize a webhook payload into events. */
   async receive(inbound) {
-    if (Array.isArray(inbound)) return this.handleEvents(inbound); // event webhook
-    if (inbound && (inbound.fields || inbound.body)) {
-      if (inbound.body && !inbound.fields) {
-        return this.normalizeInbound(parseMultipartForm(inbound.body, inbound.contentType));
-      }
-      return this.normalizeInbound(inbound);
-    }
-    return [];
+    return this.normalizeInbound(inbound || {});
   }
 
   static sendSchema() {
     return {
-      from: { type: 'object', desc: '{ email, name? } sender (falls back to configured defaultFrom)' },
-      to: { type: 'array', desc: '[{ email, name? }] recipients (or a single email string)' },
+      from: { type: 'string', desc: 'Sender "Name <email>" (falls back to RESEND_FROM / defaultFrom)' },
+      to: { type: 'array', desc: 'Recipient email(s): string, array of strings, or [{ email }]' },
       subject: { type: 'string', required: true, desc: 'Email subject' },
       text: { type: 'string', desc: 'Plain-text body' },
       html: { type: 'string', desc: 'Optional HTML body' },
-      attachments: { type: 'array', desc: '[{ filename, content (base64), type? }]' },
     };
   }
 }
 
-/** fetch + timeout that rethrows as a classified ConnectorError. */
-async function withTimeoutSafe(promise, ms) {
-  let timer;
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new ConnectorError(ERROR_CODES.TIMEOUT, `SendGrid request timed out after ${Math.round(ms / 1000)}s`)), ms);
-  });
-  try {
-    return await Promise.race([promise, timeout]);
-  } catch (e) {
-    if (e instanceof ConnectorError) throw e;
-    throw new ConnectorError(ERROR_CODES.NETWORK, `Network error talking to SendGrid: ${(e && e.message) || String(e)}`, { cause: e });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 export function registerEmailConnector(config) {
-  return ConnectorRegistry.register('email', new SendGridConnector(config instanceof ConnectorConfig ? config : new ConnectorConfig(config)));
+  return ConnectorRegistry.register('email', new ResendConnector(config instanceof ConnectorConfig ? config : new ConnectorConfig(config)));
 }

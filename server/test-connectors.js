@@ -3,7 +3,7 @@
  *
  * ⚠️ MOCK DISCLOSURE — every provider call in this suite goes to a LOCAL MOCK
  * SERVER (server/tests/connectorMocks.js) that mimics the real WhatsApp /
- * GitHub / SendGrid / Telegram API response shapes. NO live credentials are
+ * GitHub / Resend / Telegram API response shapes. NO live credentials are
  * used anywhere in this file. The connector code paths are byte-identical to
  * what runs against the real providers (only the base URL differs; it
  * defaults to the real provider URL when unset).
@@ -28,14 +28,15 @@ process.env.DATA_DIR = process.env.DATA_DIR || `/tmp/jexi-b56-${Date.now()}`;
 for (const key of [
   'GITHUB_TOKEN', 'GH_TOKEN', 'GITHUB_APP_ID', 'GITHUB_PRIVATE_KEY', 'GITHUB_INSTALLATION_ID', 'GITHUB_WEBHOOK_SECRET',
   'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_APP_SECRET', 'WHATSAPP_VERIFY_TOKEN',
-  'SENDGRID_API_KEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_SECRET_TOKEN',
+  'PHONE_NUMBER_ID', 'APP_SECRET', 'VERIFY_TOKEN',
+  'RESEND_API_KEY', 'RESEND_FROM', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_SECRET_TOKEN',
 ]) delete process.env[key];
 
 import { ConnectorRegistry } from './src/connectors/ConnectorRegistry.js';
 import { ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, withTimeout, maskSecret, createHmacSha256, createHmacSha1 } from './src/connectors/ConnectorBase.js';
 import { registerWhatsAppConnector, WhatsAppConnector } from './src/connectors/whatsapp.js';
 import { registerGitHubConnector, GitHubConnector } from './src/connectors/github.js';
-import { registerEmailConnector, SendGridConnector, parseMultipartForm } from './src/connectors/email.js';
+import { registerEmailConnector, ResendConnector } from './src/connectors/email.js';
 import { registerTelegramConnector, TelegramConnector } from './src/connectors/telegram.js';
 import { registerConnectors, getConnectorStatus, saveConnectorConfig, callConnector, handleConnectorWebhook } from './src/connectors/index.js';
 import { connectorToToolSchema, listConnectorTools, introspectSendSignature } from './src/connectors/toolBridge.js';
@@ -199,64 +200,43 @@ const prEvents = gh.normalizeInbound({ action: 'opened', pull_request: { number:
 ok(prEvents.length === 1 && prEvents[0].type === 'pull_request' && prEvents[0].number === 3, 'receive() normalizes pull_request event');
 
 /* ------------------------------------------------------------------ */
-console.log('\n== B56 EMAIL / SENDGRID (MOCK — SendGrid API shape) ==');
+console.log('\n== B57 EMAIL (MOCK — Resend API shape) ==');
 /* ------------------------------------------------------------------ */
 
-const em = registerEmailConnector(new ConnectorConfig({ name: 'email', auth: { apiKey: 'ok-key', baseUrl: mocks.sendgrid.url } }));
-ok(await em.authenticate(), 'authenticate() (SendGrid scopes) succeeds against the mock');
-const emBad = new SendGridConnector(new ConnectorConfig({ name: 'email', auth: { apiKey: 'bad-key', baseUrl: mocks.sendgrid.url } }));
+const em = registerEmailConnector(new ConnectorConfig({ name: 'email', auth: { apiKey: 'ok-key', baseUrl: mocks.resend.url } }));
+ok(await em.authenticate(), 'authenticate() (GET /domains) succeeds against the mock');
+const emBad = new ResendConnector(new ConnectorConfig({ name: 'email', auth: { apiKey: 'bad-key', baseUrl: mocks.resend.url } }));
 await expectError(() => emBad.authenticate(), ERROR_CODES.AUTH_FAILED, 'authenticate() fails with AUTH_FAILED on a bad key (401 path executed)');
 
-const mail = await em.send({ from: { email: 'jexi@example.com' }, to: [{ email: 'ada@example.com' }], subject: 'Build 56', text: 'Hello' });
-ok(mail.ok === true && mail.message_id === 'mock-message-id', 'send() → 202 + X-Message-Id captured', `id=${mail.message_id}`);
-await expectError(() => em.send({ from: { email: 'jexi@example.com' }, to: [{ email: 'ada@example.com' }], text: 'no subject' }), ERROR_CODES.PROVIDER_ERROR, 'send() without subject fails cleanly');
-const emRate = new SendGridConnector(new ConnectorConfig({ name: 'email', auth: { apiKey: 'ratelimit-key', baseUrl: mocks.sendgrid.url } }));
-await expectError(() => emRate.send({ from: { email: 'a@b.c' }, to: [{ email: 'd@e.f' }], subject: 's', text: 't' }), ERROR_CODES.RATE_LIMITED, 'send() rate-limited (429 path executed)');
-const emFail = new SendGridConnector(new ConnectorConfig({ name: 'email', auth: { apiKey: 'fail-key', baseUrl: mocks.sendgrid.url } }));
-await expectError(() => emFail.send({ from: { email: 'a@b.c' }, to: [{ email: 'd@e.f' }], subject: 's', text: 't' }), ERROR_CODES.PROVIDER_ERROR, 'send() provider 400 with the error body (path executed)');
+const mail = await em.send({ from: 'JEXI OS <jexi@example.com>', to: ['ada@example.com'], subject: 'Build 57', text: 'Hello' });
+ok(mail.ok === true && /^resend-mock-/.test(mail.message_id), 'send() → real Resend email id returned', `id=${mail.message_id}`);
+// From-chain: no from anywhere → Resend onboarding test sender (documented).
+const mailNoFrom = await em.send({ to: ['ada@example.com'], subject: 'No from', text: 'Hello' });
+ok(mailNoFrom.ok === true && /^resend-mock-/.test(mailNoFrom.message_id), 'send() falls back to the Resend onboarding test sender when no from is set');
+await expectError(() => em.send({ from: 'jexi@example.com', to: ['ada@example.com'], text: 'no subject' }), ERROR_CODES.PROVIDER_ERROR, 'send() without subject fails cleanly');
+const emRate = new ResendConnector(new ConnectorConfig({ name: 'email', auth: { apiKey: 'ratelimit-key', baseUrl: mocks.resend.url } }));
+await expectError(() => emRate.send({ from: 'a@b.c', to: ['d@e.f'], subject: 's', text: 't' }), ERROR_CODES.RATE_LIMITED, 'send() rate-limited (429 path executed)');
+const emFail = new ResendConnector(new ConnectorConfig({ name: 'email', auth: { apiKey: 'fail-key', baseUrl: mocks.resend.url } }));
+await expectError(() => emFail.send({ from: 'a@b.c', to: ['d@e.f'], subject: 's', text: 't' }), ERROR_CODES.PROVIDER_ERROR, 'send() provider 500 (path executed)');
+const emMalformed = new ResendConnector(new ConnectorConfig({ name: 'email', auth: { apiKey: 'malformed-key', baseUrl: mocks.resend.url } }));
+await expectError(() => emMalformed.send({ from: 'a@b.c', to: ['d@e.f'], subject: 's', text: 't' }), ERROR_CODES.MALFORMED_RESPONSE, 'send() malformed response (wrong-shape 200 body path executed)');
 
-// Inbound Parse webhook — realistic multipart payload.
-const boundary = '----jexitestboundary';
-const multipart = [
-  `--${boundary}`,
-  'Content-Disposition: form-data; name="to"',
-  '',
-  'ada@example.com',
-  `--${boundary}`,
-  'Content-Disposition: form-data; name="from"',
-  '',
-  'friend@outside.com',
-  `--${boundary}`,
-  'Content-Disposition: form-data; name="subject"',
-  '',
-  'Re: your message',
-  `--${boundary}`,
-  'Content-Disposition: form-data; name="text"',
-  '',
-  'Sure, sounds good.',
-  `--${boundary}`,
-  'Content-Disposition: form-data; name="attachment1"; filename="quote.pdf"',
-  'Content-Type: application/pdf',
-  '',
-  '%PDF-1.4 fake bytes',
-  `--${boundary}--`,
-  '',
-].join('\r\n');
-const parsed = parseMultipartForm(multipart, `multipart/form-data; boundary=${boundary}`);
-ok(parsed.fields.to === 'ada@example.com' && parsed.fields.subject === 'Re: your message' && parsed.fields.text === 'Sure, sounds good.', 'multipart parser extracts inbound-parse fields (dependency-free)');
-ok(parsed.attachments.length === 1 && parsed.attachments[0].filename === 'quote.pdf', 'multipart parser flags attachments separately');
-const inboundMsg = em.normalizeInbound(parsed);
-ok(inboundMsg.length === 1 && inboundMsg[0].from === 'friend@outside.com' && inboundMsg[0].subject === 'Re: your message' && inboundMsg[0].attachments[0].filename === 'quote.pdf', 'receive() normalizes inbound email');
-
-// Bounce/event webhook — distinct outcomes, never conflated with delivery.
+// Delivery webhook — distinct outcomes, never conflated with delivery.
 const events = em.handleEvents([
-  { event: 'delivered', email: 'a@b.c', timestamp: '1691785099' },
-  { event: 'bounce', email: 'bad@b.c', reason: '550 mailbox full', type: 'hard', timestamp: '1691785099' },
-  { event: 'dropped', email: 'drop@b.c', reason: 'invalid address', timestamp: '1691785099' },
-  { event: 'failed', email: 'fail@b.c', reason: '4.2.1 try later', response: '421', timestamp: '1691785099' },
+  { type: 'email.sent', data: { email_id: 'id1', to: 'a@b.c', created_at: '2026-01-01T00:00:00Z' } },
+  { type: 'email.delivered', data: { email_id: 'id2', to: 'b@c.d', created_at: '2026-01-01T00:00:00Z' } },
+  { type: 'email.bounced', data: { email_id: 'id3', to: 'bad@b.c', created_at: '2026-01-01T00:00:00Z', bounce: { description: '550 mailbox full', category: 'hard_bounce' } } },
+  { type: 'email.dropped', data: { email_id: 'id4', to: 'drop@b.c', created_at: '2026-01-01T00:00:00Z', dropped: { description: 'invalid address' } } },
 ]);
 ok(events.delivered.length === 1 && events.bounced.length === 1 && events.bounced[0].reason === '550 mailbox full', 'bounces classified distinctly from deliveries');
-ok(events.dropped.length === 1 && events.failed.length === 1, 'drops and failures classified distinctly');
+ok(events.dropped.length === 1 && events.sent.length === 1, 'drops and sends classified distinctly');
+
+// receive() normalizes a Resend delivery webhook body.
+const resendInbound = await em.receive({
+  type: 'email.delivered',
+  data: { email_id: 'ev1', to: 'you@example.com', from: 'JEXI OS <jexi@example.com>', subject: 'Hello', created_at: '2026-01-01T00:00:00Z' },
+});
+ok(resendInbound.length === 1 && resendInbound[0].provider === 'resend' && resendInbound[0].to === 'you@example.com' && resendInbound[0].type === 'email.delivered', 'receive() normalizes a Resend delivery webhook');
 
 /* ------------------------------------------------------------------ */
 console.log('\n== B56 TELEGRAM (MOCK — Bot API shape) ==');

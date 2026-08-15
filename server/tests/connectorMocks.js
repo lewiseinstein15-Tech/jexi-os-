@@ -103,24 +103,26 @@ export function startMockGitHub() {
   });
 }
 
-/* ------------------------------ SendGrid ----------------------------- */
+/* ------------------------------- Resend ------------------------------ */
 
-export function startMockSendGrid() {
+export function startMockResend() {
   return startServer(async (req, res) => {
     const token = authToken(req);
-    if (req.url === '/v3/scopes') {
-      if (token.startsWith('bad-')) return json(res, 401, { errors: [{ message: 'authorization required' }] });
-      return json(res, 200, { scopes: ['mail.send', 'suppression.read'] });
+    if (req.url === '/domains' && req.method === 'GET') {
+      if (token.startsWith('bad-')) return json(res, 401, { message: 'Invalid API key' });
+      if (token.startsWith('ratelimit-')) return json(res, 429, { message: 'Rate limit exceeded' }, { 'retry-after': '5' });
+      if (token.startsWith('fail-')) return json(res, 500, { message: 'Internal error' });
+      if (token.startsWith('malformed-')) return json(res, 200, { notTheShape: true });
+      return json(res, 200, { data: [{ id: 'domain1', name: 'example.com', status: 'verified' }] });
     }
-    if (req.url === '/v3/mail/send' && req.method === 'POST') {
-      if (token.startsWith('bad-')) return json(res, 401, { errors: [{ message: 'authorization required' }] });
-      if (token.startsWith('ratelimit-')) return json(res, 429, { errors: [{ message: 'rate limit' }] }, { 'retry-after': '5' });
-      if (token.startsWith('fail-')) return json(res, 400, { errors: [{ message: 'invalid from address', field: 'from' }] });
-      if (token.startsWith('malformed-')) { res.writeHead(202, { 'X-Message-Id': 'mock-message-id' }); return res.end('not json at all'); }
-      res.writeHead(202, { 'X-Message-Id': 'mock-message-id' });
-      return res.end(); // SendGrid returns 202 with an empty body
+    if (req.url === '/emails' && req.method === 'POST') {
+      if (token.startsWith('bad-')) return json(res, 401, { message: 'Invalid API key' });
+      if (token.startsWith('ratelimit-')) return json(res, 429, { message: 'Rate limit exceeded' }, { 'retry-after': '5' });
+      if (token.startsWith('fail-')) return json(res, 500, { message: 'Internal error' });
+      if (token.startsWith('malformed-')) return json(res, 200, { notTheShape: true });
+      return json(res, 200, { id: `resend-mock-${Date.now()}` });
     }
-    return json(res, 404, { errors: [{ message: 'not found' }] });
+    return json(res, 404, { message: 'not found' });
   });
 }
 
@@ -145,15 +147,15 @@ export function startMockTelegram() {
   });
 }
 
-/** Start every mock at once. Returns { whatsapp, github, sendgrid, telegram, closeAll }. */
+/** Start every mock at once. Returns { whatsapp, github, resend, telegram, closeAll }. */
 export async function startMockConnectorApis() {
-  const [whatsapp, github, sendgrid, telegram] = await Promise.all([
-    startMockWhatsApp(), startMockGitHub(), startMockSendGrid(), startMockTelegram(),
+  const [whatsapp, github, resend, telegram] = await Promise.all([
+    startMockWhatsApp(), startMockGitHub(), startMockResend(), startMockTelegram(),
   ]);
   return {
-    whatsapp, github, sendgrid, telegram,
+    whatsapp, github, resend, telegram,
     closeAll: async () => {
-      await Promise.all([whatsapp.close(), github.close(), sendgrid.close(), telegram.close()]);
+      await Promise.all([whatsapp.close(), github.close(), resend.close(), telegram.close()]);
     },
   };
 }
