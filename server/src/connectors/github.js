@@ -89,7 +89,22 @@ export class GitHubConnector extends Connector {
     if (!data || !data.login) {
       throw new ConnectorError(ERROR_CODES.MALFORMED_RESPONSE, 'GitHub auth returned no user identity', { provider: this.label, cause: data });
     }
-    return true;
+    return { ok: true, login: data.login };
+  }
+
+  /** Health with identity — the detail names WHICH account the token belongs
+   *  to (a token from another account passes GET /user but can't write your
+   *  repos; this makes that visible instead of a bare "authenticated"). */
+  async healthCheck() {
+    try {
+      const info = await this.authenticate();
+      return {
+        status: info && info.ok ? 'ok' : 'error',
+        detail: info && info.login ? `authenticated as @${info.login}` : 'authenticated with the provider',
+      };
+    } catch (e) {
+      return { status: 'error', detail: (e && e.message) || String(e), code: e && e.code };
+    }
   }
 
   /**

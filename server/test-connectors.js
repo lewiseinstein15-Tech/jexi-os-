@@ -155,7 +155,10 @@ const gh = registerGitHubConnector(new ConnectorConfig({
   name: 'github',
   auth: { token: 'ok-pat', webhookSecret: 'gh-secret', baseUrl: mocks.github.url },
 }));
-ok(await gh.authenticate(), 'authenticate() (PAT) succeeds against the mock');
+const ghAuth = await gh.authenticate();
+ok(ghAuth && ghAuth.ok && ghAuth.login === 'jexi-bot', 'authenticate() (PAT) succeeds against the mock and reports the account');
+const ghHealth = await gh.healthCheck();
+ok(ghHealth.status === 'ok' && /@jexi-bot/.test(ghHealth.detail), 'GitHub health check names the authenticated account', ghHealth.detail);
 const ghBad = new GitHubConnector(new ConnectorConfig({ name: 'github', auth: { token: 'bad-token', baseUrl: mocks.github.url } }));
 await expectError(() => ghBad.authenticate(), ERROR_CODES.AUTH_FAILED, 'authenticate() fails with AUTH_FAILED on a bad PAT (401 path executed)');
 
