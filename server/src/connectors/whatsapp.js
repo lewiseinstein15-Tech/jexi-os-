@@ -11,10 +11,21 @@
  * Credentials (env wins over Settings-stored values):
  *   WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_APP_SECRET,
  *   WHATSAPP_VERIFY_TOKEN, WHATSAPP_API_VERSION (default v21.0)
+ *   WHATSAPP_TEMPLATE_NAME (default hello_world) + WHATSAPP_TEMPLATE_LANG
+ *   (default en_US) — the approved template used by the B63 outside-window
+ *   fallback.
  *
  * B57: the un-prefixed names (PHONE_NUMBER_ID, APP_SECRET, VERIFY_TOKEN)
  * are accepted as fallbacks for the WHATSAPP_* forms, so Render setups that
  * already export the short names work unchanged.
+ *
+ * B63: permanent-chat hardening. Meta only lets a business send free-form
+ * text inside the 24-hour customer-service window after the user's last
+ * message; outside it (or against a test-mode allowlist), the send is
+ * rejected. When a free-form text send is rejected for exactly those
+ * reasons, send() transparently retries once with the configured approved
+ * template — which Meta always allows — so "anyone can chat with JEXI"
+ * keeps working 24/7 once the number leaves test mode.
  */
 
 import { Connector, ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, createHmacSha256, assertAsciiSecret } from './ConnectorBase.js';
@@ -36,6 +47,8 @@ export class WhatsAppConnector extends Connector {
       appSecret: process.env.WHATSAPP_APP_SECRET || process.env.APP_SECRET || '',
       verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || process.env.VERIFY_TOKEN || '',
       apiVersion: process.env.WHATSAPP_API_VERSION || this.config.auth.apiVersion || 'v21.0',
+      templateName: process.env.WHATSAPP_TEMPLATE_NAME || this.config.auth.templateName || '',
+      templateLang: process.env.WHATSAPP_TEMPLATE_LANG || this.config.auth.templateLang || '',
     };
     // Env wins ONLY when actually set — an unset env var must never clobber
     // a configured value.
@@ -111,6 +124,26 @@ export class WhatsAppConnector extends Connector {
       body = { messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'text', text: { preview_url: false, body: String(text) } };
     }
 
+    let result;
+    try {
+      result = await this.postMessage(auth, body);
+    } catch (e) {
+      // B63 — permanent-chat fallback: a free-form TEXT send rejected because
+      // we're outside Meta's 24h window (or the test-mode allowlist) retries
+      // once as the approved template, which Meta always permits. The reply
+      // loop and the app's "message anyone" both go through send(), so they
+      // inherit this automatically. Other failures throw unchanged.
+      if (type === 'text' && isOutsideWindowError(e)) {
+        const fallback = await this.sendTemplateFallback(auth, to).catch(() => null);
+        if (fallback) return { ok: true, provider: 'whatsapp', wamid: fallback.wamid, status: fallback.status, fallback: 'template' };
+      }
+      throw e;
+    }
+    return { ok: true, provider: 'whatsapp', wamid: result.data.messages[0] && result.data.messages[0].id, status: result.status };
+  }
+
+  /** POST one message body to the Graph API; returns { status, data }. */
+  async postMessage(auth, body) {
     const { status, data } = await httpJson(
       `${this.baseUrl}/${auth.apiVersion || this.apiVersion}/${auth.phoneNumberId}/messages`,
       { method: 'POST', headers: { Authorization: `Bearer ${auth.accessToken}`, 'Content-Type': 'application/json' }, body, provider: 'WhatsApp Graph API', timeout: this.requestTimeoutMs }
@@ -118,7 +151,26 @@ export class WhatsAppConnector extends Connector {
     if (!data || !data.messages) {
       throw new ConnectorError(ERROR_CODES.MALFORMED_RESPONSE, 'WhatsApp send returned a response without a message id', { status, provider: this.label, cause: data });
     }
-    return { ok: true, provider: 'whatsapp', wamid: data.messages[0] && data.messages[0].id, status };
+    return { status, data };
+  }
+
+  /**
+   * B63 — retry an outside-window send as the approved template.
+   * Defaults to hello_world (Meta's built-in template, body "Hello {{1}}",
+   * which every WABA ships with); a custom template can be set via
+   * WHATSAPP_TEMPLATE_NAME. hello_world gets its body parameter filled;
+   * custom templates are sent without components (assumed parameter-free).
+   */
+  async sendTemplateFallback(auth, to) {
+    const name = auth.templateName || 'hello_world';
+    const lang = auth.templateLang || 'en_US';
+    const template = { name, language: { code: lang } };
+    if (name === 'hello_world') {
+      template.components = [{ type: 'body', parameters: [{ type: 'text', text: 'there' }] }];
+    }
+    const body = { messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'template', template };
+    const result = await this.postMessage(auth, body);
+    return { wamid: result.data.messages[0] && result.data.messages[0].id, status: result.status };
   }
 
   /* ------------------------- webhook / receive ------------------------- */
@@ -200,4 +252,21 @@ export class WhatsAppConnector extends Connector {
 
 export function registerWhatsAppConnector(config) {
   return ConnectorRegistry.register('whatsapp', new WhatsAppConnector(config instanceof ConnectorConfig ? config : new ConnectorConfig(config)));
+}
+
+/**
+ * B63 — true when a ConnectorError means the free-form send was rejected for
+ * reasons a template would solve: outside the 24h customer-service window, or
+ * the recipient not being on the test-mode allowlist. Reads Meta's error code
+ * from the raw provider payload (e.cause.error.code) or the "(#code)" inside
+ * the message, so it survives any error-classification path.
+ */
+const OUTSIDE_WINDOW_CODES = new Set([131026, 131030, 131047, 131048, 132000]);
+function isOutsideWindowError(e) {
+  if (!e) return false;
+  const rawCode = e.cause && e.cause.error && e.cause.error.code;
+  if (rawCode && OUTSIDE_WINDOW_CODES.has(Number(rawCode))) return true;
+  const msg = (e && e.message) || '';
+  const m = msg.match(/\(#(\d+)\)/);
+  return !!(m && OUTSIDE_WINDOW_CODES.has(Number(m[1])));
 }

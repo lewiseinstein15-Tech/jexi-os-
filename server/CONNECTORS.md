@@ -58,6 +58,8 @@ verified against the untouched raw body (see the `connectorWebhooks` mount in
 | `PHONE_NUMBER_ID` (or `WHATSAPP_PHONE_NUMBER_ID`) | WhatsApp | yes | Meta App Dashboard → WhatsApp → API Setup |
 | `APP_SECRET` (or `WHATSAPP_APP_SECRET`) | WhatsApp | yes | Meta App Dashboard → App secret (HMAC for webhooks) |
 | `VERIFY_TOKEN` (or `WHATSAPP_VERIFY_TOKEN`) | WhatsApp | yes | Any string you choose; Meta echoes it during webhook setup |
+| `WHATSAPP_TEMPLATE_NAME` | WhatsApp | no | Approved template used by the B63 outside-window fallback (default `hello_world`, which every WABA ships with). Set to your own approved template name to personalize. |
+| `WHATSAPP_TEMPLATE_LANG` | WhatsApp | no | Language code for that template (default `en_US`). |
 | `GITHUB_TOKEN` (or `GH_TOKEN`) | GitHub | yes (PAT) | https://github.com/settings/tokens (repo scope) |
 | `GITHUB_WEBHOOK_SECRET` | GitHub | no | Webhook secret; falls back to `GITHUB_TOKEN` when unset |
 | `GITHUB_APP_ID` + `GITHUB_PRIVATE_KEY` + `GITHUB_INSTALLATION_ID` | GitHub | alt | GitHub App auth instead of a PAT |
@@ -95,7 +97,9 @@ curl -X POST https://YOUR-RENDER-URL/api/connectors/email/call \
   -H 'Content-Type: application/json' -H 'x-jexi-key: <key>' \
   -d '{"method":"send","payload":{"to":"you@example.com","subject":"test","html":"<p>hi</p>"}}'
 
-# WhatsApp — recipient must have messaged your number first (24h window)
+# WhatsApp — free-form text needs the 24h window (recipient messaged you first);
+# outside it, B63 auto-falls back to the WHATSAPP_TEMPLATE_NAME template,
+# which Meta always allows — so this same call works 24/7 once live.
 curl -X POST https://YOUR-RENDER-URL/api/connectors/whatsapp/call \
   -H 'Content-Type: application/json' -H 'x-jexi-key: <key>' \
   -d '{"method":"send","payload":{"to":"2547XXXXXXXX","type":"text","text":"Hello from JEXI!"}}'

@@ -14,6 +14,8 @@
  *   ratelimit-*  → HTTP 429 with retry-after
  *   fail-*       → HTTP 500 (provider error)
  *   malformed-*  → HTTP 200 with a wrong-shaped body
+ *   window-*     → B63: free-form text → HTTP 400 (#131047 outside-window);
+ *                  template sends → HTTP 200 (exercises the fallback)
  */
 
 import http from 'http';
@@ -58,6 +60,14 @@ export function startMockWhatsApp() {
     if (token.startsWith('ratelimit-')) return json(res, 429, { error: { message: '(#80007) There have been too many messages sent' } }, { 'retry-after': '7' });
     if (token.startsWith('fail-')) return json(res, 500, { error: { message: 'Internal server error' } });
     if (token.startsWith('malformed-')) return json(res, 200, { hello: 'not-the-shape-you-wanted' });
+    if (token.startsWith('window-') && isMessages) {
+      let body = {};
+      try { body = JSON.parse(await readBody(req)); } catch (e) { /* noop */ }
+      if (body.type === 'text') {
+        return json(res, 400, { error: { message: '(#131047) Re-engagement message', code: 131047, type: 'OAuthException' } });
+      }
+      return json(res, 200, { messaging_product: 'whatsapp', contacts: [{ wa_id: body.to || '' }], messages: [{ id: `wamid.mock.template.${Date.now()}` }] });
+    }
     if (isMessages) {
       return json(res, 200, { messaging_product: 'whatsapp', contacts: [{ wa_id: '15550001111' }], messages: [{ id: `wamid.mock.${Date.now()}` }] });
     }

@@ -123,6 +123,18 @@ await expectError(() => waFail.send({ to: '15550001111', text: 'hi' }), ERROR_CO
 const waMalformed = new WhatsAppConnector(new ConnectorConfig({ name: 'whatsapp', auth: { accessToken: 'malformed-token', phoneNumberId: 'PHONE_ID', baseUrl: mocks.whatsapp.url } }));
 await expectError(() => waMalformed.send({ to: '15550001111', text: 'hi' }), ERROR_CODES.MALFORMED_RESPONSE, 'send() malformed response (wrong-shape body path executed)');
 
+// B63 — permanent-chat hardening: a free-form text send rejected because the
+// 24h window is closed (Meta #131047) transparently retries as the approved
+// template, so "anyone can chat" works outside the window too.
+const waWindow = new WhatsAppConnector(new ConnectorConfig({ name: 'whatsapp', auth: { accessToken: 'window-token', phoneNumberId: 'PHONE_ID', baseUrl: mocks.whatsapp.url } }));
+const waWindowRes = await waWindow.send({ to: '15550001111', type: 'text', text: 'Hello again' });
+ok(waWindowRes.ok === true && waWindowRes.fallback === 'template' && /wamid\.mock\.template/.test(waWindowRes.wamid), 'outside-window text send auto-falls back to the hello_world template', JSON.stringify(waWindowRes));
+const waWindowExplicit = await waWindow.send({ to: '15550001111', type: 'template', template: { name: 'hello_world', language: 'en_US' } });
+ok(waWindowExplicit.ok === true, 'explicit template send passes through unchanged (fallback only fires for text)');
+const waWindowCustom = new WhatsAppConnector(new ConnectorConfig({ name: 'whatsapp', auth: { accessToken: 'window-token', phoneNumberId: 'PHONE_ID', templateName: 'jexi_greeting', templateLang: 'en', baseUrl: mocks.whatsapp.url } }));
+const waWindowCustomRes = await waWindowCustom.send({ to: '15550001111', type: 'text', text: 'Hi' });
+ok(waWindowCustomRes.ok === true && waWindowCustomRes.fallback === 'template', 'custom WHATSAPP_TEMPLATE_NAME is used for the fallback');
+
 // Meta webhook verification handshake (hub.challenge).
 const handshake = wa.handleWebhookVerification({ 'hub.mode': 'subscribe', 'hub.verify_token': 'jexi-verify', 'hub.challenge': '12345' });
 ok(handshake.verified === true && handshake.challenge === '12345', 'hub.challenge verification handshake returns the challenge');
