@@ -92,11 +92,12 @@ export const TOOL_REGISTRY = [
   // (ask_jexi, memory_lookup, knowledge_search, list_books, get_health)
   // through the same validated tool path as internal tools.
   { slug: 'mcp-call', name: 'MCP Call', type: 'MCP', desc: 'Call an external MCP tool (ask_jexi, memory_lookup, knowledge_search, list_books, get_health) with schema-validated args.', agents: ['jexi', 'context-manager', 'memory'], engine: 'MCPServer' },
-  // B56 — CONNECTORS as an INTERNAL tool: agents reach WhatsApp / GitHub /
-  // Email through the registry via this one gated tool. It is EXTERNAL-tier,
+  // B56 — CONNECTORS as an INTERNAL tool: agents reach GitHub / Email
+  // through the registry via this one gated tool. It is EXTERNAL-tier,
   // so a send always pauses for ONE explicit human approval with the
-  // finalized details (the OpenWorker risk model). Telegram was removed in B61.
-  { slug: 'connector-call', name: 'Connector Call', type: 'Connectors', desc: 'Send an outbound action or read inbound events through a registered connector (whatsapp, github, email) — send_whatsapp, create_github_issue, send_email, create_github_file.', agents: ['jexi', 'github', 'email', 'context-manager'], engine: 'Connectors' },
+  // finalized details (the OpenWorker risk model). The old messaging
+  // connectors were removed (B61/B66); GitHub + Email remain.
+  { slug: 'connector-call', name: 'Connector Call', type: 'Connectors', desc: 'Send an outbound action or read inbound events through a registered connector (github, email) — send_email, create_github_issue, create_github_file.', agents: ['jexi', 'github', 'email', 'context-manager'], engine: 'Connectors' },
   { slug: 'book-fetch', name: 'Book Fetch', type: 'Knowledge', desc: 'Fetch a free public-domain book or paper from the trusted library.', agents: ['books', 'scholar'], engine: 'TrustedLibrary' },
   { slug: 'knowledge-index', name: 'Knowledge Index', type: 'Knowledge', desc: 'Index studied material so recall is instant and complete.', agents: ['researcher', 'document-analyst', 'scholar'], engine: 'MemoryManager' },
   { slug: 'semantic-search', name: 'Semantic Search', type: 'Memory', desc: 'Hybrid vector + keyword search across all memories.', agents: ['memory', 'document-analyst', 'researcher'], engine: 'MemoryManager' },

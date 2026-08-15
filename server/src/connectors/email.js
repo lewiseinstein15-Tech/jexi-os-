@@ -31,7 +31,34 @@
  *   RESEND_RECEIVING_ADDRESS — optional "inbox" address (our receiving
  *              domain) used as the From when replying; when unset the reply
  *              From falls back to the address the original was sent TO.
+ *   JEXI_CREATOR_EMAIL      — the sender JEXI recognizes as her creator
+ *              (default lewiseinstein15@gmail.com — Lewis). Inbound emails
+ *              from this address carry creator: true and get creator-aware
+ *              tone/priority in the auto-reply loop (B66).
  */
+
+/**
+ * B66 — creator recognition. The sender JEXI treats as her creator (owner):
+ * lewiseinstein15@gmail.com by default (Lewis), overridable via env.
+ * Safety: this ONLY changes tone/priority — it never bypasses any approval,
+ * permission, or safety logic (those live in ToolRuntime/RiskGuard and apply
+ * identically to every sender).
+ */
+export const CREATOR_EMAIL = process.env.JEXI_CREATOR_EMAIL || 'lewiseinstein15@gmail.com';
+
+/** Normalize "Name <addr>" / "addr" → bare lowercase address. */
+export function bareAddress(from) {
+  const m = String(from || '').match(/<([^>]+)>/);
+  const addr = m ? m[1] : String(from || '');
+  return addr.trim().toLowerCase();
+}
+
+/** True when an inbound From belongs to JEXI's creator (Lewis by default). */
+export function isCreatorEmail(from) {
+  const wanted = bareAddress(CREATOR_EMAIL);
+  if (!wanted) return false;
+  return bareAddress(from) === wanted;
+}
 
 import crypto from 'crypto';
 import { Connector, ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, assertAsciiSecret } from './ConnectorBase.js';
@@ -299,11 +326,16 @@ export class ResendConnector extends Connector {
     // (the B61 mock's body:{} nesting was wrong — tolerate both).
     const text = f.text || (f.body && f.body.text) || (data.body && data.body.plain) || null;
     const html = f.html || (f.body && f.body.html) || null;
+    const from = f.from || data.from || null;
+    // B66 — creator recognition: emails from JEXI's creator (Lewis) are
+    // flagged so the reply loop and any consumer can treat them with the
+    // right tone/priority. Pure metadata — no approval/safety bypass.
     return {
       id: f.id || data.email_id || null,
       provider: 'resend',
       type: isReceived ? 'inbound' : (ev.type || ev.event || 'unknown'),
-      from: f.from || data.from || null,
+      from,
+      creator: isCreatorEmail(from),
       to,
       subject: f.subject || data.subject || null,
       text,

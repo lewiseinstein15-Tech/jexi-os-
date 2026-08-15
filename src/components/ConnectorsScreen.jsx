@@ -5,12 +5,6 @@ import { getBackendUrl, jexiFetch } from '../utils/helpers';
 // Which auth fields each connector exposes in the UI (env vars always win at
 // call time; these are the Settings-stored fallbacks).
 const FIELDS = {
-  whatsapp: [
-    { key: 'accessToken', label: 'ACCESS TOKEN', ph: 'EAA…', hint: 'env: WHATSAPP_ACCESS_TOKEN' },
-    { key: 'phoneNumberId', label: 'PHONE NUMBER ID', ph: '10-digit id', hint: 'env: WHATSAPP_PHONE_NUMBER_ID / PHONE_NUMBER_ID' },
-    { key: 'appSecret', label: 'APP SECRET', ph: '…', hint: 'webhook verify · env: WHATSAPP_APP_SECRET / APP_SECRET' },
-    { key: 'verifyToken', label: 'VERIFY TOKEN', ph: 'your own token', hint: 'Meta hub.challenge · env: WHATSAPP_VERIFY_TOKEN / VERIFY_TOKEN' },
-  ],
   github: [
     { key: 'token', label: 'TOKEN (PAT)', ph: 'ghp_…', hint: 'env: GITHUB_TOKEN / GH_TOKEN — or GitHub App via GITHUB_APP_ID + PRIVATE KEY' },
     { key: 'webhookSecret', label: 'WEBHOOK SECRET', ph: '…', hint: 'X-Hub-Signature verify · env: GITHUB_WEBHOOK_SECRET' },
@@ -24,17 +18,11 @@ const FIELDS = {
 
 // Minimal per-connector test-send inputs.
 const TESTS = {
-  whatsapp: [{ key: 'to', label: 'TO (E.164)', ph: '15551234567' }, { key: 'text', label: 'TEXT', ph: 'Hello from JEXI OS' }],
   github: [{ key: 'owner', label: 'OWNER', ph: 'your-org' }, { key: 'repo', label: 'REPO', ph: 'my-repo' }, { key: 'title', label: 'TITLE', ph: 'Test issue from JEXI' }],
   email: [{ key: 'to', label: 'TO', ph: 'you@example.com' }, { key: 'subject', label: 'SUBJECT', ph: 'Test from JEXI OS' }, { key: 'text', label: 'TEXT', ph: 'Hello!' }],
 };
 
-// B62 — the user's personal WhatsApp number is the default test recipient, so
-// testing doesn't require typing it every time (type any number to override).
-const DEFAULT_WHATSAPP_TEST_TO = '+254117977415';
-
 const buildTestPayload = (name, v) => {
-  if (name === 'whatsapp') return { to: v.to || DEFAULT_WHATSAPP_TEST_TO, type: 'text', text: v.text || 'Hello from JEXI OS' };
   if (name === 'github') return { action: 'create_issue', owner: v.owner, repo: v.repo, title: v.title || 'Test issue from JEXI' };
   if (name === 'email') return { to: [{ email: v.to }], subject: v.subject || 'Test from JEXI OS', text: v.text || 'Hello!' };
   return {};
@@ -57,8 +45,6 @@ export default function ConnectorsScreen() {
       const next = {};
       for (const c of r.connectors || []) next[c.name] = { ...(c.auth || {}) };
       setAuth(next);
-      // B62 — prefill the WhatsApp test recipient with the personal number.
-      setTests((prev) => ({ ...prev, whatsapp: { ...(prev.whatsapp || {}), to: DEFAULT_WHATSAPP_TEST_TO } }));
     } catch (e) { console.error('Connectors fetch failed', e); }
     setLoading(false);
   };

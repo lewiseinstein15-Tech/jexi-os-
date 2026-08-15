@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { MEMORY_FILE, KNOWLEDGE_DIR, WORKSPACE_DIR } from '../config.js';
+import crypto from 'crypto';
+import { MEMORY_FILE, KNOWLEDGE_DIR, WORKSPACE_DIR, DATA_DIR } from '../config.js';
 import { generateContent, resolveKeys, embedText } from './LLMClient.js';
 
 /**
@@ -48,6 +49,87 @@ let cache = null;
 let redisClient = null;
 let redisEnabled = Boolean(process.env.REDIS_URL);
 let consolidated = false; // run the merge pass once per process (on boot)
+
+/* ------------------------------------------------------------------ */
+/* B66 — per-session conversation memory (Orchestrator-Workers 3d).     */
+/*                                                                      */
+/* The global memory.json stays as the durable knowledge core, but chat  */
+/* HISTORY is now scoped per conversation (session): each session gets   */
+/* its own history file under DATA_DIR/sessions/, so two users (or two   */
+/* devices) never see each other's threads, and a session survives       */
+/* restarts within the same DATA_DIR.                                    */
+/* ------------------------------------------------------------------ */
+const SESSIONS_DIR = path.join(DATA_DIR, 'sessions');
+let activeSession = null; // set per request by the chat handler
+
+/** Hash a raw session id (may contain IPs/colons) into a safe filename. */
+function sessionFile(id) {
+  const safe = crypto.createHash('sha1').update(String(id || 'default')).digest('hex').slice(0, 24);
+  return path.join(SESSIONS_DIR, `${safe}.json`);
+}
+
+/** Set the active session for the current request (chat handler). */
+export function setActiveSession(id) {
+  activeSession = id ? String(id).slice(0, 120) : null;
+  return activeSession;
+}
+
+export function clearActiveSession() { activeSession = null; }
+export function getActiveSession() { return activeSession; }
+
+function loadSessionHistory() {
+  if (!activeSession) return null;
+  try {
+    const p = sessionFile(activeSession);
+    if (fs.existsSync(p)) {
+      const parsed = JSON.parse(fs.readFileSync(p, 'utf-8'));
+      return Array.isArray(parsed.history) ? parsed.history : [];
+    }
+  } catch (e) { /* fall back to global */ }
+  return [];
+}
+
+function saveSessionHistory(history) {
+  if (!activeSession) return;
+  try {
+    fs.mkdirSync(SESSIONS_DIR, { recursive: true });
+    fs.writeFileSync(sessionFile(activeSession), JSON.stringify({ session: activeSession, history }, null, 2), 'utf-8');
+  } catch (e) { /* memory must never break the chat */ }
+}
+
+/**
+ * B66 — persistence probe: prove memory survives a restart/redeploy. Each
+ * process stamps DATA_DIR with its own instance id; the probe reports whether
+ * stamps from PREVIOUS boots are still present (=> the disk is persistent).
+ * On Render this depends on a persistent disk being mounted at DATA_DIR —
+ * ephemeral containers lose it, exactly as the probe will report.
+ */
+export function memoryPersistenceProbe() {
+  const id = process.env.RENDER_INSTANCE_ID || process.env.POD_NAME || `boot-${Math.random().toString(36).slice(2, 10)}`;
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const mine = path.join(DATA_DIR, `.jexi-boot-${String(id).replace(/[^a-zA-Z0-9_-]/g, '')}.json`);
+    fs.writeFileSync(mine, JSON.stringify({ boot: new Date().toISOString(), instance: id }), 'utf-8');
+    const previous = fs.readdirSync(DATA_DIR)
+      .filter((f) => /^\.jexi-boot-/.test(f) && !f.endsWith(String(id).replace(/[^a-zA-Z0-9_-]/g, '') + '.json'))
+      .map((f) => ({ file: f, mtime: fs.statSync(path.join(DATA_DIR, f)).mtime.toISOString() }));
+    const sessionCount = (() => {
+      try { return fs.readdirSync(SESSIONS_DIR).filter((f) => f.endsWith('.json')).length; } catch (e) { return 0; }
+    })();
+    return {
+      dataDir: DATA_DIR,
+      instance: id,
+      previousBootsSeen: previous,
+      persistentDisk: previous.length > 0, // evidence-based, not assumed
+      sessionCount,
+      note: previous.length > 0
+        ? 'previous boot stamps survived — the memory directory is persistent across restarts'
+        : 'no previous boot stamps found — disk persistence not yet proven (mount a persistent disk at DATA_DIR on Render, or set REDIS_URL for cross-restart memory)',
+    };
+  } catch (e) {
+    return { dataDir: DATA_DIR, error: (e && e.message) || String(e), persistentDisk: false };
+  }
+}
 
 function ensureDirs() {
   fs.mkdirSync(path.dirname(MEMORY_FILE), { recursive: true });
@@ -473,9 +555,19 @@ function extractFactsFromMessage(text) {
 
 export function addChat(role, text) {
   const mem = loadMemory();
-  mem.chatHistory.push({ role, text: String(text || '').slice(0, 20000), time: new Date().toISOString() });
+  const entry = { role, text: String(text || '').slice(0, 20000), time: new Date().toISOString() };
+  mem.chatHistory.push(entry);
   // Keep the last 200 exchanges so long conversations stay focused
   if (mem.chatHistory.length > 200) mem.chatHistory = mem.chatHistory.slice(-200);
+
+  // B66 — per-session mirror: the active session's history file gets the
+  // same entry, so each conversation thread is isolated and durable.
+  const sessionHistory = loadSessionHistory();
+  if (Array.isArray(sessionHistory)) {
+    sessionHistory.push(entry);
+    if (sessionHistory.length > 200) sessionHistory.splice(0, sessionHistory.length - 200);
+    saveSessionHistory(sessionHistory);
+  }
 
   // User messages may carry lasting facts — capture them into semantic memory
   if (role === 'user') {
@@ -485,6 +577,12 @@ export function addChat(role, text) {
 }
 
 export function getChatHistory(n = 20) {
+  // B66 — session-scoped history wins when a session is active; the global
+  // core remains the fallback (tests / non-session callers).
+  if (activeSession) {
+    const sessionHistory = loadSessionHistory();
+    if (Array.isArray(sessionHistory) && sessionHistory.length) return sessionHistory.slice(-n);
+  }
   return loadMemory().chatHistory.slice(-n);
 }
 

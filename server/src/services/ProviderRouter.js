@@ -79,7 +79,9 @@ export function markProviderUnavailable(key, minutes = 60) {
 // Extra free OpenAI-compatible providers — slots in after the big three,
 // before HuggingFace (slow last-resort). Each is optional; a missing key is
 // simply skipped by the router. Adding one only means setting ONE env var.
-const EXTRA_PROVIDERS = ['cerebras', 'deepinfra', 'mistral', 'xai'];
+// B66 — DeepSeek joins the free/optional OpenAI-compatible tier (the primary
+// coding coworker). Qwen is reached via OpenRouter models (no separate key).
+const EXTRA_PROVIDERS = ['cerebras', 'deepinfra', 'mistral', 'xai', 'deepseek'];
 
 export function providerOrder(prefer = '') {
   const base =
@@ -104,6 +106,7 @@ const ENV_MAP = {
   deepinfra: 'DEEPINFRA_API_KEY',
   mistral: 'MISTRAL_API_KEY',
   xai: 'XAI_API_KEY',
+  deepseek: 'DEEPSEEK_API_KEY',
 };
 
 /** Which providers have keys configured right now (no secrets exposed). */
@@ -116,7 +119,7 @@ export function providerHealthSnapshot() {
   const now = Date.now();
   const names = {
     groq: 'Groq', gemini: 'Gemini', openrouter: 'OpenRouter', huggingface: 'HuggingFace',
-    cerebras: 'Cerebras', deepinfra: 'DeepInfra', mistral: 'Mistral', xai: 'Grok (xAI)',
+    cerebras: 'Cerebras', deepinfra: 'DeepInfra', mistral: 'Mistral', xai: 'Grok (xAI)', deepseek: 'DeepSeek',
   };
   return providerOrder().map((k) => {
     const s = h(k);

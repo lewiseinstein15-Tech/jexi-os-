@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Groq } from 'groq-sdk';
 import { loadSettings } from './SettingsManager.js';
 import { providerOrder, recordProviderSuccess, recordProviderFailure, configuredProviders, markProviderUnavailable } from './ProviderRouter.js';
+import { queryLocalLLM } from './OfflineAgent.js';
 
 /**
  * Keys are resolved in this order:
@@ -19,6 +20,7 @@ export function resolveKeys() {
     deepinfraKey: process.env.DEEPINFRA_API_KEY || settings.deepinfraKey || '',
     mistralKey: process.env.MISTRAL_API_KEY || settings.mistralKey || '',
     xaiKey: process.env.XAI_API_KEY || settings.xaiKey || '',
+    deepseekKey: process.env.DEEPSEEK_API_KEY || settings.deepseekKey || '',
   };
 }
 
@@ -58,6 +60,14 @@ const MISTRAL_MODELS = ['open-mistral-7b', 'open-mixtral-8x7b']; // Experiment f
 // grok-4.6 (verified against docs.x.ai/developers/models, Aug 2026); aliases
 // like grok-4 auto-migrate, and grok-3 stays as a fallback for older keys.
 const XAI_MODELS = ['grok-4.6', 'grok-4', 'grok-3'];
+
+// DeepSeek (B66 — primary coding coworker). OpenAI-compatible at
+// https://api.deepseek.com. deepseek-chat is the flagship reasoning chat
+// model; deepseek-reasoner the chain-of-thought variant.
+const DEEPSEEK_MODELS = ['deepseek-chat', 'deepseek-reasoner'];
+
+// Qwen (B66 — memory coworker + coding fallback) via OpenRouter free tier.
+const QWEN_MODELS = ['qwen/qwen3-8b:free', 'qwen/qwen-2.5-72b-instruct:free'];
 
 const TIMEOUT_MS = 90000;
 
@@ -106,7 +116,7 @@ async function tryGroq(prompt, system, imageBase64, opts, errors) {
   const { groqKey } = resolveKeys();
   if (!groqKey) return null;
   const groq = new Groq({ apiKey: groqKey });
-  const models = imageBase64 ? GROQ_VISION_MODELS : [opts.model || GROQ_TEXT_MODEL];
+  const models = imageBase64 ? GROQ_VISION_MODELS : (opts.model ? [opts.model] : [GROQ_TEXT_MODEL]);
   for (const model of models) {
     try {
       const messages = [
@@ -141,7 +151,7 @@ async function tryGemini(prompt, system, imageBase64, opts, errors) {
   const { geminiKey } = resolveKeys();
   if (!geminiKey) return null;
   const genAI = new GoogleGenerativeAI(geminiKey);
-  const primary = opts.geminiModel || process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+  const primary = opts.model || opts.geminiModel || process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
   const candidates = [primary, ...GEMINI_FALLBACK_MODELS.filter(m => m !== primary)].slice(0, 4);
   for (const modelName of candidates) {
     try {
@@ -171,7 +181,7 @@ async function tryGemini(prompt, system, imageBase64, opts, errors) {
 async function tryOpenRouter(prompt, system, imageBase64, opts, errors) {
   const { openrouterKey } = resolveKeys();
   if (!openrouterKey) return null;
-  const models = imageBase64 ? OPENROUTER_VISION_MODELS : OPENROUTER_TEXT_MODELS;
+  const models = imageBase64 ? OPENROUTER_VISION_MODELS : (opts.model ? [opts.model] : OPENROUTER_TEXT_MODELS);
   for (const model of models) {
     try {
       const controller = new AbortController();
@@ -312,13 +322,16 @@ async function tryOpenAICompat({ key, baseUrl, models, label, providerKey = '' }
 }
 
 const tryCerebras = (p, s, img, o, e) =>
-  tryOpenAICompat({ key: resolveKeys().cerebrasKey, baseUrl: 'https://api.cerebras.ai/v1', models: CEREBRAS_MODELS, label: 'Cerebras', providerKey: 'cerebras' }, p, s, img, o, e);
+  tryOpenAICompat({ key: resolveKeys().cerebrasKey, baseUrl: 'https://api.cerebras.ai/v1', models: o.model ? [o.model] : CEREBRAS_MODELS, label: 'Cerebras', providerKey: 'cerebras' }, p, s, img, o, e);
 const tryDeepInfra = (p, s, img, o, e) =>
-  tryOpenAICompat({ key: resolveKeys().deepinfraKey, baseUrl: 'https://api.deepinfra.com/v1/openai', models: DEEPINFRA_MODELS, label: 'DeepInfra', providerKey: 'deepinfra' }, p, s, img, o, e);
+  tryOpenAICompat({ key: resolveKeys().deepinfraKey, baseUrl: 'https://api.deepinfra.com/v1/openai', models: o.model ? [o.model] : DEEPINFRA_MODELS, label: 'DeepInfra', providerKey: 'deepinfra' }, p, s, img, o, e);
 const tryMistral = (p, s, img, o, e) =>
-  tryOpenAICompat({ key: resolveKeys().mistralKey, baseUrl: 'https://api.mistral.ai/v1', models: MISTRAL_MODELS, label: 'Mistral', providerKey: 'mistral' }, p, s, img, o, e);
+  tryOpenAICompat({ key: resolveKeys().mistralKey, baseUrl: 'https://api.mistral.ai/v1', models: o.model ? [o.model] : MISTRAL_MODELS, label: 'Mistral', providerKey: 'mistral' }, p, s, img, o, e);
 const tryXai = (p, s, img, o, e) =>
-  tryOpenAICompat({ key: resolveKeys().xaiKey, baseUrl: 'https://api.x.ai/v1', models: XAI_MODELS, label: 'Grok', providerKey: 'xai' }, p, s, img, o, e);
+  tryOpenAICompat({ key: resolveKeys().xaiKey, baseUrl: 'https://api.x.ai/v1', models: o.model ? [o.model] : XAI_MODELS, label: 'Grok', providerKey: 'xai' }, p, s, img, o, e);
+// B66 — DeepSeek: primary coding coworker (model forced via opts.model).
+const tryDeepSeek = (p, s, img, o, e) =>
+  tryOpenAICompat({ key: resolveKeys().deepseekKey, baseUrl: 'https://api.deepseek.com/v1', models: o.model ? [o.model] : DEEPSEEK_MODELS, label: 'DeepSeek', providerKey: 'deepseek' }, p, s, img, o, e);
 
 const PROVIDER_CALLS = {
   groq: tryGroq,
@@ -329,6 +342,7 @@ const PROVIDER_CALLS = {
   deepinfra: tryDeepInfra,
   mistral: tryMistral,
   xai: tryXai,
+  deepseek: tryDeepSeek,
 };
 
 /**
@@ -336,13 +350,19 @@ const PROVIDER_CALLS = {
  * ProviderRouter order (Groq → Gemini → OpenRouter → HuggingFace by default;
  * Gemini-first for code). Each provider's success/failure updates the router's
  * health state, so a provider that keeps failing drops to the back of the line.
+ *
+ * B66 — worker selection: `opts.provider` restricts the walk to ONE provider
+ * and `opts.model` forces a specific model on it. This is how the
+ * Orchestrator-Workers router assigns exact models per coworker (DeepSeek
+ * for coding, Qwen for memory, Grok for research…) instead of only
+ * reordering a preference list.
  */
 export async function generateContent(prompt, systemInstruction = '', imageBase64 = null, opts = {}) {
   const errors = [];
   const system = systemInstruction || 'You are JEXI OS, an expert AI operating system.';
 
   const prefer = opts.prefer || (imageBase64 ? 'gemini' : '');
-  const order = providerOrder(prefer);
+  const order = opts.provider ? [opts.provider] : providerOrder(prefer);
 
   for (const provider of order) {
     const call = PROVIDER_CALLS[provider];
@@ -363,7 +383,7 @@ export async function generateContent(prompt, systemInstruction = '', imageBase6
   if (keys.length > 0) {
     throw new Error(`All AI providers failed. ${errors.join(' | ')}`);
   }
-  throw new Error('No API keys configured. Add a key in Settings (Groq, Gemini, OpenRouter, Cerebras, DeepInfra, Mistral, Grok or HuggingFace), or set the matching env var in Render.');
+  throw new Error('No API keys configured. Add a key in Settings (Groq, Gemini, OpenRouter, Cerebras, DeepInfra, Mistral, Grok, DeepSeek or HuggingFace), or set the matching env var in Render.');
 }
 
 /** Ask the LLM a yes/no or one-word verification question. */
@@ -407,4 +427,145 @@ export async function testAllProviders() {
   const configuredCount = configured.length;
   const working = results.filter((r) => r.ok).length;
   return { tested: results, configured: configuredCount, working, total: Object.keys(PROVIDER_CALLS).length };
+}
+
+/* ------------------------------------------------------------------ */
+/* B66 — Orchestrator-Workers: native tool-calling (function calling).  */
+/*                                                                     */
+/* Replaces the JSON-in-prose tool extraction in AgentLoop.js for the   */
+/* orchestrator path: the model declares REAL tool_calls through the    */
+/* provider's native API (Groq, OpenRouter, DeepSeek, xAI, Cerebras,    */
+/* DeepInfra, Mistral are all OpenAI-compatible; Gemini/HF are text-    */
+/* only here and are skipped for tool calling).                        */
+/* ------------------------------------------------------------------ */
+
+const TOOL_CAPABLE = new Set(['groq', 'openrouter', 'deepseek', 'xai', 'cerebras', 'deepinfra', 'mistral']);
+
+function parseToolCalls(msg) {
+  return (msg?.tool_calls || [])
+    .filter((tc) => tc && tc.function)
+    .map((tc) => {
+      let args = {};
+      try { args = JSON.parse(tc.function.arguments || '{}'); } catch (e) { /* keep {} */ }
+      return { name: tc.function.name || '', arguments: args };
+    })
+    .filter((tc) => tc.name);
+}
+
+/** One native tool-calling request against one OpenAI-compatible provider. */
+async function callWithTools(provider, prompt, system, tools, opts, errors) {
+  const keys = resolveKeys();
+  const cfg = {
+    groq: { key: keys.groqKey, baseUrl: null, sdk: true, models: [opts.model || GROQ_TEXT_MODEL] },
+    openrouter: { key: keys.openrouterKey, baseUrl: 'https://openrouter.ai/api/v1', models: [opts.model || OPENROUTER_TEXT_MODELS[0]] },
+    deepseek: { key: keys.deepseekKey, baseUrl: 'https://api.deepseek.com/v1', models: [opts.model || 'deepseek-chat'] },
+    xai: { key: keys.xaiKey, baseUrl: 'https://api.x.ai/v1', models: [opts.model || XAI_MODELS[0]] },
+    cerebras: { key: keys.cerebrasKey, baseUrl: 'https://api.cerebras.ai/v1', models: [opts.model || CEREBRAS_MODELS[0]] },
+    deepinfra: { key: keys.deepinfraKey, baseUrl: 'https://api.deepinfra.com/v1/openai', models: [opts.model || DEEPINFRA_MODELS[0]] },
+    mistral: { key: keys.mistralKey, baseUrl: 'https://api.mistral.ai/v1', models: [opts.model || MISTRAL_MODELS[0]] },
+  }[provider];
+  if (!cfg || !cfg.key) return null;
+  const messages = [{ role: 'system', content: system }, { role: 'user', content: prompt }];
+  for (const model of cfg.models) {
+    try {
+      let text = '';
+      let toolCalls = [];
+      if (cfg.sdk) {
+        const groq = new Groq({ apiKey: cfg.key });
+        const completion = await groq.chat.completions.create(
+          { messages, model, tools, tool_choice: 'auto', temperature: opts.temperature ?? 0.3 },
+          { timeout: TIMEOUT_MS }
+        );
+        const msg = completion.choices?.[0]?.message;
+        text = (msg && msg.content) || '';
+        toolCalls = parseToolCalls(msg);
+      } else {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+        try {
+          const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.key}` },
+            body: JSON.stringify({ model, messages, tools, tool_choice: 'auto', temperature: opts.temperature ?? 0.3 }),
+            signal: controller.signal,
+          });
+          if (!res.ok) {
+            const b = await res.text().catch(() => '');
+            errors.push(`${provider}(${model}): HTTP ${res.status} ${b.slice(0, 120)}`);
+            continue;
+          }
+          const data = await res.json();
+          const msg = data?.choices?.[0]?.message;
+          text = (msg && msg.content) || '';
+          toolCalls = parseToolCalls(msg);
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+      return { text: String(text || '').trim(), toolCalls, model };
+    } catch (e) {
+      errors.push(`${provider}(${model}): ${e.message}`);
+      console.error(`[LLMClient] ${provider} tool-call failed:`, e.message);
+    }
+  }
+  return null;
+}
+
+/**
+ * Native function-calling generation. `tools` are OpenAI-style schemas:
+ *   [{ type: 'function', function: { name, description, parameters } }]
+ * Returns { ok, provider, model, text, toolCalls: [{name, arguments}] }.
+ * `opts.provider` pins the walk to one provider (worker assignment);
+ * otherwise the health-aware order is used, skipping non-tool providers.
+ */
+export async function generateWithTools(prompt, systemInstruction = '', tools = [], opts = {}) {
+  const errors = [];
+  const system = systemInstruction || 'You are JEXI OS, an expert AI operating system.';
+  const order = opts.provider ? [opts.provider] : providerOrder(opts.prefer || '');
+  for (const provider of order) {
+    if (!TOOL_CAPABLE.has(provider)) continue;
+    try {
+      const res = await callWithTools(provider, prompt, system, tools, opts, errors);
+      if (res && (res.toolCalls.length || res.text)) {
+        recordProviderSuccess(provider);
+        return { ok: true, provider, model: res.model || null, text: res.text, toolCalls: res.toolCalls };
+      }
+    } catch (e) {
+      errors.push(`${provider}: ${e.message}`);
+    }
+    recordProviderFailure(provider);
+  }
+  throw new Error(`All AI providers failed for tool calling. ${errors.join(' | ') || 'no tool-capable provider configured'}`);
+}
+
+/* ------------------------------------------------------------------ */
+/* B66 — graceful degradation. generateContentSafe NEVER throws: on a   */
+/* total provider failure it tries the local backend (OfflineAgent,     */
+/* OLLAMA_BASE_URL) and only then returns an honest, readable degraded  */
+/* message instead of a raw "All AI providers failed" error.            */
+/* ------------------------------------------------------------------ */
+
+function honestDegradedMessage(reason) {
+  const r = String(reason || '').slice(0, 400);
+  return `### ⚠ JEXI OS — degraded mode\n\nI'm having trouble reaching my usual AI resources right now${r ? ` (${r})` : ''}. This means I can't produce a full, thoughtful answer at the moment — no provider completed the request.\n\nWhat you can do:\n- Try again in a minute or two — rate limits and temporary outages usually clear quickly.\n- Check that your model keys are valid in **Settings → Models** (and the matching env vars on Render).\n- If you run a local model (Ollama), set \`OLLAMA_BASE_URL\` and I'll route through it automatically.\n\nI'm not going to guess or pretend — that's the honest status right now.`;
+}
+
+/**
+ * Never-throw generateContent. Returns { ok, text, degraded } — on total
+ * failure: { ok: false, degraded: true, error, text: honestDegradedMessage }.
+ */
+export async function generateContentSafe(prompt, systemInstruction = '', imageBase64 = null, opts = {}) {
+  try {
+    const text = await generateContent(prompt, systemInstruction, imageBase64, opts);
+    return { ok: true, text: String(text || '').trim(), degraded: false };
+  } catch (e) {
+    const reason = (e && e.message) || String(e);
+    try {
+      const local = await queryLocalLLM(String(prompt || '').slice(0, 6000), {});
+      if (local && local.ok && local.text) {
+        return { ok: true, text: String(local.text).trim(), degraded: true, local: true, provider: 'local' };
+      }
+    } catch (err) { /* fall through to the honest message */ }
+    return { ok: false, degraded: true, error: reason, text: honestDegradedMessage(reason) };
+  }
 }

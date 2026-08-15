@@ -1,12 +1,12 @@
 /**
- * JEXI OS — B56 acceptance suite (Connector System), extended through B61.
+ * JEXI OS — B56 acceptance suite (Connector System), extended through B66.
  *
  * ⚠️ MOCK DISCLOSURE — every provider call in this suite goes to a LOCAL MOCK
- * SERVER (server/tests/connectorMocks.js) that mimics the real WhatsApp /
- * GitHub / Resend API response shapes. NO live credentials are used anywhere
- * in this file. The connector code paths are byte-identical to what runs
- * against the real providers (only the base URL differs; it defaults to the
- * real provider URL when unset).
+ * SERVER (server/tests/connectorMocks.js) that mimics the real GitHub /
+ * Resend API response shapes. NO live credentials are used anywhere in this
+ * file. The connector code paths are byte-identical to what runs against the
+ * real providers (only the base URL differs; it defaults to the real provider
+ * URL when unset).
  *
  * Covers the directive's verification checklist per connector:
  *   - authenticate() actually calls the (mock) provider
@@ -14,16 +14,18 @@
  *   - one successful receive()/webhook parse with normalized output
  *   - failure paths EXECUTED, not just coded: auth failure (401), rate limit
  *     (429), network timeout, malformed response
- *   - webhook signature verification (WhatsApp X-Hub-Signature-256, GitHub
- *     sha256/sha1, Resend Svix HMAC-SHA256) + Meta hub.challenge
+ *   - webhook signature verification (GitHub sha256/sha1, Resend Svix
+ *     HMAC-SHA256)
  *   - B61: GitHub create_file / update_file (Contents API with SHA read),
  *     Resend inbound (Svix verify + Received-emails fetch) + reply() with
- *     Re:/threading headers, WhatsApp auto-reply loop (JEXI answers inbound
- *     texts automatically and the reply is recorded in the inbox)
+ *     Re:/threading headers
+ *   - B66: the Meta messaging connector was removed — zero references remain
+ *   - B66: email auto-reply loop (verified inbound email.received → JEXI
+ *     generates a reply → send() → recorded in the inbox) and creator
+ *     recognition (lewiseinstein15@gmail.com → creator: true)
  *   - connectorToToolSchema introspects real send() signatures
  *   - the agent-facing connector-call tool is EXTERNAL-tier and always pauses
  *     for one approval with finalized details
- *   - Telegram was removed in B61 — zero references remain
  */
 process.env.DATA_DIR = process.env.DATA_DIR || `/tmp/jexi-b56-${Date.now()}`;
 
@@ -32,15 +34,12 @@ process.env.DATA_DIR = process.env.DATA_DIR || `/tmp/jexi-b56-${Date.now()}`;
 // only ever hit the mocks.
 for (const key of [
   'GITHUB_TOKEN', 'GH_TOKEN', 'GITHUB_APP_ID', 'GITHUB_PRIVATE_KEY', 'GITHUB_INSTALLATION_ID', 'GITHUB_WEBHOOK_SECRET',
-  'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_APP_SECRET', 'WHATSAPP_VERIFY_TOKEN',
-  'PHONE_NUMBER_ID', 'APP_SECRET', 'VERIFY_TOKEN',
-  'RESEND_API_KEY', 'RESEND_FROM', 'RESEND_WEBHOOK_SECRET',
+  'RESEND_API_KEY', 'RESEND_FROM', 'RESEND_WEBHOOK_SECRET', 'JEXI_CREATOR_EMAIL',
 ]) delete process.env[key];
 
 import { ConnectorRegistry } from './src/connectors/ConnectorRegistry.js';
 import { ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, withTimeout, maskSecret, createHmacSha256, createHmacSha1, assertAsciiSecret } from './src/connectors/ConnectorBase.js';
 import { recordWebhookEvents, recordHandshake, listInbound, listConversations, resetConnectorInbox } from './src/services/ConnectorInbox.js';
-import { registerWhatsAppConnector, WhatsAppConnector } from './src/connectors/whatsapp.js';
 import { registerGitHubConnector, GitHubConnector } from './src/connectors/github.js';
 import { registerEmailConnector, ResendConnector, verifySvixSignature, verifySvixSignatureDetailed } from './src/connectors/email.js';
 import { registerConnectors, getConnectorStatus, saveConnectorConfig, callConnector, handleConnectorWebhook, setInboundReplyGenerator } from './src/connectors/index.js';
@@ -78,7 +77,7 @@ console.log('\n== B56 CORE — REGISTRY + ERROR TAXONOMY ==');
 
 try { ConnectorRegistry.register('broken', { send() {} }); ok(false, 'register() throws when authenticate is missing'); } catch (e) { ok(true, 'register() throws when authenticate is missing'); }
 try { ConnectorRegistry.register('nope', { description: 'not a connector' }); ok(false, 'register() throws for a non-connector object'); } catch (e) { ok(true, 'register() throws for a non-connector object'); }
-ok(registerConnectors().length >= 3, 'registerConnectors() registers every connector from settings without throwing');
+ok(registerConnectors().length >= 2, 'registerConnectors() registers every connector from settings without throwing');
 ConnectorRegistry.clear();
 
 ok(ERROR_CODES.AUTH_FAILED === 'AUTH_FAILED' && ERROR_CODES.RATE_LIMITED === 'RATE_LIMITED', 'error taxonomy defines auth/rate-limit/timeout/malformed codes');
@@ -91,77 +90,10 @@ try { await withTimeout(new Promise(() => {}), 300, 'test'); } catch (e) { timed
 ok(timedOut instanceof ConnectorError && timedOut.code === ERROR_CODES.TIMEOUT && Date.now() - t0 < 2000, 'withTimeout rejects with TIMEOUT instead of hanging', timedOut && timedOut.message);
 
 // httpJson direct failure classification (unit-level, no connector involved).
-await expectError(() => httpJson(`${mocks.whatsapp.url}/v21.0/123`, { headers: { Authorization: 'Bearer bad-token' }, provider: 'mock' }), ERROR_CODES.AUTH_FAILED, 'httpJson classifies 401 as AUTH_FAILED');
-await expectError(() => httpJson(`${mocks.whatsapp.url}/v21.0/123`, { headers: { Authorization: 'Bearer ratelimit-token' }, provider: 'mock' }), ERROR_CODES.RATE_LIMITED, 'httpJson classifies 429 as RATE_LIMITED');
+await expectError(() => httpJson(`${mocks.github.url}/user`, { headers: { Authorization: 'Bearer bad-token' }, provider: 'mock' }), ERROR_CODES.AUTH_FAILED, 'httpJson classifies 401 as AUTH_FAILED');
+await expectError(() => httpJson(`${mocks.github.url}/repos/o/r/issues`, { headers: { Authorization: 'Bearer ratelimit-token' }, provider: 'mock' }), ERROR_CODES.RATE_LIMITED, 'httpJson classifies 429 as RATE_LIMITED');
 await expectError(() => httpJson(`${hanging.url}/never`, { timeout: 400, provider: 'mock' }), ERROR_CODES.TIMEOUT, 'httpJson classifies a hang as TIMEOUT');
 await expectError(() => httpJson('http://127.0.0.1:1/nope', { timeout: 1500, provider: 'mock' }), ERROR_CODES.NETWORK, 'httpJson classifies connection failure as NETWORK');
-
-/* ------------------------------------------------------------------ */
-console.log('\n== B56 WHATSAPP (MOCK — WhatsApp Business Cloud API shape) ==');
-/* ------------------------------------------------------------------ */
-
-const wa = registerWhatsAppConnector(new ConnectorConfig({
-  name: 'whatsapp',
-  auth: { accessToken: 'ok-token', phoneNumberId: 'PHONE_ID', appSecret: 'app-secret', verifyToken: 'jexi-verify', baseUrl: mocks.whatsapp.url },
-}));
-
-ok(await wa.authenticate(), 'authenticate() actually calls the provider (mock) and succeeds with a valid token');
-const waBad = new WhatsAppConnector(new ConnectorConfig({ name: 'whatsapp', auth: { accessToken: 'bad-token', phoneNumberId: 'PHONE_ID', baseUrl: mocks.whatsapp.url } }));
-await expectError(() => waBad.authenticate(), ERROR_CODES.AUTH_FAILED, 'authenticate() fails with AUTH_FAILED on a bad token (401 path executed)');
-
-const waText = await wa.send({ to: '15550001111', type: 'text', text: 'Hello from JEXI' });
-ok(waText.ok === true && /^wamid\.mock\./.test(waText.wamid), 'send() text → provider wamid returned', `wamid=${waText.wamid}`);
-const waTemplate = await wa.send({ to: '15550001111', type: 'template', template: { name: 'hello_world', language: 'en_US' } });
-ok(waTemplate.ok === true && !!waTemplate.wamid, 'send() template → provider response returned');
-const waMedia = await wa.send({ to: '15550001111', type: 'media', media: { kind: 'image', link: 'https://example.com/pic.jpg', caption: 'hi' } });
-ok(waMedia.ok === true && !!waMedia.wamid, 'send() media → provider response returned');
-
-const waRate = new WhatsAppConnector(new ConnectorConfig({ name: 'whatsapp', auth: { accessToken: 'ratelimit-token', phoneNumberId: 'PHONE_ID', baseUrl: mocks.whatsapp.url } }));
-await expectError(() => waRate.send({ to: '15550001111', text: 'hi' }), ERROR_CODES.RATE_LIMITED, 'send() rate-limited (429 path executed)');
-const waFail = new WhatsAppConnector(new ConnectorConfig({ name: 'whatsapp', auth: { accessToken: 'fail-token', phoneNumberId: 'PHONE_ID', baseUrl: mocks.whatsapp.url } }));
-await expectError(() => waFail.send({ to: '15550001111', text: 'hi' }), ERROR_CODES.PROVIDER_ERROR, 'send() provider 500 (error path executed)');
-const waMalformed = new WhatsAppConnector(new ConnectorConfig({ name: 'whatsapp', auth: { accessToken: 'malformed-token', phoneNumberId: 'PHONE_ID', baseUrl: mocks.whatsapp.url } }));
-await expectError(() => waMalformed.send({ to: '15550001111', text: 'hi' }), ERROR_CODES.MALFORMED_RESPONSE, 'send() malformed response (wrong-shape body path executed)');
-
-// B63 — permanent-chat hardening: a free-form text send rejected because the
-// 24h window is closed (Meta #131047) transparently retries as the approved
-// template, so "anyone can chat" works outside the window too.
-const waWindow = new WhatsAppConnector(new ConnectorConfig({ name: 'whatsapp', auth: { accessToken: 'window-token', phoneNumberId: 'PHONE_ID', baseUrl: mocks.whatsapp.url } }));
-const waWindowRes = await waWindow.send({ to: '15550001111', type: 'text', text: 'Hello again' });
-ok(waWindowRes.ok === true && waWindowRes.fallback === 'template' && /wamid\.mock\.template/.test(waWindowRes.wamid), 'outside-window text send auto-falls back to the hello_world template', JSON.stringify(waWindowRes));
-const waWindowExplicit = await waWindow.send({ to: '15550001111', type: 'template', template: { name: 'hello_world', language: 'en_US' } });
-ok(waWindowExplicit.ok === true, 'explicit template send passes through unchanged (fallback only fires for text)');
-const waWindowCustom = new WhatsAppConnector(new ConnectorConfig({ name: 'whatsapp', auth: { accessToken: 'window-token', phoneNumberId: 'PHONE_ID', templateName: 'jexi_greeting', templateLang: 'en', baseUrl: mocks.whatsapp.url } }));
-const waWindowCustomRes = await waWindowCustom.send({ to: '15550001111', type: 'text', text: 'Hi' });
-ok(waWindowCustomRes.ok === true && waWindowCustomRes.fallback === 'template', 'custom WHATSAPP_TEMPLATE_NAME is used for the fallback');
-
-// Meta webhook verification handshake (hub.challenge).
-const handshake = wa.handleWebhookVerification({ 'hub.mode': 'subscribe', 'hub.verify_token': 'jexi-verify', 'hub.challenge': '12345' });
-ok(handshake.verified === true && handshake.challenge === '12345', 'hub.challenge verification handshake returns the challenge');
-const badHandshake = wa.handleWebhookVerification({ 'hub.mode': 'subscribe', 'hub.verify_token': 'wrong', 'hub.challenge': '1' });
-ok(badHandshake.verified === false, 'hub.challenge rejects a wrong verify_token');
-
-// X-Hub-Signature-256 over the RAW body.
-const waRaw = JSON.stringify({ object: 'whatsapp_business_account', entry: [] });
-ok(wa.verifyWebhookSignature(waRaw, `sha256=${createHmacSha256('app-secret', waRaw)}`) === true, 'webhook signature verified (HMAC-SHA256 over raw body)');
-ok(wa.verifyWebhookSignature(waRaw, 'sha256=deadbeef') === false, 'webhook signature rejected when tampered');
-ok(wa.verifyWebhookSignature(waRaw, '') === false, 'webhook signature rejected when missing');
-
-// normalizeInbound — the internal event shape.
-const waEvents = wa.normalizeInbound({
-  object: 'whatsapp_business_account',
-  entry: [{ id: '123', changes: [{ value: {
-    messaging_product: 'whatsapp',
-    metadata: { display_phone_number: '+15550000000', phone_number_id: 'PHONE_ID' },
-    contacts: [{ profile: { name: 'Ada' }, wa_id: '15550001111' }],
-    messages: [{ from: '15550001111', id: 'wamid.HBgN', timestamp: '1691785099', type: 'text', text: { body: 'Hello JEXI' } }],
-  }, field: 'messages' }] }],
-});
-ok(waEvents.length === 1 && waEvents[0].from === '15550001111' && waEvents[0].text === 'Hello JEXI' && waEvents[0].provider === 'whatsapp', 'receive() normalizes a real webhook payload', JSON.stringify(waEvents[0]));
-
-// Connector-level TIMEOUT via the configurable request timeout.
-const waHang = new WhatsAppConnector(new ConnectorConfig({ name: 'whatsapp', auth: { accessToken: 'ok-token', phoneNumberId: 'PHONE_ID', baseUrl: hanging.url, requestTimeout: 400 } }));
-await expectError(() => waHang.authenticate(), ERROR_CODES.TIMEOUT, 'connector-level network timeout → TIMEOUT (configurable requestTimeout)');
 
 /* ------------------------------------------------------------------ */
 console.log('\n== B56 GITHUB (MOCK — GitHub REST API shape) ==');
@@ -317,6 +249,15 @@ const inboundEvents = await emWeb.receive(JSON.parse(emailPayload));
 ok(inboundEvents.length === 1 && inboundEvents[0].type === 'inbound' && inboundEvents[0].provider === 'resend', 'inbound email webhook → normalized inbound event');
 ok(inboundEvents[0].text === 'Hello JEXI, can you reply?' && inboundEvents[0].subject === 'Testing JEXI inbound', 'receive() fetches the full body from the Received-emails API');
 ok(inboundEvents[0].messageId === '<orig-msg-1@example.com>' && inboundEvents[0].from === 'user@example.com' && inboundEvents[0].to[0] === 'jexi@yourdomain.com', 'inbound event carries sender + recipient + Message-ID');
+ok(inboundEvents[0].creator === false, 'non-creator sender → creator: false (recognition is specific, not blanket)');
+
+// B66 — CREATOR RECOGNITION: an inbound email from JEXI's creator (Lewis,
+// lewiseinstein15@gmail.com by default) is flagged creator: true with the
+// same parsed metadata as any other sender — recognition, not bypass.
+const creatorPayload = JSON.stringify({ type: 'email.received', data: { email_id: 'creator-inbound-1', from: 'lewiseinstein15@gmail.com', to: ['jexi@yourdomain.com'], subject: 'Directive from Lewis', created_at: '2026-08-15T12:05:00.000Z' } });
+const creatorEvents = await emWeb.receive(JSON.parse(creatorPayload));
+ok(creatorEvents.length === 1 && creatorEvents[0].creator === true && creatorEvents[0].from === 'lewiseinstein15@gmail.com', 'creator recognition: lewiseinstein15@gmail.com → creator: true', JSON.stringify({ creator: creatorEvents[0] && creatorEvents[0].creator, from: creatorEvents[0] && creatorEvents[0].from }));
+ok(creatorEvents[0].text === 'JEXI, please build me a landing page for a new product.' && creatorEvents[0].subject === 'Directive from Lewis', 'creator email body + subject parsed normally (recognition never alters the message)', creatorEvents[0] && creatorEvents[0].text);
 
 // Webhook dispatch: Svix-verified email.received → recorded in the inbox.
 ConnectorRegistry.unregister('email');
@@ -355,18 +296,14 @@ ok(lastSentFrom === 'JEXI OS <onboarding@resend.dev>', 'reply() falls back to th
 console.log('\n== B56 TOOL BRIDGE — introspected agent tool schemas ==');
 /* ------------------------------------------------------------------ */
 
-ok(JSON.stringify(introspectSendSignature(wa)) === JSON.stringify(['payload']), 'send() signature introspected (not a hardcoded stub)', `params=${JSON.stringify(introspectSendSignature(wa))}`);
-const waSchema = connectorToToolSchema('whatsapp');
-ok(waSchema.function.name === 'send_whatsapp', 'tool name derived from the connector');
-ok(waSchema.function.parameters.properties.to && waSchema.function.parameters.required.includes('to'), 'payload fields expanded from the connector schema (to required)');
-ok(waSchema.function.parameters.properties.text && waSchema.function.parameters.properties.template && waSchema.function.parameters.properties.media, 'text/template/media fields present');
+ok(JSON.stringify(introspectSendSignature(em)) === JSON.stringify(['payload']), 'send() signature introspected (not a hardcoded stub)', `params=${JSON.stringify(introspectSendSignature(em))}`);
 const ghSchema = connectorToToolSchema('github');
 ok(ghSchema.function.name === 'send_github' && ghSchema.function.parameters.required.includes('action') && ghSchema.function.parameters.required.includes('owner'), 'github tool schema: action+owner required, action description present');
 ok(ghSchema.function.parameters.properties.path && ghSchema.function.parameters.properties.content && ghSchema.function.parameters.properties.message, 'github tool schema exposes create_file/update_file fields (path/content/message)');
 const emSchema = connectorToToolSchema('email');
-ok(emSchema.function.name === 'send_email' && emSchema.function.parameters.properties.subject, 'email tool schema: subject present');
+ok(emSchema.function.name === 'send_email' && emSchema.function.parameters.properties.subject && emSchema.function.parameters.properties.to, 'email tool schema: subject + to present');
 const allTools = listConnectorTools();
-ok(allTools.length >= 3 && allTools.every((t) => t.type === 'function' && t.function.name.startsWith('send_')), 'schemas generated for every registered connector', allTools.map((t) => t.function.name).join(', '));
+ok(allTools.length >= 2 && allTools.every((t) => t.type === 'function' && t.function.name.startsWith('send_')), 'schemas generated for every registered connector', allTools.map((t) => t.function.name).join(', '));
 
 /* ------------------------------------------------------------------ */
 console.log('\n== B56 AGENT PATH — connector-call tool gating (EXTERNAL tier) ==');
@@ -390,7 +327,7 @@ const declined = await executeTool({ slug: 'connector-call', args: { name: 'gith
 ok(declined.ok === false && declined.declined === true, 'declined EXTERNAL send is cancelled — exactly one approval asked');
 
 // health via the agent path (READ tier → no approval, runs).
-const healthRes = await executeTool({ slug: 'connector-call', args: { name: 'whatsapp', method: 'health' }, profile: 'full' });
+const healthRes = await executeTool({ slug: 'connector-call', args: { name: 'github', method: 'health' }, profile: 'full' });
 ok(healthRes.ok === true && String(healthRes.result).includes('"status": "ok"'), 'connector health via agent path (READ tier, no approval)');
 
 // Unknown connector → honest structured failure, not a fabricated success.
@@ -398,27 +335,25 @@ const unknown = await executeTool({ slug: 'connector-call', args: { name: 'slack
 ok(unknown.ok === false && String(unknown.error).includes("Connector 'slack' not registered"), 'unknown connector fails honestly (never fabricated success)');
 
 // callConnector respects the enabled flag.
-const off = await callConnector('whatsapp', { method: 'send', payload: { to: '1', text: 'x' } });
-ok(off.ok === true, 'callConnector send dispatches through the registry (whatsapp registered)');
+const off = await callConnector('email', { method: 'send', payload: { to: ['a@b.c'], subject: 'x', text: 'y' } });
+ok(off.ok === true, 'callConnector send dispatches through the registry (email registered)');
 
 /* ------------------------------------------------------------------ */
 console.log('\n== B56 CONNECTOR SYSTEM — registry + webhook dispatch ==');
 /* ------------------------------------------------------------------ */
 
 const names = ConnectorRegistry.listAvailable();
-ok(names.includes('whatsapp') && names.includes('github') && names.includes('email') && !names.includes('telegram'), 'registry lists the three connectors (Telegram removed in B61)', names.join(', '));
+ok(names.includes('github') && names.includes('email') && !names.includes('telegram') && !names.includes('whatsapp'), 'registry lists exactly GitHub + Email (messaging connectors removed)', names.join(', '));
 
-const wh = await handleConnectorWebhook('whatsapp', { query: { 'hub.mode': 'subscribe', 'hub.verify_token': 'jexi-verify', 'hub.challenge': '67890' } });
-ok(wh.kind === 'handshake' && wh.verified === true && wh.challenge === '67890', 'webhook dispatch handles the Meta verification handshake');
 const whReject = await handleConnectorWebhook('github', { rawBody: '{}', headers: { 'x-hub-signature-256': 'sha256=tampered' }, body: {} });
 ok(whReject.kind === 'rejected', 'webhook dispatch rejects a bad signature (403 path)');
-const whEvents = await handleConnectorWebhook('whatsapp', { rawBody: waRaw, headers: { 'x-hub-signature-256': `sha256=${createHmacSha256('app-secret', waRaw)}` }, body: { entry: [] } });
-ok(whEvents.kind === 'events' && whEvents.verified === true && Array.isArray(whEvents.events), 'webhook dispatch verifies + normalizes inbound events');
+const ghWh = await handleConnectorWebhook('github', { rawBody: ghRaw, headers: { 'x-github-event': 'push', 'x-hub-signature-256': `sha256=${createHmacSha256('gh-secret', ghRaw)}` }, body: ghBody });
+ok(ghWh.kind === 'events' && ghWh.verified === true && ghWh.events.length === 1 && ghWh.events[0].type === 'push', 'github webhook dispatch verifies (HMAC) + normalizes events');
 
 const status = await getConnectorStatus();
-ok(status.length >= 3 && status.every((c) => c.name && c.enabled !== undefined && c.tier === 'external'), 'getConnectorStatus returns health + masked config for every connector');
+ok(status.length >= 2 && status.every((c) => c.name && c.enabled !== undefined && c.tier === 'external'), 'getConnectorStatus returns health + masked config for every connector');
 const authJson = JSON.stringify(status.map((c) => c.auth));
-ok(!authJson.includes('ok-pat') && !authJson.includes('ok-key') && !authJson.includes('app-secret'), 'connector status masks secrets (no raw keys leak)');
+ok(!authJson.includes('ok-pat') && !authJson.includes('ok-key') && !authJson.includes('gh-secret'), 'connector status masks secrets (no raw keys leak)');
 
 // saveConnectorConfig round-trips (email used here — Telegram is gone).
 const saved = saveConnectorConfig('email', { auth: { apiKey: 'new-key' }, enabled: true });
@@ -452,57 +387,58 @@ registerEmailConnector(new ConnectorConfig({ name: 'email', auth: { baseUrl: moc
 
 // Inbound inbox: records + lists webhook events and handshakes, newest first.
 resetConnectorInbox();
-recordWebhookEvents('whatsapp', [{ id: 'w1', provider: 'whatsapp', from: '15551234567', text: 'hi', type: 'text', raw: { huge: 'envelope' } }]);
-recordHandshake('whatsapp', { verified: true, challenge: 'challenge-42' });
-recordHandshake('whatsapp', { verified: false, reason: 'hub.verify_token mismatch' });
-const inbox = listInbound('whatsapp', 10);
-ok(inbox.total === 1 && inbox.events.length === 1 && inbox.events[0].from === '15551234567' && inbox.events[0].text === 'hi', 'inbox stores normalized inbound events');
-ok(!('raw' in inbox.events[0]) && inbox.events[0].type === 'text', 'inbox strips raw provider envelopes from stored events');
-ok(inbox.handshakes.length === 2 && inbox.handshakes[0].verified === false && inbox.handshakes[1].verified === true, 'inbox records Meta handshake outcomes (newest first)');
+recordWebhookEvents('email', [{ id: 'in1', provider: 'resend', from: 'user@example.com', to: ['jexi@yourdomain.com'], type: 'inbound', text: 'hi', raw: { huge: 'envelope' } }]);
+recordHandshake('email', { verified: true, challenge: 'challenge-42' });
+recordHandshake('email', { verified: false, reason: 'svix signature mismatch' });
+const inbox = listInbound('email', 10);
+ok(inbox.total === 1 && inbox.events.length === 1 && inbox.events[0].from === 'user@example.com' && inbox.events[0].text === 'hi', 'inbox stores normalized inbound events');
+ok(!('raw' in inbox.events[0]) && inbox.events[0].type === 'inbound', 'inbox strips raw provider envelopes from stored events');
+ok(inbox.handshakes.length === 2 && inbox.handshakes[0].verified === false && inbox.handshakes[1].verified === true, 'inbox records webhook handshake outcomes (newest first)');
 resetConnectorInbox();
-const emptyInbox = listInbound('whatsapp', 10);
+const emptyInbox = listInbound('email', 10);
 ok(emptyInbox.total === 0 && emptyInbox.events.length === 0 && emptyInbox.handshakes.length === 0, 'resetConnectorInbox clears the store');
 
 /* ------------------------------------------------------------------ */
-console.log('\n== B61 WHATSAPP AUTO-REPLY LOOP (inbound text → JEXI reply → send) ==');
+console.log('\n== B66 EMAIL AUTO-REPLY LOOP (verified inbound → JEXI reply → send) ==');
 /* ------------------------------------------------------------------ */
 
+// Re-register with the Svix webhook secret — the B59 corrupted-key section
+// re-registered the connector WITHOUT it, so deliveries would be rejected.
+ConnectorRegistry.unregister('email');
+registerEmailConnector(new ConnectorConfig({ name: 'email', auth: { apiKey: 'ok-key', webhookSecret: svixSecret, baseUrl: mocks.resend.url } }));
+
 // Register a fake reply generator (server/index.js registers the real LLM one)
-// and deliver a REAL inbound text webhook — the loop must answer automatically.
+// and deliver a REAL verified inbound email.received webhook — the loop must
+// answer automatically, exactly like the messaging loop it replaces.
 const tick = (ms) => new Promise((r) => setTimeout(r, ms));
 resetConnectorInbox();
 setInboundReplyGenerator(async (ev) => `JEXI here! You said: ${ev.text}`);
-const inboundRaw = JSON.stringify({
-  object: 'whatsapp_business_account',
-  entry: [{ id: '123', changes: [{ value: {
-    messaging_product: 'whatsapp',
-    metadata: { display_phone_number: '+15550000000', phone_number_id: 'PHONE_ID' },
-    contacts: [{ profile: { name: 'Ada' }, wa_id: '15550001111' }],
-    messages: [{ from: '15550001111', id: 'wamid.inbound1', timestamp: '1691785099', type: 'text', text: { body: 'What is the weather?' } }],
-  }, field: 'messages' }] }],
-});
-const replyWebhook = await handleConnectorWebhook('whatsapp', { rawBody: inboundRaw, headers: { 'x-hub-signature-256': `sha256=${createHmacSha256('app-secret', inboundRaw)}` }, body: JSON.parse(inboundRaw) });
-ok(replyWebhook.kind === 'events' && replyWebhook.events.length === 1, 'inbound text webhook verified + normalized');
+const creatorNowTs = String(Math.floor(Date.now() / 1000));
+const creatorContent = `msg_2.${creatorNowTs}.${creatorPayload}`;
+const creatorSig = crypto.createHmac('sha256', svixKey).update(creatorContent, 'utf8').digest('base64');
+const creatorHeaders = { 'svix-id': 'msg_2', 'svix-timestamp': creatorNowTs, 'svix-signature': `v1,${creatorSig}` };
+const creatorWh = await handleConnectorWebhook('email', { rawBody: creatorPayload, headers: creatorHeaders, body: JSON.parse(creatorPayload) });
+ok(creatorWh.kind === 'events' && creatorWh.verified === true && creatorWh.events.length === 1 && creatorWh.events[0].creator === true, 'creator email webhook verified (Svix) + normalized with creator: true', (creatorWh.events && creatorWh.events[0]) ? `creator=${creatorWh.events[0].creator}` : '');
 await tick(150); // the reply send is fire-and-forget; give it a beat
-const replyInbox = listInbound('whatsapp', 10);
+const replyInbox = listInbound('email', 10);
 const replyEvent = replyInbox.events.find((e) => e.type === 'reply');
-ok(!!replyEvent && replyEvent.ok === true && /^wamid\.mock\./.test(replyEvent.id), 'auto-reply SENT via send() and recorded in the inbox (wamid returned)', replyEvent && `wamid=${replyEvent.id}`);
-ok(replyEvent && replyEvent.to === '15550001111' && replyEvent.text === 'JEXI here! You said: What is the weather?', 'auto-reply addressed to the sender with the generated text');
-ok(replyEvent && replyEvent.in_reply_to === 'wamid.inbound1', 'auto-reply records which inbound message it answers');
+ok(!!replyEvent && replyEvent.ok === true && /^resend-mock-/.test(replyEvent.id), 'auto-reply SENT via send() and recorded in the inbox (message id returned)', replyEvent && `id=${replyEvent.id}`);
+ok(replyEvent && replyEvent.to === 'lewiseinstein15@gmail.com' && replyEvent.text === 'JEXI here! You said: JEXI, please build me a landing page for a new product.', 'auto-reply addressed to the sender with the generated text');
+ok(replyEvent && replyEvent.in_reply_to === '<creator-msg-1@gmail.com>', 'auto-reply records which inbound message it answers');
 
 // Generator returning empty → no reply sent, no inbox noise.
 resetConnectorInbox();
 setInboundReplyGenerator(async () => '');
-await handleConnectorWebhook('whatsapp', { rawBody: inboundRaw, headers: { 'x-hub-signature-256': `sha256=${createHmacSha256('app-secret', inboundRaw)}` }, body: JSON.parse(inboundRaw) });
+await handleConnectorWebhook('email', { rawBody: emailPayload, headers: svixHeaders, body: JSON.parse(emailPayload) });
 await tick(100);
-ok(listInbound('whatsapp', 10).events.every((e) => e.type !== 'reply'), 'empty generated reply → nothing sent');
+ok(listInbound('email', 10).events.every((e) => e.type !== 'reply'), 'empty generated reply → nothing sent');
 
 // Generator throwing → reply failure recorded honestly, webhook still 200.
 resetConnectorInbox();
 setInboundReplyGenerator(async () => { throw new Error('LLM down'); });
-await handleConnectorWebhook('whatsapp', { rawBody: inboundRaw, headers: { 'x-hub-signature-256': `sha256=${createHmacSha256('app-secret', inboundRaw)}` }, body: JSON.parse(inboundRaw) });
+await handleConnectorWebhook('email', { rawBody: emailPayload, headers: svixHeaders, body: JSON.parse(emailPayload) });
 await tick(100);
-const failReply = listInbound('whatsapp', 10).events.find((e) => e.type === 'reply');
+const failReply = listInbound('email', 10).events.find((e) => e.type === 'reply');
 ok(!!failReply && failReply.ok === false && /LLM down/.test(failReply.error || ''), 'generator failure → honest reply-failure record (no fake success)');
 setInboundReplyGenerator(null); // clean up — the real generator is registered by index.js
 
@@ -511,19 +447,19 @@ console.log('\n== B62 CONVERSATIONS (chat-thread grouping for the app) ==');
 /* ------------------------------------------------------------------ */
 
 resetConnectorInbox();
-recordWebhookEvents('whatsapp', [
-  { id: 'in1', provider: 'whatsapp', from: '15551234567', to: 'PHONE_ID', type: 'text', text: 'Hello JEXI' },
-  { id: 'in2', provider: 'whatsapp', from: '15550999999', to: 'PHONE_ID', type: 'text', text: 'Hi there' },
-  { id: 'r1', provider: 'whatsapp', type: 'reply', from: 'PHONE_ID', to: '15551234567', text: 'Hi! How can I help?', ok: true, in_reply_to: 'in1' },
+recordWebhookEvents('email', [
+  { id: 'in1', provider: 'resend', from: 'user@example.com', to: ['jexi@yourdomain.com'], type: 'inbound', text: 'Hello JEXI' },
+  { id: 'in2', provider: 'resend', from: 'other@example.com', to: ['jexi@yourdomain.com'], type: 'inbound', text: 'Hi there' },
+  { id: 'r1', provider: 'resend', type: 'reply', from: 'jexi@yourdomain.com', to: 'user@example.com', text: 'Hi! How can I help?', ok: true, in_reply_to: 'in1' },
 ]);
-const convs = listConversations('whatsapp', 10);
+const convs = listConversations('email', 10);
 ok(convs.total === 2, 'conversations grouped per partner', `${convs.total}`);
-const thread = convs.conversations.find((c) => c.partner === '15551234567');
+const thread = convs.conversations.find((c) => c.partner === 'user@example.com');
 ok(!!thread && thread.messages.length === 2 && thread.messages[0].direction === 'in' && thread.messages[1].direction === 'out', 'thread shows inbound then our reply in order');
 ok(thread && thread.messages[1].text === 'Hi! How can I help?' && thread.lastText === 'Hi! How can I help?', 'thread carries both sides + last-message preview');
 ok(thread && thread.messages[0].id === 'in1' && thread.messages[1].in_reply_to === 'in1', 'inbound id + reply linkage preserved');
 ok(convs.conversations.every((c) => c.messages.every((m) => m.direction === 'in' || m.direction === 'out')), 'every message carries a direction');
-ok(!convs.conversations.some((c) => c.partner === '15550999999' ? c.messages[0].direction !== 'in' : false), 'second partner thread is inbound-only');
+ok(!convs.conversations.some((c) => c.partner === 'other@example.com' ? c.messages[0].direction !== 'in' : false), 'second partner thread is inbound-only');
 resetConnectorInbox();
 
 await mocks.closeAll();

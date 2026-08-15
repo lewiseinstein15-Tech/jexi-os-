@@ -2,7 +2,7 @@
  * JEXI OS — Connector Base (Build 56).
  *
  * The connector system gives agents a typed, pluggable way to reach external
- * services (WhatsApp, GitHub, Email, …). Every connector implements
+ * services (GitHub, Email, …). Every connector implements
  * the same contract:
  *
  *   authenticate() -> bool   — MUST actually call the provider (never just
@@ -199,7 +199,7 @@ export class Connector {
     this.config = config;
   }
 
-  /** Provider display name, e.g. "WhatsApp Business Cloud API". */
+  /** Provider display name, e.g. "GitHub REST API". */
   get label() { return this.constructor.name; }
 
   /** Base URL override — tests point this at a local mock server. */

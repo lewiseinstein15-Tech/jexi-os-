@@ -131,7 +131,12 @@ export const COMPOUND_DETECT = [
  * validated contract for the planner's primary (LLM) path; the regex cascade
  * survives as fast-path/fallback only.
  */
-export const CLASSIFIER_INTENTS = [
+
+// B66 — intents judged SIMPLE (single coworker, fast path, no graph).
+// Everything else is COMPLEX and runs the typed-state graph.
+export const SIMPLE_INTENTS = new Set(['conversation', 'direct_answer', 'translate', 'math_solve']);
+
+const CLASSIFIER_INTENTS = [
   'image_recognition', 'clear_memory', 'link_analysis', 'math_solve', 'self_check',
   'code_task', 'computer_use', 'study_topic', 'direct_answer', 'conversation', 'memory_query',
   'knowledge_recall', 'news_latest', 'research', 'learning_research', 'explain_team',
@@ -202,6 +207,16 @@ export class Planner {
   /** Classify the intent (fast, deterministic, free) then attach the team plan. */
   async analyzeIntent(query, opts = {}) {
     const plan = await this._classify(query, opts);
+    // B66 — explicit complexity judgment (Orchestrator-Workers). SIMPLE tasks
+    // run a single-coworker fast path (no graph overhead); COMPLEX tasks get
+    // the full typed-state graph. The decision is logged via the plan event so
+    // it is auditable per request. Fast-path intents are the ones that are
+    // genuinely single-shot: direct answers, translation, identity/conversation
+    // and self-contained math solves. Everything else builds the graph.
+    plan.complexity = SIMPLE_INTENTS.has(plan.intent) ? 'SIMPLE' : 'COMPLEX';
+    plan.complexityReason = plan.complexity === 'SIMPLE'
+      ? `intent "${plan.intent}" is single-shot — one coworker, no graph`
+      : `intent "${plan.intent}" needs multiple coworkers / tools — typed-state graph path`;
     // Resolve the ordered specialist team — one source of truth for who runs.
     const teamSlugs = this._teamFor(plan);
     const team = teamSlugs.map((s) => getAgent(s)).filter(Boolean);

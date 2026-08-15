@@ -34,7 +34,6 @@ export const NAV_SECTIONS = [
     items: [
       { id: 'plugins', icon: Puzzle, label: 'Plugins', page: true },
       { id: 'connectors', icon: Cable, label: 'Connectors', page: true },
-      { id: 'chats', icon: MessageCircle, label: 'Chats', page: true },
       { id: 'knowledge', icon: BookOpen, label: 'Knowledge', page: true },
     ],
   },

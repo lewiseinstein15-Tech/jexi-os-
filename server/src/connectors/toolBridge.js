@@ -3,7 +3,7 @@
  *
  * Agents never call connector internals directly. This module turns a
  * registered connector into an OpenAI/Anthropic-style function tool
- * (`send_whatsapp`, `create_github_issue`-style) that the agent loop can
+ * (`send_email`, `create_github_issue`-style) that the agent loop can
  * invoke through the gated `connector-call` tool.
  *
  * The schema is NOT a hardcoded stub: it introspects the connector's actual
@@ -94,7 +94,7 @@ export function listConnectorTools() {
   return ConnectorRegistry.listAvailable().map((name) => connectorToToolSchema(name));
 }
 
-/** Tool names only, e.g. ['send_whatsapp', 'send_github', 'send_email']. */
+/** Tool names only, e.g. ['send_email', 'create_github_issue']. */
 export function listConnectorToolNames() {
   return listConnectorTools().map((t) => t.function.name);
 }

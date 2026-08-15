@@ -7,6 +7,8 @@ import fs from 'fs';
 import path from 'path';
 import { planner } from './src/services/Planner.js';
 import { orchestrator } from './src/services/Orchestrator.js';
+import { runSimpleTask } from './src/services/SimpleTask.js'; // B66 — Orchestrator-Workers SIMPLE fast path
+import { normalizeFinalAnswer } from './src/services/Formatting.js'; // B66 — normalize every final answer
 import { generateContent, resolveKeys, testAllProviders } from './src/services/LLMClient.js';
 import { learnFromExchange } from './src/services/PreferenceLearner.js';
 import { rollingConversationSummary } from './src/services/MemoryManager.js';
@@ -25,6 +27,8 @@ import {
   saveKnowledgeFile, searchKnowledge, getKnowledgeStructure, getKnowledgeStatus,
   hydrateFromRedis, isRedisActive, semanticRecall, backfillEmbeddings,
   resolveConversationalQuery,
+  // B66 — per-session conversation memory + persistence probe
+  setActiveSession, clearActiveSession, memoryPersistenceProbe,
 } from './src/services/MemoryManager.js';
 import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
 import { skillFolder, SKILL_META } from './src/services/SkillChain.js'; // B50 P1 — progressive skill folders
@@ -42,7 +46,7 @@ import { modelRoutingTable, providerPreferenceForIntent } from './src/services/M
 import { MCP_PORT, MCP_TOOL_ALLOWLIST, listMcpTools } from './mcp-server.js';
 import {
   registerConnectors, getConnectorStatus, saveConnectorConfig, callConnector, handleConnectorWebhook, getConnectorToolSchemas, setInboundReplyGenerator,
-} from './src/connectors/index.js'; // B56 — connector system (B61 adds the WhatsApp reply loop)
+} from './src/connectors/index.js'; // B56 — connector system (B66 — email reply loop; messaging connector removed)
 import { listInbound, listConversations } from './src/services/ConnectorInbox.js'; // B59 — provable inbound webhook log (B62 adds chat-thread conversations)
 import { trustStatus, setTrustMode, allowPattern, denyPattern, removeDecision, clearTrust, trustFolder } from './src/services/RiskGuard.js';
 import { computerStatus, runtimeCall } from './src/services/ComputerRuntime.js';
@@ -77,21 +81,31 @@ recordBoot();
 process.on('uncaughtException', (e) => { recordError('process', e.message, e.stack); console.error('[FATAL]', e); process.exit(1); });
 process.on('unhandledRejection', (e) => { recordError('process', (e && e.message) || String(e)); });
 
-// B56 — register every connector (whatsapp / github / email) from saved
+// B56 — register every connector (github / email) from saved
 // config + env. Agents reach them through the gated `connector-call`
 // tool; providers reach JEXI through /webhooks/connectors/<name>.
 registerConnectors();
 
-// B61/B62 — WhatsApp auto-reply loop: when a real inbound text arrives, JEXI
-// generates the reply and sends it back automatically via the connector's
-// send(). B62 makes it FAST: Groq leads the provider order and the whole
-// generation is capped at 12s — if the LLM is slow or down, a short fallback
-// ack is sent instead of silence, so every sender always gets a response.
+// B61/B66 — Email auto-reply loop: when a verified inbound email arrives,
+// JEXI generates the reply and sends it back automatically via the
+// connector's reply() (same thread — Re:, In-Reply-To + References). B62
+// made it FAST: Groq leads the provider order and generation is capped at
+// 12s — if the LLM is slow or down, a short fallback ack is sent instead of
+// silence, so every sender always gets a response.
+//
+// B66 — creator recognition: email from lewiseinstein15@gmail.com is JEXI's
+// creator (Lewis) and gets creator-aware tone/priority in the prompt.
+const CREATOR_EMAIL = process.env.JEXI_CREATOR_EMAIL || 'lewiseinstein15@gmail.com';
 setInboundReplyGenerator(async (event) => {
   const keys = resolveKeys();
-  if (!keys.groqKey && !keys.geminiKey && !process.env.OPENROUTER_API_KEY) return null;
-  const prompt = `Reply to this WhatsApp message from ${event.from || 'the sender'}. Be concise (max 3 short sentences), plain text, no markdown, no emojis:\n\n"${String(event.text || '').slice(0, 500)}"`;
-  const system = 'You are JEXI OS, Lewis Einstein\'s personal AI assistant. Reply in the first person as JEXI. Keep it short and helpful.';
+  if (!keys.groqKey && !keys.geminiKey && !keys.openrouterKey && !keys.deepseekKey && !keys.xaiKey) return null;
+  const from = String(event.from || '').replace(/^[^<]*<([^>]+)>$/, '$1').trim().toLowerCase();
+  const isCreator = from === String(CREATOR_EMAIL).toLowerCase();
+  const senderLine = isCreator
+    ? 'This message is from LEWIS (lewiseinstein15@gmail.com) — JEXI\'s creator and owner. Treat this as a direct instruction from your creator: respond with appropriate priority and directness, acknowledge their questions/instructions plainly, and do not pad the reply. Safety and approval rules still apply exactly as for any other sender.'
+    : `This message is from ${from || 'a sender'} — a regular user. Respond helpfully as JEXI OS.`;
+  const prompt = `Reply to this email from ${from || 'the sender'}. Subject: ${String(event.subject || '').slice(0, 200)}\n\n${senderLine}\n\nMessage:\n"${String(event.text || '').slice(0, 1500)}"\n\nReply in plain text (no markdown), max 3 short paragraphs, first person as JEXI. Be concise and directly address the message.`;
+  const system = 'You are JEXI OS, an AI operating system owned by Lewis Einstein. Reply in the first person as JEXI. Keep it short, clear, and helpful.';
   try {
     return await Promise.race([
       generateContent(prompt, system, null, { prefer: 'groq', temperature: 0.4 }),
@@ -99,7 +113,7 @@ setInboundReplyGenerator(async (event) => {
     ]);
   } catch (e) {
     // Never leave a sender unanswered — graceful fallback ack (B62).
-    return 'Thanks for messaging JEXI OS! I got your message — a proper reply is on the way shortly.';
+    return 'Thanks for emailing JEXI OS! I got your message — a proper reply is on the way shortly.';
   }
 });
 
@@ -146,7 +160,7 @@ app.use((req, res, next) => {
   // deployed process where the env vars live — same class as /api/health, so
   // they stay open for browser verification with no shell access. Connector
   // sends/config/toggle stay API-key gated.
-  if (req.method === 'GET' && req.path.startsWith('/api/connectors')) return next();
+  if (req.method === 'GET' && (req.path.startsWith('/api/connectors') || req.path === '/api/memory/persistence')) return next();
   if (keyMatches(req.headers['x-jexi-key'])) return next();
   res.status(401).json({ error: 'Unauthorized — this server is locked. Set the JEXI access key in Settings → System.' });
 });
@@ -157,10 +171,10 @@ const generalLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 600, standardHe
 app.use(['/api/chat', '/api/vision', '/api/knowledge/search', '/api/agent'], aiLimiter);
 app.use('/api', generalLimiter);
 
-// B56 — CONNECTOR WEBHOOKS. Mounted BEFORE express.json because WhatsApp /
-// GitHub signatures are HMACs over the RAW request body — parsing it first
-// would break verification. Mounted OUTSIDE /api so provider webhooks (Meta,
-// GitHub, Resend) are not gated by JEXI_API_KEY or the API rate limiter.
+// B56 — CONNECTOR WEBHOOKS. Mounted BEFORE express.json because GitHub /
+// Resend signatures are HMACs over the RAW request body — parsing it first
+// would break verification. Mounted OUTSIDE /api so provider webhooks
+// (GitHub, Resend) are not gated by JEXI_API_KEY or the API rate limiter.
 // Each provider's POST returns 200 immediately after verification +
 // normalization; failures are logged, never fabricated.
 const connectorWebhooks = express.Router();
@@ -198,8 +212,6 @@ const webhookFor = (name) => async (req, res) => {
   if (result.kind === 'rejected') return res.status(403).json({ ok: false, error: result.error });
   return res.status(200).json({ ok: true, events: result.events || [], verified: true });
 };
-connectorWebhooks.get('/webhooks/connectors/whatsapp', webhookFor('whatsapp'));
-connectorWebhooks.post('/webhooks/connectors/whatsapp', webhookFor('whatsapp'));
 connectorWebhooks.post('/webhooks/connectors/github', webhookFor('github'));
 connectorWebhooks.post('/webhooks/connectors/email', webhookFor('email'));
 app.use(connectorWebhooks);
@@ -414,6 +426,7 @@ app.get('/api/settings/status', (req, res) => {
     deepinfra: statusOf(['DEEPINFRA_API_KEY'], 'deepinfraKey'),
     mistral: statusOf(['MISTRAL_API_KEY'], 'mistralKey'),
     xai: statusOf(['XAI_API_KEY'], 'xaiKey'),
+    deepseek: statusOf(['DEEPSEEK_API_KEY'], 'deepseekKey'), // B66 — coding coworker
     github: statusOf(['GITHUB_TOKEN', 'GH_TOKEN'], 'githubToken'),
   });
 });
@@ -625,7 +638,7 @@ app.get('/api/mcp/status', (req, res) => {
   });
 });
 
-// === CONNECTOR SYSTEM (B56 — whatsapp / github / email) ===
+// === CONNECTOR SYSTEM (B56 — github / email; messaging connector removed in B66) ===
 // User-initiated sends from the Connectors UI are themselves the human
 // approval; agent-initiated sends go through the `connector-call` tool which
 // is EXTERNAL-tier and always pauses for ONE explicit approval first.
@@ -673,7 +686,7 @@ app.get('/api/connectors/:name/inbound', (req, res) => {
 
 // B62 — open chat-thread conversations (GET, read-only): the same inbox
 // grouped per partner with both sides of the exchange (inbound + our replies)
-// so the app can render a real WhatsApp-style chat view.
+// so the app can render a real chat view.
 app.get('/api/connectors/:name/conversations', (req, res) => {
   try {
     res.json({ ok: true, name: req.params.name, ...listConversations(req.params.name, req.query.limit) });
@@ -829,6 +842,11 @@ app.post('/api/skills/invoke', async (req, res) => {
 
 // === MEMORY CORE ENDPOINTS (JEXI's mind) ===
 app.get('/api/memory', (req, res) => res.json(loadMemory()));
+
+// B66 — persistence probe: evidence that memory survives a restart/redeploy
+// (previous boot stamps still present in DATA_DIR = persistent disk). GET,
+// read-only, no secrets — same class as /api/health.
+app.get('/api/memory/persistence', (req, res) => res.json(memoryPersistenceProbe()));
 app.post('/api/memory/clear', (req, res) => { clearMemory(); res.json({ success: true }); });
 app.post('/api/memory/user', (req, res) => { updateUserProfile(req.body); res.json({ success: true }); });
 
@@ -869,7 +887,12 @@ app.post('/api/chat/add', (req, res) => {
   try { addChat(req.body.role, req.body.text); res.json({ success: true }); }
   catch (e) { res.json({ success: false }); }
 });
-app.get('/api/chat/history', (req, res) => res.json(getChatHistory(Number(req.query.n) || 50)));
+// B66 — history is session-scoped (per conversation id), never a shared blob.
+app.get('/api/chat/history', (req, res) => {
+  setActiveSession(conversationId(req));
+  try { res.json(getChatHistory(Number(req.query.n) || 50)); }
+  finally { clearActiveSession(); }
+});
 
 // === KNOWLEDGE LIBRARY ENDPOINTS ===
 app.get('/api/knowledge/structure', (req, res) => res.json(getKnowledgeStructure()));
@@ -1067,6 +1090,9 @@ app.post('/api/chat', async (req, res) => {
   // Stable per-conversation id for this request (hoisted so the deadline and
   // the result store can use it too).
   const convId = conversationId(req);
+  // B66 — per-session conversation memory: chat history reads/writes for this
+  // request are scoped to this conversation (never the shared global blob).
+  setActiveSession(convId);
   // A fresh run must never serve a stale previous result during recovery.
   clearResult(convId);
   // done = emit the terminal event; persistence is handled by sendEvent above.
@@ -1262,10 +1288,15 @@ app.post('/api/chat', async (req, res) => {
     startTrace('chat.task', { intent: plan.intent, queryLen: (effectiveQuery || '').length });
 
     sendEvent('log', { agent: 'Planner', message: `Intent: ${plan.intent} — ${plan.reasoning}` });
+    // B66 — the planner's complexity judgment is announced before anything
+    // runs (auditable): SIMPLE → single-coworker fast path; COMPLEX → graph.
+    sendEvent('log', { agent: 'Orchestrator', message: `🧭 Complexity: ${plan.complexity} — ${plan.complexityReason}` });
     // Structured plan event — the frontend's agent Core needs the composed
     // team (roster) to draw its orbital ring segments before agents start.
     sendEvent('plan', {
       intent: plan.intent,
+      complexity: plan.complexity,
+      complexityReason: plan.complexityReason,
       steps: plan.steps || [],
       roster: plan.roster || [],
       skillsLine: plan.skillsLine || '',
@@ -1284,9 +1315,14 @@ app.post('/api/chat', async (req, res) => {
         return { independent: m.independent.map(name), bundled: m.bundled.map(name) };
       })(),
     });
-    const results = await orchestrator.executePlan(plan, executionQuery || effectiveQuery, sendEvent, {
-      image,
-      // B53 P2 — task scope for the run: the orchestrator gates memory reuse
+    // B66 — Orchestrator-Workers: SIMPLE tasks (single-shot intent) take the
+    // single-coworker fast path — no graph construction at all. COMPLEX tasks
+    // run the full typed-state graph as before. Both return the same contract.
+    const results = plan.complexity === 'SIMPLE'
+      ? await runSimpleTask(plan, executionQuery || effectiveQuery, sendEvent, { image })
+      : await orchestrator.executePlan(plan, executionQuery || effectiveQuery, sendEvent, {
+          image,
+          // B53 P2 — task scope for the run: the orchestrator gates memory reuse
       // and writes durable checkpoints keyed to this taskId.
       taskId: activeTaskId || null,
       // B53 P2 — continuation turns (continue/switch/resume) may reuse the
@@ -1320,8 +1356,11 @@ app.post('/api/chat', async (req, res) => {
     // Contract: a successful done ALWAYS carries a readable summary — the
     // frontend never renders a blank answer (an empty summary previously left
     // users staring at the activity log with no chat reply).
+    // B66 — the orchestrator normalizes EVERY final answer's formatting
+    // (math delimiters, blank lines, trailing whitespace) before it reaches
+    // the user, regardless of which coworker produced the content.
     const finalSummary = results.summary && String(results.summary).trim()
-      ? results.summary
+      ? normalizeFinalAnswer(results.summary)
       : results.success
         ? '✅ Task completed — the team finished, but returned no readable summary. Check the activity log above to see what ran.'
         : (results.error || 'The task failed — check the activity log for details.');
@@ -1360,13 +1399,31 @@ app.post('/api/chat', async (req, res) => {
   } catch (error) {
     recordError('chat', error.message);
     sendEvent('log', { agent: 'System', message: `Critical Error: ${error.message}` });
-    sendEvent('done', { success: false, error: error.message });
-  } finally { finished = true; clearTimeout(deadline); finish(); }
+    // B66 — graceful degradation: a total provider failure is reported as an
+    // honest, readable degraded message — never a raw error dump.
+    if (/All AI providers failed|No API keys configured/.test(String(error && error.message || ''))) {
+      done({
+        success: false,
+        degraded: true,
+        error: error.message,
+        summary: '### ⚠ JEXI OS — degraded mode\n\nI\'m having trouble reaching my usual AI resources right now, so I can\'t produce a full answer at the moment. No provider completed the request.\n\nWhat you can do:\n- Try again in a minute or two — rate limits and temporary outages usually clear quickly.\n- Check that your model keys are valid in **Settings → Models** (and the matching env vars on Render).\n- If you run a local model (Ollama), set \`OLLAMA_BASE_URL\` and I\'ll route through it automatically.\n\nI\'m not going to guess or pretend — that\'s the honest status right now.',
+      });
+    } else {
+      sendEvent('done', { success: false, error: error.message });
+    }
+  } finally { finished = true; clearTimeout(deadline); clearActiveSession(); finish(); }
 });
 
 // LIVE PROVIDER TEST — fires one tiny request through EVERY configured provider
 // and reports which keys actually work end-to-end (configured ≠ working). Useful
 // right after adding a key on Render: redeploy, then hit /api/health/providers.
+// B66 — memory persistence probe: proves DATA_DIR (sessions, memory.json)
+// survives restarts on this host (previous boot stamps present ⇒ persistent
+// disk mounted, e.g. a Render persistent disk at DATA_DIR).
+app.get('/api/health/memory', (req, res) => {
+  res.json(memoryPersistenceProbe());
+});
+
 app.get('/api/health/providers', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {

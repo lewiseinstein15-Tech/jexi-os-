@@ -14,8 +14,11 @@
  *   ratelimit-*  → HTTP 429 with retry-after
  *   fail-*       → HTTP 500 (provider error)
  *   malformed-*  → HTTP 200 with a wrong-shaped body
- *   window-*     → B63: free-form text → HTTP 400 (#131047 outside-window);
- *                  template sends → HTTP 200 (exercises the fallback)
+ *
+ * B66 — the messaging-connector mock was REMOVED (that connector was
+ * deleted entirely). The Resend mock gained a creator-email variant
+ * (email_id prefix `creator-` returns lewiseinstein15@gmail.com as the
+ * sender) so the B66 creator-recognition path is testable end-to-end.
  */
 
 import http from 'http';
@@ -45,33 +48,6 @@ function startServer(handler) {
       // ones) so close() never waits forever.
       close: () => new Promise((r) => { server.closeAllConnections?.(); server.close(r); }),
     }));
-  });
-}
-
-/* ------------------------- WhatsApp / Graph ------------------------- */
-
-export function startMockWhatsApp() {
-  return startServer(async (req, res) => {
-    const token = authToken(req);
-    const m = req.url.match(/^\/([^/]+)\/([^/]+)(\/messages)?/);
-    if (!m) return json(res, 404, { error: { message: 'not found' } });
-    const [, , phoneNumberId, isMessages] = m;
-    if (token.startsWith('bad-')) return json(res, 401, { error: { message: 'Invalid OAuth access token.', type: 'OAuthException' } });
-    if (token.startsWith('ratelimit-')) return json(res, 429, { error: { message: '(#80007) There have been too many messages sent' } }, { 'retry-after': '7' });
-    if (token.startsWith('fail-')) return json(res, 500, { error: { message: 'Internal server error' } });
-    if (token.startsWith('malformed-')) return json(res, 200, { hello: 'not-the-shape-you-wanted' });
-    if (token.startsWith('window-') && isMessages) {
-      let body = {};
-      try { body = JSON.parse(await readBody(req)); } catch (e) { /* noop */ }
-      if (body.type === 'text') {
-        return json(res, 400, { error: { message: '(#131047) Re-engagement message', code: 131047, type: 'OAuthException' } });
-      }
-      return json(res, 200, { messaging_product: 'whatsapp', contacts: [{ wa_id: body.to || '' }], messages: [{ id: `wamid.mock.template.${Date.now()}` }] });
-    }
-    if (isMessages) {
-      return json(res, 200, { messaging_product: 'whatsapp', contacts: [{ wa_id: '15550001111' }], messages: [{ id: `wamid.mock.${Date.now()}` }] });
-    }
-    return json(res, 200, { id: phoneNumberId, display_phone_number: '+15550000000', verified_name: 'JEXI Test' });
   });
 }
 
@@ -183,19 +159,23 @@ export function startMockResend() {
     const received = req.url.match(/^\/emails\/receiving\/([^/]+)$/);
     if (received && req.method === 'GET') {
       if (token.startsWith('bad-')) return json(res, 401, { message: 'Invalid API key' });
+      // B66 — creator-email variant: email_ids prefixed `creator-` come from
+      // JEXI's creator (lewiseinstein15@gmail.com), so the creator-recognition
+      // path can be tested end-to-end against the mock.
+      const isCreator = String(received[1]).startsWith('creator-');
       return json(res, 200, {
         object: 'email',
         id: received[1],
-        from: 'user@example.com',
+        from: isCreator ? 'lewiseinstein15@gmail.com' : 'user@example.com',
         to: ['jexi@yourdomain.com'],
-        subject: 'Testing JEXI inbound',
-        message_id: '<orig-msg-1@example.com>',
+        subject: isCreator ? 'Directive from Lewis' : 'Testing JEXI inbound',
+        message_id: isCreator ? '<creator-msg-1@gmail.com>' : '<orig-msg-1@example.com>',
         created_at: '2026-08-15T12:00:00.000Z',
-        text: 'Hello JEXI, can you reply?',
-        html: '<p>Hello JEXI, can you reply?</p>',
+        text: isCreator ? 'JEXI, please build me a landing page for a new product.' : 'Hello JEXI, can you reply?',
+        html: isCreator ? '<p>JEXI, please build me a landing page for a new product.</p>' : '<p>Hello JEXI, can you reply?</p>',
         headers: {
-          'message-id': '<orig-msg-1@example.com>',
-          references: '<older-msg@example.com>',
+          'message-id': isCreator ? '<creator-msg-1@gmail.com>' : '<orig-msg-1@example.com>',
+          references: isCreator ? '<older-creator-msg@gmail.com>' : '<older-msg@example.com>',
         },
         attachments: [],
       });
@@ -209,15 +189,15 @@ export let lastSentHeaders = null;
 export let lastSentFrom = null;
 export function resetLastSentHeaders() { lastSentHeaders = null; lastSentFrom = null; }
 
-/** Start every mock at once. Returns { whatsapp, github, resend, closeAll }. */
+/** Start every mock at once. Returns { github, resend, closeAll }. */
 export async function startMockConnectorApis() {
-  const [whatsapp, github, resend] = await Promise.all([
-    startMockWhatsApp(), startMockGitHub(), startMockResend(),
+  const [github, resend] = await Promise.all([
+    startMockGitHub(), startMockResend(),
   ]);
   return {
-    whatsapp, github, resend,
+    github, resend,
     closeAll: async () => {
-      await Promise.all([whatsapp.close(), github.close(), resend.close()]);
+      await Promise.all([github.close(), resend.close()]);
     },
   };
 }

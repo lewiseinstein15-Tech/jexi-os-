@@ -22,7 +22,6 @@ import PluginsScreen from './components/PluginsScreen';
 import ModelsScreen from './components/ModelsScreen';
 import McpScreen from './components/McpScreen';
 import ConnectorsScreen from './components/ConnectorsScreen';
-import WhatsAppChats from './components/WhatsAppChats';
 import ResearchScreen from './components/ResearchScreen';
 import PlaceholderPage from './components/PlaceholderPage';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -139,8 +138,6 @@ export default function App() {
             <ConnectorsScreen />
           </div>
         );
-      case 'chats':
-        return <WhatsAppChats />;
       case 'memory':
         return <MemoryPanel memory={memory} />;
       case 'knowledge':
