@@ -49,7 +49,11 @@ const CAPS = { internetKnowledge: 150, codingKnowledge: 100, learnedAnswers: 100
 
 let cache = null;
 let redisClient = null;
-let redisEnabled = Boolean(process.env.REDIS_URL);
+// Immutable intent: whether REDIS_URL was present in the environment at boot.
+// `redisEnabled` can be flipped off if client init fails; `redisConfigured`
+// stays true so health reports "configured but broken" instead of "unset".
+const redisConfigured = Boolean(process.env.REDIS_URL);
+let redisEnabled = redisConfigured;
 // Real connection state (not "a client object exists"): 'unset' | 'connecting' |
 // 'connected' | 'error'. Updated by every actual Redis command so /api/health
 // and the persistence probe report what is really happening.
@@ -144,8 +148,8 @@ export async function memoryPersistenceProbe() {
   // --- Redis-backed persistence (B68): REDIS_URL is a first-class backend.
   // --- Stamp Redis on every probe so a redeploy can prove the stamps
   // --- survived — exactly the same evidence model as the disk stamps.
-  const redis = { configured: redisEnabled, connected: false, error: '', previousBootsSeen: [] };
-  if (redisEnabled) {
+  const redis = { configured: redisConfigured, connected: false, error: '', previousBootsSeen: [] };
+  if (redisConfigured) {
     const r = await getRedis();
     if (r) {
       try {
@@ -165,6 +169,10 @@ export async function memoryPersistenceProbe() {
         redisStatus = 'error';
         redisLastError = redis.error;
       }
+    } else if (redisLastError) {
+      // Client init failed (invalid REDIS_URL shape, import failure): surface
+      // the real reason instead of reporting a blank "not connected".
+      redis.error = redisLastError;
     }
   }
   const redisPersistent = redis.connected && redis.previousBootsSeen.length > 0;
@@ -176,7 +184,7 @@ export async function memoryPersistenceProbe() {
     note = 'previous boot stamps survived — the memory directory is persistent across restarts';
   } else if (redis.connected) {
     note = 'Redis connected (REDIS_URL) but no previous boot stamps seen yet — Redis-backed persistence will be proven after the next restart/redeploy';
-  } else if (redisEnabled && redis.error) {
+  } else if (redisConfigured && redis.error) {
     note = `REDIS_URL is configured but the Redis connection failed: ${redis.error}`;
   } else {
     note = 'no previous boot stamps found — disk persistence not yet proven (mount a persistent disk at DATA_DIR on Render, or set REDIS_URL for cross-restart memory)';
@@ -189,7 +197,7 @@ export async function memoryPersistenceProbe() {
     persistent, // true when EITHER backend survived a restart
     sessionCount,
     redis: {
-      configured: redisEnabled,
+      configured: redisConfigured,
       connected: redis.connected,
       error: redis.error,
       previousBootsSeen: redis.previousBootsSeen,
@@ -209,8 +217,20 @@ async function getRedis() {
   if (!redisEnabled) return null;
   if (redisClient) return redisClient;
   try {
+    // Normalize + validate the URL BEFORE constructing the client: ioredis
+    // throws a bare "Invalid URL" TypeError for e.g. `redis://:6379` (empty
+    // host) or leading whitespace — turn that into an actionable message the
+    // probe/health endpoint can show. Never echo the value (it may contain a
+    // password); only the shape is described.
+    const rawUrl = String(process.env.REDIS_URL || '').trim();
+    if (!/^rediss?:\/\//i.test(rawUrl)) {
+      throw new Error('REDIS_URL does not start with redis:// or rediss:// — it is not a Redis connection string');
+    }
+    if (!/^rediss?:\/\/.+/i.test(rawUrl) || rawUrl.includes('://:')) {
+      throw new Error('REDIS_URL is missing its hostname — expected redis://<user>:<password>@<host>:<port>');
+    }
     const { Redis } = await import('ioredis');
-    redisClient = new Redis(process.env.REDIS_URL, {
+    redisClient = new Redis(rawUrl, {
       lazyConnect: true,
       maxRetriesPerRequest: 2,
       enableReadyCheck: true,
@@ -284,7 +304,7 @@ export function isRedisActive() {
 
 /** Diagnostic detail for /api/health and the persistence probe. */
 export function redisConnectionInfo() {
-  return { configured: redisEnabled, status: redisStatus, error: redisLastError };
+  return { configured: redisConfigured, status: redisStatus, error: redisLastError };
 }
 
 /* ---------------- Local JSON store ---------------- */

@@ -88,9 +88,49 @@ So: **not** a Redis connection failure — the code path to use Redis as a persi
 
 ```
 $ cd server && npm test
-EXIT=0 — all suites pass; B68 suite 28/28 (disk stamps 7, Redis cross-process 9,
-broken-Redis paths 10, health truthfulness 2).
+EXIT=0 — all suites pass; B68 suite 33/33 (disk stamps 7, Redis cross-process 10
+incl. whitespace normalization, broken-Redis paths 14 incl. malformed URL,
+health truthfulness 2).
 ```
+
+## Live finding after deploy — the configured REDIS_URL value is itself malformed
+
+Once B68 deployed on Render, the new truthfulness surfaced the actual blocker the
+user's report was pointing at:
+
+```
+/api/health →  redis: false, redisDetail: { configured: true, status: "error", error: "Invalid URL" }
+```
+
+`REDIS_URL` **is** set in the Render environment, but the value cannot be parsed as a
+Redis connection string. Reproduced with the real ioredis client:
+
+```
+THROW "redis://:6379" → Invalid URL          (empty host)
+THROW "  redis://host:6379" → Invalid URL    (leading whitespace)
+OK   "redis://h:p@host:6379" / "rediss://default:abc@host:6379"
+```
+
+So the fix has two parts, both now in the code:
+
+1. **Normalize:** leading/trailing whitespace around the URL is trimmed before use
+   (test: `REDIS_URL` with leading spaces connects fine).
+2. **Actionable failure:** an unparseable value now produces a clear message instead
+   of a bare `Invalid URL` TypeError — e.g. `REDIS_URL does not start with redis://
+   or rediss://…` or `REDIS_URL is missing its hostname — expected
+   redis://<user>:<password>@<host>:<port>` — surfaced in `/api/health/memory`'s
+   `redis.error`/`note` and `/api/health`'s `redisDetail.error` (test: malformed
+   URL → `configured: true`, `connected: false`, actionable error, `isRedisActive()
+   false`).
+
+## What the user must do (the remaining live blocker)
+
+The **code** is fixed and deployed; the **value** is not. Fix the `REDIS_URL` env
+var in the Render dashboard — it must be a full `redis://` or `rediss://` connection
+string with a hostname (e.g. Upstash's "Redis" tab connection string, not its REST
+URL), with no leading space. After that, the endpoint will show `connected: true`
+and the second restart proves persistence (`persistent: true`, note: **"Redis-backed
+persistence PROVEN"**).
 
 ### Live-vs-mock disclosure
 

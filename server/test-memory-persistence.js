@@ -114,6 +114,10 @@ try {
   ok(rb2.persistentDisk === false, 'boot 2: still no disk persistence (fresh DATA_DIR)');
   ok(rb2.persistent === true, 'boot 2: persistent=true — Redis alone proved it');
   ok(rb2.note.includes('Redis-backed persistence PROVEN'), 'note says Redis-backed persistence is PROVEN', rb2.note);
+
+  // Leading whitespace around the URL (a classic mis-paste) must be tolerated.
+  const spaced = await runBoot({ REDIS_URL: `  ${mock.url}`, RENDER_INSTANCE_ID: 'redis-boot-space' });
+  ok(spaced.redis.connected === true, 'REDIS_URL with leading whitespace is normalized (trimmed) before use', spaced.redis.error || '');
 } finally {
   await mock.close();
 }
@@ -137,6 +141,17 @@ ok(Boolean(bad.redis.error), 'dead REDIS_URL → the real connection error is su
 ok(bad._isRedisActive === false, 'dead REDIS_URL → isRedisActive()=false (truthful health)');
 ok(bad.persistent === false, 'dead REDIS_URL → persistent=false (never claims persistence it cannot prove)');
 ok(bad.note.includes('connection failed'), 'note names the failure instead of a generic message', bad.note);
+
+// Malformed URL — exactly what the live Render service hit (ioredis threw
+// "Invalid URL"): env var is SET but the value is not a valid connection
+// string. The probe must report configured=true (so it is not mistaken for
+// "not configured") with an ACTIONABLE error, never a bare TypeError.
+const malformed = await runBoot({ REDIS_URL: 'redis://:6379', RENDER_INSTANCE_ID: 'bad-url-shape' });
+ok(malformed.redis.configured === true && malformed.redis.connected === false,
+  'malformed REDIS_URL (empty host) → configured=true (env IS set) + connected=false');
+ok(String(malformed.redis.error).includes('hostname'), 'malformed REDIS_URL → actionable error names the cause', String(malformed.redis.error).slice(0, 120));
+ok(malformed.note.includes('connection failed'), 'malformed REDIS_URL → note names the failure, not a generic message', malformed.note);
+ok(malformed._isRedisActive === false, 'malformed REDIS_URL → isRedisActive()=false');
 
 // Auth failure — mock answers every command with WRONGPASS.
 const authMock = await startMockRedis({ mode: 'authfail' });
