@@ -46,6 +46,26 @@ there, same place `REDIS_URL` was set:
 4. In the app (web + Android): **Settings → System → JEXI Access Key** → paste
    `com/0006/25` → the task board (and everything else) recovers automatically.
 
+## Change 3 — Update detection no longer depends on the phone's GitHub API quota
+
+**Problem:** the Android app's update banner compares its baked-in build tag
+against `api.github.com/releases/latest` directly from the phone. Unauthenticated
+GitHub API is capped at 60 req/hr per IP — easy for a phone to exhaust — and when
+that fails the check silently shows no banner (the user did not receive build #69).
+
+**After:**
+- `server/index.js` — new open `GET /api/update/version`: server-side GitHub fetch
+  with a proper User-Agent, 60s cache, returns `{ tag, number, date, notes }`.
+  Open class (no secrets, no AI spend), so it works even when the backend is locked.
+- `src/hooks/useUpdateChecker.js` — checks GitHub API first, **falls back to the
+  backend probe** on any failure (rate limit, offline api.github.com, 403). A
+  fresh check runs on app open, on focus, and every 10 min.
+
+```
+$ cd server && node --check index.js && node test-connectors.js → EXIT=0
+$ npm run build → EXIT=0
+```
+
 ## Verification plan (post-deploy, on request)
 
 - `GET /api/memory` without the key → **401**

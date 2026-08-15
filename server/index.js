@@ -152,7 +152,7 @@ app.use(cors({ origin: CORS_ALLOWLIST }));
 // else under /api/* (chat, vision, knowledge, memory, desktop, settings write,
 // APK proxy) is gated when JEXI_API_KEY is set.
 // NOTE: mounted on the app root (not '/api') so req.path keeps its full form.
-const OPEN_PATHS = ['/api/health', '/api/health/memory', '/api/settings/status', '/api/metrics', '/api/update/apk']; // B70 — health/memory + the APK update proxy are read-only infra (no secrets, no AI spend); a locked backend must stay observable and still deliver app updates
+const OPEN_PATHS = ['/api/health', '/api/health/memory', '/api/settings/status', '/api/metrics', '/api/update/apk', '/api/update/version']; // B70 — health/memory + the APK update proxy/version probe are read-only infra (no secrets, no AI spend); a locked backend must stay observable and still deliver app updates
 app.use((req, res, next) => {
   if (!API_KEY || req.method === 'OPTIONS') return next();
   if (!req.path.startsWith('/api')) return next();
@@ -968,6 +968,36 @@ app.get('/api/update/apk', async (req, res) => {
   } catch (e) {
     recordError('update', e.message);
     res.status(502).json({ success: false, error: 'Could not fetch the newest APK: ' + e.message });
+  }
+});
+
+// B70 — version probe for the in-app update checker. The app compares its
+// baked-in build tag against the newest GitHub Release; this server-side probe
+// is the fallback when api.github.com is rate-limited or unreachable from the
+// phone's IP (unauthenticated GitHub API is capped at 60 req/hr). Read-only
+// public release metadata — open class. Cached 60s so the phone never hammers
+// GitHub through the proxy.
+let cachedReleaseVersion = null;
+let cachedReleaseVersionAt = 0;
+app.get('/api/update/version', async (req, res) => {
+  try {
+    if (cachedReleaseVersion && Date.now() - cachedReleaseVersionAt < 60000) {
+      return res.json(cachedReleaseVersion);
+    }
+    const upstream = await axios({
+      method: 'GET',
+      url: 'https://api.github.com/repos/lewiseinstein15-Tech/jexi-os-/releases/latest',
+      timeout: 15000,
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'JEXI-OS-Update/1.0' },
+    });
+    const d = upstream.data || {};
+    const tag = String(d.tag_name || '');
+    const m = tag.match(/(\d+)/);
+    cachedReleaseVersion = { tag, number: m ? parseInt(m[1], 10) : 0, date: d.published_at || null, notes: d.name || '' };
+    cachedReleaseVersionAt = Date.now();
+    res.json(cachedReleaseVersion);
+  } catch (e) {
+    res.status(502).json({ error: 'Could not fetch the newest release: ' + (e && e.message) });
   }
 });
 
