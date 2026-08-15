@@ -8,6 +8,7 @@ import path from 'path';
 import { planner } from './src/services/Planner.js';
 import { orchestrator } from './src/services/Orchestrator.js';
 import { runSimpleTask } from './src/services/SimpleTask.js'; // B66 — Orchestrator-Workers SIMPLE fast path
+import { workerRoster } from './src/services/WorkerRouter.js'; // B69 — expose the REAL coworker structure to the UI
 import { normalizeFinalAnswer } from './src/services/Formatting.js'; // B66 — normalize every final answer
 import { generateContent, resolveKeys, testAllProviders } from './src/services/LLMClient.js';
 import { learnFromExchange } from './src/services/PreferenceLearner.js';
@@ -596,7 +597,13 @@ app.post('/api/notifications/clear', (req, res) => res.json(clearNotifications()
 // === MODEL ROUTING (roadmap stage 24 — per-domain provider preference) ===
 // Exposes the intent → provider map; AgentLoop honors it via opts.prefer.
 app.get('/api/models', (req, res) => {
-  res.json({ routing: modelRoutingTable(), preferenceFor: (intent) => providerPreferenceForIntent(intent) });
+  res.json({
+    routing: modelRoutingTable(), // legacy preference table (back-compat)
+    preferenceFor: (intent) => providerPreferenceForIntent(intent),
+    // B69 — the REAL Orchestrator-Workers structure: task type → coworker →
+    // exact provider/model chain (WorkerRouter). The UI leads with this.
+    workers: workerRoster(),
+  });
 });
 
 // === RISK GUARD / TRUST (roadmap stage 17) ===

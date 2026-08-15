@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Brain, Activity, Cpu } from 'lucide-react';
+import { Brain, Activity, Cpu, GitBranch, Zap } from 'lucide-react';
 import { getBackendUrl, jexiFetch } from '../utils/helpers';
 
 const STATUS_COLOR = {
@@ -9,8 +9,22 @@ const STATUS_COLOR = {
   unused: 'text-text-tertiary',
 };
 
+const COWORKER_ICON = {
+  coder: GitBranch,
+  memory: Brain,
+  researcher: Zap,
+  fallback: Cpu,
+};
+
+const COWORKER_HINT = {
+  coder: 'Coding / GitHub operations',
+  memory: 'Memory / conversation continuity',
+  researcher: 'Research / realtime information',
+  fallback: 'General fallback — last resort only',
+};
+
 export default function ModelsScreen() {
-  const [routing, setRouting] = useState([]);
+  const [workers, setWorkers] = useState([]);
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -21,7 +35,7 @@ export default function ModelsScreen() {
           jexiFetch(`${getBackendUrl()}/api/models`).then((x) => x.json()),
           jexiFetch(`${getBackendUrl()}/api/health/providers`).then((x) => x.json()).catch(() => ({ providers: [] })),
         ]);
-        setRouting(r.routing || []);
+        setWorkers(r.workers || []);
         setProviders(p.providers || []);
       } catch (e) { console.error('Models fetch failed', e); }
       setLoading(false);
@@ -34,8 +48,40 @@ export default function ModelsScreen() {
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Brain className="w-3.5 h-3.5 text-brand" />
-        <h2 className="text-[10px] font-bold text-brand tracking-wider flex-1">MODEL ROUTING</h2>
+        <h2 className="text-[10px] font-bold text-brand tracking-wider flex-1">ORCHESTRATOR · WORKERS</h2>
       </div>
+
+      {/* The real Orchestrator-Workers roster: task type → coworker → chain */}
+      {workers.length > 0 && (
+        <div>
+          <p className="eyebrow mb-1.5">COWORKER ROUTING · TASK TYPE → MODEL CHAIN</p>
+          <div className="space-y-2">
+            {workers.map((w) => {
+              const Icon = COWORKER_ICON[w.slug] || Cpu;
+              return (
+                <div key={w.slug} className="surface-card p-3">
+                  <div className="flex items-center gap-2">
+                    <Icon className="w-3.5 h-3.5 text-brand" />
+                    <span className="text-[10px] font-bold text-text-primary uppercase tracking-wider">{w.slug}</span>
+                    <span className="text-[9px] text-text-tertiary flex-1 truncate">{COWORKER_HINT[w.slug] || w.role}</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {w.providers.map((p) => (
+                      <span key={p} className="px-1.5 py-0.5 rounded bg-white/[0.06] border border-hairline text-[8px] font-mono text-text-secondary">
+                        {p}
+                      </span>
+                    ))}
+                    <span className="px-1.5 py-0.5 rounded bg-status-error/[0.08] border border-status-error/25 text-[8px] font-mono text-status-error/80">
+                      fallback: {w.fallback.join(' → ')}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[8px] text-text-tertiary mt-1.5">Each coworker walks its own chain (primary → fallback → last-resort tier) chosen by task type — not a global preference order.</p>
+        </div>
+      )}
 
       {/* Provider health */}
       <div>
@@ -60,21 +106,6 @@ export default function ModelsScreen() {
           ))}
         </div>
         {providers.length === 0 && <p className="text-[10px] text-text-tertiary">Provider health is unavailable right now.</p>}
-      </div>
-
-      {/* Per-domain routing */}
-      <div>
-        <p className="eyebrow mb-1.5">PER-DOMAIN ROUTING · WHICH PROVIDER LEADS</p>
-        <div className="surface-card divide-y divide-hairline/50">
-          {routing.map((r) => (
-            <div key={r.intent} className="flex items-center gap-2 px-3 py-2">
-              <Cpu className="w-3 h-3 text-text-tertiary flex-shrink-0" />
-              <span className="text-[10px] font-mono text-text-secondary flex-1 truncate">{r.intent}</span>
-              <span className={`text-[9px] font-semibold ${r.provider === '(auto)' ? 'text-text-tertiary' : 'text-brand'}`}>{r.providerLabel}</span>
-            </div>
-          ))}
-        </div>
-        <p className="text-[8px] text-text-tertiary mt-1.5">Math/vision lead with Gemini · research/news with OpenRouter · code/data with Groq. Every task still fails over through the full chain automatically.</p>
       </div>
     </div>
   );
