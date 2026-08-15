@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { getBackendUrl, jexiFetch } from '../utils/helpers';
+import { getBackendUrl, jexiFetch, onAccessKeyChange } from '../utils/helpers';
 
 /**
  * useTasks — roadmap stage 8 frontend.
@@ -144,6 +144,11 @@ export const useTasks = () => {
       setCreating(false);
     }
   }, [refresh]);
+
+  // B70 — when the backend is locked (JEXI_API_KEY) and the user pastes the
+  // access key in Settings → System, requests that 401'd can now succeed:
+  // refetch the list immediately instead of waiting for a manual retry.
+  useEffect(() => onAccessKeyChange(() => refresh()), [refresh]);
 
   // Live subscription: connect to the task.* stream, rebuild detail from it,
   // and fall back to polling when the stream is unavailable or drops.
