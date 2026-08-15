@@ -13,7 +13,7 @@
  *                 (HMAC-SHA1) using GITHUB_WEBHOOK_SECRET.
  */
 
-import { Connector, ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, createHmacSha256, createHmacSha1 } from './ConnectorBase.js';
+import { Connector, ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, createHmacSha256, createHmacSha1, assertAsciiSecret } from './ConnectorBase.js';
 import { ConnectorRegistry } from './ConnectorRegistry.js';
 import crypto from 'crypto';
 
@@ -35,6 +35,7 @@ export class GitHubConnector extends Connector {
     // a configured value.
     const merged = { ...this.config.auth };
     for (const [k, v] of Object.entries(env)) if (v) merged[k] = v;
+    assertAsciiSecret(merged.token, 'GITHUB_TOKEN');
     return merged;
   }
 

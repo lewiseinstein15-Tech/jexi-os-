@@ -33,7 +33,8 @@ for (const key of [
 ]) delete process.env[key];
 
 import { ConnectorRegistry } from './src/connectors/ConnectorRegistry.js';
-import { ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, withTimeout, maskSecret, createHmacSha256, createHmacSha1 } from './src/connectors/ConnectorBase.js';
+import { ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, withTimeout, maskSecret, createHmacSha256, createHmacSha1, assertAsciiSecret } from './src/connectors/ConnectorBase.js';
+import { recordWebhookEvents, recordHandshake, listInbound, resetConnectorInbox } from './src/services/ConnectorInbox.js';
 import { registerWhatsAppConnector, WhatsAppConnector } from './src/connectors/whatsapp.js';
 import { registerGitHubConnector, GitHubConnector } from './src/connectors/github.js';
 import { registerEmailConnector, ResendConnector } from './src/connectors/email.js';
@@ -341,6 +342,39 @@ registerTelegramConnector(new ConnectorConfig({ name: 'telegram', auth: { botTok
 // Restore the project's real settings.json (test never leaves state behind).
 if (originalSettings !== null) fs.writeFileSync(SETTINGS_PATH, originalSettings, 'utf-8');
 else fs.rmSync(SETTINGS_PATH, { force: true });
+
+/* ------------------------------------------------------------------ */
+console.log('\n== B59 — corrupted-secret guard + inbound inbox ==');
+/* ------------------------------------------------------------------ */
+
+// assertAsciiSecret: clean ASCII passes, a stray emoji (U+2705 — exactly what
+// corrupted the live RESEND_API_KEY on Render) is rejected with a clear message.
+ok(assertAsciiSecret('re_abc123', 'RESEND_API_KEY') === 're_abc123', 'assertAsciiSecret passes clean ASCII secrets');
+let asciiErr = null;
+try { assertAsciiSecret('re_abc\u2705def', 'RESEND_API_KEY'); } catch (e) { asciiErr = e; }
+ok(asciiErr && asciiErr.code === ERROR_CODES.PROVIDER_ERROR && /non-ASCII/.test(asciiErr.message), 'assertAsciiSecret rejects a key containing an emoji with a clear message');
+
+// A corrupted env key surfaces a readable health error instead of Node's
+// cryptic "Cannot convert argument to a ByteString" TypeError.
+process.env.RESEND_API_KEY = 're_bad\u2705key';
+registerEmailConnector(new ConnectorConfig({ name: 'email', auth: { baseUrl: mocks.resend.url } }));
+const badHealth = await callConnector('email', { method: 'health' });
+ok(badHealth.ok === false && /non-ASCII/.test((badHealth.health && badHealth.health.detail) || ''), 'email health with an emoji-corrupted key fails with a readable error');
+delete process.env.RESEND_API_KEY;
+registerEmailConnector(new ConnectorConfig({ name: 'email', auth: { baseUrl: mocks.resend.url } }));
+
+// Inbound inbox: records + lists webhook events and handshakes, newest first.
+resetConnectorInbox();
+recordWebhookEvents('whatsapp', [{ id: 'w1', provider: 'whatsapp', from: '15551234567', text: 'hi', type: 'text', raw: { huge: 'envelope' } }]);
+recordHandshake('whatsapp', { verified: true, challenge: 'challenge-42' });
+recordHandshake('whatsapp', { verified: false, reason: 'hub.verify_token mismatch' });
+const inbox = listInbound('whatsapp', 10);
+ok(inbox.total === 1 && inbox.events.length === 1 && inbox.events[0].from === '15551234567' && inbox.events[0].text === 'hi', 'inbox stores normalized inbound events');
+ok(!('raw' in inbox.events[0]) && inbox.events[0].type === 'text', 'inbox strips raw provider envelopes from stored events');
+ok(inbox.handshakes.length === 2 && inbox.handshakes[0].verified === false && inbox.handshakes[1].verified === true, 'inbox records Meta handshake outcomes (newest first)');
+resetConnectorInbox();
+const emptyInbox = listInbound('whatsapp', 10);
+ok(emptyInbox.total === 0 && emptyInbox.events.length === 0 && emptyInbox.handshakes.length === 0, 'resetConnectorInbox clears the store');
 
 await mocks.closeAll();
 await hanging.close();

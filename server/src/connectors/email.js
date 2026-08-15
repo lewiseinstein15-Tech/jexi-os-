@@ -20,7 +20,7 @@
  * onboarding@resend.dev, which works for testing).
  */
 
-import { Connector, ConnectorConfig, ConnectorError, ERROR_CODES, httpJson } from './ConnectorBase.js';
+import { Connector, ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, assertAsciiSecret } from './ConnectorBase.js';
 import { ConnectorRegistry } from './ConnectorRegistry.js';
 
 /** Normalize a from value: "Name <email>" | { email, name? } → Resend string. */
@@ -49,6 +49,7 @@ export class ResendConnector extends Connector {
     // a configured value.
     const merged = { ...this.config.auth };
     for (const [k, v] of Object.entries(env)) if (v) merged[k] = v;
+    assertAsciiSecret(merged.apiKey, 'RESEND_API_KEY');
     return merged;
   }
 

@@ -15,6 +15,7 @@
  */
 
 import { loadSettings, saveSettings } from '../services/SettingsManager.js';
+import { recordWebhookEvents, recordHandshake } from '../services/ConnectorInbox.js';
 import { ConnectorConfig, ConnectorError, ERROR_CODES } from './ConnectorBase.js';
 import { ConnectorRegistry } from './ConnectorRegistry.js';
 import { registerWhatsAppConnector } from './whatsapp.js';
@@ -144,6 +145,7 @@ export async function handleConnectorWebhook(name, { rawBody, headers = {}, quer
   // WhatsApp GET verification handshake (Meta requires this).
   if (name === 'whatsapp' && (query['hub.mode'] || query['hub.challenge'])) {
     const handshake = connector.handleWebhookVerification(query);
+    recordHandshake(name, { verified: !!handshake.verified, reason: handshake.reason || null, challenge: handshake.challenge || null });
     return { kind: 'handshake', ...handshake };
   }
 
@@ -151,6 +153,7 @@ export async function handleConnectorWebhook(name, { rawBody, headers = {}, quer
   if (name === 'whatsapp' || name === 'github') {
     const verified = connector.verifyWebhookSignature(rawBody, headers);
     if (!verified) {
+      recordWebhookEvents(name, [{ provider: name, type: 'rejected', error: 'Webhook signature verification failed (X-Hub-Signature mismatch)' }]);
       return { kind: 'rejected', error: 'Webhook signature verification failed (X-Hub-Signature mismatch)' };
     }
   }
@@ -178,6 +181,8 @@ export async function handleConnectorWebhook(name, { rawBody, headers = {}, quer
     events = connector.normalizeInbound(body);
   }
 
+  // B59 — durable log so inbound deliveries are provable end-to-end.
+  recordWebhookEvents(name, events);
   return { kind: 'events', verified: true, events };
 }
 

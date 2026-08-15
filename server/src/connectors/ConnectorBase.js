@@ -126,6 +126,24 @@ export function maskSecret(value, keep = 4) {
   return `••••${s.slice(-keep)}`;
 }
 
+/**
+ * B59 — reject secrets that contain non-ASCII characters (a stray emoji or
+ * smart-quote from copy-paste) BEFORE the request goes out. Node's fetch
+ * otherwise dies with an opaque "Cannot convert argument to a ByteString…"
+ * TypeError when serializing the header; this surfaces the real cause: the
+ * stored value is corrupted and must be re-pasted.
+ */
+export function assertAsciiSecret(value, label = 'secret') {
+  const s = String(value == null ? '' : value);
+  if (/[^\x00-\x7F]/.test(s)) {
+    throw new ConnectorError(
+      ERROR_CODES.PROVIDER_ERROR,
+      `${label} contains non-ASCII characters (e.g. an emoji or smart-quote from copy-paste) at position ${s.search(/[^\x00-\x7F]/)} — the stored value is corrupted. Re-paste ${label} exactly as shown in the provider dashboard.`
+    );
+  }
+  return s;
+}
+
 import crypto from 'crypto';
 
 /* ------------------------------------------------------------------ */

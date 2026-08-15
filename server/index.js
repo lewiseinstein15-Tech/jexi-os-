@@ -43,6 +43,7 @@ import { MCP_PORT, MCP_TOOL_ALLOWLIST, listMcpTools } from './mcp-server.js';
 import {
   registerConnectors, getConnectorStatus, saveConnectorConfig, callConnector, handleConnectorWebhook, getConnectorToolSchemas,
 } from './src/connectors/index.js'; // B56 — connector system
+import { listInbound } from './src/services/ConnectorInbox.js'; // B59 — provable inbound webhook log
 import { trustStatus, setTrustMode, allowPattern, denyPattern, removeDecision, clearTrust, trustFolder } from './src/services/RiskGuard.js';
 import { computerStatus, runtimeCall } from './src/services/ComputerRuntime.js';
 import { listTasks, getTask, updateTask, deleteTask, taskStats as taskRegistryStats } from './src/services/TaskRegistry.js';
@@ -638,6 +639,15 @@ app.get('/api/connectors/:name/health', async (req, res) => {
   try {
     const result = await callConnector(req.params.name, { method: 'health' });
     res.status(result.ok ? 200 : 400).json(result);
+  } catch (e) { res.status(500).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+
+// Open inbound log (GET, read-only) — recent verified webhook events + Meta
+// handshake records per connector, so live inbound deliveries are provable
+// from a browser (same class as the open health endpoints; no secrets).
+app.get('/api/connectors/:name/inbound', (req, res) => {
+  try {
+    res.json({ ok: true, name: req.params.name, ...listInbound(req.params.name, req.query.limit) });
   } catch (e) { res.status(500).json({ ok: false, error: (e && e.message) || String(e) }); }
 });
 

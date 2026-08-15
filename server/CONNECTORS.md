@@ -22,6 +22,7 @@ Source: `server/src/connectors/` — `ConnectorBase.js`, `ConnectorRegistry.js`,
 |---|---|---|
 | `GET /api/connectors` | open (GET) | Masked status for every connector (no values) |
 | `GET /api/connectors/:name/health` | open (GET) | Real health check (calls the provider; read-only, no secrets) |
+| `GET /api/connectors/:name/inbound` | open (GET) | B59 — recent verified inbound webhook events + Meta handshake records (newest first, no secrets) |
 | `POST /api/connectors/:name/call` | API key (`x-jexi-key`) | Real action: body `{ "method": "send"\|"health"\|"receive", "payload": {...} }` |
 | `POST /api/connectors/:name/config` | API key | Save Settings-stored keys (env always wins at call time) |
 | `POST /api/connectors/:name/toggle` | API key | Enable/disable a connector |
@@ -74,6 +75,7 @@ https://YOUR-RENDER-URL/api/connectors                  → masked status for al
 https://YOUR-RENDER-URL/api/connectors/whatsapp/health  → real PASS/FAIL + detail
 https://YOUR-RENDER-URL/api/connectors/github/health    → real username on PASS
 https://YOUR-RENDER-URL/api/connectors/email/health     → real Resend key check on PASS
+https://YOUR-RENDER-URL/api/connectors/whatsapp/inbound → B59 — every webhook Meta delivered to JEXI, parsed + newest first
 ```
 
 Each health URL is a normal GET — open it in a phone browser, or curl it from
@@ -174,6 +176,26 @@ Per-connector `health_check()`:
 2. Every update is verified against that secret before parsing.
 
 ---
+
+## Proving inbound (receive) works — no shell needed
+
+Every verified webhook delivery and every Meta hub.challenge handshake is
+recorded in a durable inbox (`DATA_DIR/connector-inbox.json`) and readable at
+`GET /api/connectors/:name/inbound` from any browser:
+
+```
+https://YOUR-RENDER-URL/api/connectors/whatsapp/inbound
+```
+
+→ `{ events: [ { at, id, provider, from, to, type, text, timestamp } ],
+handshakes: [ { at, verified, reason?, challenge? } ], total }`
+
+So the loop "phone → WhatsApp → Meta webhook → JEXI" is fully provable:
+message the business number, then open that URL and the parsed event is there.
+
+> ⚠️ Corrupted keys: if a health check reports "contains non-ASCII
+> characters (e.g. an emoji)", the env value was corrupted during copy-paste.
+> Re-paste the key fresh from the provider dashboard — no other fix needed.
 
 ## Test suites
 

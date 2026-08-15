@@ -17,7 +17,7 @@
  * already export the short names work unchanged.
  */
 
-import { Connector, ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, createHmacSha256 } from './ConnectorBase.js';
+import { Connector, ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, createHmacSha256, assertAsciiSecret } from './ConnectorBase.js';
 import { ConnectorRegistry } from './ConnectorRegistry.js';
 
 export class WhatsAppConnector extends Connector {
@@ -41,6 +41,8 @@ export class WhatsAppConnector extends Connector {
     // a configured value.
     const merged = { ...this.config.auth };
     for (const [k, v] of Object.entries(env)) if (v) merged[k] = v;
+    assertAsciiSecret(merged.accessToken, 'WHATSAPP_ACCESS_TOKEN');
+    assertAsciiSecret(merged.appSecret, 'WHATSAPP_APP_SECRET / APP_SECRET');
     return merged;
   }
 
