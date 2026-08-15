@@ -137,7 +137,7 @@ Frontend bundled clean; no TypeScript in this project (pure JS/JSX — nothing t
 |---|---|
 | 1. WhatsApp removal | **DONE** — zero functional refs; negative test asserts absence |
 | 2. Email primary + creator recognition | **DONE** — mock-proven; live loop proven in B65 |
-| 3a. Orchestrator role / classification / truthfulness | **DONE**; native tool-calling adoption **PARTIAL** (capability shipped in `generateWithTools`; not yet attached to every worker; legacy `/api/agent` JSON-in-prose loop still exists, unused by the frontend) |
+| 3a. Orchestrator role / classification / truthfulness | **DONE**; native tool-calling adoption **DONE in B67** (SIMPLE path + AgentLoop now run real provider-native `tool_calls` executed through ToolRuntime; JSON-in-prose `extractToolCalls` removed — see `FIXLOG-B67.md`) |
 | 3b. Coworker assignment | **DONE** (`WorkerRouter.js`, exact models per task type) |
 | 3c. Loop vs graph | **DONE** (SIMPLE fast path + COMPLEX graph) |
 | 3d. Memory | per-session **DONE**; live redeploy-persistence **BLOCKED** pending Render deploy + `/api/health/memory` check (probe shipped) |

@@ -5,10 +5,12 @@
  *   - profile gating (blocked vs allowed)
  *   - argument validation
  *   - real engine calls that need no keys (memory-write, profile-read)
- *   - tool-call extraction (the loop's JSON convention)
+ *   - B67 native tool-calling: schema building + the loop mechanics (the
+ *     __mockCompletions seam drives the loop without network calls)
  */
-import { getToolCatalog, TOOL_PROFILES, toolPermission, activeToolProfile, setToolProfile, executeTool } from './src/services/ToolRuntime.js';
-import { extractToolCalls } from './src/services/AgentLoop.js';
+import { getToolCatalog, TOOL_PROFILES, toolPermission, activeToolProfile, setToolProfile, executeTool, buildNativeSchemas } from './src/services/ToolRuntime.js';
+import { generateWithToolsLoop } from './src/services/LLMClient.js';
+import { executeNativeToolCalls } from './src/services/WorkerRouter.js';
 import { getTool, TOOL_COUNT } from './src/services/ToolRegistry.js';
 
 let passed = 0, failed = 0;
@@ -62,18 +64,52 @@ check('profile-read returns profile data', profile.ok === true && typeof profile
 const routed = await executeTool({ slug: 'pitch-deck', args: {}, profile: 'auto' });
 check('non-executable tool routes to its agents', routed.ok === true && routed.routed === true);
 
-/* ---------------- Stage 12: tool-call extraction ---------------- */
-const fenced = extractToolCalls('First I will search.\n```json\n{"tool": "web-search", "args": {"query": "JEXI"}}\n```\nThen answer.');
-check('extracts fenced json tool calls', fenced.length === 1 && fenced[0].tool === 'web-search');
+/* ---------------- Stage 12 (B67): NATIVE tool-calling loop ---------------- */
+// 1. buildNativeSchemas: flat TOOL_SCHEMAS-style defs → OpenAI function schemas.
+const schemas = buildNativeSchemas([
+  { slug: 'memory-recall', name: 'Memory Recall', desc: 'Recall facts', schema: { query: { type: 'string', required: true, desc: 'What to recall' }, limit: { type: 'number', desc: 'Max' } } },
+  { slug: 'profile-read', name: 'Profile Read', desc: 'Read profile', schema: {} },
+  { slug: 'no-engine-tool', name: 'No Engine', desc: 'Registry-only', schema: null }, // no schema → dropped
+]);
+check('buildNativeSchemas emits OpenAI function shape', schemas.length === 2 && schemas.every((s) => s.type === 'function' && s.function && s.function.name && s.function.parameters));
+check('buildNativeSchemas marks required args', schemas[0].function.parameters.required.includes('query'));
+check('buildNativeSchemas types number args as number', schemas[0].function.parameters.properties.limit.type === 'number');
+check('buildNativeSchemas drops defs without a schema', schemas.every((s) => s.function.name !== 'no-engine-tool'));
 
-const inline = extractToolCalls('{"tool":"memory-recall","args":{"query":"preferences"}}');
-check('extracts inline tool calls', inline.length === 1 && inline[0].tool === 'memory-recall');
+// 2. The native loop executes declared tool calls through the injected
+//    executor and keeps looping until the model answers directly.
+let executedNames = [];
+const loopRes = await generateWithToolsLoop('q', 'sys', schemas, {
+  __mockCompletions: [
+    { text: '', toolCalls: [{ id: 'call_1', name: 'memory-recall', arguments: { query: 'preferences' } }] },
+    { text: 'Here is the final answer.', toolCalls: [] },
+  ],
+  executeToolCalls: async (calls) => {
+    executedNames.push(...calls.map((c) => c.name));
+    return calls.map((c) => ({ tool_call_id: c.id, content: 'RESULT for ' + c.name }));
+  },
+});
+check('native loop executed the tool call', executedNames.length === 1 && executedNames[0] === 'memory-recall');
+check('native loop returned the tool calls', (loopRes.toolCalls || []).length === 1);
+check('native loop ran 2 rounds then answered', loopRes.iterations === 2 && loopRes.text === 'Here is the final answer.');
 
-const mixed = extractToolCalls('no tools needed — here is the answer');
-check('no calls when model answers directly', mixed.length === 0);
+// 3. When the model answers directly, no tools are executed.
+let directCalls = 0;
+const directRes = await generateWithToolsLoop('q', 'sys', schemas, {
+  __mockCompletions: [{ text: 'Direct answer.', toolCalls: [] }],
+  executeToolCalls: async () => { directCalls++; return []; },
+});
+check('no tool execution when the model answers directly', directCalls === 0 && directRes.iterations === 1 && directRes.text === 'Direct answer.');
 
-const deduped = extractToolCalls('```json\n{"tool":"web-search","args":{"query":"x"}}\n```\n```json\n{"tool":"web-search","args":{"query":"x"}}\n```');
-check('duplicate calls are deduped', deduped.length === 1);
+// 4. executeNativeToolCalls runs through the REAL gated runtime (keyless
+//    memory engine) and preserves the call id for the round-trip.
+const native = await executeNativeToolCalls([{ id: 'call_7', name: 'memory-recall', arguments: { query: 'quantum' } }], { profile: 'auto', intent: 'conversation' });
+check('executeNativeToolCalls returns tool_call_id', native.length === 1 && native[0].tool_call_id === 'call_7');
+check('executeNativeToolCalls returns real engine content', typeof native[0].content === 'string' && native[0].content.length > 0 && !native[0].content.startsWith('ERROR'));
+
+// 5. A blocked tool is reported honestly (never a fake success).
+const blockedNative = await executeNativeToolCalls([{ id: 'call_8', name: 'code-run', arguments: { command: 'echo hi' } }], { profile: 'auto' });
+check('executeNativeToolCalls reports blocked tools honestly', blockedNative.length === 1 && blockedNative[0].content.startsWith('ERROR') && /permission/.test(blockedNative[0].content));
 
 /* ---------------- Registry sanity (used by the loop) ---------------- */
 check('getTool finds web-search', getTool('web-search')?.name === 'Web Search');

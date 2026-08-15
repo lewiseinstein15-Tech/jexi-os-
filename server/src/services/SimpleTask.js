@@ -26,6 +26,22 @@ const COWORKER_LABELS = {
 };
 
 /**
+ * B67 — native tool schemas for the SIMPLE path. The single coworker is
+ * offered REAL function-calling tools (declared through the provider's native
+ * tool API, executed through the gated ToolRuntime). SIMPLE intents are
+ * memory/answer-focused, so the set is memory + profile + knowledge reads and
+ * one write — all safe/write_local, so they run autonomously under the
+ * default profile, and all inside the conversation/direct_answer allowlist.
+ */
+const SIMPLE_TOOL_DEFS = [
+  { slug: 'memory-recall', name: 'Memory Recall', desc: 'Retrieve remembered facts, preferences and prior answers about the user or a topic.', schema: { query: { type: 'string', required: true, desc: 'What to recall' }, limit: { type: 'number', desc: 'Max matches' } } },
+  { slug: 'memory-write', name: 'Memory Write', desc: 'Store a durable fact or preference the user explicitly wants remembered.', schema: { fact: { type: 'string', required: true, desc: 'Fact or preference to store' }, label: { type: 'string', desc: 'Optional label' } } },
+  { slug: 'semantic-search', name: 'Semantic Search', desc: 'Hybrid vector + keyword search across all memories.', schema: { query: { type: 'string', required: true, desc: 'Semantic query' }, limit: { type: 'number', desc: 'Max matches' } } },
+  { slug: 'profile-read', name: 'Profile Read', desc: 'Read the stored user profile: name, facts, preferences.', schema: {} },
+  { slug: 'knowledge-search', name: 'Knowledge Search', desc: 'Search the saved knowledge library and studied topics.', schema: { query: { type: 'string', required: true, desc: 'Search query' } } },
+];
+
+/**
  * Run a SIMPLE task end-to-end. Returns the same shape as
  * Orchestrator.executePlan ({ success, summary, statistics, error }).
  */
@@ -60,11 +76,27 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
   emit('agent.log', { message: `🧑‍💻 Coworker assigned: ${COWORKER_LABELS[role] || role} (${role}).` });
 
   const prompt = `The user asked: "${query}"\n\n${ctx ? `Conversation context:\n${ctx.slice(0, 4000)}\n\n` : ''}Answer directly and completely. ${FORMAT_RULES}`;
-  const res = await runWorker(role, prompt, JEXI_SYSTEM_PROMPT + preferencesBlock(), { temperature: 0.4 });
+  const res = await runWorker(role, prompt, JEXI_SYSTEM_PROMPT + preferencesBlock(), {
+    temperature: 0.4,
+    // B67 — the coworker can really call these tools via native function
+    // calling; intent is passed so ToolRuntime enforces the allowlist.
+    tools: SIMPLE_TOOL_DEFS,
+    intent: plan.intent,
+    profile: opts.profile,
+    sendEvent: emit,
+    confirm: opts.confirm,
+    signal: opts.signal,
+    maxIterations: opts.maxIterations || 4,
+  });
   results.statistics.executionTime = Date.now() - startTime;
   results.statistics.provider = res.provider || null;
   results.statistics.worker = res.worker || role;
   results.statistics.degraded = !!res.degraded;
+  results.statistics.toolCalls = (res.toolCalls || []).length;
+  results.statistics.iterations = res.iterations || 0;
+  if (results.statistics.toolCalls > 0) {
+    emit('log', { agent: 'Orchestrator', message: `🔧 Coworker used ${results.statistics.toolCalls} native tool call(s) (${results.statistics.iterations} round${results.statistics.iterations === 1 ? '' : 's'}).` });
+  }
 
   if (res.ok && res.text) {
     const summary = normalizeFinalAnswer(res.text);

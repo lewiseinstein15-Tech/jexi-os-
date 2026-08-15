@@ -1,26 +1,35 @@
 /**
  * JEXI OS — Agent Loop (roadmap stage 12: Orchestrator v2 — tool-calling loop).
  *
- * The classic orchestrator runs specialists that WRITE text and JEXI parses
- * it — fine, but the model never gets to actually USE a tool mid-answer. This
- * is the biggest gap vs Grok Build (which assembles context → model → tool
- * dispatch → loop). AgentLoop closes it with a real tool-calling loop:
+ * B67 — this loop now uses REAL native function calling. The old version made
+ * the model emit ```json {"tool": ...} blocks in prose and JEXI parsed them
+ * with extractToolCalls — fragile, provider-dependent, and unlike every modern
+ * agent runtime. The B67 loop drives the provider's NATIVE tool_calls API
+ * (Groq / OpenRouter / DeepSeek / xAI / Cerebras / DeepInfra / Mistral) and
+ * executes the declared calls through the same gated ToolRuntime:
  *
  *   plan (Planner composes team + auto tool set)
- *   → generate (model may emit a tool call as a ```json block)
- *   → execute (ToolRuntime runs it with permission gates + tool.* events)
- *   → feed results back into context
- *   → repeat (max iterations + call cap)
- *   → finalize (model writes the final answer with real tool evidence)
+ *   → generate (provider emits real tool_calls)
+ *   → execute (ToolRuntime runs them with permission gates + tool.* events)
+ *   → feed results back into the conversation
+ *   → repeat (bounded maxIterations)
+ *   → final answer written by the model from real tool evidence
  *
- * The tool set offered is ALWAYS the auto-selected subset for the intent
- * (AutoTool-style pruning — never the whole catalog).
+ * The tool set offered is ALWAYS the auto-selected, executable subset for the
+ * intent (AutoTool-style pruning — never the whole catalog).
+ *
+ * Event stream (unchanged — /api/agent and SubagentRuntime depend on it):
+ *   agent.plan  → { query, intent, team, tools }
+ *   agent.log   → { message }
+ *   tool.start  → { tool, name, permission, profile }
+ *   tool.result → { tool, ok, durationMs, preview/error }
+ *   agent.done  → { answer, stats }
  */
 
 import { Planner } from './Planner.js';
 import { getTool } from './ToolRegistry.js';
-import { executeTool, activeToolProfile, TOOL_PROFILES, isToolDone } from './ToolRuntime.js';
-import { generateContent } from './LLMClient.js';
+import { buildNativeSchemas, executeTool, activeToolProfile, TOOL_PROFILES, isToolDone } from './ToolRuntime.js';
+import { generateWithToolsLoop, generateContent } from './LLMClient.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { preferencesBlock } from './PreferenceLearner.js';
 import { providerPreferenceForIntent } from './ModelRouting.js';
@@ -37,58 +46,10 @@ async function safePlan(query, image) {
   }
 }
 
-/** Extract tool-call objects from model text: ```json blocks or inline {"tool":...}. */
-export function extractToolCalls(text) {
-  const calls = [];
-  const seen = new Set();
-
-  // Fenced json blocks (the documented convention)
-  const fences = String(text || '').match(/```json\s*([\s\S]*?)```/g) || [];
-  for (const fence of fences) {
-    const body = fence.replace(/^```json\s*/, '').replace(/```$/, '').trim();
-    try {
-      const parsed = JSON.parse(body);
-      if (parsed && parsed.tool && !seen.has(parsed.tool + JSON.stringify(parsed.args || {}))) {
-        seen.add(parsed.tool + JSON.stringify(parsed.args || {}));
-        calls.push(parsed);
-      }
-    } catch (e) { /* not json — ignore */ }
-  }
-
-  // Inline {"tool": "...", "args": {...}} objects — brace-counted so nested
-  // args objects don't truncate the JSON.
-  if (!calls.length) {
-    const str = String(text || '');
-    const starts = [];
-    let i = 0;
-    while ((i = str.indexOf('{"tool"', i)) !== -1) { starts.push(i); i += 7; }
-    for (const start of starts) {
-      let depth = 0, end = -1;
-      for (let j = start; j < str.length; j++) {
-        if (str[j] === '{') depth++;
-        else if (str[j] === '}') { depth--; if (depth === 0) { end = j + 1; break; } }
-      }
-      if (end === -1) continue;
-      try {
-        const parsed = JSON.parse(str.slice(start, end));
-        if (parsed.tool && !seen.has(parsed.tool + JSON.stringify(parsed.args || {}))) {
-          seen.add(parsed.tool + JSON.stringify(parsed.args || {}));
-          calls.push(parsed);
-        }
-      } catch (e) { /* ignore */ }
-    }
-  }
-
-  return calls.slice(0, MAX_TOOL_CALLS);
-}
-
 /**
- * Run the tool-calling loop. Streams events via sendEvent:
- *   agent.plan  → { query, intent, team, tools }
- *   agent.log   → { message }            (what the loop is doing)
- *   tool.start  → { tool, name, permission, profile }
- *   tool.result → { tool, ok, durationMs, preview/error }
- *   agent.done  → { answer, stats }
+ * Run the native tool-calling loop. Streams events via sendEvent (see the
+ * stream contract at the top). Keeps its call signature — SubagentRuntime
+ * and /api/agent call it with { query, image, sendEvent, opts }.
  */
 export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   const start = Date.now();
@@ -103,7 +64,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   }
   const checkCancelled = () => {
     if (opts.signal && opts.signal.aborted) {
-      emit('agent.done', { answer: '', cancelled: true, stats: { cancelled: true, toolCalls: callsMade, tools: tools.length, durationMs: Date.now() - start } });
+      emit('agent.done', { answer: '', cancelled: true, stats: { cancelled: true, toolCalls: callsMade, tools: schemas.length, durationMs: Date.now() - start } });
       return true;
     }
     return false;
@@ -111,92 +72,75 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
 
   const plan = await safePlan(query, image);
   const team = plan.teamSlugs || [];
-  const tools = (plan.tools || []).map((slug) => getTool(slug)).filter(Boolean).slice(0, 12);
+  // Only tools with a real executable engine (TOOL_SCHEMAS entry) are offered —
+  // buildNativeSchemas drops registry-only tools instead of giving the model
+  // routing dead-ends.
+  const toolDefs = (plan.tools || []).map((slug) => getTool(slug)).filter(Boolean).slice(0, 12);
+  const schemas = buildNativeSchemas(toolDefs);
   const profile = opts.profile || activeToolProfile();
   const prefer = providerPreferenceForIntent(plan.intent); // stage 24: per-domain model routing
 
   emit('agent.plan', {
     query, intent: plan.intent,
     team: team.length ? team : plan.steps || [],
-    tools: tools.map((t) => ({ slug: t.slug, name: t.name, type: t.type })),
+    tools: toolDefs.map((t) => ({ slug: t.slug, name: t.name, type: t.type })),
     profile, profileLabel: TOOL_PROFILES[profile]?.label,
   });
-  emit('agent.log', { message: `🧠 Plan: ${plan.planSummary || plan.intent}. Loop with ${tools.length} auto-selected tools (profile: ${profile}).` });
+  emit('agent.log', { message: `🧠 Plan: ${plan.planSummary || plan.intent}. Native tool-calling loop with ${schemas.length} executable tools (profile: ${profile}).` });
 
-  const toolContext = [];   // {tool, args, result} evidence fed back to the model
+  const toolContext = [];   // {tool, args, result} evidence (for the synthesis fallback)
   let callsMade = 0;
   let finalText = '';
 
-  if (checkCancelled()) return { answer: '', cancelled: true, stats: { cancelled: true, toolCalls: 0, tools: tools.length, durationMs: Date.now() - start } };
+  if (checkCancelled()) return { answer: '', cancelled: true, stats: { cancelled: true, toolCalls: 0, tools: schemas.length, durationMs: Date.now() - start } };
 
-  for (let iter = 1; iter <= MAX_ITERATIONS; iter++) {
-    if (checkCancelled()) return { answer: '', cancelled: true, stats: { cancelled: true, toolCalls: callsMade, tools: tools.length, durationMs: Date.now() - start } };
-    const canCall = tools.length > 0 && callsMade < MAX_TOOL_CALLS;
-
-    const prompt = buildPrompt({ query, image, tools, toolContext, iteration: iter, canCall });
-
-    let reply;
-    try {
-      reply = await generateContent(prompt, JEXI_SYSTEM_PROMPT + preferencesBlock(), image || null, { temperature: 0.3, prefer });
-    } catch (e) {
-      emit('agent.log', { message: `⚠ Generation failed: ${(e && e.message) || e}. Finishing with what we have.` });
-      finalText = String(reply || '');
-      break;
-    }
-
-    if (!canCall) {
-      finalText = String(reply || '');
-      break;
-    }
-
-    const calls = extractToolCalls(reply);
-    if (!calls.length) {
-      finalText = String(reply || '');
-      break; // model answered directly — done
-    }
-
-    emit('agent.log', { message: `🔁 Iteration ${iter}: ${calls.length} tool call(s) requested → executing…` });
-
-    let allFailed = true;
-    for (const call of calls) {
-      callsMade++;
-      const allowedSlugs = new Set(tools.map((t) => t.slug));
-      if (!allowedSlugs.has(call.tool)) {
-        emit('tool.result', { tool: call.tool, ok: false, error: `Not in the auto-selected tool set for this task (${allowedSlugs.size} tools).` });
-        toolContext.push({ tool: call.tool, args: call.args, error: 'Tool not in allowed set' });
-        continue;
+  try {
+    const res = await generateWithToolsLoop(
+      `The user asked: "${query}"${image ? '\n(An image was provided — analyze it.)' : ''}`,
+      (opts.systemPromptOverride || JEXI_SYSTEM_PROMPT) + preferencesBlock(),
+      schemas,
+      {
+        temperature: 0.3,
+        prefer,
+        signal: opts.signal,
+        maxIterations: MAX_ITERATIONS,
+        // Execute the model's native tool calls through the gated runtime —
+        // the same permission/risk/approval path as every other tool call.
+        executeToolCalls: async (calls) => {
+          const results = [];
+          for (const call of calls) {
+            if (callsMade >= MAX_TOOL_CALLS) {
+              results.push({ tool_call_id: call.id, content: 'ERROR: tool-call budget exhausted for this task.' });
+              continue;
+            }
+            callsMade++;
+            const r = await executeTool({ slug: call.name, args: call.arguments || {}, profile, sendEvent: emit, confirm: opts.confirm });
+            const done = isToolDone(r);
+            toolContext.push({ tool: call.name, args: call.arguments || {}, ok: r.ok, done, error: r.error, result: r.result, paused: r.paused === true || r.approvalRequired === true, blocked: r.blocked === true });
+            if (r.paused || r.approvalRequired) {
+              emit('agent.log', { message: `⏸ ${call.name} is an external action and needs your approval (real finalized details shown) — waiting for your yes/no before it can run.` });
+            }
+            if (r.blocked) {
+              emit('agent.log', { message: `⛔ ${call.name} blocked by permission profile "${profile}".` });
+            }
+            if (r.routed) {
+              emit('agent.log', { message: `🧭 ${call.name} is routed to its owning agents for the pipeline — it did NOT execute here, so it is not counted as a completed step.` });
+            }
+            const content = r.ok && r.result ? String(r.result).slice(0, 6000) : `ERROR: ${r.error || 'tool returned no output'}`;
+            results.push({ tool_call_id: call.id, content });
+          }
+          return results;
+        },
       }
-      // B55 P1/P5 — thread the graph's confirm callback so an EXTERNAL-tier
-      // tool pauses for ONE human approval with real finalized details, and
-      // only a REAL completed execution counts as a done step (a routed/
-      // pending/blocked result is never reported as finished).
-      const res = await executeTool({ slug: call.tool, args: call.args || {}, profile, sendEvent: emit, confirm: opts.confirm });
-      const done = isToolDone(res);
-      toolContext.push({ tool: call.tool, args: call.args || {}, ok: res.ok, done, routed: res.routed === true, pending: res.paused === true || res.approvalRequired === true, result: res.result, error: res.error });
-      if (done) allFailed = false;
-      if (res.paused || res.approvalRequired) {
-        emit('agent.log', { message: `⏸ ${call.tool} is an external action and needs your approval (real finalized details shown) — waiting for your yes/no before it can run.` });
-        break; // the graph parks at confirmationPause; nothing runs until approved
-      }
-      if (res.routed) {
-        emit('agent.log', { message: `🧭 ${call.tool} is routed to its owning agents for the pipeline — it did NOT execute here, so it is not counted as a completed step.` });
-      }
-      if (res.blocked) {
-        emit('agent.log', { message: `⛔ ${call.tool} blocked by permission profile "${profile}".` });
-        break;
-      }
-    }
-
-    // All calls failed (bad args / no engine / blocked) — stop looping, let the
-    // model answer from knowledge rather than burning iterations.
-    if (allFailed && callsMade >= MAX_TOOL_CALLS) {
-      finalText = String(reply || '');
-      break;
-    }
+    );
+    finalText = res.ok ? res.text : '';
+  } catch (e) {
+    emit('agent.log', { message: `⚠ Generation failed: ${(e && e.message) || e}. Finishing with what we have.` });
   }
 
-  // Final synthesis pass: if we made tool calls but never got a clean answer,
-  // generate the final answer with the tool evidence included.
+  // Final synthesis pass: if we made tool calls but never got a clean answer
+  // (loop hit its iteration cap), generate the final answer from the real
+  // tool evidence instead of leaving the user with nothing.
   if (!finalText && toolContext.length) {
     const evidence = toolContext.map((c) => `## Tool: ${c.tool}\n${c.error ? `ERROR: ${c.error}` : c.result}`).join('\n\n');
     try {
@@ -218,28 +162,11 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
     stats: {
       iterations: Math.min(MAX_ITERATIONS, callsMade ? MAX_ITERATIONS : 1),
       toolCalls: callsMade,
-      tools: tools.length,
+      tools: schemas.length,
       durationMs: Date.now() - start,
       profile,
     },
   });
 
-  return { answer: finalText, stats: { toolCalls: callsMade, tools: tools.length, durationMs: Date.now() - start } };
-}
-
-function buildPrompt({ query, image, tools, toolContext, iteration, canCall }) {
-  const toolList = tools.map((t) => `- ${t.slug}: ${t.desc}`).join('\n');
-
-  let context = '';
-  if (toolContext.length) {
-    context = '\n\nTOOL RESULTS SO FAR (real, verified — use them):\n' + toolContext.map((c) =>
-      `### ${c.tool} ${c.args ? JSON.stringify(c.args).slice(0, 200) : ''}\n${c.error ? `ERROR: ${c.error}` : String(c.result || '').slice(0, 2500)}`
-    ).join('\n\n').slice(0, 12000);
-  }
-
-  const callInstruction = canCall
-    ? `\n\nIf you need real data to answer, call a tool from the list below by emitting ONE fenced json block like this:\n\`\`\`json\n{"tool": "web-search", "args": {"query": "..."}}\n\`\`\`\nUse only tools from this list: ${tools.map((t) => t.slug).join(', ')}. Then WAIT — your tool results will be appended and you can continue. If you can answer from knowledge/memory alone, answer directly without a tool call.`
-    : '\n\nYou have used all available tool calls. Answer now using the tool results already provided.';
-
-  return `The user asked: "${query}"${image ? '\n(An image was provided — analyze it.)' : ''}\n\nAuto-selected tools for this task:\n${toolList || '(none — answer from knowledge)'}${context}${callInstruction}`;
+  return { answer: finalText, stats: { toolCalls: callsMade, tools: schemas.length, durationMs: Date.now() - start } };
 }

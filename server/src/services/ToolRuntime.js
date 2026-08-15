@@ -143,6 +143,46 @@ export function validateToolOutput(slug, result) {
 }
 
 /* ------------------------------------------------------------------ */
+/* B67 — native tool-calling schemas.                                  */
+/*                                                                     */
+/* Converts tool definitions (the flat TOOL_SCHEMAS style, or explicit  */
+/* { slug, name, desc, schema } entries) into OpenAI function-calling  */
+/* schemas so the Orchestrator-Workers SIMPLE path and the AgentLoop   */
+/* can offer REAL native tool calls — no JSON-in-prose parsing.        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Build OpenAI function-calling schemas from tool definitions.
+ * Each def: { slug, name?, desc?, schema? } where schema is the flat
+ * TOOL_SCHEMAS shape ({ key: { type, required, desc } }). Defs without a
+ * schema (registry-only, no executable engine) are omitted — offering them
+ * would just give the model routing dead-ends.
+ */
+export function buildNativeSchemas(defs) {
+  return (defs || [])
+    .map((t) => {
+      const schema = (t && t.schema) || TOOL_SCHEMAS[t && t.slug];
+      if (!schema) return null;
+      const properties = {};
+      const required = [];
+      for (const [k, spec] of Object.entries(schema)) {
+        const type = spec.type === 'number' ? 'number' : spec.type === 'array' ? 'array' : spec.type === 'object' ? 'object' : 'string';
+        properties[k] = { type, description: spec.desc || '' };
+        if (spec.required) required.push(k);
+      }
+      return {
+        type: 'function',
+        function: {
+          name: t.slug,
+          description: String(t.desc || t.name || t.slug).slice(0, 500),
+          parameters: { type: 'object', properties, required },
+        },
+      };
+    })
+    .filter(Boolean);
+}
+
+/* ------------------------------------------------------------------ */
 /* Permissions — safe = read-only, medium = writes JEXI's own data,    */
 /* risky = executes code / touches external systems.                   */
 /* ------------------------------------------------------------------ */

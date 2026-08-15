@@ -18,7 +18,8 @@
  * tool calls, not JSON-in-prose parsing.
  */
 
-import { generateWithTools, generateContentSafe } from './LLMClient.js';
+import { generateWithToolsLoop, generateContentSafe } from './LLMClient.js';
+import { executeTool } from './ToolRuntime.js';
 
 /** Coworker assignments — exact models per task type (B66 3b). */
 export const COWORKERS = {
@@ -80,10 +81,44 @@ export function workerRoster() {
 }
 
 /**
+ * B67 — execute the model's native tool calls through the REAL gated tool
+ * runtime (ToolRuntime.executeTool: permission profile → risk guard → arg
+ * validation → engine), and return the OpenAI-shaped [{ tool_call_id, content }]
+ * results the tool loop feeds back to the model. Blocked / approval-required /
+ * failed calls return their honest error text — the model never sees a fake
+ * success, and an external-tier tool without a confirm callback reports that
+ * it needs approval (truthful failure, B66 3a).
+ */
+export async function executeNativeToolCalls(calls, opts = {}) {
+  const out = [];
+  for (const call of calls || []) {
+    const res = await executeTool({
+      slug: call.name,
+      args: call.arguments || {},
+      profile: opts.profile,
+      intent: opts.intent,
+      sendEvent: opts.sendEvent,
+      confirm: opts.confirm,
+    });
+    const content = res && res.ok && res.result
+      ? String(res.result).slice(0, 6000)
+      : `ERROR: ${(res && res.error) || 'tool returned no output'}`;
+    out.push({ tool_call_id: call.id, name: call.name, content });
+  }
+  return out;
+}
+
+/**
  * Run one coworker for a task. Returns
- *   { ok, text, worker, provider, model, toolCalls?, degraded?, attempts }
+ *   { ok, text, worker, provider, model, toolCalls?, iterations?, degraded?, attempts }
  * Never throws: on total failure the text carries the honest degraded
  * message from generateContentSafe (B66 3e — no raw errors, no pretending).
+ *
+ * B67 — native tool-calling adoption: when opts.tools (tool defs) is passed,
+ * runWorker runs the REAL native loop (generateWithToolsLoop + executeTool
+ * executor) — the model declares tool_calls through the provider API, the
+ * coworker executes them with full gating, results feed back, and the loop
+ * repeats until the model answers directly. No JSON-in-prose anywhere.
  */
 export async function runWorker(role, prompt, system = '', opts = {}) {
   const chain = coworkerChain(role);
@@ -94,9 +129,18 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
     const label = p.model ? `${p.key}(${p.model})` : p.key;
     try {
       if (wantsTools) {
-        const res = await generateWithTools(prompt, system, opts.tools, { provider: p.key, model: p.model, temperature: opts.temperature });
+        const res = await generateWithToolsLoop(prompt, system, opts.tools, {
+          provider: p.key,
+          model: p.model,
+          temperature: opts.temperature,
+          maxIterations: opts.maxIterations,
+          signal: opts.signal,
+          __mockCompletions: opts.__mockCompletions, // test seam
+          // Execute the model's native tool calls through the gated runtime.
+          executeToolCalls: (calls) => executeNativeToolCalls(calls, opts),
+        });
         if (res.ok) {
-          return { ok: true, text: res.text, toolCalls: res.toolCalls || [], worker: role, provider: res.provider, model: res.model, attempts };
+          return { ok: true, text: res.text, toolCalls: res.toolCalls || [], iterations: res.iterations || 0, worker: role, provider: res.provider, model: res.model, attempts };
         }
         attempts.push(`${label}: empty response`);
       } else {

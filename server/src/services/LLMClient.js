@@ -441,21 +441,26 @@ export async function testAllProviders() {
 
 const TOOL_CAPABLE = new Set(['groq', 'openrouter', 'deepseek', 'xai', 'cerebras', 'deepinfra', 'mistral']);
 
+/**
+ * Parse a provider's tool_calls into { id, name, arguments }. The id is
+ * KEPT (B67) because a native loop must echo it back as tool_call_id when
+ * feeding tool results to the next round.
+ */
 function parseToolCalls(msg) {
   return (msg?.tool_calls || [])
     .filter((tc) => tc && tc.function)
     .map((tc) => {
       let args = {};
       try { args = JSON.parse(tc.function.arguments || '{}'); } catch (e) { /* keep {} */ }
-      return { name: tc.function.name || '', arguments: args };
+      return { id: tc.id || null, name: tc.function.name || '', arguments: args };
     })
     .filter((tc) => tc.name);
 }
 
-/** One native tool-calling request against one OpenAI-compatible provider. */
-async function callWithTools(provider, prompt, system, tools, opts, errors) {
+/** Per-provider connection config for native tool calling (OpenAI-compatible). */
+function providerToolConfig(provider, opts) {
   const keys = resolveKeys();
-  const cfg = {
+  return {
     groq: { key: keys.groqKey, baseUrl: null, sdk: true, models: [opts.model || GROQ_TEXT_MODEL] },
     openrouter: { key: keys.openrouterKey, baseUrl: 'https://openrouter.ai/api/v1', models: [opts.model || OPENROUTER_TEXT_MODELS[0]] },
     deepseek: { key: keys.deepseekKey, baseUrl: 'https://api.deepseek.com/v1', models: [opts.model || 'deepseek-chat'] },
@@ -464,71 +469,152 @@ async function callWithTools(provider, prompt, system, tools, opts, errors) {
     deepinfra: { key: keys.deepinfraKey, baseUrl: 'https://api.deepinfra.com/v1/openai', models: [opts.model || DEEPINFRA_MODELS[0]] },
     mistral: { key: keys.mistralKey, baseUrl: 'https://api.mistral.ai/v1', models: [opts.model || MISTRAL_MODELS[0]] },
   }[provider];
-  if (!cfg || !cfg.key) return null;
-  const messages = [{ role: 'system', content: system }, { role: 'user', content: prompt }];
-  for (const model of cfg.models) {
-    try {
-      let text = '';
-      let toolCalls = [];
-      if (cfg.sdk) {
-        const groq = new Groq({ apiKey: cfg.key });
-        const completion = await groq.chat.completions.create(
-          { messages, model, tools, tool_choice: 'auto', temperature: opts.temperature ?? 0.3 },
-          { timeout: TIMEOUT_MS }
-        );
-        const msg = completion.choices?.[0]?.message;
-        text = (msg && msg.content) || '';
-        toolCalls = parseToolCalls(msg);
-      } else {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-        try {
-          const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.key}` },
-            body: JSON.stringify({ model, messages, tools, tool_choice: 'auto', temperature: opts.temperature ?? 0.3 }),
-            signal: controller.signal,
-          });
-          if (!res.ok) {
-            const b = await res.text().catch(() => '');
-            errors.push(`${provider}(${model}): HTTP ${res.status} ${b.slice(0, 120)}`);
-            continue;
-          }
-          const data = await res.json();
-          const msg = data?.choices?.[0]?.message;
-          text = (msg && msg.content) || '';
-          toolCalls = parseToolCalls(msg);
-        } finally {
-          clearTimeout(timer);
-        }
-      }
-      return { text: String(text || '').trim(), toolCalls, model };
-    } catch (e) {
-      errors.push(`${provider}(${model}): ${e.message}`);
-      console.error(`[LLMClient] ${provider} tool-call failed:`, e.message);
-    }
-  }
-  return null;
 }
 
 /**
- * Native function-calling generation. `tools` are OpenAI-style schemas:
- *   [{ type: 'function', function: { name, description, parameters } }]
- * Returns { ok, provider, model, text, toolCalls: [{name, arguments}] }.
- * `opts.provider` pins the walk to one provider (worker assignment);
- * otherwise the health-aware order is used, skipping non-tool providers.
+ * ONE native tool-calling request against one provider with a full message
+ * history. Returns { text, toolCalls, rawToolCalls, model } or throws (the
+ * caller decides provider/model fallback). rawToolCalls are the API's own
+ * tool_calls objects — replayed verbatim into the next round's messages.
  */
-export async function generateWithTools(prompt, systemInstruction = '', tools = [], opts = {}) {
+async function chatWithToolsOnce(provider, cfg, model, messages, tools, opts) {
+  if (cfg.sdk) {
+    const groq = new Groq({ apiKey: cfg.key });
+    const completion = await groq.chat.completions.create(
+      { messages, model, tools, tool_choice: 'auto', temperature: opts.temperature ?? 0.3 },
+      { timeout: TIMEOUT_MS }
+    );
+    const msg = completion.choices?.[0]?.message;
+    return { text: (msg && msg.content) || '', toolCalls: parseToolCalls(msg), rawToolCalls: msg?.tool_calls || [], model };
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.key}` },
+      body: JSON.stringify({ model, messages, tools, tool_choice: 'auto', temperature: opts.temperature ?? 0.3 }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const b = await res.text().catch(() => '');
+      throw new Error(`HTTP ${res.status} ${b.slice(0, 120)}`);
+    }
+    const data = await res.json();
+    const msg = data?.choices?.[0]?.message;
+    return { text: (msg && msg.content) || '', toolCalls: parseToolCalls(msg), rawToolCalls: msg?.tool_calls || [], model };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * B67 — the REAL native tool loop for one provider. Round after round:
+ *   generate (provider may emit tool_calls) → execute (opts.executeToolCalls)
+ *   → feed results back → generate again — until the model answers directly
+ *   or the bounded maxIterations is reached. If the provider fails, null is
+ *   returned so the caller's provider walk falls through to the next one
+ *   (B66 3e graceful degradation, now inside tool calling too).
+ */
+async function runToolLoopForProvider(provider, messages, tools, opts, errors) {
+  const cfg = providerToolConfig(provider, opts);
+  if (!cfg || !cfg.key) return null;
+  const maxIter = Math.max(1, opts.maxIterations || 6);
+  let model = null;
+  const allCalls = [];
+  let finalText = '';
+  let iterations = 0;
+
+  for (let i = 0; i < maxIter; i++) {
+    if (opts.signal && opts.signal.aborted) break;
+    iterations++;
+    // First round picks the first working model; later rounds pin it so the
+    // loop doesn't hop mid-conversation (tool results stay coherent).
+    const candidates = model ? [model] : cfg.models;
+    let round = null;
+    let lastErr = null;
+    for (const m of candidates) {
+      try {
+        round = await chatWithToolsOnce(provider, cfg, m, messages, tools, opts);
+        model = m;
+        break;
+      } catch (e) {
+        lastErr = e;
+        errors.push(`${provider}(${m}): ${e.message}`);
+      }
+    }
+    if (!round) {
+      errors.push(`${provider}: ${(lastErr && lastErr.message) || 'all models failed'}`);
+      return null; // provider failed → outer walk tries the next provider
+    }
+
+    if (!round.toolCalls.length) {
+      finalText = round.text;
+      break; // model answered directly — loop done
+    }
+
+    allCalls.push(...round.toolCalls);
+    const results = typeof opts.executeToolCalls === 'function'
+      ? await opts.executeToolCalls(round.toolCalls).catch((e) => [{ tool_call_id: null, content: `EXECUTION ERROR: ${(e && e.message) || e}` }])
+      : [];
+
+    // Feed the assistant's tool_calls and the real results back as messages.
+    messages.push({ role: 'assistant', content: round.text || null, tool_calls: round.rawToolCalls });
+    for (const r of results) {
+      messages.push({ role: 'tool', tool_call_id: r.tool_call_id || `call_${allCalls.length}`, content: String(r.content ?? '').slice(0, 12000) });
+    }
+    // Nothing executed (no executor / all calls failed) — stop looping instead
+    // of letting the model re-call tools forever.
+    if (!results.length) { finalText = String(round.text || ''); break; }
+  }
+
+  if (!finalText && !allCalls.length) return null;
+  return { text: String(finalText || '').trim(), toolCalls: allCalls, model, iterations };
+}
+
+/**
+ * Native function-calling LOOP (B67). `tools` are OpenAI-style schemas:
+ *   [{ type: 'function', function: { name, description, parameters } }]
+ * `opts.executeToolCalls(calls)` runs the declared tool calls for real and
+ * returns [{ tool_call_id, content }] which are fed back to the model; the
+ * loop repeats until the model answers directly or maxIterations (default 6).
+ * Returns { ok, provider, model, text, toolCalls: [{id,name,arguments}], iterations }.
+ * `opts.provider` pins the walk to one provider (worker assignment); otherwise
+ * the health-aware order is used, skipping non-tool providers.
+ * Test seam (same pattern as AgentLoop's __mockAnswer): `opts.__mockCompletions`
+ * is an array of { text, toolCalls } rounds that drive the loop deterministically.
+ */
+export async function generateWithToolsLoop(prompt, systemInstruction = '', tools = [], opts = {}) {
   const errors = [];
   const system = systemInstruction || 'You are JEXI OS, an expert AI operating system.';
+
+  if (Array.isArray(opts.__mockCompletions) && opts.__mockCompletions.length) {
+    const allCalls = [];
+    let finalText = '';
+    let iterations = 0;
+    for (const round of opts.__mockCompletions) {
+      iterations++;
+      if (Array.isArray(round.toolCalls) && round.toolCalls.length) {
+        allCalls.push(...round.toolCalls);
+        const results = typeof opts.executeToolCalls === 'function' ? await opts.executeToolCalls(round.toolCalls) : [];
+        if (!results.length) { finalText = String(round.text || ''); break; }
+      } else {
+        finalText = String(round.text || '');
+        break;
+      }
+    }
+    return { ok: true, provider: 'mock', model: null, text: String(finalText || '').trim(), toolCalls: allCalls, iterations };
+  }
+
   const order = opts.provider ? [opts.provider] : providerOrder(opts.prefer || '');
+  const messages = [{ role: 'system', content: system }, { role: 'user', content: prompt }];
   for (const provider of order) {
     if (!TOOL_CAPABLE.has(provider)) continue;
     try {
-      const res = await callWithTools(provider, prompt, system, tools, opts, errors);
-      if (res && (res.toolCalls.length || res.text)) {
+      const res = await runToolLoopForProvider(provider, messages, tools, opts, errors);
+      if (res) {
         recordProviderSuccess(provider);
-        return { ok: true, provider, model: res.model || null, text: res.text, toolCalls: res.toolCalls };
+        return { ok: true, provider, model: res.model || null, text: res.text, toolCalls: res.toolCalls, iterations: res.iterations };
       }
     } catch (e) {
       errors.push(`${provider}: ${e.message}`);
@@ -536,6 +622,16 @@ export async function generateWithTools(prompt, systemInstruction = '', tools = 
     recordProviderFailure(provider);
   }
   throw new Error(`All AI providers failed for tool calling. ${errors.join(' | ') || 'no tool-capable provider configured'}`);
+}
+
+/**
+ * Native function-calling generation (single round). Kept as a thin wrapper
+ * over the loop for callers that only need one shot — the loop with
+ * maxIterations 1 and no executor returns toolCalls un-executed, same
+ * contract as before.
+ */
+export async function generateWithTools(prompt, systemInstruction = '', tools = [], opts = {}) {
+  return generateWithToolsLoop(prompt, systemInstruction, tools, { ...opts, maxIterations: 1 });
 }
 
 /* ------------------------------------------------------------------ */
