@@ -321,3 +321,17 @@ the planner before it decides; internal agents can call external MCP tools
 through the same validated path as internal ones; and all verification shares one
 structured prompt pattern. JEXI now *decides how to accomplish an objective* —
 it does not just pick a regex bucket and run one function.
+
+---
+
+## Build 68 — REDIS_URL is now a first-class, verified memory-persistence backend
+
+See **`FIXLOG-B68.md`** for the full diagnosis + proof. Summary: `/api/health/memory`
+reported "disk persistence not yet proven" despite `REDIS_URL` being set because the
+probe only ever checked disk stamps — it never pinged, stamped, or verified Redis, and
+`isRedisActive()` returned true based on a client object existing, not a real
+connection. B68 makes the probe async, stamps BOTH backends (disk + Redis boot stamps),
+reports `persistent: true` when either survived a restart, tracks real connection state
+(`redisStatus` updated by every actual command), surfaces `redisDetail` in `/api/health`,
+and proves Redis-only restart survival with two fresh processes against a labeled mock
+RESP server (28/28 assertions, full `npm test` exit 0).

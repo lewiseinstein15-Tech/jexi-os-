@@ -24,6 +24,8 @@ import { generateContent, resolveKeys, embedText } from './LLMClient.js';
  */
 
 const MEMORY_REDIS_KEY = 'jexi:memory';
+const REDIS_BOOTSTAMPS_KEY = 'jexi:bootstamps';
+const REDIS_BOOT_TTL = 60 * 60 * 24 * 30; // 30 days — same window as the memory mirror
 
 const DEFAULT_MEMORY = {
   userProfile: { name: '', location: '', interests: [] },
@@ -48,6 +50,11 @@ const CAPS = { internetKnowledge: 150, codingKnowledge: 100, learnedAnswers: 100
 let cache = null;
 let redisClient = null;
 let redisEnabled = Boolean(process.env.REDIS_URL);
+// Real connection state (not "a client object exists"): 'unset' | 'connecting' |
+// 'connected' | 'error'. Updated by every actual Redis command so /api/health
+// and the persistence probe report what is really happening.
+let redisStatus = redisEnabled ? 'connecting' : 'unset';
+let redisLastError = '';
 let consolidated = false; // run the merge pass once per process (on boot)
 
 /* ------------------------------------------------------------------ */
@@ -97,38 +104,98 @@ function saveSessionHistory(history) {
   } catch (e) { /* memory must never break the chat */ }
 }
 
+/** Bound a Redis command with a hard timeout so a dead/slow server can never
+ * hang the health probe. Returns the command's result or throws on timeout. */
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`Redis command timed out after ${ms}ms`)), ms)),
+  ]);
+}
+
 /**
- * B66 — persistence probe: prove memory survives a restart/redeploy. Each
- * process stamps DATA_DIR with its own instance id; the probe reports whether
- * stamps from PREVIOUS boots are still present (=> the disk is persistent).
- * On Render this depends on a persistent disk being mounted at DATA_DIR —
- * ephemeral containers lose it, exactly as the probe will report.
+ * B66+B68 — persistence probe: prove memory survives a restart/redeploy. Each
+ * process stamps BOTH persistence layers — DATA_DIR on disk AND Redis (when
+ * REDIS_URL is configured). The probe then reports whether stamps from
+ * PREVIOUS boots are still present after a restart/redeploy:
+ *   - disk stamps survived  => persistent disk mounted at DATA_DIR
+ *   - Redis stamps survived => REDIS_URL is a fully valid persistence backend
+ *     (memory survives redeploys even without a disk)
+ * Async because it performs a real Redis ping + stamp round-trip.
  */
-export function memoryPersistenceProbe() {
+export async function memoryPersistenceProbe() {
   const id = process.env.RENDER_INSTANCE_ID || process.env.POD_NAME || `boot-${Math.random().toString(36).slice(2, 10)}`;
+  const disk = { previousBootsSeen: [], persistent: false };
   try {
     fs.mkdirSync(DATA_DIR, { recursive: true });
     const mine = path.join(DATA_DIR, `.jexi-boot-${String(id).replace(/[^a-zA-Z0-9_-]/g, '')}.json`);
     fs.writeFileSync(mine, JSON.stringify({ boot: new Date().toISOString(), instance: id }), 'utf-8');
-    const previous = fs.readdirSync(DATA_DIR)
+    disk.previousBootsSeen = fs.readdirSync(DATA_DIR)
       .filter((f) => /^\.jexi-boot-/.test(f) && !f.endsWith(String(id).replace(/[^a-zA-Z0-9_-]/g, '') + '.json'))
       .map((f) => ({ file: f, mtime: fs.statSync(path.join(DATA_DIR, f)).mtime.toISOString() }));
-    const sessionCount = (() => {
-      try { return fs.readdirSync(SESSIONS_DIR).filter((f) => f.endsWith('.json')).length; } catch (e) { return 0; }
-    })();
-    return {
-      dataDir: DATA_DIR,
-      instance: id,
-      previousBootsSeen: previous,
-      persistentDisk: previous.length > 0, // evidence-based, not assumed
-      sessionCount,
-      note: previous.length > 0
-        ? 'previous boot stamps survived — the memory directory is persistent across restarts'
-        : 'no previous boot stamps found — disk persistence not yet proven (mount a persistent disk at DATA_DIR on Render, or set REDIS_URL for cross-restart memory)',
-    };
+    disk.persistent = disk.previousBootsSeen.length > 0;
   } catch (e) {
-    return { dataDir: DATA_DIR, error: (e && e.message) || String(e), persistentDisk: false };
+    disk.error = (e && e.message) || String(e);
   }
+  const sessionCount = (() => {
+    try { return fs.readdirSync(SESSIONS_DIR).filter((f) => f.endsWith('.json')).length; } catch (e) { return 0; }
+  })();
+
+  // --- Redis-backed persistence (B68): REDIS_URL is a first-class backend.
+  // --- Stamp Redis on every probe so a redeploy can prove the stamps
+  // --- survived — exactly the same evidence model as the disk stamps.
+  const redis = { configured: redisEnabled, connected: false, error: '', previousBootsSeen: [] };
+  if (redisEnabled) {
+    const r = await getRedis();
+    if (r) {
+      try {
+        await withTimeout(r.ping(), 5000);
+        redis.connected = true;
+        redisStatus = 'connected';
+        redisLastError = '';
+        const raw = await withTimeout(r.get(REDIS_BOOTSTAMPS_KEY), 5000);
+        const stamps = (() => { try { return JSON.parse(raw || '[]'); } catch (e) { return []; } })();
+        redis.previousBootsSeen = stamps
+          .filter((s) => s && s.instance !== id)
+          .map((s) => ({ instance: s.instance, boot: s.boot }));
+        const next = [...stamps.filter((s) => s && s.instance !== id), { instance: id, boot: new Date().toISOString() }].slice(-20);
+        await withTimeout(r.set(REDIS_BOOTSTAMPS_KEY, JSON.stringify(next), 'EX', REDIS_BOOT_TTL), 5000);
+      } catch (e) {
+        redis.error = (e && e.message) || String(e);
+        redisStatus = 'error';
+        redisLastError = redis.error;
+      }
+    }
+  }
+  const redisPersistent = redis.connected && redis.previousBootsSeen.length > 0;
+  const persistent = disk.persistent || redisPersistent;
+  let note;
+  if (redisPersistent) {
+    note = 'Redis-backed persistence PROVEN: boot stamps from previous boots survived in Redis (REDIS_URL) — memory survives redeploys without a persistent disk';
+  } else if (disk.persistent) {
+    note = 'previous boot stamps survived — the memory directory is persistent across restarts';
+  } else if (redis.connected) {
+    note = 'Redis connected (REDIS_URL) but no previous boot stamps seen yet — Redis-backed persistence will be proven after the next restart/redeploy';
+  } else if (redisEnabled && redis.error) {
+    note = `REDIS_URL is configured but the Redis connection failed: ${redis.error}`;
+  } else {
+    note = 'no previous boot stamps found — disk persistence not yet proven (mount a persistent disk at DATA_DIR on Render, or set REDIS_URL for cross-restart memory)';
+  }
+  return {
+    dataDir: DATA_DIR,
+    instance: id,
+    previousBootsSeen: disk.previousBootsSeen,
+    persistentDisk: disk.persistent,
+    persistent, // true when EITHER backend survived a restart
+    sessionCount,
+    redis: {
+      configured: redisEnabled,
+      connected: redis.connected,
+      error: redis.error,
+      previousBootsSeen: redis.previousBootsSeen,
+    },
+    note,
+  };
 }
 
 function ensureDirs() {
@@ -147,11 +214,23 @@ async function getRedis() {
       lazyConnect: true,
       maxRetriesPerRequest: 2,
       enableReadyCheck: true,
+      connectTimeout: 8000,
+      // Fail fast instead of retrying forever: a wrong/blocked URL should
+      // surface in seconds, not hang the boot sequence.
+      retryStrategy: (times) => Math.min(times * 200, 4000),
+    });
+    // ioredis emits 'error' for connection failures; without a listener it
+    // throws uncaught and can crash the process. Track the real state instead.
+    redisClient.on('error', (e) => {
+      redisStatus = 'error';
+      redisLastError = (e && e.message) || String(e);
     });
     return redisClient;
   } catch (e) {
     console.error('[Memory] Redis client failed to init, using local file only:', e.message);
     redisEnabled = false;
+    redisStatus = 'error';
+    redisLastError = (e && e.message) || String(e);
     return null;
   }
 }
@@ -163,6 +242,8 @@ export async function hydrateFromRedis() {
   if (!r) return false;
   try {
     const raw = await r.get(MEMORY_REDIS_KEY);
+    redisStatus = 'connected';
+    redisLastError = '';
     if (raw) {
       const parsed = JSON.parse(raw);
       cache = { ...structuredClone(DEFAULT_MEMORY), ...parsed };
@@ -175,6 +256,8 @@ export async function hydrateFromRedis() {
     }
   } catch (e) {
     console.error('[Memory] Redis hydrate failed, using local file:', e.message);
+    redisStatus = 'error';
+    redisLastError = (e && e.message) || String(e);
   }
   return false;
 }
@@ -183,13 +266,25 @@ async function redisPush(memory) {
   if (!redisEnabled) return;
   const r = await getRedis();
   if (!r) return;
-  try { await r.set(MEMORY_REDIS_KEY, JSON.stringify(memory), 'EX', 60 * 60 * 24 * 30); } // 30-day TTL
-  catch (e) { console.error('[Memory] Redis write failed:', e.message); }
+  try {
+    await r.set(MEMORY_REDIS_KEY, JSON.stringify(memory), 'EX', 60 * 60 * 24 * 30); // 30-day TTL
+    redisStatus = 'connected';
+    redisLastError = '';
+  } catch (e) {
+    console.error('[Memory] Redis write failed:', e.message);
+    redisStatus = 'error';
+    redisLastError = (e && e.message) || String(e);
+  }
 }
 
-/** True when a Redis layer is configured (used by the load-balancer health check). */
+/** True only when Redis is configured AND a real command has succeeded. */
 export function isRedisActive() {
-  return redisEnabled && !!redisClient;
+  return redisEnabled && redisStatus === 'connected';
+}
+
+/** Diagnostic detail for /api/health and the persistence probe. */
+export function redisConnectionInfo() {
+  return { configured: redisEnabled, status: redisStatus, error: redisLastError };
 }
 
 /* ---------------- Local JSON store ---------------- */

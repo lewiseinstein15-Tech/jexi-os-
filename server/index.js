@@ -28,7 +28,8 @@ import {
   hydrateFromRedis, isRedisActive, semanticRecall, backfillEmbeddings,
   resolveConversationalQuery,
   // B66 — per-session conversation memory + persistence probe
-  setActiveSession, clearActiveSession, memoryPersistenceProbe,
+  // B68 — redisConnectionInfo for truthful health reporting
+  setActiveSession, clearActiveSession, memoryPersistenceProbe, redisConnectionInfo,
 } from './src/services/MemoryManager.js';
 import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
 import { skillFolder, SKILL_META } from './src/services/SkillChain.js'; // B50 P1 — progressive skill folders
@@ -846,7 +847,7 @@ app.get('/api/memory', (req, res) => res.json(loadMemory()));
 // B66 — persistence probe: evidence that memory survives a restart/redeploy
 // (previous boot stamps still present in DATA_DIR = persistent disk). GET,
 // read-only, no secrets — same class as /api/health.
-app.get('/api/memory/persistence', (req, res) => res.json(memoryPersistenceProbe()));
+app.get('/api/memory/persistence', async (req, res) => res.json(await memoryPersistenceProbe()));
 app.post('/api/memory/clear', (req, res) => { clearMemory(); res.json({ success: true }); });
 app.post('/api/memory/user', (req, res) => { updateUserProfile(req.body); res.json({ success: true }); });
 
@@ -1420,8 +1421,9 @@ app.post('/api/chat', async (req, res) => {
 // B66 — memory persistence probe: proves DATA_DIR (sessions, memory.json)
 // survives restarts on this host (previous boot stamps present ⇒ persistent
 // disk mounted, e.g. a Render persistent disk at DATA_DIR).
-app.get('/api/health/memory', (req, res) => {
-  res.json(memoryPersistenceProbe());
+app.get('/api/health/memory', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(await memoryPersistenceProbe());
 });
 
 app.get('/api/health/providers', async (req, res) => {
@@ -1535,6 +1537,7 @@ app.get('/api/health', (req, res) => {
     instanceId: INSTANCE_ID,
     uptime: Math.round(process.uptime()),
     redis: isRedisActive(),
+    redisDetail: redisConnectionInfo(),
     port: PORT,
     providers: providerHealthSnapshot(),
     // Round-6 platform & reliability status (aggregates only — no secrets)
