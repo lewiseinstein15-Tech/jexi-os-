@@ -41,8 +41,8 @@ import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNot
 import { modelRoutingTable, providerPreferenceForIntent } from './src/services/ModelRouting.js';
 import { MCP_PORT, MCP_TOOL_ALLOWLIST, listMcpTools } from './mcp-server.js';
 import {
-  registerConnectors, getConnectorStatus, saveConnectorConfig, callConnector, handleConnectorWebhook, getConnectorToolSchemas,
-} from './src/connectors/index.js'; // B56 — connector system
+  registerConnectors, getConnectorStatus, saveConnectorConfig, callConnector, handleConnectorWebhook, getConnectorToolSchemas, setInboundReplyGenerator,
+} from './src/connectors/index.js'; // B56 — connector system (B61 adds the WhatsApp reply loop)
 import { listInbound } from './src/services/ConnectorInbox.js'; // B59 — provable inbound webhook log
 import { trustStatus, setTrustMode, allowPattern, denyPattern, removeDecision, clearTrust, trustFolder } from './src/services/RiskGuard.js';
 import { computerStatus, runtimeCall } from './src/services/ComputerRuntime.js';
@@ -77,10 +77,27 @@ recordBoot();
 process.on('uncaughtException', (e) => { recordError('process', e.message, e.stack); console.error('[FATAL]', e); process.exit(1); });
 process.on('unhandledRejection', (e) => { recordError('process', (e && e.message) || String(e)); });
 
-// B56 — register every connector (whatsapp / github / email / telegram) from
-// saved config + env. Agents reach them through the gated `connector-call`
+// B56 — register every connector (whatsapp / github / email) from saved
+// config + env. Agents reach them through the gated `connector-call`
 // tool; providers reach JEXI through /webhooks/connectors/<name>.
 registerConnectors();
+
+// B61 — WhatsApp auto-reply loop: when a real inbound text arrives, JEXI
+// generates the reply (LLM; falls back to no reply when no AI keys are set)
+// and sends it back automatically via the connector's send().
+setInboundReplyGenerator(async (event) => {
+  const keys = resolveKeys();
+  if (!keys.groqKey && !keys.geminiKey && !process.env.OPENROUTER_API_KEY) return null;
+  try {
+    const text = await generateContent(
+      `Reply to this WhatsApp message from ${event.from || 'the sender'}. Be concise (max 3 short sentences), plain text, no markdown, no emojis:\n\n"${String(event.text || '').slice(0, 500)}"`,
+      'You are JEXI OS, Lewis Einstein\'s personal AI assistant. Reply in the first person as JEXI. Keep it short and helpful.'
+    );
+    return text;
+  } catch (e) {
+    return null;
+  }
+});
 
 const app = express();
 
@@ -139,9 +156,9 @@ app.use('/api', generalLimiter);
 // B56 — CONNECTOR WEBHOOKS. Mounted BEFORE express.json because WhatsApp /
 // GitHub signatures are HMACs over the RAW request body — parsing it first
 // would break verification. Mounted OUTSIDE /api so provider webhooks (Meta,
-// GitHub, Resend, Telegram) are not gated by JEXI_API_KEY or the API
-// rate limiter. Each provider's POST returns 200 immediately after
-// verification + normalization; failures are logged, never fabricated.
+// GitHub, Resend) are not gated by JEXI_API_KEY or the API rate limiter.
+// Each provider's POST returns 200 immediately after verification +
+// normalization; failures are logged, never fabricated.
 const connectorWebhooks = express.Router();
 // B57 fix: scope the raw-body parser to the webhook paths ONLY. Unscoped, the
 // router-level `type: () => true` consumed EVERY request body on the server
@@ -181,7 +198,6 @@ connectorWebhooks.get('/webhooks/connectors/whatsapp', webhookFor('whatsapp'));
 connectorWebhooks.post('/webhooks/connectors/whatsapp', webhookFor('whatsapp'));
 connectorWebhooks.post('/webhooks/connectors/github', webhookFor('github'));
 connectorWebhooks.post('/webhooks/connectors/email', webhookFor('email'));
-connectorWebhooks.post('/webhooks/connectors/telegram', webhookFor('telegram'));
 app.use(connectorWebhooks);
 
 app.use(express.json({ limit: '30mb' })); // Room for base64 book uploads + code files + images
@@ -605,7 +621,7 @@ app.get('/api/mcp/status', (req, res) => {
   });
 });
 
-// === CONNECTOR SYSTEM (B56 — whatsapp / github / email / telegram) ===
+// === CONNECTOR SYSTEM (B56 — whatsapp / github / email) ===
 // User-initiated sends from the Connectors UI are themselves the human
 // approval; agent-initiated sends go through the `connector-call` tool which
 // is EXTERNAL-tier and always pauses for ONE explicit approval first.

@@ -45,7 +45,7 @@ https://github.com/lewiseinstein15-Tech/jexi-os-/releases/latest/download/app-de
 1. **Transfer the APK to your phone.** Easiest free ways:
    - Upload `app-debug.apk` to your own **Google Drive** and download it on the
      phone, or
-   - Send it to yourself on **WhatsApp / Telegram** (open it on the phone), or
+   - Send it to yourself on **WhatsApp** (open it on the phone), or
    - Plug the phone into your computer via USB and copy the file over.
 2. **Tap the APK file.** Android will ask to allow installing from that source
    (your file manager / Drive / WhatsApp). Tap **Settings → Allow from this

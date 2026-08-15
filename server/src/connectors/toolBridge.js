@@ -94,7 +94,7 @@ export function listConnectorTools() {
   return ConnectorRegistry.listAvailable().map((name) => connectorToToolSchema(name));
 }
 
-/** Tool names only, e.g. ['send_whatsapp', 'send_github', 'send_email', 'send_telegram']. */
+/** Tool names only, e.g. ['send_whatsapp', 'send_github', 'send_email']. */
 export function listConnectorToolNames() {
   return listConnectorTools().map((t) => t.function.name);
 }

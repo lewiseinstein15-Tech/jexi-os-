@@ -1,25 +1,35 @@
 /**
- * JEXI OS — Email Connector (Build 57: SendGrid → Resend).
+ * JEXI OS — Email Connector (Build 61: Resend outbound + inbound + reply).
  *
  * B56 shipped this connector on SendGrid, but the SendGrid account was
- * rejected during provider vetting — JEXI does not use SendGrid at all. This
- * build replaces it with Resend (same connector contract, no new deps):
+ * rejected during provider vetting — JEXI does not use SendGrid at all. B57
+ * replaced it with Resend for sending. B61 adds the full inbound loop:
  *
- *   send    → POST https://api.resend.com/emails
- *             { from: "Name <email>", to: ["a@b.com"], subject, html | text }
- *             → 200 { "id": "uuid" }        (schema confirmed against
- *               https://resend.com/docs/api-reference/emails/send-email)
- *   auth    → GET  https://api.resend.com/domains   (200 = key valid;
- *             a REAL call — never just "variable exists")
- *   receive → Resend delivery webhook (JSON events: email.delivered /
- *             email.bounced / email.dropped / email.complained / email.sent)
- *             normalized into the internal message shape.
+ *   send     → POST https://api.resend.com/emails
+ *   auth     → GET  https://api.resend.com/domains   (real call, never just
+ *              "variable exists")
+ *   receive  → Resend INBOUND webhook (email.received), verified with the
+ *              Svix signature scheme (svix-id / svix-timestamp /
+ *              svix-signature + RESEND_WEBHOOK_SECRET, Ed25519 — verified in
+ *              B61 with real Ed25519 round-trips, no new dependency). The
+ *              webhook only carries metadata, so the full body is fetched
+ *              from the Received-emails API (GET /emails/{email_id}) and
+ *              normalized into the internal message shape.
+ *   reply    → respond to a specific inbound email on the SAME thread:
+ *              "Re: <subject>", In-Reply-To + References threading headers,
+ *              quoted original, reply_to set to our receiving address so the
+ *              conversation keeps coming back to JEXI.
  *
- * Credentials: RESEND_API_KEY (env wins over the Settings-stored value);
- * optional RESEND_FROM for a verified sender (defaults to Resend's built-in
- * onboarding@resend.dev, which works for testing).
+ * Credentials (env wins over the Settings-stored value):
+ *   RESEND_API_KEY          — required (outbound + fetching received emails)
+ *   RESEND_WEBHOOK_SECRET   — required for inbound webhooks (Svix verify)
+ *   RESEND_FROM             — optional verified sender for outbound
+ *   RESEND_RECEIVING_ADDRESS — optional "inbox" address (our receiving
+ *              domain) used as the From when replying; when unset the reply
+ *              From falls back to the address the original was sent TO.
  */
 
+import crypto from 'crypto';
 import { Connector, ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, assertAsciiSecret } from './ConnectorBase.js';
 import { ConnectorRegistry } from './ConnectorRegistry.js';
 
@@ -37,6 +47,61 @@ export function normalizeTo(to) {
   return list.map((t) => (typeof t === 'string' ? t.trim() : (t && t.email) || '')).filter(Boolean);
 }
 
+/* ------------------------------------------------------------------ */
+/* Svix webhook verification (used by Resend's email.received events). */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Verify a Svix-signed webhook body using only Node's crypto (no `svix`
+ * dependency): the webhook secret is the base64 of a 32-byte Ed25519 seed;
+ * the public key is derived from that seed via the standard PKCS8-DER trick
+ * (Node's createPrivateKey accepts a raw Ed25519 seed as PKCS8, and
+ * exporting its JWK reveals the derived public key). Verified with real
+ * Ed25519 sign/verify round-trips before shipping (B61).
+ */
+export function verifySvixSignature(secret, rawBody, headers = {}) {
+  const seedRaw = String(secret || '').replace(/^whsec_/, '').trim();
+  if (!seedRaw) return false;
+  let seed;
+  try { seed = Buffer.from(seedRaw, 'base64'); } catch (e) { return false; }
+  if (!seed || seed.length !== 32) return false;
+
+  const svixId = headers['svix-id'];
+  const svixTs = headers['svix-timestamp'];
+  const svixSig = headers['svix-signature'];
+  if (!svixId || !svixTs || !svixSig) return false;
+
+  const signedContent = `${svixId}.${svixTs}.${rawBody}`;
+  // PKCS8 DER header for an Ed25519 private key: the 32-byte seed follows.
+  const PKCS8_PREFIX = Buffer.from('302e020100300506032b657004220420', 'hex');
+  let publicKey;
+  try {
+    const priv = crypto.createPrivateKey({ key: Buffer.concat([PKCS8_PREFIX, seed]), format: 'der', type: 'pkcs8' });
+    const jwk = priv.export({ format: 'jwk' });
+    publicKey = crypto.createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: jwk.x }, format: 'jwk' });
+  } catch (e) { return false; }
+
+  // svix-signature may carry several signatures: "v1,<sig1> v1,<sig2>"
+  const entries = String(svixSig).split(/\s+/).filter(Boolean);
+  for (const entry of entries) {
+    const [version, sigB64] = entry.split(',');
+    if (version !== 'v1' || !sigB64) continue;
+    try {
+      const sig = Buffer.from(sigB64, 'base64');
+      if (crypto.verify(null, Buffer.from(signedContent, 'utf8'), publicKey, sig)) return true;
+    } catch (e) { /* try the next signature */ }
+  }
+  return false;
+}
+
+/** Extract one header value from Resend's headers: [{name, value}] list. */
+function headerValue(headers, name) {
+  if (!Array.isArray(headers)) return null;
+  const wanted = String(name).toLowerCase();
+  const found = headers.find((h) => h && String(h.name || '').toLowerCase() === wanted);
+  return found ? found.value : null;
+}
+
 export class ResendConnector extends Connector {
   static toolName = 'email';
   static toolLabel = 'Email';
@@ -44,7 +109,12 @@ export class ResendConnector extends Connector {
   get defaultBaseUrl() { return 'https://api.resend.com'; }
 
   resolveAuth() {
-    const env = { apiKey: process.env.RESEND_API_KEY || '', from: process.env.RESEND_FROM || '' };
+    const env = {
+      apiKey: process.env.RESEND_API_KEY || '',
+      from: process.env.RESEND_FROM || '',
+      webhookSecret: process.env.RESEND_WEBHOOK_SECRET || '',
+      receivingAddress: process.env.RESEND_RECEIVING_ADDRESS || '',
+    };
     // Env wins ONLY when actually set — an unset env var must never clobber
     // a configured value.
     const merged = { ...this.config.auth };
@@ -84,10 +154,23 @@ export class ResendConnector extends Connector {
     return status === 200;
   }
 
+  /** Health: real domains call + inbound-readiness note (Svix secret present). */
+  async healthCheck() {
+    let note = '';
+    try {
+      const auth = this.resolveAuth();
+      note = auth.webhookSecret ? 'inbound ready (Svix secret set)' : 'inbound needs RESEND_WEBHOOK_SECRET';
+      const ok = await this.authenticate();
+      return { status: ok ? 'ok' : 'error', detail: ok ? `authenticated with the provider · ${note}` : 'authentication failed' };
+    } catch (e) {
+      return { status: 'error', detail: (e && e.message) || String(e), code: e && e.code };
+    }
+  }
+
   /**
    * send(payload):
    *   { from?: "Name <email>" | { email, name? }, to: 'a@b.c' | ['a@b.c'] | [{email}],
-   *     subject, text?, html? }
+   *     subject, text?, html?, reply_to?, headers? }
    * Returns { ok: true, provider: 'resend', message_id } — Resend's real
    * response body id.
    */
@@ -108,6 +191,8 @@ export class ResendConnector extends Connector {
       subject: String(payload.subject),
       ...(payload.text ? { text: String(payload.text) } : {}),
       ...(payload.html ? { html: String(payload.html) } : {}),
+      ...(payload.reply_to ? { reply_to: payload.reply_to } : {}),
+      ...(payload.headers && typeof payload.headers === 'object' ? { headers: payload.headers } : {}),
     };
 
     const { status, data } = await httpJson(`${this.baseUrl}/emails`, {
@@ -124,6 +209,59 @@ export class ResendConnector extends Connector {
   }
 
   /* ------------------------- webhook / receive ------------------------- */
+
+  /** Svix-signed inbound webhook (email.received). Returns true when valid. */
+  verifyWebhookSignature(rawBody, headers = {}) {
+    const auth = this.resolveAuth();
+    if (!auth.webhookSecret) throw new ConnectorError(ERROR_CODES.NOT_CONFIGURED, 'Resend webhook verification needs RESEND_WEBHOOK_SECRET', { provider: this.label });
+    return verifySvixSignature(auth.webhookSecret, rawBody, headers);
+  }
+
+  /** Fetch the full received email (webhook events carry metadata only). */
+  async fetchEmail(emailId) {
+    const auth = this.resolveAuth();
+    this.assertAuth(auth);
+    if (!emailId) throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, 'fetchEmail requires an email id', { provider: this.label });
+    const { data } = await httpJson(`${this.baseUrl}/emails/${encodeURIComponent(emailId)}`, {
+      headers: { Authorization: `Bearer ${auth.apiKey}` },
+      provider: 'Resend API',
+      timeout: this.requestTimeoutMs,
+    });
+    return data || null;
+  }
+
+  /**
+   * Normalize ONE inbound webhook event into the internal message shape.
+   * The `email.received` event carries metadata only (per Resend's current
+   * docs: "Webhooks do not include the email body, headers, or attachments…
+   * You must call the Received emails API"); callers that want the body call
+   * fetchEmail() and pass the result as `full`.
+   */
+  normalizeInboundEvent(ev, full) {
+    const data = (ev && ev.data) || {};
+    const f = full || {};
+    const headers = f.headers || data.headers || [];
+    const messageId = f.message_id || headerValue(headers, 'Message-ID') || data.message_id || null;
+    const inReplyTo = headerValue(headers, 'In-Reply-To') || null;
+    const references = headerValue(headers, 'References') || null;
+    const to = Array.isArray(f.to) ? f.to : Array.isArray(data.to) ? data.to : (data.to ? [data.to] : []);
+    const isReceived = ev.type === 'email.received';
+    return {
+      id: f.id || data.email_id || null,
+      provider: 'resend',
+      type: isReceived ? 'inbound' : (ev.type || ev.event || 'unknown'),
+      from: f.from || data.from || null,
+      to,
+      subject: f.subject || data.subject || null,
+      text: (f.body && f.body.text) || (data.body && data.body.plain) || null,
+      html: (f.body && f.body.html) || null,
+      messageId,
+      inReplyTo,
+      references,
+      timestamp: (f.created_at || data.created_at) ? new Date(String(f.created_at || data.created_at)).toISOString() : null,
+      raw: ev,
+    };
+  }
 
   /**
    * Classify Resend delivery webhook events — bounces/drops/complaints are
@@ -153,31 +291,96 @@ export class ResendConnector extends Connector {
     return outcome;
   }
 
-  /** Normalize a Resend webhook body → internal event shape (array). */
-  normalizeInbound(body) {
-    if (!body) return [];
+  /** receive(): normalize inbound webhook payload(s), fetching bodies. */
+  async receive(inbound) {
+    if (!inbound) return [];
+    const list = Array.isArray(inbound) ? inbound : [inbound];
     const events = [];
-    const list = Array.isArray(body) ? body : [body];
     for (const ev of list) {
-      const data = ev.data || {};
-      events.push({
-        id: data.email_id || null,
-        provider: 'resend',
-        type: ev.type || ev.event || 'unknown',
-        from: data.from || null,
-        to: data.to || null,
-        subject: data.subject || null,
-        text: (data.body && data.body.plain) || null,
-        timestamp: data.created_at ? new Date(data.created_at).toISOString() : null,
-        raw: ev,
-      });
+      if (ev.type === 'email.received') {
+        let full = null;
+        try { full = await this.fetchEmail((ev.data && ev.data.email_id) || ev.email_id); } catch (e) { /* keep metadata-only event */ }
+        events.push(this.normalizeInboundEvent(ev, full));
+      } else {
+        // Delivery/bounce/drop events — classify honestly, never as deliveries.
+        events.push(this.normalizeInboundEvent(ev, null));
+      }
     }
     return events;
   }
 
-  /** receive(): normalize a webhook payload into events. */
-  async receive(inbound) {
-    return this.normalizeInbound(inbound || {});
+  /* ------------------------------ reply ------------------------------ */
+
+  /**
+   * reply(payload): respond to a specific inbound email on the same thread.
+   *   { email_id: string, to?: string, subject?: string, text: string,
+   *     html?: string, quoteOriginal?: boolean (default true), from?: string }
+   *
+   * When email_id is given the original is fetched: sender becomes the To,
+   * our receiving address becomes the From, the subject gets a "Re:" prefix,
+   * In-Reply-To / References are set from the original Message-ID, and the
+   * original body is quoted (optional). Returns Resend's real message id.
+   */
+  async reply(payload = {}) {
+    const auth = this.resolveAuth();
+    this.assertAuth(auth);
+    const { email_id, to, subject, text, html, quoteOriginal = true, from } = payload;
+    if (!email_id && !to) throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, 'Email reply requires email_id (to fetch the original) or to', { provider: this.label });
+    if (!text && !html) throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, 'Email reply requires text or html', { provider: this.label });
+
+    let original = null;
+    if (email_id) original = await this.fetchEmail(email_id);
+
+    const headersList = original && original.headers;
+    const originalMsgId = (original && (original.message_id || headerValue(headersList, 'Message-ID'))) || null;
+    const originalRefs = (original && headerValue(headersList, 'References')) || '';
+    const origSubject = String((original && original.subject) || subject || '');
+
+    // Clean subject: strip an existing "Re:"/"Fwd:" prefix, then add one "Re:".
+    const clean = origSubject.replace(/^(re|fwd?|aw|sv|antw):\s*/i, '');
+    const finalSubject = subject || (clean ? `Re: ${clean}` : 'Re: your message');
+
+    // To = original sender (unless overridden); From = our receiving address.
+    const toAddr = to || (original && original.from) || '';
+    if (!toAddr) throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, 'Email reply could not resolve the original sender', { provider: this.label });
+    const originalRecipient = Array.isArray(original && original.to) && original.to.length ? original.to[0] : null;
+    const fromAddr = from || auth.receivingAddress || (originalRecipient || auth.from || this.config.auth.defaultFrom || 'JEXI OS <onboarding@resend.dev>');
+
+    // Threading headers: continue the same thread, not a new one.
+    const headers = {};
+    if (originalMsgId) {
+      headers['In-Reply-To'] = originalMsgId;
+      headers.References = (originalRefs ? `${originalRefs} ` : '') + originalMsgId;
+    }
+
+    let finalText = text;
+    if (quoteOriginal && original && (original.body && (original.body.text || original.body.html))) {
+      const quoted = (original.body.text || original.body.html || '').split('\n').map((l) => `> ${l}`).join('\n');
+      finalText = `${text}\n\n${quoted}`;
+    }
+
+    const body = {
+      from: fromAddr,
+      to: [toAddr],
+      subject: finalSubject,
+      headers,
+      ...(finalText ? { text: String(finalText) } : {}),
+      ...(html ? { html: String(html) } : {}),
+      // Replies keep coming to our receiving address (thread continuity).
+      ...(originalRecipient ? { reply_to: originalRecipient } : {}),
+    };
+
+    const { status, data } = await httpJson(`${this.baseUrl}/emails`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${auth.apiKey}`, 'Content-Type': 'application/json' },
+      body,
+      provider: 'Resend API',
+      timeout: this.requestTimeoutMs,
+    });
+    if (!data || !data.id) {
+      throw new ConnectorError(ERROR_CODES.MALFORMED_RESPONSE, 'Resend reply returned a response without an email id', { status, provider: this.label, cause: data });
+    }
+    return { ok: true, provider: 'resend', message_id: data.id, status, subject: finalSubject, in_reply_to: originalMsgId };
   }
 
   static sendSchema() {
@@ -187,6 +390,7 @@ export class ResendConnector extends Connector {
       subject: { type: 'string', required: true, desc: 'Email subject' },
       text: { type: 'string', desc: 'Plain-text body' },
       html: { type: 'string', desc: 'Optional HTML body' },
+      reply_to: { type: 'string', desc: 'Reply-To address (thread continuity)' },
     };
   }
 }

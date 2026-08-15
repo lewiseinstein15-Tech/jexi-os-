@@ -3,7 +3,7 @@
 **251 specialist agents · 507 skills · 177 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
-> ⚙️ GENERATED FILE — updated 2026-08-14 by `cd server && npm run audit-roster`. Do not edit by hand.
+> ⚙️ GENERATED FILE — updated 2026-08-15 by `cd server && npm run audit-roster`. Do not edit by hand.
 > The audit (`node scripts/audit-roster.js --check`, wired into `npm test`) fails CI if this file drifts from the registries.
 
 ---
@@ -1261,7 +1261,7 @@ This section and every table below are GENERATED from the live registries by `cd
 ### Connectors (1)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
-| `connector-call` | JEXI Core, GitHub Agent, Email Composer, Context Manager | Connectors | Send an outbound action or read inbound events through a registered connector (whatsapp, github, email, telegram) — send_whatsapp, create_github_issue, send_email, send_telegram. |
+| `connector-call` | JEXI Core, GitHub Agent, Email Composer, Context Manager | Connectors | Send an outbound action or read inbound events through a registered connector (whatsapp, github, email) — send_whatsapp, create_github_issue, send_email, create_github_file. |
 
 ### Creative (6)
 | Tool | Allowed agents | Engine | What it does |

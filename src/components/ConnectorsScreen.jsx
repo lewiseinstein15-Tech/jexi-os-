@@ -18,10 +18,7 @@ const FIELDS = {
   email: [
     { key: 'apiKey', label: 'RESEND API KEY', ph: 're_…', hint: 'env: RESEND_API_KEY' },
     { key: 'defaultFrom', label: 'DEFAULT FROM (email)', ph: 'jexi@yourdomain.com', hint: 'used when send() has no from (falls back to Resend onboarding test sender)' },
-  ],
-  telegram: [
-    { key: 'botToken', label: 'BOT TOKEN', ph: '123:ABC…', hint: 'env: TELEGRAM_BOT_TOKEN (from @BotFather)' },
-    { key: 'secretToken', label: 'WEBHOOK SECRET', ph: '…', hint: 'X-Telegram-Bot-Api-Secret-Token · env: TELEGRAM_SECRET_TOKEN' },
+    { key: 'webhookSecret', label: 'WEBHOOK SECRET', ph: 'whsec_…', hint: 'inbound Svix verify · env: RESEND_WEBHOOK_SECRET' },
   ],
 };
 
@@ -30,14 +27,12 @@ const TESTS = {
   whatsapp: [{ key: 'to', label: 'TO (E.164)', ph: '15551234567' }, { key: 'text', label: 'TEXT', ph: 'Hello from JEXI OS' }],
   github: [{ key: 'owner', label: 'OWNER', ph: 'your-org' }, { key: 'repo', label: 'REPO', ph: 'my-repo' }, { key: 'title', label: 'TITLE', ph: 'Test issue from JEXI' }],
   email: [{ key: 'to', label: 'TO', ph: 'you@example.com' }, { key: 'subject', label: 'SUBJECT', ph: 'Test from JEXI OS' }, { key: 'text', label: 'TEXT', ph: 'Hello!' }],
-  telegram: [{ key: 'chat_id', label: 'CHAT ID', ph: '777' }, { key: 'text', label: 'TEXT', ph: 'Hello from JEXI OS' }],
 };
 
 const buildTestPayload = (name, v) => {
   if (name === 'whatsapp') return { to: v.to, type: 'text', text: v.text || 'Hello from JEXI OS' };
   if (name === 'github') return { action: 'create_issue', owner: v.owner, repo: v.repo, title: v.title || 'Test issue from JEXI' };
   if (name === 'email') return { to: [{ email: v.to }], subject: v.subject || 'Test from JEXI OS', text: v.text || 'Hello!' };
-  if (name === 'telegram') return { chat_id: Number(v.chat_id), text: v.text || 'Hello from JEXI OS' };
   return {};
 };
 

@@ -71,7 +71,7 @@ export const TOOL_SCHEMAS = {
   'self-diagnose': {},
   'trend-scan': { query: { type: 'string', desc: 'Topic to scan trends for' } },
   'mcp-call': { tool: { type: 'string', required: true, desc: 'MCP tool name (ask_jexi, memory_lookup, knowledge_search, list_books, get_health)' }, args: { type: 'object', desc: 'Arguments for the MCP tool' } },
-  'connector-call': { name: { type: 'string', required: true, desc: 'Connector name (whatsapp, github, email, telegram)' }, method: { type: 'string', desc: "Method: 'send' (default) | 'receive' | 'health'" }, payload: { type: 'object', desc: 'Payload for the connector method (see the generated send_<connector> tool schemas)' } },
+  'connector-call': { name: { type: 'string', required: true, desc: 'Connector name (whatsapp, github, email)' }, method: { type: 'string', desc: "Method: 'send' (default) | 'receive' | 'reply' | 'health'" }, payload: { type: 'object', desc: 'Payload for the connector method (see the generated send_<connector> tool schemas)' } },
 };
 
 /* ------------------------------------------------------------------ */

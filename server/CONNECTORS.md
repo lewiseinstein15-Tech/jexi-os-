@@ -1,18 +1,21 @@
-# JEXI OS — Connectors (WhatsApp · GitHub · Email · Telegram)
+# JEXI OS — Connectors (WhatsApp · GitHub · Email)
 
-The connector layer gives JEXI OS real outbound channels with **verifiable**
-credentials. Every connector implements the same contract:
+The connector layer gives JEXI OS real outbound + inbound channels with
+**verifiable** credentials. Every connector implements the same contract:
 
 | Method | What it does |
 |---|---|
 | `authenticate()` | Makes a **real** call to the provider's API (never just "key is present") |
 | `healthCheck()` | Wraps `authenticate()` → `{ status: 'ok'\|'error', detail }` with the provider's real answer |
-| `send(payload)` | Fires a **real** outbound action (message / issue / email) and returns the provider's raw response |
+| `send(payload)` | Fires a **real** outbound action (message / email / issue / file commit) and returns the provider's raw response |
 | `receive(body)` | Parses an inbound webhook payload into a flat, structured event shape |
+| `reply(payload)` | Email only (B61) — answers a specific inbound email on the **same thread** (Re: subject, In-Reply-To + References, quoted original) |
+| `verifyWebhookSignature()` | Per-provider inbound verification (HMAC / Svix Ed25519) over the raw body |
 
 Source: `server/src/connectors/` — `ConnectorBase.js`, `ConnectorRegistry.js`,
-`whatsapp.js`, `github.js`, `email.js` (Resend), `telegram.js`, `toolBridge.js`,
-`index.js` (wiring).
+`whatsapp.js`, `github.js`, `email.js` (Resend), `toolBridge.js`, `index.js`
+(wiring). Telegram was removed in B61 (connector, registry entries, env vars,
+routes, tests, docs — zero references remain).
 
 ---
 
@@ -23,21 +26,20 @@ Source: `server/src/connectors/` — `ConnectorBase.js`, `ConnectorRegistry.js`,
 | `GET /api/connectors` | open (GET) | Masked status for every connector (no values) |
 | `GET /api/connectors/:name/health` | open (GET) | Real health check (calls the provider; read-only, no secrets) |
 | `GET /api/connectors/:name/inbound` | open (GET) | B59 — recent verified inbound webhook events + Meta handshake records (newest first, no secrets) |
-| `POST /api/connectors/:name/call` | API key (`x-jexi-key`) | Real action: body `{ "method": "send"\|"health"\|"receive", "payload": {...} }` |
+| `POST /api/connectors/:name/call` | API key (`x-jexi-key`) | Real action: body `{ "method": "send"\|"receive"\|"reply"\|"health", "payload": {...} }` |
 | `POST /api/connectors/:name/config` | API key | Save Settings-stored keys (env always wins at call time) |
 | `POST /api/connectors/:name/toggle` | API key | Enable/disable a connector |
 | `GET /webhooks/connectors/whatsapp` | none (Meta) | Meta verification handshake (`hub.challenge` + verify token) |
-| `POST /webhooks/connectors/whatsapp` | HMAC (`x-hub-signature-256` with app secret) | Inbound WhatsApp messages |
+| `POST /webhooks/connectors/whatsapp` | HMAC (`x-hub-signature-256` with app secret) | Inbound WhatsApp messages → JEXI auto-replies (B61) |
 | `POST /webhooks/connectors/github` | HMAC (`x-hub-signature-256`/`sha1` with `GITHUB_WEBHOOK_SECRET`) | GitHub webhook events |
-| `POST /webhooks/connectors/email` | none (Resend) | Resend delivery-event webhook (delivered / bounced / dropped / complained) |
-| `POST /webhooks/connectors/telegram` | `X-Telegram-Bot-Api-Secret-Token` | Telegram updates |
+| `POST /webhooks/connectors/email` | Svix Ed25519 (`RESEND_WEBHOOK_SECRET`) | Resend inbound (`email.received`) + delivery events |
 
 Status + health are deliberately open (same class as `/api/health`) so you can
 verify connectors **from a browser with zero shell access** — the checks run
 inside the deployed server's process, where the env vars live. Test sends stay
 API-key gated because they fire real messages.
 
-Webhook routes are mounted **before** `express.json()` so HMAC signatures are
+Webhook routes are mounted **before** `express.json()` so signatures are
 verified against the untouched raw body (see the `connectorWebhooks` mount in
 `server/index.js`).
 
@@ -47,8 +49,10 @@ verified against the untouched raw body (see the `connectorWebhooks` mount in
 
 | Variable | Connector | Required | Where to get it |
 |---|---|---|---|
-| `RESEND_API_KEY` | Email | yes | https://resend.com/api-keys |
+| `RESEND_API_KEY` | Email | yes | https://resend.com/api-keys (Full access for inbound fetch) |
+| `RESEND_WEBHOOK_SECRET` | Email | inbound | Resend → Webhooks → signing secret (Svix `whsec_…`) |
 | `RESEND_FROM` | Email | no | Verified sender. Default: Resend's documented test sender `onboarding@resend.dev` |
+| `RESEND_RECEIVING_ADDRESS` | Email | no | Our receiving address (e.g. `jexi@yourdomain.com`); used as From when replying |
 | `WHATSAPP_ACCESS_TOKEN` | WhatsApp | yes | Meta App Dashboard → WhatsApp → API Setup |
 | `PHONE_NUMBER_ID` (or `WHATSAPP_PHONE_NUMBER_ID`) | WhatsApp | yes | Meta App Dashboard → WhatsApp → API Setup |
 | `APP_SECRET` (or `WHATSAPP_APP_SECRET`) | WhatsApp | yes | Meta App Dashboard → App secret (HMAC for webhooks) |
@@ -56,8 +60,6 @@ verified against the untouched raw body (see the `connectorWebhooks` mount in
 | `GITHUB_TOKEN` (or `GH_TOKEN`) | GitHub | yes (PAT) | https://github.com/settings/tokens (repo scope) |
 | `GITHUB_WEBHOOK_SECRET` | GitHub | no | Webhook secret; falls back to `GITHUB_TOKEN` when unset |
 | `GITHUB_APP_ID` + `GITHUB_PRIVATE_KEY` + `GITHUB_INSTALLATION_ID` | GitHub | alt | GitHub App auth instead of a PAT |
-| `TELEGRAM_BOT_TOKEN` | Telegram | yes | @BotFather |
-| `TELEGRAM_SECRET_TOKEN` | Telegram | no | Webhook secret token |
 
 All keys also fall back to `settings.json` (Settings → Connectors UI); an
 **unset** env var never clobbers a stored value.
@@ -97,20 +99,22 @@ curl -X POST https://YOUR-RENDER-URL/api/connectors/whatsapp/call \
   -H 'Content-Type: application/json' -H 'x-jexi-key: <key>' \
   -d '{"method":"send","payload":{"to":"2547XXXXXXXX","type":"text","text":"Hello from JEXI!"}}'
 
-# GitHub issue in a disposable repo
+# GitHub — create a real file commit (returns commit SHA + file URL)
 curl -X POST https://YOUR-RENDER-URL/api/connectors/github/call \
   -H 'Content-Type: application/json' -H 'x-jexi-key: <key>' \
-  -d '{"method":"send","payload":{"action":"create_issue","owner":"octocat","repo":"disposable-repo","title":"JEXI connector test","body":"real issue"}}'
+  -d '{"method":"send","payload":{"action":"create_file","owner":"octocat","repo":"disposable-repo","path":"notes.md","content":"# Notes\nhello","message":"JEXI created this file"}}'
+
+# GitHub — update that file (reads the current SHA first, commits the change)
+curl -X POST https://YOUR-RENDER-URL/api/connectors/github/call \
+  -H 'Content-Type: application/json' -H 'x-jexi-key: <key>' \
+  -d '{"method":"send","payload":{"action":"update_file","owner":"octocat","repo":"disposable-repo","path":"notes.md","content":"# Notes\nupdated by JEXI","message":"JEXI updated this file"}}'
 ```
 
 Each returns the provider's raw response (email id / WhatsApp wamid / GitHub
-issue number + URL). No `JEXI_API_KEY` on Render? Then drop the `x-jexi-key`
+commit SHA + URL). No `JEXI_API_KEY` on Render? Then drop the `x-jexi-key`
 header entirely.
 
 ### Full live script (for any host where the keys exist)
-
-If you ever have the env vars on a machine you can run commands on, the script
-prints payloads + raw responses end to end:
 
 ```bash
 cd server
@@ -120,20 +124,13 @@ GITHUB_TEST_REPO="owner/disposable-test-repo" \
 node scripts/test-connectors-live.js
 ```
 
-The script prints, per connector: env presence (masked), the **real**
-`health_check()` result, the **exact payload sent**, and the **raw provider
-response** (message id / issue number / email id). It also demonstrates the
-webhook handshake and HMAC verification running, and prints the curl commands
-for the deployed `/webhooks/connectors/*` endpoints.
-
 Per-connector `health_check()`:
 
 | Connector | Real call | PASS means |
 |---|---|---|
-| Email | `GET https://api.resend.com/domains` | 200 — key valid, lists configured domains |
+| Email | `GET https://api.resend.com/domains` | 200 — key valid, lists configured domains (inbound note when `RESEND_WEBHOOK_SECRET` is set) |
 | WhatsApp | `GET https://graph.facebook.com/v21.0/{PHONE_NUMBER_ID}?fields=id,display_phone_number,verified_name` | 200 — token + phone number live |
 | GitHub | `GET https://api.github.com/user` | 200 — returns the authenticated username |
-| Telegram | `GET https://api.telegram.org/bot<token>/getMe` | 200 — bot token valid |
 
 ---
 
@@ -148,6 +145,12 @@ Per-connector `health_check()`:
    token matches.
 5. Subscribe to the `messages` field. Inbound texts are HMAC-verified with the
    app secret and parsed by `receive()`.
+6. **Auto-reply (B61):** every verified inbound text is answered automatically
+   — JEXI generates a reply (LLM, when AI keys are set) and sends it back via
+   `send()` on the business number. The reply is recorded in the inbox
+   (`type: "reply"`, with the wamid + the inbound message it answers), so the
+   full loop phone → Meta → JEXI → Meta → phone is provable at
+   `GET /api/connectors/whatsapp/inbound`.
 
 ### GitHub
 
@@ -159,21 +162,23 @@ Per-connector `health_check()`:
    Each delivery carries `x-hub-signature-256`; the server verifies it against
    the raw body before `receive()` parses the event.
 
-### Email (Resend)
+### Email (Resend) — inbound read + reply
 
-1. Resend dashboard → **Webhooks** → add webhook.
-2. URL: `https://YOUR-RENDER-URL/webhooks/connectors/email`
-3. Events: `email.delivered`, `email.bounced`, `email.dropped`,
-   `email.complained`, `email.sent`.
-   Deliveries/bounces/drops are classified distinctly — a bounce is never
-   reported as a delivery.
-
-### Telegram
-
-1. Tell @BotFather to set the webhook, with your secret token as
-   `X-Telegram-Bot-Api-Secret-Token`:
-   `https://api.telegram.org/bot<token>/setWebhook?url=https://YOUR-RENDER-URL/webhooks/connectors/telegram&secret_token=YOUR_TELEGRAM_SECRET_TOKEN`
-2. Every update is verified against that secret before parsing.
+1. Resend dashboard → **Emails → Receiving** — get your receiving address
+   (`anything@<your-id>.resend.app` or your own domain with the MX record).
+2. Resend dashboard → **Webhooks** → **Add Webhook**.
+3. URL: `https://YOUR-RENDER-URL/webhooks/connectors/email`
+4. Event: **`email.received`** (this is what makes read + reply work; delivery
+   events are classified separately and never reported as deliveries).
+5. Copy the webhook **signing secret** (Svix `whsec_…`) into
+   `RESEND_WEBHOOK_SECRET` on Render — every delivery is verified with the
+   Svix Ed25519 scheme before `receive()` parses it.
+6. Every `email.received` webhook carries metadata only; the connector then
+   calls Resend's **Received-emails API** (`GET /emails/{email_id}`) for the
+   full body and normalizes it into the internal message shape.
+7. **`reply()`** answers on the same thread: `Re: <subject>`, `In-Reply-To` +
+   `References` headers, quoted original, `reply_to` = our receiving address —
+   so the conversation keeps coming back to JEXI.
 
 ---
 
@@ -190,8 +195,9 @@ https://YOUR-RENDER-URL/api/connectors/whatsapp/inbound
 → `{ events: [ { at, id, provider, from, to, type, text, timestamp } ],
 handshakes: [ { at, verified, reason?, challenge? } ], total }`
 
-So the loop "phone → WhatsApp → Meta webhook → JEXI" is fully provable:
-message the business number, then open that URL and the parsed event is there.
+So the loop "phone → WhatsApp → Meta webhook → JEXI → auto-reply → phone" is
+fully provable: message the business number, then open that URL and the parsed
+event **and** the recorded `type: "reply"` are both there.
 
 > ⚠️ Corrupted keys: if a health check reports "contains non-ASCII
 > characters (e.g. an emoji)", the env value was corrupted during copy-paste.
@@ -200,7 +206,10 @@ message the business number, then open that URL and the parsed event is there.
 ## Test suites
 
 - `server/test-connectors.js` — offline (runs in `npm test`): payload shapes
-  match provider docs, handshake + HMAC verification, `receive()` parsing,
-  error paths executed (401/429/500/malformed/timeout). No network, no keys.
+  match provider docs, handshake + HMAC/Svix verification, `receive()` parsing
+  (including fetching the received email body), `reply()` threading headers,
+  GitHub Contents-API create/update (SHA read), the WhatsApp auto-reply loop,
+  error paths executed (401/429/500/malformed/timeout), and zero Telegram
+  references. No network, no keys.
 - `server/scripts/test-connectors-live.js` — live end-to-end proof, run on the
   host that holds the keys (see above).

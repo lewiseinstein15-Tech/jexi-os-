@@ -2,7 +2,7 @@
  * JEXI OS — Connector Base (Build 56).
  *
  * The connector system gives agents a typed, pluggable way to reach external
- * services (WhatsApp, GitHub, Email, Telegram, …). Every connector implements
+ * services (WhatsApp, GitHub, Email, …). Every connector implements
  * the same contract:
  *
  *   authenticate() -> bool   — MUST actually call the provider (never just
@@ -94,7 +94,7 @@ export async function httpJson(url, { method = 'GET', headers = {}, body, timeou
 
   const retryAfter = (res.headers && res.headers.get && res.headers.get('retry-after'))
     || (data && (data.retry_after ?? data.retryAfter))
-    || (data && data.parameters && (data.parameters.retry_after ?? data.parameters.retryAfter)); // Telegram nests it under parameters
+    || (data && data.parameters && (data.parameters.retry_after ?? data.parameters.retryAfter));
   if (res.status === 401) throw new ConnectorError(ERROR_CODES.AUTH_FAILED, `Auth failed for ${provider || url} (HTTP 401)`, { status: 401, provider });
   if (res.status === 403) {
     // Keep the provider's own words (GitHub: "Resource not accessible by

@@ -8,9 +8,15 @@
  *                   token, cached and refreshed before expiry.
  *
  * send() actions: create_issue · create_comment · create_pr · create_commit
+ *                 create_file · update_file (Contents API, real commits)
  * receive():      webhook POST (push / pull_request / issues) verified with
  *                 X-Hub-Signature-256 (HMAC-SHA256) or legacy X-Hub-Signature
  *                 (HMAC-SHA1) using GITHUB_WEBHOOK_SECRET.
+ *
+ * B61 — create_file / update_file: PUT /repos/{owner}/{repo}/contents/{path}
+ * with base64 content + commit message (and, for updates, the SHA read from
+ * the existing file first — GitHub rejects an update without the current
+ * SHA). Returns the provider's real commit SHA + file URL.
  */
 
 import { Connector, ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, createHmacSha256, createHmacSha1, assertAsciiSecret } from './ConnectorBase.js';
@@ -143,7 +149,13 @@ export class GitHubConnector extends Connector {
       if (action === 'create_commit') {
         return await this.createCommit(payload, headers, url);
       }
-      throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, `Unknown GitHub action "${action}" (create_issue | create_comment | create_pr | create_commit)`, { provider: this.label });
+      if (action === 'create_file') {
+        return await this.createOrUpdateFile(payload, headers, url, false);
+      }
+      if (action === 'update_file') {
+        return await this.createOrUpdateFile(payload, headers, url, true);
+      }
+      throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, `Unknown GitHub action "${action}" (create_issue | create_comment | create_pr | create_commit | create_file | update_file)`, { provider: this.label });
     } catch (e) {
       // GitHub returns 403 for rate limits too — reclassify honestly.
       if (e instanceof ConnectorError && e.code === ERROR_CODES.PERMISSION_DENIED && /rate limit/i.test(e.message)) {
@@ -180,6 +192,59 @@ export class GitHubConnector extends Connector {
     // 5. update ref
     const { status, data: ref } = await httpJson(url(`/repos/${owner}/${repo}/git/refs/heads/${branch}`), { method: 'PATCH', headers, body: { sha: commit.sha, force: false }, provider: 'GitHub API', timeout: this.requestTimeoutMs });
     return { ok: true, provider: 'github', action: 'create_commit', sha: commit.sha, branch, ref: ref.ref, status };
+  }
+
+  /**
+   * Create or update one file via the Contents API (real commit).
+   *   create_file: { action, owner, repo, path, content, message, branch? }
+   *   update_file: { action, owner, repo, path, content, message, branch?, sha? }
+   * update_file reads the existing file FIRST (GitHub requires the current
+   * SHA on update; the connector never guesses it), then PUTs with that SHA.
+   * Returns the provider's real commit SHA + file html_url.
+   */
+  async createOrUpdateFile(payload, headers, url, isUpdate) {
+    const { owner, repo, path, content, message, branch, sha } = payload;
+    const label = isUpdate ? 'update_file' : 'create_file';
+    if (!path || content === undefined || content === null || !message) {
+      throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, `${label} requires path + content + message`, { provider: this.label });
+    }
+    const fileUrl = url(`/repos/${owner}/${repo}/contents/${String(path).split('/').map(encodeURIComponent).join('/')}`);
+    const b64 = Buffer.from(String(content), 'utf8').toString('base64');
+
+    let finalSha = sha;
+    if (isUpdate) {
+      // Read the existing file first — its SHA is REQUIRED for the update.
+      let existing = null;
+      try {
+        const res = await httpJson(fileUrl, { headers, provider: 'GitHub API', timeout: this.requestTimeoutMs });
+        existing = res.data;
+      } catch (e) {
+        if (e instanceof ConnectorError && e.status === 404) {
+          throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, `update_file: no existing file at ${path} (GitHub returned 404) — use create_file for new files`, { status: 404, provider: this.label });
+        }
+        throw e;
+      }
+      finalSha = (existing && existing.sha) || sha;
+      if (!finalSha) {
+        throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, `update_file: no existing file at ${path} — use create_file for new files`, { provider: this.label, cause: existing });
+      }
+    }
+
+    const body = { message, content: b64, ...(finalSha ? { sha: finalSha } : {}), ...(branch ? { branch } : {}) };
+    const { status, data } = await httpJson(fileUrl, { method: 'PUT', headers, body, provider: 'GitHub API', timeout: this.requestTimeoutMs });
+    if (!data || !data.commit || !data.commit.sha) {
+      throw new ConnectorError(ERROR_CODES.MALFORMED_RESPONSE, `${label} returned a response without a commit sha`, { status, provider: this.label, cause: data });
+    }
+    return {
+      ok: true,
+      provider: 'github',
+      action: label,
+      path,
+      sha: (data.content && data.content.sha) || null,
+      commit: data.commit.sha,
+      html_url: (data.content && data.content.html_url) || null,
+      status,
+    };
   }
 
   /* ------------------------- webhook / receive ------------------------- */
@@ -258,7 +323,7 @@ export class GitHubConnector extends Connector {
 
   static sendSchema() {
     return {
-      action: { type: 'string', required: true, desc: "create_issue | create_comment | create_pr | create_commit" },
+      action: { type: 'string', required: true, desc: "create_issue | create_comment | create_pr | create_commit | create_file | update_file" },
       owner: { type: 'string', required: true, desc: 'Repository owner (user or org)' },
       repo: { type: 'string', required: true, desc: 'Repository name' },
       title: { type: 'string', desc: 'Issue/PR title' },
@@ -266,9 +331,12 @@ export class GitHubConnector extends Connector {
       issue_number: { type: 'number', desc: 'Issue number (create_comment)' },
       head: { type: 'string', desc: 'Head branch (create_pr)' },
       base: { type: 'string', desc: 'Base branch (create_pr)' },
-      branch: { type: 'string', desc: 'Target branch (create_commit)' },
-      message: { type: 'string', desc: 'Commit message (create_commit)' },
+      branch: { type: 'string', desc: 'Target branch (create_commit / create_file / update_file)' },
+      message: { type: 'string', desc: 'Commit message (create_commit / create_file / update_file)' },
       changes: { type: 'array', desc: '[{ path, content }] files to write (create_commit)' },
+      path: { type: 'string', desc: 'File path in the repo (create_file / update_file)' },
+      content: { type: 'string', desc: 'File content, UTF-8 (create_file / update_file)' },
+      sha: { type: 'string', desc: 'Current file SHA (update_file; read automatically when omitted)' },
     };
   }
 }

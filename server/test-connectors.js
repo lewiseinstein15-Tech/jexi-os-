@@ -1,12 +1,12 @@
 /**
- * JEXI OS — B56 acceptance suite (Connector System).
+ * JEXI OS — B56 acceptance suite (Connector System), extended through B61.
  *
  * ⚠️ MOCK DISCLOSURE — every provider call in this suite goes to a LOCAL MOCK
  * SERVER (server/tests/connectorMocks.js) that mimics the real WhatsApp /
- * GitHub / Resend / Telegram API response shapes. NO live credentials are
- * used anywhere in this file. The connector code paths are byte-identical to
- * what runs against the real providers (only the base URL differs; it
- * defaults to the real provider URL when unset).
+ * GitHub / Resend API response shapes. NO live credentials are used anywhere
+ * in this file. The connector code paths are byte-identical to what runs
+ * against the real providers (only the base URL differs; it defaults to the
+ * real provider URL when unset).
  *
  * Covers the directive's verification checklist per connector:
  *   - authenticate() actually calls the (mock) provider
@@ -14,11 +14,16 @@
  *   - one successful receive()/webhook parse with normalized output
  *   - failure paths EXECUTED, not just coded: auth failure (401), rate limit
  *     (429), network timeout, malformed response
- *   - webhook signature verification (WhatsApp X-Hub-Signature-256,
- *     GitHub sha256/sha1, Telegram secret token) + Meta hub.challenge
+ *   - webhook signature verification (WhatsApp X-Hub-Signature-256, GitHub
+ *     sha256/sha1, Resend Svix Ed25519) + Meta hub.challenge
+ *   - B61: GitHub create_file / update_file (Contents API with SHA read),
+ *     Resend inbound (Svix verify + Received-emails fetch) + reply() with
+ *     Re:/threading headers, WhatsApp auto-reply loop (JEXI answers inbound
+ *     texts automatically and the reply is recorded in the inbox)
  *   - connectorToToolSchema introspects real send() signatures
  *   - the agent-facing connector-call tool is EXTERNAL-tier and always pauses
  *     for one approval with finalized details
+ *   - Telegram was removed in B61 — zero references remain
  */
 process.env.DATA_DIR = process.env.DATA_DIR || `/tmp/jexi-b56-${Date.now()}`;
 
@@ -29,7 +34,7 @@ for (const key of [
   'GITHUB_TOKEN', 'GH_TOKEN', 'GITHUB_APP_ID', 'GITHUB_PRIVATE_KEY', 'GITHUB_INSTALLATION_ID', 'GITHUB_WEBHOOK_SECRET',
   'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_APP_SECRET', 'WHATSAPP_VERIFY_TOKEN',
   'PHONE_NUMBER_ID', 'APP_SECRET', 'VERIFY_TOKEN',
-  'RESEND_API_KEY', 'RESEND_FROM', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_SECRET_TOKEN',
+  'RESEND_API_KEY', 'RESEND_FROM', 'RESEND_WEBHOOK_SECRET',
 ]) delete process.env[key];
 
 import { ConnectorRegistry } from './src/connectors/ConnectorRegistry.js';
@@ -37,12 +42,11 @@ import { ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, withTimeout, ma
 import { recordWebhookEvents, recordHandshake, listInbound, resetConnectorInbox } from './src/services/ConnectorInbox.js';
 import { registerWhatsAppConnector, WhatsAppConnector } from './src/connectors/whatsapp.js';
 import { registerGitHubConnector, GitHubConnector } from './src/connectors/github.js';
-import { registerEmailConnector, ResendConnector } from './src/connectors/email.js';
-import { registerTelegramConnector, TelegramConnector } from './src/connectors/telegram.js';
-import { registerConnectors, getConnectorStatus, saveConnectorConfig, callConnector, handleConnectorWebhook } from './src/connectors/index.js';
+import { registerEmailConnector, ResendConnector, verifySvixSignature } from './src/connectors/email.js';
+import { registerConnectors, getConnectorStatus, saveConnectorConfig, callConnector, handleConnectorWebhook, setInboundReplyGenerator } from './src/connectors/index.js';
 import { connectorToToolSchema, listConnectorTools, introspectSendSignature } from './src/connectors/toolBridge.js';
 import { executeTool, toolTier, getToolCatalog } from './src/services/ToolRuntime.js';
-import { startMockConnectorApis, startHangingServer } from './tests/connectorMocks.js';
+import { startMockConnectorApis, startHangingServer, lastSentHeaders, resetLastSentHeaders } from './tests/connectorMocks.js';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -74,7 +78,7 @@ console.log('\n== B56 CORE — REGISTRY + ERROR TAXONOMY ==');
 
 try { ConnectorRegistry.register('broken', { send() {} }); ok(false, 'register() throws when authenticate is missing'); } catch (e) { ok(true, 'register() throws when authenticate is missing'); }
 try { ConnectorRegistry.register('nope', { description: 'not a connector' }); ok(false, 'register() throws for a non-connector object'); } catch (e) { ok(true, 'register() throws for a non-connector object'); }
-ok(registerConnectors().length >= 4, 'registerConnectors() registers every connector from settings without throwing');
+ok(registerConnectors().length >= 3, 'registerConnectors() registers every connector from settings without throwing');
 ConnectorRegistry.clear();
 
 ok(ERROR_CODES.AUTH_FAILED === 'AUTH_FAILED' && ERROR_CODES.RATE_LIMITED === 'RATE_LIMITED', 'error taxonomy defines auth/rate-limit/timeout/malformed codes');
@@ -186,6 +190,16 @@ ok(pr.ok === true && pr.number === 7, 'create_pr → PR number returned');
 const commit = await gh.send({ action: 'create_commit', owner: 'o', repo: 'r', branch: 'main', message: 'add file', changes: [{ path: 'a.txt', content: 'hello' }] });
 ok(commit.ok === true && commit.sha === 'commitsha1', 'create_commit → blob→tree→commit→ref flow returns commit sha');
 
+// B61 — Contents API file operations.
+const createdFile = await gh.send({ action: 'create_file', owner: 'o', repo: 'r', path: 'docs/notes.md', content: '# Notes\nhello', message: 'create notes' });
+ok(createdFile.ok === true && createdFile.action === 'create_file' && createdFile.commit && createdFile.html_url && /docs\/notes\.md/.test(createdFile.html_url), 'create_file → real commit sha + file URL returned', `commit=${createdFile.commit}`);
+const updatedFile = await gh.send({ action: 'update_file', owner: 'o', repo: 'r', path: 'docs/notes.md', content: '# Notes\nupdated', message: 'update notes' });
+ok(updatedFile.ok === true && updatedFile.action === 'update_file' && updatedFile.commit && updatedFile.commit !== createdFile.commit, 'update_file → reads the existing SHA first and commits the change', `commit=${updatedFile.commit}`);
+let missingShaErr = null;
+try { await gh.send({ action: 'update_file', owner: 'o', repo: 'r', path: 'brand-new.md', content: 'x', message: 'should fail' }); } catch (e) { missingShaErr = e; }
+ok(missingShaErr && missingShaErr.code === ERROR_CODES.PROVIDER_ERROR && /create_file/.test(missingShaErr.message), 'update_file on a missing file fails honestly (use create_file)', missingShaErr && missingShaErr.message);
+await expectError(() => gh.send({ action: 'create_file', owner: 'o', repo: 'r', path: 'x.md', message: 'no content' }), ERROR_CODES.PROVIDER_ERROR, 'create_file without content fails cleanly');
+
 await expectError(() => gh.send({ action: 'create_issue', owner: 'o', repo: 'r' }), ERROR_CODES.PROVIDER_ERROR, 'create_issue without title fails cleanly');
 const ghRate = new GitHubConnector(new ConnectorConfig({ name: 'github', auth: { token: 'ratelimit-token', baseUrl: mocks.github.url } }));
 await expectError(() => ghRate.send({ action: 'create_issue', owner: 'o', repo: 'r', title: 't' }), ERROR_CODES.RATE_LIMITED, 'send() rate-limited (429 path executed)');
@@ -244,31 +258,58 @@ const resendInbound = await em.receive({
   type: 'email.delivered',
   data: { email_id: 'ev1', to: 'you@example.com', from: 'JEXI OS <jexi@example.com>', subject: 'Hello', created_at: '2026-01-01T00:00:00Z' },
 });
-ok(resendInbound.length === 1 && resendInbound[0].provider === 'resend' && resendInbound[0].to === 'you@example.com' && resendInbound[0].type === 'email.delivered', 'receive() normalizes a Resend delivery webhook');
+ok(resendInbound.length === 1 && resendInbound[0].provider === 'resend' && resendInbound[0].to[0] === 'you@example.com' && resendInbound[0].type === 'email.delivered', 'receive() normalizes a Resend delivery webhook');
 
 /* ------------------------------------------------------------------ */
-console.log('\n== B56 TELEGRAM (MOCK — Bot API shape) ==');
+console.log('\n== B61 EMAIL INBOUND (Svix verify + Received-emails fetch + reply) ==');
 /* ------------------------------------------------------------------ */
 
-const tg = registerTelegramConnector(new ConnectorConfig({ name: 'telegram', auth: { botToken: 'ok-token', secretToken: 'tg-secret', baseUrl: mocks.telegram.url } }));
-ok(await tg.authenticate(), 'authenticate() (getMe) succeeds against the mock');
-const tgBad = new TelegramConnector(new ConnectorConfig({ name: 'telegram', auth: { botToken: 'bad-token', baseUrl: mocks.telegram.url } }));
-await expectError(() => tgBad.authenticate(), ERROR_CODES.AUTH_FAILED, 'authenticate() fails with AUTH_FAILED on a bad token (401 path executed)');
+// Real Ed25519 round-trip: sign with the PKCS8-derived key (exactly what the
+// connector does to VERIFY), using a whsec_ secret like Resend's.
+const seed = crypto.randomBytes(32);
+const svixSecret = 'whsec_' + seed.toString('base64');
+const PKCS8_PREFIX = Buffer.from('302e020100300506032b657004220420', 'hex');
+const svixPriv = crypto.createPrivateKey({ key: Buffer.concat([PKCS8_PREFIX, seed]), format: 'der', type: 'pkcs8' });
+const emailPayload = JSON.stringify({ type: 'email.received', data: { email_id: 'inbound-1', from: 'user@example.com', to: ['jexi@yourdomain.com'], subject: 'Testing JEXI inbound', created_at: '2026-08-15T12:00:00.000Z' } });
+const svixContent = `msg_1.1691785099.${emailPayload}`;
+const svixSig = crypto.sign(null, Buffer.from(svixContent, 'utf8'), svixPriv).toString('base64url');
+const svixHeaders = { 'svix-id': 'msg_1', 'svix-timestamp': '1691785099', 'svix-signature': `v1,${svixSig}` };
+ok(verifySvixSignature(svixSecret, emailPayload, svixHeaders) === true, 'Svix webhook signature verified (Ed25519, real sign/verify, no new dependency)');
+ok(verifySvixSignature(svixSecret, emailPayload + 'tampered', svixHeaders) === false, 'Svix webhook rejected when the body is tampered');
+ok(verifySvixSignature(svixSecret, emailPayload, { ...svixHeaders, 'svix-signature': 'v1,c2lnbmF0dXJl' }) === false, 'Svix webhook rejected on a bad signature');
+ok(verifySvixSignature('', emailPayload, svixHeaders) === false, 'Svix webhook rejected with no secret');
 
-const tgMsg = await tg.send({ chat_id: 777, text: 'Hello from JEXI' });
-ok(tgMsg.ok === true && tgMsg.message_id === 99, 'sendMessage → provider message_id returned');
-const tgPhoto = await tg.send({ chat_id: 777, photo: 'https://example.com/x.png', caption: 'look' });
-ok(tgPhoto.ok === true && tgPhoto.method === 'sendPhoto', 'sendPhoto → provider response returned');
-const tgRate = new TelegramConnector(new ConnectorConfig({ name: 'telegram', auth: { botToken: 'ratelimit-token', baseUrl: mocks.telegram.url } }));
-try { await tgRate.send({ chat_id: 1, text: 'hi' }); ok(false, 'send() rate-limited (429 path executed)'); }
-catch (e) { ok(e instanceof ConnectorError && e.code === ERROR_CODES.RATE_LIMITED && e.retryAfter === 6, 'send() rate-limited (429 path executed)', e.message); }
+const emWeb = new ResendConnector(new ConnectorConfig({ name: 'email', auth: { apiKey: 'ok-key', webhookSecret: svixSecret, baseUrl: mocks.resend.url } }));
+ok(emWeb.verifyWebhookSignature(emailPayload, svixHeaders) === true, 'connector.verifyWebhookSignature() validates the Svix headers');
+ok(emWeb.verifyWebhookSignature(emailPayload, { ...svixHeaders, 'svix-signature': 'v1,bad' }) === false, 'connector rejects a tampered Svix signature');
 
-ok(tg.verifyWebhookSecret({ 'x-telegram-bot-api-secret-token': 'tg-secret' }) === true, 'webhook verified by secret token header');
-ok(tg.verifyWebhookSecret({ 'x-telegram-bot-api-secret-token': 'wrong' }) === false, 'webhook rejected on secret mismatch');
-const tgEvents = tg.normalizeInbound({ update_id: 9001, message: { message_id: 11, date: 1691785099, chat: { id: 777, type: 'private' }, from: { id: 888, username: 'tester' }, text: 'hello' } });
-ok(tgEvents.length === 1 && tgEvents[0].text === 'hello' && tgEvents[0].chat.id === 777, 'receive() normalizes a Bot API update');
-const polled = await tg.receive({ offset: 0 });
-ok(polled.length === 1 && polled[0].text === 'hello from telegram', 'receive() polling mode (getUpdates) returns normalized events');
+// Inbound receive: the webhook carries metadata only; the body is fetched
+// from the Received-emails API and normalized into the internal shape.
+const inboundEvents = await emWeb.receive(JSON.parse(emailPayload));
+ok(inboundEvents.length === 1 && inboundEvents[0].type === 'inbound' && inboundEvents[0].provider === 'resend', 'inbound email webhook → normalized inbound event');
+ok(inboundEvents[0].text === 'Hello JEXI, can you reply?' && inboundEvents[0].subject === 'Testing JEXI inbound', 'receive() fetches the full body from the Received-emails API');
+ok(inboundEvents[0].messageId === '<orig-msg-1@example.com>' && inboundEvents[0].from === 'user@example.com' && inboundEvents[0].to[0] === 'jexi@yourdomain.com', 'inbound event carries sender + recipient + Message-ID');
+
+// Webhook dispatch: Svix-verified email.received → recorded in the inbox.
+ConnectorRegistry.unregister('email');
+registerEmailConnector(new ConnectorConfig({ name: 'email', auth: { apiKey: 'ok-key', webhookSecret: svixSecret, baseUrl: mocks.resend.url } }));
+resetConnectorInbox();
+const emailWh = await handleConnectorWebhook('email', { rawBody: emailPayload, headers: svixHeaders, body: JSON.parse(emailPayload) });
+ok(emailWh.kind === 'events' && emailWh.verified === true && emailWh.events.length === 1, 'email webhook dispatch verifies (Svix) + normalizes inbound');
+const emailInbox = listInbound('email', 10);
+ok(emailInbox.total === 1 && emailInbox.events[0].type === 'inbound' && emailInbox.events[0].text === 'Hello JEXI, can you reply?', 'email inbound delivery recorded in the inbox (provable)');
+
+// reply(): same thread — Re: subject, In-Reply-To + References headers,
+// quoted original, reply_to = our receiving address.
+resetLastSentHeaders();
+const replyRes = await emWeb.reply({ email_id: 'inbound-1', text: 'Got it — JEXI here.' });
+ok(replyRes.ok === true && /^resend-mock-/.test(replyRes.message_id), 'reply() sends and returns Resend\'s real message id');
+ok(replyRes.subject === 'Re: Testing JEXI inbound', 'reply() prefixes the subject with Re:', replyRes.subject);
+ok(replyRes.in_reply_to === '<orig-msg-1@example.com>', 'reply() carries the original Message-ID');
+ok(lastSentHeaders && lastSentHeaders['In-Reply-To'] === '<orig-msg-1@example.com>', 'reply() sets In-Reply-To on the wire');
+ok(lastSentHeaders && /older-msg@example\.com/.test(lastSentHeaders.References || ''), 'reply() appends to References (thread continuity)');
+const replyNoEmailId = await emWeb.reply({ to: 'user@example.com', subject: 'Standalone', text: 'hi' });
+ok(replyNoEmailId.ok === true && replyNoEmailId.subject === 'Standalone', 'reply() works with explicit to/subject (no email_id needed)');
 
 /* ------------------------------------------------------------------ */
 console.log('\n== B56 TOOL BRIDGE — introspected agent tool schemas ==');
@@ -281,12 +322,11 @@ ok(waSchema.function.parameters.properties.to && waSchema.function.parameters.re
 ok(waSchema.function.parameters.properties.text && waSchema.function.parameters.properties.template && waSchema.function.parameters.properties.media, 'text/template/media fields present');
 const ghSchema = connectorToToolSchema('github');
 ok(ghSchema.function.name === 'send_github' && ghSchema.function.parameters.required.includes('action') && ghSchema.function.parameters.required.includes('owner'), 'github tool schema: action+owner required, action description present');
-const tgSchema = connectorToToolSchema('telegram');
-ok(tgSchema.function.name === 'send_telegram' && tgSchema.function.parameters.required.includes('chat_id'), 'telegram tool schema: chat_id required');
+ok(ghSchema.function.parameters.properties.path && ghSchema.function.parameters.properties.content && ghSchema.function.parameters.properties.message, 'github tool schema exposes create_file/update_file fields (path/content/message)');
 const emSchema = connectorToToolSchema('email');
 ok(emSchema.function.name === 'send_email' && emSchema.function.parameters.properties.subject, 'email tool schema: subject present');
 const allTools = listConnectorTools();
-ok(allTools.length >= 4 && allTools.every((t) => t.type === 'function' && t.function.name.startsWith('send_')), 'schemas generated for every registered connector', allTools.map((t) => t.function.name).join(', '));
+ok(allTools.length >= 3 && allTools.every((t) => t.type === 'function' && t.function.name.startsWith('send_')), 'schemas generated for every registered connector', allTools.map((t) => t.function.name).join(', '));
 
 /* ------------------------------------------------------------------ */
 console.log('\n== B56 AGENT PATH — connector-call tool gating (EXTERNAL tier) ==');
@@ -310,7 +350,7 @@ const declined = await executeTool({ slug: 'connector-call', args: { name: 'gith
 ok(declined.ok === false && declined.declined === true, 'declined EXTERNAL send is cancelled — exactly one approval asked');
 
 // health via the agent path (READ tier → no approval, runs).
-const healthRes = await executeTool({ slug: 'connector-call', args: { name: 'telegram', method: 'health' }, profile: 'full' });
+const healthRes = await executeTool({ slug: 'connector-call', args: { name: 'whatsapp', method: 'health' }, profile: 'full' });
 ok(healthRes.ok === true && String(healthRes.result).includes('"status": "ok"'), 'connector health via agent path (READ tier, no approval)');
 
 // Unknown connector → honest structured failure, not a fabricated success.
@@ -326,7 +366,7 @@ console.log('\n== B56 CONNECTOR SYSTEM — registry + webhook dispatch ==');
 /* ------------------------------------------------------------------ */
 
 const names = ConnectorRegistry.listAvailable();
-ok(names.includes('whatsapp') && names.includes('github') && names.includes('email') && names.includes('telegram'), 'registry lists all four connectors', names.join(', '));
+ok(names.includes('whatsapp') && names.includes('github') && names.includes('email') && !names.includes('telegram'), 'registry lists the three connectors (Telegram removed in B61)', names.join(', '));
 
 const wh = await handleConnectorWebhook('whatsapp', { query: { 'hub.mode': 'subscribe', 'hub.verify_token': 'jexi-verify', 'hub.challenge': '67890' } });
 ok(wh.kind === 'handshake' && wh.verified === true && wh.challenge === '67890', 'webhook dispatch handles the Meta verification handshake');
@@ -336,15 +376,15 @@ const whEvents = await handleConnectorWebhook('whatsapp', { rawBody: waRaw, head
 ok(whEvents.kind === 'events' && whEvents.verified === true && Array.isArray(whEvents.events), 'webhook dispatch verifies + normalizes inbound events');
 
 const status = await getConnectorStatus();
-ok(status.length >= 4 && status.every((c) => c.name && c.enabled !== undefined && c.tier === 'external'), 'getConnectorStatus returns health + masked config for every connector');
+ok(status.length >= 3 && status.every((c) => c.name && c.enabled !== undefined && c.tier === 'external'), 'getConnectorStatus returns health + masked config for every connector');
 const authJson = JSON.stringify(status.map((c) => c.auth));
-ok(!authJson.includes('ok-pat') && !authJson.includes('ok-key') && !authJson.includes('app-secret') && !authJson.includes('tg-secret'), 'connector status masks secrets (no raw keys leak)');
+ok(!authJson.includes('ok-pat') && !authJson.includes('ok-key') && !authJson.includes('app-secret'), 'connector status masks secrets (no raw keys leak)');
 
-// saveConnectorConfig round-trips.
-const saved = saveConnectorConfig('telegram', { auth: { botToken: 'new-token' }, enabled: true });
-ok(saved.name === 'telegram' && saved.enabled === true, 'saveConnectorConfig persists + re-registers a connector');
-ConnectorRegistry.unregister('telegram');
-registerTelegramConnector(new ConnectorConfig({ name: 'telegram', auth: { botToken: 'ok-token', secretToken: 'tg-secret', baseUrl: mocks.telegram.url } }));
+// saveConnectorConfig round-trips (email used here — Telegram is gone).
+const saved = saveConnectorConfig('email', { auth: { apiKey: 'new-key' }, enabled: true });
+ok(saved.name === 'email' && saved.enabled === true, 'saveConnectorConfig persists + re-registers a connector');
+ConnectorRegistry.unregister('email');
+registerEmailConnector(new ConnectorConfig({ name: 'email', auth: { apiKey: 'ok-key', baseUrl: mocks.resend.url } }));
 
 // Restore the project's real settings.json (test never leaves state behind).
 if (originalSettings !== null) fs.writeFileSync(SETTINGS_PATH, originalSettings, 'utf-8');
@@ -382,6 +422,49 @@ ok(inbox.handshakes.length === 2 && inbox.handshakes[0].verified === false && in
 resetConnectorInbox();
 const emptyInbox = listInbound('whatsapp', 10);
 ok(emptyInbox.total === 0 && emptyInbox.events.length === 0 && emptyInbox.handshakes.length === 0, 'resetConnectorInbox clears the store');
+
+/* ------------------------------------------------------------------ */
+console.log('\n== B61 WHATSAPP AUTO-REPLY LOOP (inbound text → JEXI reply → send) ==');
+/* ------------------------------------------------------------------ */
+
+// Register a fake reply generator (server/index.js registers the real LLM one)
+// and deliver a REAL inbound text webhook — the loop must answer automatically.
+const tick = (ms) => new Promise((r) => setTimeout(r, ms));
+resetConnectorInbox();
+setInboundReplyGenerator(async (ev) => `JEXI here! You said: ${ev.text}`);
+const inboundRaw = JSON.stringify({
+  object: 'whatsapp_business_account',
+  entry: [{ id: '123', changes: [{ value: {
+    messaging_product: 'whatsapp',
+    metadata: { display_phone_number: '+15550000000', phone_number_id: 'PHONE_ID' },
+    contacts: [{ profile: { name: 'Ada' }, wa_id: '15550001111' }],
+    messages: [{ from: '15550001111', id: 'wamid.inbound1', timestamp: '1691785099', type: 'text', text: { body: 'What is the weather?' } }],
+  }, field: 'messages' }] }],
+});
+const replyWebhook = await handleConnectorWebhook('whatsapp', { rawBody: inboundRaw, headers: { 'x-hub-signature-256': `sha256=${createHmacSha256('app-secret', inboundRaw)}` }, body: JSON.parse(inboundRaw) });
+ok(replyWebhook.kind === 'events' && replyWebhook.events.length === 1, 'inbound text webhook verified + normalized');
+await tick(150); // the reply send is fire-and-forget; give it a beat
+const replyInbox = listInbound('whatsapp', 10);
+const replyEvent = replyInbox.events.find((e) => e.type === 'reply');
+ok(!!replyEvent && replyEvent.ok === true && /^wamid\.mock\./.test(replyEvent.id), 'auto-reply SENT via send() and recorded in the inbox (wamid returned)', replyEvent && `wamid=${replyEvent.id}`);
+ok(replyEvent && replyEvent.to === '15550001111' && replyEvent.text === 'JEXI here! You said: What is the weather?', 'auto-reply addressed to the sender with the generated text');
+ok(replyEvent && replyEvent.in_reply_to === 'wamid.inbound1', 'auto-reply records which inbound message it answers');
+
+// Generator returning empty → no reply sent, no inbox noise.
+resetConnectorInbox();
+setInboundReplyGenerator(async () => '');
+await handleConnectorWebhook('whatsapp', { rawBody: inboundRaw, headers: { 'x-hub-signature-256': `sha256=${createHmacSha256('app-secret', inboundRaw)}` }, body: JSON.parse(inboundRaw) });
+await tick(100);
+ok(listInbound('whatsapp', 10).events.every((e) => e.type !== 'reply'), 'empty generated reply → nothing sent');
+
+// Generator throwing → reply failure recorded honestly, webhook still 200.
+resetConnectorInbox();
+setInboundReplyGenerator(async () => { throw new Error('LLM down'); });
+await handleConnectorWebhook('whatsapp', { rawBody: inboundRaw, headers: { 'x-hub-signature-256': `sha256=${createHmacSha256('app-secret', inboundRaw)}` }, body: JSON.parse(inboundRaw) });
+await tick(100);
+const failReply = listInbound('whatsapp', 10).events.find((e) => e.type === 'reply');
+ok(!!failReply && failReply.ok === false && /LLM down/.test(failReply.error || ''), 'generator failure → honest reply-failure record (no fake success)');
+setInboundReplyGenerator(null); // clean up — the real generator is registered by index.js
 
 await mocks.closeAll();
 await hanging.close();

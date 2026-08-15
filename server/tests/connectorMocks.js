@@ -68,6 +68,8 @@ export function startMockWhatsApp() {
 /* ------------------------------ GitHub ------------------------------ */
 
 export function startMockGitHub() {
+  // B61 — in-memory repo state for Contents API (create_file / update_file).
+  const files = new Map(); // `${owner}/${repo}/${path}` → { sha, content }
   return startServer(async (req, res) => {
     const token = authToken(req);
     const url = req.url.split('?')[0];
@@ -87,6 +89,7 @@ export function startMockGitHub() {
     const trees = url.match(/^\/repos\/([^/]+)\/([^/]+)\/git\/trees$/);
     const commits = url.match(/^\/repos\/([^/]+)\/([^/]+)\/git\/commits$/);
     const refPatch = url.match(/^\/repos\/([^/]+)\/([^/]+)\/git\/refs\/heads\/([^/]+)$/);
+    const contents = url.match(/^\/repos\/([^/]+)\/([^/]+)\/contents\/(.+)$/);
     if (token.startsWith('bad-')) return json(res, 401, { message: 'Bad credentials' });
     if (token.startsWith('ratelimit-')) return json(res, 429, { message: 'Too many requests' }, { 'retry-after': '30' });
     if (token.startsWith('fail-')) return json(res, 500, { message: 'Server error' });
@@ -100,6 +103,38 @@ export function startMockGitHub() {
     if (trees && req.method === 'POST') return json(res, 201, { sha: 'treesha1' });
     if (commits && req.method === 'POST') return json(res, 201, { sha: 'commitsha1' });
     if (refPatch && req.method === 'PATCH') return json(res, 200, { ref: `refs/heads/${refPatch[3]}`, object: { sha: 'commitsha1' } });
+    if (contents) {
+      const key = `${contents[1]}/${contents[2]}/${contents[3]}`;
+      const existing = files.get(key);
+      if (req.method === 'GET') {
+        if (!existing) return json(res, 404, { message: 'Not Found' });
+        return json(res, 200, {
+          sha: existing.sha,
+          content: Buffer.from(existing.content, 'utf8').toString('base64'),
+          html_url: `https://github.com/${contents[1]}/${contents[2]}/blob/main/${contents[3]}`,
+        });
+      }
+      if (req.method === 'PUT') {
+        const body = await readBody(req);
+        let parsed = null;
+        try { parsed = JSON.parse(body); } catch (e) { /* keep null */ }
+        const newSha = `sha-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+        const newContent = parsed && parsed.content ? Buffer.from(parsed.content, 'base64').toString('utf8') : '';
+        if (existing && (!parsed || !parsed.sha)) {
+          // GitHub rejects an update without the current SHA (422).
+          return json(res, 422, { message: 'sha was supposed to be included in the request and must match the current file SHA' });
+        }
+        if (existing && parsed && parsed.sha && parsed.sha !== existing.sha) {
+          return json(res, 409, { message: 'Current file sha does not match' });
+        }
+        files.set(key, { sha: newSha, content: newContent });
+        const commitSha = `commit-${newSha}`;
+        return json(res, 201, {
+          content: { sha: newSha, html_url: `https://github.com/${contents[1]}/${contents[2]}/blob/main/${contents[3]}` },
+          commit: { sha: commitSha, html_url: `https://github.com/${contents[1]}/${contents[2]}/commit/${commitSha}` },
+        });
+      }
+    }
     return json(res, 404, { message: 'Not Found' });
   });
 }
@@ -121,42 +156,49 @@ export function startMockResend() {
       if (token.startsWith('ratelimit-')) return json(res, 429, { message: 'Rate limit exceeded' }, { 'retry-after': '5' });
       if (token.startsWith('fail-')) return json(res, 500, { message: 'Internal error' });
       if (token.startsWith('malformed-')) return json(res, 200, { notTheShape: true });
+      // B61 — capture the sent body so tests can assert threading headers.
+      const raw = await readBody(req);
+      let parsed = null;
+      try { parsed = JSON.parse(raw); } catch (e) { /* keep null */ }
+      if (parsed && parsed.headers && parsed.headers['In-Reply-To']) lastSentHeaders = parsed.headers;
       return json(res, 200, { id: `resend-mock-${Date.now()}` });
+    }
+    // B61 — Received-emails API: full email for one inbound event.
+    const received = req.url.match(/^\/emails\/([^/]+)$/);
+    if (received && req.method === 'GET') {
+      if (token.startsWith('bad-')) return json(res, 401, { message: 'Invalid API key' });
+      return json(res, 200, {
+        id: received[1],
+        from: 'user@example.com',
+        to: ['jexi@yourdomain.com'],
+        subject: 'Testing JEXI inbound',
+        message_id: '<orig-msg-1@example.com>',
+        created_at: '2026-08-15T12:00:00.000Z',
+        body: { text: 'Hello JEXI, can you reply?', html: '<p>Hello JEXI, can you reply?</p>' },
+        headers: [
+          { name: 'Message-ID', value: '<orig-msg-1@example.com>' },
+          { name: 'References', value: '<older-msg@example.com>' },
+        ],
+        attachments: [],
+      });
     }
     return json(res, 404, { message: 'not found' });
   });
 }
 
-/* ------------------------------ Telegram ----------------------------- */
+/** B61 — test hook: last threaded-reply headers the Resend mock captured. */
+export let lastSentHeaders = null;
+export function resetLastSentHeaders() { lastSentHeaders = null; }
 
-export function startMockTelegram() {
-  return startServer(async (req, res) => {
-    const url = req.url.split('?')[0];
-    const tokenMatch = url.match(/^\/bot([^/]+)\/(getMe|sendMessage|sendPhoto|sendDocument|getUpdates)$/);
-    if (!tokenMatch) return json(res, 404, { ok: false, error_code: 404, description: 'not found' });
-    const [, token, method] = tokenMatch;
-    if (token.startsWith('bad-')) return json(res, 401, { ok: false, error_code: 401, description: 'Unauthorized' });
-    if (token.startsWith('ratelimit-')) return json(res, 429, { ok: false, error_code: 429, description: 'Too Many Requests', parameters: { retry_after: 6 } });
-    if (method === 'getMe') return json(res, 200, { ok: true, result: { id: 555, username: 'jexi_test_bot', first_name: 'JEXI' } });
-    if (method === 'getUpdates') {
-      return json(res, 200, { ok: true, result: [{ update_id: 9001, message: { message_id: 11, date: 1691785099, chat: { id: 777, type: 'private' }, from: { id: 888, username: 'tester' }, text: 'hello from telegram' } }] });
-    }
-    if (method === 'sendMessage' || method === 'sendPhoto' || method === 'sendDocument') {
-      return json(res, 200, { ok: true, result: { message_id: 99, date: 1691785099, chat: { id: 777, type: 'private' }, text: 'sent' } });
-    }
-    return json(res, 200, { ok: true, result: [] });
-  });
-}
-
-/** Start every mock at once. Returns { whatsapp, github, resend, telegram, closeAll }. */
+/** Start every mock at once. Returns { whatsapp, github, resend, closeAll }. */
 export async function startMockConnectorApis() {
-  const [whatsapp, github, resend, telegram] = await Promise.all([
-    startMockWhatsApp(), startMockGitHub(), startMockResend(), startMockTelegram(),
+  const [whatsapp, github, resend] = await Promise.all([
+    startMockWhatsApp(), startMockGitHub(), startMockResend(),
   ]);
   return {
-    whatsapp, github, resend, telegram,
+    whatsapp, github, resend,
     closeAll: async () => {
-      await Promise.all([whatsapp.close(), github.close(), resend.close(), telegram.close()]);
+      await Promise.all([whatsapp.close(), github.close(), resend.close()]);
     },
   };
 }
