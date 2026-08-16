@@ -429,6 +429,8 @@ app.get('/api/settings/status', (req, res) => {
     mistral: statusOf(['MISTRAL_API_KEY'], 'mistralKey'),
     xai: statusOf(['XAI_API_KEY'], 'xaiKey'),
     deepseek: statusOf(['DEEPSEEK_API_KEY'], 'deepseekKey'), // B66 — coding coworker
+    nvidia: statusOf(['NVIDIA_API_KEY'], 'nvidiaKey'), // B75 — no-card free tier
+    sambanova: statusOf(['SAMBANOVA_API_KEY'], 'sambanovaKey'), // B75 — no-card free tier
     github: statusOf(['GITHUB_TOKEN', 'GH_TOKEN'], 'githubToken'),
   });
 });

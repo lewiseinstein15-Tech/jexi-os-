@@ -52,6 +52,8 @@ export default function SettingsPanel() {
   const [deepinfraKey, setDeepinfraKey] = useState('');
   const [mistralKey, setMistralKey] = useState('');
   const [xaiKey, setXaiKey] = useState('');
+  const [nvidiaKey, setNvidiaKey] = useState('');
+  const [sambanovaKey, setSambanovaKey] = useState('');
   const [githubToken, setGithubToken] = useState('');
   const [keyStatus, setKeyStatus] = useState(null); // { groq, gemini, github }
   const [status, setStatus] = useState('idle'); // idle, loading, saved, error
@@ -90,6 +92,8 @@ export default function SettingsPanel() {
         setDeepinfraKey(data.deepinfraKey || '');
         setMistralKey(data.mistralKey || '');
         setXaiKey(data.xaiKey || '');
+        setNvidiaKey(data.nvidiaKey || '');
+        setSambanovaKey(data.sambanovaKey || '');
         setGithubToken(data.githubToken || '');
         try { setKeyStatus(await statusRes.json()); } catch (e) { /* status endpoint optional */ }
         try { if (trustRes) setTrust(await trustRes.json()); } catch (e) { /* trust endpoint optional */ }
@@ -137,6 +141,8 @@ export default function SettingsPanel() {
       if (!keyStatus?.deepinfra?.configured) body.deepinfraKey = deepinfraKey;
       if (!keyStatus?.mistral?.configured) body.mistralKey = mistralKey;
       if (!keyStatus?.xai?.configured) body.xaiKey = xaiKey;
+      if (!keyStatus?.nvidia?.configured) body.nvidiaKey = nvidiaKey;
+      if (!keyStatus?.sambanova?.configured) body.sambanovaKey = sambanovaKey;
       if (!keyStatus?.github?.configured) body.githubToken = githubToken;
       const res = await jexiFetch(`${backendUrl}/api/settings`, {
         method: 'POST',
@@ -255,6 +261,30 @@ export default function SettingsPanel() {
             hint="grok-4.6 flagship, OpenAI-compatible. Set XAI_API_KEY in Render and it's automatic."
             status={keyStatus?.xai}
             envNames={['XAI_API_KEY']}
+          />
+
+          {/* NVIDIA NIM — no-card free tier (DeepSeek V4 Flash, Llama, Nemotron) */}
+          <KeyField
+            label="NVIDIA NIM KEY (FREE DEEPSEEK V4)"
+            icon={<Cpu className="w-3 h-3 text-[#76B900]" />}
+            value={nvidiaKey}
+            onChange={(e) => setNvidiaKey(e.target.value)}
+            placeholder="nvapi-…"
+            hint="Free key at build.nvidia.com → API Keys — no credit card. Unlocks free DeepSeek V4 Flash, Llama 3.3, Nemotron. Set NVIDIA_API_KEY in Render and it's automatic."
+            status={keyStatus?.nvidia}
+            envNames={['NVIDIA_API_KEY']}
+          />
+
+          {/* SambaNova — no-card free tier (DeepSeek V3.1/V3.2) */}
+          <KeyField
+            label="SAMBANOVA KEY (FREE DEEPSEEK V3)"
+            icon={<Cloud className="w-3 h-3 text-emerald-400" />}
+            value={sambanovaKey}
+            onChange={(e) => setSambanovaKey(e.target.value)}
+            placeholder="Get free key at cloud.sambanova.ai — no card"
+            hint="Free tier with DeepSeek-V3.1/V3.2 — no credit card. Set SAMBANOVA_API_KEY in Render and it's automatic."
+            status={keyStatus?.sambanova}
+            envNames={['SAMBANOVA_API_KEY']}
           />
 
           {/* GitHub Token — powers the GitHub Agent (commit, push, PR, issues) */}

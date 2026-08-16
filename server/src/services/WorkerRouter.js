@@ -6,9 +6,9 @@
  * its PRIMARY model, a fallback, and finally the general last-resort tier
  * (HuggingFace → DeepInfra → Mistral).
  *
- *   coder       → DeepSeek first (deepseek-chat), then FREE code models
- *   memory      → FREE OpenRouter general model first, then near-free + Gemini
- *   researcher  → Grok (xAI) first, Groq, then OpenRouter models
+ *   coder       → DeepSeek first (deepseek-chat), then FREE DeepSeek (NVIDIA) + free code models
+ *   memory      → Gemini first (free tier, 1,500 RPD), then FREE OpenRouter + near-free
+ *   researcher  → Groq 70B first (free tier), then Groq 8B, OpenRouter, Grok last
  *   fallback    → vLLM (self-hosted, free) → HuggingFace (incl. free Qwen)
  *                  → DeepInfra → Mistral (last resort)
  *
@@ -53,23 +53,28 @@ export const COWORKERS = {
   memory: {
     role: 'Memory / conversation continuity',
     providers: [
-      // B73 — FREE 120B general model first (tool calling, 262k ctx,
-      // live-verified $0). OpenRouter free-tier rate limits just fall through
-      // to the next provider below.
+      // B75b — live-probe evidence: Gemini is the best conversation primary.
+      // Tested ✅ against the real key, and its free tier (1,500 RPD) has 30x
+      // the daily volume of OpenRouter :free models (50 RPD) — chat is the
+      // highest-frequency path and can't live on a 50/day cap.
+      { key: 'gemini', model: 'gemini-2.5-flash' },
+      // B73 — FREE 120B general model (tool calling, 262k ctx, live $0).
       { key: 'openrouter', model: 'nvidia/nemotron-3-super-120b-a12b:free' },
       // B72 — was qwen/qwen3-8b:free (deleted from OpenRouter). seed-2.0-mini
       // is the near-free workhorse the live provider probe proves works.
       { key: 'openrouter', model: 'bytedance-seed/seed-2.0-mini' },
-      { key: 'gemini', model: 'gemini-2.5-flash' },         // Gemini: free tier, large-context handling
     ],
   },
   researcher: {
     role: 'Research / realtime information',
     providers: [
-      { key: 'xai', model: 'grok-4.6' },                             // B66 primary (needs credits)
-      { key: 'groq', model: 'llama-3.1-8b-instant' },                // Groq free tier — live-verified
+      // B75b — Groq 70B leads research: live-verified ✅, on Groq's free tier
+      // (1,000 RPD), and far better research quality than the 8B.
+      { key: 'groq', model: 'llama-3.3-70b-versatile' },
+      { key: 'groq', model: 'llama-3.1-8b-instant' },                // proven free fallback
       { key: 'openrouter', model: 'bytedance-seed/seed-2.0-mini' },  // near-free fallback
-      { key: 'openrouter', model: 'google/gemma-4-26b-a4b-it:free' } // B73 — FREE fallback
+      { key: 'openrouter', model: 'google/gemma-4-26b-a4b-it:free' }, // B73 — FREE fallback
+      { key: 'xai', model: 'grok-4.6' }, // B66 primary — moved last: live probe 403s (no credits) and must not slow every research task; works the moment the xAI account is funded
     ],
   },
   fallback: {

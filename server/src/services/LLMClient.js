@@ -291,64 +291,16 @@ async function tryOpenRouter(prompt, system, imageBase64, opts, errors) {
 /**
  * HuggingFace free Inference API — text only, last-resort provider.
  *
- * B73 follow-up — endpoint: HF's current serverless gateway is
- * `router.huggingface.co/hf-inference/models/<id>`; the legacy
- * `api-inference.huggingface.co` host no longer resolves from some networks
- * (live-observed DNS failure in the B72 probe's "fetch failed" — and again
- * in this sandbox). The router endpoint is tried FIRST (live-verified: all
- * free DeepSeek + Qwen models below return HTTP 401 "token required" =
- * served), then the legacy host as a fallback. Both speak the same protocol.
+ * B75b — endpoint fix found by the LIVE probe (deployed backend): HF retired
+ * the per-model TGI endpoints on the router (`/hf-inference/models/<id>` now
+ * returns 400 "Model not supported by provider hf-inference") and replaced
+ * them with an OpenAI-compatible gateway at `https://router.huggingface.co/v1`
+ * (chat/completions, live-verified 401 = valid endpoint). Free users get a
+ * small monthly credit meter (Inference Providers pool). Same model IDs, now
+ * through the standard OpenAI-compatible caller.
  */
-async function tryHuggingFace(prompt, system, imageBase64, opts, errors) {
-  if (imageBase64) return null; // HF free tier text-only here
-  const { hfKey } = resolveKeys();
-  if (!hfKey) return null;
-  const endpoints = [
-    (model) => `https://router.huggingface.co/hf-inference/models/${model}`,
-    (model) => `https://api-inference.huggingface.co/models/${model}`,
-  ];
-  for (const model of HF_TEXT_MODELS) {
-    for (const buildUrl of endpoints) {
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 60000);
-        try {
-          const res = await fetch(buildUrl(model), {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${hfKey}`,
-            },
-            body: JSON.stringify({ inputs: `${system}\n\n${prompt}`, parameters: { max_new_tokens: 900, temperature: opts.temperature ?? 0.4 } }),
-            signal: controller.signal,
-          });
-          if (!res.ok) {
-            const body = await res.text().catch(() => '');
-            // 401/404 on the ROUTER endpoint → model not served there or token
-            // wrong — try the legacy host before giving up on this model.
-            errors.push(`HF(${model}): HTTP ${res.status} ${body.slice(0, 100)}`);
-            continue;
-          }
-          const data = await res.json();
-          const text = Array.isArray(data) ? data?.[0]?.generated_text : data?.generated_text;
-          if (typeof text === 'string' && text.trim()) {
-            // Strip the echoed prompt prefix the inference API sometimes returns.
-            return text.trim().replace(new RegExp(`^${system.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), '').replace(new RegExp(`^${prompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), '').trim().slice(0, 6000) || text.trim().slice(0, 6000);
-          }
-          errors.push(`HF(${model}) returned an empty response`);
-        } finally {
-          clearTimeout(timer);
-        }
-      } catch (e) {
-        // A network failure (DNS / timeout) on the router endpoint is worth
-        // one retry through the legacy host before moving to the next model.
-        errors.push(`HF(${model}): ${e.message}`);
-        console.error('[LLMClient] HuggingFace failed:', e.message);
-      }
-    }
-  }
-  return null;
-}
+const tryHuggingFace = (p, s, img, o, e) =>
+  tryOpenAICompat({ key: resolveKeys().hfKey, baseUrl: 'https://router.huggingface.co/v1', models: o.model ? [o.model] : HF_TEXT_MODELS, label: 'HuggingFace', providerKey: 'huggingface' }, p, s, img, o, e);
 
 /**
  * Generic OpenAI-compatible chat-completions caller — Cerebras, DeepInfra and

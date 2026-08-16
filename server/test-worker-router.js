@@ -59,20 +59,33 @@ ok(
   `every verified-free OpenRouter model is wired into COWORKERS (${OPENROUTER_FREE_TEXT_MODELS.join(', ')})`
 );
 
-// 3. Memory coworker (conversation path) leads with a FREE model, then the
-//    near-free workhorse, then Gemini's free tier.
+// 3. Memory coworker (conversation path) — B75b live-probe evidence: Gemini
+//    leads (tested OK, free tier 1,500 RPD vs OpenRouter-free's 50 RPD), then
+//    the FREE 120B OpenRouter model, then the near-free workhorse.
 const memoryChain = coworkerChain('memory');
 ok(
-  memoryChain[0] && memoryChain[0].key === 'openrouter' && memoryChain[0].model === 'nvidia/nemotron-3-super-120b-a12b:free',
-  `memory worker primary = openrouter(nvidia/nemotron-3-super-120b-a12b:free) — $0, got ${JSON.stringify(memoryChain[0])}`
+  memoryChain[0] && memoryChain[0].key === 'gemini' && memoryChain[0].model === 'gemini-2.5-flash',
+  `memory worker primary = gemini(gemini-2.5-flash) — free tier, 1,500 RPD, got ${JSON.stringify(memoryChain[0])}`
 );
 ok(
-  memoryChain[1] && memoryChain[1].key === 'openrouter' && memoryChain[1].model === 'bytedance-seed/seed-2.0-mini',
-  'memory worker #2 = openrouter(bytedance-seed/seed-2.0-mini) — near-free workhorse stays reachable'
+  memoryChain[1] && memoryChain[1].key === 'openrouter' && memoryChain[1].model === 'nvidia/nemotron-3-super-120b-a12b:free',
+  `memory worker #2 = openrouter(nvidia/nemotron-3-super-120b-a12b:free) — $0, got ${JSON.stringify(memoryChain[1])}`
 );
 ok(
-  memoryChain[2] && memoryChain[2].key === 'gemini' && memoryChain[2].model === 'gemini-2.5-flash',
-  'memory worker #3 = gemini(gemini-2.5-flash) — free tier, large-context provider stays reachable'
+  memoryChain[2] && memoryChain[2].key === 'openrouter' && memoryChain[2].model === 'bytedance-seed/seed-2.0-mini',
+  'memory worker #3 = openrouter(bytedance-seed/seed-2.0-mini) — near-free workhorse stays reachable'
+);
+
+// 3b. Researcher — B75b: Groq 70B leads (free tier, 1,000 RPD), Grok moved
+//     last (live probe 403s with no credits — must not slow every task).
+const researcherChain = coworkerChain('researcher');
+ok(
+  researcherChain[0] && researcherChain[0].key === 'groq' && researcherChain[0].model === 'llama-3.3-70b-versatile',
+  `researcher primary = groq(llama-3.3-70b-versatile) — free tier, got ${JSON.stringify(researcherChain[0])}`
+);
+ok(
+  researcherChain[4] && researcherChain[4].key === 'xai',
+  'grok stays reachable but last among the research providers (no credits → must not slow every task)'
 );
 
 // 4. Coder coworker: DeepSeek (paid-but-cheap primary) → FREE DeepSeek via
@@ -123,7 +136,7 @@ ok(coworkerFor('latest news on AI') === 'researcher', 'research request → rese
 const memChain = coworkerChain('memory');
 ok(
   memChain.length === 7 && memChain[3].key === 'vllm' && memChain[4].key === 'huggingface' && memChain[5].key === 'deepinfra' && memChain[6].key === 'mistral',
-  'memory chain = [nemotron:free, seed-2.0-mini, gemini, vllm, huggingface, deepinfra, mistral] (vLLM leads the fallback tier)'
+  'memory chain = [gemini, nemotron:free, seed-2.0-mini, vllm, huggingface, deepinfra, mistral] (vLLM leads the fallback tier)'
 );
 
 // 6b. B74 — vLLM is part of the general provider walk too (right before the
@@ -138,8 +151,8 @@ ok(COWORKERS.fallback.providers[0].key === 'vllm', 'vLLM leads the last-resort f
 const roster = workerRoster();
 const memoryRoster = roster.find((w) => w.slug === 'memory');
 ok(
-  memoryRoster && memoryRoster.providers[0] === 'openrouter:nvidia/nemotron-3-super-120b-a12b:free',
-  `Models screen roster shows the free memory primary, got ${memoryRoster && memoryRoster.providers[0]}`
+  memoryRoster && memoryRoster.providers[0] === 'gemini:gemini-2.5-flash',
+  `Models screen roster shows the live-tested memory primary, got ${memoryRoster && memoryRoster.providers[0]}`
 );
 
 // 8. B74 — vLLM provider round-trip against a mock OpenAI-compatible server
