@@ -51,13 +51,18 @@ const OPENROUTER_TEXT_MODELS = [
 ];
 
 // Free text models on the HuggingFace Inference API (HF_TOKEN). Free tier is
-// slow — these are a last-resort text provider, gated on the token. B73: the
-// genuinely-free Qwen path (verified on HF's supported Inference Providers
-// list) — no free Qwen remains on OpenRouter, and DeepSeek has no free tier
-// on any wired provider (see QWEN_MODELS note).
+// slow — these are a last-resort text provider, gated on the token. B73
+// follow-up — free DeepSeek AND free Qwen live here (live-verified via
+// router.huggingface.co/hf-inference/models/<id> → HTTP 401 "token needed"
+// means the model is served free): DeepSeek's own API has no free tier and
+// OpenRouter carries no free DeepSeek/Qwen, but HF serverless serves the
+// DeepSeek open-weight releases (deepseek-coder, R1-distill) and Qwen2.5 for
+// $0 with the existing HF_TOKEN.
 const HF_TEXT_MODELS = [
-  'Qwen/Qwen2.5-7B-Instruct',        // free Qwen — general
-  'Qwen/Qwen2.5-Coder-7B-Instruct',  // free Qwen — coding
+  'Qwen/Qwen2.5-7B-Instruct',                  // free Qwen — general
+  'deepseek-ai/deepseek-coder-6.7b-instruct',  // free DeepSeek — coding
+  'Qwen/Qwen2.5-Coder-7B-Instruct',            // free Qwen — coding
+  'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B',   // free DeepSeek — reasoning
   'microsoft/phi-4',
   'HuggingFaceH4/zephyr-7b-beta',
   'mistralai/Mistral-7B-Instruct-v0.3',
@@ -94,6 +99,8 @@ export const QWEN_MODELS = ['Qwen/Qwen2.5-7B-Instruct', 'Qwen/Qwen2.5-Coder-7B-I
 // (no dead :free models, genuinely-free entries present).
 export const OPENROUTER_FREE_TEXT_MODELS = ['nvidia/nemotron-3-super-120b-a12b:free', 'cohere/north-mini-code:free', 'google/gemma-4-26b-a4b-it:free'];
 export const HF_FREE_QWEN_MODELS = ['Qwen/Qwen2.5-7B-Instruct', 'Qwen/Qwen2.5-Coder-7B-Instruct'];
+// B73 follow-up — free DeepSeek on the HF serverless tier (live-verified 401).
+export const HF_FREE_DEEPSEEK_MODELS = ['deepseek-ai/deepseek-coder-6.7b-instruct', 'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B'];
 
 const TIMEOUT_MS = 90000;
 
@@ -255,43 +262,63 @@ async function tryOpenRouter(prompt, system, imageBase64, opts, errors) {
   return null;
 }
 
-/** HuggingFace free Inference API — text only, last-resort provider. */
+/**
+ * HuggingFace free Inference API — text only, last-resort provider.
+ *
+ * B73 follow-up — endpoint: HF's current serverless gateway is
+ * `router.huggingface.co/hf-inference/models/<id>`; the legacy
+ * `api-inference.huggingface.co` host no longer resolves from some networks
+ * (live-observed DNS failure in the B72 probe's "fetch failed" — and again
+ * in this sandbox). The router endpoint is tried FIRST (live-verified: all
+ * free DeepSeek + Qwen models below return HTTP 401 "token required" =
+ * served), then the legacy host as a fallback. Both speak the same protocol.
+ */
 async function tryHuggingFace(prompt, system, imageBase64, opts, errors) {
   if (imageBase64) return null; // HF free tier text-only here
   const { hfKey } = resolveKeys();
   if (!hfKey) return null;
+  const endpoints = [
+    (model) => `https://router.huggingface.co/hf-inference/models/${model}`,
+    (model) => `https://api-inference.huggingface.co/models/${model}`,
+  ];
   for (const model of HF_TEXT_MODELS) {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 60000);
+    for (const buildUrl of endpoints) {
       try {
-        const res = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${hfKey}`,
-          },
-          body: JSON.stringify({ inputs: `${system}\n\n${prompt}`, parameters: { max_new_tokens: 900, temperature: opts.temperature ?? 0.4 } }),
-          signal: controller.signal,
-        });
-        if (!res.ok) {
-          const body = await res.text().catch(() => '');
-          errors.push(`HF(${model}): HTTP ${res.status} ${body.slice(0, 100)}`);
-          continue;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 60000);
+        try {
+          const res = await fetch(buildUrl(model), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${hfKey}`,
+            },
+            body: JSON.stringify({ inputs: `${system}\n\n${prompt}`, parameters: { max_new_tokens: 900, temperature: opts.temperature ?? 0.4 } }),
+            signal: controller.signal,
+          });
+          if (!res.ok) {
+            const body = await res.text().catch(() => '');
+            // 401/404 on the ROUTER endpoint → model not served there or token
+            // wrong — try the legacy host before giving up on this model.
+            errors.push(`HF(${model}): HTTP ${res.status} ${body.slice(0, 100)}`);
+            continue;
+          }
+          const data = await res.json();
+          const text = Array.isArray(data) ? data?.[0]?.generated_text : data?.generated_text;
+          if (typeof text === 'string' && text.trim()) {
+            // Strip the echoed prompt prefix the inference API sometimes returns.
+            return text.trim().replace(new RegExp(`^${system.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), '').replace(new RegExp(`^${prompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), '').trim().slice(0, 6000) || text.trim().slice(0, 6000);
+          }
+          errors.push(`HF(${model}) returned an empty response`);
+        } finally {
+          clearTimeout(timer);
         }
-        const data = await res.json();
-        const text = Array.isArray(data) ? data?.[0]?.generated_text : data?.generated_text;
-        if (typeof text === 'string' && text.trim()) {
-          // Strip the echoed prompt prefix the inference API sometimes returns.
-          return text.trim().replace(new RegExp(`^${system.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), '').replace(new RegExp(`^${prompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), '').trim().slice(0, 6000) || text.trim().slice(0, 6000);
-        }
-        errors.push(`HF(${model}) returned an empty response`);
-      } finally {
-        clearTimeout(timer);
+      } catch (e) {
+        // A network failure (DNS / timeout) on the router endpoint is worth
+        // one retry through the legacy host before moving to the next model.
+        errors.push(`HF(${model}): ${e.message}`);
+        console.error('[LLMClient] HuggingFace failed:', e.message);
       }
-    } catch (e) {
-      errors.push(`HF(${model}): ${e.message}`);
-      console.error('[LLMClient] HuggingFace failed:', e.message);
     }
   }
   return null;

@@ -20,7 +20,7 @@
  */
 
 import { COWORKERS, coworkerChain, coworkerFor, workerRoster, runWorker } from './src/services/WorkerRouter.js';
-import { QWEN_MODELS, OPENROUTER_FREE_TEXT_MODELS, HF_FREE_QWEN_MODELS } from './src/services/LLMClient.js';
+import { QWEN_MODELS, OPENROUTER_FREE_TEXT_MODELS, HF_FREE_QWEN_MODELS, HF_FREE_DEEPSEEK_MODELS } from './src/services/LLMClient.js';
 
 let passed = 0;
 let failed = 0;
@@ -86,16 +86,23 @@ ok(
 );
 ok(coderChain[0] && coderChain[0].key === 'deepseek', 'coder #1 stays deepseek(deepseek-chat) — architecture primary');
 
-// 4b. B73 — free Qwen is real via HuggingFace serverless (already wired): the
-//     documented Qwen list points at HF-served models, and the fallback tier
-//     reaches HF (where those models actually live).
+// 4b. B73 follow-up — free Qwen AND free DeepSeek are real via HuggingFace
+//     serverless (already wired): the documented lists point at HF-served
+//     models (live-verified HTTP 401 = served, token-gated = free tier), and
+//     the fallback tier reaches HF where they actually live.
 ok(
   QWEN_MODELS.every((m) => HF_FREE_QWEN_MODELS.includes(m)),
   'free Qwen is served via HuggingFace Inference API (Qwen2.5-7B-Instruct + Qwen2.5-Coder-7B-Instruct)'
 );
 ok(
+  HF_FREE_DEEPSEEK_MODELS.length === 2 &&
+  HF_FREE_DEEPSEEK_MODELS[0] === 'deepseek-ai/deepseek-coder-6.7b-instruct' &&
+  HF_FREE_DEEPSEEK_MODELS[1] === 'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B',
+  'free DeepSeek is served via HuggingFace Inference API (deepseek-coder-6.7b-instruct + DeepSeek-R1-Distill-Qwen-7B)'
+);
+ok(
   coworkerChain('coder').some((p) => p.key === 'huggingface') && coworkerChain('memory').some((p) => p.key === 'huggingface'),
-  'fallback tier reaches HuggingFace where the free Qwen models live'
+  'fallback tier reaches HuggingFace where the free DeepSeek + Qwen models live'
 );
 
 // 5. Conversation still routes to the memory worker (unchanged semantics).
