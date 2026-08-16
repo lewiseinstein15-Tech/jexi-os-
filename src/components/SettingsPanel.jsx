@@ -375,7 +375,7 @@ export default function SettingsPanel() {
               placeholder="you@example.com — leave empty for in-app only"
               className="w-full bg-surface-1 text-text-primary border border-hairline rounded-md px-3 py-2.5 text-xs focus:outline-none focus:border-brand-line"
             />
-            <p className="text-[8px] text-text-tertiary mt-1">When a goal finishes (or fails), JEXI sends you the report by email. Requires the Email connector key (<span className="font-mono text-text-secondary">RESEND_API_KEY</span>). Env var: <span className="font-mono text-text-secondary">GOAL_REPORT_EMAIL</span>.</p>
+            <p className="text-[8px] text-text-tertiary mt-1">When a goal finishes (or fails), JEXI sends you the report by email. Defaults to <span className="font-mono text-text-secondary">lewiseinstein15@gmail.com</span> — set a different address here to override (requires the Email connector key, <span className="font-mono text-text-secondary">RESEND_API_KEY</span>). Env var: <span className="font-mono text-text-secondary">GOAL_REPORT_EMAIL</span>.</p>
           </div>
 
           {/* Backend URL (runtime override) */}

@@ -18,10 +18,20 @@
 import { notify } from './NotificationCenter.js';
 import { loadSettings } from './SettingsManager.js';
 
+/**
+ * The creator's email is the DEFAULT report recipient baked into the code —
+ * JEXI's owner always gets goal reports even with zero configuration.
+ * Explicit configuration still wins:
+ *   1. GOAL_REPORT_EMAIL env var  → 2. Settings → goalReportEmail  → 3. this.
+ */
+export const DEFAULT_REPORT_EMAIL = 'lewiseinstein15@gmail.com';
+
 /** Injectable connector caller (defaults wired in index.js). */
 let callConnectorImpl = null;
 /** Dedupe: job ids already reported. */
 const reported = new Set();
+/** Observable record of every email send attempt (capped). */
+const emailReports = [];
 
 export function setGoalCallConnector(fn) {
   callConnectorImpl = fn;
@@ -29,15 +39,26 @@ export function setGoalCallConnector(fn) {
 
 export function resetGoalNotifier() {
   reported.clear();
+  emailReports.length = 0;
 }
 
-/** Recipient for goal reports: env wins over the Settings panel value. */
+/** Live email-send record — lets the owner verify deliveries (no secrets). */
+export function goalReportStats() {
+  return {
+    sends: emailReports.length,
+    ok: emailReports.filter((r) => r.ok).length,
+    failed: emailReports.filter((r) => !r.ok).length,
+    last: emailReports.length ? { ...emailReports[emailReports.length - 1] } : null,
+  };
+}
+
+/** Recipient for goal reports: env > Settings panel > code default (creator). */
 export function goalReportRecipient() {
   try {
     const settings = loadSettings();
-    return String(process.env.GOAL_REPORT_EMAIL || settings.goalReportEmail || '').trim();
+    return String(process.env.GOAL_REPORT_EMAIL || settings.goalReportEmail || DEFAULT_REPORT_EMAIL).trim() || DEFAULT_REPORT_EMAIL;
   } catch {
-    return String(process.env.GOAL_REPORT_EMAIL || '').trim();
+    return String(process.env.GOAL_REPORT_EMAIL || DEFAULT_REPORT_EMAIL).trim() || DEFAULT_REPORT_EMAIL;
   }
 }
 
@@ -94,12 +115,24 @@ export function notifyGoalComplete(job) {
   ].filter(Boolean).join('\n');
 
   (async () => {
+    let ok = false;
+    let error = '';
     try {
-      await callConnectorImpl('email', {
+      // callConnector NEVER throws — it returns { ok:false, error, code } on
+      // failure (it catches provider errors internally), so success is
+      // `result.ok === true`, NOT "no exception". Checking the result keeps
+      // the send record honest (a missing key is recorded as failed).
+      const result = await callConnectorImpl('email', {
         method: 'send',
         payload: { to, subject: title.slice(0, 120), text },
       });
-    } catch (e) { /* email failure is never fatal */ }
+      ok = !!(result && result.ok);
+      if (!ok) error = String((result && (result.error || result.code)) || 'email send failed');
+    } catch (e) {
+      error = (e && e.message) || String(e);
+    }
+    emailReports.push({ at: Date.now(), jobId: job.id, to, ok, error: error.slice(0, 200) });
+    if (emailReports.length > 50) emailReports.shift();
   })();
 }
 
