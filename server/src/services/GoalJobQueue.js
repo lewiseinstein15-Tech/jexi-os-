@@ -71,6 +71,14 @@ function load() {
           j.events = (j.events || []).concat([{ type: 'log', agent: 'Goal Queue', message: '⏹ Interrupted by server restart.' }]).slice(-MAX_EVENTS_PER_JOB);
         }
         if (j.status === 'queued') j.status = 'queued'; // worker picks it up
+        // AUTO-HEAL: scheduled (unattended) goals can never wait for a human.
+        // Any scheduler-sourced job parked in need-info is resumed with
+        // 'use defaults' so it completes and reports (heals pre-fix jobs).
+        if (j.status === 'need-info' && (j.unattended || String(j.session || '').startsWith('scheduler:'))) {
+          j.pendingAnswer = 'use defaults';
+          j.status = 'queued';
+          j.events = (j.events || []).concat([{ type: 'log', agent: 'Goal Queue', message: '↻ Scheduled goal was waiting for details — auto-resuming with defaults (unattended).' }]).slice(-MAX_EVENTS_PER_JOB);
+        }
       }
       return parsed;
     }
@@ -121,13 +129,14 @@ function publicJob(j) {
 }
 
 /** Enqueue a goal. Returns the job id immediately. */
-export function enqueueGoal({ goal, session = 'default', autonomy = 'ask' }) {
+export function enqueueGoal({ goal, session = 'default', autonomy = 'ask', unattended = false }) {
   const id = `job-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   jobs[id] = {
     id,
     goal: String(goal || '').trim(),
     session: String(session || 'default'),
     autonomy: String(autonomy || 'ask').toLowerCase(),
+    unattended: Boolean(unattended), // scheduled/background: never park, always auto-approve
     status: 'queued',
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -220,6 +229,17 @@ async function wakeWorker() {
 
 async function runNext() {
   while (true) {
+    // 0) AUTO-HEAL: scheduled/unattended goals can never wait for a human —
+    //    resume any parked scheduler job with 'use defaults' (also covers
+    //    jobs created before the unattended flag existed).
+    for (const j of Object.values(jobs)) {
+      if (j.status === 'need-info' && (j.unattended || String(j.session || '').startsWith('scheduler:'))) {
+        j.pendingAnswer = 'use defaults';
+        j.status = 'queued';
+        j.events = (j.events || []).concat([{ type: 'log', agent: 'Goal Queue', message: '↻ Scheduled goal was waiting for details — auto-resuming with defaults (unattended).' }]).slice(-MAX_EVENTS_PER_JOB);
+        persist();
+      }
+    }
     // 1) Pick the next queued job (oldest first, need-info answers included).
     const next = Object.values(jobs)
       .filter((j) => j.status === 'queued')
@@ -251,6 +271,7 @@ async function runNext() {
           goal: next.goal,
           session: next.session,
           autonomy: next.autonomy,
+          unattended: Boolean(next.unattended),
           sendEvent: (t, d) => addEvent(next, { type: t, ...d }),
         });
       }

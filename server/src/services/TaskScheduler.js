@@ -249,6 +249,7 @@ class TaskScheduler {
           goal: s.query,
           session: `scheduler:${s.id}`,
           autonomy: s.autonomy || 'ask',
+          unattended: true, // scheduled runs: never park, always auto-approve
         });
         s.lastJobId = jobId;
         s.runCount = (s.runCount || 0) + 1;

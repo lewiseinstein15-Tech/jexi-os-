@@ -44,3 +44,30 @@ not just old-style tasks. JEXI runs on her own schedule and reports when done
 - Live e2e: POST /api/schedules (kind goal, full autonomy) → run-now →
   durable goal job created (`give me a tech news roundup`, autonomy full),
   schedule records lastJobId/lastStatus/runCount.
+
+---
+
+## B82-fix (same day): scheduled goals were parking forever — unattended mode
+
+**Reported:** a 5-minute scheduled goal with Full autonomy never completed
+and no email arrived.
+
+**Root cause (verified on the live deployment):** scheduled goals with
+`autonomy: 'full'` ran the preflight question pass — but there is no human to
+answer an unattended scheduled run, so the job parked in `need-info`
+permanently (`session: scheduler:...`, 6 unanswered questions) and never
+reached a terminal state → no notification, no email.
+
+**Fix:**
+- `GoalEngine.startGoal(..., { unattended })`: scheduled/background runs SKIP
+  the question pass entirely and ALWAYS auto-approve confirmations.
+- `GoalJobQueue`: jobs carry `unattended`; the worker AUTO-HEALS any
+  scheduler-sourced job stuck in `need-info` by resuming it with
+  "use defaults" (at boot AND every worker loop) — heals pre-fix jobs,
+  including the one on the live instance, after deploy.
+- `TaskScheduler`: goal schedules enqueue with `unattended: true`.
+- Preflight prompt tightened: max 3 questions, blocking facts only.
+
+**Verification:** goal-engine 28/28, goal-jobs 23/23, sweep 16 suites green,
+lint 0 errors. Live e2e: scheduled goal (full) → run-now → `status: done`,
+`infoRequests: []`, real news summary produced.
