@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "217031730528",
+    "project_id": "jexi-os",
+    "storage_bucket": "jexi-os.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:217031730528:android:d781c0450050ba8ff2aa05",
+        "android_client_info": {
+          "package_name": "com.jexi.os"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAraPvoS2uvvOkuESM7DncV1IsxIRuTpEM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

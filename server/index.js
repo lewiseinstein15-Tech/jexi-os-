@@ -82,6 +82,7 @@ import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLi
 import { enqueueGoal, enqueueChat, answerJob, getJob as getGoalJob, getJobEvents, subscribe as subscribeJob, listJobs, setGoalExecutor, setChatExecutor, setGoalNotifier, hydrateGoalJobsFromRedis } from './src/services/GoalJobQueue.js'; // Phase 2 — durable background goal jobs (B85 — durable chat)
 import { notifyGoalComplete, setGoalCallConnector, goalReportStats } from './src/services/GoalNotifier.js'; // Phase 4 — goal completion notifications + email reports
 import { getVapidPublicKey, addSubscription, removeSubscription, broadcastPush, listSubscriptions } from './src/services/PushManager.js'; // B84 — web push notifications (closed-app delivery)
+import { addFcmToken, removeFcmToken, listFcmTokens, fcmStatus, broadcastFcm } from './src/services/FcmManager.js'; // B86 — FCM push for the installed APK
 
 
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
@@ -674,6 +675,24 @@ app.post('/api/push/unsubscribe', (req, res) => {
 // Debug: how many devices are registered (read-only, no secrets).
 app.get('/api/push/subscriptions', (req, res) => res.json({ count: listSubscriptions().length }));
 
+// === FCM (B86) — push to the installed Android app even when closed ===
+// Register this device's FCM token (from @capacitor-firebase/messaging).
+app.post('/api/push/fcm-token', (req, res) => {
+  const { token, ua } = req.body || {};
+  if (!token || typeof token !== 'string') return res.status(400).json({ ok: false, error: 'FCM token required' });
+  const result = addFcmToken(token, ua);
+  res.json(result.ok ? { ok: true, count: result.count } : result);
+});
+
+app.post('/api/push/fcm-unregister', (req, res) => {
+  const { token } = req.body || {};
+  if (!token) return res.status(400).json({ ok: false, error: 'FCM token required' });
+  res.json(removeFcmToken(token));
+});
+
+// Status: configured + device count (read-only, no secrets).
+app.get('/api/push/fcm-status', (req, res) => res.json(fcmStatus()));
+
 // === MODEL ROUTING (roadmap stage 24 — per-domain provider preference) ===
 // Exposes the intent → provider map; AgentLoop honors it via opts.prefer.
 app.get('/api/models', (req, res) => {
@@ -1234,8 +1253,11 @@ setChatExecutor({
     return { success: false, error: 'No paused chat task found in this session.' };
   },
 });
-// B84 — every notification also pushes to all registered devices (web push).
-setNotifyBroadcaster((n) => { broadcastPush(n.title, n.body, n.link).catch(() => {}); });
+// B84/B86 — every notification pushes to web-push devices AND FCM (installed APK).
+setNotifyBroadcaster((n) => {
+  broadcastPush(n.title, n.body, n.link).catch(() => {});
+  broadcastFcm(n.title, n.body, n.link).catch(() => {});
+});
 
 // GET /api/goals — durable goal job records (read-only, no secrets).
 app.get('/api/goals', (req, res) => res.json({ goals: listJobs() }));
