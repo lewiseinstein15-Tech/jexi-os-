@@ -40,18 +40,39 @@ const SERVICE_ACCOUNT_FILE = path.join(process.cwd(), 'firebase-service-account.
 let serviceAccount = null;
 let accessToken = null;
 let accessTokenExp = 0;
+/** Why FCM is (not) configured — surfaced by fcmStatus() for diagnostics. */
+let configError = '';
 
 export function resolveServiceAccount() {
   if (serviceAccount) return serviceAccount;
+  configError = '';
   try {
-    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-      serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS && fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
+    // 1) Base64-encoded JSON (Render-safe — immune to newline/quote mangling).
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_B64) {
+      serviceAccount = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_B64, 'base64').toString('utf-8'));
+      if (!serviceAccount.client_email || !serviceAccount.private_key) {
+        configError = 'FIREBASE_SERVICE_ACCOUNT_B64 decoded but missing client_email/private_key';
+        serviceAccount = null;
+      }
+    }
+    // 2) Plain JSON env var (multiline paste).
+    if (!serviceAccount && process.env.FIREBASE_SERVICE_ACCOUNT) {
+      try {
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+      } catch (e) {
+        configError = `FIREBASE_SERVICE_ACCOUNT is not valid JSON: ${e.message}`;
+      }
+    }
+    // 3) Credentials path / local gitignored file.
+    if (!serviceAccount && process.env.GOOGLE_APPLICATION_CREDENTIALS && fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
       serviceAccount = JSON.parse(fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf-8'));
-    } else if (fs.existsSync(SERVICE_ACCOUNT_FILE)) {
+    }
+    if (!serviceAccount && fs.existsSync(SERVICE_ACCOUNT_FILE)) {
       serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_FILE, 'utf-8'));
     }
+    if (!serviceAccount && !configError) configError = 'FIREBASE_SERVICE_ACCOUNT env not set';
   } catch (e) {
+    configError = `Service account parse failed: ${e.message}`;
     serviceAccount = null;
   }
   return serviceAccount;
@@ -181,6 +202,7 @@ export function fcmStatus() {
     configured: isFcmConfigured(),
     projectId: sa ? sa.project_id : null,
     deviceTokens: tokens.length,
+    detail: isFcmConfigured() ? 'ok' : (configError || 'not configured'),
   };
 }
 
