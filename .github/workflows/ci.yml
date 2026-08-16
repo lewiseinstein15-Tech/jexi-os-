@@ -22,6 +22,8 @@ jobs:
       - name: Syntax check
         run: |
           for f in index.js src/services/*.js; do node --check "$f"; done
+      - name: Lint (error-level rules — no-undef, redeclaration, unsafe patterns)
+        run: npm run lint
       - name: Run all test suites
         run: npm test
 
