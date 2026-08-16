@@ -79,7 +79,8 @@ import { GoalEngine } from './src/services/GoalEngine.js'; // autonomy: goal-lev
 import { rateLimiterStatus } from './src/services/ProviderRateLimiter.js'; // free-tier pacing status
 import { touchSession, listSessions } from './src/services/SessionStore.js'; // session registry (isolation observability)
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines } from './src/services/JexiIdentity.js'; // canonical identity (name / creator / capabilities)
-import { enqueueGoal, answerJob, getJob as getGoalJob, getJobEvents, subscribe as subscribeJob, listJobs, setGoalExecutor } from './src/services/GoalJobQueue.js'; // Phase 2 — durable background goal jobs
+import { enqueueGoal, answerJob, getJob as getGoalJob, getJobEvents, subscribe as subscribeJob, listJobs, setGoalExecutor, setGoalNotifier } from './src/services/GoalJobQueue.js'; // Phase 2 — durable background goal jobs
+import { notifyGoalComplete, setGoalCallConnector } from './src/services/GoalNotifier.js'; // Phase 4 — goal completion notifications + email reports
 
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
 // everything across restarts/redeploys (non-blocking).
@@ -1171,6 +1172,10 @@ const goalEngine = new GoalEngine({
 });
 // Phase 2 — goals run as durable background jobs (survive restarts).
 setGoalExecutor(goalEngine);
+// Phase 4 — when a goal finishes, JEXI notifies (bell) and emails the report
+// when GOAL_REPORT_EMAIL / Settings → goalReportEmail is set.
+setGoalNotifier(notifyGoalComplete);
+setGoalCallConnector(callConnector);
 
 // GET /api/goals — durable goal job records (read-only, no secrets).
 app.get('/api/goals', (req, res) => res.json({ goals: listJobs() }));
