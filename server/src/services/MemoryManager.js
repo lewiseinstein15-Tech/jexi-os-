@@ -274,7 +274,7 @@ export async function hydrateFromRedis() {
       cache = { ...structuredClone(DEFAULT_MEMORY), ...parsed };
       migrate(cache);
       ensureDirs();
-      fs.writeFileSync(MEMORY_FILE, JSON.stringify(cache, null, 2), 'utf-8');
+      writeMemoryFile(JSON.stringify(cache, null, 2));
       console.log('[Memory] ✓ Hydrated memory core from Redis.');
       consolidateMemory();
       return true;
@@ -353,10 +353,28 @@ export function loadMemory() {
   return cache;
 }
 
+/**
+ * Phase 2 — atomic memory persistence: write to a temp file, fsync, then
+ * rename over the real file. A crash mid-write can never corrupt memory.json
+ * (rename is atomic on POSIX), and no reader ever sees a half-written file.
+ */
+function writeMemoryFile(content) {
+  ensureDirs();
+  const tmp = `${MEMORY_FILE}.tmp-${process.pid}-${Date.now().toString(36)}`;
+  const fd = fs.openSync(tmp, 'w');
+  try {
+    fs.writeSync(fd, content, null, 'utf-8');
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+  fs.renameSync(tmp, MEMORY_FILE);
+}
+
 export function saveMemory() {
   ensureDirs();
   try {
-    fs.writeFileSync(MEMORY_FILE, JSON.stringify(loadMemory(), null, 2), 'utf-8');
+    writeMemoryFile(JSON.stringify(loadMemory(), null, 2));
   } catch (e) {
     console.error('[Memory] save error:', e.message);
   }
@@ -961,7 +979,7 @@ export function clearMemory() {
   cache = structuredClone(DEFAULT_MEMORY);
   consolidated = false;
   ensureDirs();
-  try { fs.writeFileSync(MEMORY_FILE, JSON.stringify(cache, null, 2), 'utf-8'); } catch (e) {}
+  try { writeMemoryFile(JSON.stringify(cache, null, 2)); } catch (e) {}
   if (redisEnabled) { getRedis().then(r => { if (r) r.del(MEMORY_REDIS_KEY).catch(() => {}); }).catch(() => {}); }
   // Also wipe generated workspace files
   try {

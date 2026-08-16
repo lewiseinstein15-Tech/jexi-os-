@@ -79,6 +79,7 @@ import { GoalEngine } from './src/services/GoalEngine.js'; // autonomy: goal-lev
 import { rateLimiterStatus } from './src/services/ProviderRateLimiter.js'; // free-tier pacing status
 import { touchSession, listSessions } from './src/services/SessionStore.js'; // session registry (isolation observability)
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines } from './src/services/JexiIdentity.js'; // canonical identity (name / creator / capabilities)
+import { enqueueGoal, answerJob, getJob as getGoalJob, getJobEvents, subscribe as subscribeJob, listJobs, setGoalExecutor } from './src/services/GoalJobQueue.js'; // Phase 2 — durable background goal jobs
 
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
 // everything across restarts/redeploys (non-blocking).
@@ -1168,80 +1169,90 @@ const goalEngine = new GoalEngine({
   generateContent,
   store: { saveRun, loadRun, clearRun },
 });
+// Phase 2 — goals run as durable background jobs (survive restarts).
+setGoalExecutor(goalEngine);
 
-// GET /api/goals — live goal records (read-only, no secrets).
-app.get('/api/goals', (req, res) => res.json({ goals: goalEngine.listGoals() }));
+// GET /api/goals — durable goal job records (read-only, no secrets).
+app.get('/api/goals', (req, res) => res.json({ goals: listJobs() }));
 
-// GET /api/goals/:id — one goal record.
+// GET /api/goals/:id — one goal job record.
 app.get('/api/goals/:id', (req, res) => {
-  const g = goalEngine.goal(String(req.params.id).slice(0, 80));
+  const g = getGoalJob(String(req.params.id).slice(0, 80));
   if (!g) return res.status(404).json({ error: 'goal not found' });
   res.json({ goal: g });
 });
 
-// POST /api/goals — start an autonomous goal (NDJSON stream, same contract as
-// /api/chat). autonomy: 'ask' (pause at confirmations, default) | 'full'
-// (preflight questions once, then run to completion with auto-approved
-// confirmations for THIS goal).
-app.post('/api/goals', async (req, res) => {
+// GET /api/goals/:id/stream — live NDJSON stream for a goal job. Replays the
+// persisted event log, then streams new events; closes when the job finishes.
+app.get('/api/goals/:id/stream', (req, res) => {
+  const id = String(req.params.id).slice(0, 80);
+  // Headers FIRST — subscribeJob replays the persisted log synchronously and
+  // a write before setHeader would throw ERR_HTTP_HEADERS_SENT.
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Cache-Control', 'no-cache');
+  const sendEvent = (event) => { try { res.write(JSON.stringify(event) + '\n'); } catch (e) {} };
+  const sub = subscribeJob(id, sendEvent);
+  if (!sub.ok) return res.status(404).json({ error: sub.error });
+  if (sub.finished) return res.end();
+  const heartbeat = setInterval(() => { try { res.write('{"type":"heartbeat"}\n'); } catch (e) {} }, 10000);
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    clearInterval(heartbeat);
+    clearInterval(poll);
+    try { if (sub.unsubscribe) sub.unsubscribe(); } catch (e) {}
+    try { res.end(); } catch (e) {}
+  };
+  const poll = setInterval(() => {
+    const j = getGoalJob(id);
+    if (j && (j.status === 'done' || j.status === 'failed')) close();
+  }, 2000);
+  req.on('close', close);
+  const j0 = getGoalJob(id);
+  if (j0 && (j0.status === 'done' || j0.status === 'failed')) close();
+});
+
+// POST /api/goals — enqueue an autonomous goal. Returns { ok, jobId }
+// immediately (202); the worker runs it in the background and the job
+// survives restarts. autonomy: 'ask' (pause at confirmations, default) |
+// 'full' (preflight questions once, then run end-to-end).
+app.post('/api/goals', (req, res) => {
   const { goal, autonomy } = req.body || {};
   if (!goal || !String(goal).trim()) return res.status(400).json({ success: false, error: 'No goal provided' });
   const convId = conversationId(req);
-  res.setHeader('Content-Type', 'application/x-ndjson');
-  res.setHeader('Cache-Control', 'no-cache');
-  const sendEvent = (type, data) => { try { res.write(JSON.stringify({ type, ...data }) + '\n'); } catch (e) {} };
-  const heartbeat = setInterval(() => { try { res.write('{"type":"heartbeat"}\n'); } catch (e) {} }, 10000);
-  const finish = () => { clearInterval(heartbeat); try { res.end(); } catch (e) {} };
-  try {
-    const out = await goalEngine.startGoal({
-      goal: String(goal).trim(),
-      session: convId,
-      autonomy: String(autonomy || 'ask').toLowerCase(),
-      sendEvent,
-    });
-    if (out.needInfo && out.needInfo.length) {
-      sendEvent('goal.need-info', { goalId: out.goalId, questions: out.needInfo });
-      sendEvent('done', {
-        success: true, query: goal, parked: true, goalId: out.goalId,
-        summary: `### 📋 Almost there — I need a few details\n\n${out.needInfo.map((q, i) => `${i + 1}. **${q.question}**`).join('\n')}\n\nJust type your answers and I'll take it from there.`,
-      });
-    } else if (out.result) {
-      sendEvent('done', {
-        success: out.result.success !== false, query: goal, goalId: out.goalId,
-        summary: normalizeFinalAnswer(out.result.summary || (out.result.success === false ? (out.result.error || 'Goal failed.') : '✅ Goal completed — check the activity log above.')),
-        files: out.result.files || [], sources: out.result.sources || [], statistics: out.result.statistics || {},
-      });
-    } else {
-      sendEvent('done', { success: false, query: goal, goalId: out.goalId, summary: `### ⚠ JEXI OS\n\n${out.error || 'The goal failed to start.'}` });
-    }
-  } catch (e) {
-    sendEvent('done', { success: false, error: e.message, summary: `### ⚠ JEXI OS\n\n${e.message}` });
-  }
-  finish();
+  const { id } = enqueueGoal({ goal: String(goal).trim(), session: convId, autonomy: String(autonomy || 'ask').toLowerCase() });
+  res.status(202).json({ ok: true, jobId: id, status: 'queued', stream: `/api/goals/${id}/stream` });
 });
 
-// POST /api/goals/:id/info — answer a parked goal's questions (or use /api/chat;
-// a message in the goal's session is auto-routed to the parked goal).
-app.post('/api/goals/:id/info', async (req, res) => {
+// POST /api/goals/:id/info — answer a parked goal's questions. Streams the
+// resumed run as NDJSON (or use /api/chat — a message in the goal's session
+// is auto-routed to the parked goal).
+app.post('/api/goals/:id/info', (req, res) => {
   const { answer } = req.body || {};
+  const id = String(req.params.id).slice(0, 80);
   if (!answer || !String(answer).trim()) return res.status(400).json({ ok: false, error: 'No answer provided' });
-  const convId = conversationId(req);
+  const ack = answerJob(id, String(answer).trim());
+  if (!ack.ok) return res.status(400).json(ack);
   res.setHeader('Content-Type', 'application/x-ndjson');
   res.setHeader('Cache-Control', 'no-cache');
   const sendEvent = (type, data) => { try { res.write(JSON.stringify({ type, ...data }) + '\n'); } catch (e) {} };
   const heartbeat = setInterval(() => { try { res.write('{"type":"heartbeat"}\n'); } catch (e) {} }, 10000);
-  const finish = () => { clearInterval(heartbeat); try { res.end(); } catch (e) {} };
-  try {
-    const out = await goalEngine.resumeWithInfo({ goalId: String(req.params.id).slice(0, 80), session: convId, answer: String(answer).trim(), sendEvent });
-    if (out.result) {
-      sendEvent('done', { success: out.result.success !== false, summary: normalizeFinalAnswer(out.result.summary || '✅ Goal completed.'), files: out.result.files || [], sources: out.result.sources || [], statistics: out.result.statistics || {}, goalId: out.goalId });
-    } else {
-      sendEvent('done', { success: false, summary: `### ⚠ JEXI OS\n\n${out.error || 'Could not resume the goal.'}` });
-    }
-  } catch (e) {
-    sendEvent('done', { success: false, summary: `### ⚠ JEXI OS\n\n${e.message}` });
-  }
-  finish();
+  let closed = false;
+  const finish = () => {
+    if (closed) return;
+    closed = true;
+    clearInterval(heartbeat);
+    clearInterval(poll);
+    try { if (sub.unsubscribe) sub.unsubscribe(); } catch (e) {}
+    try { res.end(); } catch (e) {}
+  };
+  const sub = subscribeJob(id, sendEvent, { replay: false });
+  const poll = setInterval(() => {
+    const j = getGoalJob(id);
+    if (j && (j.status === 'done' || j.status === 'failed')) finish();
+  }, 1500);
+  req.on('close', finish);
 });
 
 // GET /api/identity — who JEXI is, who built her, what she can do (read-only,
@@ -1338,28 +1349,78 @@ app.post('/api/chat', async (req, res) => {
     const pendingOffer = loadOffer(convId);
     const hasPending = Boolean(pendingOffer);
 
-    // GOAL ENGINE — a parked goal in this session is waiting for the user's
-    // details; the next message IS the answer (no re-planning, no confusion
-    // with the offer flow).
-    const parkedGoalId = (() => {
-      for (const g of goalEngine.listGoals()) {
-        if (g.session === convId && g.status === 'need-info') return g.id;
+    // GOAL ENGINE (Phase 2) — the durable background job queue. Two paths:
+    //   1) "/goal <text>" (or "goal: <text>") starts an autonomous goal job;
+    //   2) a parked (need-info) goal in this session is waiting for details —
+    //      the next message IS the answer. Both stream live through the job's
+    //      event log, so they survive restarts and never mix sessions.
+    const GOAL_PREFIX_RE = /^(?:\/goal|goal:)\s+(.+)$/i;
+    const goalMatch = image ? null : raw.match(GOAL_PREFIX_RE);
+    if (goalMatch) {
+      const goalText = goalMatch[1].trim();
+      const savedSettings = loadSettings();
+      const autonomy = ['ask', 'full'].includes(savedSettings.autonomyMode) ? savedSettings.autonomyMode : 'ask';
+      const { id: jobId } = enqueueGoal({ goal: goalText, session: convId, autonomy });
+      sendEvent('log', { agent: 'Goal Engine', message: `🎯 Goal started (job ${jobId}, autonomy: ${autonomy}) — streaming live...` });
+      const sub = subscribeJob(jobId, (event) => {
+        if (event.type === 'done') {
+          done({ success: event.success !== false, query: goalText, parked: !!event.parked, goalId: event.goalId || jobId, summary: normalizeFinalAnswer(event.summary || '✅ Goal completed.'), files: event.files || [], sources: event.sources || [], statistics: event.statistics || {} });
+        } else if (event.type !== 'job.started') {
+          sendEvent(event.type, event);
+        }
+      });
+      if (sub.ok && sub.finished) {
+        // Finished between enqueue and subscribe — recover the terminal event.
+        const evs = getJobEvents(jobId) || [];
+        const last = [...evs].reverse().find((e) => e.type === 'done');
+        if (last) {
+          done({ success: last.success !== false, query: goalText, parked: !!last.parked, goalId: last.goalId || jobId, summary: normalizeFinalAnswer(last.summary || '✅ Goal completed.'), files: last.files || [], sources: last.sources || [], statistics: last.statistics || {} });
+        } else {
+          done({ success: false, query: goalText, summary: '### ⚠ JEXI OS\n\nThe goal already finished without a result.' });
+        }
+        return;
+      }
+      if (sub.ok) {
+        const iv = setInterval(() => {
+          const j = getGoalJob(jobId);
+          if (j && (j.status === 'done' || j.status === 'failed')) { clearInterval(iv); try { sub.unsubscribe(); } catch (e) {} finish(); }
+        }, 1500);
+        req.on('close', () => { clearInterval(iv); try { sub.unsubscribe(); } catch (e) {} });
+      }
+      return;
+    }
+
+    // Parked goal — the user's next message answers its questions.
+    const parkedJob = (() => {
+      for (const j of listJobs()) {
+        if (j.session === convId && j.status === 'need-info') return j;
       }
       return null;
     })();
-    if (parkedGoalId && !image && raw.trim()) {
+    if (parkedJob && !image && raw.trim()) {
       clearOffer(convId);
       clearRun(convId);
-      sendEvent('log', { agent: 'Goal Engine', message: `📨 Received your details — resuming goal "${String(goalEngine.goal(parkedGoalId)?.goal || '').slice(0, 80)}"...` });
-      const out = await goalEngine.resumeWithInfo({ goalId: parkedGoalId, session: convId, answer: raw, sendEvent });
-      if (out && out.result) {
-        done({
-          success: out.result.success !== false, query: raw,
-          summary: normalizeFinalAnswer(out.result.summary || (out.result.success === false ? (out.result.error || 'The goal failed.') : '✅ Goal completed — check the activity log above.')),
-          files: out.result.files || [], sources: out.result.sources || [], statistics: out.result.statistics || {}, goalId: parkedGoalId,
-        });
-      } else {
-        done({ success: false, query: raw, summary: `### ⚠ JEXI OS\n\n${(out && out.error) || 'Could not resume the goal.'}` });
+      sendEvent('log', { agent: 'Goal Engine', message: `📨 Received your details — resuming goal "${String(parkedJob.goal || '').slice(0, 80)}"...` });
+      const ack = answerJob(parkedJob.id, raw);
+      if (!ack.ok) {
+        done({ success: false, query: raw, summary: `### ⚠ JEXI OS\n\n${ack.error}` });
+        return;
+      }
+      const sub = subscribeJob(parkedJob.id, (event) => {
+        if (event.type === 'done') {
+          done({ success: event.success !== false, query: raw, parked: !!event.parked, goalId: event.goalId || parkedJob.id, summary: normalizeFinalAnswer(event.summary || '✅ Goal completed.'), files: event.files || [], sources: event.sources || [], statistics: event.statistics || {} });
+        } else if (event.type !== 'job.started') {
+          sendEvent(event.type, event);
+        }
+      }, { replay: false });
+      if (sub.ok && !sub.finished) {
+        const iv = setInterval(() => {
+          const j = getGoalJob(parkedJob.id);
+          if (j && (j.status === 'done' || j.status === 'failed')) { clearInterval(iv); try { sub.unsubscribe(); } catch (e) {} finish(); }
+        }, 1500);
+        req.on('close', () => { clearInterval(iv); try { sub.unsubscribe(); } catch (e) {} });
+      } else if (sub.ok && sub.finished) {
+        done({ success: false, query: raw, summary: '### ⚠ JEXI OS\n\nThat goal already finished — start a new one with "/goal <text>".' });
       }
       return;
     }

@@ -641,7 +641,7 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
       return results;
     });
 
-    N.research = this.wrapCase('research', async ({ results, sendEvent, query, plan }) => {
+    N.research = this.wrapCase('research', async ({ results, sendEvent, query, plan, state }) => {
       // B54 P3 — the two independent knowledge probes (books/library recall and
       // the semantic-memory check) run CONCURRENTLY, not one-after-the-other:
       // both are read-only lookups and either one can short-circuit the search.
