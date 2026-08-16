@@ -1,7 +1,7 @@
 import fetch from 'node-fetch';
 import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
-import { isSSRF } from './Security.js';
+import { isSSRF, safeFetchUrl } from './Security.js';
 import { YoutubeTranscript } from 'youtube-transcript';
 import { convert } from 'html-to-text';
 import { extractText, getDocumentProxy } from 'unpdf';
@@ -32,7 +32,8 @@ async function renderWithJS(url) {
 
 async function fetchBuffer(url) {
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, timeout: 20000 });
+    // safeFetchUrl re-validates every redirect hop (SSRF guard).
+    const res = await safeFetchUrl(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, timeout: 20000 }, fetch);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.arrayBuffer();
   } catch (e) {
@@ -45,7 +46,8 @@ async function fetchBuffer(url) {
 
 async function fetchHTML(url, opts = {}) {
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, timeout: 12000 });
+    // safeFetchUrl re-validates every redirect hop (SSRF guard).
+    const res = await safeFetchUrl(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, timeout: 12000 }, fetch);
     if (res.status === 403 || res.status === 503) throw new Error('Blocked by host');
     return await res.text();
   } catch (e) {

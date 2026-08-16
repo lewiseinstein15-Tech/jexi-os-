@@ -117,6 +117,7 @@ async function scrapeSocialCaption(url, platform) {
  * transcript API; the caption is what the creator wrote).
  */
 export async function getVideoTranscript(url) {
+  if (await isSSRF(url)) throw new Error('Security blocked (SSRF)');
   const info = classifyVideoUrl(url);
   if (!info.platform) return null;
   if (info.platform === 'youtube' && info.videoId) {
@@ -193,6 +194,7 @@ function videoDurationSec(ffmpegPath, file) {
  * Returns [] when ffmpeg is unavailable — the caller falls back gracefully.
  */
 export async function extractFramesFromDirectVideo(url, { maxFrames = 5 } = {}) {
+  if (await isSSRF(url)) throw new Error('Security blocked (SSRF)');
   let ffmpegPath = null;
   try { ffmpegPath = (await import('ffmpeg-static')).default; } catch (e) {}
   if (!ffmpegPath || !fs.existsSync(ffmpegPath)) return [];

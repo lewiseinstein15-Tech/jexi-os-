@@ -39,14 +39,38 @@ import {
   semanticRecall, memoryForAgent, conversationTranscript,
 } from './MemoryManager.js';
 import { WORKSPACE_DIR, MANAGER_URL, PUBLIC_URL, MAX_DEBUG_ATTEMPTS } from '../config.js';
+import { resolveInside } from './PathSafety.js'; // security: real path-resolution for /guard writes
 import { setTaskCheckpoint } from './TaskRegistry.js'; // B53 P6 — durable task checkpoints
 import { loadCoworker, orchestratorPromptFragment } from './CoworkerFiles.js'; // B78 — filesystem-native coworker + orchestrator rules
 import { appendEvent } from './EventLog.js'; // B78 — orchestrator decisions are first-class events
 
 function readWorkspaceFile(name) {
-  const filePath = path.join(WORKSPACE_DIR, name);
-  if (!fs.existsSync(filePath)) return null;
-  return fs.readFileSync(filePath, 'utf-8');
+  try {
+    const filePath = resolveInside(WORKSPACE_DIR, name);
+    if (!fs.existsSync(filePath)) return null;
+    return fs.readFileSync(filePath, 'utf-8');
+  } catch { return null; }
+}
+
+/**
+ * /guard scope check — path-resolved, not substring-based. A write is allowed
+ * only when the resolved target stays inside the workspace AND (if scope
+ * paths are declared) inside one of them. `../../etc/passwd` or a scope like
+ * "src" can never be bypassed with a name like "srcX../secret".
+ */
+function makeScopeGuard(scope) {
+  return (name) => {
+    try {
+      const target = resolveInside(WORKSPACE_DIR, name);
+      if (!scope || !scope.paths || !scope.paths.length) return true;
+      return scope.paths.some((p) => {
+        try {
+          const scopeRoot = resolveInside(WORKSPACE_DIR, p);
+          return target === scopeRoot || target.startsWith(scopeRoot + path.sep);
+        } catch { return false; }
+      });
+    } catch { return false; }
+  };
 }
 
 function listWorkspaceFiles() {
@@ -1024,8 +1048,8 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
 
       if (project && project.files && project.files.length > 0) {
         fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
-        // /guard: only write files inside the user-declared scope
-        const allowedWrite = (name) => !scope.paths || !scope.paths.length || scope.paths.some(p => name.includes(p));
+        // /guard: only write files inside the user-declared scope (path-resolved)
+        const allowedWrite = makeScopeGuard(scope);
         project.files.forEach(f => {
           if (!allowedWrite(f.name)) { sendEvent('log', { agent: 'Coder', message: `⛔ /guard: skipping ${f.name} (outside allowed scope)` }); return; }
           fs.writeFileSync(path.join(WORKSPACE_DIR, f.name), f.code, 'utf-8');
@@ -1051,7 +1075,7 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
       const c = state.context.code;
       if (c.done) return state;
       const scope = c.scope;
-      const allowedWrite = (name) => !scope.paths || !scope.paths.length || scope.paths.some(p => name.includes(p));
+      const allowedWrite = makeScopeGuard(scope);
       const entryPoint = c.entryPoint;
       const existingCode = readWorkspaceFile(entryPoint);
       const initialFiles = existingCode ? [{ name: entryPoint, code: existingCode }] : [];

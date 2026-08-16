@@ -1,7 +1,8 @@
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { WORKSPACE_DIR, MANAGER_URL, PUBLIC_URL } from '../config.js';
+import { isShellSafeFileName } from './PathSafety.js';
 
 /**
  * Run a file in the workspace and capture its output.
@@ -14,6 +15,13 @@ export function runFile(fileName, onOutput) {
 
     if (!fs.existsSync(filePath)) {
       return resolve({ success: false, output: `Error: File '${cleanName}' not found.` });
+    }
+
+    // Security: file runs are invoked with execFile (argv array, no shell), and
+    // the name must be a single shell-safe file name — a crafted filename can
+    // never inject commands.
+    if (!isShellSafeFileName(cleanName)) {
+      return resolve({ success: false, output: `Error: '${cleanName}' is not a safe file name.` });
     }
 
     if (cleanName.toLowerCase().endsWith('.html')) {
@@ -43,13 +51,72 @@ export function runFile(fileName, onOutput) {
       return;
     }
 
-    let command = '';
-    if (cleanName.endsWith('.py')) command = `python3 ${cleanName} 2>&1 || python ${cleanName} 2>&1`;
-    else if (cleanName.endsWith('.js')) command = `node ${cleanName} 2>&1`;
-    else if (cleanName.endsWith('.sh')) command = `bash ${cleanName} 2>&1`;
+    let cmd = null;
+    let args = null;
+    if (cleanName.endsWith('.py')) { cmd = 'python3'; args = [cleanName]; }
+    else if (cleanName.endsWith('.js')) { cmd = 'node'; args = [cleanName]; }
+    else if (cleanName.endsWith('.sh')) { cmd = 'bash'; args = [cleanName]; }
     else return resolve({ success: false, output: `Error: Unsupported file type.` });
 
-    runCommand(command, { cwd: WORKSPACE_DIR, timeout: 15000, onOutput }).then(resolve);
+    runFileCmd(cmd, args, { timeout: 15000, onOutput }).then(async (res) => {
+      // python3 may be missing on some hosts — retry with `python` (the old
+      // `python3 f 2>&1 || python f 2>&1` fallback, now without a shell).
+      if (!res.success && cleanName.endsWith('.py') && /ENOENT|spawn python3/i.test(res.output)) {
+        const retry = await runFileCmd('python', args, { timeout: 15000, onOutput });
+        return resolve(retry);
+      }
+      resolve(res);
+    });
+  });
+}
+
+/** Invoke one command with an argv array — never a shell string. */
+function runFileCmd(command, args, opts = {}) {
+  return new Promise((resolve) => {
+    const onOutput = opts.onOutput || (() => {});
+    let fullOutput = '';
+    let resolved = false;
+
+    const done = (success, output) => {
+      if (resolved) return;
+      resolved = true;
+      resolve({ success, output });
+    };
+
+    let child;
+    try {
+      child = execFile(command, args, { cwd: opts.cwd || WORKSPACE_DIR, timeout: opts.timeout || 15000, maxBuffer: 10 * 1024 * 1024 });
+    } catch (e) {
+      return done(false, `Failed to start process: ${e.message}`);
+    }
+
+    const checkSuccess = (data) => {
+      // If a server started, treat as success and free the port
+      if (/listening|server running|started on|http:\/\/localhost|ready in/i.test(data)) {
+        onOutput('stdout', '\n[Runner] Server detected as running. Marking as successful.\n');
+        try { child.kill(); } catch (e) {}
+        done(true, fullOutput);
+      }
+    };
+
+    child.stdout.on('data', (data) => {
+      fullOutput += data;
+      onOutput('stdout', data);
+      checkSuccess(data);
+    });
+    child.stderr.on('data', (data) => {
+      fullOutput += data;
+      onOutput('stderr', data);
+      checkSuccess(data);
+    });
+    child.on('close', (code) => {
+      if (resolved) return;
+      done(code === 0, fullOutput || (code === 0 ? 'Script executed successfully.' : '(no output)'));
+    });
+    child.on('error', (err) => {
+      if (resolved) return;
+      done(false, `Failed to start process: ${err.message}`);
+    });
   });
 }
 

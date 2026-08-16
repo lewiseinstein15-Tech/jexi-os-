@@ -10,6 +10,7 @@ import { extractContent } from './Extractor.js';
 import { aggregateSearch } from './SearchEngine.js';
 import { saveInternetKnowledge, saveCodingKnowledge } from './MemoryManager.js';
 import { runtimeCall, activeProvider } from './ComputerRuntime.js';
+import { resolveInside } from './PathSafety.js';
 
 const VIRTUAL_API = process.env.VIRTUAL_API || MANAGER_URL;
 const MAX_ATTEMPTS = Number(process.env.COMPUTER_USE_MAX_ATTEMPTS) || MAX_DEBUG_ATTEMPTS;
@@ -199,9 +200,19 @@ export class ComputerUseAgent {
               break;
             }
             case 'write_file': {
+              // Security: resolve the target inside the workspace and reject
+              // any escape (../, absolute paths) before writing.
+              let target;
+              try {
+                target = resolveInside(WORKSPACE_DIR, action.filename);
+              } catch (e) {
+                stepOutput.text += `\n[ERROR] write_file blocked: ${e.message}\n`;
+                sendEvent?.('log', { agent: 'Navigator', message: `⛔ write_file blocked: ${e.message}` });
+                break;
+              }
               await this.api('write-file', { filename: action.filename, content: action.code });
-              fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
-              fs.writeFileSync(path.join(WORKSPACE_DIR, action.filename), action.code, 'utf-8');
+              fs.mkdirSync(path.dirname(target), { recursive: true });
+              fs.writeFileSync(target, action.code, 'utf-8');
               if (!filesCreated.includes(action.filename)) filesCreated.push(action.filename);
               await new Promise(r2 => setTimeout(r2, 400));
               break;
