@@ -40,6 +40,8 @@ import {
 } from './MemoryManager.js';
 import { WORKSPACE_DIR, MANAGER_URL, PUBLIC_URL, MAX_DEBUG_ATTEMPTS } from '../config.js';
 import { setTaskCheckpoint } from './TaskRegistry.js'; // B53 P6 — durable task checkpoints
+import { loadCoworker, orchestratorPromptFragment } from './CoworkerFiles.js'; // B78 — filesystem-native coworker + orchestrator rules
+import { appendEvent } from './EventLog.js'; // B78 — orchestrator decisions are first-class events
 
 function readWorkspaceFile(name) {
   const filePath = path.join(WORKSPACE_DIR, name);
@@ -782,6 +784,13 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
     N.github = this.wrapCase('github', async ({ results, sendEvent, query, plan, opts }) => {
       const req = parseGithubRequest(query);
       const lower = query.toLowerCase();
+      // B78 — the github coworker's mandate is loaded from
+      // jexi-agents/coworkers/github.md at the routing point (not baked into
+      // a composite prompt) and announced so the run is auditable.
+      const githubCoworker = loadCoworker('github');
+      if (githubCoworker) {
+        sendEvent('log', { agent: 'GitHub Agent', message: `📋 Operating rules loaded from ${githubCoworker.file} — ${githubCoworker.meta.description || githubCoworker.meta.name || 'github operations'}.` });
+      }
 
       // "commit and push" — run both steps, show both outputs
       if (req.action === 'commit' && /\b(push|upload to github|send to github)\b/.test(lower)) {

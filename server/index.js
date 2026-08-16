@@ -19,6 +19,11 @@ import {
 } from './src/services/SelfMonitor.js';
 import { loadSettings, saveSettings } from './src/services/SettingsManager.js';
 import { providerHealthSnapshot } from './src/services/ProviderRouter.js';
+// B78 — event-sourced logging: the durable, ordered event log is the source of
+// truth for what happened per session (user messages, orchestrator decisions,
+// coworker calls/results, tool calls/results, compactions, errors).
+import { appendEvent, getEvents, eventLogStats, hydrateEventLogFromRedis } from './src/services/EventLog.js';
+import { chatEventLogger } from './src/services/ChatEventLogger.js'; // B78 — /api/chat user_message + error events into the event log
 import { AGENT_ROSTER, SKILL_REGISTRY, ROSTER_COUNT, SKILL_COUNT, getAgent } from './src/services/AgentRoster.js';
 import { executionModel } from './src/services/Reachability.js';
 import { DesktopManager, ensureBrowser, browserStatus, restartBrowser } from './src/services/DesktopManager.js';
@@ -73,6 +78,9 @@ import { PORT, WORKSPACE_DIR, DATA_DIR, SERVER_ROOT } from './src/config.js';
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
 // everything across restarts/redeploys (non-blocking).
 hydrateFromRedis().catch((e) => { recordError('memory', (e && e.message) || String(e)); });
+// B78 — the event log uses the SAME Redis-backed persistence as the memory
+// core, so the audit trail survives redeploys too (non-blocking hydrate).
+hydrateEventLogFromRedis().catch((e) => { recordError('events', (e && e.message) || String(e)); });
 
 // Vector layer (TencentDB-Agent-Memory pattern): embed memories saved before
 // the vector layer existed. Non-blocking; no-op without a Groq key.
@@ -152,7 +160,7 @@ app.use(cors({ origin: CORS_ALLOWLIST }));
 // else under /api/* (chat, vision, knowledge, memory, desktop, settings write,
 // APK proxy) is gated when JEXI_API_KEY is set.
 // NOTE: mounted on the app root (not '/api') so req.path keeps its full form.
-const OPEN_PATHS = ['/api/health', '/api/health/memory', '/api/settings/status', '/api/metrics', '/api/update/apk', '/api/update/version']; // B70 — health/memory + the APK update proxy/version probe are read-only infra (no secrets, no AI spend); a locked backend must stay observable and still deliver app updates
+const OPEN_PATHS = ['/api/health', '/api/health/memory', '/api/settings/status', '/api/metrics', '/api/update/apk', '/api/update/version', '/api/events']; // B70 — health/memory + the APK update proxy/version probe are read-only infra (no secrets, no AI spend); a locked backend must stay observable and still deliver app updates. B78 — the event log is GET-only, read-only, sanitized (no raw keys), and the same class of debug surface as the connector inbound log, so it stays open for browser inspection.
 app.use((req, res, next) => {
   if (!API_KEY || req.method === 'OPTIONS') return next();
   if (!req.path.startsWith('/api')) return next();
@@ -219,6 +227,9 @@ connectorWebhooks.post('/webhooks/connectors/email', webhookFor('email'));
 app.use(connectorWebhooks);
 
 app.use(express.json({ limit: '30mb' })); // Room for base64 book uploads + code files + images
+// B78 — record every /api/chat user_message and terminal error into the
+// durable event log (mounted before routes; never throws).
+app.use(chatEventLogger());
 
 // === MODEL CONTEXT PROTOCOL (MCP) — let Claude Desktop / Cursor / any MCP
 // client connect to JEXI's tools and data at /mcp (read-only + ask_jexi only).
@@ -462,6 +473,9 @@ app.post('/api/agent', async (req, res) => {
   const { query, image, profile } = req.body || {};
   if (!query || !String(query).trim()) return res.status(400).json({ success: false, error: 'No query provided' });
 
+  // B78 — the incoming request is the first event in the log (source: agent).
+  try { appendEvent('user_message', { source: 'agent', image: !!image, text: String(query).slice(0, 2000) }); } catch (e) {}
+
   res.setHeader('Content-Type', 'application/x-ndjson');
   res.setHeader('Cache-Control', 'no-cache');
   const sendEvent = (type, data) => { try { res.write(JSON.stringify({ type, ...data }) + '\n'); } catch (e) {} };
@@ -485,6 +499,7 @@ app.post('/api/agent', async (req, res) => {
     if (!finished) {
       finished = true;
       clearTimeout(deadline);
+      try { appendEvent('error', { component: 'agent', message: String((e && e.message) || e).slice(0, 400) }); } catch (err) {}
       sendEvent('agent.done', { answer: `The agent loop failed: ${(e && e.message) || e}`, stats: { error: true } });
     }
     finish();
@@ -902,6 +917,20 @@ app.get('/api/chat/history', (req, res) => {
   setActiveSession(conversationId(req));
   try { res.json(getChatHistory(Number(req.query.n) || 50)); }
   finally { clearActiveSession(); }
+});
+
+// B78 — EVENT LOG (event-sourced logging): read the durable, ordered event
+// log per session — the source of truth for what happened, in order. GET,
+// read-only, sanitized (payloads are truncated, never raw keys) — same class
+// as the connector inbound log.
+//   GET /api/events?session=X&limit=50&type=orchestrator_decision
+app.get('/api/events', (req, res) => {
+  try {
+    const events = getEvents({ session: req.query.session, type: req.query.type, limit: req.query.limit });
+    res.json({ ok: true, count: events.length, events, stats: eventLogStats() });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: (e && e.message) || String(e) });
+  }
 });
 
 // === KNOWLEDGE LIBRARY ENDPOINTS ===

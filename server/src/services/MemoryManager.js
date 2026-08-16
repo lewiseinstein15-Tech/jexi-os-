@@ -3,6 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { MEMORY_FILE, KNOWLEDGE_DIR, WORKSPACE_DIR, DATA_DIR } from '../config.js';
 import { generateContent, resolveKeys, embedText } from './LLMClient.js';
+import { appendEvent } from './EventLog.js'; // B78 — every compaction is a first-class event
 
 /**
  * JEXI OS Memory Core
@@ -213,7 +214,7 @@ function ensureDirs() {
 
 /* ---------------- Redis (optional durable layer) ---------------- */
 
-async function getRedis() {
+export async function getRedis() {
   if (!redisEnabled) return null;
   if (redisClient) return redisClient;
   try {
@@ -848,8 +849,22 @@ export async function resolveConversationalQuery(query) {
 
 // Keep this many most-recent turns verbatim; everything older is compressed.
 const SUMMARY_RECENT_TURNS = 12;
-// Only start compressing once the history is comfortably past the verbatim window.
-const SUMMARY_THRESHOLD = 28;
+
+// B78 — TOKEN-THRESHOLD COMPACTION (replaces the fixed 28-turn counter).
+// The trigger is the ESTIMATED TOKEN count of the running conversation
+// (summary + every turn, ~4 chars/token), so:
+//   (a) a short but frequent chat no longer compacts too early and loses
+//       detail unnecessarily (it never crosses the ceiling), and
+//   (b) a few very long/dense turns blow past the ceiling and compact BEFORE
+//       they exceed what the underlying models can actually handle.
+// Default ceiling: 110,000 estimated tokens (within the 100k-135k band the
+// models in use can handle well). Override with JEXI_COMPACTION_TOKENS.
+const COMPACTION_TOKEN_THRESHOLD = Math.max(2000, Number(process.env.JEXI_COMPACTION_TOKENS) || 110000);
+
+/** Rough token estimate: ~4 chars/token for mixed English (tokenizer ballpark). */
+export function estimateTokens(text) {
+  return Math.ceil(String(text || '').length / 4);
+}
 
 /** Cached rolling summary of the whole conversation ('' until it exists). */
 export function getRollingSummary() {
@@ -860,17 +875,35 @@ export function getRollingSummary() {
  * Async context compaction — compress the turns older than the recent window
  * into one dense running summary (Mem0/DeepAgents pattern). No AI keys → the
  * cached summary is returned untouched; failures never break a chat.
+ *
+ * B78 — the trigger is TOKEN usage, not turn count: when the estimated token
+ * size of the running context (summary + every chat turn) crosses
+ * COMPACTION_TOKEN_THRESHOLD, the old turns are compressed into the summary
+ * and a `context_compaction` event is appended to the event log (what
+ * triggered it, how many tokens were in play, what got summarized).
+ *
+ * Test seam: `__generate` overrides the LLM call (the same contract as
+ * generateContent) so tests can fire a real compaction without network/keys.
  */
-export async function rollingConversationSummary({ force = false } = {}) {
+export async function rollingConversationSummary({ force = false, __generate } = {}) {
   const mem = loadMemory();
   const turns = mem.chatHistory || [];
-  if (!force && turns.length < SUMMARY_THRESHOLD) return mem.conversationSummary || '';
-
   const old = turns.slice(0, Math.max(0, turns.length - SUMMARY_RECENT_TURNS));
-  if (!force && old.length === 0) return mem.conversationSummary || '';
+  const gen = typeof __generate === 'function' ? __generate : generateContent;
+
+  // B78 — token-threshold trigger: estimate the running context and compact
+  // when it crosses the ceiling. `force` bypasses the check (manual refresh).
+  const currentTokens =
+    estimateTokens(mem.conversationSummary) +
+    turns.reduce((sum, h) => sum + estimateTokens(h.text || ''), 0);
+  const overThreshold = currentTokens >= COMPACTION_TOKEN_THRESHOLD;
+  if (!force) {
+    if (!overThreshold) return mem.conversationSummary || '';
+    if (old.length === 0) return mem.conversationSummary || '';
+  }
 
   const keys = resolveKeys();
-  if (!keys.groqKey && !keys.geminiKey && !keys.openrouterKey) return mem.conversationSummary || '';
+  if (!keys.groqKey && !keys.geminiKey && !keys.openrouterKey && !force && typeof __generate !== 'function') return mem.conversationSummary || '';
 
   const prior = mem.conversationSummary ? `Previous running summary:\n${mem.conversationSummary}\n\n` : '';
   const text = old
@@ -879,7 +912,7 @@ export async function rollingConversationSummary({ force = false } = {}) {
   if (!text.trim()) return mem.conversationSummary || '';
 
   try {
-    const summary = await generateContent(
+    const summary = await gen(
       `${prior}Compress this conversation into a dense running summary (max 400 words, bullet points). Keep: the user's goals, key decisions, facts about the user, open tasks, and anything JEXI promised or built. Drop small talk and repeats.\n\nCONVERSATION TO COMPRESS:\n${text.slice(0, 24000)}`,
       'You are JEXI OS\'s Context Manager. Output ONLY the compressed summary.'
     );
@@ -887,6 +920,19 @@ export async function rollingConversationSummary({ force = false } = {}) {
     if (clean.length >= 20) {
       mem.conversationSummary = clean;
       saveMemory();
+      // B78 — every compaction is a first-class event in the event log.
+      try {
+        appendEvent('context_compaction', {
+          trigger: force ? 'manual' : 'token_threshold',
+          threshold: COMPACTION_TOKEN_THRESHOLD,
+          estimatedTokens: currentTokens,
+          turnsCompressed: old.length,
+          summaryLength: clean.length,
+          reason: force
+            ? 'forced by caller'
+            : `running context (${currentTokens} est. tokens) crossed the ${COMPACTION_TOKEN_THRESHOLD} token ceiling`,
+        });
+      } catch (e) { /* the event log must never break the chat */ }
     }
     return mem.conversationSummary || '';
   } catch (e) {

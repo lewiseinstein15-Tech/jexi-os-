@@ -18,6 +18,8 @@ import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { preferencesBlock } from './PreferenceLearner.js';
 import { runWorker, coworkerFor } from './WorkerRouter.js';
 import { normalizeFinalAnswer, FORMAT_RULES } from './Formatting.js';
+import { loadCoworker, orchestratorPromptFragment } from './CoworkerFiles.js'; // B78 — filesystem-native coworker mandates
+import { appendEvent } from './EventLog.js'; // B78 — orchestrator decisions are first-class events
 
 const COWORKER_LABELS = {
   coder: 'Coder (DeepSeek/Qwen)',
@@ -73,10 +75,30 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
   try { addChat('user', query); } catch (e) {}
   const ctx = await conversationContext(query).catch(() => '');
   const role = coworkerFor(plan.intent);
-  emit('agent.log', { message: `🧑‍💻 Coworker assigned: ${COWORKER_LABELS[role] || role} (${role}).` });
+
+  // B78 — filesystem-native coworker definitions: the mandate for the
+  // assigned coworker is loaded from jexi-agents/coworkers/<role>.md AT the
+  // routing point (not baked into a composite prompt). Editing one file
+  // changes only that coworker. The orchestrator rules (ORCHESTRATOR.md) are
+  // appended to every run.
+  const coworkerFile = loadCoworker(role);
+  const coworkerMandate = coworkerFile ? `\n\nCOWORKER MANDATE (${coworkerFile.file}):\n${coworkerFile.body.slice(0, 4000)}` : '';
+  emit('agent.log', { message: `🧑‍💻 Coworker assigned: ${COWORKER_LABELS[role] || role} (${role})${coworkerFile ? ` — mandate loaded from ${coworkerFile.file}` : ''}.` });
+  try {
+    appendEvent('orchestrator_decision', {
+      complexity: 'SIMPLE',
+      complexityReason: plan.complexityReason || `intent "${plan.intent}" is single-shot`,
+      intent: plan.intent,
+      classification: 'continue/new',
+      coworkers: [role],
+      coworkerFiles: coworkerFile ? [coworkerFile.file] : [],
+      reasoning: plan.reasoning || '',
+      via: 'runSimpleTask',
+    });
+  } catch (e) {}
 
   const prompt = `The user asked: "${query}"\n\n${ctx ? `Conversation context:\n${ctx.slice(0, 4000)}\n\n` : ''}Answer directly and completely. ${FORMAT_RULES}`;
-  const res = await runWorker(role, prompt, JEXI_SYSTEM_PROMPT + preferencesBlock(), {
+  const res = await runWorker(role, prompt, JEXI_SYSTEM_PROMPT + preferencesBlock() + orchestratorPromptFragment() + coworkerMandate, {
     temperature: 0.4,
     // B67 — the coworker can really call these tools via native function
     // calling; intent is passed so ToolRuntime enforces the allowlist.

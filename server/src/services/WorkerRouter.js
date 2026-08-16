@@ -32,6 +32,8 @@
 
 import { generateWithToolsLoop, generateContentSafe } from './LLMClient.js';
 import { executeTool } from './ToolRuntime.js';
+import { appendEvent } from './EventLog.js'; // B78 — coworker calls/results are first-class events
+import { getActiveSession } from './MemoryManager.js';
 
 /** Coworker assignments — exact models per task type (B66 3b). */
 export const COWORKERS = {
@@ -159,6 +161,26 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
   const chain = coworkerChain(role);
   const attempts = [];
   const wantsTools = Array.isArray(opts.tools) && opts.tools.length > 0;
+  // B78 — every call attempt and its outcome lands in the event log so the
+  // exact provider→fallback sequence is auditable per task.
+  const session = getActiveSession() || 'default';
+  const logCall = (p, mode) => {
+    try {
+      appendEvent('coworker_call', {
+        coworker: role,
+        provider: p.key,
+        model: p.model || null,
+        mode,
+        promptChars: String(prompt || '').length,
+        systemChars: String(system || '').length,
+      }, session);
+    } catch (e) {}
+  };
+  const logResult = (outcome) => {
+    try {
+      appendEvent('coworker_result', { coworker: role, ...outcome, attempts: attempts.slice(-8) }, session);
+    } catch (e) {}
+  };
 
   // Pass 1 — native tool calling (B67): walk the chain with real function
   // calls through the gated runtime. NOTE: only TOOL_CAPABLE providers are
@@ -168,6 +190,7 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
   if (wantsTools) {
     for (const p of chain) {
       const label = p.model ? `${p.key}(${p.model})` : p.key;
+      logCall(p, 'tool_calling');
       try {
         const res = await generateWithToolsLoop(prompt, system, opts.tools, {
           provider: p.key,
@@ -180,6 +203,7 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
           executeToolCalls: (calls) => executeNativeToolCalls(calls, opts),
         });
         if (res.ok) {
+          logResult({ ok: true, mode: 'tool_calling', provider: res.provider, model: res.model, toolCalls: (res.toolCalls || []).length, iterations: res.iterations || 0 });
           return { ok: true, text: res.text, toolCalls: res.toolCalls || [], iterations: res.iterations || 0, worker: role, provider: res.provider, model: res.model, attempts };
         }
         attempts.push(`${label}: empty response`);
@@ -198,9 +222,11 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
   // because every tool-capable provider is down.
   for (const p of chain) {
     const label = p.model ? `${p.key}(${p.model})` : p.key;
+    logCall(p, 'text');
     try {
       const res = await generateContentSafe(prompt, system, null, { provider: p.key, model: p.model, temperature: opts.temperature });
       if (res.ok && res.text) {
+        logResult({ ok: true, mode: 'text', provider: res.provider || p.key, model: res.model || p.model || null, degraded: !!res.degraded, local: !!res.local });
         return { ok: true, text: res.text, degraded: !!res.degraded, local: !!res.local, worker: role, provider: res.provider || p.key, model: res.model || p.model || null, attempts };
       }
       attempts.push(`${label}: ${res.error || 'empty response'}`);
@@ -211,6 +237,10 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
 
   // Total failure — never throw: hand back the honest degraded message.
   const reason = attempts.join(' | ').slice(0, 400);
+  logResult({ ok: false, degraded: true, reason: reason || 'all providers failed' });
+  // B78 — total worker failure is also a first-class error event (component,
+  // message, whether a fallback covered it — here: none, degraded message).
+  try { appendEvent('error', { component: `worker:${role}`, message: reason || 'all providers failed', fallback: 'none — degraded message returned to the user', attempts: attempts.slice(-8) }, session); } catch (e) {}
   return {
     ok: false,
     degraded: true,

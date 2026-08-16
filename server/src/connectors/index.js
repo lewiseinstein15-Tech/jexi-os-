@@ -31,6 +31,7 @@ import { ConnectorRegistry } from './ConnectorRegistry.js';
 import { registerGitHubConnector } from './github.js';
 import { registerEmailConnector } from './email.js';
 import { listConnectorTools } from './toolBridge.js';
+import { appendEvent } from '../services/EventLog.js'; // B78 — verified inbound messages are user_message events in the event log
 
 export const CONNECTOR_NAMES = ['github', 'email'];
 
@@ -258,6 +259,37 @@ export async function handleConnectorWebhook(name, { rawBody, headers = {}, quer
 
   // B59 — durable log so inbound deliveries are provable end-to-end.
   recordWebhookEvents(name, events);
+
+  // B78 — event-sourced logging: verified inbound messages are first-class
+  // `user_message` events too (source: email / github_webhook), so the event
+  // log is the source of truth ACROSS channels — not just the chat UI. Email
+  // events carry the creator flag (Lewis, JEXI's creator); github events carry
+  // the event type/action/repo. The webhook inbox stays as-is on top of this.
+  for (const ev of events || []) {
+    try {
+      if (name === 'email') {
+        const from = String(ev.from || '').replace(/^[^<]*<([^>]+)>$/, '$1').trim().toLowerCase();
+        const creator = String(process.env.JEXI_CREATOR_EMAIL || 'lewiseinstein15@gmail.com').toLowerCase();
+        appendEvent('user_message', {
+          source: 'email',
+          creator: from === creator,
+          from: ev.from || null,
+          subject: String(ev.subject || '').slice(0, 300),
+          text: String(ev.text || '').slice(0, 2000),
+          kind: ev.type || 'email.received',
+        }, `email:${from || 'unknown'}`);
+      } else if (name === 'github') {
+        appendEvent('user_message', {
+          source: 'github_webhook',
+          kind: ev.type || 'webhook',
+          action: ev.action || null,
+          repo: ev.repo || null,
+          sender: ev.sender || null,
+          summary: String(ev.summary || ev.title || ev.body || '').slice(0, 500),
+        }, `github:${ev.repo || 'unknown'}`);
+      }
+    } catch (e) { /* the event log must never break a webhook delivery */ }
+  }
 
   // B61/B66 — email reply loop: JEXI answers verified inbound emails
   // automatically (creator-aware; the generator in index.js handles tone).

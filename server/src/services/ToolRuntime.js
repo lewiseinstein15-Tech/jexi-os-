@@ -33,8 +33,9 @@ import { synthesizeAnswer } from './Summarizer.js';
 import { analyzeVideo, getVideoTranscript } from './VideoAnalyzer.js';
 import {
   semanticRecall, rememberUserFact, searchKnowledge, saveKnowledgeFile,
-  loadMemory, rememberEpisode, saveMemory,
+  loadMemory, rememberEpisode, saveMemory, getActiveSession,
 } from './MemoryManager.js';
+import { appendEvent } from './EventLog.js'; // B78 — tool calls/results are first-class events
 import { collectSystemStatus } from './SelfMonitor.js';
 import { loadSettings, saveSettings } from './SettingsManager.js';
 import { runHooks } from './HookEngine.js';
@@ -429,7 +430,39 @@ function formatResult(result) {
  * Execute a tool by slug with full gating + observability.
  * Returns { ok, permission, profile, durationMs, result, error, approvalRequired }.
  */
-export async function executeTool({ slug, args = {}, profile, intent, sendEvent, confirm }) {
+/**
+ * B78 — event-sourced logging wrapper: every tool invocation and its real
+ * outcome is recorded in the durable event log (tool_call → tool_result),
+ * regardless of which return path the gate took (allowed / blocked / failed).
+ * The gated body is unchanged below (executeToolInner).
+ */
+export async function executeTool(params) {
+  const { slug, args = {} } = params || {};
+  try {
+    appendEvent('tool_call', {
+      tool: slug,
+      args: safeArgs(slug, args),
+      tier: toolTier(slug, args),
+      profile: (params && (params.profile || activeToolProfile())) || activeToolProfile(),
+    });
+  } catch (e) {}
+  const result = await executeToolInner(params);
+  try {
+    appendEvent('tool_result', {
+      tool: slug,
+      ok: !!result.ok,
+      blocked: !!result.blocked,
+      declined: !!result.declined,
+      paused: !!result.paused,
+      approvalRequired: !!result.approvalRequired,
+      error: String(result.error || '').slice(0, 300),
+      durationMs: result.durationMs || 0,
+    });
+  } catch (e) {}
+  return result;
+}
+
+async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, confirm }) {
   const started = Date.now();
   const emit = (type, payload) => { try { if (typeof sendEvent === 'function') sendEvent(type, payload); } catch (e) {} };
   const tool = getTool(slug);
