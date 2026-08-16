@@ -37,6 +37,16 @@ let queueWake = null; // promise resolver to wake the worker
 /** @type {{ startGoal: Function, resumeWithInfo: Function }} */
 const executor = { startGoal: null, resumeWithInfo: null };
 
+/** @type {{ run: Function, resume: Function }} — chat jobs (B85: durable chat). */
+const chatExecutor = { run: null, resume: null };
+
+export function setChatExecutor(exec) {
+  if (exec) {
+    if (typeof exec.run === 'function') chatExecutor.run = exec.run.bind(exec);
+    if (typeof exec.resume === 'function') chatExecutor.resume = exec.resume.bind(exec);
+  }
+}
+
 /** Optional terminal-state reporter (GoalNotifier) — injected from index.js. */
 let notifier = null;
 /**
@@ -118,7 +128,7 @@ function load() {
         // AUTO-HEAL: scheduled (unattended) goals can never wait for a human.
         // Any scheduler-sourced job parked in need-info is resumed with
         // 'use defaults' so it completes and reports (heals pre-fix jobs).
-        if (j.status === 'need-info' && (j.unattended || String(j.session || '').startsWith('scheduler:'))) {
+        if (j.status === 'need-info' && j.kind !== 'chat' && (j.unattended || String(j.session || '').startsWith('scheduler:'))) {
           j.pendingAnswer = 'use defaults';
           j.status = 'queued';
           j.events = (j.events || []).concat([{ type: 'log', agent: 'Goal Queue', message: '↻ Scheduled goal was waiting for details — auto-resuming with defaults (unattended).' }]).slice(-MAX_EVENTS_PER_JOB);
@@ -251,7 +261,7 @@ export async function hydrateGoalJobsFromRedis() {
         j.endedAt = now;
         j.events = (j.events || []).concat([{ type: 'log', agent: 'Goal Queue', message: '⏹ Interrupted by server restart (restored from Redis).' }]).slice(-MAX_EVENTS_PER_JOB);
       }
-      if (j.status === 'need-info' && (j.unattended || String(j.session || '').startsWith('scheduler:'))) {
+      if (j.status === 'need-info' && j.kind !== 'chat' && (j.unattended || String(j.session || '').startsWith('scheduler:'))) {
         j.pendingAnswer = 'use defaults';
         j.status = 'queued';
         j.events = (j.events || []).concat([{ type: 'log', agent: 'Goal Queue', message: '↻ Scheduled goal was waiting for details — auto-resuming with defaults (unattended).' }]).slice(-MAX_EVENTS_PER_JOB);
@@ -265,6 +275,35 @@ export async function hydrateGoalJobsFromRedis() {
     console.error('[GoalJobs] Redis hydrate error:', e.message);
     return false;
   }
+}
+
+/** Enqueue a CHAT task as a durable background job (B85). */
+export function enqueueChat({ query, session = 'default' }) {
+  const id = `job-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  jobs[id] = {
+    id,
+    kind: 'chat',
+    goal: String(query || '').trim(), // mirrors the queue shape (GoalNotifier uses .goal)
+    query: String(query || '').trim(),
+    session: String(session || 'default'),
+    autonomy: 'ask',
+    unattended: true,
+    status: 'queued',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    startedAt: null,
+    endedAt: null,
+    events: [],
+    infoRequests: [],
+    autoApprovals: [],
+    result: null,
+    error: null,
+    goalId: null,
+    pendingAnswer: null,
+  };
+  persist();
+  wakeWorker();
+  return { id };
 }
 
 export function getJob(jobId) {
@@ -322,7 +361,8 @@ async function runNext() {
     //    resume any parked scheduler job with 'use defaults' (also covers
     //    jobs created before the unattended flag existed).
     for (const j of Object.values(jobs)) {
-      if (j.status === 'need-info' && (j.unattended || String(j.session || '').startsWith('scheduler:'))) {
+      // Chat jobs are interactive — never auto-answer them.
+      if (j.status === 'need-info' && j.kind !== 'chat' && (j.unattended || String(j.session || '').startsWith('scheduler:'))) {
         j.pendingAnswer = 'use defaults';
         j.status = 'queued';
         j.events = (j.events || []).concat([{ type: 'log', agent: 'Goal Queue', message: '↻ Scheduled goal was waiting for details — auto-resuming with defaults (unattended).' }]).slice(-MAX_EVENTS_PER_JOB);
@@ -345,7 +385,44 @@ async function runNext() {
 
     try {
       let out;
-      if (next.pendingAnswer && next.goalId) {
+      if (next.kind === 'chat') {
+        addEvent(next, { type: 'chat.started', jobId: next.id, query: next.query });
+        if (next.pendingAnswer) {
+          out = await chatExecutor.resume({
+            session: next.session,
+            answer: next.pendingAnswer,
+            sendEvent: (t, d) => addEvent(next, { type: t, ...d }),
+          });
+          next.pendingAnswer = null;
+        } else {
+          out = await chatExecutor.run({
+            query: next.query,
+            session: next.session,
+            sendEvent: (t, d) => addEvent(next, { type: t, ...d }),
+          });
+        }
+        if (out && out.paused) {
+          next.status = 'need-info';
+          next.infoRequests = [{ field: 'confirmation', question: String((out && out.summary) || 'Confirmation needed.').slice(0, 300) }];
+          addEvent(next, { type: 'done', success: true, parked: true, summary: String((out && out.summary) || 'Waiting for your answer — reply in chat and I will continue.').slice(0, 600) });
+        } else if (out && out.success !== undefined) {
+          next.status = out.success === false ? 'failed' : 'done';
+          next.result = out;
+          next.endedAt = Date.now();
+          addEvent(next, {
+            type: 'done', success: out.success !== false,
+            summary: out.summary || (out.success === false ? (out.error || 'Task failed.') : '✅ Task completed.'),
+            files: out.files || [], sources: out.sources || [], statistics: out.statistics || {},
+          });
+          reportTerminal(next);
+        } else {
+          next.status = 'failed';
+          next.error = (out && out.error) || 'chat task failed';
+          next.endedAt = Date.now();
+          addEvent(next, { type: 'done', success: false, summary: `### ⚠ JEXI OS\n\n${next.error}` });
+          reportTerminal(next);
+        }
+      } else if (next.pendingAnswer && next.goalId) {
         addEvent(next, { type: 'goal.resuming', goalId: next.goalId, goal: next.goal });
         out = await executor.resumeWithInfo({
           goalId: next.goalId,
@@ -365,12 +442,17 @@ async function runNext() {
         });
       }
 
-      if (out && out.goalId) next.goalId = out.goalId;
-      if (out && out.needInfo && out.needInfo.length) {
+      // Goal-only bookkeeping — chat jobs were fully handled in their branch.
+      if (next.kind === 'chat') {
+        // (chat branch already set status/result/events)
+      } else if (out && out.goalId) {
+        next.goalId = out.goalId;
+      }
+      if (next.kind !== 'chat' && out && out.needInfo && out.needInfo.length) {
         next.status = 'need-info';
         next.infoRequests = out.needInfo;
         addEvent(next, { type: 'done', success: true, parked: true, goalId: out.goalId, summary: 'Waiting for your details — answer in chat and I will continue.' });
-      } else if (out && out.result) {
+      } else if (next.kind !== 'chat' && out && out.result) {
         next.status = out.result.success === false ? 'failed' : 'done';
         next.result = out.result;
         next.endedAt = Date.now();
@@ -380,7 +462,7 @@ async function runNext() {
           files: out.result.files || [], sources: out.result.sources || [], statistics: out.result.statistics || {},
         });
         reportTerminal(next);
-      } else {
+      } else if (next.kind !== 'chat') {
         next.status = 'failed';
         next.error = (out && out.error) || 'goal failed';
         next.endedAt = Date.now();
