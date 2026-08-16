@@ -82,7 +82,11 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
       } else {
         // Honest, actionable failure — never a confusing "is the backend
         // running?" (the backend is online; the TASK failed mid-flight).
-        const why = data.error || 'the task hit an unexpected error';
+        // B72 — the backend's done event carries the real reason in data.error
+        // (falling back to data.summary, which already held the degraded-mode
+        // message). Without this fallback the user saw only the generic "the
+        // task hit an unexpected error" instead of what actually went wrong.
+        const why = data.error || (data.summary && String(data.summary).trim()) || 'the task hit an unexpected error';
         setMessages(prev => [...prev, { role: 'jexi', text: `⚠ ${why}\n\nThe server is online — tap STOP and try again, or ask me to continue from where it stopped.` }]);
       }
     }

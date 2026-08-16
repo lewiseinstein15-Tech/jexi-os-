@@ -27,13 +27,19 @@ export const COWORKERS = {
     role: 'Coding / GitHub operations',
     providers: [
       { key: 'deepseek', model: 'deepseek-chat' },
-      { key: 'openrouter', model: 'qwen/qwen3-8b:free' }, // Qwen fallback
+      // B72 — qwen/qwen3-8b:free was REMOVED from OpenRouter (live-verified:
+      // zero free Qwen models remain). Replaced with seed-2.0-mini, the
+      // codebase's own established OpenRouter model that the live provider
+      // probe proves works with this account's key.
+      { key: 'openrouter', model: 'bytedance-seed/seed-2.0-mini' },
     ],
   },
   memory: {
     role: 'Memory / conversation continuity',
     providers: [
-      { key: 'openrouter', model: 'qwen/qwen3-8b:free' },  // Qwen: cross-check + summarize
+      // B72 — was qwen/qwen3-8b:free (deleted from OpenRouter). Every
+      // conversation task died on this dead model before Gemini was tried.
+      { key: 'openrouter', model: 'bytedance-seed/seed-2.0-mini' },
       { key: 'gemini', model: 'gemini-2.5-flash' },         // Gemini: large-context handling
     ],
   },
@@ -125,10 +131,15 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
   const attempts = [];
   const wantsTools = Array.isArray(opts.tools) && opts.tools.length > 0;
 
-  for (const p of chain) {
-    const label = p.model ? `${p.key}(${p.model})` : p.key;
-    try {
-      if (wantsTools) {
+  // Pass 1 — native tool calling (B67): walk the chain with real function
+  // calls through the gated runtime. NOTE: only TOOL_CAPABLE providers are
+  // even attempted here — Gemini/HuggingFace are text-only and get skipped
+  // by generateWithToolsLoop, so a tools-first task can fail even when those
+  // providers are healthy.
+  if (wantsTools) {
+    for (const p of chain) {
+      const label = p.model ? `${p.key}(${p.model})` : p.key;
+      try {
         const res = await generateWithToolsLoop(prompt, system, opts.tools, {
           provider: p.key,
           model: p.model,
@@ -143,13 +154,27 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
           return { ok: true, text: res.text, toolCalls: res.toolCalls || [], iterations: res.iterations || 0, worker: role, provider: res.provider, model: res.model, attempts };
         }
         attempts.push(`${label}: empty response`);
-      } else {
-        const res = await generateContentSafe(prompt, system, null, { provider: p.key, model: p.model, temperature: opts.temperature });
-        if (res.ok && res.text) {
-          return { ok: true, text: res.text, degraded: !!res.degraded, local: !!res.local, worker: role, provider: res.provider || p.key, model: res.model || p.model || null, attempts };
-        }
-        attempts.push(`${label}: ${res.error || 'empty response'}`);
+      } catch (e) {
+        attempts.push(`${label}: ${(e && e.message) || e}`);
       }
+    }
+  }
+
+  // Pass 2 — plain-text fallback (B72): if tools failed for every
+  // tool-capable provider (dead model, no balance, tool-call rejected) OR no
+  // tools were requested, walk the SAME chain WITHOUT tools. This is what
+  // makes Gemini / HuggingFace / Mistral reachable for conversation tasks —
+  // they are text-only and were unreachable through the tool path. Tools are
+  // a bonus, never a hard requirement: a conversation answer must not die
+  // because every tool-capable provider is down.
+  for (const p of chain) {
+    const label = p.model ? `${p.key}(${p.model})` : p.key;
+    try {
+      const res = await generateContentSafe(prompt, system, null, { provider: p.key, model: p.model, temperature: opts.temperature });
+      if (res.ok && res.text) {
+        return { ok: true, text: res.text, degraded: !!res.degraded, local: !!res.local, worker: role, provider: res.provider || p.key, model: res.model || p.model || null, attempts };
+      }
+      attempts.push(`${label}: ${res.error || 'empty response'}`);
     } catch (e) {
       attempts.push(`${label}: ${(e && e.message) || e}`);
     }
