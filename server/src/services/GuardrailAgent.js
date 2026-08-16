@@ -18,7 +18,8 @@ const INJECTION_PATTERNS = [
   /\b(you are|act as) (now )?(an? )?(unfiltered|uncensored|unrestricted|jailbroken|dan|developer mode)/i,
   /\b(release|disable|remove|bypass) (your|the) (safety|guardrails?|restrictions?|constraints?|filters?|rules?)/i,
   /\b(system|developer|user|assistant) (prompt|message|instruction)s?:?\s*["']?/i,
-  /\b(hack|bypass|jailbreak|evade|override|escalate)/i.test('') ? /(^|\s)(hack|jailbreak|bypass|evade|override|privesc)(\s|$)/i : /(^|\s)(hack|jailbreak|bypass|evade|override|privesc)(\s|$)/i,
+  // (dead ternary removed: the condition was a constant false)
+  /(^|\s)(hack|jailbreak|bypass|evade|override|privesc|escalat\w*)(\s|$)/i,
   /\b(this is (an? )?important (instruction|prompt|request)|you must now|from now on you must)/i,
   /\btell me (your|the) (system|developer) prompt/i,
   /\b(show|reveal|print|output) (your|the) (system|developer) (prompt|instructions?)/i,

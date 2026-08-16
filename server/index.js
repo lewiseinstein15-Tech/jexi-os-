@@ -74,6 +74,7 @@ import { mountMcp } from './mcp-server.js';
 import { taskManager } from './src/services/TaskManager.js';
 import { taskScheduler } from './src/services/TaskScheduler.js';
 import { PORT, WORKSPACE_DIR, DATA_DIR, SERVER_ROOT } from './src/config.js';
+import { resolveInside } from './src/services/PathSafety.js'; // security: one path-escape check for every workspace route/writer
 
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
 // everything across restarts/redeploys (non-blocking).
@@ -132,10 +133,30 @@ const app = express();
 // === API ACCESS CONTROL (optional but recommended for production) ===
 // Set JEXI_API_KEY in the host env (Render dashboard) and every AI-spend / data
 // endpoint requires the `x-jexi-key` header (the Settings panel has a matching
-// field). Without it, JEXI stays wide open — fine locally, risky on the public
-// internet where strangers could burn your Groq/Gemini quota. When unset, local
-// dev and self-hosted use are unchanged.
+// field).
+//
+// FAIL-CLOSED BY DEFAULT (security hardening): a key-less server is remotely
+// exploitable — anyone can reach /api/processes (arbitrary shell commands),
+// /preview (file reads) and /api/chat (unlimited AI spend). Therefore:
+//   - NODE_ENV=production + no key            → the server REFUSES to start.
+//   - local dev (no NODE_ENV) + no key        → binds to 127.0.0.1 ONLY.
+//   - JEXI_ALLOW_UNLOCKED=1                   → restores the old wide-open
+//     behavior (never use on a public host).
 const API_KEY = process.env.JEXI_API_KEY || '';
+const ALLOW_UNLOCKED = ['1', 'true', 'yes'].includes(String(process.env.JEXI_ALLOW_UNLOCKED || '').toLowerCase());
+if (!API_KEY && !ALLOW_UNLOCKED && process.env.NODE_ENV === 'production') {
+  console.error([
+    '\n[FATAL] JEXI OS refused to start: JEXI_API_KEY is not set and NODE_ENV=production.',
+    'A key-less server on the public internet is remotely exploitable (shell access via',
+    '/api/processes, file reads via /preview, unlimited AI spend via /api/chat).',
+    '',
+    'Fix: set JEXI_API_KEY to a strong random string in your host environment, then',
+    'restart. (To deliberately run unlocked in production, set JEXI_ALLOW_UNLOCKED=1',
+    '— NOT recommended.)',
+    '',
+  ].join('\n'));
+  process.exit(1);
+}
 const keyMatches = (sent) => {
   if (!API_KEY || !sent) return false;
   const a = Buffer.from(String(sent));
@@ -378,7 +399,8 @@ app.post('/api/desktop/restart', async (req, res) => {
 // === FILE VIEWER & PREVIEW ENDPOINTS ===
 app.get('/api/files/:filename', (req, res) => {
   try {
-    const filePath = path.join(WORKSPACE_DIR, req.params.filename);
+    // resolveInside throws on any escape (.., absolute, NUL) → 400, never a read.
+    const filePath = resolveInside(WORKSPACE_DIR, req.params.filename);
     if (!fs.existsSync(filePath)) return res.status(404).send('File not found');
     const content = fs.readFileSync(filePath, 'utf-8');
     const ext = path.extname(req.params.filename).substring(1);
@@ -388,7 +410,8 @@ app.get('/api/files/:filename', (req, res) => {
 
 app.get('/preview/:filename', (req, res) => {
   try {
-    const filePath = path.join(WORKSPACE_DIR, req.params.filename);
+    // resolveInside throws on any escape (.., absolute, NUL) → 400, never a read.
+    const filePath = resolveInside(WORKSPACE_DIR, req.params.filename);
     if (!fs.existsSync(filePath)) return res.status(404).send('File not found');
     const content = fs.readFileSync(filePath, 'utf-8');
     const ext = path.extname(req.params.filename).substring(1);
@@ -459,10 +482,14 @@ app.post('/api/tools/profile', (req, res) => {
 });
 
 // Execute one tool with full gating (permission profile → validation → engine).
+// NOTE: the permission profile is a SERVER-side setting — a client-supplied
+// `profile` is ignored here. Accepting it from the request body would let
+// anyone self-grant "full" and bypass the approval gates for risky/external
+// tools.
 app.post('/api/tools/execute', async (req, res) => {
-  const { slug, args, profile } = req.body || {};
+  const { slug, args } = req.body || {};
   if (!slug) return res.status(400).json({ ok: false, error: 'No tool slug provided' });
-  const result = await executeTool({ slug, args: args || {}, profile });
+  const result = await executeTool({ slug, args: args || {} });
   res.json(result);
 });
 
@@ -1684,7 +1711,15 @@ if (fs.existsSync(publicDir)) {
   });
 }
 
-app.listen(PORT, '0.0.0.0', () => {
+// Fail-closed binding: without a key (and without the explicit escape hatch)
+// the server only listens on loopback — a key-less instance can never be
+// reached from the public internet.
+const BIND_HOST = (!API_KEY && !ALLOW_UNLOCKED) ? '127.0.0.1' : '0.0.0.0';
+if (!API_KEY && !ALLOW_UNLOCKED) {
+  console.warn('\n⚠ JEXI OS started WITHOUT JEXI_API_KEY — binding to 127.0.0.1 only (fail-closed).\n  Any public deployment needs JEXI_API_KEY set. To force the old wide-open\n  behavior set JEXI_ALLOW_UNLOCKED=1 (NOT recommended).\n');
+}
+
+app.listen(PORT, BIND_HOST, () => {
   console.log(`🧠 JEXI OS BRAIN running on port ${PORT}`);
   // Chromium is launched LAZILY on first desktop/QA use, never held resident at
   // boot: on small hosts (512MB) a permanently-open browser + concurrent page
