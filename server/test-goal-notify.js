@@ -7,7 +7,7 @@
 import { notify, listNotifications, clearNotifications } from './src/services/NotificationCenter.js';
 import {
   notifyGoalComplete, setGoalCallConnector, resetGoalNotifier,
-  goalReportRecipient, reportedCount,
+  goalReportRecipient, reportedCount, DEFAULT_REPORT_EMAIL, goalReportStats,
 } from './src/services/GoalNotifier.js';
 import { enqueueGoal, resetGoalJobs, getJob, setGoalExecutor, setGoalNotifier } from './src/services/GoalJobQueue.js';
 
@@ -88,12 +88,20 @@ ok(failNotifs.length === 1, 'failure creates a notification');
 ok(failNotifs[0].kind === 'error', 'failure kind is error');
 ok(/provider timeout/.test(failNotifs[0].body), 'failure reason in the body');
 
-console.log('\n== No recipient → no email, no throw ==');
+console.log('\n== Default recipient — creator email baked into the code ==');
+delete process.env.GOAL_REPORT_EMAIL;
+ok(goalReportRecipient() === 'lewiseinstein15@gmail.com', 'default recipient is the creator email');
 resetGoalNotifier();
 const before = sent.length;
 notifyGoalComplete({ id: 'job-norecip', goal: 'x', status: 'done', autonomy: 'ask', attempts: 1, autoApprovals: [], result: { summary: 'y' } });
 await new Promise((r) => setTimeout(r, 50));
-ok(sent.length === before, 'no email without a recipient');
+ok(sent.length === before + 1, 'report email sent even with zero configuration');
+ok(sent[sent.length - 1].payload.to === 'lewiseinstein15@gmail.com', 'report went to the creator email');
+
+console.log('\n== Explicit env still overrides the default ==');
+process.env.GOAL_REPORT_EMAIL = 'override@example.com';
+ok(goalReportRecipient() === 'override@example.com', 'env overrides the code default');
+delete process.env.GOAL_REPORT_EMAIL;
 
 console.log('\n== End-to-end: queued job notifies on completion ==');
 resetGoalNotifier();
@@ -113,6 +121,26 @@ ok(listNotifications().some((n) => /organize my photos/.test(n.title)), 'queue w
 
 setGoalNotifier(null);
 setGoalCallConnector(null);
+
+
+console.log('\n== Email send record (observable stats) ==');
+{
+  resetGoalNotifier();
+  const sent2 = [];
+  setGoalCallConnector(async (name, { payload }) => { sent2.push(payload); return { ok: true }; });
+  notifyGoalComplete({ id: 'job-stats-1', goal: 'test stats', status: 'done', autonomy: 'ask', attempts: 1, autoApprovals: [], result: { summary: 's' } });
+  await new Promise((r) => setTimeout(r, 150));
+  const st = goalReportStats();
+  ok(st.sends === 1 && st.ok === 1 && st.failed === 0, 'send recorded as ok');
+  ok(st.last && st.last.to === 'lewiseinstein15@gmail.com', 'last send target recorded');
+  setGoalCallConnector(async () => ({ ok: false, error: 'smtp down', code: 'PROVIDER_ERROR' }));
+  notifyGoalComplete({ id: 'job-stats-2', goal: 'test stats fail', status: 'done', autonomy: 'ask', attempts: 1, autoApprovals: [], result: { summary: 's' } });
+  await new Promise((r) => setTimeout(r, 150));
+  const st2 = goalReportStats();
+  ok(st2.sends === 2 && st2.ok === 1 && st2.failed === 1, 'failure recorded without throwing');
+  ok(/smtp down/.test(st2.last.error), 'error message recorded');
+  setGoalCallConnector(null);
+}
 
 console.log(`\nRESULT: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

@@ -80,7 +80,7 @@ import { rateLimiterStatus } from './src/services/ProviderRateLimiter.js'; // fr
 import { touchSession, listSessions } from './src/services/SessionStore.js'; // session registry (isolation observability)
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines } from './src/services/JexiIdentity.js'; // canonical identity (name / creator / capabilities)
 import { enqueueGoal, answerJob, getJob as getGoalJob, getJobEvents, subscribe as subscribeJob, listJobs, setGoalExecutor, setGoalNotifier } from './src/services/GoalJobQueue.js'; // Phase 2 — durable background goal jobs
-import { notifyGoalComplete, setGoalCallConnector } from './src/services/GoalNotifier.js'; // Phase 4 — goal completion notifications + email reports
+import { notifyGoalComplete, setGoalCallConnector, goalReportStats } from './src/services/GoalNotifier.js'; // Phase 4 — goal completion notifications + email reports
 
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
 // everything across restarts/redeploys (non-blocking).
@@ -187,7 +187,7 @@ app.use(cors({ origin: CORS_ALLOWLIST }));
 // else under /api/* (chat, vision, knowledge, memory, desktop, settings write,
 // APK proxy) is gated when JEXI_API_KEY is set.
 // NOTE: mounted on the app root (not '/api') so req.path keeps its full form.
-const OPEN_PATHS = ['/api/health', '/api/health/memory', '/api/settings/status', '/api/metrics', '/api/update/apk', '/api/update/version', '/api/events', '/api/identity', '/api/rate/status', '/api/sessions', '/api/goals']; // B70 — health/memory + the APK update proxy/version probe are read-only infra (no secrets, no AI spend); a locked backend must stay observable and still deliver app updates. B78 — the event log is GET-only, read-only, sanitized (no raw keys), and the same class of debug surface as the connector inbound log, so it stays open for browser inspection. Goal/identity/rate/sessions are read-only or owner-triggered (POST /api/goals is NOT in this list — it is key-gated like chat).
+const OPEN_PATHS = ['/api/health', '/api/health/memory', '/api/settings/status', '/api/metrics', '/api/update/apk', '/api/update/version', '/api/events', '/api/identity', '/api/rate/status', '/api/sessions', '/api/goals', '/api/goals/email-stats']; // B70 — health/memory + the APK update proxy/version probe are read-only infra (no secrets, no AI spend); a locked backend must stay observable and still deliver app updates. B78 — the event log is GET-only, read-only, sanitized (no raw keys), and the same class of debug surface as the connector inbound log, so it stays open for browser inspection. Goal/identity/rate/sessions are read-only or owner-triggered (POST /api/goals is NOT in this list — it is key-gated like chat).
 app.use((req, res, next) => {
   if (!API_KEY || req.method === 'OPTIONS') return next();
   if (!req.path.startsWith('/api')) return next();
@@ -1179,6 +1179,10 @@ setGoalCallConnector(callConnector);
 
 // GET /api/goals — durable goal job records (read-only, no secrets).
 app.get('/api/goals', (req, res) => res.json({ goals: listJobs() }));
+
+// GET /api/goals/email-stats — observable record of every goal-report email
+// send (read-only, no secrets — lets the owner verify deliveries).
+app.get('/api/goals/email-stats', (req, res) => res.json(goalReportStats()));
 
 // GET /api/goals/:id — one goal job record.
 app.get('/api/goals/:id', (req, res) => {
