@@ -5,7 +5,7 @@
 
 import {
   enqueueGoal, answerJob, getJob, getJobEvents, listJobs, subscribe,
-  resetGoalJobs, jobCounts, setGoalExecutor,
+  resetGoalJobs, jobCounts, setGoalExecutor, setGoalNotifier, _markUnreportedForTest,
 } from './src/services/GoalJobQueue.js';
 
 let passed = 0;
@@ -147,6 +147,24 @@ ok(getJob(uj.id)?.status === 'done', 'unattended job completes');
 
 
 // restore
+
+
+console.log('\n== Restored terminal jobs report after notifier wires up ==');
+{
+  resetGoalJobs();
+  mockExecutor._provided = true; // completes immediately
+  let reported = 0;
+  setGoalNotifier(() => { reported += 1; });
+  const jx = enqueueGoal({ goal: 'report-test', session: 's-rp', autonomy: 'ask' });
+  await waitFor(() => getJob(jx.id)?.status === 'done');
+  ok(reported === 1, 'completion reported once');
+  // Simulate a pre-notifier terminal job (e.g. restored from Redis): mark
+  // unreported, then re-set the notifier → must flush.
+  _markUnreportedForTest(jx.id);
+  setGoalNotifier(() => { reported += 1; });
+  await new Promise((r) => setTimeout(r, 100));
+  ok(reported === 2, 'unreported restored terminal job reported on notifier set');
+}
 
 console.log(`\nRESULT: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

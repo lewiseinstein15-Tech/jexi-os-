@@ -39,6 +39,13 @@ const executor = { startGoal: null, resumeWithInfo: null };
 
 /** Optional terminal-state reporter (GoalNotifier) — injected from index.js. */
 let notifier = null;
+/**
+ * Terminal jobs that reached a terminal state while no notifier was wired
+ * (module load / boot hydration happen before index.js sets it). Flushed by
+ * setGoalNotifier so restored jobs still report (email) — never silently
+ * skipped across restarts/redeploys.
+ */
+const pendingReports = [];
 
 export function setGoalExecutor(exec) {
   if (exec) {
@@ -49,13 +56,45 @@ export function setGoalExecutor(exec) {
 
 export function setGoalNotifier(fn) {
   notifier = typeof fn === 'function' ? fn : null;
+  flushPendingReports();
 }
 
 /** Report a terminal job (in-app notification + optional email report). */
 function reportTerminal(job) {
+  if (!job || !job.id) return;
+  job.reported = true;
+  persist();
   if (notifier) {
     try { notifier(job); } catch { /* never break the worker */ }
+  } else {
+    pendingReports.push(job.id);
   }
+}
+
+/** Report terminal jobs that finished before the notifier was wired. */
+function flushPendingReports() {
+  if (!notifier || !pendingReports.length) return;
+  const ids = pendingReports.splice(0);
+  for (const id of ids) {
+    const j = jobs[id];
+    if (j && j.reported) continue; // already reported
+    if (j) {
+      j.reported = true;
+      try { notifier(j); } catch { /* never break the worker */ }
+    }
+  }
+  persist();
+}
+
+/** Test helper: force-mark a job as unreported + queue it for flush
+ *  (simulates a terminal job restored from disk/Redis pre-notifier). */
+export function _markUnreportedForTest(jobId) {
+  const j = jobs[jobId];
+  if (j) {
+    j.reported = false;
+    if (!pendingReports.includes(jobId)) pendingReports.push(jobId);
+  }
+  return Boolean(j);
 }
 
 function load() {
@@ -66,6 +105,9 @@ function load() {
       for (const j of Object.values(parsed)) {
         // Boot recovery: queued → will re-run; running → interrupted honestly;
         // need-info stays parked (answerable after restart).
+        if (j.status === 'done' || j.status === 'failed') {
+          if (!j.reported) pendingReports.push(j.id); // report after notifier wires up
+        }
         if (j.status === 'running') {
           j.status = 'failed';
           j.error = 'Interrupted by a server restart — re-run the goal.';
@@ -200,6 +242,9 @@ export async function hydrateGoalJobsFromRedis() {
     const now = Date.now();
     for (const [id, j] of Object.entries(parsed)) {
       if (!j || !j.id || jobs[id]) continue;
+      if (j.status === 'done' || j.status === 'failed') {
+        if (!j.reported) pendingReports.push(j.id); // report after notifier wires up
+      }
       if (j.status === 'running') {
         j.status = 'failed';
         j.error = 'Interrupted by a server restart — re-run the goal.';
