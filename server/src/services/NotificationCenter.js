@@ -16,6 +16,13 @@ const MAX = 50;
 
 let items = load();
 
+/** Optional broadcast hook (PushManager wires itself here) — fired after a
+ *  notification is persisted, with the notification object. Never throws. */
+let broadcaster = null;
+export function setNotifyBroadcaster(fn) {
+  broadcaster = typeof fn === 'function' ? fn : null;
+}
+
 function load() {
   try {
     if (fs.existsSync(FILE)) {
@@ -47,6 +54,10 @@ export function notify({ title, body = '', kind = 'info', link = '' }) {
   items.unshift(n);
   if (items.length > MAX) items = items.slice(0, MAX);
   persist();
+  // B84 — fire the push broadcaster (web push to every device) best-effort.
+  if (broadcaster) {
+    try { broadcaster(n); } catch (e) { /* push must never break notify */ }
+  }
   return n;
 }
 
