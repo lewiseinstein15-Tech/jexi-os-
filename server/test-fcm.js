@@ -75,6 +75,14 @@ setFcmSender(async () => { const e = new Error('network'); e.statusCode = 500; t
 const res2 = await broadcastFcm('t', 'b');
 ok(res2.failed === 1 && res2.sent === 0 && res2.pruned === 0, 'failure counted, no throw');
 
+console.log('\n== Redis hydration is a graceful no-op without REDIS_URL ==');
+{
+  delete process.env.REDIS_URL;
+  resetFcmManager();
+  const h = await (await import('./src/services/FcmManager.js')).hydrateFcmTokensFromRedis();
+  ok(h === false, 'no REDIS_URL → hydrate no-op (never throws)');
+}
+
 console.log('\n== No tokens / not configured → no-op ==');
 resetFcmManager();
 ok((await broadcastFcm('t', 'b')).sent === 0, 'no tokens → 0 sent');

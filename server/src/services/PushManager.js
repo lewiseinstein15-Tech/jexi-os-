@@ -23,8 +23,10 @@ import fs from 'fs';
 import path from 'path';
 import webpush from 'web-push';
 import { DATA_DIR } from '../config.js';
+import { redisGet, redisSet, isRedisConfigured } from './RedisStore.js';
 
 const VAPID_FILE = path.join(DATA_DIR, 'vapid.json');
+const REDIS_KEY = 'jexi:push-subs:v1';
 const SUBS_FILE = path.join(DATA_DIR, 'push-subscriptions.json');
 const MAX_SUBS = 30;
 const VAPID_SUBJECT = `mailto:${process.env.VAPID_SUBJECT || 'lewiseinstein15@gmail.com'}`;
@@ -82,6 +84,28 @@ function persistSubs() {
     fs.mkdirSync(DATA_DIR, { recursive: true });
     fs.writeFileSync(SUBS_FILE, JSON.stringify(subs, null, 2), 'utf-8');
   } catch { /* best effort */ }
+  // Redis mirror — subscriptions must survive redeploys on ephemeral-disk hosts.
+  try { redisSet(REDIS_KEY, JSON.stringify(subs)).catch(() => {}); } catch { /* fail open */ }
+}
+
+/**
+ * Hydrate push subscriptions from the Redis mirror (boot, non-blocking).
+ */
+export async function hydratePushSubsFromRedis() {
+  if (!isRedisConfigured()) return false;
+  if (subs.length > 0) return false;
+  try {
+    const raw = await redisGet(REDIS_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return false;
+    subs = parsed.filter((s) => s && s.endpoint);
+    if (subs.length) { persistSubs(); console.log(`[Push] ✓ Hydrated ${subs.length} subscription(s) from Redis.`); }
+    return subs.length > 0;
+  } catch (e) {
+    console.error('[Push] Redis hydrate error:', e.message);
+    return false;
+  }
 }
 
 function validSubscription(sub) {

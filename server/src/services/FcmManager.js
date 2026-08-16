@@ -26,8 +26,10 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { DATA_DIR } from '../config.js';
+import { redisGet, redisSet, isRedisConfigured } from './RedisStore.js';
 
 const TOKENS_FILE = path.join(DATA_DIR, 'fcm-tokens.json');
+const REDIS_KEY = 'jexi:fcm-tokens:v1';
 const MAX_TOKENS = 30;
 const SERVICE_ACCOUNT_FILE = path.join(process.cwd(), 'firebase-service-account.json');
 
@@ -128,6 +130,29 @@ function persistTokens() {
     fs.mkdirSync(DATA_DIR, { recursive: true });
     fs.writeFileSync(TOKENS_FILE, JSON.stringify(tokens, null, 2), 'utf-8');
   } catch { /* best effort */ }
+  // Redis mirror — device tokens must survive redeploys on ephemeral-disk hosts.
+  try { redisSet(REDIS_KEY, JSON.stringify(tokens)).catch(() => {}); } catch { /* fail open */ }
+}
+
+/**
+ * Hydrate FCM tokens from the Redis mirror (boot, non-blocking).
+ * Used when the local file is missing (ephemeral disk after a redeploy).
+ */
+export async function hydrateFcmTokensFromRedis() {
+  if (!isRedisConfigured()) return false;
+  if (tokens.length > 0) return false; // file already loaded
+  try {
+    const raw = await redisGet(REDIS_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return false;
+    tokens = parsed.filter((t) => t && t.token);
+    if (tokens.length) { persistTokens(); console.log(`[FCM] ✓ Hydrated ${tokens.length} device token(s) from Redis.`); }
+    return tokens.length > 0;
+  } catch (e) {
+    console.error('[FCM] Redis hydrate error:', e.message);
+    return false;
+  }
 }
 
 export function addFcmToken(token, ua = '') {
