@@ -138,5 +138,50 @@ console.log('\n== List / find parked ==');
   ok(goals[0].goal.includes('book me a flight'), 'record has the goal text');
 }
 
+
+
+console.log('\n== Unattended (scheduled) runs never park ==');
+{
+  const questionsJson = JSON.stringify({ questions: [{ field: 'departure', question: 'Departure city?' }] });
+  const gen = async () => questionsJson;
+  const calls = [];
+  const orch = {
+    async executePlan(plan, query, sendEvent, opts) {
+      calls.push({ autoConfirm: !!opts.autoConfirm });
+      return { success: true, summary: '✅ done unattended.' };
+    },
+  };
+  const engine = new GoalEngine({ planner: fakePlanner, orchestrator: orch, generateContent: gen, store: null });
+  const events = [];
+  const out = await engine.startGoal({ goal: 'book me a flight', session: 's-unatt', autonomy: 'full', unattended: true, sendEvent: (t) => events.push(t) });
+  ok(!out.needInfo, 'unattended run does NOT park with questions');
+  ok(out.result && out.result.success === true, 'unattended run completes immediately');
+  ok(calls[0].autoConfirm === true, 'unattended run auto-approves confirmations');
+  ok(events.includes('goal.need-info') === false, 'no need-info event for unattended');
+  ok(events.some((t) => t === 'goal.start'), 'still streams start event');
+}
+
+console.log('\n== Unattended + ask autonomy also auto-approves ==');
+{
+  const calls = [];
+  const orch = {
+    async executePlan(plan, query, sendEvent, opts) {
+      calls.push({ autoConfirm: !!opts.autoConfirm });
+      return { success: true, summary: 'ok' };
+    },
+  };
+  const engine = new GoalEngine({ planner: fakePlanner, orchestrator: orch, generateContent: null, store: null });
+  await engine.startGoal({ goal: 'research X', session: 's-unatt2', autonomy: 'ask', unattended: true });
+  ok(calls[0].autoConfirm === true, 'ask+unattended forces auto-approval (no human to ask)');
+}
+
+console.log('\n== Attended full autonomy still parks ==');
+{
+  const questionsJson = JSON.stringify({ questions: [{ field: 'departure', question: 'Departure city?' }] });
+  const engine = new GoalEngine({ planner: fakePlanner, orchestrator: fakeOrchestrator, generateContent: async () => questionsJson, store: null });
+  const out = await engine.startGoal({ goal: 'book me a flight', session: 's-att', autonomy: 'full' });
+  ok(out.needInfo && out.needInfo.length === 1, 'attended full autonomy still asks preflight questions');
+}
+
 console.log(`\nRESULT: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

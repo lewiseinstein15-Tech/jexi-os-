@@ -93,7 +93,7 @@ export class GoalEngine {
    *   { result: <orchestrator results> }     — completed synchronously
    * (The caller streams `sendEvent` lines during the run.)
    */
-  async startGoal({ goal, session = 'default', autonomy = 'ask', sendEvent = () => {}, providedInfo = null }) {
+  async startGoal({ goal, session = 'default', autonomy = 'ask', sendEvent = () => {}, providedInfo = null, unattended = false }) {
     const level = AUTONOMY_LEVELS.includes(autonomy) ? autonomy : 'ask';
     const emit = (type, data) => { try { sendEvent(type, data); } catch { /* noop */ } };
 
@@ -103,6 +103,7 @@ export class GoalEngine {
       goal: String(goal || '').trim(),
       session,
       autonomy: level,
+      unattended: Boolean(unattended), // scheduled/background runs: never park
       status: 'running',
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -123,14 +124,16 @@ export class GoalEngine {
       }
     }
 
-    emit('goal.start', { goalId: id, autonomy: level, goal: record.goal });
+    emit('goal.start', { goalId: id, autonomy: level, unattended: record.unattended, goal: record.goal });
 
     try {
       const plan = await this.planner.analyzeIntent(record.goal, {});
       emit('goal.plan', { goalId: id, intent: plan.intent, complexity: plan.complexity, steps: plan.steps || [] });
 
-      // FULL autonomy → preflight questions once.
-      if (level === 'full') {
+      // FULL autonomy → preflight questions once. UNATTENDED runs (scheduled
+      // goals) SKIP questions entirely — there is no one to answer, so asking
+      // would park the job forever. Defaults + auto-approval are used instead.
+      if (level === 'full' && !record.unattended) {
         const questions = await this.askWhatItNeeds(record.goal, plan);
         if (questions.length && !providedInfo) {
           record.status = 'need-info';
@@ -144,6 +147,8 @@ export class GoalEngine {
           record.infoRequests = questions; // for the record
           emit('goal.info-provided', { goalId: id, answer: String(providedInfo).slice(0, 400) });
         }
+      } else if (record.unattended) {
+        emit('log', { agent: 'Goal Engine', message: '⚙️ Scheduled run — no question pass (unattended). Using defaults and auto-approving confirmations for this goal.' });
       }
 
       const result = await this.runWithRetry(record, plan, providedInfo, emit);
@@ -244,7 +249,9 @@ export class GoalEngine {
       const opts = {
         // Full autonomy pre-authorizes THIS goal: confirmations resolve
         // automatically; the graph still honors RiskGuard/Guardrail blocks.
-        autoConfirm: record.autonomy === 'full',
+        // Unattended (scheduled) runs ALWAYS auto-approve — there is no human
+        // to ask, so pausing would deadlock the schedule.
+        autoConfirm: record.autonomy === 'full' || record.unattended,
         onPause: async (pausedState) => {
           await this._parkRun(record, plan, effQuery, pausedState);
           record.status = 'need-info';
@@ -295,7 +302,7 @@ export class GoalEngine {
   async askWhatItNeeds(goal, plan) {
     if (!this.generateContent) return [];
     try {
-      const prompt = `You are the preflight planner for an autonomous agent. The user gave this GOAL:\n"${String(goal).slice(0, 1000)}"\n\nPlanned intent: ${plan.intent}. Team: ${(plan.steps || []).join(', ') || 'general'}.\n\nTo execute this goal END-TO-END without pausing, what personal details or decisions do you genuinely need from the user? Ask ONLY for things the agent cannot know or reasonably infer (dates, locations, budgets, preferences, account handles, contact details). Do NOT ask for things that can be defaulted or asked later.\n\nReply with STRICT JSON only: {"questions": [{"field": "short_key", "question": "one clear question"}]}. Max 6 questions. If nothing is needed, reply {"questions": []}.`;
+      const prompt = `You are the preflight planner for an autonomous agent. The user gave this GOAL:\n"${String(goal).slice(0, 1000)}"\n\nPlanned intent: ${plan.intent}. Team: ${(plan.steps || []).join(', ') || 'general'}.\n\nTo execute this goal END-TO-END without pausing, what personal details do you GENUINELY need from the user? STRICT RULES:\n- Ask ONLY for blocking facts the agent cannot know or infer: specific dates, cities/flights, budgets, account handles, contact/email addresses.\n- NEVER ask about preferences that have sensible defaults (depth, tone, region, count, time range, sources). Default those.\n- Ask at most 3 questions. Prefer 0-1. If everything can be defaulted, ask nothing.\n\nReply with STRICT JSON only: {"questions": [{"field": "short_key", "question": "one clear question"}]}. Max 3 questions. If nothing is needed, reply {"questions": []}.`;
       const raw = await this.generateContent(prompt, 'You output strict JSON only.', null, { prefer: 'groq', temperature: 0.2 });
       const parsed = JSON.parse(String(raw || '').replace(/```json|```/g, '').trim());
       const checked = QUESTIONS_SCHEMA.safeParse(parsed);
