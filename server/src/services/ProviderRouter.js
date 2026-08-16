@@ -85,7 +85,11 @@ export function markProviderUnavailable(key, minutes = 60) {
 // hardware via an OpenAI-compatible server (github.com/vllm-project/vllm).
 // Sits right before the slow HF free tier; skipped instantly when nothing is
 // listening on VLLM_BASE_URL (default http://localhost:8000/v1).
-const EXTRA_PROVIDERS = ['cerebras', 'deepinfra', 'mistral', 'xai', 'deepseek'];
+// B75 — NVIDIA NIM + SambaNova join the no-card free tier (research: GitHub
+// Models was retired 2026-07-30; these two are live-verified free with no
+// credit card — NVIDIA gives free DeepSeek V4 Flash, SambaNova free
+// DeepSeek-V3.1/V3.2).
+const EXTRA_PROVIDERS = ['cerebras', 'deepinfra', 'mistral', 'xai', 'deepseek', 'nvidia', 'sambanova'];
 
 export function providerOrder(prefer = '') {
   const base =
@@ -111,6 +115,8 @@ const ENV_MAP = {
   mistral: 'MISTRAL_API_KEY',
   xai: 'XAI_API_KEY',
   deepseek: 'DEEPSEEK_API_KEY',
+  nvidia: 'NVIDIA_API_KEY',
+  sambanova: 'SAMBANOVA_API_KEY',
   // B74 — vLLM has no API key; "configured" = a VLLM_BASE_URL is set.
   vllm: 'VLLM_BASE_URL',
 };
@@ -126,6 +132,7 @@ export function providerHealthSnapshot() {
   const names = {
     groq: 'Groq', gemini: 'Gemini', openrouter: 'OpenRouter', huggingface: 'HuggingFace',
     cerebras: 'Cerebras', deepinfra: 'DeepInfra', mistral: 'Mistral', xai: 'Grok (xAI)', deepseek: 'DeepSeek',
+    nvidia: 'NVIDIA NIM', sambanova: 'SambaNova',
     vllm: 'vLLM (self-hosted)',
   };
   return providerOrder().map((k) => {

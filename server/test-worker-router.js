@@ -75,18 +75,22 @@ ok(
   'memory worker #3 = gemini(gemini-2.5-flash) — free tier, large-context provider stays reachable'
 );
 
-// 4. Coder coworker: DeepSeek (paid-but-cheap primary, no free tier exists —
-//    verified) then the FREE code model, then the near-free workhorse.
+// 4. Coder coworker: DeepSeek (paid-but-cheap primary) → FREE DeepSeek via
+//    NVIDIA NIM (B75, no-card) → free OpenRouter code model → near-free seed.
 const coderChain = coworkerChain('coder');
-ok(
-  coderChain[1] && coderChain[1].key === 'openrouter' && coderChain[1].model === 'cohere/north-mini-code:free',
-  `coder #2 = openrouter(cohere/north-mini-code:free) — free code model, got ${JSON.stringify(coderChain[1])}`
-);
-ok(
-  coderChain[2] && coderChain[2].key === 'openrouter' && coderChain[2].model === 'bytedance-seed/seed-2.0-mini',
-  `coder #3 = openrouter(bytedance-seed/seed-2.0-mini) — near-free fallback, got ${JSON.stringify(coderChain[2])}`
-);
 ok(coderChain[0] && coderChain[0].key === 'deepseek', 'coder #1 stays deepseek(deepseek-chat) — architecture primary');
+ok(
+  coderChain[1] && coderChain[1].key === 'nvidia' && coderChain[1].model === 'deepseek-ai/deepseek-v4-flash-0731',
+  `coder #2 = nvidia(deepseek-ai/deepseek-v4-flash-0731) — FREE DeepSeek via NVIDIA NIM, got ${JSON.stringify(coderChain[1])}`
+);
+ok(
+  coderChain[2] && coderChain[2].key === 'openrouter' && coderChain[2].model === 'cohere/north-mini-code:free',
+  `coder #3 = openrouter(cohere/north-mini-code:free) — free code model, got ${JSON.stringify(coderChain[2])}`
+);
+ok(
+  coderChain[3] && coderChain[3].key === 'openrouter' && coderChain[3].model === 'bytedance-seed/seed-2.0-mini',
+  `coder #4 = openrouter(bytedance-seed/seed-2.0-mini) — near-free fallback, got ${JSON.stringify(coderChain[3])}`
+);
 
 // 4b. B73 follow-up — free Qwen AND free DeepSeek are real via HuggingFace
 //     serverless (already wired): the documented lists point at HF-served
@@ -125,6 +129,8 @@ ok(
 // 6b. B74 — vLLM is part of the general provider walk too (right before the
 //     slow HF free tier; huggingface must stay last per test-roster-skills).
 ok(providerOrder().includes('vllm'), 'vLLM is in the general provider walk');
+ok(providerOrder().includes('nvidia'), 'NVIDIA NIM (no-card free tier) is in the general provider walk');
+ok(providerOrder().includes('sambanova'), 'SambaNova (no-card free DeepSeek) is in the general provider walk');
 ok(providerOrder()[providerOrder().length - 1] === 'huggingface', 'general order keeps huggingface last (vLLM sits just before it)');
 ok(COWORKERS.fallback.providers[0].key === 'vllm', 'vLLM leads the last-resort fallback tier (self-hosted free inference)');
 
@@ -165,6 +171,29 @@ ok(
   delete process.env.VLLM_BASE_URL;
   delete process.env.VLLM_MODEL;
   await new Promise((r) => mockVllm.close(r));
+
+  // B75 — NVIDIA NIM round-trip against a mock OpenAI-compatible server.
+  const mockNvidia = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', (c) => (body += c));
+    req.on('end', () => {
+      let parsed = {};
+      try { parsed = JSON.parse(body || '{}'); } catch (e) { /* keep {} */ }
+      ok(req.url === '/v1/chat/completions', `NVIDIA mock hit /v1/chat/completions (got ${req.url})`);
+      ok(parsed.model === 'deepseek-ai/deepseek-v4-flash-0731', `NVIDIA mock got the DeepSeek V4 model (got ${JSON.stringify(parsed.model)})`);
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ choices: [{ message: { content: 'deepseek v4 from nvidia' } }] }));
+    });
+  });
+  await new Promise((r) => mockNvidia.listen(0, '127.0.0.1', r));
+  const nvPort = mockNvidia.address().port;
+  process.env.NVIDIA_API_KEY = 'test-key';
+  process.env.NVIDIA_API_URL = `http://127.0.0.1:${nvPort}/v1`;
+  const nvText = await generateContent('ping', 'You are a test.', null, { provider: 'nvidia', model: 'deepseek-ai/deepseek-v4-flash-0731', temperature: 0 });
+  ok(nvText === 'deepseek v4 from nvidia', `NVIDIA NIM provider round-trip ok (got ${JSON.stringify(nvText)})`);
+  delete process.env.NVIDIA_API_KEY;
+  delete process.env.NVIDIA_API_URL;
+  await new Promise((r) => mockNvidia.close(r));
 
   const res = await runWorker('memory', 'The user asked: "what is my name?"', 'You are JEXI OS.', {
     tools: [{ slug: 'memory-recall', name: 'Memory Recall', desc: 'Recall', schema: {} }],

@@ -40,6 +40,9 @@ export const COWORKERS = {
       // consumed → HTTP 402 until topped up). It's cheap (~$0.30/M) and works
       // the moment the account has balance.
       { key: 'deepseek', model: 'deepseek-chat' },
+      // B75 — FREE DeepSeek: NVIDIA NIM hosts DeepSeek V4 Flash for no-card
+      // free-tier users (live-verified in NVIDIA's 102-model catalog).
+      { key: 'nvidia', model: 'deepseek-ai/deepseek-v4-flash-0731' },
       // B73 — FREE code model, live-verified at $0 on OpenRouter (the free
       // Qwen/DeepSeek models OpenRouter once hosted were removed).
       { key: 'openrouter', model: 'cohere/north-mini-code:free' },

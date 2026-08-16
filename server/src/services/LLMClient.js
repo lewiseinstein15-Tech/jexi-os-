@@ -21,6 +21,8 @@ export function resolveKeys() {
     mistralKey: process.env.MISTRAL_API_KEY || settings.mistralKey || '',
     xaiKey: process.env.XAI_API_KEY || settings.xaiKey || '',
     deepseekKey: process.env.DEEPSEEK_API_KEY || settings.deepseekKey || '',
+    nvidiaKey: process.env.NVIDIA_API_KEY || settings.nvidiaKey || '',
+    sambanovaKey: process.env.SAMBANOVA_API_KEY || settings.sambanovaKey || '',
   };
 }
 
@@ -101,6 +103,30 @@ export const OPENROUTER_FREE_TEXT_MODELS = ['nvidia/nemotron-3-super-120b-a12b:f
 export const HF_FREE_QWEN_MODELS = ['Qwen/Qwen2.5-7B-Instruct', 'Qwen/Qwen2.5-Coder-7B-Instruct'];
 // B73 follow-up — free DeepSeek on the HF serverless tier (live-verified 401).
 export const HF_FREE_DEEPSEEK_MODELS = ['deepseek-ai/deepseek-coder-6.7b-instruct', 'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B'];
+
+// B75 — no-card free AI providers (research: GitHub Models was RETIRED on
+// 2026-07-30, so the no-card frontier tier is NVIDIA NIM + SambaNova + the
+// already-wired Groq/Gemini/OpenRouter/Mistral/HF).
+//
+// NVIDIA NIM (build.nvidia.com): free NVIDIA Developer Program key, ~1,000
+// inference credits (1 credit ≈ 1 call), 40 RPM, NO credit card. Live-verified
+// against integrate.api.nvidia.com/v1/models (102 models) — DeepSeek V4 Flash
+// (a FREE DeepSeek!), Llama 3.3, Nemotron 3, Gemma 4.
+const NVIDIA_MODELS = [
+  'deepseek-ai/deepseek-v4-flash-0731',   // free DeepSeek V4 Flash
+  'meta/llama-3.3-70b-instruct',
+  'nvidia/nemotron-3-super-120b-a12b',
+  'google/gemma-4-31b-it',
+];
+// SambaNova (cloud.sambanova.ai): free tier, NO credit card, 20 RPM / 200K
+// TPD. Live-verified /v1/models — DeepSeek-V3.1/V3.2 are on the free tier
+// (another free DeepSeek path), plus Llama 3.3, gpt-oss-120b, MiniMax-M2.7.
+const SAMBANOVA_MODELS = [
+  'DeepSeek-V3.1',
+  'DeepSeek-V3.2',
+  'Meta-Llama-3.3-70B-Instruct',
+  'gpt-oss-120b',
+];
 
 const TIMEOUT_MS = 90000;
 
@@ -385,6 +411,16 @@ const tryXai = (p, s, img, o, e) =>
 // B66 — DeepSeek: primary coding coworker (model forced via opts.model).
 const tryDeepSeek = (p, s, img, o, e) =>
   tryOpenAICompat({ key: resolveKeys().deepseekKey, baseUrl: 'https://api.deepseek.com/v1', models: o.model ? [o.model] : DEEPSEEK_MODELS, label: 'DeepSeek', providerKey: 'deepseek' }, p, s, img, o, e);
+// B75 — NVIDIA NIM: no-card free key, OpenAI-compatible at
+// https://integrate.api.nvidia.com/v1 (live-verified endpoint + model IDs).
+// NVIDIA_API_URL is a test seam (mirrors VLLM_BASE_URL) so the regression
+// suite can point the provider at a mock server.
+const tryNvidia = (p, s, img, o, e) =>
+  tryOpenAICompat({ key: resolveKeys().nvidiaKey, baseUrl: process.env.NVIDIA_API_URL || 'https://integrate.api.nvidia.com/v1', models: o.model ? [o.model] : NVIDIA_MODELS, label: 'NVIDIA NIM', providerKey: 'nvidia' }, p, s, img, o, e);
+// B75 — SambaNova: no-card free tier (DeepSeek-V3.1/V3.2 free), OpenAI-
+// compatible at https://api.sambanova.ai/v1 (live-verified).
+const trySambaNova = (p, s, img, o, e) =>
+  tryOpenAICompat({ key: resolveKeys().sambanovaKey, baseUrl: 'https://api.sambanova.ai/v1', models: o.model ? [o.model] : SAMBANOVA_MODELS, label: 'SambaNova', providerKey: 'sambanova' }, p, s, img, o, e);
 
 /**
  * vLLM (B74) — self-hosted, OpenAI-compatible inference
@@ -451,6 +487,8 @@ const PROVIDER_CALLS = {
   mistral: tryMistral,
   xai: tryXai,
   deepseek: tryDeepSeek,
+  nvidia: tryNvidia,
+  sambanova: trySambaNova,
   vllm: tryVllm,
 };
 
