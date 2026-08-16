@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { StatusBar } from '@capacitor/status-bar';
 import { useJexiEngine } from './hooks/useJexiEngine';
 import { useMemory } from './hooks/useMemory';
+import { getBackendUrl } from './utils/helpers';
 import TopNav from './components/TopNav';
 import NavList from './components/NavList';
 import BottomNavigation from './components/BottomNavigation';
@@ -42,12 +43,40 @@ export default function App() {
   // painted and a short branded moment has passed (ChatGPT/Claude style), so
   // opening the app never shows a blank frame.
   const [booted, setBooted] = useState(false);
+  const [bootStatus, setBootStatus] = useState('Connecting to JEXI\u2019s brain…');
   const engine = useJexiEngine();
   const memory = useMemory(activeNav);
 
+  // B79 — REAL loading page on open (never a blank screen, never a fake
+  // flash): the branded splash stays up until the shell has painted AND the
+  // backend is reachable, so a sleeping Render instance (up to ~45s cold
+  // start) is covered by the loading page instead of an empty app. Hard cap
+  // so the splash can never trap the app behind itself.
   useEffect(() => {
-    const t = setTimeout(() => setBooted(true), 900);
-    return () => clearTimeout(t);
+    let alive = true;
+    let done = false;
+    const finish = () => { if (alive && !done) { done = true; setBooted(true); } };
+    // 1) Minimum brand moment — the splash never flashes.
+    const minDelay = new Promise((r) => setTimeout(r, 1400));
+    // 2) Real readiness signal — ping the brain. On success show "Brain
+    //    online" for a beat before fading.
+    const health = (async () => {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 12000);
+      try {
+        const res = await fetch(`${getBackendUrl()}/api/health`, { signal: ctrl.signal, cache: 'no-store' });
+        if (alive && res.ok) {
+          setBootStatus('Brain online');
+          await new Promise((r) => setTimeout(r, 400));
+        }
+      } catch (e) { /* brain still sleeping — the hard cap releases us */ }
+      finally { clearTimeout(t); }
+    })();
+    Promise.race([
+      Promise.all([minDelay, health]),
+      new Promise((r) => setTimeout(r, 15000)), // hard cap — never trap the app
+    ]).then(finish);
+    return () => { alive = false; };
   }, []);
 
   // Native polish: match the phone's status bar to the app's dark theme.
@@ -205,9 +234,10 @@ export default function App() {
         {/* FIXED BOTTOM NAVIGATION — mobile only, always visible */}
         <BottomNavigation activeNav={activeNav} setActiveNav={navigate} />
 
-        {/* B79 — branded loading screen on open; fades out once the shell is up */}
+        {/* B79 — branded loading page on open; fades out once the shell is
+            painted AND the brain is reachable (covers Render cold starts) */}
         <AnimatePresence>
-          {!booted && <BootSplash key="boot-splash" />}
+          {!booted && <BootSplash key="boot-splash" status={bootStatus} />}
         </AnimatePresence>
       </div>
     </ErrorBoundary>

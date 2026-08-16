@@ -11,7 +11,7 @@ import { motion } from 'framer-motion';
  */
 const ORBIT_DOTS = [0, 60, 120, 180, 240, 300];
 
-export default function BootSplash() {
+export default function BootSplash({ status = 'Booting agent core' }) {
   return (
     <motion.div
       initial={{ opacity: 1 }}
@@ -59,9 +59,9 @@ export default function BootSplash() {
         Multi-agent operating system
       </p>
 
-      {/* Booting status */}
+      {/* Booting status — live: connects → brain online → fade */}
       <div className="mt-8 flex items-center gap-1.5">
-        <span className="text-[9px] font-mono text-text-secondary">Booting agent core</span>
+        <span className="text-[9px] font-mono text-text-secondary">{status}</span>
         <span className="flex gap-0.5">
           {[0, 1, 2].map((i) => (
             <span
