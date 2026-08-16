@@ -5,6 +5,7 @@ import { notify } from './NotificationCenter.js';
 import { recordError } from './SelfMonitor.js';
 import { enqueueGoal, getJob } from './GoalJobQueue.js';
 import { DATA_DIR } from '../config.js';
+import { redisGet, redisSet, isRedisConfigured } from './RedisStore.js';
 
 /**
  * TaskScheduler — roadmap stage 23 (recurring workflows) + Build 81/82:
@@ -25,6 +26,7 @@ import { DATA_DIR } from '../config.js';
  */
 
 const SCHEDULES_FILE = path.join(DATA_DIR, 'schedules.json');
+const REDIS_KEY = 'jexi:schedules:v1';
 const TICK_MS = 5000;         // how often due schedules are checked
 const MAX_SCHEDULES = 40;     // safety cap
 const SAVE_DELAY_MS = 300;
@@ -80,6 +82,8 @@ class TaskScheduler {
     } catch (e) {
       // Best-effort — never crash a tick over a disk error.
     }
+    // Redis mirror — survives redeploys on ephemeral-disk hosts.
+    try { redisSet(REDIS_KEY, JSON.stringify([...this.schedules.values()])).catch(() => {}); } catch { /* fail open */ }
   }
 
   // ---------- cadence helpers ----------
@@ -94,6 +98,40 @@ class TaskScheduler {
       return d.getTime();
     }
     return from + Math.max(1, s.everySeconds || 0) * 1000;
+  }
+
+  /**
+   * Hydrate schedules from the Redis mirror (called at boot, non-blocking).
+   * Used when the local file is missing (ephemeral disk after a redeploy).
+   * Catch-up: a due active schedule is re-armed for a single run shortly
+   * after boot (never a burst).
+   */
+  async hydrateFromRedis() {
+    if (!isRedisConfigured()) return false;
+    if (this.schedules.size > 0) return false; // file already loaded
+    try {
+      const raw = await redisGet(REDIS_KEY);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return false;
+      let restored = 0;
+      for (const s of parsed) {
+        if (!s || !s.id) continue;
+        if (s.status !== 'active' && s.status !== 'paused') continue;
+        if (s.status === 'active' && (!s.nextRunAt || s.nextRunAt < Date.now())) {
+          s.nextRunAt = Date.now() + 1000; // single catch-up run
+        }
+        s.kind = s.kind === 'goal' ? 'goal' : 'task';
+        s.autonomy = ['ask', 'full'].includes(s.autonomy) ? s.autonomy : 'ask';
+        this.schedules.set(s.id, s);
+        restored += 1;
+      }
+      if (restored) { this._save(); console.log(`[Scheduler] ✓ Hydrated ${restored} schedule(s) from Redis.`); }
+      return restored > 0;
+    } catch (e) {
+      console.error('[Scheduler] Redis hydrate error:', e.message);
+      return false;
+    }
   }
 
   // ---------- public API ----------

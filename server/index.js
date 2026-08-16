@@ -79,8 +79,9 @@ import { GoalEngine } from './src/services/GoalEngine.js'; // autonomy: goal-lev
 import { rateLimiterStatus } from './src/services/ProviderRateLimiter.js'; // free-tier pacing status
 import { touchSession, listSessions } from './src/services/SessionStore.js'; // session registry (isolation observability)
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines } from './src/services/JexiIdentity.js'; // canonical identity (name / creator / capabilities)
-import { enqueueGoal, answerJob, getJob as getGoalJob, getJobEvents, subscribe as subscribeJob, listJobs, setGoalExecutor, setGoalNotifier } from './src/services/GoalJobQueue.js'; // Phase 2 — durable background goal jobs
+import { enqueueGoal, answerJob, getJob as getGoalJob, getJobEvents, subscribe as subscribeJob, listJobs, setGoalExecutor, setGoalNotifier, hydrateGoalJobsFromRedis } from './src/services/GoalJobQueue.js'; // Phase 2 — durable background goal jobs
 import { notifyGoalComplete, setGoalCallConnector, goalReportStats } from './src/services/GoalNotifier.js'; // Phase 4 — goal completion notifications + email reports
+
 
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
 // everything across restarts/redeploys (non-blocking).
@@ -92,6 +93,11 @@ hydrateEventLogFromRedis().catch((e) => { recordError('events', (e && e.message)
 // Vector layer (TencentDB-Agent-Memory pattern): embed memories saved before
 // the vector layer existed. Non-blocking; no-op without a Groq key.
 backfillEmbeddings().catch((e) => { recordError('memory', (e && e.message) || String(e)); });
+
+// Phase 4b — schedules + goal jobs mirror to Redis so they survive redeploys
+// on ephemeral-disk hosts (Render free). Non-blocking hydrations.
+taskScheduler.hydrateFromRedis().catch((e) => { recordError('schedule', (e && e.message) || String(e)); });
+hydrateGoalJobsFromRedis().catch((e) => { recordError('goals', (e && e.message) || String(e)); });
 
 // Self-monitoring: she keeps a live error log and can diagnose her own system.
 recordBoot();

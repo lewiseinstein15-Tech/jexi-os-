@@ -22,8 +22,10 @@
 import fs from 'fs';
 import path from 'path';
 import { DATA_DIR } from '../config.js';
+import { redisGet, redisSet, isRedisConfigured } from './RedisStore.js';
 
 const FILE = path.join(DATA_DIR, 'goal-jobs.json');
+const REDIS_KEY = 'jexi:goal-jobs:v1';
 const MAX_EVENTS_PER_JOB = 300;
 const MAX_JOBS = 50;
 
@@ -94,6 +96,8 @@ function persist() {
       fs.mkdirSync(DATA_DIR, { recursive: true });
       fs.writeFileSync(FILE, JSON.stringify(jobs, null, 2), 'utf-8');
     } catch (e) { console.error('[GoalJobs] persist error:', e.message); }
+    // Redis mirror — survives redeploys on ephemeral-disk hosts.
+    try { redisSet(REDIS_KEY, JSON.stringify(jobs)).catch(() => {}); } catch { /* fail open */ }
   }, 300);
 }
 
@@ -176,6 +180,46 @@ export function answerJob(jobId, answer) {
   persist();
   wakeWorker();
   return { ok: true, id: jobId };
+}
+
+/**
+ * Hydrate goal jobs from the Redis mirror (called at boot, non-blocking).
+ * Used when the local file is missing (ephemeral disk after a redeploy).
+ * Re-applies boot recovery + auto-heal so restored jobs behave like
+ * file-loaded ones.
+ */
+export async function hydrateGoalJobsFromRedis() {
+  if (!isRedisConfigured()) return false;
+  if (Object.keys(jobs).length > 0) return false; // file already loaded
+  try {
+    const raw = await redisGet(REDIS_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return false;
+    let restored = 0;
+    const now = Date.now();
+    for (const [id, j] of Object.entries(parsed)) {
+      if (!j || !j.id || jobs[id]) continue;
+      if (j.status === 'running') {
+        j.status = 'failed';
+        j.error = 'Interrupted by a server restart — re-run the goal.';
+        j.endedAt = now;
+        j.events = (j.events || []).concat([{ type: 'log', agent: 'Goal Queue', message: '⏹ Interrupted by server restart (restored from Redis).' }]).slice(-MAX_EVENTS_PER_JOB);
+      }
+      if (j.status === 'need-info' && (j.unattended || String(j.session || '').startsWith('scheduler:'))) {
+        j.pendingAnswer = 'use defaults';
+        j.status = 'queued';
+        j.events = (j.events || []).concat([{ type: 'log', agent: 'Goal Queue', message: '↻ Scheduled goal was waiting for details — auto-resuming with defaults (unattended).' }]).slice(-MAX_EVENTS_PER_JOB);
+      }
+      jobs[id] = j;
+      restored += 1;
+    }
+    if (restored) { persist(); console.log(`[GoalJobs] ✓ Hydrated ${restored} job(s) from Redis.`); }
+    return restored > 0;
+  } catch (e) {
+    console.error('[GoalJobs] Redis hydrate error:', e.message);
+    return false;
+  }
 }
 
 export function getJob(jobId) {
