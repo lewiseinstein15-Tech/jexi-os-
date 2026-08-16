@@ -194,7 +194,7 @@ export default function TopNav({ activeNav, running, onNavigate, contextOverride
               </div>
               <div className="px-4 py-3 border-t border-hairline flex-shrink-0">
                 <p className="text-[8px] font-bold tracking-wider text-text-tertiary font-mono">
-                  v1.1 · 106 specialists · 328 skills
+                  v1.2 · 251 specialists · 507 skills · FCM + goals + push
                 </p>
               </div>
             </motion.aside>
