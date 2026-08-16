@@ -2,16 +2,19 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Target, Zap, Play, Loader2, ChevronRight, ChevronDown, X,
   CheckCircle2, AlertCircle, Clock, PauseCircle, Send, ListChecks,
+  CalendarClock, Plus, Pause, PlayCircle, RotateCcw, Trash2, Repeat,
 } from 'lucide-react';
 import { getBackendUrl, jexiFetch } from '../utils/helpers';
 import PanelHeader from './PanelHeader';
 import MarkdownRenderer from './MarkdownRenderer';
 
 /**
- * GOALS — Phase 3: autonomous goals as durable background jobs.
+ * GOALS — Phase 3/4: autonomous goals as durable background jobs.
  * Start a goal (Ask = pauses at confirmations, Full = asks for details once
- * then runs end-to-end), watch its live event stream, answer parked goals.
- * Jobs survive restarts and are session-isolated.
+ * then runs end-to-end), watch its live event stream, answer parked goals,
+ * and SCHEDULE goals (every N minutes / hourly / daily at HH:MM) so JEXI
+ * runs proactively and reports when done. Jobs survive restarts and are
+ * session-isolated.
  */
 
 const STATUS_META = {
@@ -22,6 +25,18 @@ const STATUS_META = {
   failed: { label: 'FAILED', text: 'text-status-error', border: 'border-status-error/40', dot: 'bg-status-error', Icon: AlertCircle },
 };
 
+const SCHED_STATUS = {
+  active: { label: 'ACTIVE', text: 'text-brand', dot: 'bg-brand animate-pulse' },
+  paused: { label: 'PAUSED', text: 'text-status-warn', dot: 'bg-status-warn' },
+};
+
+const CADENCES = [
+  { value: '300', label: 'Every 5 min' },
+  { value: '3600', label: 'Hourly' },
+  { value: '86400', label: 'Daily' },
+  { value: 'dailyAt', label: 'Daily at…' },
+];
+
 const timeAgo = (ts) => {
   if (!ts) return '—';
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -30,6 +45,8 @@ const timeAgo = (ts) => {
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   return new Date(ts).toLocaleDateString();
 };
+
+const fmtTime = (ts) => (ts ? new Date(ts).toLocaleString() : '—');
 
 export default function GoalsScreen() {
   const [goals, setGoals] = useState([]);
@@ -42,8 +59,64 @@ export default function GoalsScreen() {
   const [answers, setAnswers] = useState({}); // jobId → input
   const [answering, setAnswering] = useState({});
   const [error, setError] = useState('');
+  const [schedules, setSchedules] = useState([]);
+  const [schGoal, setSchGoal] = useState('');
+  const [schCadence, setSchCadence] = useState('86400');
+  const [schDailyAt, setSchDailyAt] = useState('08:00');
+  const [schAutonomy, setSchAutonomy] = useState('full');
+  const [savingSch, setSavingSch] = useState(false);
   const abortRef = useRef({}); // jobId → AbortController
   const timerRef = useRef(null);
+
+  const loadSchedules = useCallback(async () => {
+    try {
+      const res = await jexiFetch(`${getBackendUrl()}/api/schedules`);
+      const data = await res.json();
+      setSchedules(data.schedules || []);
+    } catch (e) { /* offline — keep last */ }
+  }, []);
+
+  const addSchedule = async () => {
+    const goal = schGoal.trim();
+    if (!goal) return;
+    setSavingSch(true);
+    setError('');
+    try {
+      const body = { query: goal, kind: 'goal', autonomy: schAutonomy };
+      if (schCadence === 'dailyAt') body.dailyAt = schDailyAt;
+      else body.everySeconds = Number(schCadence);
+      const res = await jexiFetch(`${getBackendUrl()}/api/schedules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSchGoal('');
+        await loadSchedules();
+      } else {
+        setError(data.error || 'Could not create the schedule.');
+      }
+    } catch (e) {
+      setError(String(e.message || e));
+    } finally {
+      setSavingSch(false);
+    }
+  };
+
+  const schAction = async (id, action) => {
+    try {
+      await jexiFetch(`${getBackendUrl()}/api/schedules/${id}/${action}`, { method: 'POST' });
+      await loadSchedules();
+    } catch (e) { /* noop */ }
+  };
+
+  const removeSchedule = async (id) => {
+    try {
+      await jexiFetch(`${getBackendUrl()}/api/schedules/${id}`, { method: 'DELETE' });
+      await loadSchedules();
+    } catch (e) { /* noop */ }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -59,9 +132,10 @@ export default function GoalsScreen() {
 
   useEffect(() => {
     load();
-    timerRef.current = setInterval(load, 5000); // poll for status changes
+    loadSchedules();
+    timerRef.current = setInterval(() => { load(); loadSchedules(); }, 5000); // poll for status changes
     return () => { clearInterval(timerRef.current); Object.values(abortRef.current).forEach((a) => a?.abort()); };
-  }, [load]);
+  }, [load, loadSchedules]);
 
   /** Stream one job's NDJSON events (replay + live). */
   const openStream = useCallback((jobId) => {
@@ -230,6 +304,90 @@ export default function GoalsScreen() {
             No goals yet. Start one above or with <span className="font-mono">/goal …</span> in chat.
           </div>
         )}
+        {/* Scheduled goals — JEXI runs proactively */}
+        <div className="bg-surface-2 border border-hairline rounded-md p-3 mt-4">
+          <label className="flex items-center gap-2 text-[10px] font-bold text-text-secondary mb-2">
+            <CalendarClock className="w-3 h-3 text-brand" />
+            SCHEDULED GOALS — JEXI RUNS THESE ON HER OWN
+          </label>
+          <div className="flex flex-col gap-2">
+            <input
+              value={schGoal}
+              onChange={(e) => setSchGoal(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addSchedule()}
+              placeholder="e.g. research the day's AI news and summarize it"
+              className="w-full bg-surface-1 text-text-primary border border-hairline rounded-md px-3 py-2.5 text-xs focus:outline-none focus:border-brand-line"
+            />
+            <div className="flex flex-wrap gap-1.5">
+              <select
+                value={schCadence}
+                onChange={(e) => setSchCadence(e.target.value)}
+                className="bg-surface-1 text-text-primary border border-hairline rounded-md px-2 py-2 text-[10px] focus:outline-none"
+              >
+                {CADENCES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+              {schCadence === 'dailyAt' && (
+                <input
+                  type="time"
+                  value={schDailyAt}
+                  onChange={(e) => setSchDailyAt(e.target.value)}
+                  className="bg-surface-1 text-text-primary border border-hairline rounded-md px-2 py-2 text-[10px] focus:outline-none"
+                />
+              )}
+              {[
+                ['ask', 'Ask'],
+                ['full', 'Full'],
+              ].map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setSchAutonomy(val)}
+                  className={`px-2.5 py-2 rounded-md text-[10px] font-bold border ${schAutonomy === val ? 'bg-brand text-black border-brand' : 'bg-surface-1 text-text-secondary border-hairline'}`}
+                >
+                  {label}
+                </button>
+              ))}
+              <button
+                onClick={addSchedule}
+                disabled={savingSch || !schGoal.trim()}
+                className="px-3 py-2 rounded-md text-[10px] font-bold bg-brand text-black flex items-center gap-1.5 disabled:opacity-40"
+              >
+                {savingSch ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />} ADD
+              </button>
+            </div>
+          </div>
+          {error && <p className="text-[10px] text-status-error mt-2">{error}</p>}
+          <p className="text-[8px] text-text-tertiary mt-2">Scheduled goals fire as durable background jobs — they survive restarts, ask for details if needed, and notify/email you when done.</p>
+        </div>
+
+        {schedules.length > 0 && (
+          <div className="space-y-1.5">
+            {schedules.map((sc) => {
+              const sm = SCHED_STATUS[sc.status] || SCHED_STATUS.paused;
+              return (
+                <div key={sc.id} className="bg-surface-2 border border-hairline rounded-md px-3 py-2 flex items-center gap-2.5">
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${sm.dot}`} />
+                  <span className={`text-[8px] font-bold tracking-wider shrink-0 ${sm.text}`}>{sm.label}</span>
+                  <span className="text-xs text-text-primary font-semibold truncate flex-1">{sc.query}</span>
+                  <span className="text-[8px] text-text-tertiary shrink-0 hidden sm:block">
+                    {sc.dailyAt ? `daily ${sc.dailyAt}` : `every ${Math.round((sc.everySeconds || 0) / 60)}m`} · {sc.autonomy.toUpperCase()}
+                  </span>
+                  <span className="text-[8px] text-text-tertiary shrink-0 hidden md:block">next {fmtTime(sc.nextRunAt)}</span>
+                  <span className="text-[8px] text-text-tertiary shrink-0 hidden md:block">
+                    {sc.runCount ? `${sc.runCount} runs · last ${sc.lastStatus || '—'}` : 'never run'}
+                  </span>
+                  <div className="flex gap-1 shrink-0">
+                    {sc.status === 'active'
+                      ? <button onClick={() => schAction(sc.id, 'pause')} title="Pause" className="p-1 rounded hover:bg-surface-1"><Pause className="w-3 h-3 text-text-tertiary" /></button>
+                      : <button onClick={() => schAction(sc.id, 'resume')} title="Resume" className="p-1 rounded hover:bg-surface-1"><PlayCircle className="w-3 h-3 text-brand" /></button>}
+                    <button onClick={() => schAction(sc.id, 'run-now')} title="Run now" className="p-1 rounded hover:bg-surface-1"><RotateCcw className="w-3 h-3 text-text-tertiary" /></button>
+                    <button onClick={() => removeSchedule(sc.id)} title="Delete" className="p-1 rounded hover:bg-surface-1"><Trash2 className="w-3 h-3 text-status-error/70" /></button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {goals.map((g) => {
           const meta = STATUS_META[g.status] || STATUS_META.queued;
           const Icon = meta.Icon;
