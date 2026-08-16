@@ -42,7 +42,7 @@ export async function setupPushSubscription() {
     if (existing) {
       // Keep the server in sync even across re-deploys (cheap upsert).
       try {
-        await jexiFetch(`${base}/api/push/subscribe`, {
+        const res = await jexiFetch(`${base}/api/push/subscribe`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -51,6 +51,7 @@ export async function setupPushSubscription() {
             ua: navigator.userAgent,
           }),
         });
+        if (res && !res.ok) throw new Error(`subscribe HTTP ${res.status}`);
       } catch (e) { /* server offline — will resubscribe later */ }
       return true;
     }
@@ -73,11 +74,12 @@ export async function setupPushSubscription() {
       },
       ua: navigator.userAgent,
     };
-    await jexiFetch(`${base}/api/push/subscribe`, {
+    const res = await jexiFetch(`${base}/api/push/subscribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    if (!res || !res.ok) return false;
     return true;
   } catch (e) {
     return false; // never break the app over push

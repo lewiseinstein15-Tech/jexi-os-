@@ -33,7 +33,7 @@ async function reportDiag(step, error = '', permission = '') {
   try {
     const base = getBackendUrl();
     if (!base) return;
-    await jexiFetch(`${base}/api/push/diag`, {
+    const res = await jexiFetch(`${base}/api/push/diag`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -44,6 +44,7 @@ async function reportDiag(step, error = '', permission = '') {
         ua: typeof navigator !== 'undefined' ? String(navigator.userAgent).slice(0, 120) : '',
       }),
     });
+    if (res && !res.ok) throw new Error(`diag ${res.status}`);
   } catch { /* diag must never break anything */ }
 }
 
@@ -103,11 +104,16 @@ export async function setupFcmOnce() {
     return false;
   }
   try {
-    await jexiFetch(`${base}/api/push/fcm-token`, {
+    const res = await jexiFetch(`${base}/api/push/fcm-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token, ua: (navigator.userAgent || 'android').slice(0, 120) }),
     });
+    if (!res || !res.ok) {
+      let body = '';
+      try { body = await res.text(); } catch { /* noop */ }
+      throw new Error(`register HTTP ${res ? res.status : '?'} ${body.slice(0, 120)}`);
+    }
   } catch (e) {
     await reportDiag('register-error', e.message, receive);
     throw e;
