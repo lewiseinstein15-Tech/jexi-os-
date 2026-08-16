@@ -35,10 +35,24 @@ let queueWake = null; // promise resolver to wake the worker
 /** @type {{ startGoal: Function, resumeWithInfo: Function }} */
 const executor = { startGoal: null, resumeWithInfo: null };
 
+/** Optional terminal-state reporter (GoalNotifier) — injected from index.js. */
+let notifier = null;
+
 export function setGoalExecutor(exec) {
   if (exec) {
     if (typeof exec.startGoal === 'function') executor.startGoal = exec.startGoal.bind(exec);
     if (typeof exec.resumeWithInfo === 'function') executor.resumeWithInfo = exec.resumeWithInfo.bind(exec);
+  }
+}
+
+export function setGoalNotifier(fn) {
+  notifier = typeof fn === 'function' ? fn : null;
+}
+
+/** Report a terminal job (in-app notification + optional email report). */
+function reportTerminal(job) {
+  if (notifier) {
+    try { notifier(job); } catch { /* never break the worker */ }
   }
 }
 
@@ -255,17 +269,20 @@ async function runNext() {
           summary: out.result.summary || (out.result.success === false ? (out.result.error || 'Goal failed.') : '✅ Goal completed.'),
           files: out.result.files || [], sources: out.result.sources || [], statistics: out.result.statistics || {},
         });
+        reportTerminal(next);
       } else {
         next.status = 'failed';
         next.error = (out && out.error) || 'goal failed';
         next.endedAt = Date.now();
         addEvent(next, { type: 'done', success: false, summary: `### ⚠ JEXI OS\n\n${next.error}` });
+        reportTerminal(next);
       }
     } catch (e) {
       next.status = 'failed';
       next.error = (e && e.message) || String(e);
       next.endedAt = Date.now();
       addEvent(next, { type: 'done', success: false, summary: `### ⚠ JEXI OS\n\n${next.error}` });
+      reportTerminal(next);
     } finally {
       running = null;
     }

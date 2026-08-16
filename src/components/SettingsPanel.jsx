@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server, Github, ShieldCheck, Shield, Globe, Lock, Cpu, Cloud } from 'lucide-react';
+import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server, Github, ShieldCheck, Shield, Globe, Lock, Cpu, Cloud, Mail } from 'lucide-react';
 import { getBackendUrl, setBackendUrl, getAccessKey, setAccessKey, jexiFetch } from '../utils/helpers';
 import PanelHeader from './PanelHeader';
 
@@ -61,6 +61,7 @@ export default function SettingsPanel() {
 
   const [accessKey, setAccessKeyState] = useState(getAccessKey());
   const [autonomyMode, setAutonomyMode] = useState('ask'); // ask | full — goal autonomy level
+  const [goalReportEmail, setGoalReportEmail] = useState(''); // email address for goal completion reports
   const [backendUrl, setBackendUrlState] = useState(getBackendUrl());
   const [backendInput, setBackendInput] = useState(getBackendUrl());
   const [backendStatus, setBackendStatus] = useState('idle'); // idle, saved, error
@@ -97,6 +98,7 @@ export default function SettingsPanel() {
         setSambanovaKey(data.sambanovaKey || '');
         setGithubToken(data.githubToken || '');
         setAutonomyMode(['ask', 'full'].includes(data.autonomyMode) ? data.autonomyMode : 'ask');
+        setGoalReportEmail(data.goalReportEmail || '');
         try { setKeyStatus(await statusRes.json()); } catch (e) { /* status endpoint optional */ }
         try { if (trustRes) setTrust(await trustRes.json()); } catch (e) { /* trust endpoint optional */ }
         try {
@@ -147,6 +149,7 @@ export default function SettingsPanel() {
       if (!keyStatus?.sambanova?.configured) body.sambanovaKey = sambanovaKey;
       if (!keyStatus?.github?.configured) body.githubToken = githubToken;
       body.autonomyMode = autonomyMode; // goal autonomy level (ask = pause at confirmations, full = preflight questions then run)
+      body.goalReportEmail = goalReportEmail; // email address for goal completion reports (empty = off)
       const res = await jexiFetch(`${backendUrl}/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -357,6 +360,22 @@ export default function SettingsPanel() {
               ))}
             </div>
             <p className="text-[8px] text-text-tertiary mt-1">Used when you start a goal (<span className="font-mono text-text-secondary">/goal</span> or Goals). Full autonomy = JEXI asks for the details she needs once, then executes end-to-end and reports when done.</p>
+          </div>
+
+          {/* Goal report email — JEXI emails you when a goal finishes */}
+          <div className="bg-surface-2 border border-hairline rounded-md p-3">
+            <label className="flex items-center gap-2 text-[10px] font-bold text-text-secondary mb-1.5 tracking-wider">
+              <Mail className="w-3 h-3 text-brand" />
+              EMAIL GOAL REPORTS TO (OPTIONAL)
+            </label>
+            <input
+              type="email"
+              value={goalReportEmail}
+              onChange={(e) => setGoalReportEmail(e.target.value)}
+              placeholder="you@example.com — leave empty for in-app only"
+              className="w-full bg-surface-1 text-text-primary border border-hairline rounded-md px-3 py-2.5 text-xs focus:outline-none focus:border-brand-line"
+            />
+            <p className="text-[8px] text-text-tertiary mt-1">When a goal finishes (or fails), JEXI sends you the report by email. Requires the Email connector key (<span className="font-mono text-text-secondary">RESEND_API_KEY</span>). Env var: <span className="font-mono text-text-secondary">GOAL_REPORT_EMAIL</span>.</p>
           </div>
 
           {/* Backend URL (runtime override) */}
