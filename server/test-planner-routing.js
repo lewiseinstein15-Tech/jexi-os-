@@ -185,6 +185,12 @@ const autonomousTests = [
   { q: 'I want the latest news on AI', expect: 'news_latest' },
   { q: 'I want to find out about black holes', expect: 'domain:astrophysics' },
   { q: 'tell me about the moon', expect: 'learning_research' },
+  // Travel/booking — real-world actions route to the browser team, not research.
+  { q: 'book me a flight to Mombasa', expect: 'travel_booking' },
+  { q: 'book a hotel in Nairobi for next weekend', expect: 'travel_booking' },
+  { q: 'book us a table at an Italian restaurant', expect: 'travel_booking' },
+  { q: 'reserve a flight ticket to London', expect: 'travel_booking' },
+  { q: 'plan my vacation to Zanzibar', expect: 'travel_booking' },
 ];
 for (const { q, expect } of autonomousTests) {
   const p = await planner.analyzeIntent(q);

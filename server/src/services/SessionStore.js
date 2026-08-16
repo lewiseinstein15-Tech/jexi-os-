@@ -134,8 +134,43 @@ export function clearAllSessions() {
   runSessions.clear();
   resultSessions.clear();
   recoveryEvents.length = 0;
+  sessionRegistry.clear();
 }
 
 export function sessionCounts() {
-  return { offers: offerSessions.size, runs: runSessions.size, results: resultSessions.size };
+  return { offers: offerSessions.size, runs: runSessions.size, results: resultSessions.size, sessions: sessionRegistry.size };
+}
+
+/* ------------------------------------------------------------------ */
+/* Session registry — which conversations exist, when last active.     */
+/* Drives /api/sessions so the UI can show/switch conversations and    */
+/* prove that per-session history is never mixed.                      */
+/* ------------------------------------------------------------------ */
+const sessionRegistry = new Map(); // convId → { firstSeen, lastSeen, turns }
+
+export function touchSession(convId) {
+  if (!convId) return;
+  const now = Date.now();
+  const prev = sessionRegistry.get(convId);
+  if (prev) {
+    prev.lastSeen = now;
+    prev.turns += 1;
+  } else {
+    sessionRegistry.set(convId, { firstSeen: now, lastSeen: now, turns: 1 });
+  }
+}
+
+export function listSessions() {
+  return [...sessionRegistry.entries()]
+    .map(([id, s]) => ({ id, firstSeen: s.firstSeen, lastSeen: s.lastSeen, turns: s.turns }))
+    .sort((a, b) => b.lastSeen - a.lastSeen)
+    .slice(0, 100);
+}
+
+export function clearSession(convId) {
+  if (!convId) return;
+  sessionRegistry.delete(convId);
+  offerSessions.delete(convId);
+  runSessions.delete(convId);
+  resultSessions.delete(convId);
 }

@@ -1500,6 +1500,12 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
         state = opts.resumeState;
         state.status = 'running'; // the pause is over — this is a fresh run
         state.context = { ...(state.context || {}), results, sendEvent, opts };
+        // GOAL ENGINE — the user's answer to a parked question travels with
+        // the resume and is available to the resumed node via
+        // state.context.userAnswers (last element = most recent answer).
+        if (opts.userAnswer) {
+          state.context.userAnswers = [...(state.context.userAnswers || []), String(opts.userAnswer).slice(0, 2000)];
+        }
         if (opts.confirmed) {
           state.confirmationPayload = { ...(state.confirmationPayload || {}), resolved: true };
           startNode = 'confirmationPause';
@@ -1531,7 +1537,15 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
       // parks at confirmationPause and the session store holds the RunState.
       // The callback writes to the SHARED opts reference (not the copied state
       // object), which is exactly what wrapCase reads at the node boundary.
+      // GOAL ENGINE — autoConfirm: when the user pre-authorized a goal (Full
+      // autonomy), confirmations resolve immediately and are recorded in
+      // opts._autoApprovals instead of pausing the run. RiskGuard/Guardrail
+      // blocks are NOT confirmations and still refuse execution.
       const confirm = async (payload) => {
+        if (opts.autoConfirm) {
+          (opts._autoApprovals ||= []).push(payload);
+          return true;
+        }
         opts._pendingConfirmation = payload;
         return 'paused';
       };

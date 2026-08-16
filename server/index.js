@@ -75,6 +75,10 @@ import { taskManager } from './src/services/TaskManager.js';
 import { taskScheduler } from './src/services/TaskScheduler.js';
 import { PORT, WORKSPACE_DIR, DATA_DIR, SERVER_ROOT } from './src/config.js';
 import { resolveInside } from './src/services/PathSafety.js'; // security: one path-escape check for every workspace route/writer
+import { GoalEngine } from './src/services/GoalEngine.js'; // autonomy: goal-level execution with info-asking + resume
+import { rateLimiterStatus } from './src/services/ProviderRateLimiter.js'; // free-tier pacing status
+import { touchSession, listSessions } from './src/services/SessionStore.js'; // session registry (isolation observability)
+import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines } from './src/services/JexiIdentity.js'; // canonical identity (name / creator / capabilities)
 
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
 // everything across restarts/redeploys (non-blocking).
@@ -181,7 +185,7 @@ app.use(cors({ origin: CORS_ALLOWLIST }));
 // else under /api/* (chat, vision, knowledge, memory, desktop, settings write,
 // APK proxy) is gated when JEXI_API_KEY is set.
 // NOTE: mounted on the app root (not '/api') so req.path keeps its full form.
-const OPEN_PATHS = ['/api/health', '/api/health/memory', '/api/settings/status', '/api/metrics', '/api/update/apk', '/api/update/version', '/api/events']; // B70 — health/memory + the APK update proxy/version probe are read-only infra (no secrets, no AI spend); a locked backend must stay observable and still deliver app updates. B78 — the event log is GET-only, read-only, sanitized (no raw keys), and the same class of debug surface as the connector inbound log, so it stays open for browser inspection.
+const OPEN_PATHS = ['/api/health', '/api/health/memory', '/api/settings/status', '/api/metrics', '/api/update/apk', '/api/update/version', '/api/events', '/api/identity', '/api/rate/status', '/api/sessions', '/api/goals']; // B70 — health/memory + the APK update proxy/version probe are read-only infra (no secrets, no AI spend); a locked backend must stay observable and still deliver app updates. B78 — the event log is GET-only, read-only, sanitized (no raw keys), and the same class of debug surface as the connector inbound log, so it stays open for browser inspection. Goal/identity/rate/sessions are read-only or owner-triggered (POST /api/goals is NOT in this list — it is key-gated like chat).
 app.use((req, res, next) => {
   if (!API_KEY || req.method === 'OPTIONS') return next();
   if (!req.path.startsWith('/api')) return next();
@@ -1144,13 +1148,125 @@ async function buildPlannerMemory(query) {
   return parts.join('\n');
 }
 
-/** Stable per-conversation id: explicit header wins, else the client address. */
+/** Stable per-conversation id: explicit header wins, else the client address.
+ *  Sanitized so a crafted header can never create odd session keys, and every
+ *  touch is recorded in the session registry (isolation observability). */
 function conversationId(req) {
-  return String(req.headers['x-jexi-session'] || req.headers['x-forwarded-for'] || req.ip || 'default').slice(0, 120);
+  const raw = String(req.headers['x-jexi-session'] || req.headers['x-forwarded-for'] || req.ip || 'default');
+  const clean = raw.replace(/[^A-Za-z0-9._-]/g, '').slice(0, 64) || 'default';
+  touchSession(clean);
+  return clean;
 }
 
 const CONFIRM_RE = /^(yes|yeah|yep|yup|sure|ok|okay|k|go ahead|do it|do that|do it now|please|please do|yes please|absolutely|alright|alrighty|proceed|sounds good|fine|make it|build it|go on|sure do it|yes do it)\b[\s.,!?]*$/i;
 const DECLINE_RE = /^(no|nope|never ?mind|cancel|stop|forget it|skip|don'?t|no thanks)\b[\s.,!?]*$/i;
+
+// === GOAL ENGINE (autonomy) — goal-level execution with info-asking ===
+const goalEngine = new GoalEngine({
+  planner,
+  orchestrator,
+  generateContent,
+  store: { saveRun, loadRun, clearRun },
+});
+
+// GET /api/goals — live goal records (read-only, no secrets).
+app.get('/api/goals', (req, res) => res.json({ goals: goalEngine.listGoals() }));
+
+// GET /api/goals/:id — one goal record.
+app.get('/api/goals/:id', (req, res) => {
+  const g = goalEngine.goal(String(req.params.id).slice(0, 80));
+  if (!g) return res.status(404).json({ error: 'goal not found' });
+  res.json({ goal: g });
+});
+
+// POST /api/goals — start an autonomous goal (NDJSON stream, same contract as
+// /api/chat). autonomy: 'ask' (pause at confirmations, default) | 'full'
+// (preflight questions once, then run to completion with auto-approved
+// confirmations for THIS goal).
+app.post('/api/goals', async (req, res) => {
+  const { goal, autonomy } = req.body || {};
+  if (!goal || !String(goal).trim()) return res.status(400).json({ success: false, error: 'No goal provided' });
+  const convId = conversationId(req);
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Cache-Control', 'no-cache');
+  const sendEvent = (type, data) => { try { res.write(JSON.stringify({ type, ...data }) + '\n'); } catch (e) {} };
+  const heartbeat = setInterval(() => { try { res.write('{"type":"heartbeat"}\n'); } catch (e) {} }, 10000);
+  const finish = () => { clearInterval(heartbeat); try { res.end(); } catch (e) {} };
+  try {
+    const out = await goalEngine.startGoal({
+      goal: String(goal).trim(),
+      session: convId,
+      autonomy: String(autonomy || 'ask').toLowerCase(),
+      sendEvent,
+    });
+    if (out.needInfo && out.needInfo.length) {
+      sendEvent('goal.need-info', { goalId: out.goalId, questions: out.needInfo });
+      sendEvent('done', {
+        success: true, query: goal, parked: true, goalId: out.goalId,
+        summary: `### 📋 Almost there — I need a few details\n\n${out.needInfo.map((q, i) => `${i + 1}. **${q.question}**`).join('\n')}\n\nJust type your answers and I'll take it from there.`,
+      });
+    } else if (out.result) {
+      sendEvent('done', {
+        success: out.result.success !== false, query: goal, goalId: out.goalId,
+        summary: normalizeFinalAnswer(out.result.summary || (out.result.success === false ? (out.result.error || 'Goal failed.') : '✅ Goal completed — check the activity log above.')),
+        files: out.result.files || [], sources: out.result.sources || [], statistics: out.result.statistics || {},
+      });
+    } else {
+      sendEvent('done', { success: false, query: goal, goalId: out.goalId, summary: `### ⚠ JEXI OS\n\n${out.error || 'The goal failed to start.'}` });
+    }
+  } catch (e) {
+    sendEvent('done', { success: false, error: e.message, summary: `### ⚠ JEXI OS\n\n${e.message}` });
+  }
+  finish();
+});
+
+// POST /api/goals/:id/info — answer a parked goal's questions (or use /api/chat;
+// a message in the goal's session is auto-routed to the parked goal).
+app.post('/api/goals/:id/info', async (req, res) => {
+  const { answer } = req.body || {};
+  if (!answer || !String(answer).trim()) return res.status(400).json({ ok: false, error: 'No answer provided' });
+  const convId = conversationId(req);
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Cache-Control', 'no-cache');
+  const sendEvent = (type, data) => { try { res.write(JSON.stringify({ type, ...data }) + '\n'); } catch (e) {} };
+  const heartbeat = setInterval(() => { try { res.write('{"type":"heartbeat"}\n'); } catch (e) {} }, 10000);
+  const finish = () => { clearInterval(heartbeat); try { res.end(); } catch (e) {} };
+  try {
+    const out = await goalEngine.resumeWithInfo({ goalId: String(req.params.id).slice(0, 80), session: convId, answer: String(answer).trim(), sendEvent });
+    if (out.result) {
+      sendEvent('done', { success: out.result.success !== false, summary: normalizeFinalAnswer(out.result.summary || '✅ Goal completed.'), files: out.result.files || [], sources: out.result.sources || [], statistics: out.result.statistics || {}, goalId: out.goalId });
+    } else {
+      sendEvent('done', { success: false, summary: `### ⚠ JEXI OS\n\n${out.error || 'Could not resume the goal.'}` });
+    }
+  } catch (e) {
+    sendEvent('done', { success: false, summary: `### ⚠ JEXI OS\n\n${e.message}` });
+  }
+  finish();
+});
+
+// GET /api/identity — who JEXI is, who built her, what she can do (read-only,
+// generated from the live registries, always available even with no AI key).
+app.get('/api/identity', (req, res) => {
+  res.json({
+    name: JEXI_IDENTITY.name,
+    fullName: JEXI_IDENTITY.fullName,
+    tagline: JEXI_IDENTITY.tagline,
+    createdBy: JEXI_IDENTITY.createdBy,
+    createdByTitle: JEXI_IDENTITY.createdByTitle,
+    counts: { agents: ROSTER_COUNT, skills: SKILL_COUNT, tools: TOOL_REGISTRY.length },
+    capabilities: buildCapabilityLines(),
+    limitations: buildLimitationLines(),
+    autonomy: ['ask', 'full'],
+    answer: IDENTITY_ANSWER,
+  });
+});
+
+// GET /api/rate/status — free-tier pacing status (read-only, no secrets).
+app.get('/api/rate/status', (req, res) => res.json(rateLimiterStatus()));
+
+// GET /api/sessions — which conversations exist and when they were active
+// (read-only; proves per-session history is never mixed).
+app.get('/api/sessions', (req, res) => res.json({ sessions: listSessions() }));
 
 // Build 48, P5 — when the NDJSON stream drops (proxy drop, backgrounded app,
 // host restart), the server-side mission keeps running. The frontend polls this
@@ -1221,6 +1337,33 @@ app.post('/api/chat', async (req, res) => {
     const raw = String(query || '').trim();
     const pendingOffer = loadOffer(convId);
     const hasPending = Boolean(pendingOffer);
+
+    // GOAL ENGINE — a parked goal in this session is waiting for the user's
+    // details; the next message IS the answer (no re-planning, no confusion
+    // with the offer flow).
+    const parkedGoalId = (() => {
+      for (const g of goalEngine.listGoals()) {
+        if (g.session === convId && g.status === 'need-info') return g.id;
+      }
+      return null;
+    })();
+    if (parkedGoalId && !image && raw.trim()) {
+      clearOffer(convId);
+      clearRun(convId);
+      sendEvent('log', { agent: 'Goal Engine', message: `📨 Received your details — resuming goal "${String(goalEngine.goal(parkedGoalId)?.goal || '').slice(0, 80)}"...` });
+      const out = await goalEngine.resumeWithInfo({ goalId: parkedGoalId, session: convId, answer: raw, sendEvent });
+      if (out && out.result) {
+        done({
+          success: out.result.success !== false, query: raw,
+          summary: normalizeFinalAnswer(out.result.summary || (out.result.success === false ? (out.result.error || 'The goal failed.') : '✅ Goal completed — check the activity log above.')),
+          files: out.result.files || [], sources: out.result.sources || [], statistics: out.result.statistics || {}, goalId: parkedGoalId,
+        });
+      } else {
+        done({ success: false, query: raw, summary: `### ⚠ JEXI OS\n\n${(out && out.error) || 'Could not resume the goal.'}` });
+      }
+      return;
+    }
+
     let effectiveQuery = raw;
     let plan;
     let activeTaskId = null;   // Build 47 — the task this turn belongs to

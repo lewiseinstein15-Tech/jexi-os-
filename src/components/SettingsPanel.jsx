@@ -60,6 +60,7 @@ export default function SettingsPanel() {
   const [initialLoad, setInitialLoad] = useState(true);
 
   const [accessKey, setAccessKeyState] = useState(getAccessKey());
+  const [autonomyMode, setAutonomyMode] = useState('ask'); // ask | full — goal autonomy level
   const [backendUrl, setBackendUrlState] = useState(getBackendUrl());
   const [backendInput, setBackendInput] = useState(getBackendUrl());
   const [backendStatus, setBackendStatus] = useState('idle'); // idle, saved, error
@@ -95,6 +96,7 @@ export default function SettingsPanel() {
         setNvidiaKey(data.nvidiaKey || '');
         setSambanovaKey(data.sambanovaKey || '');
         setGithubToken(data.githubToken || '');
+        setAutonomyMode(['ask', 'full'].includes(data.autonomyMode) ? data.autonomyMode : 'ask');
         try { setKeyStatus(await statusRes.json()); } catch (e) { /* status endpoint optional */ }
         try { if (trustRes) setTrust(await trustRes.json()); } catch (e) { /* trust endpoint optional */ }
         try {
@@ -144,6 +146,7 @@ export default function SettingsPanel() {
       if (!keyStatus?.nvidia?.configured) body.nvidiaKey = nvidiaKey;
       if (!keyStatus?.sambanova?.configured) body.sambanovaKey = sambanovaKey;
       if (!keyStatus?.github?.configured) body.githubToken = githubToken;
+      body.autonomyMode = autonomyMode; // goal autonomy level (ask = pause at confirmations, full = preflight questions then run)
       const res = await jexiFetch(`${backendUrl}/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -330,6 +333,30 @@ export default function SettingsPanel() {
               </button>
             </div>
             <p className="text-[8px] text-text-tertiary mt-1">If you set <span className="font-mono text-text-secondary">JEXI_API_KEY</span> on the server (Render → Environment), every request must carry this key. Stored in your browser, sent only to your own backend.</p>
+          </div>
+
+          {/* Autonomy level — goal-level execution behavior */}
+          <div className="bg-surface-2 border border-hairline rounded-md p-3">
+            <label className="flex items-center gap-2 text-[10px] font-bold text-text-secondary mb-1.5 tracking-wider">
+              <Zap className="w-3 h-3 text-brand" />
+              AUTONOMY LEVEL (GOALS)
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                ['ask', 'Ask', 'Pause at every confirmation — you approve each step.'],
+                ['full', 'Full', 'Preflight questions once, then runs the whole goal itself (auto-approves confirmations for that goal; destructive/safety blocks still apply).'],
+              ].map(([val, label, desc]) => (
+                <button
+                  key={val}
+                  onClick={() => setAutonomyMode(val)}
+                  className={`text-left rounded-md border px-3 py-2.5 ${autonomyMode === val ? 'border-brand bg-brand-dim' : 'border-hairline bg-surface-1'}`}
+                >
+                  <div className={`text-xs font-bold ${autonomyMode === val ? 'text-brand' : 'text-text-primary'}`}>{label}</div>
+                  <div className="text-[8px] text-text-tertiary mt-1 leading-relaxed">{desc}</div>
+                </button>
+              ))}
+            </div>
+            <p className="text-[8px] text-text-tertiary mt-1">Used when you start a goal (<span className="font-mono text-text-secondary">/goal</span> or Goals). Full autonomy = JEXI asks for the details she needs once, then executes end-to-end and reports when done.</p>
           </div>
 
           {/* Backend URL (runtime override) */}

@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Groq } from 'groq-sdk';
 import { loadSettings } from './SettingsManager.js';
 import { providerOrder, recordProviderSuccess, recordProviderFailure, configuredProviders, markProviderUnavailable } from './ProviderRouter.js';
+import { takeSlot, releaseSlot } from './ProviderRateLimiter.js'; // free-tier pacing
 import { queryLocalLLM } from './OfflineAgent.js';
 
 /**
@@ -466,16 +467,25 @@ export async function generateContent(prompt, systemInstruction = '', imageBase6
   for (const provider of order) {
     const call = PROVIDER_CALLS[provider];
     if (!call) continue;
+    // Free-tier pacing: wait for the provider's rate slot (bounded). When
+    // throttled for too long, slide to the next healthy provider.
+    const slot = await takeSlot(provider);
+    if (!slot.ok) {
+      errors.push(`${provider}: ${slot.reason} (rate limiter)`);
+      continue;
+    }
     try {
       const text = await call(prompt, system, imageBase64, opts, errors);
       if (text) {
         recordProviderSuccess(provider);
+        releaseSlot();
         return text;
       }
     } catch (e) {
       errors.push(`${provider}: ${e.message}`);
     }
     recordProviderFailure(provider);
+    releaseSlot();
   }
 
   const keys = Object.values(resolveKeys()).filter(Boolean);
@@ -709,16 +719,24 @@ export async function generateWithToolsLoop(prompt, systemInstruction = '', tool
   const messages = [{ role: 'system', content: system }, { role: 'user', content: prompt }];
   for (const provider of order) {
     if (!TOOL_CAPABLE.has(provider)) continue;
+    // Free-tier pacing (same as generateContent).
+    const slot = await takeSlot(provider);
+    if (!slot.ok) {
+      errors.push(`${provider}: ${slot.reason} (rate limiter)`);
+      continue;
+    }
     try {
       const res = await runToolLoopForProvider(provider, messages, tools, opts, errors);
       if (res) {
         recordProviderSuccess(provider);
+        releaseSlot();
         return { ok: true, provider, model: res.model || null, text: res.text, toolCalls: res.toolCalls, iterations: res.iterations };
       }
     } catch (e) {
       errors.push(`${provider}: ${e.message}`);
     }
     recordProviderFailure(provider);
+    releaseSlot();
   }
   throw new Error(`All AI providers failed for tool calling. ${errors.join(' | ') || 'no tool-capable provider configured'}`);
 }
