@@ -81,7 +81,7 @@ import { touchSession, listSessions } from './src/services/SessionStore.js'; // 
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines } from './src/services/JexiIdentity.js'; // canonical identity (name / creator / capabilities)
 import { enqueueGoal, enqueueChat, answerJob, getJob as getGoalJob, getJobEvents, subscribe as subscribeJob, listJobs, setGoalExecutor, setChatExecutor, setGoalNotifier, hydrateGoalJobsFromRedis } from './src/services/GoalJobQueue.js'; // Phase 2 — durable background goal jobs (B85 — durable chat)
 import { notifyGoalComplete, setGoalCallConnector, goalReportStats } from './src/services/GoalNotifier.js'; // Phase 4 — goal completion notifications + email reports
-import { getVapidPublicKey, addSubscription, removeSubscription, broadcastPush, listSubscriptions, hydratePushSubsFromRedis } from './src/services/PushManager.js'; // B84 — web push notifications (closed-app delivery)
+import { getVapidPublicKey, addSubscription, removeSubscription, broadcastPush, listSubscriptions, hydratePushSubsFromRedis, recordPushDiag, listPushDiag } from './src/services/PushManager.js'; // B84 — web push notifications (closed-app delivery)
 import { addFcmToken, removeFcmToken, listFcmTokens, fcmStatus, broadcastFcm, hydrateFcmTokensFromRedis } from './src/services/FcmManager.js'; // B86 — FCM push for the installed APK
 
 
@@ -198,7 +198,7 @@ app.use(cors({ origin: CORS_ALLOWLIST }));
 // else under /api/* (chat, vision, knowledge, memory, desktop, settings write,
 // APK proxy) is gated when JEXI_API_KEY is set.
 // NOTE: mounted on the app root (not '/api') so req.path keeps its full form.
-const OPEN_PATHS = ['/api/health', '/api/health/memory', '/api/settings/status', '/api/metrics', '/api/update/apk', '/api/update/version', '/api/events', '/api/identity', '/api/rate/status', '/api/sessions', '/api/goals', '/api/goals/email-stats', '/api/push/vapid-key', '/api/push/fcm-status']; // B70 — health/memory + the APK update proxy/version probe are read-only infra (no secrets, no AI spend); a locked backend must stay observable and still deliver app updates. B78 — the event log is GET-only, read-only, sanitized (no raw keys), and the same class of debug surface as the connector inbound log, so it stays open for browser inspection. Goal/identity/rate/sessions are read-only or owner-triggered (POST /api/goals is NOT in this list — it is key-gated like chat).
+const OPEN_PATHS = ['/api/health', '/api/health/memory', '/api/settings/status', '/api/metrics', '/api/update/apk', '/api/update/version', '/api/events', '/api/identity', '/api/rate/status', '/api/sessions', '/api/goals', '/api/goals/email-stats', '/api/push/vapid-key', '/api/push/fcm-status', '/api/push/diag']; // B70 — health/memory + the APK update proxy/version probe are read-only infra (no secrets, no AI spend); a locked backend must stay observable and still deliver app updates. B78 — the event log is GET-only, read-only, sanitized (no raw keys), and the same class of debug surface as the connector inbound log, so it stays open for browser inspection. Goal/identity/rate/sessions are read-only or owner-triggered (POST /api/goals is NOT in this list — it is key-gated like chat).
 app.use((req, res, next) => {
   if (!API_KEY || req.method === 'OPTIONS') return next();
   if (!req.path.startsWith('/api')) return next();
@@ -695,6 +695,14 @@ app.post('/api/push/fcm-unregister', (req, res) => {
 
 // Status: configured + device count (read-only, no secrets).
 app.get('/api/push/fcm-status', (req, res) => res.json(fcmStatus()));
+
+// Client-side push/FCM diagnostics — the app reports on-device failures so
+// they are visible here (GET open/read-only; POST is key-gated like other writes).
+app.get('/api/push/diag', (req, res) => res.json({ diag: listPushDiag() }));
+app.post('/api/push/diag', (req, res) => {
+  const { step, error, platform, permission, ua } = req.body || {};
+  res.json(recordPushDiag({ step, error, platform, permission, ua }));
+});
 
 // === MODEL ROUTING (roadmap stage 24 — per-domain provider preference) ===
 // Exposes the intent → provider map; AgentLoop honors it via opts.prefer.

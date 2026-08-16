@@ -28,6 +28,7 @@ import { redisGet, redisSet, isRedisConfigured } from './RedisStore.js';
 const VAPID_FILE = path.join(DATA_DIR, 'vapid.json');
 const REDIS_KEY = 'jexi:push-subs:v1';
 const SUBS_FILE = path.join(DATA_DIR, 'push-subscriptions.json');
+const DIAG_FILE = path.join(DATA_DIR, 'push-diag.json');
 const MAX_SUBS = 30;
 const VAPID_SUBJECT = `mailto:${process.env.VAPID_SUBJECT || 'lewiseinstein15@gmail.com'}`;
 
@@ -143,6 +144,42 @@ export function listSubscriptions() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Client diagnostics — the app reports what happened on-device        */
+/* (platform, permission, step, error) so failures are visible         */
+/* server-side instead of silent.                                      */
+/* ------------------------------------------------------------------ */
+
+let diag = loadDiag();
+
+function loadDiag() {
+  try {
+    if (fs.existsSync(DIAG_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(DIAG_FILE, 'utf-8'));
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch { /* fresh */ }
+  return [];
+}
+
+function persistDiag() {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(DIAG_FILE, JSON.stringify(diag, null, 2), 'utf-8');
+  } catch { /* best effort */ }
+}
+
+export function recordPushDiag({ step = '', error = '', platform = '', permission = '', ua = '' } = {}) {
+  diag.unshift({ at: Date.now(), step: String(step).slice(0, 60), error: String(error).slice(0, 300), platform: String(platform).slice(0, 40), permission: String(permission).slice(0, 40), ua: String(ua).slice(0, 120) });
+  if (diag.length > 60) diag.length = 60;
+  persistDiag();
+  return { ok: true };
+}
+
+export function listPushDiag() {
+  return diag;
+}
+
+/* ------------------------------------------------------------------ */
 /* Broadcast                                                           */
 /* ------------------------------------------------------------------ */
 
@@ -194,4 +231,6 @@ export function resetPushManager() {
   subs = [];
   persistSubs();
   sender = null;
+  diag = [];
+  persistDiag();
 }

@@ -6,7 +6,7 @@
 
 import {
   addSubscription, removeSubscription, listSubscriptions, getVapidPublicKey,
-  broadcastPush, setPushSender, resetPushManager,
+  broadcastPush, setPushSender, resetPushManager, recordPushDiag, listPushDiag,
 } from './src/services/PushManager.js';
 import { notify, clearNotifications, setNotifyBroadcaster } from './src/services/NotificationCenter.js';
 
@@ -76,6 +76,19 @@ ok(pushed[0].id === n.id, 'broadcaster got the same notification object');
 setNotifyBroadcaster(() => { throw new Error('boom'); });
 ok(notify({ title: 'x' }).id, 'broadcaster throw does not break notify');
 setNotifyBroadcaster(null);
+
+
+console.log('\n== Client diagnostics store ==');
+{
+  resetPushManager();
+  recordPushDiag({ step: 'registered', platform: 'native', permission: 'granted' });
+  recordPushDiag({ step: 'get-token-error', error: 'Play services not ready', platform: 'native' });
+  const d = listPushDiag();
+  ok(d.length === 2, 'diag entries recorded');
+  ok(d[0].step === 'get-token-error' && /Play services/.test(d[0].error), 'newest first with error text');
+  ok(d[1].permission === 'granted', 'permission captured');
+  ok(typeof d[0].at === 'number', 'timestamp present');
+}
 
 console.log(`\nRESULT: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

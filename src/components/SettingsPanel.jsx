@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server, Github, ShieldCheck, Shield, Globe, Lock, Cpu, Cloud, Mail } from 'lucide-react';
+import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server, Github, ShieldCheck, Shield, Globe, Lock, Cpu, Cloud, Mail, Bell, Loader2 } from 'lucide-react';
 import { getBackendUrl, setBackendUrl, getAccessKey, setAccessKey, jexiFetch } from '../utils/helpers';
+import { setupFcm } from '../utils/fcmSetup';
 import PanelHeader from './PanelHeader';
 
 // Each credential's status from the backend: { configured, source: 'env' | 'settings' | 'none' }
@@ -62,6 +63,10 @@ export default function SettingsPanel() {
   const [accessKey, setAccessKeyState] = useState(getAccessKey());
   const [autonomyMode, setAutonomyMode] = useState('ask'); // ask | full — goal autonomy level
   const [goalReportEmail, setGoalReportEmail] = useState(''); // email address for goal completion reports
+  const [fcmServer, setFcmServer] = useState(false); // server FCM configured
+  const [fcmDevices, setFcmDevices] = useState(0);
+  const [fcmBusy, setFcmBusy] = useState(false);
+  const [lastDiag, setLastDiag] = useState('');
   const [backendUrl, setBackendUrlState] = useState(getBackendUrl());
   const [backendInput, setBackendInput] = useState(getBackendUrl());
   const [backendStatus, setBackendStatus] = useState('idle'); // idle, saved, error
@@ -101,6 +106,10 @@ export default function SettingsPanel() {
         setGoalReportEmail(data.goalReportEmail || '');
         try { setKeyStatus(await statusRes.json()); } catch (e) { /* status endpoint optional */ }
         try { if (trustRes) setTrust(await trustRes.json()); } catch (e) { /* trust endpoint optional */ }
+        try {
+          const fcmRes = await jexiFetch(`${base}/api/push/fcm-status`).catch(() => null);
+          if (fcmRes) { const f = await fcmRes.json(); setFcmServer(!!f.configured); setFcmDevices(f.deviceTokens || 0); }
+        } catch (e) { /* optional */ }
         try {
           if (toolsRes) {
             const toolsData = await toolsRes.json();
@@ -376,6 +385,44 @@ export default function SettingsPanel() {
               className="w-full bg-surface-1 text-text-primary border border-hairline rounded-md px-3 py-2.5 text-xs focus:outline-none focus:border-brand-line"
             />
             <p className="text-[8px] text-text-tertiary mt-1">When a goal finishes (or fails), JEXI sends you the report by email. Defaults to <span className="font-mono text-text-secondary">lewiseinstein15@gmail.com</span> — set a different address here to override (requires the Email connector key, <span className="font-mono text-text-secondary">RESEND_API_KEY</span>). Env var: <span className="font-mono text-text-secondary">GOAL_REPORT_EMAIL</span>.</p>
+          </div>
+
+          {/* Push notification status + enable button */}
+          <div className="bg-surface-2 border border-hairline rounded-md p-3">
+            <label className="flex items-center gap-2 text-[10px] font-bold text-text-secondary mb-1.5 tracking-wider">
+              <Bell className="w-3 h-3 text-brand" />
+              PHONE NOTIFICATIONS
+            </label>
+            <div className="flex flex-col gap-1.5 text-[10px] text-text-secondary">
+              <div className="flex justify-between">
+                <span>This device (web push)</span>
+                <span className={typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'text-brand' : 'text-status-warn'}>
+                  {typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Server FCM (installed app, closed-app push)</span>
+                <span className={fcmServer ? 'text-brand' : 'text-status-warn'}>{fcmServer ? `READY · ${fcmDevices} device${fcmDevices === 1 ? '' : 's'}` : 'not configured on server'}</span>
+              </div>
+              {lastDiag && <div className="text-[9px] text-text-tertiary">Last device report: {lastDiag}</div>}
+            </div>
+            <button
+              onClick={async () => {
+                setFcmBusy(true);
+                try {
+                  const ok = await setupFcm();
+                  setLastDiag(ok ? 'registered ✓' : 'could not register (check permission)');
+                  setTimeout(() => setLastDiag(''), 5000);
+                } catch { setLastDiag('failed'); setTimeout(() => setLastDiag(''), 5000); }
+                setFcmBusy(false);
+              }}
+              disabled={fcmBusy}
+              className="mt-2 px-3 py-2 rounded-md text-[10px] font-bold bg-brand text-black flex items-center gap-1.5 disabled:opacity-40"
+            >
+              {fcmBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Bell className="w-3 h-3" />}
+              ENABLE NOTIFICATIONS
+            </button>
+            <p className="text-[8px] text-text-tertiary mt-1">On Android 13+, tap this (or reinstall the app) to re-show the system permission dialog. Closed-app notifications need FCM: installed APK + server FCM configured + this toggle granted.</p>
           </div>
 
           {/* Backend URL (runtime override) */}
