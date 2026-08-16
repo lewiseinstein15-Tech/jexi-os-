@@ -36,15 +36,32 @@ const GROQ_VISION_MODELS = [
 ];
 const GROQ_TEXT_MODEL = 'llama-3.1-8b-instant';
 
-// Seed-family (ByteDance) + free text models via OpenRouter. SeedRealtime
+// Seed-family (ByteDance) + FREE text models via OpenRouter. SeedRealtime
 // itself has NO public API yet — it is free only inside the Doubao app — but
-// the Seed 2.0 / 1.6 vision models and free text models are live today.
+// the Seed 2.0 / 1.6 vision models and the free text models below are live
+// today. B73: every entry live-verified against openrouter.ai/api/v1/models —
+// the old llama-3.3-70b:free / deepseek-chat-v3-0324:free entries were
+// REMOVED by OpenRouter (no longer in the model list → instant 404s).
 const OPENROUTER_VISION_MODELS = ['bytedance-seed/seed-2.0-mini', 'bytedance-seed/seed-1.6-flash'];
-const OPENROUTER_TEXT_MODELS = ['bytedance-seed/seed-2.0-mini', 'meta-llama/llama-3.3-70b-instruct:free', 'deepseek/deepseek-chat-v3-0324:free'];
+const OPENROUTER_TEXT_MODELS = [
+  'bytedance-seed/seed-2.0-mini',            // $0.10/M in — near-free workhorse, proven working
+  'nvidia/nemotron-3-super-120b-a12b:free',  // $0 — 120B general model, tool calling, 262k ctx
+  'cohere/north-mini-code:free',             // $0 — code-focused, tool calling
+  'google/gemma-4-26b-a4b-it:free',          // $0 — general, tool calling
+];
 
 // Free text models on the HuggingFace Inference API (HF_TOKEN). Free tier is
-// slow — these are a last-resort text provider, gated on the token.
-const HF_TEXT_MODELS = ['microsoft/phi-4', 'HuggingFaceH4/zephyr-7b-beta', 'mistralai/Mistral-7B-Instruct-v0.3'];
+// slow — these are a last-resort text provider, gated on the token. B73: the
+// genuinely-free Qwen path (verified on HF's supported Inference Providers
+// list) — no free Qwen remains on OpenRouter, and DeepSeek has no free tier
+// on any wired provider (see QWEN_MODELS note).
+const HF_TEXT_MODELS = [
+  'Qwen/Qwen2.5-7B-Instruct',        // free Qwen — general
+  'Qwen/Qwen2.5-Coder-7B-Instruct',  // free Qwen — coding
+  'microsoft/phi-4',
+  'HuggingFaceH4/zephyr-7b-beta',
+  'mistralai/Mistral-7B-Instruct-v0.3',
+];
 
 // Free / no-card OpenAI-compatible providers (text only). Each is optional —
 // a missing key is skipped entirely by the router; a failing one falls through
@@ -66,8 +83,17 @@ const XAI_MODELS = ['grok-4.6', 'grok-4', 'grok-3'];
 // model; deepseek-reasoner the chain-of-thought variant.
 const DEEPSEEK_MODELS = ['deepseek-chat', 'deepseek-reasoner'];
 
-// Qwen (B66 — memory coworker + coding fallback) via OpenRouter free tier.
-const QWEN_MODELS = ['qwen/qwen3-8b:free', 'qwen/qwen-2.5-72b-instruct:free'];
+// Qwen (B66 — memory coworker + coding fallback). B73 live-verified: there is
+// NO free Qwen on OpenRouter anymore (qwen3-8b:free and qwen-2.5-72b:free were
+// removed) and Groq's only Qwen (qwen3.6-27b) is PAID preview. Free Qwen runs
+// through HuggingFace serverless inference (HF_TEXT_MODELS above). This list
+// is documentation only — WorkerRouter routes Qwen needs through the HF tier.
+export const QWEN_MODELS = ['Qwen/Qwen2.5-7B-Instruct', 'Qwen/Qwen2.5-Coder-7B-Instruct'];
+
+// B73 — exported so the regression suite can guard the free-model wiring
+// (no dead :free models, genuinely-free entries present).
+export const OPENROUTER_FREE_TEXT_MODELS = ['nvidia/nemotron-3-super-120b-a12b:free', 'cohere/north-mini-code:free', 'google/gemma-4-26b-a4b-it:free'];
+export const HF_FREE_QWEN_MODELS = ['Qwen/Qwen2.5-7B-Instruct', 'Qwen/Qwen2.5-Coder-7B-Instruct'];
 
 const TIMEOUT_MS = 90000;
 

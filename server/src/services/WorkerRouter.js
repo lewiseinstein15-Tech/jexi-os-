@@ -6,10 +6,18 @@
  * its PRIMARY model, a fallback, and finally the general last-resort tier
  * (HuggingFace → DeepInfra → Mistral).
  *
- *   coder       → DeepSeek first (deepseek-chat), Qwen via OpenRouter as fallback
- *   memory      → Qwen (summarization/cross-check) + Gemini (large context)
- *   researcher  → Grok (xAI) first, Groq, then OpenRouter free models
- *   fallback    → HuggingFace → DeepInfra → Mistral (last resort only)
+ *   coder       → DeepSeek first (deepseek-chat), then FREE code models
+ *   memory      → FREE OpenRouter general model first, then near-free + Gemini
+ *   researcher  → Grok (xAI) first, Groq, then OpenRouter models
+ *   fallback    → HuggingFace (incl. free Qwen) → DeepInfra → Mistral (last resort)
+ *
+ * B73 — free-model audit (live-verified): OpenRouter has ZERO free DeepSeek
+ * and ZERO free Qwen models today; DeepSeek's own API has no permanent free
+ * tier (one-time promo credits only). The free models applied here
+ * (north-mini-code:free, nemotron-3-super-120b:free, gemma-4-26b:free) were
+ * confirmed live at $0 against openrouter.ai/api/v1/models, and free Qwen
+ * (Qwen2.5-7B / Qwen2.5-Coder-7B) is served via HuggingFace's free Inference
+ * API (HF_TOKEN) in the fallback tier.
  *
  * runWorker() executes one coworker: it walks the coworker's chain with the
  * provider pinned via generateContent(opts.provider/opts.model). When the
@@ -26,29 +34,38 @@ export const COWORKERS = {
   coder: {
     role: 'Coding / GitHub operations',
     providers: [
+      // B66 — DeepSeek stays the architecture's coding primary. It has NO free
+      // tier (verified B73 — paid API only, one-time promo credits already
+      // consumed → HTTP 402 until topped up). It's cheap (~$0.30/M) and works
+      // the moment the account has balance.
       { key: 'deepseek', model: 'deepseek-chat' },
-      // B72 — qwen/qwen3-8b:free was REMOVED from OpenRouter (live-verified:
-      // zero free Qwen models remain). Replaced with seed-2.0-mini, the
-      // codebase's own established OpenRouter model that the live provider
-      // probe proves works with this account's key.
+      // B73 — FREE code model, live-verified at $0 on OpenRouter (the free
+      // Qwen/DeepSeek models OpenRouter once hosted were removed).
+      { key: 'openrouter', model: 'cohere/north-mini-code:free' },
+      // Near-free fallback ($0.10/M in) — proven working with this account.
       { key: 'openrouter', model: 'bytedance-seed/seed-2.0-mini' },
     ],
   },
   memory: {
     role: 'Memory / conversation continuity',
     providers: [
-      // B72 — was qwen/qwen3-8b:free (deleted from OpenRouter). Every
-      // conversation task died on this dead model before Gemini was tried.
+      // B73 — FREE 120B general model first (tool calling, 262k ctx,
+      // live-verified $0). OpenRouter free-tier rate limits just fall through
+      // to the next provider below.
+      { key: 'openrouter', model: 'nvidia/nemotron-3-super-120b-a12b:free' },
+      // B72 — was qwen/qwen3-8b:free (deleted from OpenRouter). seed-2.0-mini
+      // is the near-free workhorse the live provider probe proves works.
       { key: 'openrouter', model: 'bytedance-seed/seed-2.0-mini' },
-      { key: 'gemini', model: 'gemini-2.5-flash' },         // Gemini: large-context handling
+      { key: 'gemini', model: 'gemini-2.5-flash' },         // Gemini: free tier, large-context handling
     ],
   },
   researcher: {
     role: 'Research / realtime information',
     providers: [
-      { key: 'xai', model: 'grok-4.6' },
-      { key: 'groq', model: 'llama-3.1-8b-instant' },
-      { key: 'openrouter', model: 'bytedance-seed/seed-2.0-mini' },
+      { key: 'xai', model: 'grok-4.6' },                             // B66 primary (needs credits)
+      { key: 'groq', model: 'llama-3.1-8b-instant' },                // Groq free tier — live-verified
+      { key: 'openrouter', model: 'bytedance-seed/seed-2.0-mini' },  // near-free fallback
+      { key: 'openrouter', model: 'google/gemma-4-26b-a4b-it:free' } // B73 — FREE fallback
     ],
   },
   fallback: {
