@@ -79,7 +79,7 @@ import { GoalEngine } from './src/services/GoalEngine.js'; // autonomy: goal-lev
 import { rateLimiterStatus } from './src/services/ProviderRateLimiter.js'; // free-tier pacing status
 import { touchSession, listSessions } from './src/services/SessionStore.js'; // session registry (isolation observability)
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines } from './src/services/JexiIdentity.js'; // canonical identity (name / creator / capabilities)
-import { enqueueGoal, answerJob, getJob as getGoalJob, getJobEvents, subscribe as subscribeJob, listJobs, setGoalExecutor, setGoalNotifier, hydrateGoalJobsFromRedis } from './src/services/GoalJobQueue.js'; // Phase 2 — durable background goal jobs
+import { enqueueGoal, enqueueChat, answerJob, getJob as getGoalJob, getJobEvents, subscribe as subscribeJob, listJobs, setGoalExecutor, setChatExecutor, setGoalNotifier, hydrateGoalJobsFromRedis } from './src/services/GoalJobQueue.js'; // Phase 2 — durable background goal jobs (B85 — durable chat)
 import { notifyGoalComplete, setGoalCallConnector, goalReportStats } from './src/services/GoalNotifier.js'; // Phase 4 — goal completion notifications + email reports
 import { getVapidPublicKey, addSubscription, removeSubscription, broadcastPush, listSubscriptions } from './src/services/PushManager.js'; // B84 — web push notifications (closed-app delivery)
 
@@ -1206,6 +1206,34 @@ setGoalExecutor(goalEngine);
 // when GOAL_REPORT_EMAIL / Settings → goalReportEmail is set.
 setGoalNotifier(notifyGoalComplete);
 setGoalCallConnector(callConnector);
+// B85 — durable chat: long chat tasks run on the same queue as goals, so
+// they survive restarts; confirmations park the job and a reply in chat
+// resumes it (RunState persisted via SessionStore, same as the sync path).
+setChatExecutor({
+  run: async ({ query, session, sendEvent }) => {
+    let paused = false;
+    const plan = await planner.analyzeIntent(query, {});
+    const opts = {
+      onPause: async (pausedState) => {
+        paused = true;
+        saveRun(session, { plan, query, state: pausedState });
+      },
+    };
+    const results = plan.complexity === 'SIMPLE'
+      ? await runSimpleTask(plan, query, sendEvent, opts)
+      : await orchestrator.executePlan(plan, query, sendEvent, opts);
+    return paused ? { ...results, paused: true } : results;
+  },
+  resume: async ({ session, answer, sendEvent }) => {
+    const entry = loadRun(session);
+    if (entry && entry.state && entry.plan) {
+      const resumed = await orchestrator.executePlan(entry.plan, entry.query, sendEvent, { resumeState: entry.state, confirmed: true });
+      clearRun(session);
+      return resumed;
+    }
+    return { success: false, error: 'No paused chat task found in this session.' };
+  },
+});
 // B84 — every notification also pushes to all registered devices (web push).
 setNotifyBroadcaster((n) => { broadcastPush(n.title, n.body, n.link).catch(() => {}); });
 
@@ -1264,6 +1292,45 @@ app.post('/api/goals', (req, res) => {
   const convId = conversationId(req);
   const { id } = enqueueGoal({ goal: String(goal).trim(), session: convId, autonomy: String(autonomy || 'ask').toLowerCase() });
   res.status(202).json({ ok: true, jobId: id, status: 'queued', stream: `/api/goals/${id}/stream` });
+});
+
+// === DURABLE CHAT (B85) ===
+// POST /api/chat/async — run a chat task as a durable background job.
+// Returns { ok, jobId } immediately; stream events via
+// GET /api/chat/async/:id/stream; a reply in /api/chat resumes a parked job.
+app.post('/api/chat/async', (req, res) => {
+  const { query } = req.body || {};
+  if (!query || !String(query).trim()) return res.status(400).json({ success: false, error: 'No query provided' });
+  const convId = conversationId(req);
+  const { id } = enqueueChat({ query: String(query).trim(), session: convId });
+  res.status(202).json({ ok: true, jobId: id, status: 'queued', stream: `/api/chat/async/${id}/stream` });
+});
+
+app.get('/api/chat/async/:id/stream', (req, res) => {
+  const id = String(req.params.id).slice(0, 80);
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Cache-Control', 'no-cache');
+  const sendEvent = (event) => { try { res.write(JSON.stringify(event) + '\n'); } catch (e) {} };
+  const sub = subscribeJob(id, sendEvent);
+  if (!sub.ok) return res.status(404).json({ error: sub.error });
+  if (sub.finished) return res.end();
+  const heartbeat = setInterval(() => { try { res.write('{"type":"heartbeat"}\n'); } catch (e) {} }, 10000);
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    clearInterval(heartbeat);
+    clearInterval(poll);
+    try { if (sub.unsubscribe) sub.unsubscribe(); } catch (e) {}
+    try { res.end(); } catch (e) {}
+  };
+  const poll = setInterval(() => {
+    const j = getGoalJob(id);
+    if (j && (j.status === 'done' || j.status === 'failed')) close();
+  }, 2000);
+  req.on('close', close);
+  const j0 = getGoalJob(id);
+  if (j0 && (j0.status === 'done' || j0.status === 'failed')) close();
 });
 
 // POST /api/goals/:id/info — answer a parked goal's questions. Streams the

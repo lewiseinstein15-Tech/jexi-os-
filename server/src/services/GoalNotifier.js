@@ -84,7 +84,8 @@ export function notifyGoalComplete(job) {
 
   const ok = job.status === 'done';
   const kind = ok ? 'success' : 'error';
-  const title = `${ok ? '✅' : '⚠️'} Goal ${ok ? 'complete' : 'failed'}: ${String(job.goal || '').slice(0, 90)}`;
+  const isChat = job.kind === 'chat';
+  const title = `${ok ? '✅' : '⚠️'} ${isChat ? 'Task complete' : 'Goal complete'}${ok ? '' : ' — failed'}: ${String(job.goal || job.query || '').slice(0, 90)}`;
   const summary = ok
     ? String((job.result && (job.result.summary || '')) || 'Finished.').slice(0, 300)
     : String(job.error || (job.result && job.result.error) || 'Failed.').slice(0, 300);
