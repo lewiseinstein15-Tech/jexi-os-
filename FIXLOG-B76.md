@@ -65,6 +65,28 @@ $ npm run build
 ✓ built in 18.09s
 ```
 
+## LIVE CONFIRMATION (same day) — keys added to Render, probed again
+
+Both keys (`NVIDIA_API_KEY`, `SAMBANOVA_API_KEY`) are set in the Render env
+and the deployed build now includes B75/B76 (settings/status reports them as
+`configured: true, source: env`). Full live probe:
+
+| Provider | Result |
+|---|---|
+| Groq | ✅ OK |
+| Gemini | ✅ OK |
+| OpenRouter | ✅ OK |
+| Mistral | ✅ OK |
+| HuggingFace | ✅ OK — **the B76 endpoint fix works** (free DeepSeek/Qwen tier back) |
+| **NVIDIA NIM** | ✅ OK — **free DeepSeek V4 Flash confirmed live with the real key** |
+| **SambaNova** | ❌ HTTP 402 `PAYMENT_METHOD_REQUIRED`, `balance_units: 0` — key valid, but the "no-card free tier" claim is outdated: SambaNova now requires a payment method on file (all four models 402) |
+| Cerebras / DeepInfra / xAI / DeepSeek | ❌ 402/403 — still need funding |
+
+Action taken: the app's SambaNova hint was corrected ("no credit card" →
+"live-tested: requires a payment method") so it no longer misleads. NVIDIA NIM
+is the confirmed no-card win. Final working free set: **Groq, Gemini,
+OpenRouter, Mistral, HuggingFace, NVIDIA NIM** (plus self-hosted vLLM).
+
 ## User's to-do (the keys are made — now point JEXI at them)
 1. Render dashboard → jexi-os-brain → Environment → add:
    `NVIDIA_API_KEY` (from build.nvidia.com → API Keys) and

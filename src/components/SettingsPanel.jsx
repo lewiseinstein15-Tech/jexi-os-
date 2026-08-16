@@ -275,14 +275,14 @@ export default function SettingsPanel() {
             envNames={['NVIDIA_API_KEY']}
           />
 
-          {/* SambaNova — no-card free tier (DeepSeek V3.1/V3.2) */}
+          {/* SambaNova — live-verified B76: now requires a payment method */}
           <KeyField
-            label="SAMBANOVA KEY (FREE DEEPSEEK V3)"
+            label="SAMBANOVA KEY (DEEPSEEK V3)"
             icon={<Cloud className="w-3 h-3 text-emerald-400" />}
             value={sambanovaKey}
             onChange={(e) => setSambanovaKey(e.target.value)}
-            placeholder="Get free key at cloud.sambanova.ai — no card"
-            hint="Free tier with DeepSeek-V3.1/V3.2 — no credit card. Set SAMBANOVA_API_KEY in Render and it's automatic."
+            placeholder="Get key at cloud.sambanova.ai"
+            hint="Live-tested: your key is valid but the account shows 402 PAYMENT_METHOD_REQUIRED (0 balance units) — the free tier now needs a card on file. Optional; skip if you don't want to add one."
             status={keyStatus?.sambanova}
             envNames={['SAMBANOVA_API_KEY']}
           />
