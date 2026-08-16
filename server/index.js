@@ -1793,17 +1793,19 @@ app.delete('/api/tasks/:id', (req, res) => {
   res.json({ success: taskManager.remove(req.params.id) });
 });
 
-// === AUTOMATIONS (roadmap stage 23 — recurring missions) ===
-// A schedule is a query + interval; each due run launches a real background
-// mission through TaskManager, so every run shows up in /api/tasks with its
-// own task.* event stream. Schedules survive restarts (DATA_DIR/schedules.json).
+// === AUTOMATIONS (roadmap stage 23 — recurring missions; Build 82 — goals) ===
+// A schedule is a query + cadence (everySeconds interval or dailyAt HH:MM).
+// kind 'task' launches a TaskManager mission; kind 'goal' launches a durable
+// autonomous GOAL JOB (preflight questions, auto-approvals, restart survival,
+// completion notification + email report). Schedules survive restarts
+// (DATA_DIR/schedules.json); a missed run fires once as a catch-up.
 app.get('/api/schedules', (req, res) => {
   res.json({ schedules: taskScheduler.list().map((s) => taskScheduler.publicSchedule(s)) });
 });
 
 app.post('/api/schedules', (req, res) => {
-  const { query, everySeconds, label, image } = req.body || {};
-  const result = taskScheduler.create({ query, everySeconds, label, image });
+  const { query, everySeconds, label, image, kind, autonomy, dailyAt } = req.body || {};
+  const result = taskScheduler.create({ query, everySeconds, label, image, kind, autonomy, dailyAt });
   if (result.error) return res.status(400).json({ success: false, error: result.error });
   res.json({ success: true, schedule: result.schedule });
 });
