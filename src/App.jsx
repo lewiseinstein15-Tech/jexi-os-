@@ -17,6 +17,7 @@ import DownloadPanel from './components/DownloadPanel';
 import UpdateBanner from './components/UpdateBanner';
 import BootSplash from './components/BootSplash'; // B79 — branded loading screen on open (never a blank screen)
 import TasksScreen from './components/TasksScreen';
+import GoalsScreen from './components/GoalsScreen';
 import SkillsScreen from './components/SkillsScreen';
 import WorkspaceScreen from './components/WorkspaceScreen';
 import TerminalScreen from './components/TerminalScreen';
@@ -123,6 +124,8 @@ export default function App() {
         );
       case 'tasks':
         return <TasksScreen />;
+      case 'goals':
+        return <GoalsScreen />;
       case 'skills':
         return (
           <div className="px-3 pt-4 pb-8 space-y-3 max-w-[900px] mx-auto">

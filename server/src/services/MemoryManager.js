@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { DatabaseSync } from 'node:sqlite'; // Phase 3 — SQLite-backed memory core (built-in, no deps)
 import { MEMORY_FILE, KNOWLEDGE_DIR, WORKSPACE_DIR, DATA_DIR } from '../config.js';
 import { generateContent, resolveKeys, embedText } from './LLMClient.js';
 import { appendEvent } from './EventLog.js'; // B78 — every compaction is a first-class event
@@ -335,15 +336,85 @@ function migrate(mem) {
   if (!Array.isArray(mem.episodes)) mem.episodes = [];
 }
 
+/* ------------------------------------------------------------------ */
+/* Phase 3 — SQLite backing store for the memory core.                 */
+/*                                                                     */
+/* The memory core (the whole JSON document) lives in a single-row key- */
+/* value table in DATA_DIR/jexi-memory.db. SQLite gives us crash-safe,  */
+/* atomic writes and instant start (no full-file JSON parse at boot is  */
+/* required for correctness — the row read is O(1)). The legacy         */
+/* memory.json file remains as (a) the one-time migration source and    */
+/* (b) a mirror of every write, so downgrading or moving hosts loses    */
+/* nothing. Every access goes through try/catch — memory must never     */
+/* break the chat.                                                      */
+/* ------------------------------------------------------------------ */
+
+const SQLITE_FILE = path.join(DATA_DIR, 'jexi-memory.db');
+const SQLITE_KEY = 'memory:core';
+let db = null;
+
+function getDb() {
+  if (db) return db;
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    db = new DatabaseSync(SQLITE_FILE);
+    db.exec('CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);');
+    db.exec('PRAGMA journal_mode = WAL;');
+    db.exec('PRAGMA synchronous = NORMAL;');
+    return db;
+  } catch (e) {
+    console.error('[Memory] SQLite init error:', e.message);
+    return null;
+  }
+}
+
+function sqliteGet(key) {
+  try {
+    const row = getDb()?.prepare('SELECT value FROM kv WHERE key = ?').get(key);
+    return row ? row.value : null;
+  } catch (e) {
+    console.error('[Memory] SQLite read error:', e.message);
+    return null;
+  }
+}
+
+function sqliteSet(key, value) {
+  try {
+    getDb()?.prepare('INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
+    return true;
+  } catch (e) {
+    console.error('[Memory] SQLite write error:', e.message);
+    return false;
+  }
+}
+
 export function loadMemory() {
   ensureDirs();
   if (cache) return cache;
+
+  // 1) Primary: SQLite row (fast, atomic, crash-safe).
+  const sqliteRaw = sqliteGet(SQLITE_KEY);
+  if (sqliteRaw) {
+    try {
+      const parsed = JSON.parse(sqliteRaw);
+      cache = { ...structuredClone(DEFAULT_MEMORY), ...parsed };
+      migrate(cache);
+      if (!consolidated) consolidateMemory(); // merge near-duplicates once per boot
+      return cache;
+    } catch (e) {
+      console.error('[Memory] SQLite parse error (falling back to file):', e.message);
+    }
+  }
+
+  // 2) Migration source / fallback: the legacy JSON file. When found and the
+  //    SQLite row is missing, migrate the file into SQLite once.
   try {
     if (fs.existsSync(MEMORY_FILE)) {
       const parsed = JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf-8'));
       cache = { ...structuredClone(DEFAULT_MEMORY), ...parsed };
       migrate(cache);
-      if (!consolidated) consolidateMemory(); // merge near-duplicates once per boot
+      if (!consolidated) consolidateMemory();
+      sqliteSet(SQLITE_KEY, JSON.stringify(cache, null, 2)); // one-time migration
       return cache;
     }
   } catch (e) {
@@ -354,12 +425,12 @@ export function loadMemory() {
 }
 
 /**
- * Phase 2 — atomic memory persistence: write to a temp file, fsync, then
- * rename over the real file. A crash mid-write can never corrupt memory.json
- * (rename is atomic on POSIX), and no reader ever sees a half-written file.
+ * Phase 2+3 — persistence: write to SQLite (primary) AND mirror to the
+ * legacy JSON file via temp+fsync+rename (atomic, crash-safe, downgrade-safe).
  */
 function writeMemoryFile(content) {
   ensureDirs();
+  sqliteSet(SQLITE_KEY, content);
   const tmp = `${MEMORY_FILE}.tmp-${process.pid}-${Date.now().toString(36)}`;
   const fd = fs.openSync(tmp, 'w');
   try {
