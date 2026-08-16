@@ -386,6 +386,61 @@ const tryXai = (p, s, img, o, e) =>
 const tryDeepSeek = (p, s, img, o, e) =>
   tryOpenAICompat({ key: resolveKeys().deepseekKey, baseUrl: 'https://api.deepseek.com/v1', models: o.model ? [o.model] : DEEPSEEK_MODELS, label: 'DeepSeek', providerKey: 'deepseek' }, p, s, img, o, e);
 
+/**
+ * vLLM (B74) — self-hosted, OpenAI-compatible inference
+ * (github.com/vllm-project/vllm). A local `vllm serve <model>` exposes
+ * /v1/chat/completions, so JEXI routes to a genuinely-FREE backend on the
+ * user's own hardware — no API key, no per-token cost. Enabled by default at
+ * http://localhost:8000/v1 (vLLM's server port); override with VLLM_BASE_URL,
+ * pin the served model with VLLM_MODEL, and optionally set VLLM_API_KEY (for
+ * `vllm serve --api-key`). Env is read at CALL time (not module load) so
+ * tests can point it at a mock server. When nothing listens, the connection
+ * is refused instantly and the walk continues — zero effective cost.
+ */
+async function tryVllm(prompt, system, imageBase64, opts, errors) {
+  if (imageBase64) return null; // text-only — vision stays on hosted providers
+  const base = String(process.env.VLLM_BASE_URL || 'http://localhost:8000/v1').replace(/\/+$/, '');
+  const model = opts.model || process.env.VLLM_MODEL || 'default';
+  const apiKey = process.env.VLLM_API_KEY || '';
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(`${base}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: prompt },
+          ],
+          temperature: opts.temperature ?? 0.4,
+          max_tokens: 1600,
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const b = await res.text().catch(() => '');
+        errors.push(`vLLM: HTTP ${res.status} ${b.slice(0, 120)}`);
+        return null;
+      }
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content || '';
+      if (text) return text.trim();
+      errors.push('vLLM returned an empty response');
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (e) {
+    errors.push(`vLLM: ${e.message}`);
+  }
+  return null;
+}
+
 const PROVIDER_CALLS = {
   groq: tryGroq,
   gemini: tryGemini,
@@ -396,6 +451,7 @@ const PROVIDER_CALLS = {
   mistral: tryMistral,
   xai: tryXai,
   deepseek: tryDeepSeek,
+  vllm: tryVllm,
 };
 
 /**
@@ -696,7 +752,7 @@ export async function generateWithTools(prompt, systemInstruction = '', tools = 
 
 function honestDegradedMessage(reason) {
   const r = String(reason || '').slice(0, 400);
-  return `### ⚠ JEXI OS — degraded mode\n\nI'm having trouble reaching my usual AI resources right now${r ? ` (${r})` : ''}. This means I can't produce a full, thoughtful answer at the moment — no provider completed the request.\n\nWhat you can do:\n- Try again in a minute or two — rate limits and temporary outages usually clear quickly.\n- Check that your model keys are valid in **Settings → Models** (and the matching env vars on Render).\n- If you run a local model (Ollama), set \`OLLAMA_BASE_URL\` and I'll route through it automatically.\n\nI'm not going to guess or pretend — that's the honest status right now.`;
+  return `### ⚠ JEXI OS — degraded mode\n\nI'm having trouble reaching my usual AI resources right now${r ? ` (${r})` : ''}. This means I can't produce a full, thoughtful answer at the moment — no provider completed the request.\n\nWhat you can do:\n- Try again in a minute or two — rate limits and temporary outages usually clear quickly.\n- Check that your model keys are valid in **Settings → Models** (and the matching env vars on Render).\n- If you run a local model (Ollama), set \`OLLAMA_BASE_URL\`, or a self-hosted **vLLM** server with \`VLLM_BASE_URL\` (default http://localhost:8000/v1) — I'll route through it automatically.\n\nI'm not going to guess or pretend — that's the honest status right now.`;
 }
 
 /**

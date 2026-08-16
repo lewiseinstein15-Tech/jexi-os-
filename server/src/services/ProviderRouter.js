@@ -81,15 +81,19 @@ export function markProviderUnavailable(key, minutes = 60) {
 // simply skipped by the router. Adding one only means setting ONE env var.
 // B66 — DeepSeek joins the free/optional OpenAI-compatible tier (the primary
 // coding coworker). Qwen is reached via OpenRouter models (no separate key).
+// B74 — vLLM (self-hosted): genuinely free inference on the user's own
+// hardware via an OpenAI-compatible server (github.com/vllm-project/vllm).
+// Sits right before the slow HF free tier; skipped instantly when nothing is
+// listening on VLLM_BASE_URL (default http://localhost:8000/v1).
 const EXTRA_PROVIDERS = ['cerebras', 'deepinfra', 'mistral', 'xai', 'deepseek'];
 
 export function providerOrder(prefer = '') {
   const base =
     prefer === 'gemini'
-      ? ['gemini', 'groq', 'openrouter', ...EXTRA_PROVIDERS, 'huggingface']
+      ? ['gemini', 'groq', 'openrouter', ...EXTRA_PROVIDERS, 'vllm', 'huggingface']
       : prefer === 'openrouter'
-        ? ['openrouter', 'groq', 'gemini', ...EXTRA_PROVIDERS, 'huggingface']
-        : ['groq', 'gemini', 'openrouter', ...EXTRA_PROVIDERS, 'huggingface'];
+        ? ['openrouter', 'groq', 'gemini', ...EXTRA_PROVIDERS, 'vllm', 'huggingface']
+        : ['groq', 'gemini', 'openrouter', ...EXTRA_PROVIDERS, 'vllm', 'huggingface'];
 
   const healthy = base.filter((k) => !providerInCooldown(k));
   const cooling = base.filter((k) => providerInCooldown(k));
@@ -107,6 +111,8 @@ const ENV_MAP = {
   mistral: 'MISTRAL_API_KEY',
   xai: 'XAI_API_KEY',
   deepseek: 'DEEPSEEK_API_KEY',
+  // B74 — vLLM has no API key; "configured" = a VLLM_BASE_URL is set.
+  vllm: 'VLLM_BASE_URL',
 };
 
 /** Which providers have keys configured right now (no secrets exposed). */
@@ -120,6 +126,7 @@ export function providerHealthSnapshot() {
   const names = {
     groq: 'Groq', gemini: 'Gemini', openrouter: 'OpenRouter', huggingface: 'HuggingFace',
     cerebras: 'Cerebras', deepinfra: 'DeepInfra', mistral: 'Mistral', xai: 'Grok (xAI)', deepseek: 'DeepSeek',
+    vllm: 'vLLM (self-hosted)',
   };
   return providerOrder().map((k) => {
     const s = h(k);

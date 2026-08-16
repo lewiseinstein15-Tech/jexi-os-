@@ -9,7 +9,8 @@
  *   coder       → DeepSeek first (deepseek-chat), then FREE code models
  *   memory      → FREE OpenRouter general model first, then near-free + Gemini
  *   researcher  → Grok (xAI) first, Groq, then OpenRouter models
- *   fallback    → HuggingFace (incl. free Qwen) → DeepInfra → Mistral (last resort)
+ *   fallback    → vLLM (self-hosted, free) → HuggingFace (incl. free Qwen)
+ *                  → DeepInfra → Mistral (last resort)
  *
  * B73 — free-model audit (live-verified): OpenRouter has ZERO free DeepSeek
  * and ZERO free Qwen models today; DeepSeek's own API has no permanent free
@@ -71,6 +72,11 @@ export const COWORKERS = {
   fallback: {
     role: 'General fallback (last resort)',
     providers: [
+      // B74 — vLLM first in the last-resort tier: self-hosted = genuinely
+      // free inference (github.com/vllm-project/vllm, OpenAI-compatible at
+      // VLLM_BASE_URL, default http://localhost:8000/v1). Skipped instantly
+      // when no server is listening; fast + free beats the slow HF tier.
+      { key: 'vllm' },
       { key: 'huggingface' },
       { key: 'deepinfra' },
       { key: 'mistral' },

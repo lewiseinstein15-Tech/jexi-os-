@@ -69,7 +69,7 @@ check('groq back at the front after recovery', providerOrder()[0] === 'groq');
 // Snapshot shape (no secrets).
 const snap = providerHealthSnapshot();
 // B66 — DeepSeek added as a coworker provider (now 9 in the router).
-check('snapshot lists all ' + snap.length + ' providers (got ' + snap.length + ')', snap.length === 9 && snap.some((p) => p.key === 'xai') && snap.some((p) => p.key === 'deepseek'));
+check('snapshot lists all ' + snap.length + ' providers (got ' + snap.length + ')', snap.length === 10 && snap.some((p) => p.key === 'xai') && snap.some((p) => p.key === 'deepseek') && snap.some((p) => p.key === 'vllm'));
 
 /* ---------------- Round 3: Tools, Critics, Memory, Guardrails ---------------- */
 

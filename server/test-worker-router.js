@@ -19,8 +19,10 @@
  * native tool loop must still work end-to-end with the new configuration.
  */
 
+import http from 'node:http';
 import { COWORKERS, coworkerChain, coworkerFor, workerRoster, runWorker } from './src/services/WorkerRouter.js';
-import { QWEN_MODELS, OPENROUTER_FREE_TEXT_MODELS, HF_FREE_QWEN_MODELS, HF_FREE_DEEPSEEK_MODELS } from './src/services/LLMClient.js';
+import { QWEN_MODELS, OPENROUTER_FREE_TEXT_MODELS, HF_FREE_QWEN_MODELS, HF_FREE_DEEPSEEK_MODELS, generateContent } from './src/services/LLMClient.js';
+import { providerOrder } from './src/services/ProviderRouter.js';
 
 let passed = 0;
 let failed = 0;
@@ -110,13 +112,21 @@ ok(coworkerFor('conversation') === 'memory', 'conversation → memory worker (un
 ok(coworkerFor('build me a calculator app') === 'coder', 'code request → coder worker (unchanged)');
 ok(coworkerFor('latest news on AI') === 'researcher', 'research request → researcher worker (unchanged)');
 
-// 6. The fallback tier is still appended after each coworker's own chain
-//    (memory now owns 3 providers, so the chain is 6 entries long).
+// 6. The fallback tier is still appended after each coworker's own chain —
+//    B74: vLLM (self-hosted, free) leads the last-resort tier, then
+//    HuggingFace → DeepInfra → Mistral. Memory owns 3 providers, so the
+//    chain is 7 entries long.
 const memChain = coworkerChain('memory');
 ok(
-  memChain.length === 6 && memChain[3].key === 'huggingface' && memChain[4].key === 'deepinfra' && memChain[5].key === 'mistral',
-  'memory chain = [nemotron:free, seed-2.0-mini, gemini, huggingface, deepinfra, mistral] (fallback tier appended)'
+  memChain.length === 7 && memChain[3].key === 'vllm' && memChain[4].key === 'huggingface' && memChain[5].key === 'deepinfra' && memChain[6].key === 'mistral',
+  'memory chain = [nemotron:free, seed-2.0-mini, gemini, vllm, huggingface, deepinfra, mistral] (vLLM leads the fallback tier)'
 );
+
+// 6b. B74 — vLLM is part of the general provider walk too (right before the
+//     slow HF free tier; huggingface must stay last per test-roster-skills).
+ok(providerOrder().includes('vllm'), 'vLLM is in the general provider walk');
+ok(providerOrder()[providerOrder().length - 1] === 'huggingface', 'general order keeps huggingface last (vLLM sits just before it)');
+ok(COWORKERS.fallback.providers[0].key === 'vllm', 'vLLM leads the last-resort fallback tier (self-hosted free inference)');
 
 // 7. workerRoster() (Models screen) reflects the free-first chains.
 const roster = workerRoster();
@@ -126,11 +136,36 @@ ok(
   `Models screen roster shows the free memory primary, got ${memoryRoster && memoryRoster.providers[0]}`
 );
 
-// 8. runWorker's native tool path still completes with the new config
+// 8. B74 — vLLM provider round-trip against a mock OpenAI-compatible server
+//    (vLLM exposes /v1/chat/completions — this proves JEXI speaks it).
+// 9. runWorker's native tool path still completes with the new config
 //    (test seam: __mockCompletions drives the loop deterministically — the
 //    model declares one memory-recall tool call, the executor returns a real
 //    result, and the loop finishes with a direct answer).
 (async () => {
+  const mockVllm = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', (c) => (body += c));
+    req.on('end', () => {
+      let parsed = {};
+      try { parsed = JSON.parse(body || '{}'); } catch (e) { /* keep {} */ }
+      ok(req.url === '/v1/chat/completions', `vLLM mock hit /v1/chat/completions (got ${req.url})`);
+      ok(parsed.model === 'test-model', `vLLM request carries the model (got ${JSON.stringify(parsed.model)})`);
+      ok(Array.isArray(parsed.messages) && parsed.messages[1]?.role === 'user', 'vLLM request carries system+user messages');
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ choices: [{ message: { content: 'pong from vLLM' } }] }));
+    });
+  });
+  await new Promise((r) => mockVllm.listen(0, '127.0.0.1', r));
+  const vllmPort = mockVllm.address().port;
+  process.env.VLLM_BASE_URL = `http://127.0.0.1:${vllmPort}/v1`;
+  process.env.VLLM_MODEL = 'test-model';
+  const vllmText = await generateContent('ping', 'You are a test.', null, { provider: 'vllm', temperature: 0 });
+  ok(vllmText === 'pong from vLLM', `vLLM provider round-trip ok (got ${JSON.stringify(vllmText)})`);
+  delete process.env.VLLM_BASE_URL;
+  delete process.env.VLLM_MODEL;
+  await new Promise((r) => mockVllm.close(r));
+
   const res = await runWorker('memory', 'The user asked: "what is my name?"', 'You are JEXI OS.', {
     tools: [{ slug: 'memory-recall', name: 'Memory Recall', desc: 'Recall', schema: {} }],
     maxIterations: 3,
