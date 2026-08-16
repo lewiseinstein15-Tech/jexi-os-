@@ -29,6 +29,7 @@ const VAPID_FILE = path.join(DATA_DIR, 'vapid.json');
 const REDIS_KEY = 'jexi:push-subs:v1';
 const SUBS_FILE = path.join(DATA_DIR, 'push-subscriptions.json');
 const DIAG_FILE = path.join(DATA_DIR, 'push-diag.json');
+const DIAG_REDIS_KEY = 'jexi:push-diag:v1';
 const MAX_SUBS = 30;
 const VAPID_SUBJECT = `mailto:${process.env.VAPID_SUBJECT || 'lewiseinstein15@gmail.com'}`;
 
@@ -166,6 +167,21 @@ function persistDiag() {
     fs.mkdirSync(DATA_DIR, { recursive: true });
     fs.writeFileSync(DIAG_FILE, JSON.stringify(diag, null, 2), 'utf-8');
   } catch { /* best effort */ }
+  try { redisSet(DIAG_REDIS_KEY, JSON.stringify(diag)).catch(() => {}); } catch { /* fail open */ }
+}
+
+/** Hydrate diagnostics from Redis (boot, non-blocking). */
+export async function hydratePushDiagFromRedis() {
+  if (!isRedisConfigured()) return false;
+  if (diag.length > 0) return false;
+  try {
+    const raw = await redisGet(DIAG_REDIS_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return false;
+    diag = parsed;
+    return diag.length > 0;
+  } catch { return false; }
 }
 
 export function recordPushDiag({ step = '', error = '', platform = '', permission = '', ua = '' } = {}) {

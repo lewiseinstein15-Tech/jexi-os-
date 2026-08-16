@@ -81,7 +81,7 @@ import { touchSession, listSessions } from './src/services/SessionStore.js'; // 
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines } from './src/services/JexiIdentity.js'; // canonical identity (name / creator / capabilities)
 import { enqueueGoal, enqueueChat, answerJob, getJob as getGoalJob, getJobEvents, subscribe as subscribeJob, listJobs, setGoalExecutor, setChatExecutor, setGoalNotifier, hydrateGoalJobsFromRedis } from './src/services/GoalJobQueue.js'; // Phase 2 — durable background goal jobs (B85 — durable chat)
 import { notifyGoalComplete, setGoalCallConnector, goalReportStats } from './src/services/GoalNotifier.js'; // Phase 4 — goal completion notifications + email reports
-import { getVapidPublicKey, addSubscription, removeSubscription, broadcastPush, listSubscriptions, hydratePushSubsFromRedis, recordPushDiag, listPushDiag } from './src/services/PushManager.js'; // B84 — web push notifications (closed-app delivery)
+import { getVapidPublicKey, addSubscription, removeSubscription, broadcastPush, listSubscriptions, hydratePushSubsFromRedis, recordPushDiag, listPushDiag, hydratePushDiagFromRedis } from './src/services/PushManager.js'; // B84 — web push notifications (closed-app delivery)
 import { addFcmToken, removeFcmToken, listFcmTokens, fcmStatus, broadcastFcm, hydrateFcmTokensFromRedis } from './src/services/FcmManager.js'; // B86 — FCM push for the installed APK
 
 
@@ -103,6 +103,7 @@ hydrateGoalJobsFromRedis().catch((e) => { recordError('goals', (e && e.message) 
 // B86-fix — push device tokens + subscriptions survive redeploys (ephemeral disk).
 hydrateFcmTokensFromRedis().catch((e) => { recordError('push', (e && e.message) || String(e)); });
 hydratePushSubsFromRedis().catch((e) => { recordError('push', (e && e.message) || String(e)); });
+hydratePushDiagFromRedis().catch((e) => { recordError('push', (e && e.message) || String(e)); });
 
 // Self-monitoring: she keeps a live error log and can diagnose her own system.
 recordBoot();
