@@ -48,7 +48,7 @@ import { verifyDomainAnswer, detectDomain, deterministicChecks } from './src/ser
 import { runSubagents, decomposeQuery } from './src/services/SubagentRuntime.js';
 import { listHooks, addHook, updateHook, removeHook } from './src/services/HookEngine.js';
 import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services/PluginRegistry.js';
-import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications } from './src/services/NotificationCenter.js';
+import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications, setNotifyBroadcaster } from './src/services/NotificationCenter.js';
 import { modelRoutingTable, providerPreferenceForIntent } from './src/services/ModelRouting.js';
 import { MCP_PORT, MCP_TOOL_ALLOWLIST, listMcpTools } from './mcp-server.js';
 import {
@@ -81,6 +81,7 @@ import { touchSession, listSessions } from './src/services/SessionStore.js'; // 
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines } from './src/services/JexiIdentity.js'; // canonical identity (name / creator / capabilities)
 import { enqueueGoal, answerJob, getJob as getGoalJob, getJobEvents, subscribe as subscribeJob, listJobs, setGoalExecutor, setGoalNotifier, hydrateGoalJobsFromRedis } from './src/services/GoalJobQueue.js'; // Phase 2 — durable background goal jobs
 import { notifyGoalComplete, setGoalCallConnector, goalReportStats } from './src/services/GoalNotifier.js'; // Phase 4 — goal completion notifications + email reports
+import { getVapidPublicKey, addSubscription, removeSubscription, broadcastPush, listSubscriptions } from './src/services/PushManager.js'; // B84 — web push notifications (closed-app delivery)
 
 
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
@@ -193,7 +194,7 @@ app.use(cors({ origin: CORS_ALLOWLIST }));
 // else under /api/* (chat, vision, knowledge, memory, desktop, settings write,
 // APK proxy) is gated when JEXI_API_KEY is set.
 // NOTE: mounted on the app root (not '/api') so req.path keeps its full form.
-const OPEN_PATHS = ['/api/health', '/api/health/memory', '/api/settings/status', '/api/metrics', '/api/update/apk', '/api/update/version', '/api/events', '/api/identity', '/api/rate/status', '/api/sessions', '/api/goals', '/api/goals/email-stats']; // B70 — health/memory + the APK update proxy/version probe are read-only infra (no secrets, no AI spend); a locked backend must stay observable and still deliver app updates. B78 — the event log is GET-only, read-only, sanitized (no raw keys), and the same class of debug surface as the connector inbound log, so it stays open for browser inspection. Goal/identity/rate/sessions are read-only or owner-triggered (POST /api/goals is NOT in this list — it is key-gated like chat).
+const OPEN_PATHS = ['/api/health', '/api/health/memory', '/api/settings/status', '/api/metrics', '/api/update/apk', '/api/update/version', '/api/events', '/api/identity', '/api/rate/status', '/api/sessions', '/api/goals', '/api/goals/email-stats', '/api/push/vapid-key']; // B70 — health/memory + the APK update proxy/version probe are read-only infra (no secrets, no AI spend); a locked backend must stay observable and still deliver app updates. B78 — the event log is GET-only, read-only, sanitized (no raw keys), and the same class of debug surface as the connector inbound log, so it stays open for browser inspection. Goal/identity/rate/sessions are read-only or owner-triggered (POST /api/goals is NOT in this list — it is key-gated like chat).
 app.use((req, res, next) => {
   if (!API_KEY || req.method === 'OPTIONS') return next();
   if (!req.path.startsWith('/api')) return next();
@@ -649,6 +650,29 @@ app.post('/api/notifications/read', (req, res) => {
   else res.json(markAllRead());
 });
 app.post('/api/notifications/clear', (req, res) => res.json(clearNotifications()));
+
+// === WEB PUSH (B84) — notifications even when the app is closed ===
+// Public VAPID key so clients can subscribe (read-only, open like /api/identity).
+app.get('/api/push/vapid-key', (req, res) => res.json({ publicKey: getVapidPublicKey(), subject: 'mailto:lewiseinstein15@gmail.com' }));
+
+// Register this device for web push. { endpoint, keys: { p256dh, auth }, ua }
+app.post('/api/push/subscribe', (req, res) => {
+  const { endpoint, keys, ua } = req.body || {};
+  if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
+    return res.status(400).json({ ok: false, error: 'endpoint + keys.p256dh + keys.auth required' });
+  }
+  const result = addSubscription({ endpoint, keys, ua });
+  res.json(result.ok ? { ok: true, count: result.count } : result);
+});
+
+app.post('/api/push/unsubscribe', (req, res) => {
+  const { endpoint } = req.body || {};
+  if (!endpoint) return res.status(400).json({ ok: false, error: 'endpoint required' });
+  res.json(removeSubscription(endpoint));
+});
+
+// Debug: how many devices are registered (read-only, no secrets).
+app.get('/api/push/subscriptions', (req, res) => res.json({ count: listSubscriptions().length }));
 
 // === MODEL ROUTING (roadmap stage 24 — per-domain provider preference) ===
 // Exposes the intent → provider map; AgentLoop honors it via opts.prefer.
@@ -1182,6 +1206,8 @@ setGoalExecutor(goalEngine);
 // when GOAL_REPORT_EMAIL / Settings → goalReportEmail is set.
 setGoalNotifier(notifyGoalComplete);
 setGoalCallConnector(callConnector);
+// B84 — every notification also pushes to all registered devices (web push).
+setNotifyBroadcaster((n) => { broadcastPush(n.title, n.body, n.link).catch(() => {}); });
 
 // GET /api/goals — durable goal job records (read-only, no secrets).
 app.get('/api/goals', (req, res) => res.json({ goals: listJobs() }));
