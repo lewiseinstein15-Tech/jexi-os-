@@ -107,6 +107,15 @@ body,
   -webkit-overflow-scrolling: touch;
 }
 
+/* B79 — the app shell's height needs a 100vh fallback: 100dvh is not
+   supported on older Android WebViews (pre-Chrome 108) and silently collapses
+   the fixed layout into a freely-scrolling page. Modern browsers get dvh;
+   everything else gets vh. The shell is the ONLY full-viewport element. */
+.app-shell {
+  height: 100vh;
+  height: 100dvh;
+}
+
 html { color-scheme: dark; }
 
 body {

@@ -14,6 +14,7 @@ import SettingsPanel from './components/SettingsPanel';
 import KnowledgePanel from './components/KnowledgePanel';
 import DownloadPanel from './components/DownloadPanel';
 import UpdateBanner from './components/UpdateBanner';
+import BootSplash from './components/BootSplash'; // B79 — branded loading screen on open (never a blank screen)
 import TasksScreen from './components/TasksScreen';
 import SkillsScreen from './components/SkillsScreen';
 import WorkspaceScreen from './components/WorkspaceScreen';
@@ -37,8 +38,17 @@ const PLACEHOLDERS = {};
 export default function App() {
   const [activeNav, setActiveNav] = useState('home');
   const [isDesktop, setIsDesktop] = useState(isDesktopQuery);
+  // B79 — boot splash: hold the branded loading screen until the shell has
+  // painted and a short branded moment has passed (ChatGPT/Claude style), so
+  // opening the app never shows a blank frame.
+  const [booted, setBooted] = useState(false);
   const engine = useJexiEngine();
   const memory = useMemory(activeNav);
+
+  useEffect(() => {
+    const t = setTimeout(() => setBooted(true), 900);
+    return () => clearTimeout(t);
+  }, []);
 
   // Native polish: match the phone's status bar to the app's dark theme.
   useEffect(() => {
@@ -157,7 +167,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <div className="h-dvh overflow-hidden bg-void text-text-primary flex flex-col relative">
+      <div className="app-shell overflow-hidden bg-void text-text-primary flex flex-col relative">
         {/* FIXED TOP BAR — never scrolls */}
         <TopNav activeNav={activeNav} running={engine.isProcessing} onNavigate={navigate} />
         <UpdateBanner />
@@ -183,7 +193,7 @@ export default function App() {
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.18 }}
                 className={activeNav === 'command'
-                  ? 'h-full flex flex-col py-3'
+                  ? 'h-full flex flex-col py-3 overflow-hidden' // B79 — the Command Center NEVER scrolls the page; only the inner chat scrolls
                   : 'min-h-full'}
               >
                 {renderPage()}
@@ -194,6 +204,11 @@ export default function App() {
 
         {/* FIXED BOTTOM NAVIGATION — mobile only, always visible */}
         <BottomNavigation activeNav={activeNav} setActiveNav={navigate} />
+
+        {/* B79 — branded loading screen on open; fades out once the shell is up */}
+        <AnimatePresence>
+          {!booted && <BootSplash key="boot-splash" />}
+        </AnimatePresence>
       </div>
     </ErrorBoundary>
   );

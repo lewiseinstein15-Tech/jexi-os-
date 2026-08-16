@@ -24,11 +24,15 @@ export default function CommandCenter({ engine, isDesktop }) {
   const hiddenCount = steps.length - visibleSteps.length;
 
   return (
-    <div className={isDesktop ? 'flex gap-4 items-stretch h-full min-h-0 px-4' : 'flex flex-col gap-3 flex-1 min-h-0 px-3'}>
+    // B79 — the Command Center is a FIXED work surface (ChatGPT/Claude-style):
+    // the page never scrolls. A huge plan header scrolls INSIDE its own card
+    // (capped height), and the conversation scrolls inside ChatWindow.
+    <div className={isDesktop ? 'flex gap-4 items-stretch h-full min-h-0 px-4 overflow-hidden' : 'flex flex-col gap-3 flex-1 min-h-0 px-3 overflow-hidden'}>
       {/* Main column — full work surface width (B53 P1: no 680px center strip) */}
       <div className={isDesktop ? 'flex flex-col gap-3 w-full min-w-0 min-h-0' : 'flex flex-col gap-3 flex-1 min-h-0'}>
-        {/* Task / plan header */}
-        <div className="surface-card p-3.5 rounded-xl flex-shrink-0">
+        {/* Task / plan header — capped height so a long plan scrolls inside
+            the card instead of pushing the page (B79) */}
+        <div className="surface-card p-3.5 rounded-xl flex-shrink-0 max-h-[36%] overflow-y-auto">
           <div className="flex items-center gap-2 mb-2">
             <Radio className="w-3.5 h-3.5 text-brand" />
             <p className="text-[9px] font-bold tracking-[0.18em] text-brand">COMMAND CENTER</p>
