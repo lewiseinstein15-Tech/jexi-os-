@@ -7,6 +7,7 @@ import {
 import { getBackendUrl, jexiFetch } from '../utils/helpers';
 import PanelHeader from './PanelHeader';
 import MarkdownRenderer from './MarkdownRenderer';
+import { showPhoneNotification } from '../utils/phoneNotify'; // B83 — buzz the phone when a goal finishes
 
 /**
  * GOALS — Phase 3/4: autonomous goals as durable background jobs.
@@ -160,6 +161,14 @@ export default function GoalsScreen() {
             try { ev = JSON.parse(line); } catch { continue; }
             if (ev.type === 'heartbeat') continue;
             setLogs((prev) => ({ ...prev, [jobId]: [...(prev[jobId] || []), ev] }));
+            // B83 — phone notification the moment a goal finishes (deduped by job id).
+            if (ev.type === 'done' && !ev.parked) {
+              showPhoneNotification(
+                ev.success ? '✅ Goal complete' : '⚠️ Goal failed',
+                String(ev.summary || '').replace(/[#*`>\-]/g, '').slice(0, 160),
+                `goal:${jobId}`,
+              );
+            }
           }
         }
       } catch (e) { /* aborted or closed */ }

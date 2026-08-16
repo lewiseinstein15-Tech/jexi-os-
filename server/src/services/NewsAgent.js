@@ -151,6 +151,9 @@ function normalizeUrl(url) {
 
 const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'on', 'at', 'for', 'and', 'with', 'from', 'by', 'is', 'are', 'was', 'be', 'it', 'this', 'that', 'as', 'after', 'over', 'up', 'down', 'new', 'first', 'says', 'say', 'said', 'us', 'uk']);
 
+/** Generic words that carry no topic signal — they must never drive relevance. */
+const GENERIC_TOPIC_WORDS = new Set(['news', 'latest', 'today', 'now', 'headline', 'headlines', 'about', 'research', 'update', 'updates', 'summary', 'summarize', 'give', 'find', 'get', 'me', 'for', 'what', 'some', 'top', 'stories', 'story', 'article', 'articles', 'read', 'daily', 'week', 'month', 'day', 'current', 'recent', 'recently', 'best', 'interesting', 'important', 'major', 'big', 'main', 'general']);
+
 function titleWords(title) {
   return String(title || '')
     .toLowerCase()
@@ -210,27 +213,49 @@ export function filterNews(items, query) {
   });
 
   // 5. Rank: credibility + recency + relevance to the question + entity boost
+  //
+  // TOPIC FIDELITY (B83): the query's meaningful words — including short ones
+  // like "AI" (previously dropped by a length>3 filter!) — are matched as
+  // WORD-BOUNDARY tokens, and on-topic stories are guaranteed to rank FIRST:
+  // credibility/recency may rank within each bucket, but an off-topic generic
+  // headline can never crowd out a topic match again.
   const terms = String(query || '')
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
-    .filter((w) => w.length > 3);
-  const entities = [...new Set(String(query || '').replace(/[^a-zA-Z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 2 && /^[A-Z]/.test(w)))];
+    .filter((w) => w.length >= 2 && !STOP.has(w) && !GENERIC_TOPIC_WORDS.has(w));
+  // Uppercase entities in the query (e.g. "AI", "OpenAI") — matched TWO ways:
+  // word-boundary lowercase AND case-sensitive substring, so "OpenAI" in a
+  // title matches "AI" while "said"/"training"/"daily" never do.
+  const entities = [...new Set(String(query || '').replace(/[^a-zA-Z0-9\s]/g, ' ').split(/\s+/)
+    .filter((w) => w.length > 1 && /^[A-Z]/.test(w) && !GENERIC_TOPIC_WORDS.has(w.toLowerCase()) && !STOP.has(w.toLowerCase())))];
+  const topicPatterns = [...new Set([...terms, ...entities.map((e) => e.toLowerCase())])]
+    .map((t) => ({ token: t, re: new RegExp(`\\b${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i') }));
+  const acronymPatterns = entities.filter((e) => e.length <= 5)
+    .map((e) => ({ token: e, re: new RegExp(e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })); // case-sensitive
   const now = Date.now();
+
+  const matchesTopic = (n) => {
+    const blob = `${n.title} ${n.snippet || ''}`;
+    return topicPatterns.some(({ re }) => re.test(blob)) || acronymPatterns.some(({ re }) => re.test(blob));
+  };
 
   const scored = deduped.map((n) => {
     let score = n.factual === 'high' ? 3 : n.factual === 'mixed' ? 1 : 0;
     const ageMs = n.date ? now - new Date(n.date).getTime() : 0;
     if (!n.date || ageMs < 24 * 3600 * 1000) score += 2;
     else if (ageMs < 48 * 3600 * 1000) score += 1;
-    const blob = `${n.title} ${n.snippet || ''}`.toLowerCase();
-    for (const t of terms) if (blob.includes(t)) score += 1;
-    for (const e of entities) if (blob.includes(e.toLowerCase())) score += 3;
-    return { ...n, score };
+    const blob = `${n.title} ${n.snippet || ''}`;
+    for (const { re } of topicPatterns) if (re.test(blob)) { score += 6; break; } // word-boundary topic match
+    for (const { re } of acronymPatterns) if (re.test(blob)) { score += 6; break; } // case-sensitive acronym (OpenAI → AI)
+    return { ...n, score, onTopic: matchesTopic(n) };
   });
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, 12);
+  // On-topic stories first, then generic fill (bounded to 12).
+  const onTopic = scored.filter((n) => n.onTopic);
+  const rest = scored.filter((n) => !n.onTopic);
+  return [...onTopic, ...rest].slice(0, 12);
 }
 
 /* ---------------- STAGE 3 — NEWS EDITOR: cited digest ---------------- */

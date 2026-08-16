@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { StatusBar } from '@capacitor/status-bar';
 import { useJexiEngine } from './hooks/useJexiEngine';
 import { useMemory } from './hooks/useMemory';
+import usePhoneNotifications from './hooks/usePhoneNotifications'; // B83 — real phone notifications when tasks/goals finish
 import { getBackendUrl } from './utils/helpers';
 import TopNav from './components/TopNav';
 import NavList from './components/NavList';
@@ -47,6 +48,7 @@ export default function App() {
   const [bootStatus, setBootStatus] = useState('Connecting to JEXI\u2019s brain…');
   const engine = useJexiEngine();
   const memory = useMemory(activeNav);
+  usePhoneNotifications(); // B83 — polls the notification center and shows phone notifications
 
   // B79 — REAL loading page on open (never a blank screen, never a fake
   // flash): the branded splash stays up until the shell has painted AND the
