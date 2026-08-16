@@ -189,6 +189,27 @@ export class DesktopManager {
   async goto(agentId, url) {
     const ready = await ensureBrowser();
     if (!ready.ok) throw new Error(ready.error);
+    // Phase 2 — SSRF guard on browser navigation: block private / link-local /
+    // cloud-metadata targets, but KEEP loopback allowed (JEXI legitimately
+    // previews locally-built apps at http://localhost). Localhost-only dev
+    // servers cannot be reached by remote attackers anyway — the threat is
+    // the LLM being tricked into navigating to 169.254.169.254 or internal
+    // ranges. Set DESKTOP_ALLOW_PRIVATE=1 to lift the block entirely.
+    const allowPrivate = ['1', 'true', 'yes'].includes(String(process.env.DESKTOP_ALLOW_PRIVATE || '').toLowerCase());
+    if (!allowPrivate) {
+      try {
+        const u = new URL(url);
+        const host = u.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+        const isLoopback = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.localhost');
+        if (!isLoopback) {
+          const blocked = await import('./Security.js').then((m) => m.isSSRF(url));
+          if (blocked) throw new Error(`Security blocked (SSRF): ${String(url).slice(0, 120)}`);
+        }
+      } catch (e) {
+        if (e.message && /Security blocked/.test(e.message)) throw e;
+        throw new Error(`Invalid URL: ${String(url).slice(0, 120)}`);
+      }
+    }
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await new Promise(r => setTimeout(r, 1200));
     return { url: page.url(), title: await page.title() };

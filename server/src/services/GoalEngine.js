@@ -164,9 +164,29 @@ export class GoalEngine {
   /**
    * Resume a parked (need-info) goal with the user's answers.
    * `answer` is the raw text; it is injected as context for the run.
+   * `fallback` ({ goal, autonomy }) re-creates the engine record when the
+   * process restarted (the in-memory goals map is gone, but the job queue
+   * persisted the goal text).
    */
-  async resumeWithInfo({ goalId, session, answer, sendEvent = () => {} }) {
-    const g = this.goals.get(goalId);
+  async resumeWithInfo({ goalId, session, answer, sendEvent = () => {}, fallback = null }) {
+    let g = this.goals.get(goalId);
+    if (!g && fallback && fallback.goal) {
+      g = {
+        id: goalId,
+        goal: String(fallback.goal).trim(),
+        session,
+        autonomy: AUTONOMY_LEVELS.includes(fallback.autonomy) ? fallback.autonomy : 'ask',
+        status: 'need-info',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        attempts: 0,
+        infoRequests: [],
+        autoApprovals: [],
+        result: null,
+        error: null,
+      };
+      this.goals.set(goalId, g);
+    }
     if (!g) return { ok: false, error: 'goal not found' };
     if (g.status !== 'need-info') return { ok: false, error: `goal is not waiting for info (status: ${g.status})` };
     const emit = (type, data) => { try { sendEvent(type, data); } catch { /* noop */ } };
