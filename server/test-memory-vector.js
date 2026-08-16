@@ -79,12 +79,14 @@ const hybridNone = await hybridSearch([e1], 'machine intelligence', { relevanceF
 ok(Array.isArray(hybridNone), 'hybridSearch never throws without keys');
 
 /* ---------------- 6. 402 hard cooldown ---------------- */
-resetProviderHealth('cerebras');
-ok(!providerInCooldown('cerebras'), 'cerebras healthy before 402');
-markProviderUnavailable('cerebras', 60);
-ok(providerInCooldown('cerebras'), '402 marks the provider as unavailable');
+// B77 — cerebras is payment-gated and REMOVED from the router; the 402-park
+// mechanism is provider-agnostic, so this tests it on a live free provider.
+resetProviderHealth('nvidia');
+ok(!providerInCooldown('nvidia'), 'provider healthy before 402');
+markProviderUnavailable('nvidia', 60);
+ok(providerInCooldown('nvidia'), '402 marks the provider as unavailable');
 const { providerHealthSnapshot } = await import('./src/services/ProviderRouter.js');
-const snap = providerHealthSnapshot().find(p => p.key === 'cerebras');
+const snap = providerHealthSnapshot().find(p => p.key === 'nvidia');
 ok(snap.cooldownLeftSec >= 3500, `hour-long cooldown applied (${snap.cooldownLeftSec}s left)`);
 
 console.log(`\n${failures === 0 ? 'ALL MEMORY-VECTOR TESTS PASSED' : `${failures} FAILURES`}`);

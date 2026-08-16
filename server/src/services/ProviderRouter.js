@@ -11,6 +11,12 @@
  * This module is pure routing state + ordering. The actual HTTP/SDK calls live
  * in LLMClient (tryGroq/tryGemini/tryOpenRouter/…) — the router decides the
  * ORDER and tracks HEALTH so generateContent just walks the list.
+ *
+ * B77 — FREE-ONLY routing: every payment-gated provider was REMOVED from the
+ * active order (Cerebras, DeepInfra, xAI/Grok, direct DeepSeek, SambaNova —
+ * all live-probed 402/403). They can never be attempted again until someone
+ * explicitly re-adds them; the walk is now only the six live-verified free
+ * tiers + self-hosted vLLM.
  */
 
 const COOLDOWN_MS = 30_000;        // skip a provider for 30s after a failure
@@ -57,9 +63,8 @@ export function resetProviderHealth(key) {
 
 /**
  * Force a LONG cooldown (default 1h) — used when a provider is unusable, e.g.
- * HTTP 402 payment-required (Cerebras/DeepInfra without billing). A dead
- * provider shouldn't slow down every request with a retry loop, so it gets
- * parked for an hour instead of the usual 30s.
+ * HTTP 402 payment-required. A dead provider shouldn't slow down every request
+ * with a retry loop, so it gets parked for an hour instead of the usual 30s.
  */
 export function markProviderUnavailable(key, minutes = 60) {
   const s = h(key);
@@ -69,28 +74,29 @@ export function markProviderUnavailable(key, minutes = 60) {
 }
 
 /**
+ * B77 — FREE-ONLY extras. The payment-gated providers (cerebras, deepinfra,
+ * xai, deepseek, sambanova — all live-probed 402/403) were REMOVED from this
+ * list so the router can never attempt them. Only the live-verified free
+ * tiers remain: Mistral (Experiment free tier) and NVIDIA NIM (no-card free
+ * key, DeepSeek V4 Flash). The provider code still exists in LLMClient for
+ * anyone who later funds an account — re-adding here is a one-line change.
+ */
+const EXTRA_PROVIDERS = ['mistral', 'nvidia'];
+
+// Load spreading (B77): rotate the healthy head of the DEFAULT order so no
+// single free provider is always first. Daily rate limits (Gemini 1,500 RPD,
+// Groq 1,000 RPD, OpenRouter-free 50 RPD) get spread across the big three
+// instead of hammering one until it 429s.
+let rotationTick = 0;
+
+/**
  * Ordered provider keys for a request, adjusted by health.
  * `prefer` biases the order for the task type:
  *   'gemini'     → Gemini first (strong at code), then Groq, then OpenRouter, then HF
- *   'openrouter' → OpenRouter free models first (Seed/DeepSeek/Qwen family)
- *   default      → Groq first (fast + free), then Gemini, OpenRouter, HF
+ *   'openrouter' → OpenRouter free models first (Seed vision family)
+ *   default      → rotated across Groq / Gemini / OpenRouter (load spread), then extras
  * Cooldowned providers are pushed to the END, healthy ones keep priority.
  */
-// Extra free OpenAI-compatible providers — slots in after the big three,
-// before HuggingFace (slow last-resort). Each is optional; a missing key is
-// simply skipped by the router. Adding one only means setting ONE env var.
-// B66 — DeepSeek joins the free/optional OpenAI-compatible tier (the primary
-// coding coworker). Qwen is reached via OpenRouter models (no separate key).
-// B74 — vLLM (self-hosted): genuinely free inference on the user's own
-// hardware via an OpenAI-compatible server (github.com/vllm-project/vllm).
-// Sits right before the slow HF free tier; skipped instantly when nothing is
-// listening on VLLM_BASE_URL (default http://localhost:8000/v1).
-// B75 — NVIDIA NIM + SambaNova join the no-card free tier (research: GitHub
-// Models was retired 2026-07-30; these two are live-verified free with no
-// credit card — NVIDIA gives free DeepSeek V4 Flash, SambaNova free
-// DeepSeek-V3.1/V3.2).
-const EXTRA_PROVIDERS = ['cerebras', 'deepinfra', 'mistral', 'xai', 'deepseek', 'nvidia', 'sambanova'];
-
 export function providerOrder(prefer = '') {
   const base =
     prefer === 'gemini'
@@ -101,22 +107,32 @@ export function providerOrder(prefer = '') {
 
   const healthy = base.filter((k) => !providerInCooldown(k));
   const cooling = base.filter((k) => providerInCooldown(k));
+
+  if (!prefer) {
+    // B77 — rotate the healthy head (first 3) of the default order. The slow
+    // tail (vLLM → HuggingFace) never rotates, so "huggingface stays last"
+    // holds. Preference-biased orders stay deterministic (those paths need
+    // the bias — Gemini-first for code/vision, OpenRouter-first for Seed).
+    const head = healthy.slice(0, 3);
+    const tail = healthy.slice(3);
+    rotationTick++;
+    const shift = head.length ? rotationTick % head.length : 0;
+    const rotated = [...head.slice(shift), ...head.slice(0, shift)];
+    return [...rotated, ...tail, ...cooling];
+  }
   return [...healthy, ...cooling];
 }
 
 /** Which providers have keys configured right now (no secrets exposed). */
+// B77 — payment-gated providers removed from ENV_MAP too: they are never
+// probed by the health checks and never counted as configured.
 const ENV_MAP = {
   groq: 'GROQ_API_KEY',
   gemini: 'GEMINI_API_KEY',
   openrouter: 'OPENROUTER_API_KEY',
   huggingface: 'HF_TOKEN',
-  cerebras: 'CEREBRAS_API_KEY',
-  deepinfra: 'DEEPINFRA_API_KEY',
   mistral: 'MISTRAL_API_KEY',
-  xai: 'XAI_API_KEY',
-  deepseek: 'DEEPSEEK_API_KEY',
   nvidia: 'NVIDIA_API_KEY',
-  sambanova: 'SAMBANOVA_API_KEY',
   // B74 — vLLM has no API key; "configured" = a VLLM_BASE_URL is set.
   vllm: 'VLLM_BASE_URL',
 };
@@ -131,16 +147,18 @@ export function providerHealthSnapshot() {
   const now = Date.now();
   const names = {
     groq: 'Groq', gemini: 'Gemini', openrouter: 'OpenRouter', huggingface: 'HuggingFace',
-    cerebras: 'Cerebras', deepinfra: 'DeepInfra', mistral: 'Mistral', xai: 'Grok (xAI)', deepseek: 'DeepSeek',
-    nvidia: 'NVIDIA NIM', sambanova: 'SambaNova',
+    mistral: 'Mistral', nvidia: 'NVIDIA NIM',
     vllm: 'vLLM (self-hosted)',
   };
-  return providerOrder().map((k) => {
+  // B77 — compute the order ONCE (it rotates, so a second call could change
+  // the positions and make indexOf return -1 for every key).
+  const order = providerOrder();
+  return order.map((k) => {
     const s = h(k);
     return {
       provider: names[k] || k,
       key: k,
-      order: providerOrder().indexOf(k) + 1,
+      order: order.indexOf(k) + 1,
       configured: !!process.env[ENV_MAP[k]],
       calls: s.calls,
       ok: s.ok,

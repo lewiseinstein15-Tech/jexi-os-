@@ -44,13 +44,17 @@ check('getSkill finds a skill', getSkill('verification')?.name === 'Verification
 
 /* ---------------- Provider Router ---------------- */
 
-// Default order is Groq-first; gemini preference puts Gemini first.
-check('default order starts with groq', providerOrder()[0] === 'groq');
+// B77 — the default order ROTATES its healthy head (load spreading across the
+// free big three) so the head is always a permutation of {groq, gemini,
+// openrouter}; preference-biased orders stay deterministic.
+check('default head is a rotation of groq/gemini/openrouter', ['groq', 'gemini', 'openrouter'].every((k) => providerOrder().slice(0, 3).includes(k)));
 check('gemini preference starts with gemini', providerOrder('gemini')[0] === 'gemini');
 check('openrouter preference starts with openrouter', providerOrder('openrouter')[0] === 'openrouter');
-check('extra free providers are in the order', ['cerebras', 'deepinfra', 'mistral'].every((k) => providerOrder().includes(k)));
+check('free extra providers are in the order', ['mistral', 'nvidia'].every((k) => providerOrder().includes(k)));
 check('huggingface stays last', providerOrder()[providerOrder().length - 1] === 'huggingface');
 check('together is removed from the router', !providerOrder().includes('together'));
+// B77 — payment-gated providers are never in the walk (never attempted).
+check('payment-gated providers removed from the walk', !['cerebras', 'deepinfra', 'xai', 'deepseek', 'sambanova'].some((k) => providerOrder().includes(k)));
 
 // Cooldown: 3 failures push a provider to the back.
 resetProviderHealth('groq');
@@ -61,15 +65,16 @@ check('groq enters cooldown after 3 failures', providerInCooldown('groq'));
 const cooled = providerOrder();
 check('cooldowned groq moves to the back', cooled[cooled.length - 1] === 'groq');
 
-// A success resets the streak → groq returns to the front.
+// A success resets the streak → groq returns to the healthy head.
 recordProviderSuccess('groq');
 check('success clears cooldown', !providerInCooldown('groq'));
-check('groq back at the front after recovery', providerOrder()[0] === 'groq');
+check('groq back in the healthy head after recovery', providerOrder().slice(0, 3).includes('groq'));
 
 // Snapshot shape (no secrets).
 const snap = providerHealthSnapshot();
-// B66 — DeepSeek added as a coworker provider (now 9 in the router).
-check('snapshot lists all ' + snap.length + ' providers (got ' + snap.length + ')', snap.length === 12 && snap.some((p) => p.key === 'xai') && snap.some((p) => p.key === 'deepseek') && snap.some((p) => p.key === 'vllm') && snap.some((p) => p.key === 'nvidia') && snap.some((p) => p.key === 'sambanova'));
+// B77 — free-only walk: 7 providers (groq, gemini, openrouter, mistral,
+// nvidia, vllm, huggingface); payment-gated ones are gone from the snapshot.
+check('snapshot lists all ' + snap.length + ' providers (got ' + snap.length + ')', snap.length === 7 && snap.some((p) => p.key === 'mistral') && snap.some((p) => p.key === 'nvidia') && snap.some((p) => p.key === 'vllm') && !snap.some((p) => ['xai', 'deepseek', 'cerebras', 'deepinfra', 'sambanova'].includes(p.key)));
 
 /* ---------------- Round 3: Tools, Critics, Memory, Guardrails ---------------- */
 

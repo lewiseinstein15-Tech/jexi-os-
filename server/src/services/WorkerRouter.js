@@ -3,14 +3,17 @@
  *
  * The orchestrator selects COWORKERS by task type — not by reordering a
  * global preference list. Each coworker owns an exact provider→model chain:
- * its PRIMARY model, a fallback, and finally the general last-resort tier
- * (HuggingFace → DeepInfra → Mistral).
+ * its PRIMARY model, a fallback, and finally the general last-resort tier.
  *
- *   coder       → DeepSeek first (deepseek-chat), then FREE DeepSeek (NVIDIA) + free code models
- *   memory      → Gemini first (free tier, 1,500 RPD), then FREE OpenRouter + near-free
- *   researcher  → Groq 70B first (free tier), then Groq 8B, OpenRouter, Grok last
- *   fallback    → vLLM (self-hosted, free) → HuggingFace (incl. free Qwen)
- *                  → DeepInfra → Mistral (last resort)
+ * B77 — FREE-ONLY chains: every payment-gated provider was REMOVED so it can
+ * never be attempted again (deepseek-chat direct API 402, grok 403,
+ * deepinfra 402 — all live-probed). Every entry below is a live-verified
+ * free (or near-free) tier:
+ *
+ *   coder       → NVIDIA DeepSeek V4 Flash (free) → north-mini-code:free → seed
+ *   memory      → Gemini 2.5 Flash (free, 1,500 RPD) → nemotron-3:free → seed
+ *   researcher  → Groq 70B (free) → Groq 8B (free) → seed → gemma-4:free
+ *   fallback    → vLLM (self-hosted) → HuggingFace (free DeepSeek/Qwen) → Mistral
  *
  * B73 — free-model audit (live-verified): OpenRouter has ZERO free DeepSeek
  * and ZERO free Qwen models today; DeepSeek's own API has no permanent free
@@ -35,18 +38,14 @@ export const COWORKERS = {
   coder: {
     role: 'Coding / GitHub operations',
     providers: [
-      // B66 — DeepSeek stays the architecture's coding primary. It has NO free
-      // tier (verified B73 — paid API only, one-time promo credits already
-      // consumed → HTTP 402 until topped up). It's cheap (~$0.30/M) and works
-      // the moment the account has balance.
-      { key: 'deepseek', model: 'deepseek-chat' },
-      // B75 — FREE DeepSeek: NVIDIA NIM hosts DeepSeek V4 Flash for no-card
-      // free-tier users (live-verified in NVIDIA's 102-model catalog).
+      // B77 — payment-gated deepseek-chat (402) REMOVED from the chain. The
+      // FREE DeepSeek path is NVIDIA NIM (B75/B76 live-verified working):
+      // DeepSeek V4 Flash leads the coder, then free OpenRouter code model,
+      // then the near-free uncapped workhorse.
       { key: 'nvidia', model: 'deepseek-ai/deepseek-v4-flash-0731' },
-      // B73 — FREE code model, live-verified at $0 on OpenRouter (the free
-      // Qwen/DeepSeek models OpenRouter once hosted were removed).
+      // B73 — FREE code model, live-verified at $0 on OpenRouter.
       { key: 'openrouter', model: 'cohere/north-mini-code:free' },
-      // Near-free fallback ($0.10/M in) — proven working with this account.
+      // Near-free fallback ($0.10/M in, uncapped) — proven working.
       { key: 'openrouter', model: 'bytedance-seed/seed-2.0-mini' },
     ],
   },
@@ -74,7 +73,6 @@ export const COWORKERS = {
       { key: 'groq', model: 'llama-3.1-8b-instant' },                // proven free fallback
       { key: 'openrouter', model: 'bytedance-seed/seed-2.0-mini' },  // near-free fallback
       { key: 'openrouter', model: 'google/gemma-4-26b-a4b-it:free' }, // B73 — FREE fallback
-      { key: 'xai', model: 'grok-4.6' }, // B66 primary — moved last: live probe 403s (no credits) and must not slow every research task; works the moment the xAI account is funded
     ],
   },
   fallback: {
@@ -84,9 +82,9 @@ export const COWORKERS = {
       // free inference (github.com/vllm-project/vllm, OpenAI-compatible at
       // VLLM_BASE_URL, default http://localhost:8000/v1). Skipped instantly
       // when no server is listening; fast + free beats the slow HF tier.
+      // B77 — deepinfra (402) REMOVED; only live free tiers remain.
       { key: 'vllm' },
       { key: 'huggingface' },
-      { key: 'deepinfra' },
       { key: 'mistral' },
     ],
   },

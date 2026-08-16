@@ -76,33 +76,36 @@ ok(
   'memory worker #3 = openrouter(bytedance-seed/seed-2.0-mini) — near-free workhorse stays reachable'
 );
 
-// 3b. Researcher — B75b: Groq 70B leads (free tier, 1,000 RPD), Grok moved
-//     last (live probe 403s with no credits — must not slow every task).
+// 3b. Researcher — B75b: Groq 70B leads (free tier, 1,000 RPD). B77: Grok
+//     (403, payment-gated) removed from the chain entirely.
 const researcherChain = coworkerChain('researcher');
 ok(
   researcherChain[0] && researcherChain[0].key === 'groq' && researcherChain[0].model === 'llama-3.3-70b-versatile',
   `researcher primary = groq(llama-3.3-70b-versatile) — free tier, got ${JSON.stringify(researcherChain[0])}`
 );
-ok(
-  researcherChain[4] && researcherChain[4].key === 'xai',
-  'grok stays reachable but last among the research providers (no credits → must not slow every task)'
-);
+ok(!researcherChain.some((p) => p.key === 'xai'), 'payment-gated grok removed from the research chain');
 
-// 4. Coder coworker: DeepSeek (paid-but-cheap primary) → FREE DeepSeek via
-//    NVIDIA NIM (B75, no-card) → free OpenRouter code model → near-free seed.
+// 4. Coder coworker — B77: payment-gated deepseek-chat REMOVED; free DeepSeek
+//    via NVIDIA NIM leads, then free OpenRouter code model, then near-free seed.
 const coderChain = coworkerChain('coder');
-ok(coderChain[0] && coderChain[0].key === 'deepseek', 'coder #1 stays deepseek(deepseek-chat) — architecture primary');
 ok(
-  coderChain[1] && coderChain[1].key === 'nvidia' && coderChain[1].model === 'deepseek-ai/deepseek-v4-flash-0731',
-  `coder #2 = nvidia(deepseek-ai/deepseek-v4-flash-0731) — FREE DeepSeek via NVIDIA NIM, got ${JSON.stringify(coderChain[1])}`
+  coderChain[0] && coderChain[0].key === 'nvidia' && coderChain[0].model === 'deepseek-ai/deepseek-v4-flash-0731',
+  `coder #1 = nvidia(deepseek-ai/deepseek-v4-flash-0731) — FREE DeepSeek leads, got ${JSON.stringify(coderChain[0])}`
 );
 ok(
-  coderChain[2] && coderChain[2].key === 'openrouter' && coderChain[2].model === 'cohere/north-mini-code:free',
-  `coder #3 = openrouter(cohere/north-mini-code:free) — free code model, got ${JSON.stringify(coderChain[2])}`
+  coderChain[1] && coderChain[1].key === 'openrouter' && coderChain[1].model === 'cohere/north-mini-code:free',
+  `coder #2 = openrouter(cohere/north-mini-code:free) — free code model, got ${JSON.stringify(coderChain[1])}`
 );
 ok(
-  coderChain[3] && coderChain[3].key === 'openrouter' && coderChain[3].model === 'bytedance-seed/seed-2.0-mini',
-  `coder #4 = openrouter(bytedance-seed/seed-2.0-mini) — near-free fallback, got ${JSON.stringify(coderChain[3])}`
+  coderChain[2] && coderChain[2].key === 'openrouter' && coderChain[2].model === 'bytedance-seed/seed-2.0-mini',
+  `coder #3 = openrouter(bytedance-seed/seed-2.0-mini) — near-free fallback, got ${JSON.stringify(coderChain[2])}`
+);
+ok(!coderChain.some((p) => p.key === 'deepseek'), 'payment-gated deepseek (direct API) removed from the coder chain');
+
+// 4b. B77 — no payment-gated provider survives ANYWHERE in the coworker chains.
+ok(
+  !['cerebras', 'deepinfra', 'xai', 'deepseek', 'sambanova'].some((k) => JSON.stringify(COWORKERS).includes(`"key":"${k}"`)),
+  'no payment-gated provider (cerebras/deepinfra/xai/deepseek/sambanova) remains in COWORKERS'
 );
 
 // 4b. B73 follow-up — free Qwen AND free DeepSeek are real via HuggingFace
@@ -135,15 +138,16 @@ ok(coworkerFor('latest news on AI') === 'researcher', 'research request → rese
 //    chain is 7 entries long.
 const memChain = coworkerChain('memory');
 ok(
-  memChain.length === 7 && memChain[3].key === 'vllm' && memChain[4].key === 'huggingface' && memChain[5].key === 'deepinfra' && memChain[6].key === 'mistral',
-  'memory chain = [gemini, nemotron:free, seed-2.0-mini, vllm, huggingface, deepinfra, mistral] (vLLM leads the fallback tier)'
+  memChain.length === 6 && memChain[3].key === 'vllm' && memChain[4].key === 'huggingface' && memChain[5].key === 'mistral',
+  'memory chain = [gemini, nemotron:free, seed-2.0-mini, vllm, huggingface, mistral] (payment-gated deepinfra removed)'
 );
 
 // 6b. B74 — vLLM is part of the general provider walk too (right before the
 //     slow HF free tier; huggingface must stay last per test-roster-skills).
 ok(providerOrder().includes('vllm'), 'vLLM is in the general provider walk');
 ok(providerOrder().includes('nvidia'), 'NVIDIA NIM (no-card free tier) is in the general provider walk');
-ok(providerOrder().includes('sambanova'), 'SambaNova (no-card free DeepSeek) is in the general provider walk');
+ok(!providerOrder().includes('sambanova'), 'payment-gated sambanova removed from the general provider walk');
+ok(!['cerebras', 'deepinfra', 'xai', 'deepseek'].some((k) => providerOrder().includes(k)), 'no payment-gated provider in the general provider walk');
 ok(providerOrder()[providerOrder().length - 1] === 'huggingface', 'general order keeps huggingface last (vLLM sits just before it)');
 ok(COWORKERS.fallback.providers[0].key === 'vllm', 'vLLM leads the last-resort fallback tier (self-hosted free inference)');
 
