@@ -86,18 +86,26 @@ export async function setupFcmOnce() {
     });
   } catch (e) { /* listener optional */ }
 
-  // 3) Get + register the FCM token.
+  // 3) Get + register the FCM token. Some devices need a warm-up: retry the
+  //    token a few times with a delay before declaring failure.
   let token;
-  try {
-    token = await FirebaseMessaging.getToken();
-  } catch (e) {
-    await reportDiag('get-token-error', e.message, receive);
-    throw e;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      token = await FirebaseMessaging.getToken();
+    } catch (e) {
+      await reportDiag('get-token-error', e.message, receive);
+      throw e;
+    }
+    if (token) break;
+    await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
   }
   if (!token) {
     await reportDiag('empty-token', '', receive);
-    throw new Error('empty FCM token');
+    throw new Error('empty FCM token (Play Services may need the app reinstalled)');
   }
+  // Some builds return an object with a .token field — normalize.
+  if (typeof token === 'object' && token && token.token) token = token.token;
+  token = String(token || '').trim();
   const base = getBackendUrl();
   if (!base) {
     await reportDiag('no-backend-url', '', receive);
