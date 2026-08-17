@@ -103,7 +103,7 @@ export function conversationSummary(convId) {
     id: convId,
     title,
     titleSource,
-    messageCount: events.length,
+    messageCount: events.filter((e) => e.kind === 'chat').length,
     userMessages: stats.userMessages ?? events.filter((e) => e.role === 'user').length,
     jexiMessages: stats.jexiMessages ?? events.filter((e) => e.role === 'jexi').length,
     toolCalls: stats.toolCalls ?? null,

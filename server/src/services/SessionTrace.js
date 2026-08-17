@@ -11,6 +11,7 @@
 import { getEvents } from './EventLog.js';
 import { loadConversationEvents, conversationSummary } from './SessionConversations.js';
 import { isCompactionEvent } from './CompactionEngine.js';
+import { isLifecycleEvent } from './SessionLifecycle.js'; // B119 — lifecycle events surface in the trace
 
 /**
  * Build one conversation's trace.
@@ -28,6 +29,15 @@ export function buildTrace(convId, { limit = 200 } = {}) {
     retained: e.meta ? e.meta.retained : null,
     text: String(e.text || '').slice(0, 400),
   }));
+  // B119 — the DSH lifecycle events (turn/start, step/start, tool/call,
+  // tool/result, step/end, turn/end, assistant/message, user/message) land
+  // in the trace so the UI can replay the exact question → response flow.
+  const lifecycle = conv.filter((e) => isLifecycleEvent(e)).map((e) => ({
+    kind: e.kind,
+    at: e.at,
+    text: String(e.text || '').slice(0, 200),
+    meta: e.meta || undefined,
+  }));
   const counts = {};
   for (const e of events) counts[e.type] = (counts[e.type] || 0) + 1;
   const summary = conversationSummary(convId);
@@ -35,6 +45,7 @@ export function buildTrace(convId, { limit = 200 } = {}) {
   return {
     convId,
     events,
+    lifecycle,
     compaction,
     counts,
     summary,

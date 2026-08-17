@@ -34,6 +34,8 @@ import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { buildSkillCatalog } from './SkillDiscovery.js'; // B98 — dsh-style available-skills catalog (metadata only)
 import { listPluginTools } from './PluginContext.js'; // B105 — plugin tools are visible to the model (weather-now etc.)
 import { preferencesBlock } from './PreferenceLearner.js';
+import { assemblePrompt } from './PromptAssembly.js'; // B119 — dsh systemPrompt.assemble mirror
+import { lifecycleTurnStart, lifecycleStepStart, lifecycleToolCall, lifecycleToolResult, lifecycleStepEnd, lifecycleTurnEnd } from './SessionLifecycle.js'; // B119 — dsh session-event vocabulary
 import { providerPreferenceForIntent } from './ModelRouting.js';
 
 // B96 — DeepSeek-Harness-style loop: more steps per turn (the rate limiter
@@ -51,12 +53,6 @@ export function repeatReminderFor(key, count) {
   if (count === 5) return `[Reminder: this is the ${count}th identical call. Repeating it again will not produce a different result. Try a different tool or answer directly.]`;
   if (count === 8) return `[Reminder: ${count} identical calls in a row — the loop will cap tool calls soon. Do NOT call \"${String(key).split('|')[0]}\" again; synthesize an answer from the evidence you have.]`;
   return null;
-}
-
-/** B99 — lazily imported SDK section for code mode (dsh tools:sdk). */
-async function renderSdkBlock(codeTools) {
-  const { renderToolsSdk } = await import('./CodeModeRuntime.js');
-  return `\n${renderToolsSdk(codeTools)}\n`;
 }
 
 /** Planner.analyzeIntent returns a plan (intent/teamSlugs/steps/tools/toolsLine). */
@@ -145,10 +141,20 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
 
   if (checkCancelled()) return { answer: '', cancelled: true, stats: { cancelled: true, toolCalls: 0, tools: schemas.length, durationMs: Date.now() - start } };
 
+  // B119 — dsh lifecycle: the whole turn is replayable from the session log.
+  const convId = opts.spillOwner || null;
+  try { lifecycleTurnStart(convId, 1); } catch { /* noop */ }
+
   try {
     const res = await generateWithToolsLoop(
       `The user asked: "${query}"${image ? '\n(An image was provided — analyze it.)' : ''}`,
-      (opts.systemPromptOverride || JEXI_SYSTEM_PROMPT) + (opts.presetFlavor || '') + buildSkillCatalog(30) + (codeMode ? await renderSdkBlock(codeTools) : '') + preferencesBlock(),
+      await assemblePrompt({
+        convId: opts.spillOwner || null,
+        codeMode,
+        codeTools,
+        presetFlavor: opts.presetFlavor || '',
+        base: opts.systemPromptOverride || null,
+      }),
       schemas,
       {
         temperature: 0.3,
@@ -168,9 +174,13 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
             // B96 — dsh-style step events: tool/call + tool/result on the wire.
             try { emit('step/start', { turn: 1, step: callsMade }); } catch (e) {}
             try { emit('tool/call', { callId: call.id, name: call.name, arguments: JSON.stringify(call.arguments || {}).slice(0, 500) }); } catch (e) {}
+            // B119 — durable lifecycle events (dsh session-event vocabulary).
+            try { lifecycleStepStart(convId, 1, callsMade); lifecycleToolCall(convId, 1, callsMade, call.id, call.name, call.arguments || {}); } catch { /* noop */ }
             const r = await executeTool({ slug: call.name, args: call.arguments || {}, profile, sendEvent: emit, confirm: opts.confirm, codeTools: codeMode ? codeTools : undefined, spillOwner: opts.spillOwner });
             try { emit('tool/result', { callId: call.id, name: call.name, ok: !!r.ok, error: r.error || null }); } catch (e) {}
+            try { lifecycleToolResult(convId, 1, callsMade, call.id, call.name, !!r.ok, r.error, r.durationMs); } catch { /* noop */ }
             try { emit('step/end', { turn: 1, step: callsMade }); } catch (e) {}
+            try { lifecycleStepEnd(convId, 1, callsMade); } catch { /* noop */ }
             const done = isToolDone(r);
             toolContext.push({ tool: call.name, args: call.arguments || {}, ok: r.ok, done, error: r.error, result: r.result, paused: r.paused === true || r.approvalRequired === true, blocked: r.blocked === true });
             // B106 — repeat-tool-reminder: identical consecutive calls get an
@@ -231,5 +241,6 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
     },
   });
 
+  try { lifecycleTurnEnd(convId, 1, finalText ? 'completed' : 'error'); } catch { /* noop */ }
   return { answer: finalText, stats: { toolCalls: callsMade, tools: schemas.length, durationMs: Date.now() - start } };
 }

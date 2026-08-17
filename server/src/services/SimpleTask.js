@@ -15,6 +15,7 @@
 import { conversationContext } from './Orchestrator.js';
 import { addChat } from './MemoryManager.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
+import { assemblePrompt } from './PromptAssembly.js'; // B119 — dsh prompt assembly
 import { preferencesBlock } from './PreferenceLearner.js';
 import { runWorker, coworkerFor } from './WorkerRouter.js';
 import { listPluginTools } from './PluginContext.js'; // B105 — plugin tools visible to SIMPLE-path coworkers
@@ -112,7 +113,15 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
       return plugins.length ? [...SIMPLE_TOOL_DEFS, ...plugins, ...extra] : [...SIMPLE_TOOL_DEFS, ...extra];
     } catch { return SIMPLE_TOOL_DEFS; }
   })();
-  const res = await runWorker(role, prompt, JEXI_SYSTEM_PROMPT + (opts.presetFlavor || '') + preferencesBlock() + orchestratorPromptFragment() + coworkerMandate, {
+  const system = await assemblePrompt({
+    convId: opts.convId || null,
+    codeMode: opts.codeMode,
+    codeTools: coworkerTools,
+    presetFlavor: opts.presetFlavor || '',
+    includeSessionRefs: false, // conversationContext below already injects them
+    includeState: false,       // the coworker focuses on its mandate
+  }) + orchestratorPromptFragment() + coworkerMandate;
+  const res = await runWorker(role, prompt, system, {
     temperature: 0.4,
     // B67 — the coworker can really call these tools via native function
     // calling; intent is passed so ToolRuntime enforces the allowlist.

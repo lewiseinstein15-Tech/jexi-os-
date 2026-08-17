@@ -98,6 +98,8 @@ import { appendConversationEvent, listConversations as listSessionConversations,
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines } from './src/services/JexiIdentity.js'; // canonical identity (name / creator / capabilities)
 import { JEXI_NORMAL_PROMPT, IDENTITY_QUESTION_RE } from './src/services/JexiPrompt.js'; // B103 — normal-mode prompt + deterministic identity-question detection
 import { isDirectIntent } from './src/services/Planner.js'; // B114 — AUTO mode: JEXI decides direct vs agent
+import { setGoalEngine } from './src/services/PromptAssembly.js'; // B119 — goal state in prompts
+import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B119 — dsh lifecycle events
 import { DoAnythingAgent } from './src/services/DoAnythingAgent.js'; // B89 — free-form autonomous agent loop
 import { TravelBookingAgent, parseBookingQuery } from './src/services/TravelBookingAgent.js'; // B90 — browser booking flow
 import { aggregateSearch } from './src/services/SearchEngine.js'; // B90 — travel web-search alternatives
@@ -1367,6 +1369,7 @@ const goalEngine = new GoalEngine({
 });
 // Phase 2 — goals run as durable background jobs (survive restarts).
 setGoalExecutor(goalEngine);
+setGoalEngine(goalEngine); // B119 — goal state renders into prompts (dsh goal section)
 // Phase 4 — when a goal finishes, JEXI notifies (bell) and emails the report
 // when GOAL_REPORT_EMAIL / Settings → goalReportEmail is set.
 setGoalNotifier(notifyGoalComplete);
@@ -1936,6 +1939,8 @@ app.post('/api/chat', async (req, res) => {
     let raw = String(query || '').trim();
     // B96 — append the user message to the conversation's durable log.
     try { appendConversationEvent(convId, { role: 'user', text: raw, kind: 'chat' }); } catch (e) {}
+    // B119 — dsh lifecycle: the user message is also a typed session event.
+    try { lifecycleUserMessage(convId, 1, raw); } catch { /* noop */ }
     // B116-fix — HOIST preset+mode BEFORE any use: the auto-routing block and
     // /plan handling reference `mode`, so declaring it later crashed every
     // chat request with "Cannot access 'mode' before initialization" (TDZ).

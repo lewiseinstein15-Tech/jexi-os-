@@ -254,8 +254,22 @@ export default function ConversationsScreen() {
                 {showTrace && trace && trace.convId === c.id && (
                   <div className="mt-2 rounded-md border border-hairline bg-surface-1 px-2 py-1.5 space-y-1 max-h-48 overflow-y-auto">
                     <p className="text-[8px] font-black tracking-wider text-text-secondary flex items-center gap-1">
-                      <Activity className="w-2.5 h-2.5 text-brand" /> SESSION TRACE · {trace.events?.length || 0} events · {trace.compaction?.length || 0} compaction(s)
+                      <Activity className="w-2.5 h-2.5 text-brand" /> SESSION TRACE · {trace.events?.length || 0} events · {trace.lifecycle?.length || 0} lifecycle · {trace.compaction?.length || 0} compaction(s)
                     </p>
+                    {(trace.lifecycle || []).slice(-40).map((e, i) => {
+                      const m = e.meta || {};
+                      let line = e.kind;
+                      let color = 'text-text-tertiary';
+                      if (e.kind === 'turn/start') { line = `🔁 turn ${m.turn} start`; color = 'text-brand/80'; }
+                      else if (e.kind === 'turn/end') { line = `🔁 turn ${m.turn} end (${m.reason || 'completed'})`; color = 'text-brand/80'; }
+                      else if (e.kind === 'step/start') { line = `▸ step ${m.step}`; color = 'text-text-tertiary'; }
+                      else if (e.kind === 'step/end') { line = `▪ step ${m.step} done`; color = 'text-text-tertiary'; }
+                      else if (e.kind === 'tool/call') { line = `🔧 ${m.name} ${m.arguments || ''}`; color = 'text-cyan-300/80'; }
+                      else if (e.kind === 'tool/result') { line = `${m.ok ? '✅' : '❌'} ${m.name}${m.durationMs ? ' · ' + m.durationMs + 'ms' : ''}`; color = m.ok ? 'text-brand/80' : 'text-status-error'; }
+                      else if (e.kind === 'user/message') { line = `💬 ${e.text}`; color = 'text-text-secondary'; }
+                      else if (e.kind === 'assistant/message') { line = `🤖 ${e.text}`; color = 'text-text-secondary'; }
+                      return <p key={`lc-${i}`} className={`text-[8px] leading-snug font-mono ${color}`}>{line}</p>;
+                    })}
                     {(trace.events || []).slice(-60).map((e, i) => {
                       const p = e.payload || {};
                       let line = e.type;
