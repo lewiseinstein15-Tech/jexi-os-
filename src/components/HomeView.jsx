@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Search, Code2, Sigma, Ruler, BarChart3, Workflow, ArrowRight, Loader2, Bot, MessageCircle, Zap } from 'lucide-react';
+import { Send, Search, Code2, Sigma, Ruler, BarChart3, Workflow, ArrowRight, Loader2, Zap } from 'lucide-react';
 import CapabilityCards from './CapabilityCards';
 
 // Semantic accent quick actions (spec §49) — small icon + name + description,
@@ -24,14 +24,6 @@ function greeting() {
 
 export default function HomeView({ messages, logs, isProcessing, onSend, onOpenCommand }) {
   const [input, setInput] = useState('');
-  // B114 — AUTO is the default: JEXI decides per query whether to answer
-  // directly or run the agent pipeline. Pill cycles AUTO → AGENT → NORMAL.
-  const [mode, setModeState] = useState(() => (typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_mode') || 'auto') : 'auto'));
-  const toggleMode = () => {
-    const next = mode === 'auto' ? 'agent' : mode === 'agent' ? 'normal' : 'auto';
-    setModeState(next);
-    try { localStorage.setItem('jexi_mode', next); } catch { /* noop */ }
-  };
 
   const submit = (text) => {
     const q = (text || '').trim();
@@ -112,15 +104,10 @@ export default function HomeView({ messages, logs, isProcessing, onSend, onOpenC
         ))}
       </div>
       <div className="flex items-center justify-between -mt-3">
-        <p className="text-[8px] text-text-tertiary">Attach photos & files inside chat (📎) · v1.2 · B92</p>
-        <button
-          type="button"
-          onClick={toggleMode}
-          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[8px] font-black tracking-wider transition-all ${mode !== 'normal' ? 'border-brand-line bg-brand-dim/40 text-brand' : 'border-hairline text-text-tertiary'}`}
-          title="AUTO = JEXI decides · AGENT = full team · NORMAL = direct answers"
-        >
-          {mode === 'auto' ? <><Zap className="w-2.5 h-2.5" /> AUTO</> : mode === 'agent' ? <><Bot className="w-2.5 h-2.5" /> AGENT</> : <><MessageCircle className="w-2.5 h-2.5" /> NORMAL</>}
-        </button>
+        <p className="text-[8px] text-text-tertiary">Attach photos & files inside chat (📎) · v1.2</p>
+        <span className="flex items-center gap-1 rounded-full border border-brand-line/50 bg-brand-dim/30 px-2.5 py-1 text-[8px] font-black tracking-wider text-brand">
+          <Zap className="w-2.5 h-2.5" /> ONE MODE · JEXI DECIDES
+        </span>
       </div>
 
       {/* Active agent strip — Home never looks frozen while a task runs */}

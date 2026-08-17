@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Square, ImagePlus, X, Stethoscope, Plus, Paperclip, FileText, Bot, MessageCircle, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Send, Square, ImagePlus, X, Stethoscope, Plus, Paperclip, FileText, Bot, MessageCircle, Loader2, ThumbsUp, ThumbsDown , Zap } from 'lucide-react';
 import { getBackendUrl, jexiFetch, getSessionId } from '../utils/helpers';
 import TypedMessage from './TypedMessage';
 import AgentPipeline from './AgentPipeline';
@@ -35,10 +35,6 @@ const QUICK_ACTIONS = [
 ];
 
 // B92 — MODE TOGGLE: Agent mode (full multi-agent team) vs Normal mode
-// (ChatGPT-style direct answers). Anyone can switch; persisted per device.
-const MODE_STORAGE = 'jexi_mode';
-const getMode = () => (typeof localStorage !== 'undefined' ? (localStorage.getItem(MODE_STORAGE) || 'agent') : 'agent');
-const setMode = (m) => { try { localStorage.setItem(MODE_STORAGE, m); } catch { /* noop */ } };
 
 export default function ChatWindow({
   messages, logs, isProcessing, onSend, onStop,
@@ -46,7 +42,6 @@ export default function ChatWindow({
 }) {
   const [input, setInput] = useState('');
   const [image, setImage] = useState(null);
-  const [mode, setModeState] = useState(getMode());
   const [fileAttachments, setFileAttachments] = useState([]); // { id, name, kind }
   const [uploading, setUploading] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -112,12 +107,6 @@ export default function ChatWindow({
     else onSend(SELF_CHECK_QUERY);
   };
 
-  const toggleMode = () => {
-    const next = mode === 'agent' ? 'normal' : 'agent';
-    setMode(next);
-    setModeState(next);
-  };
-
   // Upload an arbitrary file → backend → keep { id, name } to send with the message.
   const handleAnyFile = async (e) => {
     const file = e.target.files && e.target.files[0];
@@ -174,25 +163,10 @@ export default function ChatWindow({
     <div className="surface-card p-4 rounded-xl relative z-10 flex flex-col flex-1 min-h-0">
       <div className="flex items-center gap-2 mb-3 flex-shrink-0">
         <h2 className="text-[10px] font-bold text-brand tracking-wider">JEXI CHAT</h2>
-        {/* B92 — AGENT / NORMAL mode toggle */}
-        <div className="flex items-center rounded-full border border-hairline overflow-hidden ml-1">
-          <button
-            type="button"
-            onClick={() => { setMode('agent'); setModeState('agent'); }}
-            className={`px-2.5 py-1 text-[8px] font-black tracking-wider flex items-center gap-1 transition-all ${mode === 'agent' ? 'bg-brand text-black' : 'text-text-tertiary'}`}
-            title="Agent mode — full multi-agent team, tools, planning"
-          >
-            <Bot className="w-2.5 h-2.5" /> AGENT
-          </button>
-          <button
-            type="button"
-            onClick={() => { setMode('normal'); setModeState('normal'); }}
-            className={`px-2.5 py-1 text-[8px] font-black tracking-wider flex items-center gap-1 transition-all ${mode === 'normal' ? 'bg-brand text-black' : 'text-text-tertiary'}`}
-            title="Normal mode — direct answers like a regular chat"
-          >
-            <MessageCircle className="w-2.5 h-2.5" /> NORMAL
-          </button>
-        </div>
+        {/* B117 — ONE mode: JEXI decides per query (direct answer or full team). */}
+        <span className="flex items-center gap-1 rounded-full border border-brand-line/50 bg-brand-dim/30 px-2.5 py-1 text-[8px] font-black tracking-wider text-brand ml-1">
+          <Zap className="w-2.5 h-2.5" /> AUTO · JEXI DECIDES
+        </span>
         {isProcessing && (
           <span className="ml-auto flex items-center gap-1.5 text-[8px] text-brand font-bold">
             THINKING

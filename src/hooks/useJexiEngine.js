@@ -247,7 +247,7 @@ export const useJexiEngine = () => {
     }
   }, []);
 
-  const runSearch = useCallback(async (query, image = null, attachments = undefined, mode = null) => {
+  const runSearch = useCallback(async (query, image = null, attachments = undefined) => {
     // Halt any previous run AND any pending recovery before starting a new one.
     abortRef.current?.abort();
     recoverRef.current?.abort();
@@ -268,23 +268,18 @@ export const useJexiEngine = () => {
     try {
       const backendUrl = getBackendUrl();
       abortRef.current = new AbortController();
-      // B92 — mode header (agent | normal) rides every chat request; the
-      // server's normal path answers directly without the agent pipeline.
+      // B117 — ONE MODE: no mode header; the server routes per query.
       const headers = { 'Content-Type': 'application/json' };
-      const effMode = mode || (typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_mode') || 'auto') : 'auto');
-      // B102 — AGENT PRESET (dsh: standard/ptc/minimal/creator) rides every
-      // request; the server uses it as the default and explicit mode/code-mode
-      // headers override it.
+      // B117 — ONE MODE: JEXI decides per query (direct answer vs full team).
+      // No x-jexi-mode header is ever sent; the server routes automatically.
+      // The dsh preset (standard/ptc/minimal/creator) still rides along and
+      // is the only explicit override (minimal = direct answers only).
       const preset = typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_preset') || 'ptc') : 'ptc';
       headers['x-jexi-preset'] = preset;
-      // B114 — AUTO is the default: only force 'normal' explicitly; auto and
-      // agent both ride the server's per-query routing.
-      if (effMode === 'normal' || preset === 'minimal') headers['x-jexi-mode'] = 'normal';
-      else if (effMode === 'agent') headers['x-jexi-mode'] = 'agent';
-      // B99 — CODE MODE (PTC): on whenever the agent pipeline may run (auto
-      // included); off via Settings.
+      // B99 — CODE MODE (PTC): on whenever the agent pipeline may run; off
+      // via Settings (minimal/standard presets keep it off).
       const codeModeOn = typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_code_mode') || '1') !== '0' : true;
-      if (effMode !== 'normal' && codeModeOn && preset !== 'standard') {
+      if (codeModeOn && preset !== 'standard' && preset !== 'minimal') {
         headers['x-jexi-code-mode'] = '1';
       }
       const res = await jexiFetch(`${backendUrl}/api/chat`, {

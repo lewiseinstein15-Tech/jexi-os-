@@ -543,10 +543,9 @@ export default function SettingsPanel() {
                     onClick={() => {
                       try { localStorage.setItem('jexi_preset', key); } catch { /* noop */ }
                       setPreset(key);
-                      // Preset also drives mode + code-mode defaults. B114 —
-                      // standard/ptc/creator use AUTO (JEXI decides per query);
-                      // minimal forces direct answers.
-                      try { localStorage.setItem('jexi_mode', key === 'minimal' ? 'normal' : 'auto'); } catch { /* noop */ }
+                      // B117 — ONE mode (JEXI decides); presets only adjust the
+                      // code-mode default. Minimal keeps the server's direct
+                      // answers via its preset mapping.
                       const cm = key === 'standard' || key === 'minimal' ? '0' : '1';
                       try { localStorage.setItem('jexi_code_mode', cm); } catch { /* noop */ }
                       setCodeMode(cm === '1');

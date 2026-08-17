@@ -37,15 +37,20 @@ ok(/isDirectIntent\(dec\.intent\)/.test(idx), 'routing uses isDirectIntent');
 ok(/confidence \|\| 0\) >= 0\.6/.test(idx), 'confidence gate ≥ 0.6');
 ok(/\(mode === 'normal' \|\| autoDirect\) && !image/.test(idx), 'direct block runs for normal OR autoDirect');
 
-console.log('\n== 3. Frontend: AUTO is the default everywhere ==');
+console.log('\n== 3. Frontend: ONE mode — no toggle, JEXI decides (B117) ==');
 const hook = fs.readFileSync('../src/hooks/useJexiEngine.js', 'utf-8');
-ok(/jexi_mode'\) \|\| 'auto'/.test(hook), 'useJexiEngine defaults to auto');
+ok(!/x-jexi-mode/.test(hook.replace(/No x-jexi-mode header is ever sent/, '')), 'engine never sends x-jexi-mode');
+ok(!/jexi_mode/.test(hook), 'engine no longer reads jexi_mode');
+ok(/x-jexi-preset/.test(hook), 'preset header still rides along');
+const chat = fs.readFileSync('../src/components/ChatWindow.jsx', 'utf-8');
+ok(!/> AGENT</.test(chat) && !/> NORMAL</.test(chat), 'ChatWindow has NO agent/normal toggle buttons');
+ok(!/MODE_STORAGE|toggleMode/.test(chat), 'ChatWindow has no mode state/toggle');
+ok(/AUTO · JEXI DECIDES/.test(chat), 'ChatWindow shows the static AUTO badge');
 const home = fs.readFileSync('../src/components/HomeView.jsx', 'utf-8');
-ok(/jexi_mode'\) \|\| 'auto'/.test(home), 'Home pill defaults to auto');
-ok(/AUTO → AGENT → NORMAL/.test(home) || /mode === 'auto' \? 'agent'/.test(home), 'pill cycles AUTO → AGENT → NORMAL');
-ok(/\? <> <Zap|Zap className/.test(home), 'pill shows an AUTO label');
+ok(!/toggleMode/.test(home) && !/jexi_mode/.test(home), 'HomeView has no mode pill/toggle');
+ok(/ONE MODE · JEXI DECIDES/.test(home), 'Home shows the one-mode badge');
 const settings = fs.readFileSync('../src/components/SettingsPanel.jsx', 'utf-8');
-ok(/key === 'minimal' \? 'normal' : 'auto'/.test(settings), 'presets set auto (except minimal → normal)');
+ok(!/jexi_mode/.test(settings), 'presets no longer write jexi_mode');
 
 console.log('\n== 4. Regression: no TDZ crash (B116-fix) ==');
 const idxLines = idx.split('\n');
@@ -58,5 +63,5 @@ ok(modeDecls === 1, `exactly ONE mode declaration (${modeDecls}) — duplicate r
 const presetAfterMode = idxLines.slice(modeDecl).filter((l) => l.includes("const preset = resolvePreset")).length;
 ok(presetAfterMode === 0, `no preset declaration AFTER mode in the chat handler (${presetAfterMode}) — the duplicate is gone`);
 
-console.log(`\nB114+B116 auto-mode: ${passed} passed, ${failedCount} failed`);
+console.log(`\nB114+B116+B117 auto-mode: ${passed} passed, ${failedCount} failed`);
 process.exit(failedCount ? 1 : 0);
