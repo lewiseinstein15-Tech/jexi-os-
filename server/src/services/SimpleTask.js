@@ -17,6 +17,7 @@ import { addChat } from './MemoryManager.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { preferencesBlock } from './PreferenceLearner.js';
 import { runWorker, coworkerFor } from './WorkerRouter.js';
+import { listPluginTools } from './PluginContext.js'; // B105 — plugin tools visible to SIMPLE-path coworkers
 import { normalizeFinalAnswer, FORMAT_RULES } from './Formatting.js';
 import { loadCoworker, orchestratorPromptFragment } from './CoworkerFiles.js'; // B78 — filesystem-native coworker mandates
 import { appendEvent } from './EventLog.js'; // B78 — orchestrator decisions are first-class events
@@ -98,11 +99,19 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
   } catch (e) {}
 
   const prompt = `The user asked: "${query}"\n\n${ctx ? `Conversation context:\n${ctx.slice(0, 4000)}\n\n` : ''}Answer directly and completely. ${FORMAT_RULES}`;
+  // B105 — plugin tools join the SIMPLE-path tool set (weather-now etc.);
+  // normalizeTools in LLMClient turns def-shaped lists into provider schemas.
+  const coworkerTools = (() => {
+    try {
+      const plugins = listPluginTools().filter((p) => p && p.slug && !SIMPLE_TOOL_DEFS.some((d) => d.slug === p.slug));
+      return plugins.length ? [...SIMPLE_TOOL_DEFS, ...plugins] : SIMPLE_TOOL_DEFS;
+    } catch { return SIMPLE_TOOL_DEFS; }
+  })();
   const res = await runWorker(role, prompt, JEXI_SYSTEM_PROMPT + (opts.presetFlavor || '') + preferencesBlock() + orchestratorPromptFragment() + coworkerMandate, {
     temperature: 0.4,
     // B67 — the coworker can really call these tools via native function
     // calling; intent is passed so ToolRuntime enforces the allowlist.
-    tools: SIMPLE_TOOL_DEFS,
+    tools: coworkerTools,
     intent: plan.intent,
     profile: opts.profile,
     sendEvent: emit,

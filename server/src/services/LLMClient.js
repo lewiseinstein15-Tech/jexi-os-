@@ -695,8 +695,41 @@ async function runToolLoopForProvider(provider, messages, tools, opts, errors) {
  * Test seam (same pattern as AgentLoop's __mockAnswer): `opts.__mockCompletions`
  * is an array of { text, toolCalls } rounds that drive the loop deterministically.
  */
+/**
+ * B105 — accept BOTH OpenAI-style schemas and JEXI def-shaped tools
+ * ({ slug, name, desc, schema|args }): providers only accept the OpenAI
+ * shape, and def-shaped lists (SIMPLE_TOOL_DEFS, plugin tools) were being
+ * sent raw — silently killing tool calling in those paths.
+ */
+export function normalizeTools(tools) {
+  return (tools || [])
+    .map((t) => {
+      if (!t) return null;
+      if (t.type === 'function' && t.function) return t; // already OpenAI-shaped
+      if (!t.slug) return null;
+      const schema = t.schema || t.args;
+      const properties = {};
+      const required = [];
+      for (const [k, spec] of Object.entries(schema || {})) {
+        const type = spec && spec.type === 'number' ? 'number' : spec && spec.type === 'array' ? 'array' : spec && spec.type === 'object' ? 'object' : 'string';
+        properties[k] = { type, description: (spec && spec.desc) || '' };
+        if (spec && spec.required) required.push(k);
+      }
+      return {
+        type: 'function',
+        function: {
+          name: t.slug,
+          description: String(t.desc || t.name || t.slug).slice(0, 500),
+          parameters: { type: 'object', properties, required },
+        },
+      };
+    })
+    .filter(Boolean);
+}
+
 export async function generateWithToolsLoop(prompt, systemInstruction = '', tools = [], opts = {}) {
   systemInstruction = appendTimeContext(systemInstruction); // B104 — time context on every call
+  tools = normalizeTools(tools); // B105 — def-shaped tool lists become provider-ready schemas
   const errors = [];
   const system = systemInstruction || 'You are JEXI OS, an expert AI operating system.';
 

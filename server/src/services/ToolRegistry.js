@@ -20,6 +20,7 @@
  */
 
 import { composeTeam } from './AgentRoster.js';
+import { getPluginTool } from './PluginContext.js'; // B105 — plugin tools bypass the intent allowlist (still permission-gated)
 
 /**
  * B52 P4 — CODE-LEVEL TOOL ALLOWLIST for lightweight intents.
@@ -41,6 +42,11 @@ export const TOOL_INTENT_ALLOWLIST = {
  * @returns {{allowed: boolean, reason?: string}}
  */
 export function enforceToolAllowlist(intent, slug) {
+  // B105 — user-installed plugin tools are always callable (they still pass
+  // the permission/risk/approval gates); the allowlist covers registry tools.
+  try {
+    if (getPluginTool(slug)) return { allowed: true };
+  } catch { /* plugin check is best-effort */ }
   const allowed = TOOL_INTENT_ALLOWLIST[intent];
   if (!allowed) return { allowed: true };
   if (allowed.includes(slug)) return { allowed: true };

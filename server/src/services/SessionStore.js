@@ -73,7 +73,7 @@ export function clearRun(convId) {
 /** @type {Map<string, { at: number, result: Object }>} */
 const resultSessions = new Map();
 
-const RESULT_TTL_MS = 10 * 60 * 1000; // long enough for the frontend to poll back
+const RESULT_TTL_MS = 40 * 60 * 1000; // B105 — results must outlive the client's recovery window (30min)
 
 /** Persist the last completed run's outcome (B48 P5 — dropped-stream recovery). */
 export function saveResult(convId, result) {

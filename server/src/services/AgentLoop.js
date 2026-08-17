@@ -32,6 +32,7 @@ import { buildNativeSchemas, executeTool, activeToolProfile, TOOL_PROFILES, isTo
 import { generateWithToolsLoop, generateContent } from './LLMClient.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { buildSkillCatalog } from './SkillDiscovery.js'; // B98 — dsh-style available-skills catalog (metadata only)
+import { listPluginTools } from './PluginContext.js'; // B105 — plugin tools are visible to the model (weather-now etc.)
 import { preferencesBlock } from './PreferenceLearner.js';
 import { providerPreferenceForIntent } from './ModelRouting.js';
 
@@ -85,6 +86,11 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   // buildNativeSchemas drops registry-only tools instead of giving the model
   // routing dead-ends.
   const toolDefs = (plan.tools || []).map((slug) => getTool(slug)).filter(Boolean).slice(0, 12);
+  // B105 — PLUGIN TOOLS ARE FIRST-CLASS: every mounted plugin tool joins the
+  // offered set (they have no registry entry, so the planner never sees them).
+  const pluginTools = (() => { try { return listPluginTools(); } catch { return []; } })()
+    .filter((p) => p && p.slug && !toolDefs.some((t) => t.slug === p.slug));
+  if (pluginTools.length) toolDefs.push(...pluginTools.slice(0, 8));
   let schemas = buildNativeSchemas(toolDefs);
   const profile = opts.profile || activeToolProfile();
   const prefer = providerPreferenceForIntent(plan.intent); // stage 24: per-domain model routing

@@ -273,14 +273,17 @@ export function validateToolOutput(slug, result) {
 export function buildNativeSchemas(defs) {
   return (defs || [])
     .map((t) => {
-      const schema = (t && t.schema) || TOOL_SCHEMAS[t && t.slug];
-      if (!schema) return null;
+      if (!t || !t.slug) return null;
+      // B105 — schema sources: explicit `schema` (registry style), `args`
+      // (plugin style), TOOL_SCHEMAS, or a generic empty-object fallback so
+      // plugin tools are ALWAYS visible to the model (never silently dropped).
+      const schema = (t.schema || t.args) || TOOL_SCHEMAS[t.slug];
       const properties = {};
       const required = [];
-      for (const [k, spec] of Object.entries(schema)) {
-        const type = spec.type === 'number' ? 'number' : spec.type === 'array' ? 'array' : spec.type === 'object' ? 'object' : 'string';
-        properties[k] = { type, description: spec.desc || '' };
-        if (spec.required) required.push(k);
+      for (const [k, spec] of Object.entries(schema || {})) {
+        const type = spec && spec.type === 'number' ? 'number' : spec && spec.type === 'array' ? 'array' : spec && spec.type === 'object' ? 'object' : 'string';
+        properties[k] = { type, description: (spec && spec.desc) || '' };
+        if (spec && spec.required) required.push(k);
       }
       return {
         type: 'function',

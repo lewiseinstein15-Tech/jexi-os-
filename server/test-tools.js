@@ -69,12 +69,16 @@ check('non-executable tool routes to its agents', routed.ok === true && routed.r
 const schemas = buildNativeSchemas([
   { slug: 'memory-recall', name: 'Memory Recall', desc: 'Recall facts', schema: { query: { type: 'string', required: true, desc: 'What to recall' }, limit: { type: 'number', desc: 'Max' } } },
   { slug: 'profile-read', name: 'Profile Read', desc: 'Read profile', schema: {} },
-  { slug: 'no-engine-tool', name: 'No Engine', desc: 'Registry-only', schema: null }, // no schema → dropped
+  { slug: 'no-engine-tool', name: 'No Engine', desc: 'Registry-only', schema: null },
+  { slug: 'weather-now', name: 'Weather Now', desc: 'Plugin tool', args: { city: { type: 'string', required: true, desc: 'City' } } }, // plugin style (B105)
 ]);
-check('buildNativeSchemas emits OpenAI function shape', schemas.length === 2 && schemas.every((s) => s.type === 'function' && s.function && s.function.name && s.function.parameters));
+check('buildNativeSchemas emits OpenAI function shape', schemas.length === 4 && schemas.every((s) => s.type === 'function' && s.function && s.function.name && s.function.parameters));
 check('buildNativeSchemas marks required args', schemas[0].function.parameters.required.includes('query'));
 check('buildNativeSchemas types number args as number', schemas[0].function.parameters.properties.limit.type === 'number');
-check('buildNativeSchemas drops defs without a schema', schemas.every((s) => s.function.name !== 'no-engine-tool'));
+// B105 — schema-less defs get a GENERIC schema (never silently dropped) and
+// plugin-style `args` become provider-ready parameters.
+check('buildNativeSchemas keeps schema-less defs (generic fallback)', schemas.some((s) => s.function.name === 'no-engine-tool' && s.function.parameters && s.function.parameters.type === 'object'));
+check('buildNativeSchemas accepts plugin-style args', schemas.some((s) => s.function.name === 'weather-now' && s.function.parameters.properties.city));
 
 // 2. The native loop executes declared tool calls through the injected
 //    executor and keeps looping until the model answers directly.

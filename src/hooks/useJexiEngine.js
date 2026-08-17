@@ -165,9 +165,14 @@ export const useJexiEngine = () => {
     const backendUrl = getBackendUrl();
     const ctrl = new AbortController();
     recoverRef.current = ctrl;
-    const deadlineMs = Date.now() + 600000; // B93 — up to 10 min recovery (result store TTL)
+    // B105 — recovery window 30 min (was 10): the server's task budget is
+    // 25 min and the result store TTL is 40 min, so long research tasks now
+    // land instead of giving up while they are still running.
+    const deadlineMs = Date.now() + 30 * 60 * 1000;
     let found = false;
     let interimShown = false;
+    let patienceNoteShown = false;
+    const startedAt = Date.now();
     try {
       // Tell the user we're still waiting (not the scary fallback yet).
       setMessages(prev => [...prev, {
@@ -178,6 +183,15 @@ export const useJexiEngine = () => {
       while (!ctrl.signal.aborted && Date.now() < deadlineMs) {
         await delay(3000);
         if (ctrl.signal.aborted) break;
+        // After 2 minutes of waiting, reassure once — the task is likely a
+        // long one, not a failure.
+        if (!patienceNoteShown && Date.now() - startedAt > 120000) {
+          patienceNoteShown = true;
+          setMessages(prev => [...prev, {
+            role: 'jexi',
+            text: '⏳ Still waiting — long tasks can take several minutes. The result will appear here automatically the moment it finishes.',
+          }]);
+        }
         try {
           const res = await jexiFetch(`${backendUrl}/api/chat/result`, { signal: ctrl.signal });
           if (!res.ok) continue;
@@ -207,7 +221,7 @@ export const useJexiEngine = () => {
     if (!found && !ctrl.signal.aborted) {
       setMessages(prev => [...prev, {
         role: 'jexi',
-        text: '⚠ The connection dropped and the result did not return within 10 minutes. If JEXI is still running server-side, saying "continue" will pick it up — or just retry the task.',
+        text: '⚠ The connection dropped and the result did not return within 30 minutes. If JEXI is still running server-side, saying "continue" will pick it up — or just retry the task.',
       }]);
     }
   }, [setMessages]);

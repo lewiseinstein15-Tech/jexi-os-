@@ -1278,7 +1278,7 @@ app.post('/api/vision', async (req, res) => {
 // so concurrent chats from different users/sessions never race.
 import { saveOffer, loadOffer, clearOffer, saveRun, loadRun, clearRun, saveResult, loadResult, clearResult, recordRecoveryEvent } from './src/services/SessionStore.js';
 import { preferencesBlock } from './src/services/PreferenceLearner.js';
-const RESUME_TTL_MS = 15 * 60 * 1000;
+const RESUME_TTL_MS = Number(process.env.RESUME_TTL_MS) || 45 * 60 * 1000; // B105 — "continue" works for long tasks (was 15min)
 
 /** Trivial small talk — never feed the fact/preference loadout to the planner
  * for greetings/thanks (Build 48, P2: the root cause of fabricated-memory
@@ -1778,7 +1778,7 @@ app.post('/api/chat', async (req, res) => {
   // Hard deadline: no single request may hold the connection forever (a
   // pathological research pass, browser hang, or provider stall). On fire it
   // emits a readable done event instead of leaving the UI spinning forever.
-  const CHAT_DEADLINE_MS = 15 * 60 * 1000;
+  const CHAT_DEADLINE_MS = Number(process.env.CHAT_DEADLINE_MS) || 25 * 60 * 1000; // B105 — 25min budget (was 15): long research tasks must not drop
   let finished = false;
   const finish = () => { clearInterval(heartbeat); try { res.end(); } catch (e) {} };
   const deadline = setTimeout(() => {
