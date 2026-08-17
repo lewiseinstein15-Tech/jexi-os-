@@ -29,6 +29,11 @@ export const onAccessKeyChange = (cb) => {
  * `x-jexi-session` header; without it every client from the same IP shares
  * one conversation and dropped-stream recovery would mix sessions.
  */
+export const setSessionId = (id) => {
+  if (id) localStorage.setItem('jexi_session_id', id);
+  else localStorage.removeItem('jexi_session_id');
+};
+
 export const getSessionId = () => {
   let id = localStorage.getItem('jexi_session_id');
   if (!id) {

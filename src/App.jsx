@@ -106,6 +106,15 @@ export default function App() {
 
   const openCommand = () => navigate('command');
 
+  // B97 — RESUME IN CHAT: a past conversation's RESUME button sets the
+  // session id and asks the app to open Home so chat continues that log.
+  useEffect(() => {
+    const h = () => navigate('home');
+    window.addEventListener('jexi:resume-conversation', h);
+    return () => window.removeEventListener('jexi:resume-conversation', h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const renderPage = () => {
     switch (activeNav) {
       case 'home':

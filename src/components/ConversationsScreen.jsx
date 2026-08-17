@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   MessagesSquare, Plus, Trash2, GitFork, Search, Clock, Loader2, MessageCircle, Bot, ChevronRight,
 } from 'lucide-react';
-import { getBackendUrl, jexiFetch } from '../utils/helpers';
+import { getBackendUrl, jexiFetch, getSessionId, setSessionId } from '../utils/helpers';
 import PanelHeader from './PanelHeader';
 
 /**
@@ -141,6 +141,9 @@ export default function ConversationsScreen() {
                   </p>
                 ))}
                 <div className="flex gap-1.5 pt-1.5">
+                  <button onClick={() => { setSessionId(c.id); window.location.hash = '#home'; window.dispatchEvent(new Event('jexi:resume-conversation')); }} className="px-2 py-1 rounded text-[8px] font-bold border border-brand-line bg-brand-dim/40 text-brand flex items-center gap-1 hover:bg-brand-dim">
+                    <MessageCircle className="w-2.5 h-2.5" /> RESUME IN CHAT
+                  </button>
                   <button onClick={() => forkIt(c.id)} className="px-2 py-1 rounded text-[8px] font-bold border border-brand-line text-brand flex items-center gap-1 hover:bg-brand-dim/40">
                     <GitFork className="w-2.5 h-2.5" /> FORK
                   </button>
