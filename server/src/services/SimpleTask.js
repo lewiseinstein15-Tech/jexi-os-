@@ -109,6 +109,9 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
     confirm: opts.confirm,
     signal: opts.signal,
     maxIterations: opts.maxIterations || 4,
+    // B99 — code mode (PTC): the coworker may write ONE TypeScript program
+    // composing SIMPLE_TOOL_DEFS via run_code (dsh `code` preset).
+    codeMode: opts.codeMode,
   });
   results.statistics.executionTime = Date.now() - startTime;
   results.statistics.provider = res.provider || null;

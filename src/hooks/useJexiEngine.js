@@ -257,6 +257,10 @@ export const useJexiEngine = () => {
       const headers = { 'Content-Type': 'application/json' };
       const effMode = mode || (typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_mode') || 'agent') : 'agent');
       if (effMode === 'normal') headers['x-jexi-mode'] = 'normal';
+      // B99 — CODE MODE (PTC): on by default in agent mode; off via Settings.
+      if (effMode === 'agent' && (typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_code_mode') || '1') !== '0' : true)) {
+        headers['x-jexi-code-mode'] = '1';
+      }
       const res = await jexiFetch(`${backendUrl}/api/chat`, {
         method: 'POST',
         headers,

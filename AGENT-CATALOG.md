@@ -1,6 +1,6 @@
 # JEXI OS — Agent & Skill Catalog
 
-**251 specialist agents · 507 skills · 185 tools · 1 orchestrator.** One plain-language request in,
+**251 specialist agents · 507 skills · 186 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
 > ⚙️ GENERATED FILE — updated 2026-08-17 by `cd server && npm run audit-roster`. Do not edit by hand.
@@ -14,7 +14,7 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 |---|---|
 | Agents | 251 (251 reachable — 100%) |
 | Skills | 507 |
-| Tools | 185 |
+| Tools | 186 |
 | Intents / teams | 155 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
@@ -1221,7 +1221,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 185 tools (grouped by type)
+## The 186 tools (grouped by type)
 
 ### Agent (2)
 | Tool | Allowed agents | Engine | What it does |
@@ -1257,6 +1257,11 @@ This section and every table below are GENERATED from the live registries by `cd
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
 | `inject_failure` | Chaos Agent | ChaosAgent | Inject a controlled failure (provider timeout, tool error) — only when the chaos flag is on. |
+
+### Code (1)
+| Tool | Allowed agents | Engine | What it does |
+|---|---|---|---|
+| `run_code` | Coder, Engineer, Planner | undefined | Code Mode (PTC): execute ONE TypeScript program that composes tools as await tools.name(args) — a whole workflow in a single call. |
 
 ### Concurrency (3)
 | Tool | Allowed agents | Engine | What it does |

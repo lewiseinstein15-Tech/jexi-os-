@@ -136,6 +136,8 @@ export async function executeNativeToolCalls(calls, opts = {}) {
       intent: opts.intent,
       sendEvent: opts.sendEvent,
       confirm: opts.confirm,
+      // B99 — code mode: run_code's sub-dispatch is capped to the visible set.
+      codeTools: opts.codeTools,
     });
     const content = res && res.ok && res.result
       ? String(res.result).slice(0, 6000)
@@ -161,6 +163,20 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
   const chain = coworkerChain(role);
   const attempts = [];
   const wantsTools = Array.isArray(opts.tools) && opts.tools.length > 0;
+  // B99 — CODE MODE (PTC): when enabled and tools are offered, the model may
+  // write ONE TypeScript program via run_code composing the same tools (dsh
+  // `code` preset). The SDK section regenerates from THIS coworker's tool
+  // set — never the whole catalog.
+  let codeTools = undefined;
+  let effectiveTools = opts.tools;
+  if (wantsTools && opts.codeMode) {
+    try {
+      const { renderToolsSdk, buildRunCodeSchema } = await import('./CodeModeRuntime.js');
+      effectiveTools = [...opts.tools, buildRunCodeSchema()];
+      codeTools = opts.tools;
+      system = `${system}\n${renderToolsSdk(opts.tools)}\n`;
+    } catch (e) { /* code mode is best-effort — native path stays intact */ }
+  }
   // B78 — every call attempt and its outcome lands in the event log so the
   // exact provider→fallback sequence is auditable per task.
   const session = getActiveSession() || 'default';
@@ -192,7 +208,7 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
       const label = p.model ? `${p.key}(${p.model})` : p.key;
       logCall(p, 'tool_calling');
       try {
-        const res = await generateWithToolsLoop(prompt, system, opts.tools, {
+        const res = await generateWithToolsLoop(prompt, system, effectiveTools, {
           provider: p.key,
           model: p.model,
           temperature: opts.temperature,
@@ -200,7 +216,7 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
           signal: opts.signal,
           __mockCompletions: opts.__mockCompletions, // test seam
           // Execute the model's native tool calls through the gated runtime.
-          executeToolCalls: (calls) => executeNativeToolCalls(calls, opts),
+          executeToolCalls: (calls) => executeNativeToolCalls(calls, { ...opts, codeTools }),
         });
         if (res.ok) {
           logResult({ ok: true, mode: 'tool_calling', provider: res.provider, model: res.model, toolCalls: (res.toolCalls || []).length, iterations: res.iterations || 0 });

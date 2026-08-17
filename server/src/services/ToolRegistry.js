@@ -281,6 +281,7 @@ export const TOOL_REGISTRY = [
   { slug: 'subagent', name: 'Subagent', type: 'Agent', desc: 'Delegate a sub-task to a child agent with its own context; it reports back.', agents: ['orchestrator', 'planner'], tier: 'exec' },
   { slug: 'skill-load', name: 'Skill Load', type: 'Agent', desc: 'Load a skill into context (progressive disclosure) — auto-discovered project/user/bundled skills.', agents: ['planner', 'orchestrator'], tier: 'read' },
   { slug: 'skill-search', name: 'Skill Search', type: 'Knowledge', desc: 'Search the auto-discovered skill catalog (metadata only) for a task — find which skill to load.', agents: ['planner', 'orchestrator', 'archivist'], tier: 'read' },
+  { slug: 'run_code', name: 'Run Code Program', type: 'Code', desc: 'Code Mode (PTC): execute ONE TypeScript program that composes tools as await tools.name(args) — a whole workflow in a single call.', agents: ['coder', 'engineer', 'planner'], tier: 'write_local' },
   { slug: 'todo', name: 'Todo List', type: 'Productivity', desc: 'Manage a visible task list: add, list, complete.', agents: ['task-manager', 'planner'], tier: 'write_local' },
   { slug: 'plan', name: 'Plan', type: 'Productivity', desc: 'Create or update an explicit multi-step plan with per-step status.', agents: ['planner', 'orchestrator'], tier: 'write_local' },
 ];

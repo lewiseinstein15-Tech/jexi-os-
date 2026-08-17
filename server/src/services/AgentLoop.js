@@ -40,6 +40,12 @@ import { providerPreferenceForIntent } from './ModelRouting.js';
 const MAX_ITERATIONS = 10;
 const MAX_TOOL_CALLS = 20;
 
+/** B99 — lazily imported SDK section for code mode (dsh tools:sdk). */
+async function renderSdkBlock(codeTools) {
+  const { renderToolsSdk } = await import('./CodeModeRuntime.js');
+  return `\n${renderToolsSdk(codeTools)}\n`;
+}
+
 /** Planner.analyzeIntent returns a plan (intent/teamSlugs/steps/tools/toolsLine). */
 async function safePlan(query, image) {
   try {
@@ -79,15 +85,28 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   // buildNativeSchemas drops registry-only tools instead of giving the model
   // routing dead-ends.
   const toolDefs = (plan.tools || []).map((slug) => getTool(slug)).filter(Boolean).slice(0, 12);
-  const schemas = buildNativeSchemas(toolDefs);
+  let schemas = buildNativeSchemas(toolDefs);
   const profile = opts.profile || activeToolProfile();
   const prefer = providerPreferenceForIntent(plan.intent); // stage 24: per-domain model routing
+  // B99 — CODE MODE (PTC): when enabled, the model may write ONE TypeScript
+  // program via run_code that composes these same tools (dsh `code` preset).
+  // The SDK section is generated from the SAME pruned set (never the whole
+  // catalog) and run_code's sub-dispatch is capped to that set.
+  const codeMode = !!opts.codeMode && schemas.length > 0;
+  let codeTools = toolDefs;
+  if (codeMode) {
+    const { renderToolsSdk, buildRunCodeSchema } = await import('./CodeModeRuntime.js');
+    schemas = [...schemas, buildRunCodeSchema()];
+    codeTools = [...toolDefs];
+    try { emit('agent.log', { message: `🧮 Code Mode (PTC) active — the model may compose these ${codeTools.length} tools into one TypeScript program via run_code.` }); } catch { /* noop */ }
+  }
 
   emit('agent.plan', {
     query, intent: plan.intent,
     team: team.length ? team : plan.steps || [],
     tools: toolDefs.map((t) => ({ slug: t.slug, name: t.name, type: t.type })),
     profile, profileLabel: TOOL_PROFILES[profile]?.label,
+    codeMode,
   });
   emit('agent.log', { message: `🧠 Plan: ${plan.planSummary || plan.intent}. Native tool-calling loop with ${schemas.length} executable tools (profile: ${profile}).` });
 
@@ -100,7 +119,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   try {
     const res = await generateWithToolsLoop(
       `The user asked: "${query}"${image ? '\n(An image was provided — analyze it.)' : ''}`,
-      (opts.systemPromptOverride || JEXI_SYSTEM_PROMPT) + buildSkillCatalog(30) + preferencesBlock(),
+      (opts.systemPromptOverride || JEXI_SYSTEM_PROMPT) + buildSkillCatalog(30) + (codeMode ? await renderSdkBlock(codeTools) : '') + preferencesBlock(),
       schemas,
       {
         temperature: 0.3,
@@ -120,7 +139,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
             // B96 — dsh-style step events: tool/call + tool/result on the wire.
             try { emit('step/start', { turn: 1, step: callsMade }); } catch (e) {}
             try { emit('tool/call', { callId: call.id, name: call.name, arguments: JSON.stringify(call.arguments || {}).slice(0, 500) }); } catch (e) {}
-            const r = await executeTool({ slug: call.name, args: call.arguments || {}, profile, sendEvent: emit, confirm: opts.confirm });
+            const r = await executeTool({ slug: call.name, args: call.arguments || {}, profile, sendEvent: emit, confirm: opts.confirm, codeTools: codeMode ? codeTools : undefined });
             try { emit('tool/result', { callId: call.id, name: call.name, ok: !!r.ok, error: r.error || null }); } catch (e) {}
             try { emit('step/end', { turn: 1, step: callsMade }); } catch (e) {}
             const done = isToolDone(r);

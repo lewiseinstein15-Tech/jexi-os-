@@ -104,6 +104,16 @@ function matchScore(c, q) {
   return 0;
 }
 
+/**
+ * B99 — the safe default visible set for run_code when the calling loop did
+ * not provide its pruned schemas (direct /api/tools/execute calls): read-tier
+ * tools + planning/memory tools, capped — never the whole catalog.
+ */
+function defaultCodeTools() {
+  const extra = new Set(['todo', 'plan', 'memory-recall', 'session-list', 'session-search', 'skill-load', 'skill-search', 'subagent']);
+  return TOOL_REGISTRY.filter((t) => t.tier === 'read' || extra.has(t.slug)).slice(0, 30);
+}
+
 export const TOOL_OUTPUT_SCHEMAS = {
   'web-search': z.object({
     kind: z.string(),
@@ -123,6 +133,7 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'subagent': z.object({ kind: z.literal('subagent'), task: z.string().optional(), report: z.string().optional(), ok: z.boolean().optional(), error: z.string().optional() }).passthrough(),
   'skill-load': z.object({ kind: z.literal('skill').optional(), ok: z.boolean().optional(), slug: z.string().optional(), name: z.string().optional(), description: z.string().optional(), provider: z.string().optional(), source: z.string().optional(), rank: z.number().optional(), resourceBase: z.unknown().optional(), body: z.string().optional() }).passthrough(),
   'skill-search': z.object({ kind: z.literal('skill-search'), query: z.string(), total: z.number().optional(), results: z.array(z.unknown()).optional() }).passthrough(),
+  'run_code': z.object({ kind: z.literal('code-run').optional(), description: z.string().optional(), logs: z.array(z.string()).optional(), result: z.unknown().optional(), toolCalls: z.number().optional(), durationMs: z.number().optional(), truncated: z.boolean().optional(), error: z.string().optional(), ok: z.boolean().optional(), subCalls: z.array(z.unknown()).optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),
@@ -334,7 +345,7 @@ export function setToolProfile(profile) {
 /* ------------------------------------------------------------------ */
 const WORKSPACE = 'workspace'; // resolve from settings in index.js wiring
 
-async function runEngine(slug, args) {
+async function runEngine(slug, args, opts = {}) {
   switch (slug) {
     case 'web-search':
     case 'wikipedia-lookup':
@@ -526,6 +537,61 @@ async function runEngine(slug, args) {
       return { kind: 'skill-search', query: String(args.query).slice(0, 200), total: results.length, results };
     }
 
+    case 'run_code': {
+      // B99 — CODE MODE (PTC): dsh `code` preset mirror. The model writes ONE
+      // TypeScript program; every `await tools.<name>(args)` inside dispatches
+      // through THIS gated runtime (permissions, allowlists, risk tiers) and
+      // only what the program prints/returns comes back to the model.
+      const { renderToolsSdk, runCodeProgram, RUN_CODE_NAME } = await import('./CodeModeRuntime.js');
+      const code = String(args.code || '');
+      if (!code.trim()) return { ok: false, error: 'run_code requires a code body' };
+      const description = String(args.description || '').trim().slice(0, 120) || 'program';
+      // Visible set: the loop's pruned schemas when present, else the safe
+      // default (read-tier + planning tools) — never the whole catalog.
+      let visible = Array.isArray(opts.codeTools) ? opts.codeTools.filter((t) => t && t.slug) : [];
+      if (!visible.length) visible = defaultCodeTools();
+      const names = visible.map((t) => t.slug);
+      const subCalls = [];
+      const out = await runCodeProgram({
+        code,
+        toolNames: names,
+        isReadTool: (name) => { const t = getTool(name); return !!t && t.tier === 'read'; },
+        dispatch: async (name, tArgs) => {
+          if (name === RUN_CODE_NAME) throw new Error('run_code cannot be called from inside a program');
+          const sub = await executeTool({
+            slug: name,
+            args: tArgs || {},
+            profile: opts.profile,
+            sendEvent: opts.sendEvent,
+            signal: opts.signal,
+            intent: opts.intent,
+          });
+          subCalls.push({ name, ok: !!sub.ok, error: sub.error || null });
+          if (!sub.ok) throw new Error((sub.error || `tool "${name}" failed`).slice(0, 400));
+          if (sub.result === undefined || sub.result === null) return null;
+          try { return JSON.parse(String(sub.result)); } catch { return sub.result; }
+        },
+        signal: opts.signal,
+        maxSubCalls: 40,
+        maxRunMs: 120000,
+      });
+      const status = out.error ? 'FAILED' : out.truncated ? 'truncated' : 'ok';
+      try {
+        opts.sendEvent('agent.log', {
+          message: `🧮 Code Mode · ${description} — ${out.toolCalls} tool call(s) in ${out.durationMs}ms · ${status}${out.error ? `: ${out.error}` : ''}`,
+        });
+      } catch { /* noop */ }
+      if (out.error) {
+        return { ok: false, kind: 'code-run', description, error: out.error, logs: out.logs.slice(0, 40), toolCalls: out.toolCalls, durationMs: out.durationMs };
+      }
+      return {
+        kind: 'code-run', description, logs: out.logs.slice(0, 60),
+        result: out.result === undefined ? null : out.result,
+        toolCalls: out.toolCalls, durationMs: out.durationMs, truncated: !!out.truncated,
+        subCalls: subCalls.slice(0, 15),
+      };
+    }
+
     case 'todo': {
       // DSH todo: the model manages its own visible task list.
       const { todoList, todoAdd, todoComplete, todoRemove } = await import('./TodoStore.js');
@@ -608,7 +674,7 @@ export async function executeTool(params) {
   return result;
 }
 
-async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, confirm }) {
+async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, confirm, codeTools, signal }) {
   const started = Date.now();
   const emit = (type, payload) => { try { if (typeof sendEvent === 'function') sendEvent(type, payload); } catch (e) {} };
   // B97 — PLUGIN SEAM: plugin-mounted tools are first-class. If the static
@@ -722,7 +788,16 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
   }
 
   try {
-    const result = await withTimeout(runEngine(slug, args), 60000);
+    // B99 — code-mode programs get a longer budget (the program itself caps
+    // its own wall-clock inside the worker; this is the outer backstop).
+    const outerTimeoutMs = slug === 'run_code' ? 240000 : 60000;
+    const result = await withTimeout(runEngine(slug, args, {
+      codeTools,
+      profile,
+      sendEvent: emit,
+      signal,
+      intent,
+    }), outerTimeoutMs);
     // P4 — fail closed on malformed tool OUTPUT (never a silent empty reply).
     const outCheck = validateToolOutput(slug, result);
     if (!outCheck.ok) {

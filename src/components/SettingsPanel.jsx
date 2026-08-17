@@ -72,6 +72,7 @@ export default function SettingsPanel() {
   const [backendStatus, setBackendStatus] = useState('idle'); // idle, saved, error
   const [trust, setTrust] = useState(null);
   const [tiers, setTiers] = useState(null); // B55 OpenWorker risk tiers: { tools, counts }
+  const [codeMode, setCodeMode] = useState(() => (typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_code_mode') || '1') === '1' : true)); // B99 — PTC code mode
 
   const TIER_DEFS = [
     ['read', 'READ', 'Search & lookup — no side effects, always autonomous, never asks', 'text-[#34D399] border-[#34D399]/30 bg-[#34D399]/10'],
@@ -523,6 +524,33 @@ export default function SettingsPanel() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* B99 — Code Mode (PTC): deepseek-harness `code` preset toggle */}
+            <div className="flex items-center justify-between gap-3 rounded-md border border-hairline bg-surface-1 px-2.5 py-2">
+              <div className="min-w-0">
+                <p className="text-[9px] font-bold text-text-secondary tracking-wider flex items-center gap-1.5">
+                  <Cpu className="w-3 h-3 text-brand" /> CODE MODE (PTC)
+                </p>
+                <p className="text-[7px] text-text-tertiary mt-0.5 leading-snug">
+                  DeepSeek-Harness style: the model may write ONE TypeScript program that composes the auto-selected tools via <code className="text-brand">await tools.name(args)</code> — a whole workflow in a single call.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = (localStorage.getItem('jexi_code_mode') || '1') === '1' ? '0' : '1';
+                  try { localStorage.setItem('jexi_code_mode', next); } catch { /* noop */ }
+                  setCodeMode(next === '1');
+                }}
+                className={`flex-shrink-0 w-11 h-6 rounded-full relative transition-colors ${codeMode ? 'bg-brand' : 'bg-surface-2 border border-hairline'}`}
+                aria-label="Toggle code mode"
+              >
+                <span
+                  className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${codeMode ? 'left-[22px]' : 'left-0.5'}`}
+                  style={codeMode ? { background: '#04140D' } : {}}
+                />
+              </button>
             </div>
 
             {/* Decisions */}

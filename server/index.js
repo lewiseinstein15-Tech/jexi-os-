@@ -574,7 +574,10 @@ app.post('/api/agent', async (req, res) => {
   }, 10 * 60 * 1000);
 
   try {
-    await runAgentLoop({ query, image, profile, sendEvent });
+    // B99 — code mode header flows into the loop (default on for agent mode).
+    const codeModeHeader = String(req.headers['x-jexi-code-mode'] || '1').toLowerCase();
+    const codeMode = codeModeHeader !== '0' && codeModeHeader !== 'off' && codeModeHeader !== 'false';
+    await runAgentLoop({ query, image, profile, sendEvent, opts: { codeMode } });
     finished = true;
     clearTimeout(deadline);
     finish();
@@ -2137,8 +2140,13 @@ app.post('/api/chat', async (req, res) => {
     // B66 — Orchestrator-Workers: SIMPLE tasks (single-shot intent) take the
     // single-coworker fast path — no graph construction at all. COMPLEX tasks
     // run the full typed-state graph as before. Both return the same contract.
+    // B99 — CODE MODE (PTC): on unless the app explicitly turns it off
+    // (x-jexi-code-mode: 0). The model may write ONE TypeScript program that
+    // composes the auto-selected tools (dsh `code` preset).
+    const codeModeHeader = String(req.headers['x-jexi-code-mode'] || req.body.codeMode || '1').toLowerCase();
+    const codeMode = codeModeHeader !== '0' && codeModeHeader !== 'off' && codeModeHeader !== 'false';
     const results = plan.complexity === 'SIMPLE'
-      ? await runSimpleTask(plan, executionQuery || effectiveQuery, sendEvent, { image })
+      ? await runSimpleTask(plan, executionQuery || effectiveQuery, sendEvent, { image, codeMode })
       : await orchestrator.executePlan(plan, executionQuery || effectiveQuery, sendEvent, {
           image,
           // B53 P2 — task scope for the run: the orchestrator gates memory reuse

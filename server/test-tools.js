@@ -113,7 +113,7 @@ check('executeNativeToolCalls reports blocked tools honestly', blockedNative.len
 
 /* ---------------- Registry sanity (used by the loop) ---------------- */
 check('getTool finds web-search', getTool('web-search')?.name === 'Web Search');
-check('registry count is 185', TOOL_COUNT === 185); // B98 +1: skill-search (B96 +7: session-list/search/fork, subagent, skill-load, todo, plan)
+check('registry count is 186', TOOL_COUNT === 186); // B99 +1: run_code (B98 +1: skill-search; B96 +7: session-list/search/fork, subagent, skill-load, todo, plan)
 
 console.log(`\n=== RESULT: ${passed} passed, ${failed} failed ===`);
 process.exit(failed ? 1 : 0);
