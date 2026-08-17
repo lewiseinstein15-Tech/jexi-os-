@@ -43,5 +43,32 @@ ok(prompt.includes('WHO BUILT YOU: Lewis Einstein'), 'system prompt names the bu
 ok(prompt.includes('WHAT YOU CAN DO'), 'system prompt lists capabilities');
 ok(prompt.includes('WHAT YOU WON\'T DO'), 'system prompt lists limitations');
 
+console.log('\n== B103 — normal-mode prompt carries the SAME identity ==');
+const { JEXI_NORMAL_PROMPT, JEXI_SYSTEM_PROMPT, IDENTITY_QUESTION_RE } = await import('./src/services/JexiPrompt.js');
+ok(JEXI_NORMAL_PROMPT.includes('You are **JEXI OS**'), 'normal prompt embeds the canonical identity');
+ok(JEXI_NORMAL_PROMPT.includes('WHO BUILT YOU: Lewis Einstein'), 'normal prompt names the builder');
+ok(JEXI_NORMAL_PROMPT.includes('WHAT YOU CAN DO'), 'normal prompt lists live capabilities');
+ok(JEXI_NORMAL_PROMPT.includes('WHAT YOU WON\'T DO'), 'normal prompt lists real limitations');
+ok(/ANSWER THE QUESTION|answer the user's question directly/i.test(JEXI_NORMAL_PROMPT), 'normal prompt answers directly');
+ok(JEXI_NORMAL_PROMPT.includes('Agent mode') && !/say you can do it in Agent mode/.test(JEXI_NORMAL_PROMPT), 'normal prompt offers Agent mode honestly, does not deflect every question');
+ok(JEXI_SYSTEM_PROMPT.includes('ANSWER QUESTIONS DIRECTLY'), 'agent prompt has the question-vs-task rule');
+ok(JEXI_SYSTEM_PROMPT.includes('Questions about you'), 'agent prompt answers identity from the IDENTITY section');
+
+console.log('\n== B103 — deterministic identity-question detection ==');
+const MATCHES = [
+  'who are you', 'who is jexi', 'what are you', 'what is jexi', 'what are u',
+  'who built you', 'what created you', 'who made you', 'tell me about yourself',
+  'introduce yourself', 'what can you do', 'what are you capable of', 'what do you do',
+  'what is your name', 'what is your purpose', 'your name?', 'are you an ai',
+  'are you a robot', 'are you real', 'how do you work', 'Who are you?',
+];
+for (const q of MATCHES) ok(IDENTITY_QUESTION_RE.test(q), `matches: "${q}"`);
+const REJECTS = [
+  'what can you do about my roof leaking', 'who are you going to vote for',
+  'what are you doing', 'who is your friend', 'what can you do for me today',
+  'tell me about yourself and your family', 'who built the pyramids',
+];
+for (const q of REJECTS) ok(!IDENTITY_QUESTION_RE.test(q), `rejects: "${q}"`);
+
 console.log(`\nRESULT: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

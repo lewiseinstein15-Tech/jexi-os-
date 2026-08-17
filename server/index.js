@@ -86,6 +86,7 @@ import { rateLimiterStatus } from './src/services/ProviderRateLimiter.js'; // fr
 import { touchSession, listSessions } from './src/services/SessionStore.js'; // session registry (isolation observability)
 import { appendConversationEvent, listConversations as listSessionConversations, loadConversationEvents, forkConversation, deleteConversation, searchConversations } from './src/services/SessionConversations.js'; // B96 — DSH-style append-only conversation logs
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines } from './src/services/JexiIdentity.js'; // canonical identity (name / creator / capabilities)
+import { JEXI_NORMAL_PROMPT, IDENTITY_QUESTION_RE } from './src/services/JexiPrompt.js'; // B103 — normal-mode prompt + deterministic identity-question detection
 import { DoAnythingAgent } from './src/services/DoAnythingAgent.js'; // B89 — free-form autonomous agent loop
 import { TravelBookingAgent, parseBookingQuery } from './src/services/TravelBookingAgent.js'; // B90 — browser booking flow
 import { aggregateSearch } from './src/services/SearchEngine.js'; // B90 — travel web-search alternatives
@@ -1792,6 +1793,14 @@ app.post('/api/chat', async (req, res) => {
       }
       return;
     }
+    // B103 — DETERMINISTIC IDENTITY ANSWERS: "who are you / what can you do /
+    // who built you" are answered from the canonical profile with NO LLM call —
+    // always correct, always instant, in both agent and normal mode.
+    if (!image && raw.length <= 140 && IDENTITY_QUESTION_RE.test(raw)) {
+      sendEvent('log', { agent: 'JEXI', message: '🪪 Identity question — answering from my canonical profile (no tools needed).' });
+      done({ success: true, query: raw, summary: IDENTITY_ANSWER, statistics: { executionTime: 0, agentsUsed: 0, complexity: 'IDENTITY', confidence: 100 } });
+      return;
+    }
     // B91 — attachments: load uploaded files and inject their previews into
     // the query so the planner and every agent see them.
     let attachmentContext = '';
@@ -2019,7 +2028,7 @@ app.post('/api/chat', async (req, res) => {
       try {
         text = await generateContent(
           `${effectiveQuery}\n\n${conversationSummaryContext(convId)}`,
-          'You are JEXI OS, a helpful, precise assistant. Answer directly and concisely. If the user asks for something that needs tools (building apps, browsing, research with sources), briefly say you can do it in Agent mode.',
+          JEXI_NORMAL_PROMPT,
           null,
           { prefer: '', temperature: 0.5 }
         );
