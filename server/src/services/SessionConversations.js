@@ -29,6 +29,11 @@ function convFile(convId) {
   return path.join(CONV_DIR, `${String(convId).replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80)}.jsonl`);
 }
 
+/** Absolute path of a conversation's log file (shared with CompactionEngine). */
+export function conversationFilePath(convId) {
+  return convFile(convId);
+}
+
 function ensureDir() {
   try { fs.mkdirSync(CONV_DIR, { recursive: true }); } catch { /* noop */ }
 }

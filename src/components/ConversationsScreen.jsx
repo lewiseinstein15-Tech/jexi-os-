@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  MessagesSquare, Plus, Trash2, GitFork, Search, Clock, Loader2, MessageCircle, Bot, ChevronRight,
+  MessagesSquare, Plus, Trash2, GitFork, Search, Clock, Loader2, MessageCircle, Bot, ChevronRight, Archive,
 } from 'lucide-react';
 import { getBackendUrl, jexiFetch, getSessionId, setSessionId } from '../utils/helpers';
 import PanelHeader from './PanelHeader';
@@ -28,6 +28,8 @@ export default function ConversationsScreen() {
   const [searchQ, setSearchQ] = useState('');
   const [searchRes, setSearchRes] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [cpStatus, setCpStatus] = useState(null); // B100 — compaction pressure
+  const [cpMsg, setCpMsg] = useState(''); // result of a manual compact
 
   const load = useCallback(async () => {
     try {
@@ -46,7 +48,29 @@ export default function ConversationsScreen() {
       const res = await jexiFetch(`${getBackendUrl()}/api/conversations/${id}`);
       const d = await res.json();
       setOpenConv({ id, events: d.events || [] });
+      // B100 — compaction pressure for the open conversation
+      try {
+        const st = await jexiFetch(`${getBackendUrl()}/api/conversations/${id}/compact/status`);
+        setCpStatus(await st.json());
+      } catch (e) { setCpStatus(null); }
     } catch (e) { /* noop */ }
+    setBusy(false);
+  };
+
+  // B100 — force-compact this conversation (dsh /compact mirror)
+  const compactIt = async (id) => {
+    setBusy(true);
+    setCpMsg('');
+    try {
+      const res = await jexiFetch(`${getBackendUrl()}/api/conversations/${id}/compact`, { method: 'POST' });
+      const d = await res.json();
+      if (d.compacted) setCpMsg(`📦 Compacted — ${d.status?.lastCheckpoint?.shadowed?.events || '?'} older turns → one checkpoint.`);
+      else setCpMsg(`📦 Skipped — ${d.error || 'not large enough yet'}.`);
+      const st = await jexiFetch(`${getBackendUrl()}/api/conversations/${id}/compact/status`);
+      setCpStatus(await st.json());
+      await openConversation(id);
+      await load();
+    } catch (e) { setCpMsg('Compaction failed: ' + ((e && e.message) || e)); }
     setBusy(false);
   };
 
@@ -135,14 +159,32 @@ export default function ConversationsScreen() {
             </button>
             {openConv && openConv.id === c.id && (
               <div className="border-t border-hairline px-3 py-2 space-y-1 max-h-56 overflow-y-auto">
-                {openConv.events.map((e, i) => (
-                  <p key={i} className={`text-[9px] leading-relaxed ${e.role === 'user' ? 'text-text-secondary' : 'text-text-tertiary'}`}>
-                    <span className="font-bold">{e.role === 'user' ? 'YOU' : 'JEXI'}:</span> {String(e.text || '').slice(0, 400)}
-                  </p>
+                {openConv.events.filter((e) => !String(e.kind || '').startsWith('compaction/')).map((e, i) => (
+                  e.kind === 'compaction' ? (
+                    <div key={i} className="rounded-md border border-brand-line/40 bg-brand-dim/30 px-2 py-1.5">
+                      <p className="text-[8px] font-black tracking-wider text-brand flex items-center gap-1">
+                        <Archive className="w-2.5 h-2.5" /> COMPACTED CHECKPOINT · {e.meta?.shadowed?.events || '?'} TURNS SHADOWED
+                      </p>
+                      <p className="text-[8px] text-brand/70 leading-snug mt-0.5 line-clamp-2">{String(e.text || '').replace(/<[^>]+>/g, '').slice(0, 220)}</p>
+                    </div>
+                  ) : (
+                    <p key={i} className={`text-[9px] leading-relaxed ${e.role === 'user' ? 'text-text-secondary' : 'text-text-tertiary'}`}>
+                      <span className="font-bold">{e.role === 'user' ? 'YOU' : 'JEXI'}:</span> {String(e.text || '').slice(0, 400)}
+                    </p>
+                  )
                 ))}
+                {cpStatus && (
+                  <p className="text-[8px] text-text-tertiary flex items-center gap-1 pt-0.5">
+                    <Archive className="w-2.5 h-2.5" /> {Math.round(cpStatus.chars / 1000)}k chars · auto-compacts at {Math.round(cpStatus.threshold / 1000)}k{cpStatus.lastCheckpoint ? ` · last checkpoint ${timeAgo(cpStatus.lastCheckpoint.at)}` : ''}
+                  </p>
+                )}
+                {cpMsg && <p className="text-[8px] text-brand/80">{cpMsg}</p>}
                 <div className="flex gap-1.5 pt-1.5">
                   <button onClick={() => { setSessionId(c.id); window.location.hash = '#home'; window.dispatchEvent(new Event('jexi:resume-conversation')); }} className="px-2 py-1 rounded text-[8px] font-bold border border-brand-line bg-brand-dim/40 text-brand flex items-center gap-1 hover:bg-brand-dim">
                     <MessageCircle className="w-2.5 h-2.5" /> RESUME IN CHAT
+                  </button>
+                  <button onClick={() => compactIt(c.id)} disabled={busy} className="px-2 py-1 rounded text-[8px] font-bold border border-brand-line text-brand flex items-center gap-1 hover:bg-brand-dim/40 disabled:opacity-50">
+                    <Archive className="w-2.5 h-2.5" /> COMPACT
                   </button>
                   <button onClick={() => forkIt(c.id)} className="px-2 py-1 rounded text-[8px] font-bold border border-brand-line text-brand flex items-center gap-1 hover:bg-brand-dim/40">
                     <GitFork className="w-2.5 h-2.5" /> FORK

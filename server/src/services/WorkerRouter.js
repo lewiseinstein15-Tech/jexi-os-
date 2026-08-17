@@ -138,6 +138,8 @@ export async function executeNativeToolCalls(calls, opts = {}) {
       confirm: opts.confirm,
       // B99 — code mode: run_code's sub-dispatch is capped to the visible set.
       codeTools: opts.codeTools,
+      // B100 — spill owner: oversized results land under this session.
+      spillOwner: opts.spillOwner,
     });
     const content = res && res.ok && res.result
       ? String(res.result).slice(0, 6000)

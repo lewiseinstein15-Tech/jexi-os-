@@ -139,7 +139,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
             // B96 — dsh-style step events: tool/call + tool/result on the wire.
             try { emit('step/start', { turn: 1, step: callsMade }); } catch (e) {}
             try { emit('tool/call', { callId: call.id, name: call.name, arguments: JSON.stringify(call.arguments || {}).slice(0, 500) }); } catch (e) {}
-            const r = await executeTool({ slug: call.name, args: call.arguments || {}, profile, sendEvent: emit, confirm: opts.confirm, codeTools: codeMode ? codeTools : undefined });
+            const r = await executeTool({ slug: call.name, args: call.arguments || {}, profile, sendEvent: emit, confirm: opts.confirm, codeTools: codeMode ? codeTools : undefined, spillOwner: opts.spillOwner });
             try { emit('tool/result', { callId: call.id, name: call.name, ok: !!r.ok, error: r.error || null }); } catch (e) {}
             try { emit('step/end', { turn: 1, step: callsMade }); } catch (e) {}
             const done = isToolDone(r);

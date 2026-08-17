@@ -101,10 +101,25 @@ const TRIVIAL_QUERY_RE = /^(hi+|hii+|hey+|hello+|yo+|hiya+|howdy+|good (morning|
  * background (never "what I remember"), and an explicit rule forbids surfacing
  * irrelevant memories or narrating their use.
  */
-export async function conversationContext(query = '') {
+export async function conversationContext(query = '', convId = null) {
   const history = getChatHistory(12);
   const memoryBlock = [];
   const trivial = TRIVIAL_QUERY_RE.test(String(query || '').trim());
+
+  if (!trivial && convId) {
+    // B100 — compaction-aware: a checkpointed conversation renders the
+    // structured summary + the retained tail instead of nothing remembered.
+    try {
+      const { compactionAwareHistory } = await import('./CompactionEngine.js');
+      const { checkpoint, tail } = compactionAwareHistory(convId, { limit: 200 });
+      if (checkpoint) {
+        const recent = tail.filter((e) => e.role === 'user' || e.role === 'jexi').slice(-4)
+          .map((e) => `${e.role === 'user' ? 'User' : 'JEXI'}: ${String(e.text).replace(/\s+/g, ' ').slice(0, 220)}`).join('\n');
+        memoryBlock.push(`Compacted checkpoint of this conversation:\n${String(checkpoint.text).slice(0, 1800)}`);
+        if (recent) memoryBlock.push(`Recent turns (retained verbatim):\n${recent}`);
+      }
+    } catch { /* compaction is best-effort context */ }
+  }
 
   if (!trivial) {
     const facts = topUserFacts(4);

@@ -282,6 +282,7 @@ export const TOOL_REGISTRY = [
   { slug: 'skill-load', name: 'Skill Load', type: 'Agent', desc: 'Load a skill into context (progressive disclosure) — auto-discovered project/user/bundled skills.', agents: ['planner', 'orchestrator'], tier: 'read' },
   { slug: 'skill-search', name: 'Skill Search', type: 'Knowledge', desc: 'Search the auto-discovered skill catalog (metadata only) for a task — find which skill to load.', agents: ['planner', 'orchestrator', 'archivist'], tier: 'read' },
   { slug: 'run_code', name: 'Run Code Program', type: 'Code', desc: 'Code Mode (PTC): execute ONE TypeScript program that composes tools as await tools.name(args) — a whole workflow in a single call.', agents: ['coder', 'engineer', 'planner'], tier: 'write_local' },
+  { slug: 'spill-read', name: 'Spill Read', type: 'Memory', desc: 'Read the full body of a spilled (oversized) tool result by its spill:// locator.', agents: ['memory', 'archivist', 'context-manager'], tier: 'read' },
   { slug: 'todo', name: 'Todo List', type: 'Productivity', desc: 'Manage a visible task list: add, list, complete.', agents: ['task-manager', 'planner'], tier: 'write_local' },
   { slug: 'plan', name: 'Plan', type: 'Productivity', desc: 'Create or update an explicit multi-step plan with per-step status.', agents: ['planner', 'orchestrator'], tier: 'write_local' },
 ];

@@ -73,7 +73,7 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
   emit('log', { agent: 'Orchestrator', message: `🧭 Complexity: SIMPLE — single coworker (${plan.intent}), no graph.` });
 
   try { addChat('user', query); } catch (e) {}
-  const ctx = await conversationContext(query).catch(() => '');
+  const ctx = await conversationContext(query, opts.convId).catch(() => '');
   const role = coworkerFor(plan.intent);
 
   // B78 — filesystem-native coworker definitions: the mandate for the
@@ -112,6 +112,8 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
     // B99 — code mode (PTC): the coworker may write ONE TypeScript program
     // composing SIMPLE_TOOL_DEFS via run_code (dsh `code` preset).
     codeMode: opts.codeMode,
+    // B100 — oversized results spill under this conversation's namespace.
+    spillOwner: opts.convId,
   });
   results.statistics.executionTime = Date.now() - startTime;
   results.statistics.provider = res.provider || null;

@@ -38,6 +38,7 @@ import {
 import { appendEvent } from './EventLog.js'; // B78 — tool calls/results are first-class events
 import { getPluginTool } from './PluginContext.js'; // B97 — plugin-mounted tools run through the same gated pipeline
 import { discoverSkills, loadSkillForModel, observeHostMutationFromArgs } from './SkillDiscovery.js'; // B98 — dsh-style ranked skill discovery + progressive load
+import { SPILL_THRESHOLD } from './SpillStore.js'; // B100 — spill oversized tool results (dsh spill-policy)
 import { collectSystemStatus } from './SelfMonitor.js';
 import { loadSettings, saveSettings } from './SettingsManager.js';
 import { runHooks } from './HookEngine.js';
@@ -134,6 +135,7 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'skill-load': z.object({ kind: z.literal('skill').optional(), ok: z.boolean().optional(), slug: z.string().optional(), name: z.string().optional(), description: z.string().optional(), provider: z.string().optional(), source: z.string().optional(), rank: z.number().optional(), resourceBase: z.unknown().optional(), body: z.string().optional() }).passthrough(),
   'skill-search': z.object({ kind: z.literal('skill-search'), query: z.string(), total: z.number().optional(), results: z.array(z.unknown()).optional() }).passthrough(),
   'run_code': z.object({ kind: z.literal('code-run').optional(), description: z.string().optional(), logs: z.array(z.string()).optional(), result: z.unknown().optional(), toolCalls: z.number().optional(), durationMs: z.number().optional(), truncated: z.boolean().optional(), error: z.string().optional(), ok: z.boolean().optional(), subCalls: z.array(z.unknown()).optional() }).passthrough(),
+  'spill-read': z.object({ kind: z.literal('spill').optional(), ok: z.boolean().optional(), locator: z.string().optional(), bytes: z.number().optional(), content: z.string().optional(), error: z.string().optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),
@@ -592,6 +594,14 @@ async function runEngine(slug, args, opts = {}) {
       };
     }
 
+    case 'spill-read': {
+      // B100 — dsh spill policy: retrieve the full body of a spilled result.
+      const { readSpill } = await import('./SpillStore.js');
+      const r = readSpill(args.locator, Number(args.cap) || 30000);
+      if (!r.ok) return { ok: false, error: r.error };
+      return { kind: 'spill', locator: r.locator, bytes: r.bytes, content: r.content };
+    }
+
     case 'todo': {
       // DSH todo: the model manages its own visible task list.
       const { todoList, todoAdd, todoComplete, todoRemove } = await import('./TodoStore.js');
@@ -674,7 +684,7 @@ export async function executeTool(params) {
   return result;
 }
 
-async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, confirm, codeTools, signal }) {
+async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, confirm, codeTools, signal, spillOwner }) {
   const started = Date.now();
   const emit = (type, payload) => { try { if (typeof sendEvent === 'function') sendEvent(type, payload); } catch (e) {} };
   // B97 — PLUGIN SEAM: plugin-mounted tools are first-class. If the static
@@ -824,7 +834,30 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
     if (/^(write|save|create|edit|upload|update|build|scaffold)/i.test(slug)) {
       try { observeHostMutationFromArgs(args); } catch { /* noop */ }
     }
-    const ok = { ok: true, tool: slug, permission: perm, tier, result: formatResult(result), durationMs: Date.now() - started };
+    // B100 — SPILL POLICY (dsh spill-policy mirror): oversized results are
+    // saved to the spill store; the model receives a bounded preview + a
+    // spill:// locator it can pull with spill-read when it actually needs it.
+    // The threshold is measured on the UNCAPTED serialization (formatResult
+    // already caps at 8k, which would mask everything above the threshold).
+    let finalText;
+    // spill-read results are already the spilled form (capped) — never re-spill.
+    const alreadySpilled = slug === 'spill-read';
+    const rawLen = alreadySpilled || result === null || result === undefined ? 0 : (typeof result === 'string' ? result.length : (() => { try { return JSON.stringify(result).length; } catch { return 0; } })());
+    if (rawLen > SPILL_THRESHOLD) {
+      const raw = typeof result === 'string' ? result : (() => { try { return JSON.stringify(result); } catch { return null; } })();
+      if (raw !== null) {
+        try {
+          const { saveText, SPILL_PREVIEW_CHARS } = await import('./SpillStore.js');
+          const sp = saveText({ owner: spillOwner, source: slug, suggestedName: slug, content: raw });
+          if (sp.ok) {
+            const preview = raw.slice(0, SPILL_PREVIEW_CHARS);
+            finalText = `[📦 Result spilled — ${sp.bytes.toLocaleString()} bytes → ${sp.locator}. Use spill-read({ locator: "${sp.locator}" }) to read the full body.]\nPreview:\n${preview}${raw.length > SPILL_PREVIEW_CHARS ? '…' : ''}`;
+          }
+        } catch (e) { /* spilling is best-effort — keep the full result */ }
+      }
+    }
+    if (finalText === undefined) finalText = formatResult(result);
+    const ok = { ok: true, tool: slug, permission: perm, tier, result: finalText, durationMs: Date.now() - started };
     emit('tool.result', { tool: slug, ok: true, durationMs: ok.durationMs, preview: String(ok.result).slice(0, 300) });
     return ok;
   } catch (e) {

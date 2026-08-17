@@ -40,6 +40,8 @@ import {
 import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
 import { skillFolder, SKILL_META } from './src/services/SkillChain.js'; // B50 P1 — progressive skill folders
 import { getSkillBody, listSkillCatalog, discoverySummary, createUserSkill, invalidateSkillCache, startSkillWatcher, SKILL_NAME_RE } from './src/services/SkillDiscovery.js'; // B98 — dsh-style skill auto-discovery
+import { maybeCompact, compactNow, compactionStatus, compactionAwareHistory, isCompactionEvent } from './src/services/CompactionEngine.js'; // B100 — dsh-style compaction of long sessions
+import { listSpills, spillStats } from './src/services/SpillStore.js'; // B100 — spilled oversized tool results
 import { knowledgeStatus, loadProjectKnowledge, knowledgeLoad } from './src/services/KnowledgeBase.js'; // B50 P2 — project knowledge
 import { getToolCatalog, TOOL_PROFILES, activeToolProfile, setToolProfile, executeTool } from './src/services/ToolRuntime.js';
 import { runAgentLoop } from './src/services/AgentLoop.js';
@@ -1628,6 +1630,30 @@ app.get('/api/conversations/:id', (req, res) => {
   res.json({ id, events });
 });
 
+// B100 — compaction status for one conversation (pressure + last checkpoint).
+app.get('/api/conversations/:id/compact/status', (req, res) => {
+  const id = String(req.params.id).slice(0, 80);
+  res.json(compactionStatus(id));
+});
+
+// B100 — force compaction now (dsh compactNow / the app's COMPACT button).
+app.post('/api/conversations/:id/compact', async (req, res) => {
+  const id = String(req.params.id).slice(0, 80);
+  try {
+    const r = await compactNow(id);
+    if (!r) return res.json({ ok: true, compacted: false, error: 'not large enough to compact yet', status: compactionStatus(id) });
+    res.json({ ok: r.compacted, compacted: r.compacted, error: r.error || null, summary: r.summary ? String(r.summary).slice(0, 4000) : null, status: compactionStatus(id) });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: (e && e.message) || String(e) });
+  }
+});
+
+// B100 — spilled (oversized) tool results for a session (metadata only).
+app.get('/api/spills', (req, res) => {
+  const owner = String(req.query.owner || 'agent').slice(0, 60);
+  res.json({ owner, spills: listSpills(owner), stats: spillStats(owner) });
+});
+
 // Fork a conversation: seed a new one from an existing log (DSH fork).
 app.post('/api/conversations/:id/fork', (req, res) => {
   const id = String(req.params.id).slice(0, 80);
@@ -1654,8 +1680,18 @@ app.get('/api/chat/result', (req, res) => {
   res.json({ result });
 });
 
-function conversationSummaryContext() {
+function conversationSummaryContext(convId) {
   try {
+    // B100 — compaction-aware: if this conversation has a checkpoint, render
+    // checkpoint + retained tail instead of the ever-growing transcript.
+    if (convId) {
+      const { checkpoint, tail } = compactionAwareHistory(convId, { limit: 100 });
+      if (checkpoint) {
+        const tailText = tail.filter((e) => e.role === 'jexi' || e.role === 'user')
+          .slice(-6).map((e) => `${e.role === 'user' ? 'You' : 'JEXI'}: ${String(e.text).replace(/\s+/g, ' ').slice(0, 300)}`).join('\n');
+        return `\n\n[Earlier in this conversation — compacted checkpoint: ${String(checkpoint.text).slice(0, 2000)}]\n[Recent turns retained verbatim:\n${tailText.slice(0, 1500)}]`;
+      }
+    }
     const s = getRollingSummary();
     return s ? `\n\n[Earlier in this conversation: ${String(s).slice(0, 600)}]` : '';
   } catch { return ''; }
@@ -1694,6 +1730,14 @@ app.post('/api/chat', async (req, res) => {
       try { appendConversationEvent(convId, { role: 'jexi', text: String(payload.summary).slice(0, 20000), kind: 'chat' }); } catch (e) {}
     }
     sendEvent('done', payload);
+    // B100 — automatic compaction pressure check (dsh compactIfNeeded):
+    // long conversations are summarized in the background, never blocking
+    // the reply the user is waiting for.
+    if (payload && payload.success && !payload.recoverable) {
+      maybeCompact(convId).then((r) => {
+        if (r && r.compacted) { try { sendEvent('log', { agent: 'Memory', message: `📦 Auto-compacted this conversation — ${r.status.lastCheckpoint.shadowed.events} older turns → one checkpoint (${r.status.lastCheckpoint.shadowed.chars.toLocaleString()} chars shadowed).` }); } catch (e) {} }
+      }).catch(() => {});
+    }
   };
 
   // Heartbeat: Cloudflare's proxy in front of Render kills streams that stay
@@ -1723,6 +1767,21 @@ app.post('/api/chat', async (req, res) => {
     const raw = String(query || '').trim();
     // B96 — append the user message to the conversation's durable log.
     try { appendConversationEvent(convId, { role: 'user', text: raw, kind: 'chat' }); } catch (e) {}
+    // B100 — /compact command (dsh command-compact mirror): summarize the
+    // older range of THIS conversation into a structured checkpoint now.
+    if (/^\/compact\b/.test(raw)) {
+      sendEvent('log', { agent: 'Memory', message: '📦 Compacting this conversation — older turns become a structured checkpoint (the tail stays verbatim).' });
+      const r = await compactNow(convId);
+      if (r && r.compacted) {
+        sendEvent('log', { agent: 'Memory', message: `📦 Compaction complete — ${r.status.lastCheckpoint.shadowed.events} older turns shadowed into one checkpoint; ${r.status.events} turns retained verbatim.` });
+        done({ success: true, query: raw, summary: '### 📦 Conversation compacted\n\nOlder turns were summarized into a structured checkpoint so JEXI keeps full context without growing the prompt forever.\n\n```markdown\n' + String(r.summary).slice(0, 3000) + '\n```' });
+      } else {
+        const why = (r && r.error) || 'this conversation is not large enough to compact yet';
+        sendEvent('log', { agent: 'Memory', message: `📦 Compaction skipped — ${why}.` });
+        done({ success: true, query: raw, summary: `### 📦 Conversation compaction\n\nNothing to compact: ${why}.` });
+      }
+      return;
+    }
     // B91 — attachments: load uploaded files and inject their previews into
     // the query so the planner and every agent see them.
     let attachmentContext = '';
@@ -1947,7 +2006,7 @@ app.post('/api/chat', async (req, res) => {
       let text = '';
       try {
         text = await generateContent(
-          `${effectiveQuery}\n\n${conversationSummaryContext()}`,
+          `${effectiveQuery}\n\n${conversationSummaryContext(convId)}`,
           'You are JEXI OS, a helpful, precise assistant. Answer directly and concisely. If the user asks for something that needs tools (building apps, browsing, research with sources), briefly say you can do it in Agent mode.',
           null,
           { prefer: '', temperature: 0.5 }
@@ -2146,7 +2205,7 @@ app.post('/api/chat', async (req, res) => {
     const codeModeHeader = String(req.headers['x-jexi-code-mode'] || req.body.codeMode || '1').toLowerCase();
     const codeMode = codeModeHeader !== '0' && codeModeHeader !== 'off' && codeModeHeader !== 'false';
     const results = plan.complexity === 'SIMPLE'
-      ? await runSimpleTask(plan, executionQuery || effectiveQuery, sendEvent, { image, codeMode })
+      ? await runSimpleTask(plan, executionQuery || effectiveQuery, sendEvent, { image, codeMode, convId })
       : await orchestrator.executePlan(plan, executionQuery || effectiveQuery, sendEvent, {
           image,
           // B53 P2 — task scope for the run: the orchestrator gates memory reuse

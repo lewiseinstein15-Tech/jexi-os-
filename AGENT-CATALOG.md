@@ -1,6 +1,6 @@
 # JEXI OS — Agent & Skill Catalog
 
-**251 specialist agents · 507 skills · 186 tools · 1 orchestrator.** One plain-language request in,
+**251 specialist agents · 507 skills · 187 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
 > ⚙️ GENERATED FILE — updated 2026-08-17 by `cd server && npm run audit-roster`. Do not edit by hand.
@@ -14,7 +14,7 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 |---|---|
 | Agents | 251 (251 reachable — 100%) |
 | Skills | 507 |
-| Tools | 186 |
+| Tools | 187 |
 | Intents / teams | 155 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
@@ -1221,7 +1221,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 186 tools (grouped by type)
+## The 187 tools (grouped by type)
 
 ### Agent (2)
 | Tool | Allowed agents | Engine | What it does |
@@ -1409,7 +1409,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `video-frames` | Video Analyst, Vision Agent | VideoAnalyzer | Sample visual frames across a video timeline for vision analysis. |
 | `video-transcript` | Video Analyst | VideoAnalyzer | Pull the full timestamped transcript of a YouTube/TikTok/Instagram video. |
 
-### Memory (14)
+### Memory (15)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
 | `episode-recall` | Archivist, Context Manager, Memory Agent | MemoryManager | Remember what happened in past sessions, not just the last few turns. |
@@ -1424,6 +1424,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `session-fork` | Context Manager, Memory Agent | undefined | Fork the current conversation into a new one (seeded with history). |
 | `session-list` | Memory Agent, Context Manager, Archivist | undefined | List all past conversations with titles and activity. |
 | `session-search` | Memory Agent, Archivist, Context Manager | undefined | Search EVERY past conversation for a topic — remember what she did before. |
+| `spill-read` | Memory Agent, Archivist, Context Manager | undefined | Read the full body of a spilled (oversized) tool result by its spill:// locator. |
 | `study-notes` | Study Coach, Researcher, Teacher | MemoryManager | Create structured study notes saved to the knowledge library. |
 | `vector-embed` | Memory Agent, Document Analyst | LLMClient | Embed a memory so semantic recall can find it. |
 
