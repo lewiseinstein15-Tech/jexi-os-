@@ -36,6 +36,8 @@ import {
   loadMemory, rememberEpisode, saveMemory, getActiveSession,
 } from './MemoryManager.js';
 import { appendEvent } from './EventLog.js'; // B78 — tool calls/results are first-class events
+import { getPluginTool } from './PluginContext.js'; // B97 — plugin-mounted tools run through the same gated pipeline
+import { discoverSkills, loadSkillForModel, observeHostMutationFromArgs } from './SkillDiscovery.js'; // B98 — dsh-style ranked skill discovery + progressive load
 import { collectSystemStatus } from './SelfMonitor.js';
 import { loadSettings, saveSettings } from './SettingsManager.js';
 import { runHooks } from './HookEngine.js';
@@ -83,6 +85,25 @@ export const TOOL_SCHEMAS = {
 import { z } from 'zod';
 
 /** Per-tool output contracts for the engines whose shape downstream code trusts. */
+/**
+ * B98 — rank-aware match for skill-search (name > description > whenToUse).
+ * Mirrors DSH tool-skill's catalog search semantics (metadata only).
+ */
+function matchScore(c, q) {
+  const name = String(c.name || '').toLowerCase();
+  const desc = String(c.description || '').toLowerCase();
+  const when = String(c.whenToUse || '').toLowerCase();
+  if (name === q) return 100;
+  if (name.includes(q)) return 60;
+  if (desc.includes(q)) return 30;
+  if (when.includes(q)) return 15;
+  // token-level: any query word in name/description
+  const words = q.split(/\s+/).filter(Boolean);
+  if (words.some((w) => name.includes(w))) return 12;
+  if (words.some((w) => desc.includes(w))) return 8;
+  return 0;
+}
+
 export const TOOL_OUTPUT_SCHEMAS = {
   'web-search': z.object({
     kind: z.string(),
@@ -95,6 +116,16 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'self-diagnose': z.object({ kind: z.string(), status: z.unknown() }).passthrough(),
   'mcp-call': z.object({ ok: z.boolean(), tool: z.string().optional(), result: z.unknown().optional(), error: z.unknown().optional() }).passthrough(),
   'connector-call': z.object({ ok: z.boolean(), connector: z.string().optional(), method: z.string().optional(), result: z.unknown().optional(), events: z.unknown().optional(), error: z.unknown().optional(), code: z.string().optional() }).passthrough(),
+  // B96 — DeepSeek-Harness-style tools: canonical output contracts.
+  'session-list': z.object({ kind: z.literal('sessions'), conversations: z.array(z.unknown()).optional(), active: z.unknown().optional() }).passthrough(),
+  'session-search': z.object({ kind: z.literal('session-search'), query: z.string(), results: z.array(z.unknown()).optional() }).passthrough(),
+  'session-fork': z.object({ ok: z.boolean(), id: z.string().optional(), parentSession: z.string().optional(), seedLength: z.number().optional(), error: z.string().optional() }).passthrough(),
+  'subagent': z.object({ kind: z.literal('subagent'), task: z.string().optional(), report: z.string().optional(), ok: z.boolean().optional(), error: z.string().optional() }).passthrough(),
+  'skill-load': z.object({ kind: z.literal('skill').optional(), ok: z.boolean().optional(), slug: z.string().optional(), name: z.string().optional(), description: z.string().optional(), provider: z.string().optional(), source: z.string().optional(), rank: z.number().optional(), resourceBase: z.unknown().optional(), body: z.string().optional() }).passthrough(),
+  'skill-search': z.object({ kind: z.literal('skill-search'), query: z.string(), total: z.number().optional(), results: z.array(z.unknown()).optional() }).passthrough(),
+  'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
+  'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
+  'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),
 };
 
 /**
@@ -451,12 +482,48 @@ async function runEngine(slug, args) {
 
     case 'skill-load': {
       // DSH tool-skill: load a skill body into context (progressive disclosure).
+      // B98 — resolves through ranked discovery (project → user → bundled)
+      // first; falls back to the SkillChain roster library for legacy slugs.
+      const slug = String(args.skill || args.name || '').trim();
+      if (!slug) return { ok: false, error: 'skill name required' };
+      const found = loadSkillForModel(slug);
+      if (found) {
+        return {
+          kind: 'skill', slug, name: found.name,
+          description: String(found.content || '').slice(0, 160),
+          provider: found.provider, source: found.source, rank: found.rank,
+          resourceBase: found.resourceBase,
+          body: String(found.content || '').slice(0, 8000),
+        };
+      }
       const { loadSkill, skillMeta } = await import('./SkillChain.js');
-      const slug = String(args.skill || '').trim();
-      if (!slug) return { ok: false, error: 'skill slug required' };
       const meta = skillMeta(slug);
       const body = loadSkill(slug);
-      return { kind: 'skill', slug, name: (meta && meta.name) || slug, body: String(body || '').slice(0, 4000) };
+      if (!body) return { ok: false, error: `skill "${slug}" not found` };
+      return { kind: 'skill', slug, name: (meta && meta.name) || slug, provider: 'roster', source: 'bundled', rank: 600, body: String(body.md || '').slice(0, 8000) };
+    }
+
+    case 'skill-search': {
+      // DSH tool-skill catalog: metadata-only search across ranked roots —
+      // full bodies are NEVER returned here (progressive disclosure).
+      const q = String(args.query || '').trim().toLowerCase();
+      if (!q) return { kind: 'skill-search', query: '', total: 0, results: [] };
+      const limit = Math.min(Math.max(1, Number(args.limit) || 12), 25);
+      const results = discoverSkills()
+        .filter((c) => c.invocation.modelInvocable)
+        .map((c) => ({ c, score: matchScore(c, q) }))
+        .filter((x) => x.score > 0)
+        .sort((a, b) => b.score - a.score || a.c.rank - b.c.rank)
+        .slice(0, limit)
+        .map((x) => ({
+          name: x.c.name,
+          description: x.c.description,
+          ...(x.c.whenToUse ? { whenToUse: x.c.whenToUse } : {}),
+          source: x.c.source,
+          rank: x.c.rank,
+          provider: x.c.provider,
+        }));
+      return { kind: 'skill-search', query: String(args.query).slice(0, 200), total: results.length, results };
     }
 
     case 'todo': {
@@ -478,8 +545,20 @@ async function runEngine(slug, args) {
       return { kind: 'plan', plan: planGet() };
     }
 
-    default:
+    default: {
+      // B97 — PLUGIN SEAM: tools mounted by plugins (deepseek-harness style)
+      // execute here, through the SAME permission/risk/approval pipeline.
+      const pluginTool = getPluginTool(slug);
+      if (pluginTool) {
+        try {
+          const r = await pluginTool.handler(args || {});
+          return { ok: !!r.ok, ...r };
+        } catch (e) {
+          return { ok: false, error: (e && e.message) || 'plugin tool failed' };
+        }
+      }
       return null; // no engine — caller decides fallback
+    }
   }
 }
 
@@ -532,8 +611,15 @@ export async function executeTool(params) {
 async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, confirm }) {
   const started = Date.now();
   const emit = (type, payload) => { try { if (typeof sendEvent === 'function') sendEvent(type, payload); } catch (e) {} };
-  const tool = getTool(slug);
-  if (!tool) return { ok: false, error: `Unknown tool: ${slug}`, durationMs: 0 };
+  // B97 — PLUGIN SEAM: plugin-mounted tools are first-class. If the static
+  // registry misses, synthesize the tool record from the plugin context so
+  // the same gates (allowlist, permission, risk, approval, events) apply.
+  let tool = getTool(slug);
+  if (!tool) {
+    const pt = getPluginTool(slug);
+    if (pt) tool = { slug, name: pt.name || slug, desc: pt.desc || 'plugin tool', agents: [], permission: pt.permission || 'medium' };
+    else return { ok: false, error: `Unknown tool: ${slug}`, durationMs: 0 };
+  }
 
   // B52 P4 — hard enforcement: lightweight intents (direct_answer,
   // conversation, …) may only call their memory/knowledge allowlist. This is
@@ -658,6 +744,11 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
       return { ...routed, permission: perm, durationMs: Date.now() - started };
     }
     runHooks('afterTool', { tool: slug, query: args.query || args.url || args.command || '', ok: true }, (t, d) => emit(t, d));
+    // B98 — first-party writes under a skill root invalidate the discovery
+    // cache (DSH observeHostMutation) so new/edited skills appear instantly.
+    if (/^(write|save|create|edit|upload|update|build|scaffold)/i.test(slug)) {
+      try { observeHostMutationFromArgs(args); } catch { /* noop */ }
+    }
     const ok = { ok: true, tool: slug, permission: perm, tier, result: formatResult(result), durationMs: Date.now() - started };
     emit('tool.result', { tool: slug, ok: true, durationMs: ok.durationMs, preview: String(ok.result).slice(0, 300) });
     return ok;

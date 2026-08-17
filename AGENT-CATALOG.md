@@ -1,6 +1,6 @@
 # JEXI OS — Agent & Skill Catalog
 
-**251 specialist agents · 507 skills · 184 tools · 1 orchestrator.** One plain-language request in,
+**251 specialist agents · 507 skills · 185 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
 > ⚙️ GENERATED FILE — updated 2026-08-17 by `cd server && npm run audit-roster`. Do not edit by hand.
@@ -14,7 +14,7 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 |---|---|
 | Agents | 251 (251 reachable — 100%) |
 | Skills | 507 |
-| Tools | 184 |
+| Tools | 185 |
 | Intents / teams | 155 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
@@ -1221,12 +1221,12 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 184 tools (grouped by type)
+## The 185 tools (grouped by type)
 
 ### Agent (2)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
-| `skill-load` | Planner, Orchestrator | undefined | Load a skill into context (progressive disclosure) for a specialized workflow. |
+| `skill-load` | Planner, Orchestrator | undefined | Load a skill into context (progressive disclosure) — auto-discovered project/user/bundled skills. |
 | `subagent` | Orchestrator, Planner | undefined | Delegate a sub-task to a child agent with its own context; it reports back. |
 
 ### Browser (6)
@@ -1348,7 +1348,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `force_safe_mode` | Guardrail, Security Officer | GuardrailAgent | Restrict the task to read-only tools or abort with a clear explanation. |
 | `scan_prompt_safety` | Guardrail, Security Officer | GuardrailAgent | Scan a prompt for injection, jailbreak or tool-abuse attempts. |
 
-### Knowledge (7)
+### Knowledge (8)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
 | `book-fetch` | Books Agent, Scholar | TrustedLibrary | Fetch a free public-domain book or paper from the trusted library. |
@@ -1358,6 +1358,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `knowledge-load` | JEXI Core, Context Manager, Archivist, Coder, Engineer, Researcher | KnowledgeBase | Load a progressive project-knowledge folder (e.g. conventions, architecture) on demand — the always-on JEXI.md only carries pointers. |
 | `knowledge-save` | Researcher, Study Coach, Scholar, Document Analyst | MemoryManager | Save studied topics and notes into the knowledge library. |
 | `knowledge-search` | Books Agent, Scholar, Researcher, Document Analyst | MemoryManager | Search the saved knowledge library and studied topics. |
+| `skill-search` | Planner, Orchestrator, Archivist | undefined | Search the auto-discovered skill catalog (metadata only) for a task — find which skill to load. |
 
 ### Language (1)
 | Tool | Allowed agents | Engine | What it does |

@@ -44,6 +44,15 @@ check('long process starts', slow.status === 'running');
 const stopped = stopProcess(slow.id);
 check('stopProcess succeeds', stopped.success === true);
 check('stopProcess refuses for finished processes', stopProcess(slow.id).success === false);
+// Race guard: stopProcess returns before the child's async 'close' handler
+// persists. If that persist fires AFTER the fake registry is written below,
+// it clobbers the file and the interrupted-on-load check reads the real
+// registry instead. Wait for the close handler (log line 'exited with code').
+for (let i = 0; i < 30; i++) {
+  const rec = listProcesses().find((x) => x.id === slow.id);
+  if (rec && /exited with code/.test(rec.log || '')) break;
+  await new Promise((r) => setTimeout(r, 50));
+}
 
 /* ---------------- delete + persistence ---------------- */
 const finished = listProcesses().find((x) => x.id === p.id);

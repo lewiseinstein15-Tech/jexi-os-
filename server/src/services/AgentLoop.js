@@ -31,6 +31,7 @@ import { getTool } from './ToolRegistry.js';
 import { buildNativeSchemas, executeTool, activeToolProfile, TOOL_PROFILES, isToolDone } from './ToolRuntime.js';
 import { generateWithToolsLoop, generateContent } from './LLMClient.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
+import { buildSkillCatalog } from './SkillDiscovery.js'; // B98 — dsh-style available-skills catalog (metadata only)
 import { preferencesBlock } from './PreferenceLearner.js';
 import { providerPreferenceForIntent } from './ModelRouting.js';
 
@@ -99,7 +100,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   try {
     const res = await generateWithToolsLoop(
       `The user asked: "${query}"${image ? '\n(An image was provided — analyze it.)' : ''}`,
-      (opts.systemPromptOverride || JEXI_SYSTEM_PROMPT) + preferencesBlock(),
+      (opts.systemPromptOverride || JEXI_SYSTEM_PROMPT) + buildSkillCatalog(30) + preferencesBlock(),
       schemas,
       {
         temperature: 0.3,

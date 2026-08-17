@@ -39,6 +39,7 @@ import {
 } from './src/services/MemoryManager.js';
 import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
 import { skillFolder, SKILL_META } from './src/services/SkillChain.js'; // B50 P1 — progressive skill folders
+import { getSkillBody, listSkillCatalog, discoverySummary, createUserSkill, invalidateSkillCache, startSkillWatcher, SKILL_NAME_RE } from './src/services/SkillDiscovery.js'; // B98 — dsh-style skill auto-discovery
 import { knowledgeStatus, loadProjectKnowledge, knowledgeLoad } from './src/services/KnowledgeBase.js'; // B50 P2 — project knowledge
 import { getToolCatalog, TOOL_PROFILES, activeToolProfile, setToolProfile, executeTool } from './src/services/ToolRuntime.js';
 import { runAgentLoop } from './src/services/AgentLoop.js';
@@ -48,6 +49,7 @@ import { verifyDomainAnswer, detectDomain, deterministicChecks } from './src/ser
 import { runSubagents, decomposeQuery } from './src/services/SubagentRuntime.js';
 import { listHooks, addHook, updateHook, removeHook } from './src/services/HookEngine.js';
 import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services/PluginRegistry.js';
+import { loadPlugins, setActivePluginContext, getActivePluginContext, listPluginTools, listPluginSkills } from './src/services/PluginContext.js'; // B97 — deepseek-harness-style plugin seam
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications, setNotifyBroadcaster } from './src/services/NotificationCenter.js';
 import { modelRoutingTable, providerPreferenceForIntent } from './src/services/ModelRouting.js';
 import { MCP_PORT, MCP_TOOL_ALLOWLIST, listMcpTools } from './mcp-server.js';
@@ -106,6 +108,36 @@ backfillEmbeddings().catch((e) => { recordError('memory', (e && e.message) || St
 // on ephemeral-disk hosts (Render free). Non-blocking hydrations.
 taskScheduler.hydrateFromRedis().catch((e) => { recordError('schedule', (e && e.message) || String(e)); });
 hydrateGoalJobsFromRedis().catch((e) => { recordError('goals', (e && e.message) || String(e)); });
+
+// B97 — PLUGIN SEAM: load plugins (deepseek-harness style) at boot. Plugins
+// register tools/skills/events into the shared context; every plugin tool
+// runs through the gated ToolRuntime. Reversible: unloading removes effects.
+(async () => {
+  try {
+    const { ctx, loaded, failed } = await loadPlugins({
+      services: {
+        planner, orchestrator, generateContent, executeTool,
+        memory: { loadMemory, saveMemory, semanticRecall },
+        conversations: { appendConversationEvent, searchConversations },
+      },
+    });
+    setActivePluginContext(ctx);
+    console.log(`[Plugins] ✓ Loaded ${loaded.length} plugin(s)${loaded.length ? ': ' + loaded.map((p) => p.name).join(', ') : ''}${failed.length ? ' | failed: ' + failed.map((f) => f.file).join(', ') : ''}`);
+  } catch (e) {
+    console.error('[Plugins] boot load error:', e.message);
+  }
+})();
+
+// B98 — SKILL AUTO-DISCOVERY: watch all skill roots (project/user/bundled)
+// so skills added at runtime are picked up without a restart. mtime rescans
+// catch anything the watcher misses.
+try {
+  const n = startSkillWatcher();
+  const s = discoverySummary();
+  console.log(`[Skills] ✓ Watcher on ${n} root(s); discovered ${s.total} skill(s): ${Object.entries(s.bySource).map(([k, v]) => `${k}=${v}`).join(', ')}`);
+} catch (e) {
+  console.error('[Skills] watcher start error:', e.message);
+}
 // B86-fix — push device tokens + subscriptions survive redeploys (ephemeral disk).
 hydrateFcmTokensFromRedis().catch((e) => { recordError('push', (e && e.message) || String(e)); });
 hydratePushSubsFromRedis().catch((e) => { recordError('push', (e && e.message) || String(e)); });
@@ -844,6 +876,18 @@ app.post('/api/plugins/:id/toggle', (req, res) => {
   catch (e) { res.status(400).json({ success: false, error: (e && e.message) || String(e) }); }
 });
 
+// B97 — RUNTIME PLUGIN SEAM: what's actually mounted + which live tools/skills
+// each plugin contributed (read-only, no secrets).
+app.get('/api/plugins/runtime', (req, res) => {
+  const ctx = getActivePluginContext();
+  res.json({
+    ctxActive: !!ctx,
+    pluginTools: listPluginTools().map((t) => ({ slug: t.slug, name: t.name, desc: String(t.desc || '').slice(0, 120) })),
+    pluginSkills: listPluginSkills().map((sk) => ({ slug: sk.slug, name: sk.name || sk.slug })),
+    totalPluginTools: listPluginTools().length,
+  });
+});
+
 // === HOOK ENGINE (roadmap stage 22 — lifecycle gates) ===
 // Hooks fire before/after tools and tasks; only an explicit deny blocks.
 app.get('/api/hooks', (req, res) => res.json({ hooks: listHooks() }));
@@ -928,6 +972,40 @@ app.get('/api/skills', (req, res) => {
   }
   res.setHeader('Cache-Control', 'public, max-age=30');
   res.type('json').send(skillsCache.json);
+});
+
+// === B98 — SKILL AUTO-DISCOVERY (deepseek-harness tool-skill mirror) ===
+// Ranked roots: project .jexi/skills (100) → .agents/skills (200) →
+// plugin skills (300) → user DATA_DIR/skills (400) → bundled server/skills
+// (600). SKILL.md folders or flat <name>.md; frontmatter name+description
+// required; catalog = metadata only (progressive); body loads on demand.
+app.get('/api/skills/discovery', (req, res) => {
+  res.json({ ...discoverySummary(), skills: listSkillCatalog() });
+});
+
+app.get('/api/skills/discovery/:name', (req, res) => {
+  const name = String(req.params.name || '').trim();
+  if (!SKILL_NAME_RE.test(name)) return res.status(400).json({ success: false, error: 'invalid skill name' });
+  const skill = getSkillBody(name);
+  if (!skill) return res.status(404).json({ success: false, error: `skill "${name}" not found` });
+  res.json({ success: true, skill });
+});
+
+// User-authored skill → DATA_DIR/skills/<name>/ (rank 400) → auto-discovered.
+app.post('/api/skills/discovery', (req, res) => {
+  try {
+    const { name, description, whenToUse, body, reference } = req.body || {};
+    const created = createUserSkill({ name, description, whenToUse, body, reference });
+    res.status(201).json({ success: true, ...created });
+  } catch (e) {
+    res.status(400).json({ success: false, error: (e && e.message) || String(e) });
+  }
+});
+
+// Manual rescan (the watcher normally invalidates on file events).
+app.post('/api/skills/discovery/invalidate', (req, res) => {
+  invalidateSkillCache();
+  res.json({ success: true, ...discoverySummary() });
 });
 
 // === B50 P2 — PROJECT KNOWLEDGE (always-on JEXI.md + progressive folders) ===
