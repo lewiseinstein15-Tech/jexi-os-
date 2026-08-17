@@ -1,9 +1,9 @@
 # JEXI OS — Agent & Skill Catalog
 
-**251 specialist agents · 507 skills · 177 tools · 1 orchestrator.** One plain-language request in,
+**251 specialist agents · 507 skills · 184 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
-> ⚙️ GENERATED FILE — updated 2026-08-15 by `cd server && npm run audit-roster`. Do not edit by hand.
+> ⚙️ GENERATED FILE — updated 2026-08-17 by `cd server && npm run audit-roster`. Do not edit by hand.
 > The audit (`node scripts/audit-roster.js --check`, wired into `npm test`) fails CI if this file drifts from the registries.
 
 ---
@@ -14,8 +14,8 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 |---|---|
 | Agents | 251 (251 reachable — 100%) |
 | Skills | 507 |
-| Tools | 177 |
-| Intents / teams | 154 |
+| Tools | 184 |
+| Intents / teams | 155 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
 | Orphaned tools | 0 |
@@ -99,6 +99,7 @@ You type:  "Build me a water-intake tracker"
 | `business_plan` | Business Analyst → Startup Advisor → Financial Advisor → Market Analyst → Strategy Analyst → Sales Representative → CRM Specialist → Customer Success Manager | 0 independent · 8 bundled |
 | `marketing_plan` | Market Analyst → Growth Marketer → SEO Specialist → Copywriter → Brand Strategist → Product Marketer → Lifecycle Marketer → Community Manager → DevRel Engineer → Social Media Manager → Email Composer → Ad Copywriter → Newsletter Writer → Brand Designer | 0 independent · 14 bundled |
 | `event_planning` | Event Planner → Wedding Planner → Travel Planner → Finance Analyst | 0 independent · 4 bundled |
+| `travel_booking` | Travel Planner → Computer Use Agent → Navigator → Vision Agent → Reasoner → Memory Agent | 0 independent · 6 bundled |
 | `meal_plan` | Chef → Nutritionist → Health Coach | 0 independent · 3 bundled |
 | `workout_plan` | Fitness Trainer → Health Coach → Nutritionist → Sleep Coach → Meditation Coach | 0 independent · 5 bundled |
 | `investing_advice` | Investment Analyst → Financial Advisor → Tax Advisor | 0 independent · 3 bundled |
@@ -1220,7 +1221,13 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 177 tools (grouped by type)
+## The 184 tools (grouped by type)
+
+### Agent (2)
+| Tool | Allowed agents | Engine | What it does |
+|---|---|---|---|
+| `skill-load` | Planner, Orchestrator | undefined | Load a skill into context (progressive disclosure) for a specialized workflow. |
+| `subagent` | Orchestrator, Planner | undefined | Delegate a sub-task to a child agent with its own context; it reports back. |
 
 ### Browser (6)
 | Tool | Allowed agents | Engine | What it does |
@@ -1261,7 +1268,7 @@ This section and every table below are GENERATED from the live registries by `cd
 ### Connectors (1)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
-| `connector-call` | JEXI Core, GitHub Agent, Email Composer, Context Manager | Connectors | Send an outbound action or read inbound events through a registered connector (github, email) — send_email, create_github_issue, send_email, create_github_file. |
+| `connector-call` | JEXI Core, GitHub Agent, Email Composer, Context Manager | Connectors | Send an outbound action or read inbound events through a registered connector (github, email) — send_email, create_github_issue, create_github_file. |
 
 ### Creative (6)
 | Tool | Allowed agents | Engine | What it does |
@@ -1396,7 +1403,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `video-frames` | Video Analyst, Vision Agent | VideoAnalyzer | Sample visual frames across a video timeline for vision analysis. |
 | `video-transcript` | Video Analyst | VideoAnalyzer | Pull the full timestamped transcript of a YouTube/TikTok/Instagram video. |
 
-### Memory (11)
+### Memory (14)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
 | `episode-recall` | Archivist, Context Manager, Memory Agent | MemoryManager | Remember what happened in past sessions, not just the last few turns. |
@@ -1408,6 +1415,9 @@ This section and every table below are GENERATED from the live registries by `cd
 | `profile-read` | Memory Agent, JEXI Core | MemoryManager | Read the stored user profile: name, facts, preferences. |
 | `rolling-summary` | Context Manager, JEXI Core, Archivist | MemoryManager | Keep a compact running summary of the whole conversation so nothing is forgotten. |
 | `semantic-search` | Memory Agent, Document Analyst, Researcher | MemoryManager | Hybrid vector + keyword search across all memories. |
+| `session-fork` | Context Manager, Memory Agent | undefined | Fork the current conversation into a new one (seeded with history). |
+| `session-list` | Memory Agent, Context Manager, Archivist | undefined | List all past conversations with titles and activity. |
+| `session-search` | Memory Agent, Archivist, Context Manager | undefined | Search EVERY past conversation for a topic — remember what she did before. |
 | `study-notes` | Study Coach, Researcher, Teacher | MemoryManager | Create structured study notes saved to the knowledge library. |
 | `vector-embed` | Memory Agent, Document Analyst | LLMClient | Embed a memory so semantic recall can find it. |
 
@@ -1439,15 +1449,17 @@ This section and every table below are GENERATED from the live registries by `cd
 | `load_plugin` | Plugin Manager | PluginAgent | Validate and load an external skill/tool plugin package. |
 | `unload_plugin` | Plugin Manager | PluginAgent | Unload a plugin and remove its tools from the registry. |
 
-### Productivity (6)
+### Productivity (8)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
 | `expense-log` | Expense Tracker, Finance Analyst | DataAgent | Track expenses and budgets. |
 | `inbox-triage` | Email Triage, Email Composer | SkillChain | Triage email and draft replies. |
 | `meeting-minutes` | Meeting Planner, Note Taker, Reporter | SkillChain | Write agendas and minutes with action items. |
 | `notes-organize` | Note Taker, Study Coach | MemoryManager | Organize notes and action items. |
+| `plan` | Planner, Orchestrator | undefined | Create or update an explicit multi-step plan with per-step status. |
 | `schedule-plan` | Scheduler, Task Manager, Executive Assistant | SkillChain | Plan days, weeks and calendars. |
 | `task-board` | Task Manager, Scheduler | SkillChain | Build task lists and priority boards. |
+| `todo` | Task Manager, Planner | undefined | Manage a visible task list: add, list, complete. |
 
 ### Quality (8)
 | Tool | Allowed agents | Engine | What it does |
