@@ -1,6 +1,6 @@
 # JEXI OS — Agent & Skill Catalog
 
-**251 specialist agents · 507 skills · 191 tools · 1 orchestrator.** One plain-language request in,
+**251 specialist agents · 507 skills · 193 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
 > ⚙️ GENERATED FILE — updated 2026-08-17 by `cd server && npm run audit-roster`. Do not edit by hand.
@@ -14,7 +14,7 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 |---|---|
 | Agents | 251 (251 reachable — 100%) |
 | Skills | 507 |
-| Tools | 191 |
+| Tools | 193 |
 | Intents / teams | 155 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
@@ -1221,11 +1221,13 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 191 tools (grouped by type)
+## The 193 tools (grouped by type)
 
-### Agent (2)
+### Agent (4)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
+| `ask_user_question` | Orchestrator, Planner | undefined | Ask the user a concise question when you need confirmation, a choice, or missing information before proceeding. Answers arrive in the next message. |
+| `exit_plan_mode` | Planner, Orchestrator | undefined | Present the completed plan for user review — implementation begins only after approval (plan mode). |
 | `skill-load` | Planner, Orchestrator | undefined | Load a skill into context (progressive disclosure) — auto-discovered project/user/bundled skills. |
 | `subagent` | Orchestrator, Planner | undefined | Delegate a sub-task to a child agent with its own context; it reports back. |
 

@@ -32,11 +32,12 @@ export function planGet() {
   return { ...plan, steps: plan.steps.map((s, i) => ({ index: i, ...s })) };
 }
 
-export function planSet(title, steps) {
+export function planSet(title, steps, extra = {}) {
   plan = {
     title: String(title || '').slice(0, 120),
     steps: (Array.isArray(steps) ? steps : []).map((s) => (typeof s === 'string' ? { text: s, status: 'pending' } : { text: String(s.text || '').slice(0, 300), status: s.status || 'pending' })),
     updatedAt: Date.now(),
+    ...(extra && typeof extra === 'object' ? extra : {}),
   };
   save();
   return planGet();

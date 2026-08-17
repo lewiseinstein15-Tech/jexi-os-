@@ -42,13 +42,13 @@ function ensureDir() {
 }
 
 /** Append one event to a conversation's append-only log. */
-export function appendConversationEvent(convId, { role, text, kind = 'chat' }) {
+export function appendConversationEvent(convId, { role, text, kind = 'chat', meta }) {
   if (!convId) return null;
   ensureDir();
   const file = convFile(convId);
   const events = loadConversationEvents(convId);
   const seq = events.length ? events[events.length - 1].seq + 1 : 0;
-  const ev = { seq, at: Date.now(), role: String(role || 'user'), text: String(text || '').slice(0, 20000), kind };
+  const ev = { seq, at: Date.now(), role: String(role || 'user'), text: String(text || '').slice(0, 20000), kind, ...(meta ? { meta } : {}) };
   try {
     fs.appendFileSync(file, JSON.stringify(ev) + '\n', 'utf-8');
   } catch (e) { /* memory must never break chat */ }

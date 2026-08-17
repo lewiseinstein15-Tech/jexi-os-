@@ -40,13 +40,47 @@ const MODE_STORAGE = 'jexi_mode';
 const getMode = () => (typeof localStorage !== 'undefined' ? (localStorage.getItem(MODE_STORAGE) || 'agent') : 'agent');
 const setMode = (m) => { try { localStorage.setItem(MODE_STORAGE, m); } catch { /* noop */ } };
 
-export default function ChatWindow({ messages, logs, isProcessing, onSend, onStop }) {
+export default function ChatWindow({
+  messages, logs, isProcessing, onSend, onStop,
+  questions, onDismissQuestions, planReview, onDismissPlan,
+}) {
   const [input, setInput] = useState('');
   const [image, setImage] = useState(null);
   const [mode, setModeState] = useState(getMode());
   const [fileAttachments, setFileAttachments] = useState([]); // { id, name, kind }
   const [uploading, setUploading] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [customAnswers, setCustomAnswers] = useState({}); // B110 — question card custom inputs
+  const [cardBusy, setCardBusy] = useState(false);
+
+  // B110 — record answers to the model's pending questions, then nudge the
+  // loop to continue with them (dsh tool-ask-user: answer feeds the loop).
+  const answerQuestions = async (answers) => {
+    setCardBusy(true);
+    try {
+      const conv = (questions && questions.conv) || getSessionId();
+      await jexiFetch(`${getBackendUrl()}/api/questions/answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conv, answers }),
+      });
+      onDismissQuestions && onDismissQuestions(null);
+      onSend('Please continue — here are my answers to your questions.');
+    } catch (e) { /* noop */ }
+    setCardBusy(false);
+  };
+
+  // B110 — approve a presented plan (plan mode → implementation).
+  const approvePlanNow = async () => {
+    setCardBusy(true);
+    try {
+      const conv = (planReview && planReview.conv) || getSessionId();
+      await jexiFetch(`${getBackendUrl()}/api/plan/${conv}/approve`, { method: 'POST' });
+      onDismissPlan && onDismissPlan(null);
+      onSend('approve the plan');
+    } catch (e) { /* noop */ }
+    setCardBusy(false);
+  };
   const fileRef = useRef(null);   // photo (image/*)
   const anyFileRef = useRef(null); // any file
   const scrollRef = useRef(null);
@@ -286,6 +320,83 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
           >
             <X className="w-3 h-3" />
           </button>
+        </div>
+      )}
+
+      {/* B110 — ask_user_question card (dsh tool-ask-user): the model parked
+          questions; the user answers inline and the loop continues. */}
+      {questions && questions.questions && questions.questions.length > 0 && (
+        <div className="rounded-xl border border-brand-line/60 bg-brand-dim/20 p-3 mb-2 flex-shrink-0 max-h-56 overflow-y-auto">
+          <p className="text-[9px] font-black tracking-[0.16em] text-brand mb-2 flex items-center gap-1.5">
+            <MessageCircle className="w-3 h-3" /> JEXI NEEDS YOUR INPUT
+          </p>
+          <div className="space-y-2.5">
+            {questions.questions.map((q, qi) => (
+              <div key={q.id} className="rounded-lg bg-surface-2 border border-hairline p-2.5">
+                <p className="text-[10px] text-text-primary font-semibold">{q.question}</p>
+                {q.options && q.options.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {q.options.map((o) => (
+                      <button
+                        key={o.label}
+                        type="button"
+                        disabled={cardBusy}
+                        onClick={() => answerQuestions([{ id: q.id, selected: [o.label] }])}
+                        className="px-2 py-1 rounded-md border border-brand-line text-brand bg-brand-dim/40 text-[9px] font-bold hover:brightness-110 disabled:opacity-50"
+                      >
+                        {o.label}
+                        {o.description ? <span className="block font-normal text-text-tertiary text-[7px] mt-0.5 max-w-[160px]">{o.description}</span> : null}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-1.5 flex gap-1">
+                  <input
+                    value={customAnswers[q.id] || ''}
+                    onChange={(e) => setCustomAnswers((p) => ({ ...p, [q.id]: e.target.value }))}
+                    placeholder="Or type your own answer…"
+                    className="flex-1 bg-surface-1 border border-hairline rounded-md px-2 py-1.5 text-[10px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-brand-line"
+                  />
+                  <button
+                    type="button"
+                    disabled={cardBusy || !(customAnswers[q.id] || '').trim()}
+                    onClick={() => answerQuestions([{ id: q.id, selected: [], custom: (customAnswers[q.id] || '').trim() }])}
+                    className="px-2.5 py-1 rounded-md bg-brand text-[#04140D] text-[9px] font-bold hover:brightness-110 disabled:opacity-50"
+                  >
+                    SEND
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* B110 — plan-mode review card (dsh exit_plan_mode): approve to start
+          implementation, or revise with feedback. */}
+      {planReview && planReview.plan && (
+        <div className="rounded-xl border border-brand-line/60 bg-brand-dim/20 p-3 mb-2 flex-shrink-0 max-h-64 overflow-y-auto">
+          <p className="text-[9px] font-black tracking-[0.16em] text-brand mb-1.5 flex items-center gap-1.5">
+            <Bot className="w-3 h-3" /> PLAN READY FOR REVIEW
+          </p>
+          <pre className="text-[10px] text-text-secondary leading-relaxed whitespace-pre-wrap font-sans max-h-36 overflow-y-auto">{String(planReview.plan).slice(0, 4000)}</pre>
+          <div className="mt-2 flex gap-1.5">
+            <button
+              type="button"
+              disabled={cardBusy}
+              onClick={approvePlanNow}
+              className="flex-1 px-2.5 py-2 rounded-md bg-brand text-[#04140D] text-[10px] font-bold hover:brightness-110 disabled:opacity-50"
+            >
+              ✓ APPROVE & START
+            </button>
+            <button
+              type="button"
+              onClick={() => onDismissPlan && onDismissPlan(null)}
+              className="flex-1 px-2.5 py-2 rounded-md border border-hairline text-text-secondary text-[10px] font-bold hover:border-hairline-strong"
+            >
+              SEND CHANGES
+            </button>
+          </div>
         </div>
       )}
 

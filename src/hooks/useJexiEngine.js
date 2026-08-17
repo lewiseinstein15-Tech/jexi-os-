@@ -51,6 +51,8 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
     else if (data.type === 'plan') setPlan(prev => ({ ...prev, ...data }));
     // Build 47 — intelligence metadata (classification, task id, confidence).
     else if (data.type === 'intel') setPlan(prev => ({ ...prev, intel: data }));
+    else if (data.type === 'ask.user') setQuestions(data);
+    else if (data.type === 'plan.review') setPlanReview(data);
     else if (data.type === 'done') {
       sawDone = true;
       if (data.success) {
@@ -353,5 +355,9 @@ export const useJexiEngine = () => {
     setMessages(prev => [...prev, { role, text }]);
   }, []);
 
-  return { messages, logs, websites, plan, isProcessing, runSearch, stopGeneration, pushMessage };
+  // B110 — ask_user_question cards + plan-mode review card state.
+  const [questions, setQuestions] = useState(null); // { conv, questions: [{id,question,header,options,multiSelect}] }
+  const [planReview, setPlanReview] = useState(null); // { conv, plan }
+
+  return { messages, logs, websites, plan, isProcessing, runSearch, stopGeneration, pushMessage, questions, setQuestions, planReview, setPlanReview };
 };

@@ -173,6 +173,8 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'jobs_collect': z.object({ kind: z.literal('job').optional(), ok: z.boolean().optional(), id: z.string().optional(), status: z.string().optional(), answer: z.string().nullable().optional(), error: z.string().optional() }).passthrough(),
   'job_list': z.object({ kind: z.literal('jobs').optional(), jobs: z.array(z.unknown()).optional(), ok: z.boolean().optional(), error: z.string().optional() }).passthrough(),
   'job_kill': z.object({ kind: z.literal('job').optional(), ok: z.boolean().optional(), id: z.string().optional(), status: z.string().optional(), error: z.string().optional() }).passthrough(),
+  'ask_user_question': z.object({ kind: z.literal('ask-user').optional(), ok: z.boolean().optional(), status: z.string().optional(), questions: z.array(z.unknown()).optional(), error: z.string().optional() }).passthrough(),
+  'exit_plan_mode': z.object({ kind: z.literal('plan-review').optional(), ok: z.boolean().optional(), status: z.string().optional(), plan: z.string().optional(), error: z.string().optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),
@@ -704,6 +706,29 @@ async function runEngine(slug, args, opts = {}) {
       const r = killJob(args.id);
       if (!r.ok) return { ok: false, error: r.error };
       return { kind: 'job', id: r.id, status: r.status };
+    }
+
+    case 'ask_user_question': {
+      // B110 — dsh tool-ask-user: park structured questions for the user.
+      const { askQuestions } = await import('./PendingQuestions.js');
+      const conv = opts.spillOwner || 'default';
+      const r = askQuestions(conv, args.questions);
+      if (!r.ok) return { ok: false, error: r.error };
+      try { opts.sendEvent('ask.user', { conv, questions: r.questions }); } catch { /* noop */ }
+      return {
+        kind: 'ask-user', status: 'pending', questions: r.questions,
+        note: 'Questions are awaiting the user. End your turn now — the answers arrive in the next message.',
+      };
+    }
+
+    case 'exit_plan_mode': {
+      // B110 — dsh plan-mode: present the completed plan for review.
+      const { presentPlan } = await import('./PlanMode.js');
+      const conv = opts.spillOwner || 'default';
+      const r = presentPlan(conv, args.plan);
+      if (!r.ok) return { ok: false, error: r.error };
+      try { opts.sendEvent('plan.review', { conv, plan: r.plan }); } catch { /* noop */ }
+      return { kind: 'plan-review', status: 'pending_review', plan: r.plan };
     }
 
     case 'todo': {

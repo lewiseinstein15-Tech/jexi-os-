@@ -51,6 +51,8 @@ import { recentSessionsBlock, exportConversation } from './src/services/SessionC
 import { listMarketplace, marketplaceStats, installSkill, uninstallSkill } from './src/services/SkillMarketplace.js'; // B107 — skills marketplace
 import { maybeAutoTitle, titleUntitledSweep, setStoredTitle } from './src/services/SessionTitles.js'; // B108 — LLM conversation titles
 import { resolveSessionReferences } from './src/services/SessionReference.js'; // B109 — dsh session-reference mentions (@[label](dsh-session:…))
+import { setPlanMode, isPlanMode, planModePromptSection, approvePlan, currentPlan } from './src/services/PlanMode.js'; // B110 — dsh plan-mode (plan → approve → implement)
+import { getPending, takeAnswers, formatAnswers, clearPending, answerPending } from './src/services/PendingQuestions.js'; // B110 — dsh tool-ask-user
 import { runRetention } from './src/services/SpillStore.js'; // B104 — spill retention
 import { knowledgeStatus, loadProjectKnowledge, knowledgeLoad } from './src/services/KnowledgeBase.js'; // B50 P2 — project knowledge
 import { getToolCatalog, TOOL_PROFILES, activeToolProfile, setToolProfile, executeTool } from './src/services/ToolRuntime.js';
@@ -1724,6 +1726,32 @@ app.post('/api/conversations/:id/title', async (req, res) => {
   }
 });
 
+// B110 — pending questions (dsh tool-ask-user): read + answer.
+app.get('/api/questions/:conv', (req, res) => {
+  const conv = String(req.params.conv).slice(0, 80);
+  res.json(getPending(conv) || { questions: [] });
+});
+app.post('/api/questions/answer', (req, res) => {
+  try {
+    const { conv, answers } = req.body || {};
+    const r = answerPending(String(conv || '').slice(0, 80), answers);
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) {
+    res.status(400).json({ ok: false, error: (e && e.message) || String(e) });
+  }
+});
+// B110 — plan-mode: approve a presented plan (frontend APPROVE button).
+app.post('/api/plan/:conv/approve', (req, res) => {
+  const conv = String(req.params.conv).slice(0, 80);
+  try {
+    approvePlan(conv);
+    setPlanMode(conv, false);
+    res.json({ ok: true, approved: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: (e && e.message) || String(e) });
+  }
+});
+
 // B106 — message feedback (dsh message-feedback mirror).
 app.post('/api/feedback', (req, res) => {
   try {
@@ -1882,6 +1910,17 @@ app.post('/api/chat', async (req, res) => {
     const raw = String(query || '').trim();
     // B96 — append the user message to the conversation's durable log.
     try { appendConversationEvent(convId, { role: 'user', text: raw, kind: 'chat' }); } catch (e) {}
+    // B110 — /plan on|off (dsh plan-mode): plan first, present for approval,
+    // implement only after the user approves.
+    if (/^\/plan\b/.test(raw)) {
+      const on = !/\boff\b/.test(raw);
+      setPlanMode(convId, on);
+      sendEvent('log', { agent: 'Planner', message: on ? '📋 Plan mode ON — I will plan first and wait for your approval before executing anything.' : '📋 Plan mode OFF — I will execute tasks directly.' });
+      done({ success: true, query: raw, summary: on ? '### 📋 Plan mode ON\n\nI will now plan first and present the plan for your approval before executing. Say **approve** (or **yes**) to start implementation, or send changes and I will revise.' : '### 📋 Plan mode OFF\n\nI will execute tasks directly again.' });
+      return;
+    }
+    // B110 — pending user answers (from ask_user_question) inject into this turn.
+    const pendingAnswers = formatAnswers(takeAnswers(convId));
     // B109 — SESSION REFERENCES (dsh session-reference): @[label](dsh-session:…)
     // mentions in the query resolve to read-only snapshots injected into the
     // prompt (security-wrapped, bounded to 3 refs / 64 KB).
@@ -2116,6 +2155,10 @@ app.post('/api/chat', async (req, res) => {
     }
 
     let effectiveQuery = effectiveRaw;
+    // B110 — pending answers + plan-mode policy ride the query (plan mode's
+    // plan:policy section, dsh plan-mode mirror).
+    if (pendingAnswers) effectiveQuery = pendingAnswers + effectiveQuery;
+    if (isPlanMode(convId)) effectiveQuery = planModePromptSection(convId) + '\n\n' + effectiveQuery;
     let plan;
     let activeTaskId = null;   // Build 47 — the task this turn belongs to
     let executionQuery = effectiveQuery; // may gain resume context
@@ -2187,6 +2230,16 @@ app.post('/api/chat', async (req, res) => {
         done({ success: resumed.success, query, summary: finalSummary, sources: resumed.sources || [], statistics: resumed.statistics, files: resumed.files || [] });
         return;
       }
+      // B110 — PLAN APPROVAL: a plan presented via exit_plan_mode is approved
+      // here; plan mode turns OFF so the resumed run IMPLEMENTS, not re-plans.
+      try {
+        const cp = currentPlan(convId);
+        if (cp && cp.status === 'pending_review') {
+          approvePlan(convId);
+          setPlanMode(convId, false);
+          sendEvent('log', { agent: 'Planner', message: '✅ Plan approved — starting implementation now.' });
+        }
+      } catch { /* noop */ }
       // Classic offer flow — re-plan the original request and run it.
       sendEvent('log', { agent: 'Planner', message: `✓ Confirmed — resuming your original task: “${original.slice(0, 90)}”` });
       plan = await planner.planConfirmed(original);
@@ -2375,6 +2428,12 @@ app.post('/api/chat', async (req, res) => {
     emitMetric('chat.agents', plan.steps?.length || 0, { intent: plan.intent });
     emitMetric('chat.gate.result', results.success ? 1 : 0, { intent: plan.intent });
 
+    // B110 — if the run parked user questions (ask_user_question), surface
+    // them as cards after the answer so the user can reply.
+    try {
+      const pq = getPending(convId);
+      if (pq) sendEvent('ask.user', { conv: convId, questions: pq.questions });
+    } catch { /* noop */ }
     sendEvent('log', { agent: 'JEXI', message: '🎯 Mission complete — here is the result.' });
     // Contract: a successful done ALWAYS carries a readable summary — the
     // frontend never renders a blank answer (an empty summary previously left

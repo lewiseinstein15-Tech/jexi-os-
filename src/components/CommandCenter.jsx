@@ -136,6 +136,10 @@ export default function CommandCenter({ engine, isDesktop }) {
           isProcessing={engine.isProcessing}
           onSend={engine.runSearch}
           onStop={engine.stopGeneration}
+          questions={engine.questions}
+          onDismissQuestions={engine.setQuestions}
+          planReview={engine.planReview}
+          onDismissPlan={engine.setPlanReview}
         />
       </div>
 

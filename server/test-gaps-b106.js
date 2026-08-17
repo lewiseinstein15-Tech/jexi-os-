@@ -28,7 +28,7 @@ const { executeTool } = await import('./src/services/ToolRuntime.js');
 const { TOOL_COUNT, TOOL_REGISTRY } = await import('./src/services/ToolRegistry.js');
 
 console.log('\n== 1. Registry: the 4 job tools (dsh tool-jobs) ==');
-ok(TOOL_COUNT === 191, `registry count 187 → 191 (${TOOL_COUNT})`);
+ok(TOOL_COUNT === 193, `registry count 187 → 193 (${TOOL_COUNT})`);
 for (const slug of ['run_in_background', 'jobs_collect', 'job_list', 'job_kill']) {
   ok(TOOL_REGISTRY.some((t) => t.slug === slug), `${slug} registered`);
 }

@@ -293,6 +293,8 @@ export const TOOL_REGISTRY = [
   { slug: 'jobs_collect', name: 'Jobs Collect', type: 'Jobs', desc: 'Get the status (and the answer, if finished) of a background job by its id.', agents: ['orchestrator', 'task-manager'], tier: 'read', timeoutMs: 15000 },
   { slug: 'job_list', name: 'Job List', type: 'Jobs', desc: 'List background jobs: running, queued, finished, failed, killed.', agents: ['orchestrator', 'task-manager'], tier: 'read', timeoutMs: 15000 },
   { slug: 'job_kill', name: 'Job Kill', type: 'Jobs', desc: 'Stop a running or queued background job by its id.', agents: ['orchestrator', 'task-manager'], tier: 'write_local', timeoutMs: 15000 },
+  { slug: 'ask_user_question', name: 'Ask User', type: 'Agent', desc: 'Ask the user a concise question when you need confirmation, a choice, or missing information before proceeding. Answers arrive in the next message.', agents: ['orchestrator', 'planner'], tier: 'read', timeoutMs: 15000 },
+  { slug: 'exit_plan_mode', name: 'Exit Plan Mode', type: 'Agent', desc: 'Present the completed plan for user review — implementation begins only after approval (plan mode).', agents: ['planner', 'orchestrator'], tier: 'write_local', timeoutMs: 15000 },
   { slug: 'todo', name: 'Todo List', type: 'Productivity', desc: 'Manage a visible task list: add, list, complete.', agents: ['task-manager', 'planner'], tier: 'write_local' },
   { slug: 'plan', name: 'Plan', type: 'Productivity', desc: 'Create or update an explicit multi-step plan with per-step status.', agents: ['planner', 'orchestrator'], tier: 'write_local' },
 ];
