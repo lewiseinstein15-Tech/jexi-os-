@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Search, Code2, Sigma, Ruler, BarChart3, Workflow, ArrowRight, Loader2, Bot, MessageCircle } from 'lucide-react';
+import { Send, Search, Code2, Sigma, Ruler, BarChart3, Workflow, ArrowRight, Loader2, Bot, MessageCircle, Zap } from 'lucide-react';
 import CapabilityCards from './CapabilityCards';
 
 // Semantic accent quick actions (spec §49) — small icon + name + description,
@@ -24,10 +24,11 @@ function greeting() {
 
 export default function HomeView({ messages, logs, isProcessing, onSend, onOpenCommand }) {
   const [input, setInput] = useState('');
-  // B92 — mode pill on Home (shared with the chat header toggle).
-  const [mode, setModeState] = useState(() => (typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_mode') || 'agent') : 'agent'));
+  // B114 — AUTO is the default: JEXI decides per query whether to answer
+  // directly or run the agent pipeline. Pill cycles AUTO → AGENT → NORMAL.
+  const [mode, setModeState] = useState(() => (typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_mode') || 'auto') : 'auto'));
   const toggleMode = () => {
-    const next = mode === 'agent' ? 'normal' : 'agent';
+    const next = mode === 'auto' ? 'agent' : mode === 'agent' ? 'normal' : 'auto';
     setModeState(next);
     try { localStorage.setItem('jexi_mode', next); } catch { /* noop */ }
   };
@@ -115,10 +116,10 @@ export default function HomeView({ messages, logs, isProcessing, onSend, onOpenC
         <button
           type="button"
           onClick={toggleMode}
-          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[8px] font-black tracking-wider transition-all ${mode === 'agent' ? 'border-brand-line bg-brand-dim/40 text-brand' : 'border-hairline text-text-tertiary'}`}
-          title="Tap to switch — Agent = full multi-agent team · Normal = direct answers"
+          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[8px] font-black tracking-wider transition-all ${mode !== 'normal' ? 'border-brand-line bg-brand-dim/40 text-brand' : 'border-hairline text-text-tertiary'}`}
+          title="AUTO = JEXI decides · AGENT = full team · NORMAL = direct answers"
         >
-          {mode === 'agent' ? <><Bot className="w-2.5 h-2.5" /> AGENT MODE</> : <><MessageCircle className="w-2.5 h-2.5" /> NORMAL MODE</>}
+          {mode === 'auto' ? <><Zap className="w-2.5 h-2.5" /> AUTO</> : mode === 'agent' ? <><Bot className="w-2.5 h-2.5" /> AGENT</> : <><MessageCircle className="w-2.5 h-2.5" /> NORMAL</>}
         </button>
       </div>
 

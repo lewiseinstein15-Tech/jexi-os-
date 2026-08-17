@@ -97,6 +97,7 @@ import { touchSession, listSessions } from './src/services/SessionStore.js'; // 
 import { appendConversationEvent, listConversations as listSessionConversations, loadConversationEvents, forkConversation, deleteConversation, searchConversations } from './src/services/SessionConversations.js'; // B96 — DSH-style append-only conversation logs
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines } from './src/services/JexiIdentity.js'; // canonical identity (name / creator / capabilities)
 import { JEXI_NORMAL_PROMPT, IDENTITY_QUESTION_RE } from './src/services/JexiPrompt.js'; // B103 — normal-mode prompt + deterministic identity-question detection
+import { isDirectIntent } from './src/services/Planner.js'; // B114 — AUTO mode: JEXI decides direct vs agent
 import { DoAnythingAgent } from './src/services/DoAnythingAgent.js'; // B89 — free-form autonomous agent loop
 import { TravelBookingAgent, parseBookingQuery } from './src/services/TravelBookingAgent.js'; // B90 — browser booking flow
 import { aggregateSearch } from './src/services/SearchEngine.js'; // B90 — travel web-search alternatives
@@ -1962,6 +1963,17 @@ app.post('/api/chat', async (req, res) => {
     }
     // B113 — a normal message while plan mode is still on also auto-executes.
     if (!planAutoExecute) planAutoExecute = isPlanMode(convId);
+    // B114 — AUTO MODE: classify; conversational/direct intents get the fast
+    // direct answer, everything else falls through to the agent pipeline.
+    let autoDirect = false;
+    if (mode === 'auto') {
+      try {
+        const dec = await planner.analyzeIntent(raw);
+        autoDirect = !!dec && isDirectIntent(dec.intent) && (dec.confidence || 0) >= 0.6;
+        if (autoDirect) sendEvent('log', { agent: 'JEXI', message: '⚡ Auto mode — this is a conversation question, answering directly (agent pipeline not needed).' });
+        else sendEvent('log', { agent: 'Planner', message: `🛰 Auto mode — routed to the agent pipeline (intent: ${dec ? dec.intent : 'deterministic'}).` });
+      } catch { autoDirect = false; }
+    }
     // B110 — pending user answers (from ask_user_question) inject into this turn.
     const pendingAnswers = formatAnswers(takeAnswers(convId));
     // B109 — SESSION REFERENCES (dsh session-reference): @[label](dsh-session:…)
@@ -2220,10 +2232,12 @@ app.post('/api/chat', async (req, res) => {
     // reaches here is a plain conversation question.
     // B102 — the preset's mode is the default; an explicit header wins.
     const preset = resolvePreset(String(req.headers['x-jexi-preset'] || '').toLowerCase());
-    const mode = String(req.body.mode || req.headers['x-jexi-mode'] || preset.mode || 'agent').toLowerCase();
-    if (mode === 'normal' && !image) {
+    // B114 — AUTO (default): JEXI decides per query whether to answer directly
+    // or run the agent pipeline. 'normal'/'agent' stay as explicit overrides.
+    const mode = String(req.body.mode || req.headers['x-jexi-mode'] || preset.mode || 'auto').toLowerCase();
+    if ((mode === 'normal' || autoDirect) && !image) {
       try { addChat('user', effectiveQuery); } catch (e) {}
-      sendEvent('log', { agent: 'JEXI', message: '💬 Normal mode — answering directly (switch to Agent mode in the header for the full multi-agent team).' });
+      sendEvent('log', { agent: 'JEXI', message: autoDirect ? '💬 Answering directly — no pipeline needed for this one.' : '💬 Normal mode — answering directly.' });
       sendEvent('plan', { intent: 'normal_chat', complexity: 'NORMAL', steps: ['JEXI Core'], roster: ['JEXI Core'], mode: 'normal' });
       let text = '';
       try {

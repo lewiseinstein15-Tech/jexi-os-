@@ -271,16 +271,20 @@ export const useJexiEngine = () => {
       // B92 — mode header (agent | normal) rides every chat request; the
       // server's normal path answers directly without the agent pipeline.
       const headers = { 'Content-Type': 'application/json' };
-      const effMode = mode || (typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_mode') || 'agent') : 'agent');
+      const effMode = mode || (typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_mode') || 'auto') : 'auto');
       // B102 — AGENT PRESET (dsh: standard/ptc/minimal/creator) rides every
       // request; the server uses it as the default and explicit mode/code-mode
       // headers override it.
       const preset = typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_preset') || 'ptc') : 'ptc';
       headers['x-jexi-preset'] = preset;
+      // B114 — AUTO is the default: only force 'normal' explicitly; auto and
+      // agent both ride the server's per-query routing.
       if (effMode === 'normal' || preset === 'minimal') headers['x-jexi-mode'] = 'normal';
-      // B99 — CODE MODE (PTC): on by default in agent mode; off via Settings.
+      else if (effMode === 'agent') headers['x-jexi-mode'] = 'agent';
+      // B99 — CODE MODE (PTC): on whenever the agent pipeline may run (auto
+      // included); off via Settings.
       const codeModeOn = typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_code_mode') || '1') !== '0' : true;
-      if (effMode === 'agent' && codeModeOn && preset !== 'standard') {
+      if (effMode !== 'normal' && codeModeOn && preset !== 'standard') {
         headers['x-jexi-code-mode'] = '1';
       }
       const res = await jexiFetch(`${backendUrl}/api/chat`, {

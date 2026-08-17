@@ -149,6 +149,18 @@ const CLASSIFIER_INTENTS = [
   'legal_task',
 ];
 
+/** B114 — intents that JEXI answers DIRECTLY (no tools/pipeline) in AUTO
+ *  mode: conversational chat, simple facts/definitions, translations, math,
+ *  and creative writing. Everything else routes to the agent pipeline. */
+export const DIRECT_INTENTS = new Set([
+  'conversation', 'direct_answer', 'translate', 'math_solve', 'creative_writing',
+]);
+
+/** Is this intent answerable directly (AUTO-mode routing)? */
+export function isDirectIntent(intent) {
+  return DIRECT_INTENTS.has(String(intent || ''));
+}
+
 export const ClassificationSchema = z.object({
   intent: z.enum(CLASSIFIER_INTENTS),
   confidence: z.number().min(0).max(1),
