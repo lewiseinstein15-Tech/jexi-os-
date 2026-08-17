@@ -113,7 +113,7 @@ check('executeNativeToolCalls reports blocked tools honestly', blockedNative.len
 
 /* ---------------- Registry sanity (used by the loop) ---------------- */
 check('getTool finds web-search', getTool('web-search')?.name === 'Web Search');
-check('registry count is 177', TOOL_COUNT === 177); // +1: mcp-call (P7) +23: round-6 platform tools +1: knowledge-load (B50 P2) +1: connector-call (B56)
+check('registry count is 184', TOOL_COUNT === 184); // B96 +7: session-list/search/fork, subagent, skill-load, todo, plan
 
 console.log(`\n=== RESULT: ${passed} passed, ${failed} failed ===`);
 process.exit(failed ? 1 : 0);
