@@ -40,6 +40,13 @@ const executor = { startGoal: null, resumeWithInfo: null };
 /** @type {{ run: Function, resume: Function }} — chat jobs (B85: durable chat). */
 const chatExecutor = { run: null, resume: null };
 
+/** @type {{ run: Function }} — do-anything jobs (B89: free-form agent loop). */
+const doExecutor = { run: null };
+
+export function setDoExecutor(exec) {
+  if (exec && typeof exec.run === 'function') doExecutor.run = exec.run.bind(exec);
+}
+
 export function setChatExecutor(exec) {
   if (exec) {
     if (typeof exec.run === 'function') chatExecutor.run = exec.run.bind(exec);
@@ -168,6 +175,7 @@ function addEvent(job, event) {
 function publicJob(j) {
   return {
     id: j.id,
+    kind: j.kind || 'goal',
     goal: j.goal,
     session: j.session,
     autonomy: j.autonomy,
@@ -306,6 +314,35 @@ export function enqueueChat({ query, session = 'default' }) {
   return { id };
 }
 
+/** Enqueue a DO-ANYTHING task as a durable background job (B89). */
+export function enqueueDoAnything({ task, session = 'default' }) {
+  const id = `job-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  jobs[id] = {
+    id,
+    kind: 'doanything',
+    goal: String(task || '').trim(),
+    query: String(task || '').trim(),
+    session: String(session || 'default'),
+    autonomy: 'ask',
+    unattended: true,
+    status: 'queued',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    startedAt: null,
+    endedAt: null,
+    events: [],
+    infoRequests: [],
+    autoApprovals: [],
+    result: null,
+    error: null,
+    goalId: null,
+    pendingAnswer: null,
+  };
+  persist();
+  wakeWorker();
+  return { id };
+}
+
 export function getJob(jobId) {
   const j = jobs[jobId];
   return j ? publicJob(j) : null;
@@ -385,7 +422,31 @@ async function runNext() {
 
     try {
       let out;
-      if (next.kind === 'chat') {
+      if (next.kind === 'doanything') {
+        addEvent(next, { type: 'do.started', jobId: next.id, task: next.query });
+        out = await doExecutor.run({
+          task: next.query,
+          session: next.session,
+          sendEvent: (t, d) => addEvent(next, { type: t, ...d }),
+        });
+        if (out && out.success !== undefined) {
+          next.status = out.success === false ? 'failed' : 'done';
+          next.result = out;
+          next.endedAt = Date.now();
+          addEvent(next, {
+            type: 'done', success: out.success !== false,
+            summary: out.summary || (out.success === false ? (out.error || 'Task failed.') : '✅ Task completed.'),
+            files: out.files || [], sources: out.sources || [], statistics: out.statistics || {},
+          });
+          reportTerminal(next);
+        } else {
+          next.status = 'failed';
+          next.error = (out && out.error) || 'do-anything failed';
+          next.endedAt = Date.now();
+          addEvent(next, { type: 'done', success: false, summary: `### ⚠ JEXI OS\n\n${next.error}` });
+          reportTerminal(next);
+        }
+      } else if (next.kind === 'chat') {
         addEvent(next, { type: 'chat.started', jobId: next.id, query: next.query });
         if (next.pendingAnswer) {
           out = await chatExecutor.resume({

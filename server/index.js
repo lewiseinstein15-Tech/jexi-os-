@@ -79,7 +79,8 @@ import { GoalEngine } from './src/services/GoalEngine.js'; // autonomy: goal-lev
 import { rateLimiterStatus } from './src/services/ProviderRateLimiter.js'; // free-tier pacing status
 import { touchSession, listSessions } from './src/services/SessionStore.js'; // session registry (isolation observability)
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines } from './src/services/JexiIdentity.js'; // canonical identity (name / creator / capabilities)
-import { enqueueGoal, enqueueChat, answerJob, getJob as getGoalJob, getJobEvents, subscribe as subscribeJob, listJobs, setGoalExecutor, setChatExecutor, setGoalNotifier, hydrateGoalJobsFromRedis } from './src/services/GoalJobQueue.js'; // Phase 2 — durable background goal jobs (B85 — durable chat)
+import { DoAnythingAgent } from './src/services/DoAnythingAgent.js'; // B89 — free-form autonomous agent loop
+import { enqueueGoal, enqueueChat, enqueueDoAnything, answerJob, getJob as getGoalJob, getJobEvents, subscribe as subscribeJob, listJobs, setGoalExecutor, setChatExecutor, setDoExecutor, setGoalNotifier, hydrateGoalJobsFromRedis } from './src/services/GoalJobQueue.js'; // Phase 2 — durable background goal jobs (B85 — durable chat, B89 — do anything)
 import { notifyGoalComplete, setGoalCallConnector, goalReportStats } from './src/services/GoalNotifier.js'; // Phase 4 — goal completion notifications + email reports
 import { getVapidPublicKey, addSubscription, removeSubscription, broadcastPush, listSubscriptions, hydratePushSubsFromRedis, recordPushDiag, listPushDiag, hydratePushDiagFromRedis } from './src/services/PushManager.js'; // B84 — web push notifications (closed-app delivery)
 import { addFcmToken, removeFcmToken, listFcmTokens, fcmStatus, broadcastFcm, hydrateFcmTokensFromRedis } from './src/services/FcmManager.js'; // B86 — FCM push for the installed APK
@@ -1240,6 +1241,12 @@ setGoalCallConnector(callConnector);
 // B85 — durable chat: long chat tasks run on the same queue as goals, so
 // they survive restarts; confirmations park the job and a reply in chat
 // resumes it (RunState persisted via SessionStore, same as the sync path).
+setDoExecutor({
+  run: async ({ task, session, sendEvent }) => {
+    const agent = new DoAnythingAgent({ generateContent, executeTool });
+    return agent.run({ task, session, sendEvent });
+  },
+});
 setChatExecutor({
   run: async ({ query, session, sendEvent }) => {
     let paused = false;
@@ -1496,6 +1503,38 @@ app.post('/api/chat', async (req, res) => {
     //   2) a parked (need-info) goal in this session is waiting for details —
     //      the next message IS the answer. Both stream live through the job's
     //      event log, so they survive restarts and never mix sessions.
+    // B89 — DO ANYTHING: /do <task> or /anything <task> runs the free-form
+    // agent loop as a durable job (plans, acts, verifies, repairs, reports).
+    const DO_PREFIX_RE = /^(?:\/do|\/anything|do anything[\s:]+|anything[\s:]+)\s+(.+)$/i;
+    const doMatch = image ? null : raw.match(DO_PREFIX_RE);
+    if (doMatch) {
+      const taskText = doMatch[1].trim();
+      const { id: jobId } = enqueueDoAnything({ task: taskText, session: convId });
+      sendEvent('log', { agent: 'Do Anything', message: `🛠 Do Anything started (job ${jobId}) — planning and executing...` });
+      const sub = subscribeJob(jobId, (event) => {
+        if (event.type === 'done') {
+          done({ success: event.success !== false, query: taskText, goalId: event.goalId || jobId, summary: normalizeFinalAnswer(event.summary || '✅ Task completed.'), files: event.files || [], sources: event.sources || [], statistics: event.statistics || {} });
+        } else if (event.type !== 'job.started' && event.type !== 'do.started') {
+          sendEvent(event.type, event);
+        }
+      });
+      if (sub.ok && sub.finished) {
+        const evs = getJobEvents(jobId) || [];
+        const last = [...evs].reverse().find((e) => e.type === 'done');
+        if (last) done({ success: last.success !== false, query: taskText, summary: normalizeFinalAnswer(last.summary || '✅ Task completed.'), files: last.files || [], sources: last.sources || [], statistics: last.statistics || {} });
+        else done({ success: false, query: taskText, summary: '### ⚠ JEXI OS\n\nThe task finished without a result.' });
+        return;
+      }
+      if (sub.ok) {
+        const iv = setInterval(() => {
+          const j = getGoalJob(jobId);
+          if (j && (j.status === 'done' || j.status === 'failed')) { clearInterval(iv); try { sub.unsubscribe(); } catch (e) {} finish(); }
+        }, 1500);
+        req.on('close', () => { clearInterval(iv); try { sub.unsubscribe(); } catch (e) {} });
+      }
+      return;
+    }
+
     const GOAL_PREFIX_RE = /^(?:\/goal|goal:)\s+(.+)$/i;
     const goalMatch = image ? null : raw.match(GOAL_PREFIX_RE);
     if (goalMatch) {
