@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Eye, Loader2, Video, VideoOff, Hand, VolumeX } from 'lucide-react';
 import { getBackendUrl, jexiFetch } from '../utils/helpers';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { CameraPreview } from '@capacitor-community/camera-preview';
 import { isNativePlatform } from '../utils/phoneNotify';
 
 // Must match the installed @mediapipe/tasks-vision version (JS + WASM stay in sync)
@@ -158,6 +159,8 @@ export default function VisionPanel({ open, onClose, onVision }) {
 
   const [camStatus, setCamStatus] = useState('starting'); // starting | on | error
   const [camError, setCamError] = useState('');
+  const [camMode, setCamMode] = useState('video');       // video (getUserMedia) | native (CameraPreview)
+  const previewBoxRef = useRef(null);
   const [photoImage, setPhotoImage] = useState(null);   // native-camera fallback photo
   const [photoBusy, setPhotoBusy] = useState(false);
   const [retryKey, setRetryKey] = useState(0);          // re-run the camera effect
@@ -223,6 +226,37 @@ export default function VisionPanel({ open, onClose, onVision }) {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = null;
     if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+    // B95 — stop the NATIVE preview too (never leak the camera).
+    try { if (isNativePlatform()) CameraPreview.stop(); } catch { /* noop */ }
+  }, []);
+
+  // B95 — NATIVE CAMERA PREVIEW: a real Android camera view (no WebView
+  // getUserMedia dependency). Positioned exactly over the preview box using
+  // its bounding rect, so it lines up pixel-perfect.
+  const startNativePreview = useCallback(async () => {
+    const el = previewBoxRef.current;
+    if (!el) return false;
+    try {
+      const r = el.getBoundingClientRect();
+      await CameraPreview.start({
+        position: 'front',
+        x: Math.max(0, Math.round(r.left)),
+        y: Math.max(0, Math.round(r.top)),
+        width: Math.round(r.width),
+        height: Math.round(r.height),
+        toBack: false,
+        enableZoom: false,
+        paddingBottom: 0,
+      });
+      setCamMode('native');
+      setCamStatus('on');
+      return true;
+    } catch (e) {
+      setCamMode('video');
+      setCamStatus('error');
+      setCamError('Native camera failed (' + String((e && e.message) || e) + '). Use "Take photo".');
+      return false;
+    }
   }, []);
 
   // Camera + on-device engines (face + hands), loaded lazily in parallel
@@ -245,10 +279,12 @@ export default function VisionPanel({ open, onClose, onVision }) {
         }
         setCamStatus('on');
       } catch (e) {
-        if (!cancelled) {
-          setCamStatus('error');
-          setCamError('Camera access denied or unavailable (' + String((e && e.name) || e) + '). Allow camera permission, or use "Take photo".');
-        }
+        if (cancelled) return;
+        // B95 — WebView camera blocked? Use the NATIVE camera preview instead.
+        const usedNative = isNativePlatform() ? await startNativePreview() : false;
+        if (usedNative) return; // native preview is live
+        setCamStatus('error');
+        setCamError('Camera unavailable (' + String((e && e.name) || e) + '). Allow camera permission, retry, or use "Take photo".');
         return;
       }
 
@@ -298,7 +334,16 @@ export default function VisionPanel({ open, onClose, onVision }) {
     };
   }, [open, stopCamera, retryKey]);
 
-  const captureFrame = () => {
+  const captureFrame = async () => {
+    // B95 — native preview: capture straight from the camera view.
+    if (camMode === 'native' && isNativePlatform()) {
+      try {
+        const shot = await CameraPreview.capture({ quality: 70 });
+        const b64 = shot && (shot.value || shot.base64);
+        if (b64) return 'data:image/jpeg;base64,' + b64;
+      } catch (e) { /* fall through to error */ }
+      throw new Error('Could not capture from the native camera.');
+    }
     const video = videoRef.current;
     if (!video || !video.videoWidth) return null;
     const canvas = document.createElement('canvas');
@@ -310,7 +355,7 @@ export default function VisionPanel({ open, onClose, onVision }) {
 
   // Shared helper: send the current frame + event context to JEXI's AI vision
   const captureAndAsk = useCallback(async (prompt) => {
-    const img = captureFrame();
+    const img = await captureFrame();
     if (!img) throw new Error('No camera frame available.');
     const res = await jexiFetch(`${getBackendUrl()}/api/vision`, {
       method: 'POST',
@@ -624,9 +669,13 @@ export default function VisionPanel({ open, onClose, onVision }) {
           <button onClick={onClose} className="text-gray-400 hover:text-white p-1"><X className="w-4 h-4" /></button>
         </div>
 
-        <div className="relative rounded-xl overflow-hidden bg-black border border-[#1a1a1a] aspect-video flex items-center justify-center">
+        <div ref={previewBoxRef} className="relative rounded-xl overflow-hidden bg-black border border-[#1a1a1a] aspect-video flex items-center justify-center">
           {photoImage ? (
             <img src={photoImage} alt="captured" className="w-full h-full object-cover" />
+          ) : camStatus === 'on' && camMode === 'native' ? (
+            <div className="w-full h-full flex items-center justify-center text-[#00FF9D]/80">
+              <span className="text-[10px] font-bold flex items-center gap-1.5"><Camera className="w-4 h-4" /> NATIVE CAMERA LIVE</span>
+            </div>
           ) : camStatus === 'on' ? (
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
           ) : (
@@ -684,6 +733,14 @@ export default function VisionPanel({ open, onClose, onVision }) {
           )}
         </div>
 
+        {camStatus === 'on' && camMode === 'native' && (
+          <div className="flex gap-1.5 mt-2">
+            <button type="button" onClick={askVision} disabled={thinking} className="flex-1 px-3 py-2 rounded-lg bg-[#00FF9D] text-black text-[10px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-50">
+              {thinking ? <Loader2 className="w-3 h-3 animate-spin" /> : '📸'} SNAP & ASK JEXI
+            </button>
+            <button type="button" onClick={() => { try { CameraPreview.flip(); } catch {} }} className="px-3 py-2 rounded-lg border border-[#00d4ff]/40 text-[#00d4ff] text-[10px] font-bold">↔ FLIP</button>
+          </div>
+        )}
         <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoPick} />
         {photoImage && (
           <div className="flex flex-wrap gap-1.5 mt-2">
@@ -734,6 +791,7 @@ export default function VisionPanel({ open, onClose, onVision }) {
           {thinking ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> JEXI is looking…</> : <><Video className="w-3.5 h-3.5" /> 👁 What do you see?</>}
         </button>
 
+        {camMode !== 'native' && (
         <button
           onClick={() => { setContinuous(c => !c); setSceneChanged(false); if (!continuous) { quietUntilRef.current = 0; setQuietLeft(0); } }}
           disabled={camStatus !== 'on'}
@@ -747,6 +805,7 @@ export default function VisionPanel({ open, onClose, onVision }) {
             ? <><span className="w-2 h-2 rounded-full bg-red-400 animate-ping" /> ⏹ Stop live vision</>
             : <><VideoOff className="w-3.5 h-3.5" /> 🔴 Live vision — she narrates when something changes</>}
         </button>
+        )}
         {continuous && continuousNote && (
           <p className="mt-1.5 text-[9px] text-red-300/80 text-center">{continuousNote}</p>
         )}
