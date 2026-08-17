@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Square, ImagePlus, X, Camera, Stethoscope, Hammer, Search, GraduationCap, Link2, Plus } from 'lucide-react';
+import { Send, Square, ImagePlus, X, Camera, Stethoscope, Hammer, Search, GraduationCap, Link2, Plus, Paperclip, FileText, Bot, MessageCircle, Loader2 } from 'lucide-react';
+import { getBackendUrl, jexiFetch } from '../utils/helpers';
 import TypedMessage from './TypedMessage';
 import VisionPanel from './VisionPanel';
 import AgentPipeline from './AgentPipeline';
@@ -39,16 +40,27 @@ function QuickAction({ icon: Icon, label, title, onClick }) {
 // >=40px and the row never squishes.
 const QUICK_ACTIONS = [
   { icon: Camera, label: 'EYES', title: 'Give JEXI eyes — camera vision', action: 'vision' },
-  { icon: ImagePlus, label: 'PHOTO', title: 'Attach an image', action: 'photo' },
+  { icon: ImagePlus, label: 'PHOTO', title: 'Attach a photo (image analysis)', action: 'photo' },
+  { icon: Paperclip, label: 'FILE', title: 'Attach any file (PDF, code, text…)', action: 'file' },
   { icon: Stethoscope, label: 'CHECK', title: 'Run a self-check — JEXI diagnoses her own system', action: 'check' },
 ];
+
+// B92 — MODE TOGGLE: Agent mode (full multi-agent team) vs Normal mode
+// (ChatGPT-style direct answers). Anyone can switch; persisted per device.
+const MODE_STORAGE = 'jexi_mode';
+const getMode = () => (typeof localStorage !== 'undefined' ? (localStorage.getItem(MODE_STORAGE) || 'agent') : 'agent');
+const setMode = (m) => { try { localStorage.setItem(MODE_STORAGE, m); } catch { /* noop */ } };
 
 export default function ChatWindow({ messages, logs, isProcessing, onSend, onStop, onVisionResult }) {
   const [input, setInput] = useState('');
   const [image, setImage] = useState(null);
+  const [mode, setModeState] = useState(getMode());
+  const [fileAttachments, setFileAttachments] = useState([]); // { id, name, kind }
+  const [uploading, setUploading] = useState(false);
   const [visionOpen, setVisionOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
-  const fileRef = useRef(null);
+  const fileRef = useRef(null);   // photo (image/*)
+  const anyFileRef = useRef(null); // any file
   const scrollRef = useRef(null);
   const qaRef = useRef(null);
   const [narrowQA, setNarrowQA] = useState(false);
@@ -75,7 +87,36 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
     setQuickOpen(false);
     if (action === 'vision') setVisionOpen(true);
     else if (action === 'photo') fileRef.current?.click();
+    else if (action === 'file') anyFileRef.current?.click();
     else onSend(SELF_CHECK_QUERY);
+  };
+
+  const toggleMode = () => {
+    const next = mode === 'agent' ? 'normal' : 'agent';
+    setMode(next);
+    setModeState(next);
+  };
+
+  // Upload an arbitrary file → backend → keep { id, name } to send with the message.
+  const handleAnyFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) { alert('File too large (max 25 MB)'); return; }
+    setUploading(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+      const res = await jexiFetch(`${getBackendUrl()}/api/upload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: file.name, data: b64 }),
+      });
+      const d = await res.json();
+      if (d.ok) setFileAttachments((prev) => [...prev, { id: d.id, name: d.name, kind: d.kind }]);
+      else alert(d.error || 'Upload failed');
+    } catch (err) { alert('Upload failed: ' + String(err.message || err)); }
+    setUploading(false);
   };
 
   // Auto-scroll to the newest content: when a new message lands AND while the
@@ -99,18 +140,38 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if ((!input.trim() && !image) || isProcessing) return;
-    onSend(input, image);
+    if ((!input.trim() && !image && !fileAttachments.length) || isProcessing) return;
+    onSend(input, image, fileAttachments.length ? fileAttachments : undefined, mode);
     setInput('');
     setImage(null);
+    setFileAttachments([]);
   };
 
-  const canSend = (input.trim() || image) && !isProcessing;
+  const canSend = (input.trim() || image || fileAttachments.length) && !isProcessing;
 
   return (
     <div className="surface-card p-4 rounded-xl relative z-10 flex flex-col flex-1 min-h-0">
       <div className="flex items-center gap-2 mb-3 flex-shrink-0">
-        <h2 className="text-[10px] font-bold text-brand tracking-wider">JEXI CHAT INTERFACE</h2>
+        <h2 className="text-[10px] font-bold text-brand tracking-wider">JEXI CHAT</h2>
+        {/* B92 — AGENT / NORMAL mode toggle */}
+        <div className="flex items-center rounded-full border border-hairline overflow-hidden ml-1">
+          <button
+            type="button"
+            onClick={() => { setMode('agent'); setModeState('agent'); }}
+            className={`px-2.5 py-1 text-[8px] font-black tracking-wider flex items-center gap-1 transition-all ${mode === 'agent' ? 'bg-brand text-black' : 'text-text-tertiary'}`}
+            title="Agent mode — full multi-agent team, tools, planning"
+          >
+            <Bot className="w-2.5 h-2.5" /> AGENT
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMode('normal'); setModeState('normal'); }}
+            className={`px-2.5 py-1 text-[8px] font-black tracking-wider flex items-center gap-1 transition-all ${mode === 'normal' ? 'bg-brand text-black' : 'text-text-tertiary'}`}
+            title="Normal mode — direct answers like a regular chat"
+          >
+            <MessageCircle className="w-2.5 h-2.5" /> NORMAL
+          </button>
+        </div>
         {isProcessing && (
           <span className="ml-auto flex items-center gap-1.5 text-[8px] text-brand font-bold">
             THINKING
@@ -198,6 +259,20 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
         )}
       </div>
 
+      {/* File attachment chips (B92 — any file) */}
+      {fileAttachments.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2 flex-shrink-0">
+          {fileAttachments.map((a, i) => (
+            <span key={i} className="flex items-center gap-1.5 rounded-full border border-brand-line bg-brand-dim/30 pl-2 pr-1.5 py-1 text-[9px] text-brand">
+              {a.kind === 'image' ? <ImagePlus className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+              <span className="max-w-[140px] truncate">{a.name}</span>
+              <button type="button" onClick={() => setFileAttachments((p) => p.filter((_, j) => j !== i))} className="hover:text-status-error"><X className="w-3 h-3" /></button>
+            </span>
+          ))}
+          {uploading && <span className="flex items-center gap-1 text-[9px] text-text-tertiary"><Loader2 className="w-3 h-3 animate-spin" /> uploading…</span>}
+        </div>
+      )}
+
       {/* Image attachment preview */}
       {image && (
         <div className="relative inline-block mb-2 flex-shrink-0">
@@ -236,6 +311,7 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
           className="hidden"
           onChange={handleFile}
         />
+        <input ref={anyFileRef} type="file" className="hidden" onChange={handleAnyFile} />
         <input
           type="text"
           value={input}

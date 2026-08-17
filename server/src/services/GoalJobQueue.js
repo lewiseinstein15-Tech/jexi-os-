@@ -193,7 +193,7 @@ function publicJob(j) {
 }
 
 /** Enqueue a goal. Returns the job id immediately. */
-export function enqueueGoal({ goal, session = 'default', autonomy = 'ask', unattended = false }) {
+export function enqueueGoal({ goal, session = 'default', autonomy = 'ask', unattended = false, mode = 'agent' }) {
   const id = `job-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   jobs[id] = {
     id,
@@ -201,6 +201,7 @@ export function enqueueGoal({ goal, session = 'default', autonomy = 'ask', unatt
     session: String(session || 'default'),
     autonomy: String(autonomy || 'ask').toLowerCase(),
     unattended: Boolean(unattended), // scheduled/background: never park, always auto-approve
+    mode: mode === 'normal' ? 'normal' : 'agent',
     status: 'queued',
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -499,6 +500,7 @@ async function runNext() {
           session: next.session,
           autonomy: next.autonomy,
           unattended: Boolean(next.unattended),
+          mode: next.mode || 'agent',
           sendEvent: (t, d) => addEvent(next, { type: t, ...d }),
         });
       }

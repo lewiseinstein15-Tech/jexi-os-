@@ -738,6 +738,33 @@ export async function generateWithToolsLoop(prompt, systemInstruction = '', tool
     recordProviderFailure(provider);
     releaseSlot();
   }
+
+  // B92 — PLAIN-TEXT FALLBACK: tool calling failed (rate limits, cooldowns,
+  // provider quirks). For most tasks the tools are an enhancement, not a
+  // requirement — a direct answer is far better than a hard failure. Retry
+  // the walk with NO tools (plain generation) and mark it so callers know.
+  if (opts.fallbackToPlainText !== false) {
+    const fallbackErrors = [];
+    for (const provider of order) {
+      const call = PROVIDER_CALLS[provider];
+      if (!call) continue;
+      const slot = await takeSlot(provider);
+      if (!slot.ok) { fallbackErrors.push(`${provider}: ${slot.reason} (rate limiter)`); continue; }
+      try {
+        const text = await call(prompt, system, null, { ...opts, prefer: opts.prefer }, fallbackErrors);
+        if (text) {
+          recordProviderSuccess(provider);
+          releaseSlot();
+          return { ok: true, provider, model: null, text: String(text).trim(), toolCalls: [], iterations: 1, fallback: 'plain-text' };
+        }
+      } catch (e) {
+        fallbackErrors.push(`${provider}: ${e.message}`);
+      }
+      recordProviderFailure(provider);
+      releaseSlot();
+    }
+  }
+
   throw new Error(`All AI providers failed for tool calling. ${errors.join(' | ') || 'no tool-capable provider configured'}`);
 }
 

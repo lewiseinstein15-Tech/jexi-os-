@@ -93,7 +93,7 @@ export class GoalEngine {
    *   { result: <orchestrator results> }     — completed synchronously
    * (The caller streams `sendEvent` lines during the run.)
    */
-  async startGoal({ goal, session = 'default', autonomy = 'ask', sendEvent = () => {}, providedInfo = null, unattended = false }) {
+  async startGoal({ goal, session = 'default', autonomy = 'ask', sendEvent = () => {}, providedInfo = null, unattended = false, mode = 'agent' }) {
     const level = AUTONOMY_LEVELS.includes(autonomy) ? autonomy : 'ask';
     const emit = (type, data) => { try { sendEvent(type, data); } catch { /* noop */ } };
 
@@ -124,9 +124,27 @@ export class GoalEngine {
       }
     }
 
-    emit('goal.start', { goalId: id, autonomy: level, unattended: record.unattended, goal: record.goal });
+    emit('goal.start', { goalId: id, autonomy: level, unattended: record.unattended, mode, goal: record.goal });
 
     try {
+      // B92 — NORMAL MODE goal: one direct LLM call, no planner/roster/tools.
+      if (mode === 'normal') {
+        emit('goal.plan', { goalId: id, intent: 'normal_chat', complexity: 'NORMAL', steps: ['JEXI Core'], mode: 'normal' });
+        emit('log', { agent: 'JEXI', message: '💬 Normal mode — answering directly.' });
+        let text = '';
+        try {
+          text = await this.generateContent(record.goal, 'You are JEXI OS, a helpful, precise assistant. Answer directly and concisely. If the task needs tools (building, browsing, booking), say you can do it in Agent mode.', null, { prefer: '', temperature: 0.5 });
+        } catch (e) {
+          text = `### ⚠ JEXI OS\n\n${(e && e.message) || 'I could not answer right now.'}`;
+        }
+        const result = { success: true, summary: String(text || '').trim(), statistics: { executionTime: 0, agentsUsed: 0, complexity: 'NORMAL', confidence: 80, mode: 'normal' } };
+        record.result = result;
+        record.status = 'done';
+        record.updatedAt = Date.now();
+        emit('done', { success: true, summary: result.summary, statistics: result.statistics });
+        return { goalId: id, result };
+      }
+
       const plan = await this.planner.analyzeIntent(record.goal, {});
       emit('goal.plan', { goalId: id, intent: plan.intent, complexity: plan.complexity, steps: plan.steps || [] });
 

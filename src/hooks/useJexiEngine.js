@@ -224,7 +224,7 @@ export const useJexiEngine = () => {
     }
   }, []);
 
-  const runSearch = useCallback(async (query, image = null, attachments = undefined) => {
+  const runSearch = useCallback(async (query, image = null, attachments = undefined, mode = null) => {
     // Halt any previous run AND any pending recovery before starting a new one.
     abortRef.current?.abort();
     recoverRef.current?.abort();
@@ -245,9 +245,14 @@ export const useJexiEngine = () => {
     try {
       const backendUrl = getBackendUrl();
       abortRef.current = new AbortController();
+      // B92 — mode header (agent | normal) rides every chat request; the
+      // server's normal path answers directly without the agent pipeline.
+      const headers = { 'Content-Type': 'application/json' };
+      const effMode = mode || (typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_mode') || 'agent') : 'agent');
+      if (effMode === 'normal') headers['x-jexi-mode'] = 'normal';
       const res = await jexiFetch(`${backendUrl}/api/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ query, image: image || undefined, files: attachments || undefined }),
         signal: abortRef.current.signal,
       });
@@ -262,7 +267,7 @@ export const useJexiEngine = () => {
         abortRef.current = new AbortController();
         const retry = await jexiFetch(`${backendUrl}/api/chat`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ query, image: image || undefined, files: attachments || undefined }),
           signal: abortRef.current.signal,
         });

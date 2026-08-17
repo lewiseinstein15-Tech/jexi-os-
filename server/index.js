@@ -12,7 +12,7 @@ import { workerRoster } from './src/services/WorkerRouter.js'; // B69 — expose
 import { normalizeFinalAnswer } from './src/services/Formatting.js'; // B66 — normalize every final answer
 import { generateContent, resolveKeys, testAllProviders } from './src/services/LLMClient.js';
 import { learnFromExchange } from './src/services/PreferenceLearner.js';
-import { rollingConversationSummary } from './src/services/MemoryManager.js';
+import { rollingConversationSummary, getRollingSummary } from './src/services/MemoryManager.js';
 import {
   recordBoot, recordChat, recordVision, recordError,
   collectSystemStatus, readSourceFile,
@@ -1371,10 +1371,10 @@ app.get('/api/goals/:id/stream', (req, res) => {
 // survives restarts. autonomy: 'ask' (pause at confirmations, default) |
 // 'full' (preflight questions once, then run end-to-end).
 app.post('/api/goals', (req, res) => {
-  const { goal, autonomy } = req.body || {};
+  const { goal, autonomy, mode } = req.body || {};
   if (!goal || !String(goal).trim()) return res.status(400).json({ success: false, error: 'No goal provided' });
   const convId = conversationId(req);
-  const { id } = enqueueGoal({ goal: String(goal).trim(), session: convId, autonomy: String(autonomy || 'ask').toLowerCase() });
+  const { id } = enqueueGoal({ goal: String(goal).trim(), session: convId, autonomy: String(autonomy || 'ask').toLowerCase(), mode: String(mode || 'agent').toLowerCase() });
   res.status(202).json({ ok: true, jobId: id, status: 'queued', stream: `/api/goals/${id}/stream` });
 });
 
@@ -1541,6 +1541,13 @@ app.get('/api/chat/result', (req, res) => {
   recordRecoveryEvent({ convId, cause: 'poll', recovered: !!result });
   res.json({ result });
 });
+
+function conversationSummaryContext() {
+  try {
+    const s = getRollingSummary();
+    return s ? `\n\n[Earlier in this conversation: ${String(s).slice(0, 600)}]` : '';
+  } catch { return ''; }
+}
 
 app.post('/api/chat', async (req, res) => {
   const { query, image, files } = req.body;
@@ -1807,6 +1814,31 @@ app.post('/api/chat', async (req, res) => {
     // an ambiguous reference that needs clarification.
     const activeTaskNow = (listTasks('active') || [])[0];
     const currentTaskId = activeTaskNow?.id || null;
+    // B92 — NORMAL MODE (ChatGPT-style): the user picked "Normal" in the app.
+    // Plain questions get ONE direct LLM call — no planner, no roster, no
+    // tools, no graph. Fast, simple, minimal events. Explicit agent commands
+    // (/build, /goal, /do, links, travel) already returned above, so what
+    // reaches here is a plain conversation question.
+    const mode = String(req.body.mode || req.headers['x-jexi-mode'] || 'agent').toLowerCase();
+    if (mode === 'normal' && !image) {
+      try { addChat('user', effectiveQuery); } catch (e) {}
+      sendEvent('log', { agent: 'JEXI', message: '💬 Normal mode — answering directly (switch to Agent mode in the header for the full multi-agent team).' });
+      sendEvent('plan', { intent: 'normal_chat', complexity: 'NORMAL', steps: ['JEXI Core'], roster: ['JEXI Core'], mode: 'normal' });
+      let text = '';
+      try {
+        text = await generateContent(
+          `${effectiveQuery}\n\n${conversationSummaryContext()}`,
+          'You are JEXI OS, a helpful, precise assistant. Answer directly and concisely. If the user asks for something that needs tools (building apps, browsing, research with sources), briefly say you can do it in Agent mode.',
+          null,
+          { prefer: '', temperature: 0.5 }
+        );
+      } catch (e) {
+        text = `### ⚠ JEXI OS\n\n${(e && e.message) || 'I could not answer right now.'}`;
+      }
+      done({ success: true, query: raw, summary: normalizeFinalAnswer(text || '...'), statistics: { executionTime: 0, agentsUsed: 0, complexity: 'NORMAL', confidence: 80 } });
+      return;
+    }
+
     const analysis = image
       ? { classification: currentTaskId ? 'continue' : 'new', taskId: currentTaskId, confidence: 0.8, reason: 'image attaches to current context' }
       : await analyzeMessage(raw, { currentTaskId, image });

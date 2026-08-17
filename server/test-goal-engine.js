@@ -183,5 +183,24 @@ console.log('\n== Attended full autonomy still parks ==');
   ok(out.needInfo && out.needInfo.length === 1, 'attended full autonomy still asks preflight questions');
 }
 
+
+console.log('\n== Normal mode goal = direct answer, no planner ==');
+{
+  let planned = 0;
+  const planner = {
+    async analyzeIntent() { planned += 1; return { intent: 'x', steps: [] }; },
+  };
+  const gen = async () => '### 💬 Direct answer: 42.';
+  const orch = { async executePlan() { return { success: true, summary: 'should not run' }; } };
+  const engine = new GoalEngine({ planner, orchestrator: orch, generateContent: gen, store: null });
+  const events = [];
+  const out = await engine.startGoal({ goal: 'what is 2+2', mode: 'normal', sendEvent: (t) => events.push(t) });
+  ok(out.result && out.result.success === true, 'normal goal completes');
+  ok(/Direct answer/.test(out.result.summary), 'uses the direct LLM answer');
+  ok(planned === 0, 'planner never invoked in normal mode');
+  ok(events.includes('goal.plan') && events.includes('done'), 'minimal events streamed');
+  ok(out.result.statistics.mode === 'normal' && out.result.statistics.complexity === 'NORMAL', 'statistics mark normal mode');
+}
+
 console.log(`\nRESULT: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
