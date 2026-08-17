@@ -2732,12 +2732,21 @@ app.delete('/api/schedules/:id', (req, res) => {
 
 // Health endpoint used by the load balancer's active probes (and the keep-alive
 // cron) — must be fast, never cached, and identify the exact instance.
+// B120 — build stamp: /api/health exposes which commit the live instance is
+// running, so a stale Render deploy is instantly detectable (the freeze the
+// user hit was a live instance running pre-B116 code).
+let BUILD_STAMP = null;
+try {
+  BUILD_STAMP = JSON.parse(fs.readFileSync(path.join(SERVER_ROOT, 'build-stamp.json'), 'utf-8'));
+} catch { /* noop */ }
+
 app.get('/api/health', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json({
     ok: true,
     name: 'JEXI OS Brain',
     version: '1.0.0',
+    build: BUILD_STAMP,
     instanceId: INSTANCE_ID,
     uptime: Math.round(process.uptime()),
     redis: isRedisActive(),

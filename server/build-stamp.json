@@ -1,0 +1,6 @@
+{
+  "commit": "5c768d3",
+  "phase": "B119",
+  "builtAt": "2026-08-17T21:05:00Z",
+  "note": "Bump this file on every push so /api/health exposes whether Render deployed the latest code."
+}
