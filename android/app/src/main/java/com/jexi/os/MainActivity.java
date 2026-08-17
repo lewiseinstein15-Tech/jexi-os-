@@ -5,8 +5,6 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
-import android.webkit.PermissionRequest;
-import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 
 import androidx.core.app.ActivityCompat;
@@ -16,8 +14,10 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 
-    /** Known Android WebView bug: after backgrounding, the drawing surface can
-     *  stay black. Re-attaching the WebView forces a fresh frame. */
+    /**
+     * Known Android WebView bug: after backgrounding, the drawing surface can
+     * stay black. Re-attaching the WebView forces a fresh frame.
+     */
     private void refreshWebViewSurface() {
         getBridge().getWebView().postDelayed(() -> {
             WebView wv = getBridge().getWebView();
@@ -29,23 +29,19 @@ public class MainActivity extends BridgeActivity {
     }
 
     /**
-     * B93 — VISION FIX. The WebView silently denies navigator.mediaDevices
-     * .getUserMedia() unless onPermissionRequest is granted. The grant lives
-     * in the WebChromeClient below (installed in onCreate) — this class-level
-     * helper is reused by that client.
+     * B94 — VISION/CAMERA FIX (correct approach).
+     *
+     * Capacitor's own BridgeWebChromeClient ALREADY implements
+     * onPermissionRequest: when the WebView asks for VIDEO_CAPTURE /
+     * AUDIO_CAPTURE it requests the runtime CAMERA / RECORD_AUDIO
+     * permissions via its ActivityResult launcher and then grants the
+     * WebView request. We must NOT replace that client (a bare
+     * WebChromeClient granted without the runtime permission, which is why
+     * camera still failed). We only:
+     *   1. proactively request CAMERA + RECORD_AUDIO at launch so the OS
+     *      dialog appears immediately and getUserMedia succeeds first try,
+     *   2. keep the black-screen fix.
      */
-    private void grantWebViewPermission(PermissionRequest request) {
-        runOnUiThread(() -> {
-            try {
-                request.grant(request.getResources());
-            } catch (Exception e) {
-                request.deny();
-            }
-        });
-    }
-
-    /** Ask for camera + mic at launch so the system dialog shows early and
-     *  getUserMedia works the first time JEXI opens her eyes. */
     private void ensureRuntimePermissions() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
         String[] needed = new String[]{
@@ -68,15 +64,6 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         ensureRuntimePermissions();
-        WebView wv = getBridge().getWebView();
-        if (wv != null) {
-            wv.setWebChromeClient(new WebChromeClient() {
-                @Override
-                public void onPermissionRequest(PermissionRequest request) {
-                    grantWebViewPermission(request);
-                }
-            });
-        }
     }
 
     @Override

@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Eye, Loader2, Video, VideoOff, Hand, VolumeX } from 'lucide-react';
 import { getBackendUrl, jexiFetch } from '../utils/helpers';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { isNativePlatform } from '../utils/phoneNotify';
 
 // Must match the installed @mediapipe/tasks-vision version (JS + WASM stay in sync)
 const WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm';
@@ -156,6 +158,10 @@ export default function VisionPanel({ open, onClose, onVision }) {
 
   const [camStatus, setCamStatus] = useState('starting'); // starting | on | error
   const [camError, setCamError] = useState('');
+  const [photoImage, setPhotoImage] = useState(null);   // native-camera fallback photo
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);          // re-run the camera effect
+  const photoInputRef = useRef(null);
   const [mpStatus, setMpStatus] = useState('loading'); // loading | ready | error
   const [handStatus, setHandStatus] = useState('idle'); // idle | loading | ready | error
   const [expressions, setExpressions] = useState(null);
@@ -239,7 +245,10 @@ export default function VisionPanel({ open, onClose, onVision }) {
         }
         setCamStatus('on');
       } catch (e) {
-        if (!cancelled) { setCamStatus('error'); setCamError('Camera access denied or unavailable. Allow camera permission so JEXI can see you.'); }
+        if (!cancelled) {
+          setCamStatus('error');
+          setCamError('Camera access denied or unavailable (' + String((e && e.name) || e) + '). Allow camera permission, or use "Take photo".');
+        }
         return;
       }
 
@@ -287,7 +296,7 @@ export default function VisionPanel({ open, onClose, onVision }) {
       landmarkerRef.current = null;
       gestureRef.current = null;
     };
-  }, [open, stopCamera]);
+  }, [open, stopCamera, retryKey]);
 
   const captureFrame = () => {
     const video = videoRef.current;
@@ -312,6 +321,55 @@ export default function VisionPanel({ open, onClose, onVision }) {
     if (!data.success) throw new Error(data.error);
     return data.text;
   }, []);
+
+  // B94 — NATIVE-CAMERA FALLBACK: when getUserMedia is blocked, take a photo
+  // with the phone's real camera app (or a file picker on web) and send it
+  // to JEXI's vision — the camera ALWAYS works.
+  const takePhoto = async () => {
+    setPhotoBusy(true);
+    setVisionError('');
+    try {
+      if (isNativePlatform()) {
+        const photo = await Camera.getPhoto({ resultType: CameraResultType.DataUrl, source: CameraSource.Camera, quality: 70, width: 1280 });
+        setPhotoImage(photo.dataUrl || null);
+      } else {
+        photoInputRef.current?.click(); // web: file picker
+      }
+    } catch (e) {
+      setVisionError('Could not open the camera: ' + String((e && e.message) || e));
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
+  const handlePhotoPick = (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setPhotoImage(reader.result);
+    reader.readAsDataURL(file);
+  };
+
+  const analyzePhoto = async (prompt) => {
+    if (!photoImage) return;
+    setVisionError('');
+    setBusy(true);
+    try {
+      const res = await jexiFetch(`${getBackendUrl()}/api/vision`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: photoImage, prompt: prompt || 'Describe what you see in this photo.' }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      setVisionResult(data.text);
+    } catch (e) {
+      setVisionError('Vision failed: ' + String((e && e.message) || e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const creatorPrompt = (short, context) => (short
     ? 'You are looking at your creator, Lewis Einstein (an AI & ML Engineer), through my camera. Briefly narrate right now what you see: how I look today, my expression, my surroundings. 1-2 sentences.'
@@ -363,7 +421,20 @@ export default function VisionPanel({ open, onClose, onVision }) {
     setThinking(true);
     setVisionError('');
     try {
-      const text = await captureAndAsk(matched ? creatorPrompt(false) : strangerPrompt(false));
+      // B94 — if live camera is unavailable but a photo was taken, analyze it.
+      let text;
+      if (camStatus !== 'on' && photoImage) {
+        const res = await jexiFetch(`${getBackendUrl()}/api/vision`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: photoImage, prompt: strangerPrompt(false) }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+        text = data.text;
+      } else {
+        text = await captureAndAsk(matched ? creatorPrompt(false) : strangerPrompt(false));
+      }
       setVisionText(text);
       onVision(text);
     } catch (e) {
@@ -554,13 +625,25 @@ export default function VisionPanel({ open, onClose, onVision }) {
         </div>
 
         <div className="relative rounded-xl overflow-hidden bg-black border border-[#1a1a1a] aspect-video flex items-center justify-center">
-          {camStatus === 'on' ? (
+          {photoImage ? (
+            <img src={photoImage} alt="captured" className="w-full h-full object-cover" />
+          ) : camStatus === 'on' ? (
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
           ) : (
-            <div className="text-center px-4">
-              {camStatus === 'starting'
-                ? <div className="flex items-center justify-center gap-2 text-gray-400 text-[10px]"><Loader2 className="w-4 h-4 animate-spin" /> Starting camera…</div>
-                : <div className="text-red-400 text-[10px]">{camError}</div>}
+            <div className="text-center px-4 py-6">
+              {camStatus === 'starting' ? (
+                <div className="flex items-center justify-center gap-2 text-gray-400 text-[10px]"><Loader2 className="w-4 h-4 animate-spin" /> Starting camera…</div>
+              ) : (
+                <>
+                  <div className="text-red-400 text-[10px] mb-2">{camError}</div>
+                  <div className="flex gap-2 justify-center">
+                    <button type="button" onClick={() => setRetryKey((k) => k + 1)} className="px-3 py-1.5 rounded-lg border border-[#00FF9D]/40 text-[#00FF9D] text-[9px] font-bold hover:bg-[#00FF9D]/10">↻ RETRY CAMERA</button>
+                    <button type="button" onClick={takePhoto} disabled={photoBusy} className="px-3 py-1.5 rounded-lg bg-[#00FF9D] text-black text-[9px] font-bold disabled:opacity-50 flex items-center gap-1">
+                      {photoBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : '📷'} TAKE PHOTO
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
           {camStatus === 'on' && mpStatus === 'ready' && (
@@ -601,6 +684,13 @@ export default function VisionPanel({ open, onClose, onVision }) {
           )}
         </div>
 
+        <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoPick} />
+        {photoImage && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            <button type="button" onClick={() => analyzePhoto('Describe what you see in this photo.')} disabled={busy} className="px-3 py-1.5 rounded-lg bg-[#00FF9D] text-black text-[9px] font-bold disabled:opacity-50">🔍 ASK JEXI ABOUT THIS PHOTO</button>
+            <button type="button" onClick={() => { setPhotoImage(null); setRetryKey((k) => k + 1); }} className="px-3 py-1.5 rounded-lg border border-gray-500/40 text-gray-300 text-[9px] font-bold">✕ Use live camera</button>
+          </div>
+        )}
         <div className="flex flex-wrap gap-1.5 mt-2 min-h-[24px]">
           {mpStatus === 'loading' && <span className="text-[9px] text-gray-500 animate-pulse">Loading face engine…</span>}
           {mpStatus === 'ready' && chips.length === 0 && !enrolled && !lastGesture && <span className="text-[9px] text-gray-500">Look at the camera 👋</span>}
@@ -638,7 +728,7 @@ export default function VisionPanel({ open, onClose, onVision }) {
 
         <button
           onClick={askVision}
-          disabled={thinking || camStatus !== 'on' || continuous}
+          disabled={thinking || (camStatus !== 'on' && !photoImage) || continuous}
           className="mt-3 w-full bg-[#00FF9D] text-black rounded-xl py-2.5 text-[11px] font-bold flex items-center justify-center gap-2 disabled:opacity-40 hover:bg-[#00e68a] transition-colors"
         >
           {thinking ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> JEXI is looking…</> : <><Video className="w-3.5 h-3.5" /> 👁 What do you see?</>}
