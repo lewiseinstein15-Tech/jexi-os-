@@ -128,7 +128,28 @@ setPlanMode('gate-conv', false);
 const g4 = await executeTool({ slug: 'code-run', args: { command: 'echo ok' }, spillOwner: 'gate-conv', profile: 'full' });
 ok(g4.ok === true, 'after approval (mode off), execution works again (full profile satisfies the separate permission gate)');
 
-console.log('\n== 8. APPROVAL RESUMES THE ORIGINAL TASK (B112) ==');
+console.log('\n== 8. PLAN-AND-EXECUTE semantics (B113) ==');
+ok(PLAN_POLICY_SECTION.includes('then EXECUTE') || PLAN_POLICY_SECTION.includes('execute'), 'policy says plan THEN execute');
+ok(PLAN_POLICY_SECTION.includes('AUTOMATICALLY') || PLAN_POLICY_SECTION.includes('automatically'), 'policy says execution continues automatically');
+ok(/do not ask the user|ask_user_question is disabled/i.test(PLAN_POLICY_SECTION), 'policy forbids questions in plan mode');
+setPlanMode('gate-conv', true); // re-enable for the B113 checks
+ok(planModeBlocked('ask_user_question', {}, 'gate-conv') === true, 'ask_user_question is BLOCKED in plan mode (no questions)');
+ok(planModeBlocked('exit_plan_mode', {}, 'gate-conv') === false, 'exit_plan_mode stays usable');
+// The full plan-and-execute contract: present → approve → gate released.
+presentPlan('auto-conv', '# Ship it\n\n1. Build\n2. Preview');
+ok(currentPlan('auto-conv').status === 'pending_review', 'plan presented');
+approvePlan('auto-conv');
+setPlanMode('auto-conv', false);
+ok(currentPlan('auto-conv').status === 'approved', 'auto-approval applied');
+ok(planModeBlocked('code-run', {}, 'auto-conv') === false, 'gate released → execution runs automatically');
+const msg = await (async () => {
+  const { executeTool } = await import('./src/services/ToolRuntime.js');
+  const r = await executeTool({ slug: 'ask_user_question', args: { questions: [{ id: 'x', question: 'Proceed?' }] }, spillOwner: 'gate-conv' });
+  return r.error || '';
+})();
+ok(/do not ask the user/.test(msg), 'gate tells the model to proceed without asking');
+
+console.log('\n== 9. APPROVAL RESUMES THE ORIGINAL TASK (B112, kept for typed approve) ==');
 const { APPROVE_PLAN_RE } = await import('./src/services/PlanMode.js');
 const { buildNativeSchemas, TOOL_SCHEMAS } = await import('./src/services/ToolRuntime.js');
 for (const q of ['approve', 'approved', 'approve the plan', 'yes approve', 'start', 'implement', 'proceed with the plan', 'build it now', 'Approve']) {

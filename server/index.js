@@ -1428,7 +1428,7 @@ setChatExecutor({
         saveRun(session, { plan, query, state: pausedState });
       },
     };
-    const results = plan.complexity === 'SIMPLE'
+    let results = plan.complexity === 'SIMPLE'
       ? await runSimpleTask(plan, query, sendEvent, opts)
       : await orchestrator.executePlan(plan, query, sendEvent, opts);
     return paused ? { ...results, paused: true } : results;
@@ -1865,8 +1865,15 @@ app.post('/api/chat', async (req, res) => {
   // recoverable after a stream drop, regardless of which call site emits it.
   // Interim markers (recoverable: true, e.g. the 15-min deadline notice) are
   // NOT persisted — the store only ever holds a REAL outcome.
+  // B113 — /plan = PLAN-AND-EXECUTE: no approval pause, no question cards.
+  // While true, plan.review events become plain update logs instead of a card.
+  let planAutoExecute = false;
   const sendEvent = (type, data) => {
     if (type === 'done' && data && !data.recoverable) { try { saveResult(convId, data); } catch (e) {} }
+    if (type === 'plan.review' && planAutoExecute) {
+      type = 'log';
+      data = { agent: 'Planner', message: '📋 Plan ready — executing now.' };
+    }
     try { res.write(JSON.stringify({ type, ...data }) + '\n'); } catch (e) {}
   };
 
@@ -1925,18 +1932,36 @@ app.post('/api/chat', async (req, res) => {
   }, CHAT_DEADLINE_MS);
 
   try {
-    const raw = String(query || '').trim();
+    let raw = String(query || '').trim();
     // B96 — append the user message to the conversation's durable log.
     try { appendConversationEvent(convId, { role: 'user', text: raw, kind: 'chat' }); } catch (e) {}
-    // B110 — /plan on|off (dsh plan-mode): plan first, present for approval,
-    // implement only after the user approves.
+    // B113 — /plan = PLAN-AND-EXECUTE: plan first, then do the work
+    // AUTOMATICALLY. No approval pause, no question cards, no "should I
+    // continue" — updates stream as she works.
     if (/^\/plan\b/.test(raw)) {
-      const on = !/\boff\b/.test(raw);
-      setPlanMode(convId, on);
-      sendEvent('log', { agent: 'Planner', message: on ? '📋 Plan mode ON — I will plan first and wait for your approval before executing anything.' : '📋 Plan mode OFF — I will execute tasks directly.' });
-      done({ success: true, query: raw, summary: on ? '### 📋 Plan mode ON\n\nI will plan first and present the plan for your approval before executing — execution tools are disabled until then. Say **approve** (or **yes**) to start implementation; the preview link arrives with the implementation, not before.' : '### 📋 Plan mode OFF\n\nI will execute tasks directly again.' });
-      return;
+      const rest = raw.replace(/^\/plan\b/, '').trim();
+      if (/^off\b/i.test(rest)) {
+        setPlanMode(convId, false);
+        sendEvent('log', { agent: 'Planner', message: '📋 Plan mode OFF — executing tasks directly.' });
+        done({ success: true, query: raw, summary: '### 📋 Plan mode OFF\n\nI will execute tasks directly again.' });
+        return;
+      }
+      // ON (bare, "on", or "/plan <task>") → plan then execute automatically.
+      setPlanMode(convId, true);
+      planAutoExecute = true;
+      const task = rest.replace(/^on\b/i, '').trim();
+      if (task) {
+        raw = task; // the real task flows through the whole pipeline
+        try { appendConversationEvent(convId, { role: 'user', text: raw, kind: 'chat' }); } catch (e) {}
+        sendEvent('log', { agent: 'Planner', message: `📋 /plan — planning first, then executing automatically: “${String(raw).slice(0, 80)}”` });
+      } else {
+        sendEvent('log', { agent: 'Planner', message: '📋 Plan mode ON — I will plan first, then execute automatically and stream updates. No approval needed.' });
+        done({ success: true, query: raw, summary: '### 📋 Plan mode ON\n\nI will plan first and then execute immediately — no approval needed. Updates stream here as I work.' });
+        return;
+      }
     }
+    // B113 — a normal message while plan mode is still on also auto-executes.
+    if (!planAutoExecute) planAutoExecute = isPlanMode(convId);
     // B110 — pending user answers (from ask_user_question) inject into this turn.
     const pendingAnswers = formatAnswers(takeAnswers(convId));
     // B109 — SESSION REFERENCES (dsh session-reference): @[label](dsh-session:…)
@@ -2435,7 +2460,7 @@ app.post('/api/chat', async (req, res) => {
     const codeModeHeader = String(req.headers['x-jexi-code-mode'] || req.body.codeMode || (preset.codeMode ? '1' : '0')).toLowerCase();
     const codeMode = codeModeHeader !== '0' && codeModeHeader !== 'off' && codeModeHeader !== 'false';
     const presetFlavor = mode === 'normal' ? '' : preset.flavor;
-    const results = plan.complexity === 'SIMPLE'
+    let results = plan.complexity === 'SIMPLE'
       ? await runSimpleTask(plan, (executionQuery || effectiveQuery) + sessionRefInjected, sendEvent, { image, codeMode, convId, presetFlavor })
       : await orchestrator.executePlan(plan, (executionQuery || effectiveQuery) + sessionRefInjected, sendEvent, {
           image,
@@ -2482,6 +2507,32 @@ app.post('/api/chat', async (req, res) => {
       const cp = currentPlan(convId);
       if (cp && cp.status === 'pending_review') saveOffer(convId, raw);
     } catch { /* noop */ }
+    // B113 — PLAN-AND-EXECUTE: after the planning turn, auto-approve and run
+    // the ORIGINAL task immediately. The user never approves or answers —
+    // they just see the plan, then the execution updates.
+    if (planAutoExecute) {
+      try {
+        const cp = currentPlan(convId);
+        if (cp && cp.status === 'pending_review') {
+          approvePlan(convId);
+          setPlanMode(convId, false);
+          const original = (loadOffer(convId) || {}).query || lastUserChatText(convId) || (executionQuery || effectiveQuery);
+          sendEvent('log', { agent: 'Planner', message: `📋 Plan ready — executing now: “${String(original).slice(0, 90)}”` });
+          const p2 = await planner.planConfirmed(original);
+          results = p2.complexity === 'SIMPLE'
+            ? await runSimpleTask(p2, original, sendEvent, { image, codeMode, convId, presetFlavor })
+            : await orchestrator.executePlan(p2, original, sendEvent, {
+                image,
+                taskId: activeTaskId || null,
+                isContinuation: true,
+                onPause: async (pausedState) => { saveRun(convId, { plan: p2, query: original, state: pausedState }); saveOffer(convId, original); },
+              });
+          sendEvent('log', { agent: 'JEXI', message: '🎯 Implementation complete — here is the result.' });
+        }
+      } catch (e) {
+        results = { success: false, error: String((e && e.message) || e), summary: `Implementation failed after planning: ${(e && e.message) || e}` };
+      }
+    }
     sendEvent('log', { agent: 'JEXI', message: '🎯 Mission complete — here is the result.' });
     // Contract: a successful done ALWAYS carries a readable summary — the
     // frontend never renders a blank answer (an empty summary previously left

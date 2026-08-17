@@ -13,20 +13,20 @@ import { loadConversationEvents, appendConversationEvent } from './SessionConver
 import { planSet, planGet } from './PlanStore.js';
 
 /** DSH deployment-owned plan guidance (plan:policy section). */
-export const PLAN_POLICY_SECTION = `## PLAN MODE (active)
+export const PLAN_POLICY_SECTION = `## PLAN MODE (active — plan then execute automatically)
 
-You are in PLAN MODE. Your job right now is to THINK and PLAN, not to execute:
-- Analyze the request, break it into steps, decide the tools/agents each step needs.
-- Execution tools are HARD-DISABLED while plan mode is active — calls to them are
-  refused by the runtime, so never rely on them.
-- NEVER promise runtime artifacts while in plan mode: no preview links, no deployed
-  apps, no generated files, no screenshots. Those exist only AFTER approval, during
-  implementation. You may say: "After you approve, I will build it and provide a live
-  preview link."
+You are in PLAN MODE: plan first, then EXECUTE — all in this same flow, with no
+pauses and no questions:
+- Analyze the request and break it into steps with the tools/agents each step needs.
+- Execution tools are disabled ONLY while you are still planning — the runtime
+  refuses them, so plan without them.
 - When your plan is complete, call exit_plan_mode with the full plan as markdown
-  (title, steps with owner tool/agent, verification per step, open questions).
-- Implementation begins ONLY after the user approves the plan. If the user sends
-  changes or rejects, incorporate the feedback and present a revised plan.
+  (title, steps with owner tool/agent, verification per step). The plan is for the
+  USER'S visibility — execution then continues AUTOMATICALLY. Do not wait for
+  approval, do not ask the user anything (ask_user_question is disabled), and do
+  not end with an offer to continue.
+- NEVER promise runtime artifacts inside the plan (preview links, deployed apps,
+  generated files, screenshots) — say "will be provided with the implementation".
 - Do not paste the plan as a plain reply — exit_plan_mode is the only way to present it.`;
 
 /** Fold plan mode from the conversation log (DSH: plan/mode last one wins). */
@@ -81,6 +81,7 @@ export const PLAN_MODE_EXTRA_BLOCKED = new Set([
   'lint-check', 'security-scan', 'run_in_background', 'link-open',
   'browser-drive', 'tab-manage', 'form-fill', 'universal-link', 'github-cli',
   'deploy', 'email-send', 'scheduler-create', 'computer-use',
+  'ask_user_question', // B113 — plan mode never stops to ask; it executes.
 ]);
 
 /**
@@ -135,7 +136,7 @@ export function presentPlan(convId, planMarkdown) {
     kind: 'plan-review',
     status: 'pending_review',
     plan: md.slice(0, 12000),
-    note: 'Plan presented for review. Implementation starts only after the user approves — the preview link arrives with the implementation, not before.',
+    note: 'Plan presented for visibility. Execution continues automatically — the preview link arrives with the implementation.',
   };
 }
 

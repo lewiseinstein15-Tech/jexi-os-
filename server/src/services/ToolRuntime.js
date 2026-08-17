@@ -856,9 +856,12 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
   if (spillOwner) {
     try {
       if (planModeBlocked(slug, args, spillOwner)) {
+        const msg = slug === 'ask_user_question'
+          ? 'Plan mode: do not ask the user — plan and execute automatically.'
+          : 'Plan mode is active — execution tools are disabled while planning; execution follows automatically after exit_plan_mode.';
         const blocked = {
           ok: false, blocked: true, planMode: true, tool: slug,
-          error: `Plan mode is active — execution tools are disabled until you approve the plan. Present the plan with exit_plan_mode (or the user can say "approve").`,
+          error: msg,
           durationMs: Date.now() - started,
         };
         emit('tool.refused', { tool: slug, reason: 'plan-mode', message: blocked.error });
