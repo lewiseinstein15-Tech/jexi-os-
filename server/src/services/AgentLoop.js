@@ -103,8 +103,9 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   const pluginTools = (() => { try { return listPluginTools(); } catch { return []; } })()
     .filter((p) => p && p.slug && !toolDefs.some((t) => t.slug === p.slug));
   if (pluginTools.length) toolDefs.push(...pluginTools.slice(0, 8));
-  // B110 — the model can always ask the user or present a plan.
-  for (const slug of ['ask_user_question', 'exit_plan_mode']) {
+  // B110/B115 — the model can always ask the user, present a plan, run a
+  // workflow, or control background subagents.
+  for (const slug of ['ask_user_question', 'exit_plan_mode', 'workflow', 'send_message', 'interrupt_agent']) {
     if (!toolDefs.some((t) => t.slug === slug)) {
       const def = getTool(slug);
       if (def) toolDefs.push(def);

@@ -104,6 +104,39 @@ export function killJob(id) {
   return { ok: true, id: j.id, status: 'killed' };
 }
 
+/** B115 — dsh tool-subagent-control: deliver a message to a background job
+ *  (the JEXI analog of a background subagent). It becomes the job's next
+ *  turn: while the job is running, the message waits parked on the record;
+ *  a queued job gets its task extended. Returns a messageId (DSH send_message
+ *  contract). */
+export function sendMessageToJob(id, message) {
+  const j = jobs.get(String(id || ''));
+  if (!j) return { ok: false, error: 'subagent not found' };
+  const msg = String(message || '').slice(0, 2000);
+  if (!msg.trim()) return { ok: false, error: 'message cannot be empty' };
+  const messageId = `msg-${Date.now().toString(36)}-${(nextId++).toString(36)}`;
+  j.messages = j.messages || [];
+  j.messages.push({ messageId, text: msg, at: Date.now() });
+  if (j.status === 'queued') {
+    // Extend the queued task with the new instruction.
+    j.task = `${j.task}\n\n(additional instruction: ${msg.slice(0, 800)})`.slice(0, 4000);
+  }
+  return { ok: true, messageId, status: j.status, note: j.status === 'running' ? 'message parked — delivered when the current turn finishes' : j.status === 'finished' ? 'job already finished — message stored on the record' : 'queued with the additional instruction' };
+}
+
+/** B115 — dsh interrupt_agent: request cancellation of the current turn. */
+export function interruptJob(id) {
+  const j = jobs.get(String(id || ''));
+  if (!j) return { ok: false, error: 'agent not found' };
+  if (j.status === 'running' || j.status === 'queued') {
+    try { j._controller && j._controller.abort(); } catch { /* noop */ }
+    j.status = 'interrupted';
+    j.finishedAt = Date.now();
+    return { ok: true, accepted: true, status: 'interrupted' };
+  }
+  return { ok: true, accepted: true, status: j.status, note: 'agent already finished — accepted no-op' };
+}
+
 /** Job counts for diagnostics. */
 export function jobStats() {
   const by = {};
@@ -123,5 +156,6 @@ function publicJob(j) {
     startedAt: j.startedAt,
     finishedAt: j.finishedAt,
     durationMs: j.startedAt && j.finishedAt ? j.finishedAt - j.startedAt : null,
+    messageCount: (j.messages || []).length,
   };
 }

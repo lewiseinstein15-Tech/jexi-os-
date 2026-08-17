@@ -295,6 +295,9 @@ export const TOOL_REGISTRY = [
   { slug: 'job_kill', name: 'Job Kill', type: 'Jobs', desc: 'Stop a running or queued background job by its id.', agents: ['orchestrator', 'task-manager'], tier: 'write_local', timeoutMs: 15000 },
   { slug: 'ask_user_question', name: 'Ask User', type: 'Agent', desc: 'Ask the user a concise question when you need confirmation, a choice, or missing information before proceeding. Answers arrive in the next message.', agents: ['orchestrator', 'planner'], tier: 'read', timeoutMs: 15000 },
   { slug: 'exit_plan_mode', name: 'Exit Plan Mode', type: 'Agent', desc: 'Present the completed plan for user review — implementation begins only after approval (plan mode).', agents: ['planner', 'orchestrator'], tier: 'write_local', timeoutMs: 15000 },
+  { slug: 'workflow', name: 'Workflow', type: 'Agent', desc: 'Write and run a multi-agent workflow script: agent()/parallel()/pipeline()/phase()/log() — for large orchestration the user explicitly asks for.', agents: ['orchestrator', 'planner'], tier: 'exec', timeoutMs: 240000 },
+  { slug: 'send_message', name: 'Send Message', type: 'Agent', desc: 'Send a message to a background subagent by id — it becomes its next turn (waits if currently working).', agents: ['orchestrator', 'planner'], tier: 'write_local', timeoutMs: 15000 },
+  { slug: 'interrupt_agent', name: 'Interrupt Agent', type: 'Agent', desc: 'Request cancellation of a background subagent\'s current turn by its id (accepted no-op if already finished).', agents: ['orchestrator', 'planner'], tier: 'write_local', timeoutMs: 15000 },
   { slug: 'todo', name: 'Todo List', type: 'Productivity', desc: 'Manage a visible task list: add, list, complete.', agents: ['task-manager', 'planner'], tier: 'write_local' },
   { slug: 'plan', name: 'Plan', type: 'Productivity', desc: 'Create or update an explicit multi-step plan with per-step status.', agents: ['planner', 'orchestrator'], tier: 'write_local' },
 ];

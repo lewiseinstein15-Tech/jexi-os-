@@ -1,6 +1,6 @@
 # JEXI OS — Agent & Skill Catalog
 
-**251 specialist agents · 507 skills · 193 tools · 1 orchestrator.** One plain-language request in,
+**251 specialist agents · 507 skills · 196 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
 > ⚙️ GENERATED FILE — updated 2026-08-17 by `cd server && npm run audit-roster`. Do not edit by hand.
@@ -14,7 +14,7 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 |---|---|
 | Agents | 251 (251 reachable — 100%) |
 | Skills | 507 |
-| Tools | 193 |
+| Tools | 196 |
 | Intents / teams | 155 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
@@ -1221,15 +1221,18 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 193 tools (grouped by type)
+## The 196 tools (grouped by type)
 
-### Agent (4)
+### Agent (7)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
 | `ask_user_question` | Orchestrator, Planner | undefined | Ask the user a concise question when you need confirmation, a choice, or missing information before proceeding. Answers arrive in the next message. |
 | `exit_plan_mode` | Planner, Orchestrator | undefined | Present the completed plan for user review — implementation begins only after approval (plan mode). |
+| `interrupt_agent` | Orchestrator, Planner | undefined | Request cancellation of a background subagent's current turn by its id (accepted no-op if already finished). |
+| `send_message` | Orchestrator, Planner | undefined | Send a message to a background subagent by id — it becomes its next turn (waits if currently working). |
 | `skill-load` | Planner, Orchestrator | undefined | Load a skill into context (progressive disclosure) — auto-discovered project/user/bundled skills. |
 | `subagent` | Orchestrator, Planner | undefined | Delegate a sub-task to a child agent with its own context; it reports back. |
+| `workflow` | Orchestrator, Planner | undefined | Write and run a multi-agent workflow script: agent()/parallel()/pipeline()/phase()/log() — for large orchestration the user explicitly asks for. |
 
 ### Browser (6)
 | Tool | Allowed agents | Engine | What it does |

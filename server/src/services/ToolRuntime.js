@@ -49,6 +49,19 @@ import { classifyRisk } from './RiskGuard.js';
 /* Schemas — argument contracts for the executable tools.              */
 /* ------------------------------------------------------------------ */
 export const TOOL_SCHEMAS = {
+  'workflow': {
+    script: { type: 'string', required: true, desc: 'Plain-JS workflow script body (top-level await; end with return <json>). Globals: agent(task,{instructions,depth}), parallel([fns]), pipeline(items,...stages), phase(title), log(msg), args.' },
+    meta: { type: 'object', required: true, desc: '{name (kebab-case), description, whenToUse?, phases?: [{title, detail?}]}' },
+    args: { type: 'object', desc: 'Optional JSON input exposed as the args global' },
+    maxTotalAgents: { type: 'number', desc: 'Optional agent cap for this run' },
+  },
+  'send_message': {
+    subagent_id: { type: 'string', required: true, desc: 'The background subagent id' },
+    message: { type: 'string', required: true, desc: 'Message delivered as its next turn' },
+  },
+  'interrupt_agent': {
+    agent_id: { type: 'string', required: true, desc: 'The running agent id to interrupt' },
+  },
   // B112 — plan/ask tools need real argument schemas (providers strip undeclared args).
   'ask_user_question': {
     questions: {
@@ -186,6 +199,9 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'job_kill': z.object({ kind: z.literal('job').optional(), ok: z.boolean().optional(), id: z.string().optional(), status: z.string().optional(), error: z.string().optional() }).passthrough(),
   'ask_user_question': z.object({ kind: z.literal('ask-user').optional(), ok: z.boolean().optional(), status: z.string().optional(), questions: z.array(z.unknown()).optional(), error: z.string().optional() }).passthrough(),
   'exit_plan_mode': z.object({ kind: z.literal('plan-review').optional(), ok: z.boolean().optional(), status: z.string().optional(), plan: z.string().optional(), error: z.string().optional() }).passthrough(),
+  'workflow': z.object({ kind: z.literal('workflow').optional(), ok: z.boolean().optional(), runId: z.string().optional(), agentsStarted: z.number().optional(), result: z.unknown().optional(), stopReason: z.string().optional(), error: z.unknown().optional() }).passthrough(),
+  'send_message': z.object({ kind: z.literal('message').optional(), ok: z.boolean().optional(), messageId: z.string().optional(), status: z.string().optional(), error: z.string().optional() }).passthrough(),
+  'interrupt_agent': z.object({ kind: z.literal('interrupt').optional(), ok: z.boolean().optional(), accepted: z.boolean().optional(), status: z.string().optional(), error: z.string().optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),
@@ -740,6 +756,53 @@ async function runEngine(slug, args, opts = {}) {
       if (!r.ok) return { ok: false, error: r.error };
       try { opts.sendEvent('plan.review', { conv, plan: r.plan }); } catch { /* noop */ }
       return { kind: 'plan-review', status: 'pending_review', plan: r.plan };
+    }
+
+    case 'workflow': {
+      // B115 — dsh tool-workflow: run a model-written orchestration script
+      // that fans out subagents (agent/parallel/pipeline/phase/log globals).
+      const { startWorkflow, workflowRecord, WorkflowError } = await import('./WorkflowEngine.js');
+      const script = String(args.script || '');
+      const meta = args.meta;
+      if (!script.trim()) return { ok: false, error: 'workflow requires a script body' };
+      // Stream workflow events as agent logs (DSH observe-only events).
+      const onEvent = (type, data) => {
+        try {
+          if (type === 'workflow/phase') opts.sendEvent('agent.log', { message: `🏁 ${data.title}` });
+          else if (type === 'workflow/log') opts.sendEvent('agent.log', { message: `📝 ${data.message}` });
+          else if (type === 'workflow/agent-start') opts.sendEvent('agent.log', { message: `🧑‍💻 Subagent ${data.seq}: ${data.task}…` });
+          else if (type === 'workflow/end') opts.sendEvent('agent.log', { message: `🏁 Workflow ${data.runId} → ${data.stopReason} (${data.agentsStarted} subagents).` });
+        } catch { /* noop */ }
+      };
+      let run;
+      try {
+        run = startWorkflow({ script, meta, args: args.args, maxTotalAgents: Number(args.maxTotalAgents) || undefined, signal: opts.signal, onEvent });
+      } catch (e) {
+        const code = e instanceof WorkflowError ? e.code : 'INVALID_ARGUMENT';
+        return { ok: false, error: `${code}: ${(e && e.message) || e}` };
+      }
+      const out = await run.result;
+      const rec = workflowRecord(run.id);
+      if (out.stopReason !== 'completed') {
+        return { ok: false, kind: 'workflow', runId: run.id, agentsStarted: out.agentsStarted, stopReason: out.stopReason, error: out.error || 'workflow failed' };
+      }
+      return { kind: 'workflow', runId: run.id, agentsStarted: out.agentsStarted, stopReason: 'completed', result: out.value };
+    }
+
+    case 'send_message': {
+      // B115 — dsh tool-subagent-control: message a background subagent.
+      const { sendMessageToJob } = await import('./BackgroundJobs.js');
+      const r = sendMessageToJob(args.subagent_id, args.message);
+      if (!r.ok) return { ok: false, error: r.error };
+      return { kind: 'message', messageId: r.messageId, status: r.status };
+    }
+
+    case 'interrupt_agent': {
+      // B115 — dsh tool-subagent-control: cancel a background subagent's turn.
+      const { interruptJob } = await import('./BackgroundJobs.js');
+      const r = interruptJob(args.agent_id);
+      if (!r.ok) return { ok: false, error: r.error };
+      return { kind: 'interrupt', accepted: !!r.accepted, status: r.status };
     }
 
     case 'todo': {
