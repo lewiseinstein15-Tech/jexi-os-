@@ -1936,6 +1936,11 @@ app.post('/api/chat', async (req, res) => {
     let raw = String(query || '').trim();
     // B96 — append the user message to the conversation's durable log.
     try { appendConversationEvent(convId, { role: 'user', text: raw, kind: 'chat' }); } catch (e) {}
+    // B116-fix — HOIST preset+mode BEFORE any use: the auto-routing block and
+    // /plan handling reference `mode`, so declaring it later crashed every
+    // chat request with "Cannot access 'mode' before initialization" (TDZ).
+    const preset = resolvePreset(String(req.headers['x-jexi-preset'] || '').toLowerCase());
+    const mode = String(req.body.mode || req.headers['x-jexi-mode'] || preset.mode || 'auto').toLowerCase();
     // B113 — /plan = PLAN-AND-EXECUTE: plan first, then do the work
     // AUTOMATICALLY. No approval pause, no question cards, no "should I
     // continue" — updates stream as she works.
@@ -2230,11 +2235,9 @@ app.post('/api/chat', async (req, res) => {
     // tools, no graph. Fast, simple, minimal events. Explicit agent commands
     // (/build, /goal, /do, links, travel) already returned above, so what
     // reaches here is a plain conversation question.
-    // B102 — the preset's mode is the default; an explicit header wins.
-    const preset = resolvePreset(String(req.headers['x-jexi-preset'] || '').toLowerCase());
     // B114 — AUTO (default): JEXI decides per query whether to answer directly
-    // or run the agent pipeline. 'normal'/'agent' stay as explicit overrides.
-    const mode = String(req.body.mode || req.headers['x-jexi-mode'] || preset.mode || 'auto').toLowerCase();
+    // or run the agent pipeline. 'normal'/'agent' stay as explicit overrides
+    // (preset + mode are hoisted at the top of this handler — B116-fix).
     if ((mode === 'normal' || autoDirect) && !image) {
       try { addChat('user', effectiveQuery); } catch (e) {}
       sendEvent('log', { agent: 'JEXI', message: autoDirect ? '💬 Answering directly — no pipeline needed for this one.' : '💬 Normal mode — answering directly.' });

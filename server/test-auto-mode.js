@@ -47,5 +47,16 @@ ok(/\? <> <Zap|Zap className/.test(home), 'pill shows an AUTO label');
 const settings = fs.readFileSync('../src/components/SettingsPanel.jsx', 'utf-8');
 ok(/key === 'minimal' \? 'normal' : 'auto'/.test(settings), 'presets set auto (except minimal → normal)');
 
-console.log(`\nB114 auto-mode: ${passed} passed, ${failedCount} failed`);
+console.log('\n== 4. Regression: no TDZ crash (B116-fix) ==');
+const idxLines = idx.split('\n');
+const modeDecl = idxLines.findIndex((l) => l.includes("const mode = String(req.body.mode"));
+const autoUse = idxLines.findIndex((l) => l.includes("if (mode === 'auto')"));
+ok(modeDecl !== -1 && autoUse !== -1, 'both lines present');
+ok(modeDecl < autoUse, `mode declared BEFORE the auto block (decl ${modeDecl} < use ${autoUse}) — no "Cannot access 'mode' before initialization"`);
+const modeDecls = idxLines.filter((l) => l.includes("const mode = String(req.body.mode")).length;
+ok(modeDecls === 1, `exactly ONE mode declaration (${modeDecls}) — duplicate removed`);
+const presetAfterMode = idxLines.slice(modeDecl).filter((l) => l.includes("const preset = resolvePreset")).length;
+ok(presetAfterMode === 0, `no preset declaration AFTER mode in the chat handler (${presetAfterMode}) — the duplicate is gone`);
+
+console.log(`\nB114+B116 auto-mode: ${passed} passed, ${failedCount} failed`);
 process.exit(failedCount ? 1 : 0);
