@@ -151,7 +151,7 @@ export default function ChatWindow({
   const handleSubmit = (e) => {
     e.preventDefault();
     if ((!input.trim() && !image && !fileAttachments.length) || isProcessing) return;
-    onSend(input, image, fileAttachments.length ? fileAttachments : undefined, mode);
+    onSend(input, image, fileAttachments.length ? fileAttachments : undefined);
     setInput('');
     setImage(null);
     setFileAttachments([]);
