@@ -20,6 +20,7 @@ import BootSplash from './components/BootSplash'; // B79 — branded loading scr
 import TasksScreen from './components/TasksScreen';
 import GoalsScreen from './components/GoalsScreen';
 import NotificationsScreen from './components/NotificationsScreen';
+import ConversationsScreen from './components/ConversationsScreen';
 import SkillsScreen from './components/SkillsScreen';
 import WorkspaceScreen from './components/WorkspaceScreen';
 import TerminalScreen from './components/TerminalScreen';
@@ -131,6 +132,8 @@ export default function App() {
         return <GoalsScreen />;
       case 'notifications':
         return <NotificationsScreen />;
+      case 'conversations':
+        return <ConversationsScreen />;
       case 'skills':
         return (
           <div className="px-3 pt-4 pb-8 space-y-3 max-w-[900px] mx-auto">

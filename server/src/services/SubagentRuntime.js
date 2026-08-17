@@ -96,8 +96,27 @@ export async function runIsolatedSubagent({ name, query, image, sendEvent, opts 
  * parent receives only summary + status + artifacts.
  * Returns { subagents: [...], aggregate }.
  */
-export async function runSubagents({ tasks, sendEvent, opts = {} }) {
-  if (typeof sendEvent !== 'function') sendEvent = () => {};
+/**
+ * B96 — single delegated subagent (DSH tool-subagent): runs ONE child task
+ * in its own context and returns a plain-text report. Used by the `subagent`
+ * tool so the agent loop can delegate.
+ */
+export async function runSubagent(task, instructions = '', opts = {}) {
+  const events = [];
+  const sendEvent = (type, data) => { events.push({ type, ...data }); };
+  const out = await runSubagents({
+    tasks: [{ name: 'sub', query: String(task || ''), instructions: String(instructions || '').slice(0, 1000) }],
+    sendEvent,
+    opts: { ...opts, depth: Number(opts.depth) || 1 },
+  });
+  if (out && out.subagents && out.subagents[0]) {
+    const r = out.subagents[0];
+    return String(r.report || r.summary || r.answer || 'subagent finished').slice(0, 3000);
+  }
+  return String((out && out.aggregate) || 'subagent finished').slice(0, 3000);
+}
+
+export async function runSubagents({ tasks, sendEvent, opts = {} }) {  if (typeof sendEvent !== 'function') sendEvent = () => {};
   const emit = (type, payload) => { try { sendEvent(type, payload); } catch (e) {} };
 
   const jobs = (tasks || []).slice(0, MAX_SUBAGENTS);

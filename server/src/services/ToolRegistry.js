@@ -275,6 +275,13 @@ export const TOOL_REGISTRY = [
 
   // ── Chaos (test-only, feature-flagged) ───────────────────────
   { slug: 'inject_failure', name: 'Inject Failure', type: 'Chaos', desc: 'Inject a controlled failure (provider timeout, tool error) — only when the chaos flag is on.', agents: ['chaos-agent'], engine: 'ChaosAgent' },
+  { slug: 'session-list', name: 'Session List', type: 'Memory', desc: 'List all past conversations with titles and activity.', agents: ['memory', 'context-manager', 'archivist'], tier: 'read' },
+  { slug: 'session-search', name: 'Session Search', type: 'Memory', desc: 'Search EVERY past conversation for a topic — remember what she did before.', agents: ['memory', 'archivist', 'context-manager'], tier: 'read' },
+  { slug: 'session-fork', name: 'Session Fork', type: 'Memory', desc: 'Fork the current conversation into a new one (seeded with history).', agents: ['context-manager', 'memory'], tier: 'write_local' },
+  { slug: 'subagent', name: 'Subagent', type: 'Agent', desc: 'Delegate a sub-task to a child agent with its own context; it reports back.', agents: ['orchestrator', 'planner'], tier: 'exec' },
+  { slug: 'skill-load', name: 'Skill Load', type: 'Agent', desc: 'Load a skill into context (progressive disclosure) for a specialized workflow.', agents: ['planner', 'orchestrator'], tier: 'read' },
+  { slug: 'todo', name: 'Todo List', type: 'Productivity', desc: 'Manage a visible task list: add, list, complete.', agents: ['task-manager', 'planner'], tier: 'write_local' },
+  { slug: 'plan', name: 'Plan', type: 'Productivity', desc: 'Create or update an explicit multi-step plan with per-step status.', agents: ['planner', 'orchestrator'], tier: 'write_local' },
 ];
 
 export const TOOL_COUNT = TOOL_REGISTRY.length;
@@ -310,7 +317,8 @@ export function toolsForIntent(intent, extra = {}) {
   // the tools they may actually call — the planning-time set matches the
   // runtime gate, so heavy tools (web, browser, study, connectors) can never
   // leak into a lightweight intent's tool list.
-  const allowlist = TOOL_INTENT_ALLOWLIST[intent];
+  const allowlist = TOOL_INTENT_ALLOWLIST[intent
+];
   if (allowlist) return tools.filter((t) => allowlist.includes(t.slug));
   return tools;
 }

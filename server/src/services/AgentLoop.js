@@ -34,8 +34,10 @@ import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { preferencesBlock } from './PreferenceLearner.js';
 import { providerPreferenceForIntent } from './ModelRouting.js';
 
-const MAX_ITERATIONS = 4;
-const MAX_TOOL_CALLS = 8;
+// B96 — DeepSeek-Harness-style loop: more steps per turn (the rate limiter
+// protects free tiers), with turn/step events streamed like dsh's event log.
+const MAX_ITERATIONS = 10;
+const MAX_TOOL_CALLS = 20;
 
 /** Planner.analyzeIntent returns a plan (intent/teamSlugs/steps/tools/toolsLine). */
 async function safePlan(query, image) {
@@ -114,7 +116,12 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
               continue;
             }
             callsMade++;
+            // B96 — dsh-style step events: tool/call + tool/result on the wire.
+            try { emit('step/start', { turn: 1, step: callsMade }); } catch (e) {}
+            try { emit('tool/call', { callId: call.id, name: call.name, arguments: JSON.stringify(call.arguments || {}).slice(0, 500) }); } catch (e) {}
             const r = await executeTool({ slug: call.name, args: call.arguments || {}, profile, sendEvent: emit, confirm: opts.confirm });
+            try { emit('tool/result', { callId: call.id, name: call.name, ok: !!r.ok, error: r.error || null }); } catch (e) {}
+            try { emit('step/end', { turn: 1, step: callsMade }); } catch (e) {}
             const done = isToolDone(r);
             toolContext.push({ tool: call.name, args: call.arguments || {}, ok: r.ok, done, error: r.error, result: r.result, paused: r.paused === true || r.approvalRequired === true, blocked: r.blocked === true });
             if (r.paused || r.approvalRequired) {

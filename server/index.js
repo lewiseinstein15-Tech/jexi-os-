@@ -78,6 +78,7 @@ import { resolveInside } from './src/services/PathSafety.js'; // security: one p
 import { GoalEngine } from './src/services/GoalEngine.js'; // autonomy: goal-level execution with info-asking + resume
 import { rateLimiterStatus } from './src/services/ProviderRateLimiter.js'; // free-tier pacing status
 import { touchSession, listSessions } from './src/services/SessionStore.js'; // session registry (isolation observability)
+import { appendConversationEvent, listConversations as listSessionConversations, loadConversationEvents, forkConversation, deleteConversation, searchConversations } from './src/services/SessionConversations.js'; // B96 — DSH-style append-only conversation logs
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines } from './src/services/JexiIdentity.js'; // canonical identity (name / creator / capabilities)
 import { DoAnythingAgent } from './src/services/DoAnythingAgent.js'; // B89 — free-form autonomous agent loop
 import { TravelBookingAgent, parseBookingQuery } from './src/services/TravelBookingAgent.js'; // B90 — browser booking flow
@@ -204,7 +205,7 @@ app.use(cors({ origin: CORS_ALLOWLIST }));
 // else under /api/* (chat, vision, knowledge, memory, desktop, settings write,
 // APK proxy) is gated when JEXI_API_KEY is set.
 // NOTE: mounted on the app root (not '/api') so req.path keeps its full form.
-const OPEN_PATHS = ['/api/health', '/api/health/memory', '/api/settings/status', '/api/metrics', '/api/update/apk', '/api/update/version', '/api/events', '/api/identity', '/api/rate/status', '/api/sessions', '/api/goals', '/api/goals/email-stats', '/api/push/vapid-key', '/api/push/fcm-status', '/api/push/diag', '/api/push/fcm-token', '/api/push/fcm-unregister', '/api/push/subscribe', '/api/push/unsubscribe']; // B70 — health/memory + the APK update proxy/version probe are read-only infra (no secrets, no AI spend); a locked backend must stay observable and still deliver app updates. B78 — the event log is GET-only, read-only, sanitized (no raw keys), and the same class of debug surface as the connector inbound log, so it stays open for browser inspection. Goal/identity/rate/sessions are read-only or owner-triggered (POST /api/goals is NOT in this list — it is key-gated like chat).
+const OPEN_PATHS = ['/api/health', '/api/health/memory', '/api/settings/status', '/api/metrics', '/api/update/apk', '/api/update/version', '/api/events', '/api/identity', '/api/rate/status', '/api/sessions', '/api/goals', '/api/goals/email-stats', '/api/push/vapid-key', '/api/push/fcm-status', '/api/push/diag', '/api/push/fcm-token', '/api/push/fcm-unregister', '/api/push/subscribe', '/api/push/unsubscribe', '/api/conversations', '/api/conversations/search']; // B70 — health/memory + the APK update proxy/version probe are read-only infra (no secrets, no AI spend); a locked backend must stay observable and still deliver app updates. B78 — the event log is GET-only, read-only, sanitized (no raw keys), and the same class of debug surface as the connector inbound log, so it stays open for browser inspection. Goal/identity/rate/sessions are read-only or owner-triggered (POST /api/goals is NOT in this list — it is key-gated like chat).
 app.use((req, res, next) => {
   if (!API_KEY || req.method === 'OPTIONS') return next();
   if (!req.path.startsWith('/api')) return next();
@@ -1529,6 +1530,36 @@ app.get('/api/rate/status', (req, res) => res.json(rateLimiterStatus()));
 // (read-only; proves per-session history is never mixed).
 app.get('/api/sessions', (req, res) => res.json({ sessions: listSessions() }));
 
+// === CONVERSATIONS (B96 — DSH-style session model) ===
+// List all conversations with titles + activity (read-only).
+app.get('/api/conversations', (req, res) => res.json({ conversations: listSessionConversations() }));
+
+// Search across ALL conversations (read-only).
+app.get('/api/conversations/search', (req, res) => {
+  const q = String(req.query.q || '');
+  res.json({ query: q, results: searchConversations(q, { limit: Number(req.query.limit) || 5 }) });
+});
+
+// One conversation's full event log (read-only).
+app.get('/api/conversations/:id', (req, res) => {
+  const id = String(req.params.id).slice(0, 80);
+  const events = loadConversationEvents(id, Number(req.query.limit) || 500);
+  res.json({ id, events });
+});
+
+// Fork a conversation: seed a new one from an existing log (DSH fork).
+app.post('/api/conversations/:id/fork', (req, res) => {
+  const id = String(req.params.id).slice(0, 80);
+  const f = forkConversation(id);
+  res.json(f.ok ? { ok: true, id: f.id, parentSession: f.parentSession, seedLength: f.seedLength } : { ok: false, error: f.error });
+});
+
+// Delete a conversation's log.
+app.delete('/api/conversations/:id', (req, res) => {
+  const id = String(req.params.id).slice(0, 80);
+  res.json(deleteConversation(id));
+});
+
 // Build 48, P5 — when the NDJSON stream drops (proxy drop, backgrounded app,
 // host restart), the server-side mission keeps running. The frontend polls this
 // endpoint to AUTO-RECOVER the finished result instead of asking the user to
@@ -1576,7 +1607,13 @@ app.post('/api/chat', async (req, res) => {
   // A fresh run must never serve a stale previous result during recovery.
   clearResult(convId);
   // done = emit the terminal event; persistence is handled by sendEvent above.
-  const done = (payload) => sendEvent('done', payload);
+  const done = (payload) => {
+    // B96 — persist JEXI's answer into the conversation log too.
+    if (payload && payload.summary) {
+      try { appendConversationEvent(convId, { role: 'jexi', text: String(payload.summary).slice(0, 20000), kind: 'chat' }); } catch (e) {}
+    }
+    sendEvent('done', payload);
+  };
 
   // Heartbeat: Cloudflare's proxy in front of Render kills streams that stay
   // silent too long (deep-reads and LLM calls pause for 10-30s). A tiny event
@@ -1603,6 +1640,8 @@ app.post('/api/chat', async (req, res) => {
 
   try {
     const raw = String(query || '').trim();
+    // B96 — append the user message to the conversation's durable log.
+    try { appendConversationEvent(convId, { role: 'user', text: raw, kind: 'chat' }); } catch (e) {}
     // B91 — attachments: load uploaded files and inject their previews into
     // the query so the planner and every agent see them.
     let attachmentContext = '';

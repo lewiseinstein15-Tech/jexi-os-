@@ -411,6 +411,73 @@ async function runEngine(slug, args) {
       }
       return res;
     }
+
+    /* ---------------- B96 — DeepSeek-Harness-style tools ---------------- */
+
+    case 'session-list': {
+      // DSH session_query: list prior conversations with titles + activity.
+      const { listConversations } = await import('./SessionConversations.js');
+      const { getActiveSession } = await import('./MemoryManager.js');
+      const convs = listConversations();
+      const active = getActiveSession();
+      return { kind: 'sessions', active, conversations: convs.slice(0, 20).map((c) => ({ id: c.id, title: c.title, messages: c.messageCount, lastActive: c.lastActive, isActive: c.id === active })) };
+    }
+
+    case 'session-search': {
+      // DSH session_query: full-text search across ALL past conversations.
+      const { searchConversations } = await import('./SessionConversations.js');
+      const q = args.query || '';
+      const res = searchConversations(q, { limit: Number(args.limit) || 5 });
+      return { kind: 'session-search', query: q, results: res };
+    }
+
+    case 'session-fork': {
+      // DSH session fork: seed a new conversation from the current one.
+      const { forkConversation } = await import('./SessionConversations.js');
+      const { getActiveSession } = await import('./MemoryManager.js');
+      const source = args.session || getActiveSession() || 'default';
+      const f = forkConversation(source, args.newId || null);
+      return f.ok ? { ok: true, id: f.id, parentSession: f.parentSession, seedLength: f.seedLength } : { ok: false, error: f.error };
+    }
+
+    case 'subagent': {
+      // DSH tool-subagent: delegate a sub-task to a child agent (own context).
+      const { runSubagent } = await import('./SubagentRuntime.js');
+      const task = String(args.task || '').slice(0, 2000);
+      if (!task) return { ok: false, error: 'subagent task required' };
+      const report = await runSubagent(task, args.instructions || '', { depth: Number(args.depth) || 1 });
+      return { kind: 'subagent', task: task.slice(0, 120), report: String(report || '').slice(0, 3000) };
+    }
+
+    case 'skill-load': {
+      // DSH tool-skill: load a skill body into context (progressive disclosure).
+      const { loadSkill, skillMeta } = await import('./SkillChain.js');
+      const slug = String(args.skill || '').trim();
+      if (!slug) return { ok: false, error: 'skill slug required' };
+      const meta = skillMeta(slug);
+      const body = loadSkill(slug);
+      return { kind: 'skill', slug, name: (meta && meta.name) || slug, body: String(body || '').slice(0, 4000) };
+    }
+
+    case 'todo': {
+      // DSH todo: the model manages its own visible task list.
+      const { todoList, todoAdd, todoComplete, todoRemove } = await import('./TodoStore.js');
+      const op = args.op || 'list';
+      if (op === 'add') return { kind: 'todo', todos: todoAdd(String(args.text || '')) };
+      if (op === 'complete') return { kind: 'todo', todos: todoComplete(Number(args.index)) };
+      if (op === 'remove') return { kind: 'todo', todos: todoRemove(Number(args.index)) };
+      return { kind: 'todo', todos: todoList() };
+    }
+
+    case 'plan': {
+      // DSH plan: explicit multi-step plan with per-step status.
+      const { planSet, planGet, planUpdate } = await import('./PlanStore.js');
+      const op = args.op || 'get';
+      if (op === 'set') return { kind: 'plan', plan: planSet(String(args.title || ''), Array.isArray(args.steps) ? args.steps : []) };
+      if (op === 'update') return { kind: 'plan', plan: planUpdate(Number(args.index), String(args.status || ''), String(args.note || '')) };
+      return { kind: 'plan', plan: planGet() };
+    }
+
     default:
       return null; // no engine — caller decides fallback
   }
