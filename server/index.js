@@ -49,6 +49,7 @@ import { setJobExecutor } from './src/services/BackgroundJobs.js'; // B106 — m
 import { addFeedback, listFeedback, feedbackStats } from './src/services/FeedbackStore.js'; // B106 — thumbs up/down on answers (dsh message-feedback)
 import { recentSessionsBlock, exportConversation } from './src/services/SessionConversations.js'; // B106 — session references + export
 import { listMarketplace, marketplaceStats, installSkill, uninstallSkill } from './src/services/SkillMarketplace.js'; // B107 — skills marketplace
+import { maybeAutoTitle, titleUntitledSweep, setStoredTitle } from './src/services/SessionTitles.js'; // B108 — LLM conversation titles
 import { runRetention } from './src/services/SpillStore.js'; // B104 — spill retention
 import { knowledgeStatus, loadProjectKnowledge, knowledgeLoad } from './src/services/KnowledgeBase.js'; // B50 P2 — project knowledge
 import { getToolCatalog, TOOL_PROFILES, activeToolProfile, setToolProfile, executeTool } from './src/services/ToolRuntime.js';
@@ -149,6 +150,12 @@ try {
 } catch (e) {
   console.error('[Skills] watcher start error:', e.message);
 }
+
+// B108 — boot sweep: title the most recent untitled conversations in the
+// background (bounded; existing chats get smart titles after a redeploy).
+titleUntitledSweep({ max: 8 }).then((r) => {
+  if (r.titled > 0) console.log(`[Titles] ✓ Auto-titled ${r.titled} conversation(s) at boot`);
+}).catch(() => {});
 
 // B104 — SPILL RETENTION (dsh output-retention): spilled files age out
 // (7 days) and per-owner budgets cap growth. Runs at boot + hourly.
@@ -1700,6 +1707,22 @@ app.get('/api/conversations/:id/export', (req, res) => {
   res.send(out.content);
 });
 
+// B108 — rename a conversation (manual title) + force regenerate.
+app.post('/api/conversations/:id/rename', (req, res) => {
+  const id = String(req.params.id).slice(0, 80);
+  const r = setStoredTitle(id, String((req.body || {}).title || '').slice(0, 80));
+  res.status(r.ok ? 200 : 400).json(r);
+});
+app.post('/api/conversations/:id/title', async (req, res) => {
+  const id = String(req.params.id).slice(0, 80);
+  try {
+    const r = await maybeAutoTitle(id);
+    res.json({ ok: r, titled: r });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: (e && e.message) || String(e) });
+  }
+});
+
 // B106 — message feedback (dsh message-feedback mirror).
 app.post('/api/feedback', (req, res) => {
   try {
@@ -1825,6 +1848,9 @@ app.post('/api/chat', async (req, res) => {
       maybeCompact(convId).then((r) => {
         if (r && r.compacted) { try { sendEvent('log', { agent: 'Memory', message: `📦 Auto-compacted this conversation — ${r.status.lastCheckpoint.shadowed.events} older turns → one checkpoint (${r.status.lastCheckpoint.shadowed.chars.toLocaleString()} chars shadowed).` }); } catch (e) {} }
       }).catch(() => {});
+      // B108 — auto-title this conversation once it has enough content
+      // (dsh session-title mirror; one-shot, never blocks the reply).
+      maybeAutoTitle(convId).catch(() => {});
     }
   };
 

@@ -20,6 +20,8 @@
 import fs from 'fs';
 import path from 'path';
 import { DATA_DIR } from '../config.js';
+import { getEvents } from './EventLog.js'; // B108 — tool-call stats per session
+import { getStoredTitle, clearStoredTitle } from './SessionTitles.js'; // B108 — LLM/manual titles with fallback
 
 const CONV_DIR = path.join(DATA_DIR, 'conversations');
 const MAX_EVENTS_PER_CONV = 2000;
@@ -75,20 +77,44 @@ export function loadConversationEvents(convId, limit = 500) {
   } catch { return []; }
 }
 
-/** One conversation's summary (title = first user message). */
+/** One conversation's summary. B108 — title resolves to the stored LLM
+ *  title (or manual rename) with the first-message fallback; stats include
+ *  tool calls from the durable event log, approx tokens, duration and
+ *  compaction count (dsh session-stats mirror). */
 export function conversationSummary(convId) {
   const events = loadConversationEvents(convId, 1000);
   if (!events.length) return null;
   const firstUser = events.find((e) => e.role === 'user');
   const jexiCount = events.filter((e) => e.role === 'jexi').length;
+  // B108 — stored LLM/manual title wins; first message is the fallback.
+  let title = null;
+  try { title = getStoredTitle(convId) || null; } catch { /* noop */ }
+  if (!title) {
+    title = String(firstUser ? firstUser.text : '(empty)').replace(/\s+/g, ' ').slice(0, 80);
+  }
+  // B108 — stats (event log is best-effort; the trace carries the full view).
+  let toolCalls = null;
+  let compactions = 0;
+  try {
+    toolCalls = getEvents({ session: convId, type: 'tool_call' }).length;
+  } catch { /* noop */ }
+  for (const e of events) if (e.kind === 'compaction') compactions += 1;
+  const chars = events.reduce((a, e) => a + String(e.text || '').length, 0);
+  const firstAt = events[0].at;
+  const lastAt = events[events.length - 1].at;
   return {
     id: convId,
-    title: String(firstUser ? firstUser.text : '(empty)').replace(/\s+/g, ' ').slice(0, 80),
+    title,
+    titleSource: getStoredTitle(convId) ? 'llm' : 'fallback',
     messageCount: events.length,
     userMessages: events.filter((e) => e.role === 'user').length,
     jexiMessages: jexiCount,
-    createdAt: events[0].at,
-    lastActive: events[events.length - 1].at,
+    toolCalls,
+    approxTokens: Math.round(chars / 4),
+    durationMs: lastAt - firstAt,
+    compactions,
+    createdAt: firstAt,
+    lastActive: lastAt,
   };
 }
 
@@ -180,6 +206,7 @@ export function searchConversations(query, { limit = 5 } = {}) {
 }
 
 export function deleteConversation(convId) {
+  try { clearStoredTitle(convId); } catch { /* noop */ }
   try {
     const file = convFile(convId);
     if (fs.existsSync(file)) fs.unlinkSync(file);
