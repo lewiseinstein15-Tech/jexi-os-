@@ -21,7 +21,8 @@ import fs from 'fs';
 import path from 'path';
 import { DATA_DIR } from '../config.js';
 import { getEvents } from './EventLog.js'; // B108 — tool-call stats per session
-import { getStoredTitle, clearStoredTitle } from './SessionTitles.js'; // B108 — LLM/manual titles with fallback
+import { getStoredTitleRecord, clearStoredTitle, fallbackTitleFor } from './SessionTitles.js'; // B108/B109 — dsh session-title (pinned llm/user titles, word-capped fallback)
+import { sessionStats } from './SessionStats.js'; // B109 — dsh session-stats projection fold
 
 const CONV_DIR = path.join(DATA_DIR, 'conversations');
 const MAX_EVENTS_PER_CONV = 2000;
@@ -85,36 +86,36 @@ export function conversationSummary(convId) {
   const events = loadConversationEvents(convId, 1000);
   if (!events.length) return null;
   const firstUser = events.find((e) => e.role === 'user');
-  const jexiCount = events.filter((e) => e.role === 'jexi').length;
-  // B108 — stored LLM/manual title wins; first message is the fallback.
+  // B109 — stored title (any source) wins; DSH word+byte-capped fallback.
   let title = null;
-  try { title = getStoredTitle(convId) || null; } catch { /* noop */ }
-  if (!title) {
-    title = String(firstUser ? firstUser.text : '(empty)').replace(/\s+/g, ' ').slice(0, 80);
-  }
-  // B108 — stats (event log is best-effort; the trace carries the full view).
-  let toolCalls = null;
-  let compactions = 0;
+  let titleSource = 'fallback';
   try {
-    toolCalls = getEvents({ session: convId, type: 'tool_call' }).length;
+    const rec = getStoredTitleRecord(convId);
+    if (rec && rec.title) { title = rec.title; titleSource = rec.source || 'llm'; }
   } catch { /* noop */ }
-  for (const e of events) if (e.kind === 'compaction') compactions += 1;
-  const chars = events.reduce((a, e) => a + String(e.text || '').length, 0);
-  const firstAt = events[0].at;
-  const lastAt = events[events.length - 1].at;
+  if (!title) {
+    title = fallbackTitleFor(convId) || String(firstUser ? firstUser.text : '(empty)').replace(/\s+/g, ' ').slice(0, 60);
+  }
+  // B109 — the session-stats projection fold (best-effort).
+  let stats = {};
+  try { stats = sessionStats(convId); } catch { /* noop */ }
   return {
     id: convId,
     title,
-    titleSource: getStoredTitle(convId) ? 'llm' : 'fallback',
+    titleSource,
     messageCount: events.length,
-    userMessages: events.filter((e) => e.role === 'user').length,
-    jexiMessages: jexiCount,
-    toolCalls,
-    approxTokens: Math.round(chars / 4),
-    durationMs: lastAt - firstAt,
-    compactions,
-    createdAt: firstAt,
-    lastActive: lastAt,
+    userMessages: stats.userMessages ?? events.filter((e) => e.role === 'user').length,
+    jexiMessages: stats.jexiMessages ?? events.filter((e) => e.role === 'jexi').length,
+    toolCalls: stats.toolCalls ?? null,
+    steps: stats.steps ?? null,
+    turns: stats.turns ?? null,
+    toolMs: stats.toolMs ?? null,
+    llmMs: stats.llmMs ?? null,
+    approxTokens: stats.approxTokens ?? null,
+    durationMs: stats.durationMs ?? null,
+    compactions: stats.compactions ?? 0,
+    createdAt: events[0].at,
+    lastActive: events[events.length - 1].at,
   };
 }
 

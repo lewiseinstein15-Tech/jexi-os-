@@ -50,6 +50,7 @@ import { addFeedback, listFeedback, feedbackStats } from './src/services/Feedbac
 import { recentSessionsBlock, exportConversation } from './src/services/SessionConversations.js'; // B106 — session references + export
 import { listMarketplace, marketplaceStats, installSkill, uninstallSkill } from './src/services/SkillMarketplace.js'; // B107 — skills marketplace
 import { maybeAutoTitle, titleUntitledSweep, setStoredTitle } from './src/services/SessionTitles.js'; // B108 — LLM conversation titles
+import { resolveSessionReferences } from './src/services/SessionReference.js'; // B109 — dsh session-reference mentions (@[label](dsh-session:…))
 import { runRetention } from './src/services/SpillStore.js'; // B104 — spill retention
 import { knowledgeStatus, loadProjectKnowledge, knowledgeLoad } from './src/services/KnowledgeBase.js'; // B50 P2 — project knowledge
 import { getToolCatalog, TOOL_PROFILES, activeToolProfile, setToolProfile, executeTool } from './src/services/ToolRuntime.js';
@@ -1881,6 +1882,17 @@ app.post('/api/chat', async (req, res) => {
     const raw = String(query || '').trim();
     // B96 — append the user message to the conversation's durable log.
     try { appendConversationEvent(convId, { role: 'user', text: raw, kind: 'chat' }); } catch (e) {}
+    // B109 — SESSION REFERENCES (dsh session-reference): @[label](dsh-session:…)
+    // mentions in the query resolve to read-only snapshots injected into the
+    // prompt (security-wrapped, bounded to 3 refs / 64 KB).
+    let sessionRefInjected = '';
+    try {
+      const refRes = resolveSessionReferences(raw);
+      if (refRes.injected) {
+        sessionRefInjected = `\n\n${refRes.injected}\n`;
+        sendEvent('log', { agent: 'Memory', message: `🔗 Resolved ${refRes.resolved} referenced session(s) from your message — read-only context injected.` });
+      }
+    } catch { /* best-effort */ }
     // B100 — /compact command (dsh command-compact mirror): summarize the
     // older range of THIS conversation into a structured checkpoint now.
     if (/^\/compact\b/.test(raw)) {
@@ -2130,7 +2142,7 @@ app.post('/api/chat', async (req, res) => {
       let text = '';
       try {
         text = await generateContent(
-          `${effectiveQuery}\n\n${conversationSummaryContext(convId)}`,
+          `${effectiveQuery}\n\n${conversationSummaryContext(convId)}${sessionRefInjected}`,
           JEXI_NORMAL_PROMPT,
           null,
           { prefer: '', temperature: 0.5 }
@@ -2330,8 +2342,8 @@ app.post('/api/chat', async (req, res) => {
     const codeMode = codeModeHeader !== '0' && codeModeHeader !== 'off' && codeModeHeader !== 'false';
     const presetFlavor = mode === 'normal' ? '' : preset.flavor;
     const results = plan.complexity === 'SIMPLE'
-      ? await runSimpleTask(plan, executionQuery || effectiveQuery, sendEvent, { image, codeMode, convId, presetFlavor })
-      : await orchestrator.executePlan(plan, executionQuery || effectiveQuery, sendEvent, {
+      ? await runSimpleTask(plan, (executionQuery || effectiveQuery) + sessionRefInjected, sendEvent, { image, codeMode, convId, presetFlavor })
+      : await orchestrator.executePlan(plan, (executionQuery || effectiveQuery) + sessionRefInjected, sendEvent, {
           image,
           // B53 P2 — task scope for the run: the orchestrator gates memory reuse
       // and writes durable checkpoints keyed to this taskId.

@@ -77,11 +77,12 @@ setTitleGenerator(async () => 'Fresh Title');
 ok(await maybeAutoTitle(CONV) === true, 'after clearing, auto-title works again');
 ok(getStoredTitle(CONV) === 'Fresh Title', 'fresh title stored');
 
-console.log('\n== 5. cleanTitle sanitizes ==');
-ok(cleanTitle('"Quoted Title"') === 'Quoted Title', 'strips wrapping quotes');
+console.log('\n== 5. cleanTitle = DSH normalizeSessionTitle ==');
 ok(cleanTitle('  spaced   out  ') === 'spaced out', 'collapses whitespace');
-ok(cleanTitle('Too long. '.repeat(20)).length <= 60, 'caps length at 60 chars');
-ok(cleanTitle('trailing period.') === 'trailing period', 'strips trailing period');
+ok(Buffer.byteLength(cleanTitle('x'.repeat(300)), 'utf8') <= 60, 'caps length at the UTF-8 byte budget (60)');
+ok(cleanTitle('bad\u001B]0;title\u0007text') === 'badtext', 'strips OSC/control escapes (DSH semantics)');
+ok(cleanTitle('"Quoted Title"') === '"Quoted Title"', 'keeps quotes (DSH does not strip them)');
+ok(cleanTitle('trailing period.') === 'trailing period.', 'keeps trailing period (DSH strips only controls)');
 ok(cleanTitle('Keep the Title!') === 'Keep the Title!', 'keeps meaningful punctuation');
 
 console.log('\n== 6. Stats (dsh session-stats mirror) ==');

@@ -39,6 +39,7 @@ const EVENT_TYPES = new Set([
   'tool_call',
   'tool_result',
   'context_compaction',
+  'session_title', // B109 — dsh session/title log event
   'error',
 ]);
 
