@@ -80,6 +80,7 @@ import { rateLimiterStatus } from './src/services/ProviderRateLimiter.js'; // fr
 import { touchSession, listSessions } from './src/services/SessionStore.js'; // session registry (isolation observability)
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines } from './src/services/JexiIdentity.js'; // canonical identity (name / creator / capabilities)
 import { DoAnythingAgent } from './src/services/DoAnythingAgent.js'; // B89 — free-form autonomous agent loop
+import { TravelBookingAgent, parseBookingQuery } from './src/services/TravelBookingAgent.js'; // B90 — browser booking flow
 import { enqueueGoal, enqueueChat, enqueueDoAnything, answerJob, getJob as getGoalJob, getJobEvents, subscribe as subscribeJob, listJobs, setGoalExecutor, setChatExecutor, setDoExecutor, setGoalNotifier, hydrateGoalJobsFromRedis } from './src/services/GoalJobQueue.js'; // Phase 2 — durable background goal jobs (B85 — durable chat, B89 — do anything)
 import { notifyGoalComplete, setGoalCallConnector, goalReportStats } from './src/services/GoalNotifier.js'; // Phase 4 — goal completion notifications + email reports
 import { getVapidPublicKey, addSubscription, removeSubscription, broadcastPush, listSubscriptions, hydratePushSubsFromRedis, recordPushDiag, listPushDiag, hydratePushDiagFromRedis } from './src/services/PushManager.js'; // B84 — web push notifications (closed-app delivery)
@@ -1247,6 +1248,16 @@ setDoExecutor({
     return agent.run({ task, session, sendEvent });
   },
 });
+// B90 — the booking agent uses the real browser (DesktopManager) + web search.
+const travelBookingAgent = new TravelBookingAgent({
+  desktopManager: dm,
+  webSearch: async (q) => {
+    try {
+      const r = await aggregateSearch(q);
+      return (r && r.results) || [];
+    } catch { return []; }
+  },
+});
 setChatExecutor({
   run: async ({ query, session, sendEvent }) => {
     let paused = false;
@@ -1333,6 +1344,30 @@ app.post('/api/goals', (req, res) => {
   const convId = conversationId(req);
   const { id } = enqueueGoal({ goal: String(goal).trim(), session: convId, autonomy: String(autonomy || 'ask').toLowerCase() });
   res.status(202).json({ ok: true, jobId: id, status: 'queued', stream: `/api/goals/${id}/stream` });
+});
+
+// === TRAVEL BOOKING (B90) — search flights/hotels, present ranked options ===
+app.post('/api/travel/search', async (req, res) => {
+  const { query, selected } = req.body || {};
+  if (!query || !String(query).trim()) return res.status(400).json({ success: false, error: 'No query provided' });
+  const convId = conversationId(req);
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Cache-Control', 'no-cache');
+  const sendEvent = (type, data) => { try { res.write(JSON.stringify({ type, ...data }) + '\n'); } catch (e) {} };
+  const heartbeat = setInterval(() => { try { res.write('{"type":"heartbeat"}\n'); } catch (e) {} }, 10000);
+  const finish = () => { clearInterval(heartbeat); try { res.end(); } catch (e) {} };
+  try {
+    const out = await travelBookingAgent.run({ query: String(query).trim(), session: convId, sendEvent, opts: { selected } });
+    if (out.needInfo && out.needInfo.length) {
+      sendEvent('travel.need-info', { questions: out.needInfo });
+      sendEvent('done', { success: true, parked: true, summary: `### 📋 One quick thing\n\n${out.needInfo.map((q, i) => `${i + 1}. **${q.question}**`).join('\n')}` });
+    } else {
+      sendEvent('done', { success: out.success !== false, summary: normalizeFinalAnswer(out.summary || ''), options: out.options || [], selected: out.selected || null });
+    }
+  } catch (e) {
+    sendEvent('done', { success: false, summary: `### ⚠ JEXI OS\n\n${e.message}` });
+  }
+  finish();
 });
 
 // === DURABLE CHAT (B85) ===
@@ -1503,6 +1538,32 @@ app.post('/api/chat', async (req, res) => {
     //   2) a parked (need-info) goal in this session is waiting for details —
     //      the next message IS the answer. Both stream live through the job's
     //      event log, so they survive restarts and never mix sessions.
+    // B90 — TRAVEL: /book, /flights, /hotels → the browser booking flow.
+    const TRAVEL_RE = /^(?:\/book|\/flights|\/hotels?|book (?:me )?(?:a |an |the )?(?:flight|hotel|room|ticket|trip|car)|flights? (?:from|to)|hotels? (?:in|near|for))\b.*$/i;
+    const travelMatch = image ? null : raw.match(TRAVEL_RE);
+    if (travelMatch) {
+      const out = await travelBookingAgent.run({ query: raw, session: convId, sendEvent });
+      if (out.needInfo && out.needInfo.length) {
+        sendEvent('travel.need-info', { questions: out.needInfo });
+        done({ success: true, parked: true, summary: `### 📋 One quick thing\n\n${out.needInfo.map((q, i) => `${i + 1}. **${q.question}**`).join('\n')}\n\nAnswer here and I'll search right away.` });
+      } else {
+        done({ success: out.success !== false, query: raw, summary: normalizeFinalAnswer(out.summary || ''), options: out.options || [] });
+      }
+      return;
+    }
+    // B90 — "pick 2" / "the second one" after a travel search opens that option.
+    const PICK_RE = /^(?:pick|choose|open|the)\s*(?:option\s*)?(\d{1,2})(?:st|nd|rd|th)?(?:\s+one)?$/i;
+    const pickMatch = image ? null : raw.match(PICK_RE);
+    if (pickMatch) {
+      const last = travelBookingAgent.getLastOptions(convId);
+      if (last && last.length) {
+        const idx = Math.max(0, Math.min(last.length - 1, Number(pickMatch[1]) - 1));
+        const out = await travelBookingAgent.run({ query: 'pick', session: convId, sendEvent, opts: { selected: idx } });
+        done({ success: out.success !== false, query: raw, summary: normalizeFinalAnswer(out.summary || ''), selected: out.selected || null });
+        return;
+      }
+    }
+
     // B89 — DO ANYTHING: /do <task> or /anything <task> runs the free-form
     // agent loop as a durable job (plans, acts, verifies, repairs, reports).
     const DO_PREFIX_RE = /^(?:\/do|\/anything|do anything[\s:]+|anything[\s:]+)\s+(.+)$/i;
