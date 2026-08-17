@@ -185,9 +185,10 @@ export class BuilderAgent {
       return { success: false, error: 'bad token', summary: '### ⚠ JEXI OS\n\nThe GitHub token could not authenticate — check it and try again.' };
     }
 
-    const repoName = (opts.repo || '').replace(/[^a-zA-Z0-9._-]/g, '').toLowerCase().slice(0, 40) || `jexi-${buildId.slice(6, 12)}`;
+    const fallbackName = `jexi-${String(dir).split(path.sep).pop() || Date.now().toString(36)}`;
+    const repoName = (opts.repo || '').replace(/[^a-zA-Z0-9._-]/g, '').toLowerCase().slice(0, 40) || fallbackName;
     emit('builder.github', { owner, repo: repoName, action: 'create-repo' });
-    const created = await githubApi('/user/repos', token, 'POST', { name: repoName, private: false, description: `Built autonomously by JEXI OS: ${p.slice(0, 80)}` });
+    const created = await githubApi('/user/repos', token, 'POST', { name: repoName, private: false, description: `Built autonomously by JEXI OS: ${prompt.slice(0, 80)}` });
     if (!created.ok && created.status !== 422) {
       return { success: false, error: `repo create failed (${created.status})`, summary: `### ⚠ JEXI OS\n\nGitHub refused to create the repo: ${(created.data && created.data.message) || created.status}. Check the token has repo scope.` };
     }
@@ -198,7 +199,7 @@ export class BuilderAgent {
     const steps = [
       ['init', ['init', '-b', 'main']],
       ['add', ['add', '-A']],
-      ['commit', ['commit', '-m', `Autonomous build by JEXI OS — ${p.slice(0, 60)}`]],
+      ['commit', ['commit', '-m', `Autonomous build by JEXI OS — ${prompt.slice(0, 60)}`]],
       ['push', ['push', pushUrl, 'HEAD:main']],
     ];
     let gitFail = null;
@@ -219,8 +220,8 @@ export class BuilderAgent {
     if (this.generateContent) {
       try {
         summary = String(await this.generateContent(
-          `You autonomously built a project from: "${p.slice(0, 500)}".\n\n` +
-          `Result: ${written} file(s) (${project.language || 'unknown'}), ${rounds} run/fix round(s), run ${runClean ? 'PASSED' : (this.runFile ? 'STILL FAILING after fixes' : 'not runnable on this host')}, ` +
+          `You autonomously built a project from: "${prompt.slice(0, 500)}".\n\n` +
+          `Result: ${written} file(s) (${language || 'unknown'}), ${rounds} run/fix round(s), run ${runClean ? 'PASSED' : (this.runFile ? 'STILL FAILING after fixes' : 'not runnable on this host')}, ` +
           `pushed to ${repoUrl}${gitFail ? ' (push step failed: ' + gitFail.label + ')' : ''}.\n\n` +
           `Write the final report to the user: what was built, how it ran, the GitHub link, and any honest caveats. 2-5 short paragraphs, plain markdown.`,
           'You are JEXI OS, an autonomous builder reporting to its owner.', null, { prefer: 'groq', temperature: 0.4 }
@@ -228,7 +229,7 @@ export class BuilderAgent {
       } catch { /* fall through */ }
     }
     if (!summary || summary.length < 20) {
-      summary = `### 📦 BUILD COMPLETE — ${repoUrl}\n\n- **${written} files** (${project.language || 'unknown'}) from "${p.slice(0, 60)}…"\n- **Run/fix rounds:** ${rounds} — ${runClean ? '✅ ran clean' : (this.runFile ? '⚠ still failing after fixes' : 'not runnable on this host (no interpreter)')}\n- **Pushed to:** ${repoUrl}${gitFail ? `\n- ⚠ Push issue at "${gitFail.label}": ${gitFail.output}` : ''}`;
+      summary = `### 📦 BUILD COMPLETE — ${repoUrl}\n\n- **${written} files** (${language || 'unknown'}) from "${prompt.slice(0, 60)}…"\n- **Run/fix rounds:** ${rounds} — ${runClean ? '✅ ran clean' : (this.runFile ? '⚠ still failing after fixes' : 'not runnable on this host (no interpreter)')}\n- **Pushed to:** ${repoUrl}${gitFail ? `\n- ⚠ Push issue at "${gitFail.label}": ${gitFail.output}` : ''}`;
     }
 
     emit('builder.done', { repoUrl, repoName, files: written, rounds, runClean, gitFail: gitFail || null });
