@@ -50,17 +50,17 @@ export function enforceToolAllowlist(intent, slug) {
 /** slug → the JEXI engine (service module) that actually executes this tool. */
 export const TOOL_REGISTRY = [
   // ── Search & research ─────────────────────────────────────────
-  { slug: 'web-search', name: 'Web Search', type: 'Search', desc: 'Search multiple engines (SearXNG, DDG, Bing, Mojeek, Wikipedia, arXiv) and rank trusted sources.', agents: ['searcher', 'query-analyzer', 'researcher', 'news-scout', 'fact-checker'], engine: 'SearchEngine' },
-  { slug: 'deep-read', name: 'Deep Read', type: 'Research', desc: 'Open a URL server-side and extract its real content (strip ads, keep the text).', agents: ['extractor', 'scholar', 'researcher'], engine: 'Extractor' },
-  { slug: 'news-feed', name: 'News Feed', type: 'Research', desc: 'Fetch live headlines from free RSS feeds (Google News, BBC) and dedupe them.', agents: ['news-scout', 'news-filter'], engine: 'NewsAgent' },
+  { slug: 'web-search', name: 'Web Search', type: 'Search', desc: 'Search multiple engines (SearXNG, DDG, Bing, Mojeek, Wikipedia, arXiv) and rank trusted sources.', agents: ['searcher', 'query-analyzer', 'researcher', 'news-scout', 'fact-checker'], engine: 'SearchEngine', timeoutMs: 45000 },
+  { slug: 'deep-read', name: 'Deep Read', type: 'Research', desc: 'Open a URL server-side and extract its real content (strip ads, keep the text).', agents: ['extractor', 'scholar', 'researcher'], engine: 'Extractor', timeoutMs: 90000 },
+  { slug: 'news-feed', name: 'News Feed', type: 'Research', desc: 'Fetch live headlines from free RSS feeds (Google News, BBC) and dedupe them.', agents: ['news-scout', 'news-filter'], engine: 'NewsAgent', timeoutMs: 30000 },
   { slug: 'api-call', name: 'API Call', type: 'Data', desc: 'Call and parse an external JSON/REST API.', agents: ['scraper', 'data-engineer'], engine: 'fetch' },
-  { slug: 'trusted-library', name: 'Trusted Library', type: 'Research', desc: 'Read free, trusted books, papers and overviews (Wikipedia, Gutenberg, arXiv, Open Library).', agents: ['scholar', 'researcher', 'news-scout'], engine: 'TrustedLibrary' },
+  { slug: 'trusted-library', name: 'Trusted Library', type: 'Research', desc: 'Read free, trusted books, papers and overviews (Wikipedia, Gutenberg, arXiv, Open Library).', agents: ['scholar', 'researcher', 'news-scout'], engine: 'TrustedLibrary', timeoutMs: 60000 },
   { slug: 'wikipedia-lookup', name: 'Wikipedia Lookup', type: 'Research', desc: 'Pull the trusted overview for any topic.', agents: ['scholar', 'searcher', 'researcher'], engine: 'SearchEngine' },
   { slug: 'arxiv-search', name: 'arXiv Search', type: 'Research', desc: 'Search academic papers on arXiv.', agents: ['scholar', 'researcher'], engine: 'SearchEngine' },
-  { slug: 'pdf-extract', name: 'PDF Extract', type: 'Research', desc: 'Parse a PDF and extract its text for reading or indexing.', agents: ['document-analyst', 'extractor', 'scholar'], engine: 'Extractor' },
-  { slug: 'trend-scan', name: 'Trend Scan', type: 'Research', desc: 'Detect rising topics and trending themes from feeds and searches.', agents: ['news-filter', 'market-analyst', 'researcher'], engine: 'NewsAgent' },
-  { slug: 'market-research', name: 'Market Research', type: 'Research', desc: 'Size a market, estimate demand and map the landscape.', agents: ['market-analyst', 'researcher'], engine: 'SearchEngine' },
-  { slug: 'competitor-scan', name: 'Competitor Scan', type: 'Research', desc: 'Analyze competitors: positioning, pricing, strengths, gaps.', agents: ['market-analyst', 'seo-specialist'], engine: 'SearchEngine' },
+  { slug: 'pdf-extract', name: 'PDF Extract', type: 'Research', desc: 'Parse a PDF and extract its text for reading or indexing.', agents: ['document-analyst', 'extractor', 'scholar'], engine: 'Extractor', timeoutMs: 60000 },
+  { slug: 'trend-scan', name: 'Trend Scan', type: 'Research', desc: 'Detect rising topics and trending themes from feeds and searches.', agents: ['news-filter', 'market-analyst', 'researcher'], engine: 'NewsAgent', timeoutMs: 45000 },
+  { slug: 'market-research', name: 'Market Research', type: 'Research', desc: 'Size a market, estimate demand and map the landscape.', agents: ['market-analyst', 'researcher'], engine: 'SearchEngine', timeoutMs: 60000 },
+  { slug: 'competitor-scan', name: 'Competitor Scan', type: 'Research', desc: 'Analyze competitors: positioning, pricing, strengths, gaps.', agents: ['market-analyst', 'seo-specialist'], engine: 'SearchEngine', timeoutMs: 60000 },
 
   // ── Browser & perception ──────────────────────────────────────
   { slug: 'link-open', name: 'Open Link', type: 'Browser', desc: 'Open a shared link in the real browser and summarize what it contains.', agents: ['navigator', 'computer-use'], engine: 'DesktopManager' },
@@ -91,31 +91,31 @@ export const TOOL_REGISTRY = [
   // P7 — MCP as an INTERNAL tool: lets graph nodes call external MCP tools
   // (ask_jexi, memory_lookup, knowledge_search, list_books, get_health)
   // through the same validated tool path as internal tools.
-  { slug: 'mcp-call', name: 'MCP Call', type: 'MCP', desc: 'Call an external MCP tool (ask_jexi, memory_lookup, knowledge_search, list_books, get_health) with schema-validated args.', agents: ['jexi', 'context-manager', 'memory'], engine: 'MCPServer' },
+  { slug: 'mcp-call', name: 'MCP Call', type: 'MCP', desc: 'Call an external MCP tool (ask_jexi, memory_lookup, knowledge_search, list_books, get_health) with schema-validated args.', agents: ['jexi', 'context-manager', 'memory'], engine: 'MCPServer', timeoutMs: 30000 },
   // B56 — CONNECTORS as an INTERNAL tool: agents reach GitHub / Email
   // through the registry via this one gated tool. It is EXTERNAL-tier,
   // so a send always pauses for ONE explicit human approval with the
   // finalized details (the OpenWorker risk model). The old messaging
   // connectors were removed (B61/B66); GitHub + Email remain.
-  { slug: 'connector-call', name: 'Connector Call', type: 'Connectors', desc: 'Send an outbound action or read inbound events through a registered connector (github, email) — send_email, create_github_issue, create_github_file.', agents: ['jexi', 'github', 'email', 'context-manager'], engine: 'Connectors' },
-  { slug: 'book-fetch', name: 'Book Fetch', type: 'Knowledge', desc: 'Fetch a free public-domain book or paper from the trusted library.', agents: ['books', 'scholar'], engine: 'TrustedLibrary' },
+  { slug: 'connector-call', name: 'Connector Call', type: 'Connectors', desc: 'Send an outbound action or read inbound events through a registered connector (github, email) — send_email, create_github_issue, create_github_file.', agents: ['jexi', 'github', 'email', 'context-manager'], engine: 'Connectors', timeoutMs: 45000 },
+  { slug: 'book-fetch', name: 'Book Fetch', type: 'Knowledge', desc: 'Fetch a free public-domain book or paper from the trusted library.', agents: ['books', 'scholar'], engine: 'TrustedLibrary', timeoutMs: 45000 },
   { slug: 'knowledge-index', name: 'Knowledge Index', type: 'Knowledge', desc: 'Index studied material so recall is instant and complete.', agents: ['researcher', 'document-analyst', 'scholar'], engine: 'MemoryManager' },
   { slug: 'semantic-search', name: 'Semantic Search', type: 'Memory', desc: 'Hybrid vector + keyword search across all memories.', agents: ['memory', 'document-analyst', 'researcher'], engine: 'MemoryManager' },
   { slug: 'vector-embed', name: 'Vector Embed', type: 'Memory', desc: 'Embed a memory so semantic recall can find it.', agents: ['memory', 'document-analyst'], engine: 'LLMClient' },
   { slug: 'episode-save', name: 'Episode Save', type: 'Memory', desc: 'Save the current session as an episode for future recall.', agents: ['archivist', 'memory'], engine: 'MemoryManager' },
 
   // ── Execution & code ──────────────────────────────────────────
-  { slug: 'code-run', name: 'Run Code', type: 'Execution', desc: 'Execute generated code and capture real stdout and errors.', agents: ['runner', 'debugger', 'coder', 'qa'], engine: 'Runner' },
-  { slug: 'code-write', name: 'Write Files', type: 'Execution', desc: 'Generate and write project files into the workspace.', agents: ['architect', 'coder', 'writer', 'shipper', 'backend', 'frontend'], engine: 'Architect' },
+  { slug: 'code-run', name: 'Run Code', type: 'Execution', desc: 'Execute generated code and capture real stdout and errors.', agents: ['runner', 'debugger', 'coder', 'qa'], engine: 'Runner', timeoutMs: 120000 },
+  { slug: 'code-write', name: 'Write Files', type: 'Execution', desc: 'Generate and write project files into the workspace.', agents: ['architect', 'coder', 'writer', 'shipper', 'backend', 'frontend'], engine: 'Architect', timeoutMs: 30000 },
   { slug: 'code-fix', name: 'Fix & Re-run', type: 'Execution', desc: 'Apply a fix to failing code and re-run until it is clean.', agents: ['debugger', 'coder'], engine: 'Architect.applyFix' },
-  { slug: 'code-review', name: 'Code Review', type: 'Quality', desc: 'Review the code with APPROVED / CHANGES-REQUESTED verdict.', agents: ['reviewer', 'critic', 'security'], engine: 'SkillChain' },
-  { slug: 'security-scan', name: 'Security Scan', type: 'Quality', desc: 'OWASP-class vulnerability review with CLEARED / BLOCKED verdict.', agents: ['security', 'guardrail'], engine: 'SkillChain' },
+  { slug: 'code-review', name: 'Code Review', type: 'Quality', desc: 'Review the code with APPROVED / CHANGES-REQUESTED verdict.', agents: ['reviewer', 'critic', 'security'], engine: 'SkillChain', timeoutMs: 90000 },
+  { slug: 'security-scan', name: 'Security Scan', type: 'Quality', desc: 'OWASP-class vulnerability review with CLEARED / BLOCKED verdict.', agents: ['security', 'guardrail'], engine: 'SkillChain', timeoutMs: 90000 },
   { slug: 'fact-check', name: 'Fact Check', type: 'Quality', desc: 'Audit an answer against its sources and revise invented or unsupported claims.', agents: ['fact-checker', 'critic'], engine: 'VerificationLoop' },
   { slug: 'self-consistency', name: 'Self-Consistency', type: 'Quality', desc: 'Cross-check the answer against itself and the task before it ships.', agents: ['critic', 'reasoner'], engine: 'VerificationLoop' },
-  { slug: 'test-automation', name: 'Test Automation', type: 'Quality', desc: 'Generate and run automated tests (unit, integration, E2E) for the code.', agents: ['qa', 'reviewer'], engine: 'Runner' },
-  { slug: 'lint-check', name: 'Lint Check', type: 'Quality', desc: 'Run linters and static checks and fix what they flag.', agents: ['coder', 'reviewer'], engine: 'Runner' },
+  { slug: 'test-automation', name: 'Test Automation', type: 'Quality', desc: 'Generate and run automated tests (unit, integration, E2E) for the code.', agents: ['qa', 'reviewer'], engine: 'Runner', timeoutMs: 120000 },
+  { slug: 'lint-check', name: 'Lint Check', type: 'Quality', desc: 'Run linters and static checks and fix what they flag.', agents: ['coder', 'reviewer'], engine: 'Runner', timeoutMs: 60000 },
   { slug: 'dependency-audit', name: 'Dependency Audit', type: 'Quality', desc: 'Audit dependencies for known vulnerabilities and drift.', agents: ['security', 'reviewer'], engine: 'SkillChain' },
-  { slug: 'build-check', name: 'Build Check', type: 'Quality', desc: 'Build the project and verify it compiles cleanly.', agents: ['runner', 'qa', 'coder'], engine: 'Runner' },
+  { slug: 'build-check', name: 'Build Check', type: 'Quality', desc: 'Build the project and verify it compiles cleanly.', agents: ['runner', 'qa', 'coder'], engine: 'Runner', timeoutMs: 90000 },
   { slug: 'pr-review', name: 'PR Review', type: 'DevTools', desc: 'Review an open pull request with a verdict and comments.', agents: ['github', 'reviewer'], engine: 'GitHubAgent' },
   { slug: 'preview-server', name: 'Preview Server', type: 'DevTools', desc: 'Spin up a live preview of a built app.', agents: ['devops', 'github'], engine: 'Runner' },
 
@@ -138,13 +138,13 @@ export const TOOL_REGISTRY = [
   { slug: 'changelog-write', name: 'Changelog Write', type: 'Writing', desc: 'Write release notes and changelogs from git history.', agents: ['release-engineer', 'writer'], engine: 'WriterAgent' },
 
   // ── Data work ─────────────────────────────────────────────────
-  { slug: 'data-crunch', name: 'Data Crunch', type: 'Data', desc: 'Compute real statistics, aggregates and numbers from data.', agents: ['data', 'data-engineer', 'sql', 'math'], engine: 'DataAgent' },
+  { slug: 'data-crunch', name: 'Data Crunch', type: 'Data', desc: 'Compute real statistics, aggregates and numbers from data.', agents: ['data', 'data-engineer', 'sql', 'math'], engine: 'DataAgent', timeoutMs: 45000 },
   { slug: 'chart-builder', name: 'Chart Builder', type: 'Data', desc: 'Turn numbers into clear charts and dashboards.', agents: ['data-viz', 'data', 'data-engineer'], engine: 'DataAgent' },
   { slug: 'data-load', name: 'Data Load', type: 'Data', desc: 'Load data from files, URLs or APIs into a workable shape.', agents: ['data-engineer', 'data'], engine: 'DataAgent' },
   { slug: 'data-clean', name: 'Data Clean', type: 'Data', desc: 'Clean messy data: missing values, dupes, types, outliers.', agents: ['data-engineer', 'data-quality'], engine: 'DataAgent' },
   { slug: 'data-transform', name: 'Data Transform', type: 'Data', desc: 'Transform data between shapes and formats.', agents: ['data-engineer'], engine: 'DataAgent' },
   { slug: 'data-merge', name: 'Data Merge', type: 'Data', desc: 'Join and merge datasets correctly.', agents: ['data-engineer', 'data'], engine: 'DataAgent' },
-  { slug: 'stats-compute', name: 'Stats Compute', type: 'Data', desc: 'Compute statistics, correlations and significance.', agents: ['data', 'data-scientist', 'sql'], engine: 'DataAgent' },
+  { slug: 'stats-compute', name: 'Stats Compute', type: 'Data', desc: 'Compute statistics, correlations and significance.', agents: ['data', 'data-scientist', 'sql'], engine: 'DataAgent', timeoutMs: 45000 },
   { slug: 'report-generate', name: 'Report Generate', type: 'Data', desc: 'Turn data into a structured report with charts.', agents: ['reporting-analyst', 'bi-analyst', 'data-viz'], engine: 'DataAgent' },
   { slug: 'kpi-track', name: 'KPI Track', type: 'Data', desc: 'Define and track KPIs over time.', agents: ['bi-analyst', 'reporting-analyst', 'market-analyst'], engine: 'DataAgent' },
   { slug: 'model-train', name: 'Model Train', type: 'Data', desc: 'Train, fine-tune or evaluate a machine-learning model.', agents: ['ml-engineer', 'data-scientist', 'ml-ops'], engine: 'SkillChain' },
@@ -179,7 +179,7 @@ export const TOOL_REGISTRY = [
   { slug: 'blog-write', name: 'Blog Write', type: 'Writing', desc: 'Write blog posts and articles.', agents: ['blog-writer', 'writer'], engine: 'SkillChain' },
   { slug: 'white-paper-write', name: 'White Paper Write', type: 'Writing', desc: 'Write long-form authority documents.', agents: ['white-paper-writer', 'researcher'], engine: 'SkillChain' },
   { slug: 'case-study-write', name: 'Case Study Write', type: 'Writing', desc: 'Write customer stories with outcomes.', agents: ['case-study-writer', 'customer-success'], engine: 'SkillChain' },
-  { slug: 'summarize-doc', name: 'Summarize Doc', type: 'Writing', desc: 'Compress long content into precise summaries.', agents: ['summarizer', 'editor', 'reporter'], engine: 'Summarizer' },
+  { slug: 'summarize-doc', name: 'Summarize Doc', type: 'Writing', desc: 'Compress long content into precise summaries.', agents: ['summarizer', 'editor', 'reporter'], engine: 'Summarizer', timeoutMs: 45000 },
   { slug: 'proofread-text', name: 'Proofread Text', type: 'Writing', desc: 'Fix typos, grammar and consistency.', agents: ['proofreader', 'editor', 'copyeditor'], engine: 'SkillChain' },
   { slug: 'email-draft', name: 'Email Draft', type: 'Writing', desc: 'Draft effective emails for any audience.', agents: ['email', 'sales-rep', 'support-engineer'], engine: 'SkillChain' },
   { slug: 'social-schedule', name: 'Social Schedule', type: 'Marketing', desc: 'Plan and schedule social posts.', agents: ['social', 'community-manager'], engine: 'SkillChain' },
@@ -233,8 +233,8 @@ export const TOOL_REGISTRY = [
   { slug: 'notes-organize', name: 'Notes Organize', type: 'Productivity', desc: 'Organize notes and action items.', agents: ['note-taker', 'study'], engine: 'MemoryManager' },
 
   // ── Media & video ────────────────────────────────────────────
-  { slug: 'video-analyze', name: 'Video Analyze', type: 'Media', desc: 'Watch any video link frame-by-frame: timestamped captions, sampled frames, key moments.', agents: ['video-analyst'], engine: 'VideoAnalyzer' },
-  { slug: 'video-transcript', name: 'Video Transcript', type: 'Media', desc: 'Pull the full timestamped transcript of a YouTube/TikTok/Instagram video.', agents: ['video-analyst'], engine: 'VideoAnalyzer' },
+  { slug: 'video-analyze', name: 'Video Analyze', type: 'Media', desc: 'Watch any video link frame-by-frame: timestamped captions, sampled frames, key moments.', agents: ['video-analyst'], engine: 'VideoAnalyzer', timeoutMs: 120000 },
+  { slug: 'video-transcript', name: 'Video Transcript', type: 'Media', desc: 'Pull the full timestamped transcript of a YouTube/TikTok/Instagram video.', agents: ['video-analyst'], engine: 'VideoAnalyzer', timeoutMs: 120000 },
   { slug: 'video-frames', name: 'Video Frames', type: 'Media', desc: 'Sample visual frames across a video timeline for vision analysis.', agents: ['video-analyst', 'vision'], engine: 'VideoAnalyzer' },
 
   // ── Observability ────────────────────────────────────────────
@@ -243,8 +243,8 @@ export const TOOL_REGISTRY = [
   { slug: 'emit_metric', name: 'Emit Metric', type: 'Observability', desc: 'Record a counter or gauge (latency, tokens, gate results) into the metrics store.', agents: ['observability'], engine: 'ObservabilityAgent' },
 
   // ── Sandbox ──────────────────────────────────────────────────
-  { slug: 'create_sandbox', name: 'Create Sandbox', type: 'Sandbox', desc: 'Create an isolated execution workspace with CPU/memory/timeout limits.', agents: ['sandbox', 'runner'], engine: 'SandboxAgent' },
-  { slug: 'run_in_sandbox', name: 'Run in Sandbox', type: 'Sandbox', desc: 'Execute a command inside an isolated workspace with strict limits.', agents: ['sandbox', 'runner'], engine: 'SandboxAgent' },
+  { slug: 'create_sandbox', name: 'Create Sandbox', type: 'Sandbox', desc: 'Create an isolated execution workspace with CPU/memory/timeout limits.', agents: ['sandbox', 'runner'], engine: 'SandboxAgent', timeoutMs: 60000 },
+  { slug: 'run_in_sandbox', name: 'Run in Sandbox', type: 'Sandbox', desc: 'Execute a command inside an isolated workspace with strict limits.', agents: ['sandbox', 'runner'], engine: 'SandboxAgent', timeoutMs: 180000 },
   { slug: 'destroy_sandbox', name: 'Destroy Sandbox', type: 'Sandbox', desc: 'Tear down a sandbox workspace and release its resources.', agents: ['sandbox', 'runner'], engine: 'SandboxAgent' },
   { slug: 'snapshot_workspace', name: 'Snapshot Workspace', type: 'Sandbox', desc: 'Capture a workspace state for rollback or reuse.', agents: ['sandbox'], engine: 'SandboxAgent' },
 
@@ -276,12 +276,12 @@ export const TOOL_REGISTRY = [
   // ── Chaos (test-only, feature-flagged) ───────────────────────
   { slug: 'inject_failure', name: 'Inject Failure', type: 'Chaos', desc: 'Inject a controlled failure (provider timeout, tool error) — only when the chaos flag is on.', agents: ['chaos-agent'], engine: 'ChaosAgent' },
   { slug: 'session-list', name: 'Session List', type: 'Memory', desc: 'List all past conversations with titles and activity.', agents: ['memory', 'context-manager', 'archivist'], tier: 'read' },
-  { slug: 'session-search', name: 'Session Search', type: 'Memory', desc: 'Search EVERY past conversation for a topic — remember what she did before.', agents: ['memory', 'archivist', 'context-manager'], tier: 'read' },
+  { slug: 'session-search', name: 'Session Search', type: 'Memory', desc: 'Search EVERY past conversation for a topic — remember what she did before.', agents: ['memory', 'archivist', 'context-manager'], tier: 'read', timeoutMs: 30000 },
   { slug: 'session-fork', name: 'Session Fork', type: 'Memory', desc: 'Fork the current conversation into a new one (seeded with history).', agents: ['context-manager', 'memory'], tier: 'write_local' },
-  { slug: 'subagent', name: 'Subagent', type: 'Agent', desc: 'Delegate a sub-task to a child agent with its own context; it reports back.', agents: ['orchestrator', 'planner'], tier: 'exec' },
-  { slug: 'skill-load', name: 'Skill Load', type: 'Agent', desc: 'Load a skill into context (progressive disclosure) — auto-discovered project/user/bundled skills.', agents: ['planner', 'orchestrator'], tier: 'read' },
+  { slug: 'subagent', name: 'Subagent', type: 'Agent', desc: 'Delegate a sub-task to a child agent with its own context; it reports back.', agents: ['orchestrator', 'planner'], tier: 'exec', timeoutMs: 120000 },
+  { slug: 'skill-load', name: 'Skill Load', type: 'Agent', desc: 'Load a skill into context (progressive disclosure) — auto-discovered project/user/bundled skills.', agents: ['planner', 'orchestrator'], tier: 'read', timeoutMs: 30000 },
   { slug: 'skill-search', name: 'Skill Search', type: 'Knowledge', desc: 'Search the auto-discovered skill catalog (metadata only) for a task — find which skill to load.', agents: ['planner', 'orchestrator', 'archivist'], tier: 'read' },
-  { slug: 'run_code', name: 'Run Code Program', type: 'Code', desc: 'Code Mode (PTC): execute ONE TypeScript program that composes tools as await tools.name(args) — a whole workflow in a single call.', agents: ['coder', 'engineer', 'planner'], tier: 'write_local' },
+  { slug: 'run_code', name: 'Run Code Program', type: 'Code', desc: 'Code Mode (PTC): execute ONE TypeScript program that composes tools as await tools.name(args) — a whole workflow in a single call.', agents: ['coder', 'engineer', 'planner'], tier: 'write_local', timeoutMs: 240000 },
   { slug: 'spill-read', name: 'Spill Read', type: 'Memory', desc: 'Read the full body of a spilled (oversized) tool result by its spill:// locator.', agents: ['memory', 'archivist', 'context-manager'], tier: 'read' },
   { slug: 'todo', name: 'Todo List', type: 'Productivity', desc: 'Manage a visible task list: add, list, complete.', agents: ['task-manager', 'planner'], tier: 'write_local' },
   { slug: 'plan', name: 'Plan', type: 'Productivity', desc: 'Create or update an explicit multi-step plan with per-step status.', agents: ['planner', 'orchestrator'], tier: 'write_local' },

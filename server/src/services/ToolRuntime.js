@@ -115,15 +115,48 @@ function defaultCodeTools() {
   return TOOL_REGISTRY.filter((t) => t.tier === 'read' || extra.has(t.slug)).slice(0, 30);
 }
 
+/** B101 — union a canonical success contract with the honest-failure shape. */
+const FAILURE_SHAPE = z.object({ ok: z.literal(false), error: z.unknown() }).passthrough();
+const orFail = (success) => z.union([success, FAILURE_SHAPE]);
+
+/** B101 — the search-family engines share one canonical output contract. */
+function buildSearchContracts(...slugs) {
+  const out = {};
+  for (const slug of slugs) {
+    out[slug] = orFail(z.object({ kind: z.literal('search'), query: z.string(), results: z.array(z.unknown()).optional() }).passthrough());
+  }
+  return out;
+}
+
+/**
+ * Specific output contracts for the structured engines. Every other registry
+ * tool falls back to GENERIC_TOOL_OUTPUT in validateToolOutput (B101 — all
+ * 187 tools are contract-checked, dsh output-contract mirror).
+ */
 export const TOOL_OUTPUT_SCHEMAS = {
-  'web-search': z.object({
-    kind: z.string(),
-    query: z.string(),
-    results: z.array(z.object({ title: z.string().optional().nullable(), url: z.string().optional().nullable(), snippet: z.string().optional().nullable() })).optional(),
-  }).passthrough(),
-  'deep-read': z.object({ kind: z.string(), url: z.string(), text: z.string() }).passthrough(),
-  'pdf-extract': z.object({ kind: z.string(), url: z.string(), text: z.string() }).passthrough(),
-  'stats-compute': z.object({ kind: z.string(), stats: z.unknown() }).passthrough(),
+  // B101 — every structured engine has a canonical SUCCESS contract (required
+  // fields) unioned with the honest-FAILURE shape (ok:false + error), exactly
+  // dsh's output contract + isError channel. Anything else fails closed.
+  ...buildSearchContracts('web-search', 'wikipedia-lookup', 'arxiv-search', 'market-research', 'competitor-scan', 'trend-scan'),
+  'deep-read': orFail(z.object({ kind: z.literal('content'), url: z.string(), text: z.string() }).passthrough()),
+  'pdf-extract': orFail(z.object({ kind: z.literal('pdf'), url: z.string(), text: z.string() }).passthrough()),
+  'trusted-library': orFail(z.object({ kind: z.literal('books'), topic: z.string(), books: z.array(z.unknown()).optional() }).passthrough()),
+  'book-fetch': orFail(z.object({ kind: z.literal('book'), url: z.string(), text: z.string() }).passthrough()),
+  'news-feed': orFail(z.object({ kind: z.literal('news'), query: z.string(), items: z.array(z.unknown()).optional() }).passthrough()),
+  'memory-recall': orFail(z.object({ kind: z.literal('memory'), query: z.string(), matches: z.array(z.unknown()).optional() }).passthrough()),
+  'semantic-search': orFail(z.object({ kind: z.literal('memory'), query: z.string(), matches: z.array(z.unknown()).optional() }).passthrough()),
+  'memory-write': orFail(z.object({ kind: z.literal('stored'), fact: z.string() }).passthrough()),
+  'knowledge-save': orFail(z.object({ kind: z.literal('stored'), file: z.string() }).passthrough()),
+  'episode-save': orFail(z.object({ kind: z.literal('stored'), episode: z.string() }).passthrough()),
+  'knowledge-search': orFail(z.object({ kind: z.literal('knowledge'), query: z.string(), hits: z.array(z.unknown()).optional() }).passthrough()),
+  'profile-read': orFail(z.object({ kind: z.literal('profile'), profile: z.unknown().optional(), facts: z.array(z.unknown()).optional() }).passthrough()),
+  'code-run': orFail(z.object({ kind: z.literal('exec'), command: z.string(), output: z.string(), success: z.boolean() }).passthrough()),
+  'code-write': orFail(z.object({ kind: z.literal('written'), file: z.string() }).passthrough()),
+  'summarize-doc': orFail(z.object({ kind: z.literal('summary'), summary: z.string() }).passthrough()),
+  'video-analyze': orFail(z.object({ kind: z.literal('video'), url: z.string(), summary: z.string() }).passthrough()),
+  'video-transcript': orFail(z.object({ kind: z.literal('transcript'), url: z.string(), text: z.string() }).passthrough()),
+  'data-crunch': orFail(z.object({ kind: z.literal('stats'), stats: z.unknown() }).passthrough()),
+  'stats-compute': orFail(z.object({ kind: z.literal('stats'), stats: z.unknown() }).passthrough()),
   'self-diagnose': z.object({ kind: z.string(), status: z.unknown() }).passthrough(),
   'mcp-call': z.object({ ok: z.boolean(), tool: z.string().optional(), result: z.unknown().optional(), error: z.unknown().optional() }).passthrough(),
   'connector-call': z.object({ ok: z.boolean(), connector: z.string().optional(), method: z.string().optional(), result: z.unknown().optional(), events: z.unknown().optional(), error: z.unknown().optional(), code: z.string().optional() }).passthrough(),
@@ -166,10 +199,44 @@ export function validateToolArgs(slug, args = {}) {
  * P4 — validate a tool's OUTPUT shape, fail closed. Returns the structured
  * error when malformed so callers route to replanner instead of replying.
  */
+/**
+ * B101 — GENERIC baseline contract: every registry tool without a specific
+ * contract is still checked. Engines must return a string or a plain object
+ * (arrays/numbers/booleans fail) — the routing signal (null) is legal.
+ */
+export const GENERIC_TOOL_OUTPUT = z.union([
+  z.string(),
+  z.object({
+    ok: z.boolean().optional(),
+    kind: z.string().optional(),
+    result: z.unknown().optional(),
+    tool: z.string().optional(),
+    error: z.union([z.string(), z.object({ code: z.string().optional(), message: z.string().optional() }).passthrough(), z.null()]).optional(),
+    permission: z.string().optional(),
+    tier: z.string().optional(),
+    durationMs: z.number().optional(),
+    paused: z.boolean().optional(),
+    approvalRequired: z.boolean().optional(),
+    blocked: z.boolean().optional(),
+    routed: z.boolean().optional(),
+  }).passthrough(),
+]);
+
+/** Does this tool have a contract (specific or the generic baseline)? */
+export function hasOutputContract(slug) {
+  return !!TOOL_OUTPUT_SCHEMAS[slug] || !!GENERIC_TOOL_OUTPUT;
+}
+
+/** B101 — tier-based timeout defaults (dsh: per-tool timeoutMs, else sane floor). */
+const DEFAULT_TIMEOUTS = { read: 45000, write_local: 60000, exec: 120000, risky: 120000 };
+function defaultTimeoutFor(tool) {
+  return DEFAULT_TIMEOUTS[tool && tool.tier] || 60000;
+}
+
 export function validateToolOutput(slug, result) {
-  const schema = TOOL_OUTPUT_SCHEMAS[slug];
-  if (!schema) return { ok: true };
-  if (result === undefined || result === null) {
+  const schema = TOOL_OUTPUT_SCHEMAS[slug] || GENERIC_TOOL_OUTPUT;
+  if (result === null) return { ok: true }; // null = the routing contract (no engine)
+  if (result === undefined) {
     return { ok: false, error: { code: 'SCHEMA_VALIDATION_FAILED', message: `Tool "${slug}" returned no output`, node: 'tool' } };
   }
   const check = schema.safeParse(result);
@@ -693,7 +760,7 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
   let tool = getTool(slug);
   if (!tool) {
     const pt = getPluginTool(slug);
-    if (pt) tool = { slug, name: pt.name || slug, desc: pt.desc || 'plugin tool', agents: [], permission: pt.permission || 'medium' };
+    if (pt) tool = { slug, name: pt.name || slug, desc: pt.desc || 'plugin tool', agents: [], permission: pt.permission || 'medium', timeoutMs: typeof pt.timeoutMs === 'number' && pt.timeoutMs > 0 ? pt.timeoutMs : undefined };
     else return { ok: false, error: `Unknown tool: ${slug}`, durationMs: 0 };
   }
 
@@ -800,14 +867,45 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
   try {
     // B99 — code-mode programs get a longer budget (the program itself caps
     // its own wall-clock inside the worker; this is the outer backstop).
-    const outerTimeoutMs = slug === 'run_code' ? 240000 : 60000;
-    const result = await withTimeout(runEngine(slug, args, {
-      codeTools,
-      profile,
-      sendEvent: emit,
-      signal,
-      intent,
-    }), outerTimeoutMs);
+    // B101 — per-tool timeoutMs (dsh timeout-policy mirror): the tool's
+    // declared budget wins; otherwise a tier default. The deadline aborts a
+    // per-call controller so COOPERATIVE engines (run_code, subagent, …) see
+    // the signal and reach quiescence; the race is the structured backstop.
+    const timeoutMs = tool.timeoutMs && tool.timeoutMs > 0 ? tool.timeoutMs : defaultTimeoutFor(tool);
+    const controller = new AbortController();
+    let rejectRace = null;
+    const raceTimeout = new Promise((_, reject) => { rejectRace = reject; });
+    const timer = setTimeout(() => {
+      controller.abort();
+      if (rejectRace) rejectRace(Object.assign(new Error(`tool call timed out after ${timeoutMs}ms`), { code: 'TOOL_TIMEOUT', timeoutMs }));
+    }, timeoutMs);
+    if (signal) {
+      if (signal.aborted) controller.abort();
+      else signal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
+    let result;
+    try {
+      result = await Promise.race([
+        runEngine(slug, args, {
+          codeTools,
+          profile,
+          sendEvent: emit,
+          signal: controller.signal,
+          intent,
+        }),
+        raceTimeout,
+      ]);
+    } catch (e) {
+      clearTimeout(timer);
+      if (e && e.code === 'TOOL_TIMEOUT') {
+        const tmo = { ok: false, tool: slug, code: 'TOOL_TIMEOUT', error: e.message, durationMs: Date.now() - started };
+        emit('tool.result', { tool: slug, ok: false, code: 'TOOL_TIMEOUT', error: e.message, durationMs: tmo.durationMs });
+        return tmo;
+      }
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
     // P4 — fail closed on malformed tool OUTPUT (never a silent empty reply).
     const outCheck = validateToolOutput(slug, result);
     if (!outCheck.ok) {
@@ -905,13 +1003,7 @@ export function getToolCatalog() {
   }));
 }
 
-function withTimeout(promise, ms) {
-  let timer;
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`Tool timed out after ${Math.round(ms / 1000)}s`)), ms);
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
-}
+// B101 — per-tool timeouts replaced the flat withTimeout helper (see executeToolInner).
 
 function safeArgs(slug, args) {
   // Never log key-like values
