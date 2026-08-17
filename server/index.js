@@ -42,6 +42,8 @@ import { skillFolder, SKILL_META } from './src/services/SkillChain.js'; // B50 P
 import { getSkillBody, listSkillCatalog, discoverySummary, createUserSkill, invalidateSkillCache, startSkillWatcher, SKILL_NAME_RE } from './src/services/SkillDiscovery.js'; // B98 — dsh-style skill auto-discovery
 import { maybeCompact, compactNow, compactionStatus, compactionAwareHistory, isCompactionEvent } from './src/services/CompactionEngine.js'; // B100 — dsh-style compaction of long sessions
 import { listSpills, spillStats } from './src/services/SpillStore.js'; // B100 — spilled oversized tool results
+import { resolvePreset } from './src/services/PresetManager.js'; // B102 — dsh agent presets (standard/ptc/minimal/creator)
+import { buildTrace } from './src/services/SessionTrace.js'; // B102 — per-conversation session trace
 import { knowledgeStatus, loadProjectKnowledge, knowledgeLoad } from './src/services/KnowledgeBase.js'; // B50 P2 — project knowledge
 import { getToolCatalog, TOOL_PROFILES, activeToolProfile, setToolProfile, executeTool } from './src/services/ToolRuntime.js';
 import { runAgentLoop } from './src/services/AgentLoop.js';
@@ -576,10 +578,11 @@ app.post('/api/agent', async (req, res) => {
   }, 10 * 60 * 1000);
 
   try {
-    // B99 — code mode header flows into the loop (default on for agent mode).
-    const codeModeHeader = String(req.headers['x-jexi-code-mode'] || '1').toLowerCase();
+    // B102 — preset-aware code mode (default: ptc → code mode on).
+    const preset = resolvePreset(String(req.headers['x-jexi-preset'] || '').toLowerCase());
+    const codeModeHeader = String(req.headers['x-jexi-code-mode'] || (preset.codeMode ? '1' : '0')).toLowerCase();
     const codeMode = codeModeHeader !== '0' && codeModeHeader !== 'off' && codeModeHeader !== 'false';
-    await runAgentLoop({ query, image, profile, sendEvent, opts: { codeMode } });
+    await runAgentLoop({ query, image, profile, sendEvent, opts: { codeMode, presetFlavor: preset.flavor } });
     finished = true;
     clearTimeout(deadline);
     finish();
@@ -1648,6 +1651,13 @@ app.post('/api/conversations/:id/compact', async (req, res) => {
   }
 });
 
+// B102 — session trace: the durable event log + compaction checkpoints
+// for one conversation (dsh web session explorer mirror).
+app.get('/api/conversations/:id/trace', (req, res) => {
+  const id = String(req.params.id).slice(0, 80);
+  res.json(buildTrace(id, { limit: Number(req.query.limit) || 200 }));
+});
+
 // B100 — spilled (oversized) tool results for a session (metadata only).
 app.get('/api/spills', (req, res) => {
   const owner = String(req.query.owner || 'agent').slice(0, 60);
@@ -1998,7 +2008,9 @@ app.post('/api/chat', async (req, res) => {
     // tools, no graph. Fast, simple, minimal events. Explicit agent commands
     // (/build, /goal, /do, links, travel) already returned above, so what
     // reaches here is a plain conversation question.
-    const mode = String(req.body.mode || req.headers['x-jexi-mode'] || 'agent').toLowerCase();
+    // B102 — the preset's mode is the default; an explicit header wins.
+    const preset = resolvePreset(String(req.headers['x-jexi-preset'] || '').toLowerCase());
+    const mode = String(req.body.mode || req.headers['x-jexi-mode'] || preset.mode || 'agent').toLowerCase();
     if (mode === 'normal' && !image) {
       try { addChat('user', effectiveQuery); } catch (e) {}
       sendEvent('log', { agent: 'JEXI', message: '💬 Normal mode — answering directly (switch to Agent mode in the header for the full multi-agent team).' });
@@ -2199,13 +2211,14 @@ app.post('/api/chat', async (req, res) => {
     // B66 — Orchestrator-Workers: SIMPLE tasks (single-shot intent) take the
     // single-coworker fast path — no graph construction at all. COMPLEX tasks
     // run the full typed-state graph as before. Both return the same contract.
-    // B99 — CODE MODE (PTC): on unless the app explicitly turns it off
-    // (x-jexi-code-mode: 0). The model may write ONE TypeScript program that
-    // composes the auto-selected tools (dsh `code` preset).
-    const codeModeHeader = String(req.headers['x-jexi-code-mode'] || req.body.codeMode || '1').toLowerCase();
+    // B102 — PRESET (dsh agent-presets): standard | ptc | minimal | creator.
+    // `preset` resolved above (mode block); an explicit x-jexi-mode /
+    // x-jexi-code-mode header overrides it.
+    const codeModeHeader = String(req.headers['x-jexi-code-mode'] || req.body.codeMode || (preset.codeMode ? '1' : '0')).toLowerCase();
     const codeMode = codeModeHeader !== '0' && codeModeHeader !== 'off' && codeModeHeader !== 'false';
+    const presetFlavor = mode === 'normal' ? '' : preset.flavor;
     const results = plan.complexity === 'SIMPLE'
-      ? await runSimpleTask(plan, executionQuery || effectiveQuery, sendEvent, { image, codeMode, convId })
+      ? await runSimpleTask(plan, executionQuery || effectiveQuery, sendEvent, { image, codeMode, convId, presetFlavor })
       : await orchestrator.executePlan(plan, executionQuery || effectiveQuery, sendEvent, {
           image,
           // B53 P2 — task scope for the run: the orchestrator gates memory reuse

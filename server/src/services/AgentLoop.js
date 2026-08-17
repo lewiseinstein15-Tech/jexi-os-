@@ -119,7 +119,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   try {
     const res = await generateWithToolsLoop(
       `The user asked: "${query}"${image ? '\n(An image was provided — analyze it.)' : ''}`,
-      (opts.systemPromptOverride || JEXI_SYSTEM_PROMPT) + buildSkillCatalog(30) + (codeMode ? await renderSdkBlock(codeTools) : '') + preferencesBlock(),
+      (opts.systemPromptOverride || JEXI_SYSTEM_PROMPT) + (opts.presetFlavor || '') + buildSkillCatalog(30) + (codeMode ? await renderSdkBlock(codeTools) : '') + preferencesBlock(),
       schemas,
       {
         temperature: 0.3,

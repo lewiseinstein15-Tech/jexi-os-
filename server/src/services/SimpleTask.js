@@ -98,7 +98,7 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
   } catch (e) {}
 
   const prompt = `The user asked: "${query}"\n\n${ctx ? `Conversation context:\n${ctx.slice(0, 4000)}\n\n` : ''}Answer directly and completely. ${FORMAT_RULES}`;
-  const res = await runWorker(role, prompt, JEXI_SYSTEM_PROMPT + preferencesBlock() + orchestratorPromptFragment() + coworkerMandate, {
+  const res = await runWorker(role, prompt, JEXI_SYSTEM_PROMPT + (opts.presetFlavor || '') + preferencesBlock() + orchestratorPromptFragment() + coworkerMandate, {
     temperature: 0.4,
     // B67 — the coworker can really call these tools via native function
     // calling; intent is passed so ToolRuntime enforces the allowlist.

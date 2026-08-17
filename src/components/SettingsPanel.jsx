@@ -73,6 +73,7 @@ export default function SettingsPanel() {
   const [trust, setTrust] = useState(null);
   const [tiers, setTiers] = useState(null); // B55 OpenWorker risk tiers: { tools, counts }
   const [codeMode, setCodeMode] = useState(() => (typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_code_mode') || '1') === '1' : true)); // B99 — PTC code mode
+  const [preset, setPreset] = useState(() => (typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_preset') || 'ptc') : 'ptc')); // B102 — dsh agent presets
 
   const TIER_DEFS = [
     ['read', 'READ', 'Search & lookup — no side effects, always autonomous, never asks', 'text-[#34D399] border-[#34D399]/30 bg-[#34D399]/10'],
@@ -520,6 +521,37 @@ export default function SettingsPanel() {
                     className={`rounded-md px-2 py-2 border text-left transition-colors ${trust.mode === m ? 'bg-brand-dim border-brand-line' : 'bg-surface-1 border-hairline'}`}
                   >
                     <p className={`text-[8px] font-black tracking-wider ${trust.mode === m ? 'text-brand' : 'text-text-secondary'}`}>{label}</p>
+                    <p className="text-[7px] text-text-tertiary mt-0.5">{hint}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* B102 — AGENT PRESETS (deepseek-harness: standard / ptc / minimal / creator) */}
+            <div>
+              <p className="text-[9px] font-bold text-text-secondary mb-1.5 tracking-wider">AGENT PRESET</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  ['standard', 'STANDARD', 'Native tool calling'],
+                  ['ptc', 'PTC', 'Code Mode + SDK'],
+                  ['minimal', 'MINIMAL', 'Direct answers'],
+                  ['creator', 'CREATOR', 'Code Mode + flair'],
+                ].map(([key, label, hint]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      try { localStorage.setItem('jexi_preset', key); } catch { /* noop */ }
+                      setPreset(key);
+                      // Preset also drives mode + code-mode defaults.
+                      try { localStorage.setItem('jexi_mode', key === 'minimal' ? 'normal' : 'agent'); } catch { /* noop */ }
+                      const cm = key === 'standard' || key === 'minimal' ? '0' : '1';
+                      try { localStorage.setItem('jexi_code_mode', cm); } catch { /* noop */ }
+                      setCodeMode(cm === '1');
+                    }}
+                    className={`rounded-md px-2 py-2 border text-left transition-colors ${preset === key ? 'bg-brand-dim border-brand-line' : 'bg-surface-1 border-hairline'}`}
+                  >
+                    <p className={`text-[8px] font-black tracking-wider ${preset === key ? 'text-brand' : 'text-text-secondary'}`}>{label}</p>
                     <p className="text-[7px] text-text-tertiary mt-0.5">{hint}</p>
                   </button>
                 ))}

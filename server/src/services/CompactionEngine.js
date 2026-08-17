@@ -23,6 +23,7 @@ import path from 'path';
 import { DATA_DIR } from '../config.js';
 import { conversationFilePath, loadConversationEvents } from './SessionConversations.js';
 import { generateContent } from './LLMClient.js';
+import { appendEvent } from './EventLog.js'; // B102 — compaction is a first-class durable event
 
 /** Auto-compaction pressure: total chat characters before we compact. */
 export const AUTO_COMPACT_THRESHOLD_CHARS = 45000;
@@ -280,6 +281,16 @@ function rewriteWithCheckpoint(convId, events, cut, summary) {
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, lines.join('\n') + '\n', 'utf-8');
+    // B102 — the durable event log records the compaction (dsh compaction/*
+    // events), so the session trace can replay it.
+    try {
+      appendEvent('context_compaction', {
+        conversation: convId,
+        shadowed: checkpointEv.meta.shadowed,
+        retained: checkpointEv.meta.retained,
+        checkpointChars: String(summary || '').length,
+      }, convId);
+    } catch { /* the event log must never break a compaction */ }
   } catch (e) {
     throw new Error(`checkpoint write failed: ${(e && e.message) || e}`);
   }

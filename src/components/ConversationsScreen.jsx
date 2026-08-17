@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  MessagesSquare, Plus, Trash2, GitFork, Search, Clock, Loader2, MessageCircle, Bot, ChevronRight, Archive,
+  MessagesSquare, Plus, Trash2, GitFork, Search, Clock, Loader2, MessageCircle, Bot, ChevronRight, Archive, Activity,
 } from 'lucide-react';
 import { getBackendUrl, jexiFetch, getSessionId, setSessionId } from '../utils/helpers';
 import PanelHeader from './PanelHeader';
@@ -30,6 +30,8 @@ export default function ConversationsScreen() {
   const [busy, setBusy] = useState(false);
   const [cpStatus, setCpStatus] = useState(null); // B100 — compaction pressure
   const [cpMsg, setCpMsg] = useState(''); // result of a manual compact
+  const [trace, setTrace] = useState(null); // B102 — session trace
+  const [showTrace, setShowTrace] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -55,6 +57,20 @@ export default function ConversationsScreen() {
       } catch (e) { setCpStatus(null); }
     } catch (e) { /* noop */ }
     setBusy(false);
+  };
+
+  // B102 — session trace: durable event log + compaction checkpoints
+  const loadTrace = async (id) => {
+    setBusy(true);
+    try {
+      const res = await jexiFetch(`${getBackendUrl()}/api/conversations/${id}/trace`);
+      setTrace(await res.json());
+    } catch (e) { setTrace(null); }
+    setBusy(false);
+  };
+  const toggleTrace = async (id) => {
+    if (!showTrace || !trace || trace.convId !== id) { await loadTrace(id); setShowTrace(true); }
+    else setShowTrace(false);
   };
 
   // B100 — force-compact this conversation (dsh /compact mirror)
@@ -186,6 +202,9 @@ export default function ConversationsScreen() {
                   <button onClick={() => compactIt(c.id)} disabled={busy} className="px-2 py-1 rounded text-[8px] font-bold border border-brand-line text-brand flex items-center gap-1 hover:bg-brand-dim/40 disabled:opacity-50">
                     <Archive className="w-2.5 h-2.5" /> COMPACT
                   </button>
+                  <button onClick={() => toggleTrace(c.id)} disabled={busy} className="px-2 py-1 rounded text-[8px] font-bold border border-brand-line text-brand flex items-center gap-1 hover:bg-brand-dim/40 disabled:opacity-50">
+                    <Activity className="w-2.5 h-2.5" /> TRACE
+                  </button>
                   <button onClick={() => forkIt(c.id)} className="px-2 py-1 rounded text-[8px] font-bold border border-brand-line text-brand flex items-center gap-1 hover:bg-brand-dim/40">
                     <GitFork className="w-2.5 h-2.5" /> FORK
                   </button>
@@ -193,6 +212,28 @@ export default function ConversationsScreen() {
                     <Trash2 className="w-2.5 h-2.5" /> DELETE
                   </button>
                 </div>
+                {showTrace && trace && trace.convId === c.id && (
+                  <div className="mt-2 rounded-md border border-hairline bg-surface-1 px-2 py-1.5 space-y-1 max-h-48 overflow-y-auto">
+                    <p className="text-[8px] font-black tracking-wider text-text-secondary flex items-center gap-1">
+                      <Activity className="w-2.5 h-2.5 text-brand" /> SESSION TRACE · {trace.events?.length || 0} events · {trace.compaction?.length || 0} compaction(s)
+                    </p>
+                    {(trace.events || []).slice(-60).map((e, i) => {
+                      const p = e.payload || {};
+                      let line = e.type;
+                      let color = 'text-text-tertiary';
+                      if (e.type === 'tool_call') { line = `🔧 ${p.tool} ${JSON.stringify(p.args || {}).slice(0, 90)}`; color = 'text-cyan-300/80'; }
+                      else if (e.type === 'tool_result') { line = `${p.ok ? '✅' : '❌'} ${p.tool}${p.error ? ' — ' + String(p.error).slice(0, 80) : ''}${p.durationMs ? ' · ' + p.durationMs + 'ms' : ''}`; color = p.ok ? 'text-brand/80' : 'text-status-error'; }
+                      else if (e.type === 'user_message') { line = `💬 ${String(p.text || '').slice(0, 90)}`; color = 'text-text-secondary'; }
+                      else if (e.type === 'coworker_call') { line = `🧑‍💻 ${p.coworker} → ${p.provider}${p.model ? '/' + p.model : ''}`; color = 'text-text-secondary'; }
+                      else if (e.type === 'coworker_result') { line = `🧑‍💻 ${p.coworker} · ${p.mode || 'text'}${p.toolCalls ? ' · ' + p.toolCalls + ' tool calls' : ''}`; color = 'text-brand/70'; }
+                      else if (e.type === 'context_compaction') { line = `📦 compaction · ${p.shadowed?.events || '?'} turns shadowed`; color = 'text-brand'; }
+                      else if (e.type === 'error') { line = `⚠ ${String(p.message || '').slice(0, 100)}`; color = 'text-status-error'; }
+                      else if (e.type === 'orchestrator_decision') { line = `🧭 ${p.complexity} · ${p.intent}`; color = 'text-text-secondary'; }
+                      return <p key={i} className={`text-[8px] leading-snug font-mono ${color}`}>{line}</p>;
+                    })}
+                    {(!trace.events || trace.events.length === 0) && <p className="text-[8px] text-text-tertiary">No traced events yet — send a message in this conversation.</p>}
+                  </div>
+                )}
               </div>
             )}
           </div>
