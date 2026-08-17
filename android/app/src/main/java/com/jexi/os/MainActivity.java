@@ -30,11 +30,11 @@ public class MainActivity extends BridgeActivity {
 
     /**
      * B93 — VISION FIX. The WebView silently denies navigator.mediaDevices
-     * .getUserMedia() unless onPermissionRequest is granted here. Without it,
-     * JEXI's camera/vision never works even though the manifest has CAMERA.
+     * .getUserMedia() unless onPermissionRequest is granted. The grant lives
+     * in the WebChromeClient below (installed in onCreate) — this class-level
+     * helper is reused by that client.
      */
-    @Override
-    public void onPermissionRequest(PermissionRequest request) {
+    private void grantWebViewPermission(PermissionRequest request) {
         runOnUiThread(() -> {
             try {
                 request.grant(request.getResources());
@@ -73,13 +73,7 @@ public class MainActivity extends BridgeActivity {
             wv.setWebChromeClient(new WebChromeClient() {
                 @Override
                 public void onPermissionRequest(PermissionRequest request) {
-                    runOnUiThread(() -> {
-                        try {
-                            request.grant(request.getResources());
-                        } catch (Exception e) {
-                            request.deny();
-                        }
-                    });
+                    grantWebViewPermission(request);
                 }
             });
         }
