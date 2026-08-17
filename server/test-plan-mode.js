@@ -101,5 +101,32 @@ ok(currentPlan('default') !== null, 'plan stored for the default session');
 const t3 = await executeTool({ slug: 'exit_plan_mode', args: { plan: 'short' } });
 ok(t3.ok === false, 'too-short plan fails honestly through the gate');
 
-console.log(`\nB110 plan-mode+ask-user: ${passed} passed, ${failedCount} failed`);
+console.log('\n== 7. ENFORCEMENT: execution tools are hard-blocked in plan mode (B111) ==');
+const { planModeBlocked } = await import('./src/services/PlanMode.js');
+setPlanMode('gate-conv', true);
+ok(planModeBlocked('code-run', {}, 'gate-conv') === true, 'code-run blocked');
+ok(planModeBlocked('preview-server', {}, 'gate-conv') === true, 'preview-server blocked (no preview links before approval)');
+ok(planModeBlocked('run_code', {}, 'gate-conv') === true, 'run_code blocked');
+ok(planModeBlocked('link-open', {}, 'gate-conv') === true, 'link-open blocked');
+ok(planModeBlocked('github-cli', {}, 'gate-conv') === true, 'github-cli blocked (external tier)');
+ok(planModeBlocked('memory-recall', {}, 'gate-conv') === false, 'read tools stay usable in plan mode');
+ok(planModeBlocked('skill-search', {}, 'gate-conv') === false, 'skill-search stays usable');
+ok(planModeBlocked('exit_plan_mode', {}, 'gate-conv') === false, 'exit_plan_mode stays usable');
+ok(planModeBlocked('code-run', {}, undefined) === false, 'no conversation → no blocking');
+setPlanMode('gate-conv', false);
+ok(planModeBlocked('code-run', {}, 'gate-conv') === false, 'after plan mode off, execution allowed again');
+// Through the GATED RUNTIME: the refusal carries planMode + a clear error.
+setPlanMode('gate-conv', true);
+const g1 = await executeTool({ slug: 'code-run', args: { command: 'echo hi' }, spillOwner: 'gate-conv' });
+ok(g1.ok === false && g1.planMode === true && /Plan mode is active/.test(g1.error || ''), 'gate refuses code-run with planMode error');
+ok(g1.blocked === true, 'gate marks the refusal as blocked');
+const g2 = await executeTool({ slug: 'preview-server', args: { name: 'x' }, spillOwner: 'gate-conv' });
+ok(g2.ok === false && g2.planMode === true, 'gate refuses preview-server (no premature preview links)');
+const g3 = await executeTool({ slug: 'memory-recall', args: { query: 'anything' }, spillOwner: 'gate-conv' });
+ok(g3.ok === true, 'read tools still execute through the gate in plan mode');
+setPlanMode('gate-conv', false);
+const g4 = await executeTool({ slug: 'code-run', args: { command: 'echo ok' }, spillOwner: 'gate-conv', profile: 'full' });
+ok(g4.ok === true, 'after approval (mode off), execution works again (full profile satisfies the separate permission gate)');
+
+console.log(`\nB110+B111 plan-mode+ask-user: ${passed} passed, ${failedCount} failed`);
 process.exit(failedCount ? 1 : 0);

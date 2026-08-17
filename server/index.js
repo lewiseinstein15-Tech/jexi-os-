@@ -1916,7 +1916,7 @@ app.post('/api/chat', async (req, res) => {
       const on = !/\boff\b/.test(raw);
       setPlanMode(convId, on);
       sendEvent('log', { agent: 'Planner', message: on ? '📋 Plan mode ON — I will plan first and wait for your approval before executing anything.' : '📋 Plan mode OFF — I will execute tasks directly.' });
-      done({ success: true, query: raw, summary: on ? '### 📋 Plan mode ON\n\nI will now plan first and present the plan for your approval before executing. Say **approve** (or **yes**) to start implementation, or send changes and I will revise.' : '### 📋 Plan mode OFF\n\nI will execute tasks directly again.' });
+      done({ success: true, query: raw, summary: on ? '### 📋 Plan mode ON\n\nI will plan first and present the plan for your approval before executing — execution tools are disabled until then. Say **approve** (or **yes**) to start implementation; the preview link arrives with the implementation, not before.' : '### 📋 Plan mode OFF\n\nI will execute tasks directly again.' });
       return;
     }
     // B110 — pending user answers (from ask_user_question) inject into this turn.

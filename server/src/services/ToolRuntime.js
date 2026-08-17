@@ -39,6 +39,7 @@ import { appendEvent } from './EventLog.js'; // B78 — tool calls/results are f
 import { getPluginTool } from './PluginContext.js'; // B97 — plugin-mounted tools run through the same gated pipeline
 import { discoverSkills, loadSkillForModel, observeHostMutationFromArgs } from './SkillDiscovery.js'; // B98 — dsh-style ranked skill discovery + progressive load
 import { SPILL_THRESHOLD } from './SpillStore.js'; // B100 — spill oversized tool results (dsh spill-policy)
+import { planModeBlocked } from './PlanMode.js'; // B111 — plan mode hard-gates execution tools
 import { collectSystemStatus } from './SelfMonitor.js';
 import { loadSettings, saveSettings } from './SettingsManager.js';
 import { runHooks } from './HookEngine.js';
@@ -837,6 +838,24 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
       emit('tool.refused', { tool: slug, intent, reason: en.reason });
       return refused;
     }
+  }
+
+  // B111 — PLAN MODE ENFORCEMENT: while plan mode is active for this
+  // conversation (spillOwner = convId), execution tools are refused — no
+  // builds, no preview servers, no browsing — until the user approves.
+  if (spillOwner) {
+    try {
+      if (planModeBlocked(slug, args, spillOwner)) {
+        const blocked = {
+          ok: false, blocked: true, planMode: true, tool: slug,
+          error: `Plan mode is active — execution tools are disabled until you approve the plan. Present the plan with exit_plan_mode (or the user can say "approve").`,
+          durationMs: Date.now() - started,
+        };
+        emit('tool.refused', { tool: slug, reason: 'plan-mode', message: blocked.error });
+        emit('tool.result', { tool: slug, ok: false, blocked: true, planMode: true, durationMs: 0 });
+        return blocked;
+      }
+    } catch { /* gate is best-effort */ }
   }
 
   const perm = toolPermission(slug);

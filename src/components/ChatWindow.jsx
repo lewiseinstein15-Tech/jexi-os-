@@ -379,6 +379,7 @@ export default function ChatWindow({
           <p className="text-[9px] font-black tracking-[0.16em] text-brand mb-1.5 flex items-center gap-1.5">
             <Bot className="w-3 h-3" /> PLAN READY FOR REVIEW
           </p>
+          <p className="text-[8px] text-text-tertiary mb-1.5">Implementation and the live preview link arrive after you approve — nothing is built while the plan is pending.</p>
           <pre className="text-[10px] text-text-secondary leading-relaxed whitespace-pre-wrap font-sans max-h-36 overflow-y-auto">{String(planReview.plan).slice(0, 4000)}</pre>
           <div className="mt-2 flex gap-1.5">
             <button

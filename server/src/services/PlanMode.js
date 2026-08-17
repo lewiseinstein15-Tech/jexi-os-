@@ -17,7 +17,12 @@ export const PLAN_POLICY_SECTION = `## PLAN MODE (active)
 
 You are in PLAN MODE. Your job right now is to THINK and PLAN, not to execute:
 - Analyze the request, break it into steps, decide the tools/agents each step needs.
-- Do NOT call execution tools (search, write, run, build, research) yet.
+- Execution tools are HARD-DISABLED while plan mode is active — calls to them are
+  refused by the runtime, so never rely on them.
+- NEVER promise runtime artifacts while in plan mode: no preview links, no deployed
+  apps, no generated files, no screenshots. Those exist only AFTER approval, during
+  implementation. You may say: "After you approve, I will build it and provide a live
+  preview link."
 - When your plan is complete, call exit_plan_mode with the full plan as markdown
   (title, steps with owner tool/agent, verification per step, open questions).
 - Implementation begins ONLY after the user approves the plan. If the user sends
@@ -60,6 +65,55 @@ export function planModePromptSection(convId) {
 }
 
 /**
+ * B111 — PLAN-MODE ENFORCEMENT: execution-capable tools are hard-refused
+ * while plan mode is active (the prompt hint alone let the model both
+ * promise preview links and call builders before approval). Read tools
+ * (memory/knowledge/search) and the planning/interaction tools stay usable.
+ */
+export const PLAN_MODE_EXTRA_BLOCKED = new Set([
+  'code-run', 'code-write', 'code-fix', 'run_code', 'preview-server',
+  'create_sandbox', 'run_in_sandbox', 'build-check', 'test-automation',
+  'lint-check', 'security-scan', 'run_in_background', 'link-open',
+  'browser-drive', 'tab-manage', 'form-fill', 'universal-link', 'github-cli',
+  'deploy', 'email-send', 'scheduler-create', 'computer-use',
+]);
+
+/**
+ * Is this tool blocked by plan mode?
+ * @param {string} slug tool slug
+ * @param {object} args tool args (mcp/connector refinement)
+ * @param {string} convId conversation id (undefined → not in a chat path)
+ * @returns {boolean}
+ */
+export function planModeBlocked(slug, args = {}, convId) {
+  if (!convId || !isPlanMode(convId)) return false;
+  if (PLAN_MODE_EXTRA_BLOCKED.has(slug)) return true;
+  // tier-based: exec / external / risky tools are execution-capable.
+  const tier = tierOf(slug, args);
+  return tier === 'exec' || tier === 'external' || tier === 'risky';
+}
+
+/** Lightweight tier lookup (mirrors ToolRuntime.toolTier for the gate). */
+function tierOf(slug, args = {}) {
+  if (slug === 'mcp-call') {
+    const name = String(args.tool || '');
+    const READ = new Set(['mcp-list', 'mcp-health', 'mcp-status']);
+    return READ.has(name) ? 'read' : 'external';
+  }
+  if (slug === 'connector-call') {
+    const method = String(args.method || 'send');
+    return method === 'receive' || method === 'health' ? 'read' : 'external';
+  }
+  const TIERS = {
+    'code-run': 'exec', 'git-status': 'exec', 'branch-manage': 'exec',
+    'issue-track': 'exec', 'tab-manage': 'exec',
+    'github-cli': 'external', 'browser-drive': 'external', 'form-fill': 'external',
+    'mcp-call': 'external', 'connector-call': 'external',
+  };
+  return TIERS[slug] || 'read';
+}
+
+/**
  * Present a plan for review (exit_plan_mode engine). Stores the plan and
  * marks it pending review; the chat route surfaces an APPROVE/REVISE card.
  */
@@ -76,7 +130,7 @@ export function presentPlan(convId, planMarkdown) {
     kind: 'plan-review',
     status: 'pending_review',
     plan: md.slice(0, 12000),
-    note: 'Plan presented for review. Implementation starts only after the user approves.',
+    note: 'Plan presented for review. Implementation starts only after the user approves — the preview link arrives with the implementation, not before.',
   };
 }
 
