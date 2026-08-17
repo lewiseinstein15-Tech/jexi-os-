@@ -128,6 +128,25 @@ export default function HomeView({ messages, logs, isProcessing, onSend, onOpenC
         </button>
       </motion.form>
 
+      {/* Quick actions — the B91 agent powers, one tap */}
+      <div className="flex flex-wrap gap-1.5">
+        {[
+          ['🛠 Do Anything', '/do research the best budget phones and summarize the top 3'],
+          ['📦 Build app', '/build a calculator app with a dark UI'],
+          ['🔗 Read a link', 'Paste any YouTube/TikTok/Instagram/article link…'],
+          ['✈️ Book travel', '/book me a flight from Nairobi to Mombasa'],
+        ].map(([label, hint]) => (
+          <button
+            key={label}
+            onClick={() => { setInput(hint); }}
+            className="px-2.5 py-1.5 rounded-full border border-hairline bg-surface-2/60 text-[9px] font-semibold text-text-secondary hover:border-brand-line hover:text-brand transition-all"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="text-[8px] text-text-tertiary -mt-4">v1.2 · B91 — links · builds · files · bookings</p>
+
       {/* Active agent strip — Home never looks frozen while a task runs */}
       {isProcessing && lastLog && (
         <div className="flex items-center gap-2.5 rounded-lg border border-brand-line bg-brand-dim/30 px-3 py-2.5">
