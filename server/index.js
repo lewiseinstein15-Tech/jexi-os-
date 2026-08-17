@@ -44,6 +44,8 @@ import { maybeCompact, compactNow, compactionStatus, compactionAwareHistory, isC
 import { listSpills, spillStats } from './src/services/SpillStore.js'; // B100 — spilled oversized tool results
 import { resolvePreset } from './src/services/PresetManager.js'; // B102 — dsh agent presets (standard/ptc/minimal/creator)
 import { buildTrace } from './src/services/SessionTrace.js'; // B102 — per-conversation session trace
+import { setRequestTimeZone } from './src/services/TimeContext.js'; // B104 — every LLM call knows the user's date/time (dsh time-context)
+import { runRetention } from './src/services/SpillStore.js'; // B104 — spill retention
 import { knowledgeStatus, loadProjectKnowledge, knowledgeLoad } from './src/services/KnowledgeBase.js'; // B50 P2 — project knowledge
 import { getToolCatalog, TOOL_PROFILES, activeToolProfile, setToolProfile, executeTool } from './src/services/ToolRuntime.js';
 import { runAgentLoop } from './src/services/AgentLoop.js';
@@ -142,6 +144,18 @@ try {
   console.log(`[Skills] ✓ Watcher on ${n} root(s); discovered ${s.total} skill(s): ${Object.entries(s.bySource).map(([k, v]) => `${k}=${v}`).join(', ')}`);
 } catch (e) {
   console.error('[Skills] watcher start error:', e.message);
+}
+
+// B104 — SPILL RETENTION (dsh output-retention): spilled files age out
+// (7 days) and per-owner budgets cap growth. Runs at boot + hourly.
+try {
+  const bootRet = runRetention();
+  console.log(`[Spills] ✓ Retention ran at boot — deleted ${bootRet.deleted} file(s), freed ${bootRet.freedBytes} bytes`);
+  setInterval(() => {
+    try { const r = runRetention(); if (r.deleted > 0) console.log(`[Spills] ✓ Retention — deleted ${r.deleted} file(s), freed ${r.freedBytes} bytes`); } catch (e) { /* noop */ }
+  }, 60 * 60 * 1000).unref();
+} catch (e) {
+  console.error('[Spills] retention boot error:', e.message);
 }
 // B86-fix — push device tokens + subscriptions survive redeploys (ephemeral disk).
 hydrateFcmTokensFromRedis().catch((e) => { recordError('push', (e && e.message) || String(e)); });
@@ -579,6 +593,8 @@ app.post('/api/agent', async (req, res) => {
   }, 10 * 60 * 1000);
 
   try {
+    // B104 — user timezone for the agent loop's LLM calls.
+    setRequestTimeZone(req.headers['x-jexi-tz']);
     // B102 — preset-aware code mode (default: ptc → code mode on).
     const preset = resolvePreset(String(req.headers['x-jexi-preset'] || '').toLowerCase());
     const codeModeHeader = String(req.headers['x-jexi-code-mode'] || (preset.codeMode ? '1' : '0')).toLowerCase();
@@ -1729,6 +1745,9 @@ app.post('/api/chat', async (req, res) => {
   // Stable per-conversation id for this request (hoisted so the deadline and
   // the result store can use it too).
   const convId = conversationId(req);
+  // B104 — the user's real timezone rides every request (x-jexi-tz); the LLM
+  // system prompts then carry the correct local date/time.
+  setRequestTimeZone(req.headers['x-jexi-tz']);
   // B66 — per-session conversation memory: chat history reads/writes for this
   // request are scoped to this conversation (never the shared global blob).
   setActiveSession(convId);

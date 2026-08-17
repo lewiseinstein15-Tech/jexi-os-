@@ -4,6 +4,7 @@ import { loadSettings } from './SettingsManager.js';
 import { providerOrder, recordProviderSuccess, recordProviderFailure, configuredProviders, markProviderUnavailable } from './ProviderRouter.js';
 import { takeSlot, releaseSlot } from './ProviderRateLimiter.js'; // free-tier pacing
 import { queryLocalLLM } from './OfflineAgent.js';
+import { appendTimeContext } from './TimeContext.js'; // B104 — every LLM call knows the current date/time (dsh time-context)
 
 /**
  * Keys are resolved in this order:
@@ -458,6 +459,7 @@ const PROVIDER_CALLS = {
  * reordering a preference list.
  */
 export async function generateContent(prompt, systemInstruction = '', imageBase64 = null, opts = {}) {
+  systemInstruction = appendTimeContext(systemInstruction); // B104 — time context on every call
   const errors = [];
   const system = systemInstruction || 'You are JEXI OS, an expert AI operating system.';
 
@@ -694,6 +696,7 @@ async function runToolLoopForProvider(provider, messages, tools, opts, errors) {
  * is an array of { text, toolCalls } rounds that drive the loop deterministically.
  */
 export async function generateWithToolsLoop(prompt, systemInstruction = '', tools = [], opts = {}) {
+  systemInstruction = appendTimeContext(systemInstruction); // B104 — time context on every call
   const errors = [];
   const system = systemInstruction || 'You are JEXI OS, an expert AI operating system.';
 

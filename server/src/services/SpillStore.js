@@ -109,3 +109,56 @@ export function spillStats(owner) {
   const items = listSpills(owner);
   return { count: items.length, bytes: items.reduce((a, b) => a + b.bytes, 0) };
 }
+
+/* ---------------- retention (dsh output-retention analog) --------------- */
+
+/**
+ * B104 — retention policy: spilled files age out (default 7 days) and each
+ * owner has byte/file budgets (newest kept, oldest deleted first).
+ * @returns {{ scannedOwners: number, deleted: number, freedBytes: number, owners: object }}
+ */
+export function runRetention({ maxAgeMs = 7 * 24 * 60 * 60 * 1000, maxBytesPerOwner = 25 * 1024 * 1024, maxFilesPerOwner = 60 } = {}) {
+  const stats = { scannedOwners: 0, deleted: 0, freedBytes: 0, owners: {} };
+  try {
+    if (!fs.existsSync(SPILLS_DIR)) return stats;
+    const now = Date.now();
+    for (const owner of fs.readdirSync(SPILLS_DIR)) {
+      const dir = path.join(SPILLS_DIR, owner);
+      let st;
+      try { st = fs.statSync(dir); } catch { continue; }
+      if (!st.isDirectory()) continue;
+      stats.scannedOwners += 1;
+      let files = [];
+      try {
+        files = fs.readdirSync(dir).filter((f) => f.endsWith('.txt')).map((f) => {
+          const p = path.join(dir, f);
+          let mtime = 0, size = 0;
+          try { const s = fs.statSync(p); mtime = s.mtimeMs; size = s.size; } catch { /* noop */ }
+          return { p, mtime, size };
+        }).sort((a, b) => b.mtime - a.mtime); // newest first
+      } catch { continue; }
+      const del = (f) => {
+        try { fs.unlinkSync(f.p); stats.deleted += 1; stats.freedBytes += f.size; } catch { /* noop */ }
+      };
+      let total = files.reduce((a, f) => a + f.size, 0);
+      // 1) age out
+      for (const f of files) {
+        if (now - f.mtime > maxAgeMs) { del(f); total -= f.size; }
+      }
+      files = files.filter((f) => { try { return fs.existsSync(f.p); } catch { return false; } });
+      // 2) byte budget (oldest first)
+      let overBytes = total - maxBytesPerOwner;
+      for (let i = files.length - 1; i >= 0 && overBytes > 0; i--) {
+        del(files[i]); overBytes -= files[i].size; total -= files[i].size;
+      }
+      files = files.filter((f) => { try { return fs.existsSync(f.p); } catch { return false; } });
+      // 3) file-count budget (oldest first)
+      while (files.length > maxFilesPerOwner) {
+        const oldest = files.pop();
+        if (oldest) del(oldest);
+      }
+      stats.owners[owner] = { remaining: files.filter((f) => { try { return fs.existsSync(f.p); } catch { return false; } }).length };
+    }
+  } catch (e) { /* retention is best-effort */ }
+  return stats;
+}

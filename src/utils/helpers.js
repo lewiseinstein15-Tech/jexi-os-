@@ -51,6 +51,14 @@ export const jexiFetch = (url, opts = {}) => {
   const headers = new Headers(opts.headers || {});
   if (key) headers.set('x-jexi-key', key);
   if (!headers.has('x-jexi-session')) headers.set('x-jexi-session', getSessionId());
+  // B104 — the user's real timezone rides every request so JEXI always
+  // knows the local date/time (dsh time-context).
+  if (!headers.has('x-jexi-tz')) {
+    try {
+      const tz = (typeof Intl !== 'undefined' && Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC';
+      headers.set('x-jexi-tz', tz);
+    } catch (e) { headers.set('x-jexi-tz', 'UTC'); }
+  }
   return fetch(url, { ...opts, headers });
 };
 
