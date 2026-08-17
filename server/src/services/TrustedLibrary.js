@@ -216,13 +216,47 @@ export async function latestNews(query, limit = 10) {
 const NITTER_INSTANCES = ['https://nitter.net', 'https://nitter.poast.org', 'https://nitter.privacyredirect.com', 'https://xcancel.com'];
 
 /** Try to read public X/Twitter posts for a query via Nitter RSS. Returns null if unreachable. */
+/**
+ * B93 — Twitter fallback that actually works in 2026: Nitter instances are
+ * mostly dead, and X requires login. Instead, query the DuckDuckGo HTML
+ * search for site:twitter.com / site:x.com and parse the result cards —
+ * real tweets, real links, no login, no API key.
+ */
+async function twitterViaSearch(query, limit = 8) {
+  const q = `(site:twitter.com OR site:x.com) ${query}`;
+  const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`;
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return [];
+    const html = await res.text();
+    const $ = cheerio.load(html);
+    const items = [];
+    $('.result').each((i, el) => {
+      if (items.length >= limit) return;
+      const a = $(el).find('.result__a').first();
+      const sn = $(el).find('.result__snippet').first();
+      const title = a.text().trim();
+      let link = a.attr('href') || '';
+      // DDG wraps links in //duckduckgo.com/l/?uddg=<encoded>
+      const m = link.match(/uddg=([^&]+)/);
+      if (m) { try { link = decodeURIComponent(m[1]); } catch { /* keep raw */ } }
+      if (!/twitter\.com|x\.com/i.test(link)) return;
+      const snippet = sn.text().trim();
+      if (title || snippet) items.push({ title: title.slice(0, 120) || snippet.slice(0, 80), link, snippet: snippet.slice(0, 280), source: 'X/Twitter' });
+    });
+    return items;
+  } catch (e) {
+    return [];
+  }
+}
+
 export async function twitterLatest(query, limit = 8) {
   return cachedAsync(`twitter:${query}:${limit}`, CACHE_NEWS_MS, async () => {
     for (const base of NITTER_INSTANCES) {
       try {
         const res = await fetch(`${base}/search/rss?q=${encodeURIComponent(query)}&f=tweets`, {
           headers: { 'User-Agent': UA },
-          signal: AbortSignal.timeout(7000),
+          signal: AbortSignal.timeout(5000),
         });
         if (!res.ok) continue;
         const xml = await res.text();
@@ -239,6 +273,9 @@ export async function twitterLatest(query, limit = 8) {
         if (items.length) return { instance: base, items };
       } catch (e) {}
     }
+    // B93 — Nitter dead? Use the search-engine fallback (real tweets).
+    const fallback = await twitterViaSearch(query, limit);
+    if (fallback.length) return { instance: 'search', items: fallback };
     return null;
   });
 }

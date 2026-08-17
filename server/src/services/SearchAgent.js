@@ -129,7 +129,22 @@ export function rankSources(query, results) {
     return { ...r, relevance };
   });
   scored.sort((a, b) => b.relevance - a.relevance || 0);
-  return scored.slice(0, 6);
+
+  // B93 — SOURCE DIVERSITY: cap any single domain at 2 results so the answer
+  // never comes from one site (Wikipedia alone). Multi-source answers beat
+  // one trusted domain for research questions.
+  const perDomain = new Map();
+  const diverse = [];
+  for (const r of scored) {
+    let host = '';
+    try { host = new URL(r.link).hostname.replace(/^www\./, ''); } catch { /* noop */ }
+    const key = host || 'other';
+    if ((perDomain.get(key) || 0) >= 2) continue;
+    perDomain.set(key, (perDomain.get(key) || 0) + 1);
+    diverse.push(r);
+    if (diverse.length >= 10) break;
+  }
+  return diverse;
 }
 
 // ---------------------------------------------------------------------------
@@ -321,7 +336,7 @@ export async function runSearchTeam(query, sendEvent, opts = {}) {
       const extra = await searchOne(`${query} in-depth overview`);
       const extraRanked = rankSources(query, extra.results).slice(0, 2);
       const extraDeep = await deepRead(extraRanked, query, sendEvent);
-      const combined = [...deep, ...extraDeep].slice(0, 6);
+      const combined = [...deep, ...extraDeep].slice(0, 10);
       if (combined.length > deep.length) {
         summary = await synthesizeGrounded(query, combined, context);
         sendEvent?.('log', { agent: 'Synthesizer', message: `↻ Re-synthesized with ${combined.length} sources.` });

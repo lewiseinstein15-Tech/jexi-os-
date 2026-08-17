@@ -165,11 +165,18 @@ export const useJexiEngine = () => {
     const backendUrl = getBackendUrl();
     const ctrl = new AbortController();
     recoverRef.current = ctrl;
-    const deadlineMs = Date.now() + 180000; // up to 3 minutes of recovery
+    const deadlineMs = Date.now() + 600000; // B93 — up to 10 min recovery (result store TTL)
     let found = false;
+    let interimShown = false;
     try {
+      // Tell the user we're still waiting (not the scary fallback yet).
+      setMessages(prev => [...prev, {
+        role: 'jexi',
+        text: '⚠ The connection dropped — JEXI is still working server-side. Waiting for the result…',
+      }]);
+      interimShown = true;
       while (!ctrl.signal.aborted && Date.now() < deadlineMs) {
-        await delay(4000);
+        await delay(3000);
         if (ctrl.signal.aborted) break;
         try {
           const res = await jexiFetch(`${backendUrl}/api/chat/result`, { signal: ctrl.signal });
@@ -200,7 +207,7 @@ export const useJexiEngine = () => {
     if (!found && !ctrl.signal.aborted) {
       setMessages(prev => [...prev, {
         role: 'jexi',
-        text: '⚠ The connection dropped mid-task and the result did not return within the recovery window. The task may still be running server-side — tap STOP and retry, or say \"continue\" and I will pick it up from where it stopped.',
+        text: '⚠ The connection dropped and the result did not return within 10 minutes. If JEXI is still running server-side, saying "continue" will pick it up — or just retry the task.',
       }]);
     }
   }, [setMessages]);

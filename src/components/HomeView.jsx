@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Send, Search, Code2, Sigma, Ruler, BarChart3, Workflow, ArrowRight, Loader2, Bot, MessageCircle } from 'lucide-react';
+import CapabilityCards from './CapabilityCards';
 
 // Semantic accent quick actions (spec §49) — small icon + name + description,
 // tinted via the CSS accent utilities, never dominating the screen.
@@ -59,6 +60,12 @@ export default function HomeView({ messages, logs, isProcessing, onSend, onOpenC
         <p className="text-[13px] text-text-secondary leading-relaxed">
           Ask JEXI to research, build, analyze, code, solve, run, deploy or automate — one agent team plans it, works it, and verifies the result.
         </p>
+      </div>
+
+      {/* B93 — capability cards live on HOME (moved from Command Center) */}
+      <div className="space-y-2">
+        <p className="eyebrow">⚡ What JEXI can do</p>
+        <CapabilityCards onSend={onSend} />
       </div>
 
       {/* ONE primary command input — clean, professional */}

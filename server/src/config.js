@@ -31,4 +31,4 @@ export const KNOWLEDGE_DIR = path.join(DATA_DIR, 'knowledge');
 export const MAX_DEBUG_ATTEMPTS = Number(process.env.MAX_DEBUG_ATTEMPTS) || 5;
 
 // Max pages JEXI will deep-read during one research pass
-export const MAX_SOURCES_TO_READ = Number(process.env.MAX_SOURCES_TO_READ) || 5;
+export const MAX_SOURCES_TO_READ = Number(process.env.MAX_SOURCES_TO_READ) || 10; // B93 — more sources per research pass
