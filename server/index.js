@@ -82,6 +82,8 @@ import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLi
 import { DoAnythingAgent } from './src/services/DoAnythingAgent.js'; // B89 — free-form autonomous agent loop
 import { TravelBookingAgent, parseBookingQuery } from './src/services/TravelBookingAgent.js'; // B90 — browser booking flow
 import { aggregateSearch } from './src/services/SearchEngine.js'; // B90 — travel web-search alternatives
+import { UniversalLinkAgent } from './src/services/UniversalLinkAgent.js'; // B91 — any link: video/social/article + instruction
+import { BuilderAgent } from './src/services/BuilderAgent.js'; // B91 — autonomous project builder → GitHub push
 import { enqueueGoal, enqueueChat, enqueueDoAnything, answerJob, getJob as getGoalJob, getJobEvents, subscribe as subscribeJob, listJobs, setGoalExecutor, setChatExecutor, setDoExecutor, setGoalNotifier, hydrateGoalJobsFromRedis } from './src/services/GoalJobQueue.js'; // Phase 2 — durable background goal jobs (B85 — durable chat, B89 — do anything)
 import { notifyGoalComplete, setGoalCallConnector, goalReportStats } from './src/services/GoalNotifier.js'; // Phase 4 — goal completion notifications + email reports
 import { getVapidPublicKey, addSubscription, removeSubscription, broadcastPush, listSubscriptions, hydratePushSubsFromRedis, recordPushDiag, listPushDiag, hydratePushDiagFromRedis } from './src/services/PushManager.js'; // B84 — web push notifications (closed-app delivery)
@@ -1259,6 +1261,35 @@ const travelBookingAgent = new TravelBookingAgent({
     } catch { return []; }
   },
 });
+// B91 — universal link agent: videos (frame-by-frame + transcript), social
+// (browser), articles (deep-read) — then applies the user's instruction.
+const universalLinkAgent = new UniversalLinkAgent({
+  analyzeVideo: async (url, ev) => {
+    const { analyzeVideo } = await import('./src/services/VideoAnalyzer.js');
+    return analyzeVideo(url, ev);
+  },
+  readPage: async (url) => {
+    const { analyzeLink, extractContent } = await import('./src/services/Extractor.js');
+    try {
+      const r = await analyzeLink(url);
+      return { title: r.title, text: r.content || r.text || '' };
+    } catch {
+      // Lenient fallback (plain fetch + readability, JS off).
+      const r = await extractContent(url);
+      return { title: r.title, text: r.content || r.text || '' };
+    }
+  },
+  generateContent,
+});
+// B91 — autonomous builder: plan → write → run → fix (loop+graph) → GitHub.
+const builderAgent = new BuilderAgent({
+  planProject: async (q) => (await import('./src/services/Architect.js')).planProject(q),
+  runFile: async (name, onOut) => (await import('./src/services/Runner.js')).runFile(name, onOut),
+  fixError: async (q, err) => (await import('./src/services/Architect.js')).applyFix(q, err),
+  generateContent,
+});
+// Pending builder sessions (token/repo ask → resume): session → build context.
+const pendingBuilds = new Map();
 setChatExecutor({
   run: async ({ query, session, sendEvent }) => {
     let paused = false;
@@ -1345,6 +1376,40 @@ app.post('/api/goals', (req, res) => {
   const convId = conversationId(req);
   const { id } = enqueueGoal({ goal: String(goal).trim(), session: convId, autonomy: String(autonomy || 'ask').toLowerCase() });
   res.status(202).json({ ok: true, jobId: id, status: 'queued', stream: `/api/goals/${id}/stream` });
+});
+
+// === FILE UPLOADS (B91) — users can attach any file (not just photos) ===
+// POST /api/upload  { name, data(base64) } → { id, name, size, kind, preview }
+// Files land in DATA_DIR/uploads; chat attachments reference the id.
+app.post('/api/upload', async (req, res) => {
+  try {
+    const { name, data } = req.body || {};
+    const safeName = String(name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
+    if (!data || typeof data !== 'string') return res.status(400).json({ ok: false, error: 'No file data (base64 string)' });
+    const buf = Buffer.from(data, 'base64');
+    if (buf.length > 25 * 1024 * 1024) return res.status(400).json({ ok: false, error: 'File too large (max 25 MB)' });
+    fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true });
+    const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    fs.writeFileSync(path.join(DATA_DIR, 'uploads', `${id}-${safeName}`), buf);
+    const ext = path.extname(safeName).toLowerCase();
+    let kind = 'text';
+    let preview = '';
+    if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'].includes(ext)) {
+      kind = 'image';
+      preview = `[image ${safeName} — use vision to analyze it]`;
+    } else if (ext === '.pdf') {
+      try {
+        const { extractPdfText } = await import('./src/services/Extractor.js');
+        preview = String(await extractPdfText(buf)).slice(0, 4000);
+        kind = 'pdf';
+      } catch { kind = 'pdf'; preview = '[pdf — could not extract text (scanned?)]'; }
+    } else {
+      preview = buf.toString('utf-8').slice(0, 4000);
+    }
+    res.json({ ok: true, id, name: safeName, size: buf.length, kind, preview: preview.slice(0, 4000) });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: (e && e.message) || String(e) });
+  }
 });
 
 // === TRAVEL BOOKING (B90) — search flights/hotels, present ranked options ===
@@ -1478,7 +1543,7 @@ app.get('/api/chat/result', (req, res) => {
 });
 
 app.post('/api/chat', async (req, res) => {
-  const { query, image } = req.body;
+  const { query, image, files } = req.body;
   recordChat();
   if (!query && !image) return res.status(400).json({ success: false, error: 'No query provided' });
 
@@ -1531,6 +1596,23 @@ app.post('/api/chat', async (req, res) => {
 
   try {
     const raw = String(query || '').trim();
+    // B91 — attachments: load uploaded files and inject their previews into
+    // the query so the planner and every agent see them.
+    let attachmentContext = '';
+    if (Array.isArray(files) && files.length) {
+      const parts = [];
+      for (const f of files.slice(0, 5)) {
+        try {
+          const fp = path.join(DATA_DIR, 'uploads', String(f.id || '').replace(/[^a-zA-Z0-9._-]/g, ''));
+          if (!fp.startsWith(path.join(DATA_DIR, 'uploads')) || !fs.existsSync(fp)) continue;
+          const preview = fs.readFileSync(fp, 'utf-8').slice(0, 4000);
+          parts.push(`[Attached file "${String(f.name || 'file')}":\n${preview}]`);
+        } catch { /* skip unreadable */ }
+      }
+      if (parts.length) attachmentContext = `\n\n${parts.join('\n\n')}`;
+      sendEvent('log', { agent: 'Files', message: `📎 ${files.length} attachment(s) received and attached to this task.` });
+    }
+    const effectiveRaw = raw + attachmentContext;
     const pendingOffer = loadOffer(convId);
     const hasPending = Boolean(pendingOffer);
 
@@ -1539,6 +1621,51 @@ app.post('/api/chat', async (req, res) => {
     //   2) a parked (need-info) goal in this session is waiting for details —
     //      the next message IS the answer. Both stream live through the job's
     //      event log, so they survive restarts and never mix sessions.
+    // B91 — ANY LINK in the message (or a bare link): universal agent.
+    const LINK_RE = /(https?:\/\/[^\s]+)/i;
+    const linkMatch = image ? null : raw.match(LINK_RE);
+    if (linkMatch && !/^\/\w+/.test(raw)) {
+      const url = linkMatch[1].replace(/[),.!?]+$/, '');
+      const instruction = raw.replace(LINK_RE, '').trim();
+      sendEvent('log', { agent: 'Link Agent', message: `🔗 Processing ${url.slice(0, 60)}…` });
+      const out = await universalLinkAgent.run({ url, instruction, sendEvent });
+      done({ success: out.success !== false, query: raw, summary: normalizeFinalAnswer(out.summary || ''), sources: out.meta ? [{ title: out.meta.title || url.slice(0, 60), link: url }] : [] });
+      return;
+    }
+
+    // B91 — /build <prompt>: autonomous project builder.
+    const BUILD_RE = /^\/build\s+([\s\S]+)$/i;
+    const buildMatch = image ? null : raw.match(BUILD_RE);
+    if (buildMatch) {
+      const prompt = buildMatch[1].trim();
+      sendEvent('log', { agent: 'Builder', message: '📦 Autonomous build started — planning, writing, running, fixing…' });
+      const out = await builderAgent.run({ prompt, session: convId, sendEvent });
+      if (out.needInfo && out.needInfo.length) {
+        pendingBuilds.set(convId, { prompt, buildId: out.buildId, dir: out.dir, entry: out.entry, lastOutput: out.lastOutput, runClean: out.runClean, written: out.written, rounds: out.rounds });
+        sendEvent('builder.need-info', { questions: out.needInfo });
+        done({ success: true, parked: true, summary: out.summary || 'Need your GitHub details.' });
+      } else {
+        done({ success: out.success !== false, query: raw, summary: normalizeFinalAnswer(out.summary || ''), repoUrl: out.repoUrl || null });
+      }
+      return;
+    }
+    // Resume a pending build: the next message is "repo-name <token>".
+    const pendingBuild = pendingBuilds.get(convId);
+    if (pendingBuild && !image && raw.trim()) {
+      const parts = raw.trim().split(/\s+/);
+      const repo = parts[0].replace(/[^a-zA-Z0-9._-]/g, '').slice(0, 40);
+      const token = parts[1] || '';
+      if (repo && token) {
+        sendEvent('log', { agent: 'Builder', message: `🚀 Pushing to GitHub as ${repo}…` });
+        const out = await builderAgent.run({ prompt: pendingBuild.prompt, session: convId, sendEvent, opts: { resumeBuild: pendingBuild, repo, token } });
+        pendingBuilds.delete(convId);
+        done({ success: out.success !== false, query: raw, summary: normalizeFinalAnswer(out.summary || ''), repoUrl: out.repoUrl || null });
+      } else {
+        done({ success: false, query: raw, summary: '### 📦 Builder\n\nSend the **repo name** and the **token** separated by a space, e.g. `my-app github_pat_...`' });
+      }
+      return;
+    }
+
     // B90 — TRAVEL: /book, /flights, /hotels → the browser booking flow.
     const TRAVEL_RE = /^(?:\/book|\/flights|\/hotels?|book (?:me )?(?:a |an |the )?(?:flight|hotel|room|ticket|trip|car)|flights? (?:from|to)|hotels? (?:in|near|for))\b.*$/i;
     const travelMatch = image ? null : raw.match(TRAVEL_RE);
@@ -1668,7 +1795,7 @@ app.post('/api/chat', async (req, res) => {
       return;
     }
 
-    let effectiveQuery = raw;
+    let effectiveQuery = effectiveRaw;
     let plan;
     let activeTaskId = null;   // Build 47 — the task this turn belongs to
     let executionQuery = effectiveQuery; // may gain resume context

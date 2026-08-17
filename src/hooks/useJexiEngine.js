@@ -224,7 +224,7 @@ export const useJexiEngine = () => {
     }
   }, []);
 
-  const runSearch = useCallback(async (query, image = null) => {
+  const runSearch = useCallback(async (query, image = null, attachments = undefined) => {
     // Halt any previous run AND any pending recovery before starting a new one.
     abortRef.current?.abort();
     recoverRef.current?.abort();
@@ -248,7 +248,7 @@ export const useJexiEngine = () => {
       const res = await jexiFetch(`${backendUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, image: image || undefined }),
+        body: JSON.stringify({ query, image: image || undefined, files: attachments || undefined }),
         signal: abortRef.current.signal,
       });
       if (!res.ok && res.status >= 500) {
@@ -263,7 +263,7 @@ export const useJexiEngine = () => {
         const retry = await jexiFetch(`${backendUrl}/api/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query, image: image || undefined }),
+          body: JSON.stringify({ query, image: image || undefined, files: attachments || undefined }),
           signal: abortRef.current.signal,
         });
         if (!retry.ok) throw new Error(`Backend replied HTTP ${retry.status}`);

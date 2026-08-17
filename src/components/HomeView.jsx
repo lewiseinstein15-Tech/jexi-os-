@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Search, Code2, Sigma, Ruler, BarChart3, Workflow, ArrowRight, Loader2 } from 'lucide-react';
+import { Send, Search, Code2, Sigma, Ruler, BarChart3, Workflow, ArrowRight, Loader2, Paperclip, X, FileText, Image as ImageIcon } from 'lucide-react';
+import { getBackendUrl, jexiFetch } from '../utils/helpers';
 
 // Semantic accent quick actions (spec §49) — small icon + name + description,
 // tinted via the CSS accent utilities, never dominating the screen.
@@ -23,11 +24,37 @@ function greeting() {
 
 export default function HomeView({ messages, logs, isProcessing, onSend, onOpenCommand }) {
   const [input, setInput] = useState('');
+  const [attachments, setAttachments] = useState([]); // { id, name, kind, size }
+  const [uploading, setUploading] = useState(false);
+  const fileRef = React.useRef(null);
+
+  const pickFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) { alert('File too large (max 25 MB)'); return; }
+    setUploading(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+      const res = await jexiFetch(`${getBackendUrl()}/api/upload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: file.name, data: b64 }),
+      });
+      const d = await res.json();
+      if (d.ok) setAttachments((prev) => [...prev, { id: d.id, name: d.name, kind: d.kind, size: d.size }]);
+      else alert(d.error || 'Upload failed');
+    } catch (err) { alert('Upload failed: ' + String(err.message || err)); }
+    setUploading(false);
+  };
 
   const submit = (text) => {
     const q = (text || '').trim();
-    if (!q) return;
-    onSend(q);
+    if (!q && !attachments.length) return;
+    // Attach file context to the message ("summarize the attached file" if no text)
+    onSend(q || 'Analyze the attached file(s)', attachments.length ? attachments : undefined);
+    setAttachments([]);
     onOpenCommand();
   };
 
@@ -54,6 +81,18 @@ export default function HomeView({ messages, logs, isProcessing, onSend, onOpenC
         </p>
       </div>
 
+      {/* Attached files */}
+      {attachments.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {attachments.map((a, i) => (
+            <span key={i} className="flex items-center gap-1.5 rounded-full border border-brand-line bg-brand-dim/30 pl-2 pr-1.5 py-1 text-[9px] text-brand">
+              {a.kind === 'image' ? <ImageIcon className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+              {a.name} <button type="button" onClick={() => setAttachments((p) => p.filter((_, j) => j !== i))} className="hover:text-status-error"><X className="w-3 h-3" /></button>
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* ONE primary command input */}
       <motion.form
         initial={{ opacity: 0, y: 10 }}
@@ -62,6 +101,16 @@ export default function HomeView({ messages, logs, isProcessing, onSend, onOpenC
         onSubmit={(e) => { e.preventDefault(); submit(input); }}
         className="surface-float flex items-center gap-2 rounded-xl p-2 pl-4 transition-all duration-200 focus-within:border-brand-line focus-within:shadow-[0_0_0_3px_var(--brand-dim)]"
       >
+        <input type="file" ref={fileRef} onChange={pickFile} className="hidden" />
+        <button
+          type="button"
+          onClick={() => fileRef.current && fileRef.current.click()}
+          disabled={uploading || isProcessing}
+          title="Attach a file (PDF, image, code, text…)"
+          className="w-9 h-9 flex items-center justify-center rounded-lg text-text-tertiary hover:text-brand hover:bg-white/[0.04] disabled:opacity-40 flex-shrink-0"
+        >
+          {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+        </button>
         <input
           type="text"
           value={input}
