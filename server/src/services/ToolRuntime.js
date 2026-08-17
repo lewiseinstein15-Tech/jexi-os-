@@ -49,6 +49,16 @@ import { classifyRisk } from './RiskGuard.js';
 /* Schemas — argument contracts for the executable tools.              */
 /* ------------------------------------------------------------------ */
 export const TOOL_SCHEMAS = {
+  // B112 — plan/ask tools need real argument schemas (providers strip undeclared args).
+  'ask_user_question': {
+    questions: {
+      type: 'array', required: true,
+      desc: 'Questions to ask the user before continuing: [{ id, question, header?, options?: [{label, description?}], multi_select? }]',
+    },
+  },
+  'exit_plan_mode': {
+    plan: { type: 'string', required: true, desc: 'The complete plan as markdown: # title, then steps with owner tool/agent, verification per step, open questions.' },
+  },
   'web-search': { query: { type: 'string', required: true, desc: 'Search query' }, limit: { type: 'number', desc: 'Max results' } },
   'wikipedia-lookup': { topic: { type: 'string', required: true, desc: 'Topic to look up' } },
   'arxiv-search': { query: { type: 'string', required: true, desc: 'Paper search query' } },

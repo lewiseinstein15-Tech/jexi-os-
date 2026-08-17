@@ -59,6 +59,11 @@ export function setPlanMode(convId, active) {
   return { ok: true, active: !!active };
 }
 
+/** B112 — approval utterances that resume the ORIGINAL task after a plan
+ *  is presented (the plan card's APPROVE button sends "approve the plan";
+ *  users type "approve", "yes approve", "start", "implement", …). */
+export const APPROVE_PLAN_RE = /^(approve|approved|yes[\s,!]*approve|approve[\s,!]*(the\s+)?plan|start|implement|proceed(\s+with the plan)?|go ahead and (build|start)|build it now)\b[\s.,!?]*$/i;
+
 /** The prompt section appended while plan mode is active. */
 export function planModePromptSection(convId) {
   return isPlanMode(convId) ? `\n${PLAN_POLICY_SECTION}\n` : '';

@@ -51,7 +51,7 @@ import { recentSessionsBlock, exportConversation } from './src/services/SessionC
 import { listMarketplace, marketplaceStats, installSkill, uninstallSkill } from './src/services/SkillMarketplace.js'; // B107 — skills marketplace
 import { maybeAutoTitle, titleUntitledSweep, setStoredTitle } from './src/services/SessionTitles.js'; // B108 — LLM conversation titles
 import { resolveSessionReferences } from './src/services/SessionReference.js'; // B109 — dsh session-reference mentions (@[label](dsh-session:…))
-import { setPlanMode, isPlanMode, planModePromptSection, approvePlan, currentPlan } from './src/services/PlanMode.js'; // B110 — dsh plan-mode (plan → approve → implement)
+import { setPlanMode, isPlanMode, planModePromptSection, approvePlan, currentPlan, APPROVE_PLAN_RE } from './src/services/PlanMode.js'; // B110/B112 — dsh plan-mode (plan → approve → implement)
 import { getPending, takeAnswers, formatAnswers, clearPending, answerPending } from './src/services/PendingQuestions.js'; // B110 — dsh tool-ask-user
 import { runRetention } from './src/services/SpillStore.js'; // B104 — spill retention
 import { knowledgeStatus, loadProjectKnowledge, knowledgeLoad } from './src/services/KnowledgeBase.js'; // B50 P2 — project knowledge
@@ -1815,6 +1815,24 @@ app.get('/api/chat/result', (req, res) => {
   res.json({ result });
 });
 
+/** B112 — the last REAL user task message of a conversation (approval resume
+ *  fallback). Approval utterances and /plan commands are skipped so the
+ *  resume target is the original task, never "approve the plan" itself. */
+function lastUserChatText(convId) {
+  try {
+    const events = loadConversationEvents(convId, 500);
+    for (let i = events.length - 1; i >= 0; i--) {
+      const e = events[i];
+      if (e.role !== 'user' || e.kind !== 'chat') continue;
+      const t = String(e.text || '');
+      if (APPROVE_PLAN_RE.test(t)) continue;
+      if (/^\/plan\b/.test(t)) continue;
+      return t.slice(0, 3000);
+    }
+  } catch { /* noop */ }
+  return '';
+}
+
 function conversationSummaryContext(convId) {
   try {
     // B100 — compaction-aware: if this conversation has a checkpoint, render
@@ -2202,6 +2220,29 @@ app.post('/api/chat', async (req, res) => {
       : await analyzeMessage(raw, { currentTaskId, image });
     intelClassification = analysis.classification;
 
+    // B112 — PLAN APPROVAL (typed or the card's APPROVE button): resumes the
+    // ORIGINAL task and implements it. Previously this never ran: no offer was
+    // saved when the plan was presented, and CONFIRM_RE had no "approve"
+    // branch — so "approve the plan" was analyzed as a brand-new query and
+    // nothing got built.
+    if (!image && APPROVE_PLAN_RE.test(raw)) {
+      try {
+        const cp = currentPlan(convId);
+        if (cp && (cp.status === 'pending_review' || cp.status === 'approved')) {
+          approvePlan(convId);
+          setPlanMode(convId, false);
+          const original = (loadOffer(convId) || {}).query || lastUserChatText(convId) || raw;
+          sendEvent('log', { agent: 'Planner', message: `✅ Plan approved — starting implementation: “${String(original).slice(0, 90)}”` });
+          plan = await planner.planConfirmed(original);
+          effectiveQuery = original;
+          saveOffer(convId, original); // keep ORIGINAL as the resume target
+          executionQuery = original;
+        }
+      } catch (e) {
+        sendEvent('log', { agent: 'Planner', message: `⚠ Plan approval resume failed: ${(e && e.message) || e}` });
+      }
+    }
+
     if (!image && DECLINE_RE.test(raw) && hasPending) {
       // "no / cancel" — clear the pending task, answer WITHOUT searching.
       clearOffer(convId);
@@ -2433,6 +2474,13 @@ app.post('/api/chat', async (req, res) => {
     try {
       const pq = getPending(convId);
       if (pq) sendEvent('ask.user', { conv: convId, questions: pq.questions });
+    } catch { /* noop */ }
+    // B112 — when the run presented a plan (exit_plan_mode), save the resume
+    // offer so "approve"/"yes" re-runs the ORIGINAL task (was missing → the
+    // approval never resumed anything).
+    try {
+      const cp = currentPlan(convId);
+      if (cp && cp.status === 'pending_review') saveOffer(convId, raw);
     } catch { /* noop */ }
     sendEvent('log', { agent: 'JEXI', message: '🎯 Mission complete — here is the result.' });
     // Contract: a successful done ALWAYS carries a readable summary — the

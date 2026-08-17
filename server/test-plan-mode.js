@@ -128,5 +128,30 @@ setPlanMode('gate-conv', false);
 const g4 = await executeTool({ slug: 'code-run', args: { command: 'echo ok' }, spillOwner: 'gate-conv', profile: 'full' });
 ok(g4.ok === true, 'after approval (mode off), execution works again (full profile satisfies the separate permission gate)');
 
-console.log(`\nB110+B111 plan-mode+ask-user: ${passed} passed, ${failedCount} failed`);
+console.log('\n== 8. APPROVAL RESUMES THE ORIGINAL TASK (B112) ==');
+const { APPROVE_PLAN_RE } = await import('./src/services/PlanMode.js');
+const { buildNativeSchemas, TOOL_SCHEMAS } = await import('./src/services/ToolRuntime.js');
+for (const q of ['approve', 'approved', 'approve the plan', 'yes approve', 'start', 'implement', 'proceed with the plan', 'build it now', 'Approve']) {
+  ok(APPROVE_PLAN_RE.test(q), `approval matched: "${q}"`);
+}
+for (const q of ['approve the merger', 'please approve this', 'start the car', 'implement this feature', 'i approve of you']) {
+  ok(!APPROVE_PLAN_RE.test(q), `non-approval rejected: "${q}"`);
+}
+ok(!!TOOL_SCHEMAS['exit_plan_mode'] && TOOL_SCHEMAS['exit_plan_mode'].plan && TOOL_SCHEMAS['exit_plan_mode'].plan.required === true, 'exit_plan_mode declares its plan arg (providers keep it)');
+ok(!!TOOL_SCHEMAS['ask_user_question'] && TOOL_SCHEMAS['ask_user_question'].questions && TOOL_SCHEMAS['ask_user_question'].questions.required === true, 'ask_user_question declares its questions arg');
+const { getTool } = await import('./src/services/ToolRegistry.js');
+const sdk = buildNativeSchemas([getTool('exit_plan_mode')]);
+ok(sdk.length === 1 && sdk[0].function.parameters.properties.plan, 'buildNativeSchemas emits the plan parameter for exit_plan_mode');
+const sdk2 = buildNativeSchemas([getTool('ask_user_question')]);
+ok(sdk2.length === 1 && sdk2[0].function.parameters.properties.questions, 'buildNativeSchemas emits the questions parameter');
+// The full approval contract: presenting → pending_review → approve → plan
+// approved + gate released (mode off) → execution allowed again.
+presentPlan('approve-conv', '# Ship the app\n\n1. Scaffold\n2. Build\n3. Preview');
+ok(currentPlan('approve-conv').status === 'pending_review', 'plan waiting for review');
+approvePlan('approve-conv');
+setPlanMode('approve-conv', false);
+ok(currentPlan('approve-conv').status === 'approved', 'plan approved');
+ok(planModeBlocked('code-run', {}, 'approve-conv') === false, 'gate released after approval → implementation can run');
+
+console.log(`\nB110+B111+B112 plan-mode+ask-user: ${passed} passed, ${failedCount} failed`);
 process.exit(failedCount ? 1 : 0);

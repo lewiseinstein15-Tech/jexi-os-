@@ -104,7 +104,11 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
   const coworkerTools = (() => {
     try {
       const plugins = listPluginTools().filter((p) => p && p.slug && !SIMPLE_TOOL_DEFS.some((d) => d.slug === p.slug));
-      const extra = SIMPLE_TOOL_DEFS.some((d) => d.slug === 'ask_user_question') ? [] : [{ slug: 'ask_user_question', name: 'Ask User', desc: 'Ask the user a question when you need confirmation or missing information.' }];
+      const extra = SIMPLE_TOOL_DEFS.some((d) => d.slug === 'ask_user_question') ? [] : [{
+        slug: 'ask_user_question', name: 'Ask User',
+        desc: 'Ask the user a question when you need confirmation or missing information.',
+        schema: { questions: { type: 'array', required: true, desc: '[{id, question, header?, options?: [{label, description?}], multi_select?}]' } },
+      }];
       return plugins.length ? [...SIMPLE_TOOL_DEFS, ...plugins, ...extra] : [...SIMPLE_TOOL_DEFS, ...extra];
     } catch { return SIMPLE_TOOL_DEFS; }
   })();
