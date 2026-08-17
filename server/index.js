@@ -81,6 +81,7 @@ import { touchSession, listSessions } from './src/services/SessionStore.js'; // 
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines } from './src/services/JexiIdentity.js'; // canonical identity (name / creator / capabilities)
 import { DoAnythingAgent } from './src/services/DoAnythingAgent.js'; // B89 — free-form autonomous agent loop
 import { TravelBookingAgent, parseBookingQuery } from './src/services/TravelBookingAgent.js'; // B90 — browser booking flow
+import { aggregateSearch } from './src/services/SearchEngine.js'; // B90 — travel web-search alternatives
 import { enqueueGoal, enqueueChat, enqueueDoAnything, answerJob, getJob as getGoalJob, getJobEvents, subscribe as subscribeJob, listJobs, setGoalExecutor, setChatExecutor, setDoExecutor, setGoalNotifier, hydrateGoalJobsFromRedis } from './src/services/GoalJobQueue.js'; // Phase 2 — durable background goal jobs (B85 — durable chat, B89 — do anything)
 import { notifyGoalComplete, setGoalCallConnector, goalReportStats } from './src/services/GoalNotifier.js'; // Phase 4 — goal completion notifications + email reports
 import { getVapidPublicKey, addSubscription, removeSubscription, broadcastPush, listSubscriptions, hydratePushSubsFromRedis, recordPushDiag, listPushDiag, hydratePushDiagFromRedis } from './src/services/PushManager.js'; // B84 — web push notifications (closed-app delivery)

@@ -37,10 +37,10 @@ const CITY_HINTS = {
   cairo: 'CAI', 'hong kong': 'HKG', singapore: 'SIN', bangkok: 'BKK',
   sydney: 'SYD', melbourne: 'MEL', 'new delhi': 'DEL', mumbai: 'BOM',
   toronto: 'YYZ', 'sao paulo': 'GRU', mexico: 'MEX', amsterdam: 'AMS',
-  berlin: 'BER', rome: 'FCO', madrid: 'MAD', 'hong kong': 'HKG', lagos: 'LOS',
-  accra: 'ACC', 'cape town': 'CPT', 'south africa': 'JNB', beijing: 'PEK',
+  berlin: 'BER', rome: 'FCO', madrid: 'MAD', lagos: 'LOS',
+  accra: 'ACC', 'south africa': 'JNB', beijing: 'PEK',
   tokyo: 'TYO', seoul: 'ICN', istanbul: 'IST', 'abu dhabi': 'AUH', doha: 'DOH',
-  athens: 'ATH', 'new delhi': 'DEL', islamabad: 'ISB', karachi: 'KHI',
+  athens: 'ATH', islamabad: 'ISB', karachi: 'KHI',
 };
 
 function normalizeCity(word) {
