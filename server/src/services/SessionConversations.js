@@ -92,6 +92,41 @@ export function conversationSummary(convId) {
   };
 }
 
+/** B106 — recent OTHER sessions (dsh session-reference): titles of the last
+ *  conversations before this one, so the model knows what was discussed. */
+export function recentSessionsBlock(convId, limit = 5) {
+  try {
+    const all = listConversations().filter((c) => c.id !== convId).slice(0, Math.max(1, Number(limit) || 5));
+    if (!all.length) return '';
+    const lines = all.map((c) => `- "${c.title}" (${c.messageCount} messages, ${c.userMessages || 0} from you, last ${new Date(c.lastActive).toISOString().slice(0, 16)} UTC)`);
+    return `\n[Earlier sessions (not this conversation — you may reference them via session-search):\n${lines.join('\n')}]\n`;
+  } catch { return ''; }
+}
+
+/** B106 — session-log-export: the full conversation as JSONL or Markdown. */
+export function exportConversation(convId, format = 'jsonl') {
+  const events = loadConversationEvents(convId, 2000);
+  if (!events.length) return { ok: false, error: 'conversation not found' };
+  if (format === 'md') {
+    const lines = ['# Conversation transcript', ''];
+    for (const e of events) {
+      if (e.kind === 'compaction/start' || e.kind === 'compaction/end') continue;
+      if (e.kind === 'compaction') {
+        lines.push(`> 📦 COMPACTED CHECKPOINT (shadowed ${e.meta?.shadowed?.events || '?'} turns):`);
+        lines.push('> ' + String(e.text || '').replace(/\n/g, '\n> '));
+        lines.push('');
+        continue;
+      }
+      const who = e.role === 'user' ? 'You' : e.role === 'jexi' ? 'JEXI' : 'System';
+      lines.push(`**${who}** (${new Date(e.at).toISOString()}):`);
+      lines.push(String(e.text || '').trim());
+      lines.push('');
+    }
+    return { ok: true, format: 'md', content: lines.join('\n') };
+  }
+  return { ok: true, format: 'jsonl', content: events.map((e) => JSON.stringify(e)).join('\n') };
+}
+
 /** List all conversations, newest-active first. */
 export function listConversations() {
   ensureDir();

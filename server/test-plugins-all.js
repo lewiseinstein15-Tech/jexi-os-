@@ -45,7 +45,7 @@ ok(dupes.length === 0, `no plugin tool collides with the registry (${dupes.map((
 const seen = new Set();
 const pluginDupes = pluginTools.filter((t) => (seen.has(t.slug) ? true : !seen.add(t.slug)));
 ok(pluginDupes.length === 0, 'no duplicate slugs BETWEEN plugins');
-ok(TOOL_COUNT === 187, `registry count unchanged by plugin load (${TOOL_COUNT})`);
+ok(TOOL_COUNT === 191, `registry count unchanged by plugin load (${TOOL_COUNT})`);
 
 console.log('\n== 3. Plugin tools are MODEL-VISIBLE (the weather bug) ==');
 const weatherDef = pluginTools.find((t) => t.slug === 'weather-now');

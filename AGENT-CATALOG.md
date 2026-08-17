@@ -1,6 +1,6 @@
 # JEXI OS — Agent & Skill Catalog
 
-**251 specialist agents · 507 skills · 187 tools · 1 orchestrator.** One plain-language request in,
+**251 specialist agents · 507 skills · 191 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
 > ⚙️ GENERATED FILE — updated 2026-08-17 by `cd server && npm run audit-roster`. Do not edit by hand.
@@ -14,7 +14,7 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 |---|---|
 | Agents | 251 (251 reachable — 100%) |
 | Skills | 507 |
-| Tools | 187 |
+| Tools | 191 |
 | Intents / teams | 155 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
@@ -1221,7 +1221,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 187 tools (grouped by type)
+## The 191 tools (grouped by type)
 
 ### Agent (2)
 | Tool | Allowed agents | Engine | What it does |
@@ -1352,6 +1352,14 @@ This section and every table below are GENERATED from the live registries by `cd
 |---|---|---|---|
 | `force_safe_mode` | Guardrail, Security Officer | GuardrailAgent | Restrict the task to read-only tools or abort with a clear explanation. |
 | `scan_prompt_safety` | Guardrail, Security Officer | GuardrailAgent | Scan a prompt for injection, jailbreak or tool-abuse attempts. |
+
+### Jobs (4)
+| Tool | Allowed agents | Engine | What it does |
+|---|---|---|---|
+| `job_kill` | Orchestrator, Task Manager | undefined | Stop a running or queued background job by its id. |
+| `job_list` | Orchestrator, Task Manager | undefined | List background jobs: running, queued, finished, failed, killed. |
+| `jobs_collect` | Orchestrator, Task Manager | undefined | Get the status (and the answer, if finished) of a background job by its id. |
+| `run_in_background` | Orchestrator, Planner, Task Manager | undefined | Launch a task as a durable background job and keep working — collect it later with jobs_collect. |
 
 ### Knowledge (8)
 | Tool | Allowed agents | Engine | What it does |

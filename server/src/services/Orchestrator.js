@@ -118,6 +118,12 @@ export async function conversationContext(query = '', convId = null) {
         memoryBlock.push(`Compacted checkpoint of this conversation:\n${String(checkpoint.text).slice(0, 1800)}`);
         if (recent) memoryBlock.push(`Recent turns (retained verbatim):\n${recent}`);
       }
+      // B106 — session-reference: the model knows other past conversations.
+      try {
+        const { recentSessionsBlock } = await import('./SessionConversations.js');
+        const block = recentSessionsBlock(convId, 5);
+        if (block) memoryBlock.push(block.trim());
+      } catch { /* best-effort */ }
     } catch { /* compaction is best-effort context */ }
   }
 

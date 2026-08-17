@@ -41,6 +41,18 @@ import { providerPreferenceForIntent } from './ModelRouting.js';
 const MAX_ITERATIONS = 10;
 const MAX_TOOL_CALLS = 20;
 
+/**
+ * B106 — repeat-tool-reminder (dsh guard/repeat-tool-reminder mirror):
+ * consecutive identical calls are tracked; at thresholds 3/5/8 the loop
+ * injects an advisory reminder instead of silently repeating.
+ */
+export function repeatReminderFor(key, count) {
+  if (count === 3) return `[Reminder: you have called the same tool with the same arguments ${count} times in a row. The result has not changed — stop repeating. Change your approach: different arguments, another tool, or answer from what you already have.]`;
+  if (count === 5) return `[Reminder: this is the ${count}th identical call. Repeating it again will not produce a different result. Try a different tool or answer directly.]`;
+  if (count === 8) return `[Reminder: ${count} identical calls in a row — the loop will cap tool calls soon. Do NOT call \"${String(key).split('|')[0]}\" again; synthesize an answer from the evidence you have.]`;
+  return null;
+}
+
 /** B99 — lazily imported SDK section for code mode (dsh tools:sdk). */
 async function renderSdkBlock(codeTools) {
   const { renderToolsSdk } = await import('./CodeModeRuntime.js');
@@ -119,6 +131,9 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   const toolContext = [];   // {tool, args, result} evidence (for the synthesis fallback)
   let callsMade = 0;
   let finalText = '';
+  // B106 — repeat-tool-reminder state (consecutive identical calls).
+  let lastCallKey = null;
+  let repeatCount = 0;
 
   if (checkCancelled()) return { answer: '', cancelled: true, stats: { cancelled: true, toolCalls: 0, tools: schemas.length, durationMs: Date.now() - start } };
 
@@ -150,6 +165,13 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
             try { emit('step/end', { turn: 1, step: callsMade }); } catch (e) {}
             const done = isToolDone(r);
             toolContext.push({ tool: call.name, args: call.arguments || {}, ok: r.ok, done, error: r.error, result: r.result, paused: r.paused === true || r.approvalRequired === true, blocked: r.blocked === true });
+            // B106 — repeat-tool-reminder: identical consecutive calls get an
+            // advisory note in the result fed back to the model.
+            const callKey = `${call.name}|${JSON.stringify(call.arguments || {})}`;
+            if (callKey === lastCallKey) repeatCount += 1;
+            else { lastCallKey = callKey; repeatCount = 1; }
+            const reminder = repeatReminderFor(callKey, repeatCount);
+            if (reminder) content = `${content}\n\n${reminder}`;
             if (r.paused || r.approvalRequired) {
               emit('agent.log', { message: `⏸ ${call.name} is an external action and needs your approval (real finalized details shown) — waiting for your yes/no before it can run.` });
             }
@@ -159,7 +181,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
             if (r.routed) {
               emit('agent.log', { message: `🧭 ${call.name} is routed to its owning agents for the pipeline — it did NOT execute here, so it is not counted as a completed step.` });
             }
-            const content = r.ok && r.result ? String(r.result).slice(0, 6000) : `ERROR: ${r.error || 'tool returned no output'}`;
+            let content = r.ok && r.result ? String(r.result).slice(0, 6000) : `ERROR: ${r.error || 'tool returned no output'}`;
             results.push({ tool_call_id: call.id, content });
           }
           return results;

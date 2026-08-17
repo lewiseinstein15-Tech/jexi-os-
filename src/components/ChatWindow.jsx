@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Square, ImagePlus, X, Stethoscope, Plus, Paperclip, FileText, Bot, MessageCircle, Loader2 } from 'lucide-react';
-import { getBackendUrl, jexiFetch } from '../utils/helpers';
+import { Send, Square, ImagePlus, X, Stethoscope, Plus, Paperclip, FileText, Bot, MessageCircle, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { getBackendUrl, jexiFetch, getSessionId } from '../utils/helpers';
 import TypedMessage from './TypedMessage';
 import AgentPipeline from './AgentPipeline';
+
+const FEEDBACK_ICON = 'text-text-tertiary hover:text-brand';
 
 const SELF_CHECK_QUERY =
   'JEXI, run a full system self-check now. Check your health, memory, eyes and recent errors. If anything is wrong, tell me the exact source file and the fix.';
@@ -204,6 +206,42 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
                     <span className="text-[9px] font-bold tracking-[0.18em] text-brand">JEXI</span>
                   </div>
                   <TypedMessage text={msg.text} size="text-[13px]" />
+                  {!isProcessing && (
+                    <div className="flex items-center gap-1 mt-1 opacity-60 hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        aria-label="Helpful"
+                        onClick={async () => {
+                          try {
+                            await jexiFetch(`${getBackendUrl()}/api/feedback`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ conversation: getSessionId(), seq: i, rating: 1 }),
+                            });
+                          } catch (e) { /* noop */ }
+                        }}
+                        className={`p-1 rounded ${FEEDBACK_ICON}`}
+                      >
+                        <ThumbsUp className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Not helpful"
+                        onClick={async () => {
+                          try {
+                            await jexiFetch(`${getBackendUrl()}/api/feedback`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ conversation: getSessionId(), seq: i, rating: -1 }),
+                            });
+                          } catch (e) { /* noop */ }
+                        }}
+                        className={`p-1 rounded ${FEEDBACK_ICON} hover:text-status-error`}
+                      >
+                        <ThumbsDown className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </motion.div>

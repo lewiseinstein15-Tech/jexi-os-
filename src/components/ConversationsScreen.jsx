@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  MessagesSquare, Plus, Trash2, GitFork, Search, Clock, Loader2, MessageCircle, Bot, ChevronRight, Archive, Activity,
+  MessagesSquare, Plus, Trash2, GitFork, Search, Clock, Loader2, MessageCircle, Bot, ChevronRight, Archive, Activity, Download,
 } from 'lucide-react';
 import { getBackendUrl, jexiFetch, getSessionId, setSessionId } from '../utils/helpers';
 import PanelHeader from './PanelHeader';
@@ -204,6 +204,23 @@ export default function ConversationsScreen() {
                   </button>
                   <button onClick={() => toggleTrace(c.id)} disabled={busy} className="px-2 py-1 rounded text-[8px] font-bold border border-brand-line text-brand flex items-center gap-1 hover:bg-brand-dim/40 disabled:opacity-50">
                     <Activity className="w-2.5 h-2.5" /> TRACE
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await jexiFetch(`${getBackendUrl()}/api/conversations/${c.id}/export?format=md`);
+                        const text = await res.text();
+                        const blob = new Blob([text], { type: 'text/markdown' });
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(blob);
+                        a.download = `conversation-${c.id}.md`;
+                        a.click();
+                        URL.revokeObjectURL(a.href);
+                      } catch (e) { /* noop */ }
+                    }}
+                    className="px-2 py-1 rounded text-[8px] font-bold border border-brand-line text-brand flex items-center gap-1 hover:bg-brand-dim/40"
+                  >
+                    <Download className="w-2.5 h-2.5" /> EXPORT
                   </button>
                   <button onClick={() => forkIt(c.id)} className="px-2 py-1 rounded text-[8px] font-bold border border-brand-line text-brand flex items-center gap-1 hover:bg-brand-dim/40">
                     <GitFork className="w-2.5 h-2.5" /> FORK

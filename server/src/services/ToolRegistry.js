@@ -289,6 +289,10 @@ export const TOOL_REGISTRY = [
   { slug: 'skill-search', name: 'Skill Search', type: 'Knowledge', desc: 'Search the auto-discovered skill catalog (metadata only) for a task — find which skill to load.', agents: ['planner', 'orchestrator', 'archivist'], tier: 'read' },
   { slug: 'run_code', name: 'Run Code Program', type: 'Code', desc: 'Code Mode (PTC): execute ONE TypeScript program that composes tools as await tools.name(args) — a whole workflow in a single call.', agents: ['coder', 'engineer', 'planner'], tier: 'write_local', timeoutMs: 240000 },
   { slug: 'spill-read', name: 'Spill Read', type: 'Memory', desc: 'Read the full body of a spilled (oversized) tool result by its spill:// locator.', agents: ['memory', 'archivist', 'context-manager'], tier: 'read' },
+  { slug: 'run_in_background', name: 'Run In Background', type: 'Jobs', desc: 'Launch a task as a durable background job and keep working — collect it later with jobs_collect.', agents: ['orchestrator', 'planner', 'task-manager'], tier: 'write_local', timeoutMs: 15000 },
+  { slug: 'jobs_collect', name: 'Jobs Collect', type: 'Jobs', desc: 'Get the status (and the answer, if finished) of a background job by its id.', agents: ['orchestrator', 'task-manager'], tier: 'read', timeoutMs: 15000 },
+  { slug: 'job_list', name: 'Job List', type: 'Jobs', desc: 'List background jobs: running, queued, finished, failed, killed.', agents: ['orchestrator', 'task-manager'], tier: 'read', timeoutMs: 15000 },
+  { slug: 'job_kill', name: 'Job Kill', type: 'Jobs', desc: 'Stop a running or queued background job by its id.', agents: ['orchestrator', 'task-manager'], tier: 'write_local', timeoutMs: 15000 },
   { slug: 'todo', name: 'Todo List', type: 'Productivity', desc: 'Manage a visible task list: add, list, complete.', agents: ['task-manager', 'planner'], tier: 'write_local' },
   { slug: 'plan', name: 'Plan', type: 'Productivity', desc: 'Create or update an explicit multi-step plan with per-step status.', agents: ['planner', 'orchestrator'], tier: 'write_local' },
 ];

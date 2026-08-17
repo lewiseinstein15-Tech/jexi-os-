@@ -45,6 +45,9 @@ import { listSpills, spillStats } from './src/services/SpillStore.js'; // B100 �
 import { resolvePreset } from './src/services/PresetManager.js'; // B102 — dsh agent presets (standard/ptc/minimal/creator)
 import { buildTrace } from './src/services/SessionTrace.js'; // B102 — per-conversation session trace
 import { setRequestTimeZone } from './src/services/TimeContext.js'; // B104 — every LLM call knows the user's date/time (dsh time-context)
+import { setJobExecutor } from './src/services/BackgroundJobs.js'; // B106 — model-launched background jobs (dsh tool-jobs)
+import { addFeedback, listFeedback, feedbackStats } from './src/services/FeedbackStore.js'; // B106 — thumbs up/down on answers (dsh message-feedback)
+import { recentSessionsBlock, exportConversation } from './src/services/SessionConversations.js'; // B106 — session references + export
 import { runRetention } from './src/services/SpillStore.js'; // B104 — spill retention
 import { knowledgeStatus, loadProjectKnowledge, knowledgeLoad } from './src/services/KnowledgeBase.js'; // B50 P2 — project knowledge
 import { getToolCatalog, TOOL_PROFILES, activeToolProfile, setToolProfile, executeTool } from './src/services/ToolRuntime.js';
@@ -157,6 +160,16 @@ try {
 } catch (e) {
   console.error('[Spills] retention boot error:', e.message);
 }
+
+// B106 — BACKGROUND JOBS: the model's run_in_background tool executes the
+// native agent loop in-process; results are collected later with
+// jobs_collect (dsh tool-jobs mirror).
+setJobExecutor({
+  run: async ({ task, session, profile, signal }) => {
+    const out = await runAgentLoop({ query: task, sendEvent: () => {}, opts: { profile, spillOwner: session, signal, codeMode: true } });
+    return { answer: out.answer };
+  },
+});
 // B86-fix — push device tokens + subscriptions survive redeploys (ephemeral disk).
 hydrateFcmTokensFromRedis().catch((e) => { recordError('push', (e && e.message) || String(e)); });
 hydratePushSubsFromRedis().catch((e) => { recordError('push', (e && e.message) || String(e)); });
@@ -1675,6 +1688,34 @@ app.get('/api/conversations/:id/trace', (req, res) => {
   res.json(buildTrace(id, { limit: Number(req.query.limit) || 200 }));
 });
 
+// B106 — session-log-export (dsh session-query/session-log-export mirror).
+app.get('/api/conversations/:id/export', (req, res) => {
+  const id = String(req.params.id).slice(0, 80);
+  const fmt = String(req.query.format || 'jsonl').toLowerCase() === 'md' ? 'md' : 'jsonl';
+  const out = exportConversation(id, fmt);
+  if (!out.ok) return res.status(404).json(out);
+  res.setHeader('Content-Type', fmt === 'md' ? 'text/markdown' : 'application/x-ndjson');
+  res.setHeader('Content-Disposition', `attachment; filename="conversation-${id}.${fmt === 'md' ? 'md' : 'jsonl'}"`);
+  res.send(out.content);
+});
+
+// B106 — message feedback (dsh message-feedback mirror).
+app.post('/api/feedback', (req, res) => {
+  try {
+    const { conversation, seq, rating, note } = req.body || {};
+    const r = addFeedback({ conversation: conversation || conversationId(req), seq, rating, note });
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) {
+    res.status(400).json({ ok: false, error: (e && e.message) || String(e) });
+  }
+});
+app.get('/api/feedback', (req, res) => {
+  res.json({ feedback: listFeedback(String(req.query.conversation || ''), Number(req.query.limit) || 50) });
+});
+app.get('/api/feedback/stats', (req, res) => {
+  res.json(feedbackStats());
+});
+
 // B100 — spilled (oversized) tool results for a session (metadata only).
 app.get('/api/spills', (req, res) => {
   const owner = String(req.query.owner || 'agent').slice(0, 60);
@@ -1720,7 +1761,9 @@ function conversationSummaryContext(convId) {
       }
     }
     const s = getRollingSummary();
-    return s ? `\n\n[Earlier in this conversation: ${String(s).slice(0, 600)}]` : '';
+    const base = s ? `\n\n[Earlier in this conversation: ${String(s).slice(0, 600)}]` : '';
+    // B106 — session-reference: the model knows OTHER past conversations exist.
+    return base + recentSessionsBlock(convId, 5);
   } catch { return ''; }
 }
 

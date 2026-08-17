@@ -169,6 +169,10 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'skill-search': z.object({ kind: z.literal('skill-search'), query: z.string(), total: z.number().optional(), results: z.array(z.unknown()).optional() }).passthrough(),
   'run_code': z.object({ kind: z.literal('code-run').optional(), description: z.string().optional(), logs: z.array(z.string()).optional(), result: z.unknown().optional(), toolCalls: z.number().optional(), durationMs: z.number().optional(), truncated: z.boolean().optional(), error: z.string().optional(), ok: z.boolean().optional(), subCalls: z.array(z.unknown()).optional() }).passthrough(),
   'spill-read': z.object({ kind: z.literal('spill').optional(), ok: z.boolean().optional(), locator: z.string().optional(), bytes: z.number().optional(), content: z.string().optional(), error: z.string().optional() }).passthrough(),
+  'run_in_background': z.object({ kind: z.literal('job').optional(), ok: z.boolean().optional(), id: z.string().optional(), status: z.string().optional(), error: z.string().optional() }).passthrough(),
+  'jobs_collect': z.object({ kind: z.literal('job').optional(), ok: z.boolean().optional(), id: z.string().optional(), status: z.string().optional(), answer: z.string().nullable().optional(), error: z.string().optional() }).passthrough(),
+  'job_list': z.object({ kind: z.literal('jobs').optional(), jobs: z.array(z.unknown()).optional(), ok: z.boolean().optional(), error: z.string().optional() }).passthrough(),
+  'job_kill': z.object({ kind: z.literal('job').optional(), ok: z.boolean().optional(), id: z.string().optional(), status: z.string().optional(), error: z.string().optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),
@@ -670,6 +674,36 @@ async function runEngine(slug, args, opts = {}) {
       const r = readSpill(args.locator, Number(args.cap) || 30000);
       if (!r.ok) return { ok: false, error: r.error };
       return { kind: 'spill', locator: r.locator, bytes: r.bytes, content: r.content };
+    }
+
+    case 'run_in_background': {
+      // B106 — dsh tool-jobs: launch a durable background job.
+      const { startJob } = await import('./BackgroundJobs.js');
+      const r = startJob({ task: args.task, session: opts.spillOwner || args.session || 'default', profile: opts.profile, signal: opts.signal });
+      if (!r.ok) return { ok: false, error: r.error };
+      return { kind: 'job', id: r.id, status: r.status };
+    }
+
+    case 'jobs_collect': {
+      // B106 — collect a background job's status/answer.
+      const { collectJob } = await import('./BackgroundJobs.js');
+      const j = collectJob(args.id);
+      if (!j) return { ok: false, error: `job \"${String(args.id || '')}\" not found` };
+      return { kind: 'job', id: j.id, status: j.status, answer: j.answer, error: j.error || undefined };
+    }
+
+    case 'job_list': {
+      // B106 — list background jobs.
+      const { listJobs } = await import('./BackgroundJobs.js');
+      return { kind: 'jobs', jobs: listJobs(Number(args.limit) || 20) };
+    }
+
+    case 'job_kill': {
+      // B106 — stop a background job.
+      const { killJob } = await import('./BackgroundJobs.js');
+      const r = killJob(args.id);
+      if (!r.ok) return { ok: false, error: r.error };
+      return { kind: 'job', id: r.id, status: r.status };
     }
 
     case 'todo': {
