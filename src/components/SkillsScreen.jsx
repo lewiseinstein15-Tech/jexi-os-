@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Boxes, X, Play, User, Zap, Plus, RefreshCw, Layers, FileText } from 'lucide-react';
+import { Search, Boxes, X, Play, User, Zap, Plus, RefreshCw, Layers, FileText, Store, CheckCircle2, Trash2 } from 'lucide-react';
 import { getBackendUrl, jexiFetch } from '../utils/helpers';
 
 // Same category accent system as the roster panel (live categories, stable hash).
@@ -57,6 +57,28 @@ export default function SkillsScreen({ onUseSkill }) {
   const [addError, setAddError] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [market, setMarket] = useState(null); // B107 — marketplace
+  const [marketBusy, setMarketBusy] = useState(null); // skill name being installed/removed
+
+  const loadMarketplace = async () => {
+    try {
+      const res = await jexiFetch(`${getBackendUrl()}/api/skills/marketplace`);
+      setMarket(await res.json());
+    } catch (e) { /* noop */ }
+  };
+
+  const marketAction = async (name, action) => {
+    setMarketBusy(name);
+    try {
+      const url = action === 'install'
+        ? `${getBackendUrl()}/api/skills/marketplace/${encodeURIComponent(name)}/install`
+        : `${getBackendUrl()}/api/skills/marketplace/${encodeURIComponent(name)}`;
+      await jexiFetch(url, { method: action === 'install' ? 'POST' : 'DELETE' });
+      await loadMarketplace();
+      await loadDiscovery();
+    } catch (e) { /* noop */ }
+    setMarketBusy(null);
+  };
 
   const loadDiscovery = async () => {
     try {
@@ -80,6 +102,7 @@ export default function SkillsScreen({ onUseSkill }) {
       setLoading(false);
     })();
     loadDiscovery();
+    loadMarketplace();
   }, []);
 
   const groups = data?.byCategory || [];
@@ -196,6 +219,15 @@ export default function SkillsScreen({ onUseSkill }) {
           }`}
         >
           <Layers className="w-3 h-3" /> DISCOVERED · {disc?.total || 0}
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('marketplace')}
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 text-[9px] font-bold tracking-[0.14em] transition-colors ${
+            tab === 'marketplace' ? 'bg-brand text-[#04140D]' : 'text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          <Store className="w-3 h-3" /> MARKETPLACE · {market?.stats?.installed || 0}/{market?.stats?.total || 0}
         </button>
       </div>
 
@@ -393,6 +425,77 @@ export default function SkillsScreen({ onUseSkill }) {
                 </motion.button>
               );
             })}
+          </div>
+        </>
+      )}
+
+      {tab === 'marketplace' && (
+        <>
+          <div className="rounded-lg border border-brand-line/50 bg-brand-dim/40 px-3 py-2">
+            <p className="text-[9px] font-bold tracking-[0.14em] text-brand flex items-center gap-1.5">
+              <Store className="w-3 h-3" /> ONE-TAP SKILLS
+            </p>
+            <p className="text-[9px] text-text-secondary leading-snug mt-0.5">
+              Install a curated skill and it lands in your user root (rank 400) — auto-discovered instantly, loadable in chat with <span className="text-brand">skill-load</span>.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            {(market?.skills || []).map((sk) => (
+              <div key={sk.name} className="surface-card p-2.5">
+                <div className="flex items-start gap-2">
+                  <span className="flex-shrink-0 w-8 h-8 rounded-md border border-brand-line/40 bg-brand-dim/30 flex items-center justify-center text-[11px] font-bold text-brand">
+                    {sk.name[0]}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[12px] font-semibold text-text-primary flex items-center gap-1.5">
+                      {sk.name}
+                      {sk.installed && (
+                        <span className="text-[7px] font-bold text-brand bg-brand-dim border border-brand-line rounded-full px-1.5 py-0.5">INSTALLED</span>
+                      )}
+                      {sk.hasReference && (
+                        <span className="text-[7px] font-bold text-text-tertiary bg-surface-2 border border-hairline rounded-full px-1.5 py-0.5">+REF</span>
+                      )}
+                    </p>
+                    <p className="text-[10px] text-text-tertiary leading-snug">{sk.description}</p>
+                    {sk.whenToUse && <p className="text-[8px] text-brand/70 leading-snug mt-0.5">when: {sk.whenToUse}</p>}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                      {(sk.tags || []).map((t) => (
+                        <span key={t} className="text-[7px] font-bold text-text-tertiary bg-surface-2 border border-hairline rounded-full px-1.5 py-0.5">#{t}</span>
+                      ))}
+                      <span className="flex-1" />
+                      {sk.installed ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onUseSkill && onUseSkill(`Follow the "${sk.name}" skill instructions for this task.`)}
+                            className="flex items-center gap-1 px-2 py-1 rounded text-[8px] font-bold bg-brand-dim text-brand border border-brand-line hover:brightness-110"
+                          >
+                            <Play className="w-2.5 h-2.5" /> USE IN CHAT
+                          </button>
+                          <button
+                            type="button"
+                            disabled={marketBusy === sk.name}
+                            onClick={() => marketAction(sk.name, 'uninstall')}
+                            className="flex items-center gap-1 px-2 py-1 rounded text-[8px] font-bold border border-status-error/40 text-status-error hover:bg-status-error/10 disabled:opacity-50"
+                          >
+                            <Trash2 className="w-2.5 h-2.5" /> {marketBusy === sk.name ? '…' : 'UNINSTALL'}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={marketBusy === sk.name}
+                          onClick={() => marketAction(sk.name, 'install')}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-[8px] font-bold bg-brand text-[#04140D] hover:brightness-110 disabled:opacity-50"
+                        >
+                          <CheckCircle2 className="w-2.5 h-2.5" /> {marketBusy === sk.name ? 'INSTALLING…' : 'INSTALL'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </>
       )}

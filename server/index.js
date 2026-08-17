@@ -48,6 +48,7 @@ import { setRequestTimeZone } from './src/services/TimeContext.js'; // B104 — 
 import { setJobExecutor } from './src/services/BackgroundJobs.js'; // B106 — model-launched background jobs (dsh tool-jobs)
 import { addFeedback, listFeedback, feedbackStats } from './src/services/FeedbackStore.js'; // B106 — thumbs up/down on answers (dsh message-feedback)
 import { recentSessionsBlock, exportConversation } from './src/services/SessionConversations.js'; // B106 — session references + export
+import { listMarketplace, marketplaceStats, installSkill, uninstallSkill } from './src/services/SkillMarketplace.js'; // B107 — skills marketplace
 import { runRetention } from './src/services/SpillStore.js'; // B104 — spill retention
 import { knowledgeStatus, loadProjectKnowledge, knowledgeLoad } from './src/services/KnowledgeBase.js'; // B50 P2 — project knowledge
 import { getToolCatalog, TOOL_PROFILES, activeToolProfile, setToolProfile, executeTool } from './src/services/ToolRuntime.js';
@@ -1714,6 +1715,20 @@ app.get('/api/feedback', (req, res) => {
 });
 app.get('/api/feedback/stats', (req, res) => {
   res.json(feedbackStats());
+});
+
+// B107 — SKILLS MARKETPLACE: browse + one-tap install curated skills
+// (installs into the user root → auto-discovered by B98).
+app.get('/api/skills/marketplace', (req, res) => {
+  res.json({ skills: listMarketplace(), stats: marketplaceStats() });
+});
+app.post('/api/skills/marketplace/:name/install', (req, res) => {
+  const r = installSkill(String(req.params.name || '').toLowerCase());
+  res.status(r.ok ? 200 : 400).json(r);
+});
+app.delete('/api/skills/marketplace/:name', (req, res) => {
+  const r = uninstallSkill(String(req.params.name || '').toLowerCase());
+  res.status(r.ok ? 200 : 400).json(r);
 });
 
 // B100 — spilled (oversized) tool results for a session (metadata only).
