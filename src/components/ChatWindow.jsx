@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Square, ImagePlus, X, Camera, Stethoscope, Plus, Paperclip, FileText, Bot, MessageCircle, Loader2 } from 'lucide-react';
+import { Send, Square, ImagePlus, X, Stethoscope, Plus, Paperclip, FileText, Bot, MessageCircle, Loader2 } from 'lucide-react';
 import { getBackendUrl, jexiFetch } from '../utils/helpers';
 import TypedMessage from './TypedMessage';
-import VisionPanel from './VisionPanel';
 import AgentPipeline from './AgentPipeline';
 
 const SELF_CHECK_QUERY =
@@ -28,7 +27,6 @@ function QuickAction({ icon: Icon, label, title, onClick }) {
 // into a single "+" that opens the actions in a bottom sheet — tap targets stay
 // >=40px and the row never squishes.
 const QUICK_ACTIONS = [
-  { icon: Camera, label: 'EYES', title: 'Give JEXI eyes — camera vision', action: 'vision' },
   { icon: ImagePlus, label: 'PHOTO', title: 'Attach a photo (image analysis)', action: 'photo' },
   { icon: Paperclip, label: 'FILE', title: 'Attach any file (PDF, code, text…)', action: 'file' },
   { icon: Stethoscope, label: 'CHECK', title: 'Run a self-check — JEXI diagnoses her own system', action: 'check' },
@@ -40,13 +38,12 @@ const MODE_STORAGE = 'jexi_mode';
 const getMode = () => (typeof localStorage !== 'undefined' ? (localStorage.getItem(MODE_STORAGE) || 'agent') : 'agent');
 const setMode = (m) => { try { localStorage.setItem(MODE_STORAGE, m); } catch { /* noop */ } };
 
-export default function ChatWindow({ messages, logs, isProcessing, onSend, onStop, onVisionResult }) {
+export default function ChatWindow({ messages, logs, isProcessing, onSend, onStop }) {
   const [input, setInput] = useState('');
   const [image, setImage] = useState(null);
   const [mode, setModeState] = useState(getMode());
   const [fileAttachments, setFileAttachments] = useState([]); // { id, name, kind }
   const [uploading, setUploading] = useState(false);
-  const [visionOpen, setVisionOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const fileRef = useRef(null);   // photo (image/*)
   const anyFileRef = useRef(null); // any file
@@ -74,8 +71,7 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
 
   const runQuickAction = (action) => {
     setQuickOpen(false);
-    if (action === 'vision') setVisionOpen(true);
-    else if (action === 'photo') fileRef.current?.click();
+    if (action === 'photo') fileRef.current?.click();
     else if (action === 'file') anyFileRef.current?.click();
     else onSend(SELF_CHECK_QUERY);
   };
@@ -350,12 +346,6 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
           </motion.div>
         )}
       </AnimatePresence>
-
-      <VisionPanel
-        open={visionOpen}
-        onClose={() => setVisionOpen(false)}
-        onVision={(text) => onVisionResult && onVisionResult(text)}
-      />
     </div>
   );
 }

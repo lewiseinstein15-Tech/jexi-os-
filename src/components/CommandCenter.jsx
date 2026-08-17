@@ -136,7 +136,6 @@ export default function CommandCenter({ engine, isDesktop }) {
           isProcessing={engine.isProcessing}
           onSend={engine.runSearch}
           onStop={engine.stopGeneration}
-          onVisionResult={(text) => engine.pushMessage('jexi', text)}
         />
       </div>
 
