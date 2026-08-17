@@ -119,8 +119,24 @@ jobs:
           Direct link (always the newest build):
           https://github.com/lewiseinstein15-Tech/jexi-os-/releases/latest/download/app-debug.apk
           EOF
-          gh release create "$TAG" \
-            android/app/build/outputs/apk/debug/app-debug.apk \
-            --title "JEXI OS Android App — build #${{ github.run_number }}" \
-            --notes-file /tmp/release-notes.md \
-            --latest
+          # B114-fix — the release API is occasionally flaky (HTTP 503 seen on
+          # 2026-08-17); retry transient failures before failing the build.
+          for attempt in 1 2 3 4 5; do
+            if gh release create "$TAG" \
+              android/app/build/outputs/apk/debug/app-debug.apk \
+              --title "JEXI OS Android App — build #${{ github.run_number }}" \
+              --notes-file /tmp/release-notes.md \
+              --latest 2>/tmp/gh-release-err.txt; then
+              echo "Release $TAG published."
+              exit 0
+            fi
+            err=$(cat /tmp/gh-release-err.txt || true)
+            echo "gh release create attempt $attempt failed: $err"
+            if ! echo "$err" | grep -qE '5[0-9][0-9]|timed? ?out|rate.?limit|server|unavailable|temporarily|retry'; then
+              echo "Non-transient failure — aborting."
+              exit 1
+            fi
+            sleep 15
+          done
+          echo "Release publish failed after 5 attempts."
+          exit 1
