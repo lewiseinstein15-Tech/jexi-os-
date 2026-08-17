@@ -129,6 +129,7 @@ export class GoalEngine {
     try {
       // B92 — NORMAL MODE goal: one direct LLM call, no planner/roster/tools.
       if (mode === 'normal') {
+        const nStart = Date.now();
         emit('goal.plan', { goalId: id, intent: 'normal_chat', complexity: 'NORMAL', steps: ['JEXI Core'], mode: 'normal' });
         emit('log', { agent: 'JEXI', message: '💬 Normal mode — answering directly.' });
         let text = '';
@@ -137,7 +138,7 @@ export class GoalEngine {
         } catch (e) {
           text = `### ⚠ JEXI OS\n\n${(e && e.message) || 'I could not answer right now.'}`;
         }
-        const result = { success: true, summary: String(text || '').trim(), statistics: { executionTime: 0, agentsUsed: 0, complexity: 'NORMAL', confidence: 80, mode: 'normal' } };
+        const result = { success: true, summary: String(text || '').trim(), statistics: { executionTime: Date.now() - nStart, agentsUsed: 0, complexity: 'NORMAL', confidence: 80, mode: 'normal' } };
         record.result = result;
         record.status = 'done';
         record.updatedAt = Date.now();
