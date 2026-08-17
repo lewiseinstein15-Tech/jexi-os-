@@ -1,0 +1,43 @@
+# Deploy the JEXI OS backend ("Brain") to Render on every server change.
+#
+# Requires ONE repo secret (never commit the hook key — the repo is public):
+#   GitHub → Settings → Secrets and variables → Actions → New repository secret
+#   Name:  RENDER_DEPLOY_HOOK
+#   Value: https://api.render.com/deploy/srv-d9r5u4id0e5s73ahtvhg?key=<your-key>
+#         (Render → jexi-os-brain → Settings → Deploy Hook → copy URL)
+#
+# Until the secret exists, this workflow no-ops safely (the job is skipped).
+
+name: Deploy Backend to Render
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'server/**'
+      - 'package.json'
+      - 'render.yaml'
+  workflow_dispatch:
+    inputs:
+      clear_cache:
+        description: 'Clear build cache'
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy (manual or push)
+        if: ${{ secrets.RENDER_DEPLOY_HOOK != '' }}
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          CLEAR: ${{ inputs.clear_cache == true && '?clearCache=true' || '' }}
+        run: |
+          echo "Pinging Render deploy hook..."
+          curl -sS -m 60 -X POST "${HOOK}${CLEAR}" -H "Accept: application/json" -w "\nHTTP %{http_code}\n"
+
+      - name: Missing secret notice
+        if: ${{ secrets.RENDER_DEPLOY_HOOK == '' }}
+        run: |
+          echo "::warning::RENDER_DEPLOY_HOOK secret is not set — add it in repo Settings → Secrets to enable auto-deploy to Render."
