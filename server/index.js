@@ -51,6 +51,9 @@ import { registerCommand, listCommands, tryExecuteCommand, helpText } from './sr
 import { anonymousUserId } from './src/services/AnonymousId.js'; // B133 — dsh anonymous-user-id
 import { validateAttachment } from './src/services/AttachmentPolicy.js'; // B133 — dsh attachment policy
 import { checkConversationInvariants, invariantStatus } from './src/services/SessionInvariants.js'; // B133 — dsh invariants
+import { handleAcpRequest, acpSessionCount } from './src/services/AcpServer.js'; // B134 — agent client protocol (json-rpc)
+import { resolveCredential, setCredential, deleteCredential, listCredentialKeys, validateCredential } from './src/services/CredentialStore.js'; // B134 — dsh credentials-local
+import { effectiveSandboxMode, sandboxDenial, SANDBOX_MODES } from './src/services/SandboxMode.js'; // B134 — dsh sandbox-policy
 import { recentSessionsBlock, exportConversation } from './src/services/SessionConversations.js'; // B106 — session references + export
 import { listMarketplace, marketplaceStats, installSkill, uninstallSkill } from './src/services/SkillMarketplace.js'; // B107 — skills marketplace
 import { maybeAutoTitle, titleUntitledSweep, setStoredTitle } from './src/services/SessionTitles.js'; // B108 — LLM conversation titles
@@ -1771,6 +1774,27 @@ app.post('/api/questions/answer', (req, res) => {
 app.get('/api/projects', (req, res) => {
   res.json({ projects: listProjectCapsules() });
 });
+
+// B134 — ACP (json-rpc over HTTP) + credentials (managed store) + sandbox status.
+app.post('/api/acp', async (req, res) => {
+  try {
+    const out = await handleAcpRequest(req.body || {});
+    if (out && out.stream) { /* prompt streams are handled inline */ }
+    res.json(out);
+  } catch (e) {
+    res.status(500).json({ jsonrpc: '2.0', id: (req.body || {}).id ?? null, error: { code: -32603, message: String((e && e.message) || e) } });
+  }
+});
+app.get('/api/acp/status', (req, res) => res.json({ protocolVersion: '0.1.0', activeSessions: acpSessionCount() }));
+app.get('/api/credentials', (req, res) => res.json({ keys: listCredentialKeys() })); // keys ONLY
+app.post('/api/credentials', (req, res) => {
+  try {
+    const { key, value } = req.body || {};
+    const r = setCredential(key, value);
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+app.delete('/api/credentials/:key', (req, res) => res.json(deleteCredential(String(req.params.key || ''))));
 
 // B133 — commands, anonymous identity, session invariants.
 app.get('/api/commands', (req, res) => res.json({ commands: listCommands() }));

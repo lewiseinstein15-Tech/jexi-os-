@@ -63,6 +63,29 @@ export const TOOL_SCHEMAS = {
   'interrupt_agent': {
     agent_id: { type: 'string', required: true, desc: 'The running agent id to interrupt' },
   },
+  'terminal_open': {
+    type: { type: 'string', required: true, desc: 'Terminal backend type, usually "shell".' },
+    name: { type: 'string', desc: 'Optional display name such as "main".' },
+    cwd: { type: 'string', desc: 'Initial working directory (default: workspace root).' },
+  },
+  'terminal_send': {
+    session_id: { type: 'string', required: true, desc: 'The terminal session id.' },
+    input: { type: 'string', required: true, desc: 'Command/input to write to the session stdin.' },
+  },
+  'terminal_read': {
+    session_id: { type: 'string', required: true, desc: 'The terminal session id.' },
+    cap: { type: 'number', desc: 'Max output chars to drain (default 12000).' },
+  },
+  'terminal_signal': {
+    session_id: { type: 'string', required: true, desc: 'The terminal session id.' },
+    signal: { type: 'string', desc: 'Signal name, e.g. SIGINT (default).' },
+  },
+  'terminal_close': {
+    session_id: { type: 'string', required: true, desc: 'The terminal session id.' },
+  },
+  'sandbox_mode': {
+    mode: { type: 'string', required: true, desc: 'read-only | workspace-write | danger-full-access' },
+  },
   'create_goal': {
     objective: { type: 'string', required: true, desc: 'The concrete completion objective inferred from the direct human request.' },
     max_goal_rounds: { type: 'number', desc: 'Optional positive integer limit on automatic continuation rounds.' },
@@ -238,6 +261,13 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'get_goal': z.object({ ok: z.boolean(), goal: z.unknown().nullable().optional(), error: z.string().optional() }).passthrough(),
   'create_goal': z.object({ ok: z.boolean(), goal_id: z.string().optional(), revision: z.number().optional(), objective: z.string().optional(), started: z.boolean().optional(), note: z.string().optional(), error: z.string().optional() }).passthrough(),
   'update_goal': z.object({ ok: z.boolean(), goal_id: z.string().optional(), revision: z.number().optional(), action: z.string().optional(), status: z.string().optional(), error: z.string().optional() }).passthrough(),
+  // B134 — terminal + sandbox tools.
+  'terminal_open': z.object({ ok: z.boolean(), kind: z.literal('terminal').optional(), sessionId: z.string().optional(), name: z.string().optional(), motd: z.string().optional(), error: z.string().optional() }).passthrough(),
+  'terminal_send': z.object({ ok: z.boolean(), sessionId: z.string().optional(), status: z.string().optional(), error: z.string().optional() }).passthrough(),
+  'terminal_read': z.object({ ok: z.boolean(), sessionId: z.string().optional(), output: z.string().optional(), status: z.string().optional(), error: z.string().optional() }).passthrough(),
+  'terminal_signal': z.object({ ok: z.boolean(), sessionId: z.string().optional(), accepted: z.boolean().optional(), status: z.string().optional(), error: z.string().optional() }).passthrough(),
+  'terminal_close': z.object({ ok: z.boolean(), sessionId: z.string().optional(), closed: z.boolean().optional(), error: z.string().optional() }).passthrough(),
+  'sandbox_mode': z.object({ ok: z.boolean(), mode: z.string().optional(), error: z.string().optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),
@@ -779,6 +809,51 @@ async function runEngine(slug, args, opts = {}) {
       // B106 — list background jobs.
       const { listJobs } = await import('./BackgroundJobs.js');
       return { kind: 'jobs', jobs: listJobs(Number(args.limit) || 20) };
+    }
+
+    case 'terminal_open': {
+      // B134 — dsh tool-terminal: persistent shell sessions.
+      const { terminalOpen } = await import('./TerminalSessions.js');
+      const r = terminalOpen({ type: args.type, name: args.name, cwd: args.cwd });
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, kind: 'terminal', sessionId: r.sessionId, name: r.name, motd: r.motd };
+    }
+
+    case 'terminal_send': {
+      const { terminalSend } = await import('./TerminalSessions.js');
+      const r = terminalSend(args.session_id, args.input);
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, sessionId: r.sessionId, status: r.status };
+    }
+
+    case 'terminal_read': {
+      const { terminalRead } = await import('./TerminalSessions.js');
+      const r = terminalRead(args.session_id, { cap: args.cap });
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, sessionId: r.sessionId, output: r.output, status: r.status };
+    }
+
+    case 'terminal_signal': {
+      const { terminalSignal } = await import('./TerminalSessions.js');
+      const r = terminalSignal(args.session_id, args.signal);
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, sessionId: r.sessionId, accepted: r.accepted, status: r.status };
+    }
+
+    case 'terminal_close': {
+      const { terminalClose } = await import('./TerminalSessions.js');
+      const r = terminalClose(args.session_id);
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, sessionId: r.sessionId, closed: r.closed };
+    }
+
+    case 'sandbox_mode': {
+      // B134 — dsh sandbox-policy: set the session sandbox mode.
+      const { setSandboxMode } = await import('./SandboxMode.js');
+      const conv = opts.spillOwner || 'default';
+      const r = setSandboxMode(conv, args.mode);
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, mode: r.mode };
     }
 
     case 'get_goal': {

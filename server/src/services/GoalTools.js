@@ -33,10 +33,26 @@ function save() {
   try { writeFileAtomic(STATE_FILE, JSON.stringify(state)); } catch { /* noop */ }
 }
 
+/** B134 — goal round driver (dsh goal-round-driver): auto-continuation rounds.
+ *  A round is one completion pass; maxRounds caps them. */
+/** B134 — goal round driver: round N is the NEXT pass; the cap means "at most
+ *  maxRounds continuation passes after creation" — so after `rounds` completed
+ *  passes, round = rounds+1 and the goal is complete when rounds >= max. */
+export function goalRound(goal) {
+  const rounds = Number((goal && goal.rounds) || 0);
+  const max = Number((goal && goal.maxRounds) || 0) || 3;
+  return {
+    round: rounds + 1,
+    maxRounds: max,
+    canContinue: rounds < max,
+    complete: rounds >= max,
+  };
+}
+
 export function getCurrentGoal() {
   const goal = load().goal;
   return goal
-    ? { ok: true, goal: { id: String(goal.id || GOAL_ID_KEY), revision: Number(goal.revision || 1), objective: String(goal.objective || '').slice(0, 500), status: String(goal.status || 'running'), max_goal_rounds: Number(goal.maxRounds || 0) || null } }
+    ? { ok: true, goal: { id: String(goal.id || GOAL_ID_KEY), revision: Number(goal.revision || 1), objective: String(goal.objective || '').slice(0, 500), status: String(goal.status || 'running'), max_goal_rounds: Number(goal.maxRounds || 0) || null, ...goalRound(goal) } }
     : { ok: true, goal: null };
 }
 
@@ -74,9 +90,10 @@ export function updateGoal({ goal_id, revision, action, objective, max_goal_roun
     if (!objective) return { ok: false, error: 'objective required with action edit' };
     goal.objective = String(objective).slice(0, 500);
     if (Number(max_goal_rounds) > 0) goal.maxRounds = Math.min(Number(max_goal_rounds), 12);
-    goal.status = 'running';
+    goal.rounds = Number(goal.rounds || 0) + 1; // a new continuation round
+    goal.status = goalRound(goal).complete ? 'done' : 'running'; // cap reached → done
   } else if (action === 'pause') goal.status = 'paused';
-  else if (action === 'resume') goal.status = 'running';
+  else if (action === 'resume') { goal.rounds = Number(goal.rounds || 0) + 1; goal.status = goalRound(goal).complete ? 'done' : 'running'; }
   else if (action === 'complete') goal.status = 'done';
   else if (action === 'blocked') {
     goal.status = 'blocked';

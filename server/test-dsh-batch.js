@@ -28,7 +28,7 @@ setActivePluginContext(ctx);
 const { TOOL_COUNT, TOOL_REGISTRY } = await import('./src/services/ToolRegistry.js');
 
 console.log('\n== 1. Goal tools registered + contracts (dsh tool-goal) ==');
-ok(TOOL_COUNT === 199, `registry 196 → 199 (${TOOL_COUNT})`);
+ok(TOOL_COUNT === 205, `registry 196 → 205 (${TOOL_COUNT})`);
 for (const slug of ['get_goal', 'create_goal', 'update_goal']) {
   ok(TOOL_REGISTRY.some((t) => t.slug === slug), `${slug} registered`);
 }

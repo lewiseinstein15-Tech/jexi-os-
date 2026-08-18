@@ -301,6 +301,12 @@ export const TOOL_REGISTRY = [
   { slug: 'get_goal', name: 'Get Goal', type: 'Goal', desc: 'Read the current goal and its exact revision (dsh tool-goal).', agents: ['goal-owner', 'planner', 'orchestrator'], tier: 'read', timeoutMs: 15000 },
   { slug: 'create_goal', name: 'Create Goal', type: 'Goal', desc: 'Create a goal with a concrete completion objective and an optional round cap (dsh tool-goal).', agents: ['goal-owner', 'planner'], tier: 'write_local', timeoutMs: 15000 },
   { slug: 'update_goal', name: 'Update Goal', type: 'Goal', desc: 'Update the exact current goal revision: edit | pause | resume | complete | blocked (dsh tool-goal).', agents: ['goal-owner', 'planner'], tier: 'write_local', timeoutMs: 15000 },
+  { slug: 'terminal_open', name: 'Terminal Open', type: 'Terminal', desc: 'Create a persistent terminal session for state that must survive across tool calls.', agents: ['devops', 'coder', 'engineer'], tier: 'exec', timeoutMs: 30000 },
+  { slug: 'terminal_send', name: 'Terminal Send', type: 'Terminal', desc: 'Write a command to a terminal session (its state persists).', agents: ['devops', 'coder'], tier: 'exec', timeoutMs: 30000 },
+  { slug: 'terminal_read', name: 'Terminal Read', type: 'Terminal', desc: 'Drain a terminal session\'s output since the last read.', agents: ['devops', 'coder'], tier: 'read', timeoutMs: 30000 },
+  { slug: 'terminal_signal', name: 'Terminal Signal', type: 'Terminal', desc: 'Send a signal (SIGINT…) to a terminal session.', agents: ['devops', 'coder'], tier: 'exec', timeoutMs: 30000 },
+  { slug: 'terminal_close', name: 'Terminal Close', type: 'Terminal', desc: 'Close a terminal session (frees its slot).', agents: ['devops', 'coder'], tier: 'exec', timeoutMs: 30000 },
+  { slug: 'sandbox_mode', name: 'Sandbox Mode', type: 'System', desc: 'Set the session sandbox mode: read-only | workspace-write | danger-full-access (dsh sandbox-policy).', agents: ['guardrail'], tier: 'write_local', timeoutMs: 15000 },
   { slug: 'todo', name: 'Todo List', type: 'Productivity', desc: 'Manage a visible task list: add, list, complete.', agents: ['task-manager', 'planner'], tier: 'write_local' },
   { slug: 'plan', name: 'Plan', type: 'Productivity', desc: 'Create or update an explicit multi-step plan with per-step status.', agents: ['planner', 'orchestrator'], tier: 'write_local' },
 ];

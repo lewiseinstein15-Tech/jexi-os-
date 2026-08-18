@@ -1,6 +1,6 @@
 # JEXI OS — Agent & Skill Catalog
 
-**252 specialist agents · 508 skills · 199 tools · 1 orchestrator.** One plain-language request in,
+**252 specialist agents · 508 skills · 205 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
 > ⚙️ GENERATED FILE — updated 2026-08-18 by `cd server && npm run audit-roster`. Do not edit by hand.
@@ -14,7 +14,7 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 |---|---|
 | Agents | 252 (252 reachable — 100%) |
 | Skills | 508 |
-| Tools | 199 |
+| Tools | 205 |
 | Intents / teams | 155 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
@@ -1223,7 +1223,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 199 tools (grouped by type)
+## The 205 tools (grouped by type)
 
 ### Agent (7)
 | Tool | Allowed agents | Engine | What it does |
@@ -1540,11 +1540,21 @@ This section and every table below are GENERATED from the live registries by `cd
 | `threat-model` | Risk Analyst, Penetration Tester | SkillChain | Model attack surfaces and rank risks. |
 | `vuln-scan` | Application Security Engineer, Penetration Tester | SkillChain | Scan an app or repo for exploitable vulnerabilities. |
 
-### System (2)
+### System (3)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
+| `sandbox_mode` | Guardrail | undefined | Set the session sandbox mode: read-only | workspace-write | danger-full-access (dsh sandbox-policy). |
 | `self-diagnose` | Self-Diagnose | SelfMonitor | Read own health, memory, errors and source code to report root causes. |
 | `settings` | JEXI Core, Context Manager | SettingsManager | Read and update JEXI's settings and provider keys. |
+
+### Terminal (5)
+| Tool | Allowed agents | Engine | What it does |
+|---|---|---|---|
+| `terminal_close` | DevOps Agent, Coder | undefined | Close a terminal session (frees its slot). |
+| `terminal_open` | DevOps Agent, Coder, Engineer | undefined | Create a persistent terminal session for state that must survive across tool calls. |
+| `terminal_read` | DevOps Agent, Coder | undefined | Drain a terminal session's output since the last read. |
+| `terminal_send` | DevOps Agent, Coder | undefined | Write a command to a terminal session (its state persists). |
+| `terminal_signal` | DevOps Agent, Coder | undefined | Send a signal (SIGINT…) to a terminal session. |
 
 ### Voice (4)
 | Tool | Allowed agents | Engine | What it does |
