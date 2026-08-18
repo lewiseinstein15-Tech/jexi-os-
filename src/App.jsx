@@ -21,6 +21,7 @@ import TasksScreen from './components/TasksScreen';
 import GoalsScreen from './components/GoalsScreen';
 import NotificationsScreen from './components/NotificationsScreen';
 import ConversationsScreen from './components/ConversationsScreen';
+import ProjectsScreen from './components/ProjectsScreen'; // B129 — project memory
 import SkillsScreen from './components/SkillsScreen';
 import WorkspaceScreen from './components/WorkspaceScreen';
 import TerminalScreen from './components/TerminalScreen';
@@ -143,6 +144,15 @@ export default function App() {
         return <NotificationsScreen />;
       case 'conversations':
         return <ConversationsScreen />;
+      case 'projects':
+        return (
+          <ProjectsScreen
+            onContinue={(q) => {
+              engine.runSearch(q);
+              navigate('home');
+            }}
+          />
+        );
       case 'skills':
         return (
           <div className="px-3 pt-4 pb-8 space-y-3 max-w-[900px] mx-auto">

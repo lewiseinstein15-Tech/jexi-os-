@@ -47,6 +47,53 @@ const CALLOUT_META = {
   DANGER:    { icon: '🛑', label: 'DANGER',    cls: 'border-status-error/50 bg-status-error/[0.08]',   text: 'text-status-error' },
 };
 
+/** B129 — AUTO-LINKIFY bare URLs: react-markdown only makes markdown-linked or
+ *  <angle-bracket> URLs tappable; the preview links JEXI now returns
+ *  (https://jexi-os-brain.onrender.com/preview/…) arrive as PLAIN text and
+ *  rendered as unclickable. This pre-pass wraps every bare http(s) URL in
+ *  angle brackets (a GFM autolink) unless it is already inside []() markdown,
+ *  <> autolinks, or code/backtick spans.
+ */
+function autolinkify(content) {
+  const src = String(content || '');
+  if (!/https?:\/\//i.test(src)) return src;
+  const out = [];
+  let i = 0;
+  const len = src.length;
+  // Track []() pairs and backticks to skip URLs already linked/coded.
+  let backtick = false;
+  let inLink = false;
+  while (i < len) {
+    const ch = src[i];
+    if (ch === '`') { backtick = !backtick; out.push(ch); i++; continue; }
+    if (backtick) { out.push(ch); i++; continue; }
+    if (ch === '[') { inLink = true; out.push(ch); i++; continue; }
+    if (ch === ']' && inLink) { inLink = false; out.push(ch); i++; continue; }
+    if (inLink) { out.push(ch); i++; continue; }
+    if (ch === '<') {
+      // Already an autolink? copy through.
+      const m = src.slice(i).match(/^<https?:\/\/[^>\s]+>/i);
+      if (m) { out.push(m[0]); i += m[0].length; continue; }
+    }
+    if (src.slice(i, i + 8).toLowerCase() === 'https://' || src.slice(i, i + 7).toLowerCase() === 'http://') {
+      const m = src.slice(i).match(/^https?:\/\/[^\s)'"<>]+/i);
+      if (m) {
+        let url = m[0];
+        // Trim trailing punctuation that is not part of the URL.
+        url = url.replace(/[.,;:!?]+$/, '');
+        if (url.length > 8) {
+          out.push(`<${url}>`);
+          i += m[0].length;
+          continue;
+        }
+      }
+    }
+    out.push(ch);
+    i++;
+  }
+  return out.join('');
+}
+
 /** Flatten React children into plain text (used to sniff section/callout names). */
 function flattenText(children) {
   let out = '';
@@ -203,6 +250,7 @@ export default function MarkdownRenderer({ content, size = 'text-[11px]' }) {
     <div className={`markdown-body ${size} leading-relaxed`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
+        children={autolinkify(cleanContent)}
         rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
         components={{
           h1: ({ node, children, ...props }) => {
