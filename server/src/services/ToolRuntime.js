@@ -202,6 +202,9 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'workflow': z.object({ kind: z.literal('workflow').optional(), ok: z.boolean().optional(), runId: z.string().optional(), agentsStarted: z.number().optional(), result: z.unknown().optional(), stopReason: z.string().optional(), error: z.unknown().optional() }).passthrough(),
   'send_message': z.object({ kind: z.literal('message').optional(), ok: z.boolean().optional(), messageId: z.string().optional(), status: z.string().optional(), error: z.string().optional() }).passthrough(),
   'interrupt_agent': z.object({ kind: z.literal('interrupt').optional(), ok: z.boolean().optional(), accepted: z.boolean().optional(), status: z.string().optional(), error: z.string().optional() }).passthrough(),
+  // B121 — plugin tools get canonical output contracts too.
+  'time-now': z.object({ ok: z.boolean(), kind: z.literal('time').optional(), timezone: z.string().optional(), local: z.string().optional(), utc: z.string().optional(), common: z.array(z.string()).optional(), error: z.string().optional() }).passthrough(),
+  'currency-convert': z.object({ ok: z.boolean(), kind: z.literal('currency').optional(), from: z.string().optional(), to: z.string().optional(), amount: z.number().optional(), converted: z.number().optional(), rate: z.number().optional(), at: z.string().optional(), error: z.string().optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),

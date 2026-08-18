@@ -1945,7 +1945,11 @@ app.post('/api/chat', async (req, res) => {
     // /plan handling reference `mode`, so declaring it later crashed every
     // chat request with "Cannot access 'mode' before initialization" (TDZ).
     const preset = resolvePreset(String(req.headers['x-jexi-preset'] || '').toLowerCase());
-    const mode = String(req.body.mode || req.headers['x-jexi-mode'] || preset.mode || 'auto').toLowerCase();
+    // B121-fix — the dsh PRESET must NOT force agent mode (ptc/creator had
+    // mode:'agent', which silently disabled AUTO routing → every message ran
+    // the search/agent pipeline). Only the minimal preset forces direct
+    // answers; standard/ptc/creator now route AUTO (JEXI decides).
+    const mode = String(req.body.mode || req.headers['x-jexi-mode'] || (preset.mode === 'normal' ? 'normal' : 'auto')).toLowerCase();
     // B113 — /plan = PLAN-AND-EXECUTE: plan first, then do the work
     // AUTOMATICALLY. No approval pause, no question cards, no "should I
     // continue" — updates stream as she works.
@@ -1979,7 +1983,10 @@ app.post('/api/chat', async (req, res) => {
     if (mode === 'auto') {
       try {
         const dec = await planner.analyzeIntent(raw);
-        autoDirect = !!dec && isDirectIntent(dec.intent) && (dec.confidence || 0) >= 0.6;
+        // B121 — deterministic classifications carry no confidence; treat
+        // them as trusted. LLM ones need >= 0.5 sanity. Simple questions
+        // must NOT fall through to search/agents.
+        autoDirect = !!dec && isDirectIntent(dec.intent) && (dec.confidence === undefined || dec.confidence >= 0.5);
         if (autoDirect) sendEvent('log', { agent: 'JEXI', message: '⚡ Auto mode — this is a conversation question, answering directly (agent pipeline not needed).' });
         else sendEvent('log', { agent: 'Planner', message: `🛰 Auto mode — routed to the agent pipeline (intent: ${dec ? dec.intent : 'deterministic'}).` });
       } catch { autoDirect = false; }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server, Github, ShieldCheck, Shield, Globe, Lock, Cpu, Cloud, Mail, Bell, Loader2 } from 'lucide-react';
+import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server, Github, ShieldCheck, Shield, Globe, Lock, Cpu, Cloud, Mail, Bell, Loader2 , Puzzle } from 'lucide-react';
 import { getBackendUrl, setBackendUrl, getAccessKey, setAccessKey, jexiFetch } from '../utils/helpers';
 import { setupFcm } from '../utils/fcmSetup';
 import PanelHeader from './PanelHeader';
@@ -73,6 +73,7 @@ export default function SettingsPanel() {
   const [trust, setTrust] = useState(null);
   const [tiers, setTiers] = useState(null); // B55 OpenWorker risk tiers: { tools, counts }
   const [codeMode, setCodeMode] = useState(() => (typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_code_mode') || '1') === '1' : true)); // B99 — PTC code mode
+  const [plugins, setPlugins] = useState(null); // B121 — loaded plugins + their tools
   const [preset, setPreset] = useState(() => (typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_preset') || 'ptc') : 'ptc')); // B102 — dsh agent presets
 
   const TIER_DEFS = [
@@ -81,6 +82,14 @@ export default function SettingsPanel() {
     ['exec', 'EXEC', 'Runs code & commands — autonomous by default, logged, reversible only', 'text-status-warn border-[#FBBF24]/30 bg-[#FBBF24]/10'],
     ['external', 'EXTERNAL', 'Spends money / sends / irreversible — ALWAYS asks you once with real finalized details', 'text-status-error border-[#f87171]/40 bg-[#f87171]/10'],
   ];
+
+  useEffect(() => {
+    // B121 — show every mounted plugin + the tools JEXI can call (runtime seam).
+    jexiFetch(`${getBackendUrl()}/api/plugins/runtime`)
+      .then((r) => r.json())
+      .then(setPlugins)
+      .catch(() => setPlugins(null));
+  }, []);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -584,6 +593,27 @@ export default function SettingsPanel() {
                   style={codeMode ? { background: '#04140D' } : {}}
                 />
               </button>
+            </div>
+
+            {/* B121 — LOADED PLUGINS: every plugin JEXI has access to */}
+            <div className="rounded-md border border-hairline bg-surface-1 px-2.5 py-2">
+              <p className="text-[9px] font-bold text-text-secondary tracking-wider flex items-center gap-1.5">
+                <Puzzle className="w-3 h-3 text-brand" /> LOADED PLUGINS · {plugins?.pluginTools?.length || 0} TOOLS
+              </p>
+              <p className="text-[7px] text-text-tertiary mt-0.5 leading-snug">
+                Plugins mount live tools through the DeepSeek-Harness seam — JEXI can call every tool below in chat (weather, time, currency, and more).
+              </p>
+              {plugins?.pluginTools?.length ? (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {plugins.pluginTools.map((t) => (
+                    <span key={t.slug} className="text-[7px] font-bold text-brand bg-brand-dim/40 border border-brand-line/40 rounded-full px-1.5 py-0.5">
+                      {t.slug}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[7px] text-text-tertiary mt-1">Loading…</p>
+              )}
             </div>
 
             {/* Decisions */}

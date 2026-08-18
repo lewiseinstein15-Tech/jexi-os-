@@ -36,7 +36,10 @@ setActivePluginContext(ctx);
 ok(failed.length === 0, `no plugin failed to load (failed: ${failed.map((f) => f.file).join(', ') || 'none'})`);
 ok(loaded.length >= 1, `at least one plugin loaded (${loaded.length}: ${loaded.map((p) => p.name).join(', ')})`);
 const pluginTools = listPluginTools();
-ok(pluginTools.length >= 1, `plugin tools mounted (${pluginTools.length}: ${pluginTools.map((t) => t.slug).join(', ')})`);
+ok(pluginTools.length >= 3, `plugin tools mounted (${pluginTools.length}: ${pluginTools.map((t) => t.slug).join(', ')})`);
+for (const slug of ['weather-now', 'time-now', 'currency-convert']) {
+  ok(pluginTools.some((t) => t.slug === slug), `${slug} mounted (every plugin is accessible)`);
+}
 
 console.log('\n== 2. No slug collisions (registry ∪ plugins) ==');
 const registrySlugs = new Set(TOOL_REGISTRY.map((t) => t.slug));

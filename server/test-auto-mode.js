@@ -31,10 +31,11 @@ ok(DIRECT_INTENTS.size === 5, 'direct set has exactly the 5 conversational inten
 
 console.log('\n== 2. Mode resolution: default is AUTO ==');
 const idx = fs.readFileSync('./index.js', 'utf-8');
-ok(/preset\.mode \|\| 'auto'/.test(idx), 'server defaults to auto when no mode header');
+ok(/preset\.mode === 'normal' \? 'normal' : 'auto'/.test(idx), 'server defaults to auto when no mode header (preset never forces agent)');
 ok(/let autoDirect = false;/.test(idx), 'auto-routing flag present');
 ok(/isDirectIntent\(dec\.intent\)/.test(idx), 'routing uses isDirectIntent');
-ok(/confidence \|\| 0\) >= 0\.6/.test(idx), 'confidence gate ≥ 0.6');
+ok(/dec\.confidence === undefined \|\| dec\.confidence >= 0\.5/.test(idx), 'deterministic (no confidence) trusted; LLM needs ≥ 0.5');
+ok(/preset\.mode === 'normal' \? 'normal' : 'auto'/.test(idx), 'preset no longer forces agent — only minimal forces direct');
 ok(/\(mode === 'normal' \|\| autoDirect\) && !image/.test(idx), 'direct block runs for normal OR autoDirect');
 
 console.log('\n== 3. Frontend: ONE mode — no toggle, JEXI decides (B117) ==');
