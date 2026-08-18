@@ -25,7 +25,7 @@ const { TOOL_REGISTRY, TOOL_COUNT } = await import('./src/services/ToolRegistry.
 const { createPluginContext, setActivePluginContext } = await import('./src/services/PluginContext.js');
 
 console.log('\n== 1. Every registry tool has an output contract (dsh mandatory output) ==');
-ok(TOOL_COUNT === 196, `registry count stable (${TOOL_COUNT})`);
+ok(TOOL_COUNT === 199, `registry count stable (${TOOL_COUNT})`);
 const missing = TOOL_REGISTRY.filter((t) => !hasOutputContract(t.slug)).map((t) => t.slug);
 ok(missing.length === 0, `all ${TOOL_COUNT} tools contract-checked (missing: ${missing.slice(0, 5).join(', ') || 'none'})`);
 const specific = TOOL_REGISTRY.filter((t) => TOOL_OUTPUT_SCHEMAS[t.slug]).length;

@@ -63,6 +63,18 @@ export const TOOL_SCHEMAS = {
   'interrupt_agent': {
     agent_id: { type: 'string', required: true, desc: 'The running agent id to interrupt' },
   },
+  'create_goal': {
+    objective: { type: 'string', required: true, desc: 'The concrete completion objective inferred from the direct human request.' },
+    max_goal_rounds: { type: 'number', desc: 'Optional positive integer limit on automatic continuation rounds.' },
+  },
+  'update_goal': {
+    goal_id: { type: 'string', required: true, desc: 'Exact id returned by get_goal.' },
+    revision: { type: 'number', required: true, desc: 'Exact positive revision returned by get_goal.' },
+    action: { type: 'string', required: true, desc: 'edit | pause | resume | complete | blocked' },
+    objective: { type: 'string', desc: 'Replacement objective; valid only with action edit.' },
+    max_goal_rounds: { type: 'number', desc: 'Replacement cap; valid only with action edit.' },
+    blocking_condition: { type: 'string', desc: 'Concrete blocking condition; required only with action blocked.' },
+  },
   // B112 — plan/ask tools need real argument schemas (providers strip undeclared args).
   'ask_user_question': {
     questions: {
@@ -222,6 +234,10 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'preview-server': z.object({ ok: z.boolean(), kind: z.literal('preview').optional(), url: z.string().optional(), file: z.string().optional(), note: z.string().optional(), error: z.string().optional() }).passthrough(),
   // B131 — LSP code intelligence contract (dsh tool-lsp).
   'lsp': z.object({ ok: z.boolean(), kind: z.enum(['locations', 'hover']).optional(), locations: z.array(z.object({ uri: z.string(), range: z.unknown() })).optional(), resolvedWorkspaceUri: z.string().optional(), hover: z.unknown().nullable().optional(), error: z.string().optional() }).passthrough(),
+  // B132 — goal tools (dsh tool-goal).
+  'get_goal': z.object({ ok: z.boolean(), goal: z.unknown().nullable().optional(), error: z.string().optional() }).passthrough(),
+  'create_goal': z.object({ ok: z.boolean(), goal_id: z.string().optional(), revision: z.number().optional(), objective: z.string().optional(), started: z.boolean().optional(), note: z.string().optional(), error: z.string().optional() }).passthrough(),
+  'update_goal': z.object({ ok: z.boolean(), goal_id: z.string().optional(), revision: z.number().optional(), action: z.string().optional(), status: z.string().optional(), error: z.string().optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),
@@ -763,6 +779,34 @@ async function runEngine(slug, args, opts = {}) {
       // B106 — list background jobs.
       const { listJobs } = await import('./BackgroundJobs.js');
       return { kind: 'jobs', jobs: listJobs(Number(args.limit) || 20) };
+    }
+
+    case 'get_goal': {
+      // B132 — dsh tool-goal: read the current goal.
+      const { getCurrentGoal } = await import('./GoalTools.js');
+      const r = getCurrentGoal();
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, kind: 'goal', goal: r.goal };
+    }
+
+    case 'create_goal': {
+      // B132 — dsh tool-goal: create a goal.
+      const { createGoal } = await import('./GoalTools.js');
+      const r = await createGoal({ objective: args.objective, max_goal_rounds: args.max_goal_rounds });
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, kind: 'goal', goal_id: r.goal_id, revision: r.revision, objective: r.objective, started: !!r.started, ...(r.note ? { note: r.note } : {}) };
+    }
+
+    case 'update_goal': {
+      // B132 — dsh tool-goal: update with optimistic revision.
+      const { updateGoal } = await import('./GoalTools.js');
+      const r = updateGoal({
+        goal_id: args.goal_id, revision: args.revision, action: args.action,
+        objective: args.objective, max_goal_rounds: args.max_goal_rounds,
+        blocking_condition: args.blocking_condition,
+      });
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, kind: 'goal', goal_id: r.goal_id, revision: r.revision, action: r.action, status: r.status };
     }
 
     case 'job_kill': {

@@ -46,7 +46,7 @@ import { resolvePreset } from './src/services/PresetManager.js'; // B102 — dsh
 import { buildTrace } from './src/services/SessionTrace.js'; // B102 — per-conversation session trace
 import { setRequestTimeZone } from './src/services/TimeContext.js'; // B104 — every LLM call knows the user's date/time (dsh time-context)
 import { setJobExecutor } from './src/services/BackgroundJobs.js'; // B106 — model-launched background jobs (dsh tool-jobs)
-import { addFeedback, listFeedback, feedbackStats } from './src/services/FeedbackStore.js'; // B106 — thumbs up/down on answers (dsh message-feedback)
+import { addFeedback, listFeedback, feedbackStats, addCommandFeedback } from './src/services/FeedbackStore.js'; // B106/B132 — message + command feedback
 import { recentSessionsBlock, exportConversation } from './src/services/SessionConversations.js'; // B106 — session references + export
 import { listMarketplace, marketplaceStats, installSkill, uninstallSkill } from './src/services/SkillMarketplace.js'; // B107 — skills marketplace
 import { maybeAutoTitle, titleUntitledSweep, setStoredTitle } from './src/services/SessionTitles.js'; // B108 — LLM conversation titles
@@ -100,6 +100,8 @@ import { JEXI_NORMAL_PROMPT, IDENTITY_QUESTION_RE } from './src/services/JexiPro
 import { isDirectIntent } from './src/services/Planner.js'; // B114 — AUTO mode: JEXI decides direct vs agent
 import { runDshResearch } from './src/services/DshResearch.js'; // B125 — dsh-style model-driven research (replaces the research team pipeline)
 import { runAutonomousCoding } from './src/services/AutonomousCoding.js'; // B126 — dsh-style autonomous coding (replaces the coding team)
+import { recordTelemetry, readTelemetry, telemetryStats } from './src/services/Telemetry.js'; // B132 — dsh session-telemetry
+import { maybeCheckpoint, listSessionCheckpoints, latestCheckpoint } from './src/services/SessionCheckpoints.js'; // B132 — dsh checkpoint-policy
 import { saveProjectCapsule, findProjectCapsule, listProjectCapsules, capsuleContext, normalizeProjectName } from './src/services/ProjectCapsules.js'; // B128 — durable project memory (continue any project from any conversation)
 import { setGoalEngine } from './src/services/PromptAssembly.js'; // B119 — goal state in prompts
 import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B119 — dsh lifecycle events
@@ -1752,6 +1754,23 @@ app.get('/api/projects', (req, res) => {
   res.json({ projects: listProjectCapsules() });
 });
 
+// B132 — telemetry (read-only, no secrets) + checkpoint policy + command feedback.
+app.get('/api/telemetry', (req, res) => {
+  res.json({ events: readTelemetry(Number(req.query.limit) || 200), stats: telemetryStats() });
+});
+app.get('/api/checkpoints', (req, res) => {
+  res.json({ checkpoints: listSessionCheckpoints(String(req.query.conv || '')) });
+});
+app.post('/api/feedback/command', (req, res) => {
+  try {
+    const { command, result, note } = req.body || {};
+    const r = addCommandFeedback({ command, result, note });
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) {
+    res.status(400).json({ ok: false, error: (e && e.message) || String(e) });
+  }
+});
+
 // B110 — plan-mode: approve a presented plan (frontend APPROVE button).
 app.post('/api/plan/:conv/approve', (req, res) => {
   const conv = String(req.params.conv).slice(0, 80);
@@ -2643,6 +2662,20 @@ app.post('/api/chat', async (req, res) => {
       }
     }
     sendEvent('log', { agent: 'JEXI', message: '🎯 Mission complete — here is the result.' });
+    // B132 — telemetry + durable checkpoint after each completed turn.
+    try {
+      recordTelemetry({
+        latencyMs: Date.now() - taskStart,
+        intent: plan.intent,
+        ok: results.success !== false,
+        complexity: results.statistics?.complexity || plan.complexity,
+        toolCalls: results.statistics?.toolCalls || 0,
+        providers: results.statistics?.provider ? [results.statistics.provider] : [],
+        sourceCount: results.sources?.length || 0,
+        fileCount: results.files?.length || 0,
+      });
+    } catch { /* noop */ }
+    try { maybeCheckpoint(convId); } catch { /* noop */ }
     // Contract: a successful done ALWAYS carries a readable summary — the
     // frontend never renders a blank answer (an empty summary previously left
     // users staring at the activity log with no chat reply).

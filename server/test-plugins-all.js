@@ -40,6 +40,10 @@ ok(pluginTools.length >= 13, `plugin tools mounted (${pluginTools.length}: ${plu
 for (const slug of ['weather-now', 'time-now', 'currency-convert', 'crypto-price', 'ip-geo', 'web_search', 'web_fetch', 'bash', 'write', 'read', 'edit', 'list_files', 'lsp']) {
   ok(pluginTools.some((t) => t.slug === slug), `${slug} mounted (every plugin is accessible)`);
 }
+// goal tools are REGISTRY tools (checked by test-tools/test-b49), not plugins.
+for (const slug of ['get_goal', 'create_goal', 'update_goal']) {
+  ok(TOOL_REGISTRY.some((t) => t.slug === slug), `${slug} in the registry (goal tools)`);
+}
 
 console.log('\n== 2. No slug collisions (registry ∪ plugins) ==');
 const registrySlugs = new Set(TOOL_REGISTRY.map((t) => t.slug));
@@ -48,7 +52,7 @@ ok(dupes.length === 0, `no plugin tool collides with the registry (${dupes.map((
 const seen = new Set();
 const pluginDupes = pluginTools.filter((t) => (seen.has(t.slug) ? true : !seen.add(t.slug)));
 ok(pluginDupes.length === 0, 'no duplicate slugs BETWEEN plugins');
-ok(TOOL_COUNT === 196, `registry count unchanged by plugin load (${TOOL_COUNT})`);
+ok(TOOL_COUNT === 199, `registry count unchanged by plugin load (${TOOL_COUNT})`);
 
 console.log('\n== 3. Plugin tools are MODEL-VISIBLE (the weather bug) ==');
 const weatherDef = pluginTools.find((t) => t.slug === 'weather-now');

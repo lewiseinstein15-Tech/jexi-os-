@@ -24,6 +24,7 @@ export const AGENT_ROSTER = [
   { slug: 'jexi', name: 'JEXI Core', role: 'Identity, conversation, and the system prompt every agent inherits.', skills: ['conversation', 'identity', 'system-prompt'] },
   { slug: 'reasoner', name: 'Reasoner', role: 'Structured reasoning, math solving, and final-answer synthesis.', skills: ['reasoning', 'math', 'latex', 'synthesis'] },
   { slug: 'reflector', name: 'Reflector', role: 'Retrospective after each mission — what worked, what to remember.', skills: ['reflection', 'retrospective'] },
+  { slug: 'goal-owner', name: 'Goal Owner', role: 'Owns the active goal: reads, creates, and updates it with the goal tools (dsh tool-goal).', skills: ['goal-tracking', 'task-decomposition'] },
 
   // ── Product & design team ───────────────────────────────────
   { slug: 'product', name: 'Product Manager', role: 'Requirements, scope modes, success criteria, user stories.', skills: ['requirements', 'scope', 'acceptance-criteria'] },
@@ -346,6 +347,7 @@ export const SKILL_REGISTRY = [
   { slug: 'intent-detection', name: 'Intent Detection', category: 'Core', desc: 'Classify what a request actually asks for.', agent: 'planner' },
   { slug: 'team-composition', name: 'Team Composition', category: 'Core', desc: 'Pick the right specialists for a task.', agent: 'planner' },
   { slug: 'task-decomposition', name: 'Task Decomposition', category: 'Core', desc: 'Split big asks into ordered subtasks.', agent: 'planner' },
+  { slug: 'goal-tracking', name: 'Goal Tracking', category: 'Core', desc: 'Read, create and update the active goal with exact revisions.', agent: 'goal-owner' },
   { slug: 'pipeline-execution', name: 'Pipeline Execution', category: 'Core', desc: 'Run specialists in order with handoffs.', agent: 'orchestrator' },
   { slug: 'gates', name: 'Gate Enforcement', category: 'Core', desc: 'PASS/FAIL and CLEARED/BLOCKED gates in code.', agent: 'orchestrator' },
   { slug: 'handoff', name: 'Strict Handoff', category: 'Core', desc: 'Pass only the prior agent\'s output forward.', agent: 'orchestrator' },

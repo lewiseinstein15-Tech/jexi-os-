@@ -61,6 +61,25 @@ export function listFeedback(conversation = null, limit = 50) {
   return list.slice(-Math.max(1, Number(limit) || 50)).reverse();
 }
 
+/** B132 — command feedback (dsh command-feedback mirror): rate the RESULT of
+ *  a command (/build, /plan, /do …): worked | failed + optional note. */
+export function addCommandFeedback({ command, result, note }) {
+  const r = String(result || '');
+  if (r !== 'worked' && r !== 'failed') return { ok: false, error: "result must be 'worked' or 'failed'" };
+  const entry = {
+    at: Date.now(),
+    kind: 'command',
+    command: String(command || '').slice(0, 120),
+    result: r,
+    note: String(note || '').slice(0, 500),
+  };
+  const list = load();
+  list.push(entry);
+  while (list.length > MAX_FEEDBACK) list.shift();
+  save(list);
+  return { ok: true, ...entry };
+}
+
 /** Aggregate stats (open diagnostics endpoint). */
 export function feedbackStats() {
   const list = load();

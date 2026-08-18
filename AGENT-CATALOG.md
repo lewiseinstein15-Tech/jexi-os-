@@ -1,9 +1,9 @@
 # JEXI OS — Agent & Skill Catalog
 
-**251 specialist agents · 507 skills · 196 tools · 1 orchestrator.** One plain-language request in,
+**252 specialist agents · 508 skills · 199 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
-> ⚙️ GENERATED FILE — updated 2026-08-17 by `cd server && npm run audit-roster`. Do not edit by hand.
+> ⚙️ GENERATED FILE — updated 2026-08-18 by `cd server && npm run audit-roster`. Do not edit by hand.
 > The audit (`node scripts/audit-roster.js --check`, wired into `npm test`) fails CI if this file drifts from the registries.
 
 ---
@@ -12,9 +12,9 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 
 | Metric | Value |
 |---|---|
-| Agents | 251 (251 reachable — 100%) |
-| Skills | 507 |
-| Tools | 196 |
+| Agents | 252 (252 reachable — 100%) |
+| Skills | 508 |
+| Tools | 199 |
 | Intents / teams | 155 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
@@ -39,12 +39,12 @@ You type:  "Build me a water-intake tracker"
 ┌──────────────┴──────────────┐
 │ 2. composeTeam() picks the  │  Product → Designer → Engineer → Architect →
 │    exact specialists needed │  Coder → Runner → Debugger → QA → Reviewer →
-│    (never all 251)          │  Security → Critic → Shipper → Reflector
+│    (never all 252)          │  Security → Critic → Shipper → Reflector
 └──────────────┬──────────────┘
                ▼
 ┌──────────────┴──────────────┐
 │ 3. SKILLS expand per agent  │  team skills = each agent's registry entry
-│    (507-skill registry)       │  → streamed live in the UI as she works
+│    (508-skill registry)       │  → streamed live in the UI as she works
 └──────────────┬──────────────┘
                ▼
 ┌──────────────┴──────────────┐
@@ -77,7 +77,7 @@ You type:  "Build me a water-intake tracker"
 | `clear_memory` | Memory Agent | 0 independent · 1 bundled |
 | `link_analysis` | Video Analyst → Navigator → Extractor → Reasoner → Memory Agent | 0 independent · 5 bundled |
 | `math_solve` | Math Solver → Reasoner → Memory Agent | 0 independent · 3 bundled |
-| `self_check` | Self-Diagnose → Reasoner → Memory Agent → Tool Router → Toolsmith → Agent Builder → Prompt Engineer → Guardrail | 0 independent · 8 bundled |
+| `self_check` | Self-Diagnose → Reasoner → Memory Agent → Tool Router → Toolsmith → Agent Builder → Prompt Engineer → Guardrail → Goal Owner | 0 independent · 9 bundled |
 | `code_task` | Product Manager → Designer → Engineer → UX Researcher → Accessibility Auditor → Architect → Coder → Runner → Sandbox Agent → Debugger → QA Lead → Reviewer → Critic → Security Officer → Shipper → Reflector → UI Developer → Frontend Engineer → Landing Page Builder → Email Developer | 13 independent · 7 bundled |
 | `computer_use` | Navigator → Vision Agent → Computer Use Agent → Reasoner → Memory Agent | 0 independent · 5 bundled |
 | `study_topic` | Scholar → Researcher → Historian → Science Explainer → Document Analyst → Memory Agent | 0 independent · 6 bundled |
@@ -241,7 +241,7 @@ Today's verified independent passes live in the coding pipeline (`code_task`): P
 This section and every table below are GENERATED from the live registries by `cd server && npm run audit-roster` — they cannot drift from the code.
 
 ---
-## The 251 agents (grouped by primary skill category)
+## The 252 agents (grouped by primary skill category)
 
 ### Agent (5)
 | Agent | Tier | What it does |
@@ -300,10 +300,11 @@ This section and every table below are GENERATED from the live registries by `cd
 | **Theoretical Computer Scientist** | team | Computability, complexity, algorithms, formal methods, proofs. |
 | **UI Developer** | team | Builds pixel-perfect interfaces fast. |
 
-### Core (6)
+### Core (7)
 | Agent | Tier | What it does |
 |---|---|---|
 | **Cognitive Scientist** | team | Cognition, perception, language, learning and decision models. |
+| **Goal Owner** | team | Owns the active goal: reads, creates, and updates it with the goal tools (dsh tool-goal). |
 | **JEXI Core** | core | Identity, conversation, and the system prompt every agent inherits. |
 | **Orchestrator** | core | Runs the chosen specialists one-by-one, enforcing strict handoffs and gates. |
 | **Planner** | core | Classifies every request and composes the right team before anything runs. |
@@ -603,7 +604,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | **White Paper Writer** | team | Long-form authority documents. |
 
 
-## The 507 skills (grouped by category)
+## The 508 skills (grouped by category)
 
 ### Agent (14)
 | Skill | Owner agent | What it does |
@@ -703,11 +704,12 @@ This section and every table below are GENERATED from the live registries by `cd
 | `transformation` | Regex Specialist | Rewrite text programmatically. |
 | `vulnerability-scan` | Security Officer | Check for OWASP-class issues. |
 
-### Core (12)
+### Core (13)
 | Skill | Owner agent | What it does |
 |---|---|---|
 | `conversation` | JEXI Core | Natural multi-turn dialogue. |
 | `gates` | Orchestrator | PASS/FAIL and CLEARED/BLOCKED gates in code. |
+| `goal-tracking` | Goal Owner | Read, create and update the active goal with exact revisions. |
 | `handoff` | Orchestrator | Pass only the prior agent's output forward. |
 | `identity` | JEXI Core | Knows name, creator, and origin always. |
 | `intent-detection` | Planner | Classify what a request actually asks for. |
@@ -1221,7 +1223,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 196 tools (grouped by type)
+## The 199 tools (grouped by type)
 
 ### Agent (7)
 | Tool | Allowed agents | Engine | What it does |
@@ -1351,6 +1353,13 @@ This section and every table below are GENERATED from the live registries by `cd
 | `code-fix` | Debugger, Coder | Architect.applyFix | Apply a fix to failing code and re-run until it is clean. |
 | `code-run` | Runner, Debugger, Coder, QA Lead | Runner | Execute generated code and capture real stdout and errors. |
 | `code-write` | Architect, Coder, Technical Writer, Shipper, Backend Engineer, Frontend Engineer | Architect | Generate and write project files into the workspace. |
+
+### Goal (3)
+| Tool | Allowed agents | Engine | What it does |
+|---|---|---|---|
+| `create_goal` | Goal Owner, Planner | undefined | Create a goal with a concrete completion objective and an optional round cap (dsh tool-goal). |
+| `get_goal` | Goal Owner, Planner, Orchestrator | undefined | Read the current goal and its exact revision (dsh tool-goal). |
+| `update_goal` | Goal Owner, Planner | undefined | Update the exact current goal revision: edit | pause | resume | complete | blocked (dsh tool-goal). |
 
 ### Guardrail (2)
 | Tool | Allowed agents | Engine | What it does |

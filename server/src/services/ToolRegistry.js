@@ -298,6 +298,9 @@ export const TOOL_REGISTRY = [
   { slug: 'workflow', name: 'Workflow', type: 'Agent', desc: 'Write and run a multi-agent workflow script: agent()/parallel()/pipeline()/phase()/log() — for large orchestration the user explicitly asks for.', agents: ['orchestrator', 'planner'], tier: 'exec', timeoutMs: 240000 },
   { slug: 'send_message', name: 'Send Message', type: 'Agent', desc: 'Send a message to a background subagent by id — it becomes its next turn (waits if currently working).', agents: ['orchestrator', 'planner'], tier: 'write_local', timeoutMs: 15000 },
   { slug: 'interrupt_agent', name: 'Interrupt Agent', type: 'Agent', desc: 'Request cancellation of a background subagent\'s current turn by its id (accepted no-op if already finished).', agents: ['orchestrator', 'planner'], tier: 'write_local', timeoutMs: 15000 },
+  { slug: 'get_goal', name: 'Get Goal', type: 'Goal', desc: 'Read the current goal and its exact revision (dsh tool-goal).', agents: ['goal-owner', 'planner', 'orchestrator'], tier: 'read', timeoutMs: 15000 },
+  { slug: 'create_goal', name: 'Create Goal', type: 'Goal', desc: 'Create a goal with a concrete completion objective and an optional round cap (dsh tool-goal).', agents: ['goal-owner', 'planner'], tier: 'write_local', timeoutMs: 15000 },
+  { slug: 'update_goal', name: 'Update Goal', type: 'Goal', desc: 'Update the exact current goal revision: edit | pause | resume | complete | blocked (dsh tool-goal).', agents: ['goal-owner', 'planner'], tier: 'write_local', timeoutMs: 15000 },
   { slug: 'todo', name: 'Todo List', type: 'Productivity', desc: 'Manage a visible task list: add, list, complete.', agents: ['task-manager', 'planner'], tier: 'write_local' },
   { slug: 'plan', name: 'Plan', type: 'Productivity', desc: 'Create or update an explicit multi-step plan with per-step status.', agents: ['planner', 'orchestrator'], tier: 'write_local' },
 ];

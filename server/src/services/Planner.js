@@ -29,7 +29,7 @@ export const TEAM_PLAN = {
   clear_memory: ['memory'],
   link_analysis: ['video-analyst', 'navigator', 'extractor', 'reasoner', 'memory'],
   math_solve: ['math', 'reasoner', 'memory'],
-  self_check: ['self-diagnose', 'reasoner', 'memory', 'tool-router', 'toolsmith', 'agent-builder', 'prompt', 'guardrail'],
+  self_check: ['self-diagnose', 'reasoner', 'memory', 'tool-router', 'toolsmith', 'agent-builder', 'prompt', 'guardrail', 'goal-owner'],
   code_task: ['product', 'designer', 'engineer', 'ux-researcher', 'accessibility', 'architect', 'coder', 'runner', 'sandbox', 'debugger', 'qa', 'reviewer', 'critic', 'security', 'shipper', 'reflector', 'ui-developer', 'frontend', 'landing-page-builder', 'email-developer'],
   computer_use: ['navigator', 'vision', 'computer-use', 'reasoner', 'memory'],
   study_topic: ['scholar', 'researcher', 'history', 'science', 'document-analyst', 'memory'],

@@ -81,7 +81,7 @@ const loaded = loadSkillForModel('code-review');
 ok(!!loaded && /Code Review Skill/.test(String(loaded.content || '')), 'code-review loads with body');
 
 console.log('\n== 6. Registry untouched ==');
-ok(TOOL_COUNT === 196, `registry count unchanged (${TOOL_COUNT})`);
+ok(TOOL_COUNT === 199, `registry count unchanged (${TOOL_COUNT})`);
 
 console.log(`\nB107 marketplace: ${passed} passed, ${failedCount} failed`);
 process.exit(failedCount ? 1 : 0);
