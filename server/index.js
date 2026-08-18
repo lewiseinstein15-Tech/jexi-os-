@@ -47,6 +47,10 @@ import { buildTrace } from './src/services/SessionTrace.js'; // B102 — per-con
 import { setRequestTimeZone } from './src/services/TimeContext.js'; // B104 — every LLM call knows the user's date/time (dsh time-context)
 import { setJobExecutor } from './src/services/BackgroundJobs.js'; // B106 — model-launched background jobs (dsh tool-jobs)
 import { addFeedback, listFeedback, feedbackStats, addCommandFeedback } from './src/services/FeedbackStore.js'; // B106/B132 — message + command feedback
+import { registerCommand, listCommands, tryExecuteCommand, helpText } from './src/services/CommandRegistry.js'; // B133 — dsh commands
+import { anonymousUserId } from './src/services/AnonymousId.js'; // B133 — dsh anonymous-user-id
+import { validateAttachment } from './src/services/AttachmentPolicy.js'; // B133 — dsh attachment policy
+import { checkConversationInvariants, invariantStatus } from './src/services/SessionInvariants.js'; // B133 — dsh invariants
 import { recentSessionsBlock, exportConversation } from './src/services/SessionConversations.js'; // B106 — session references + export
 import { listMarketplace, marketplaceStats, installSkill, uninstallSkill } from './src/services/SkillMarketplace.js'; // B107 — skills marketplace
 import { maybeAutoTitle, titleUntitledSweep, setStoredTitle } from './src/services/SessionTitles.js'; // B108 — LLM conversation titles
@@ -179,6 +183,17 @@ try {
 } catch (e) {
   console.error('[Spills] retention boot error:', e.message);
 }
+
+// B133 — COMMAND REGISTRY: the chat route runs these BEFORE the model.
+try {
+  registerCommand({ name: 'help', description: 'List every JEXI command.', run: async () => ({ summary: helpText() }) });
+  registerCommand({ name: 'plan', description: 'Plan then execute automatically (or /plan off).', run: async (q, c) => ({ summary: 'Use /plan <task> or /plan on — the main chat flow handles it.' }) });
+  registerCommand({ name: 'build', description: 'Build an app autonomously.', run: async (q) => ({ summary: 'Send /build <what> — the autonomous coder handles it.' }) });
+  registerCommand({ name: 'compact', description: 'Compress this conversation into a checkpoint.', run: async (q, c) => ({ summary: 'The chat flow handles /compact automatically.' }) });
+  registerCommand({ name: 'goal', description: 'Start a goal.', run: async (q) => ({ summary: 'Send /goal <what> — the goal engine handles it.' }) });
+  registerCommand({ name: 'do', description: 'Do anything with the full toolset.', run: async (q) => ({ summary: 'Send /do <task> — the Do-Anything agent handles it.' }) });
+  console.log(`[Commands] ✓ ${listCommands().length} slash command(s) registered`);
+} catch (e) { console.error('[Commands] register error:', e.message); }
 
 // B106 — BACKGROUND JOBS: the model's run_in_background tool executes the
 // native agent loop in-process; results are collected later with
@@ -1523,6 +1538,9 @@ app.post('/api/upload', async (req, res) => {
     const { name, data } = req.body || {};
     const safeName = String(name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
     if (!data || typeof data !== 'string') return res.status(400).json({ ok: false, error: 'No file data (base64 string)' });
+    // B133 — attachment policy: validate BEFORE storage (type allowlist, executables blocked).
+    const v = validateAttachment({ name: safeName, data, size: Math.floor(Buffer.byteLength(data, 'base64')) });
+    if (!v.ok) return res.status(400).json({ ok: false, error: v.error });
     const buf = Buffer.from(data, 'base64');
     if (buf.length > 25 * 1024 * 1024) return res.status(400).json({ ok: false, error: 'File too large (max 25 MB)' });
     fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true });
@@ -1754,6 +1772,15 @@ app.get('/api/projects', (req, res) => {
   res.json({ projects: listProjectCapsules() });
 });
 
+// B133 — commands, anonymous identity, session invariants.
+app.get('/api/commands', (req, res) => res.json({ commands: listCommands() }));
+app.get('/api/identity/id', (req, res) => res.json({ userId: anonymousUserId() }));
+app.get('/api/invariants', (req, res) => {
+  const conv = String(req.query.conv || '');
+  if (conv) return res.json(checkConversationInvariants(conv));
+  res.json(invariantStatus(Number(req.query.limit) || 50));
+});
+
 // B132 — telemetry (read-only, no secrets) + checkpoint policy + command feedback.
 app.get('/api/telemetry', (req, res) => {
   res.json({ events: readTelemetry(Number(req.query.limit) || 200), stats: telemetryStats() });
@@ -1977,6 +2004,20 @@ app.post('/api/chat', async (req, res) => {
     // the search/agent pipeline). Only the minimal preset forces direct
     // answers; standard/ptc/creator now route AUTO (JEXI decides).
     const mode = String(req.body.mode || req.headers['x-jexi-mode'] || (preset.mode === 'normal' ? 'normal' : 'auto')).toLowerCase();
+    // B133 — slash commands run before the model sees the message.
+    {
+      const cmd = await tryExecuteCommand(raw, { convId, sendEvent });
+      if (cmd) {
+        if (!cmd.ok) {
+          sendEvent('log', { agent: 'JEXI', message: `⚠ ${cmd.error}` });
+          done({ success: false, query: raw, summary: `### ⚠ JEXI OS\n\n${cmd.error}` });
+        } else if (cmd.result && cmd.result.summary) {
+          done({ success: true, query: raw, summary: cmd.result.summary });
+        }
+        // matched but no summary → fall through so the flow can handle it
+        if (cmd.ok && cmd.result && cmd.result.summary) return;
+      }
+    }
     // B113 — /plan = PLAN-AND-EXECUTE: plan first, then do the work
     // AUTOMATICALLY. No approval pause, no question cards, no "should I
     // continue" — updates stream as she works.
@@ -2673,6 +2714,7 @@ app.post('/api/chat', async (req, res) => {
         providers: results.statistics?.provider ? [results.statistics.provider] : [],
         sourceCount: results.sources?.length || 0,
         fileCount: results.files?.length || 0,
+        userId: anonymousUserId(), // B133 — per-device aggregate key (no PII)
       });
     } catch { /* noop */ }
     try { maybeCheckpoint(convId); } catch { /* noop */ }

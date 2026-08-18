@@ -5,6 +5,7 @@ import { providerOrder, recordProviderSuccess, recordProviderFailure, configured
 import { takeSlot, releaseSlot } from './ProviderRateLimiter.js'; // free-tier pacing
 import { queryLocalLLM } from './OfflineAgent.js';
 import { appendTimeContext } from './TimeContext.js'; // B104 — every LLM call knows the current date/time (dsh time-context)
+import { withRetry } from './RetryPolicy.js'; // B133 — dsh llm-retry: backoff on 429/5xx/network
 
 /**
  * Keys are resolved in this order:
@@ -601,12 +602,12 @@ async function chatWithToolsOnce(provider, cfg, model, messages, tools, opts) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
+    const res = await withRetry(() => fetch(`${cfg.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.key}` },
       body: JSON.stringify({ model, messages, tools, tool_choice: 'auto', temperature: opts.temperature ?? 0.3 }),
       signal: controller.signal,
-    });
+    }), { attempts: 3 });
     if (!res.ok) {
       const b = await res.text().catch(() => '');
       throw new Error(`HTTP ${res.status} ${b.slice(0, 120)}`);
