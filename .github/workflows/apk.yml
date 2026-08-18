@@ -17,12 +17,13 @@ name: Build JEXI OS APK
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'src/**'
-      - 'android/**'
-      - 'package.json'
-      - 'capacitor.config.json'
-      - '.github/workflows/apk.yml'
+    # B123 — build on EVERY push to main so every deploy ships a fresh APK
+    # release (apk-build-NN): the in-app UpdateBanner then always has a newer
+    # build to offer, including after server-only/plugin changes.
+    paths-ignore:
+      - 'FIXLOG-*.md'
+      - 'docs/**'
+      - '*.md'
   # Manual "Rebuild APK" button in the Actions tab (no code change needed).
   workflow_dispatch:
 
