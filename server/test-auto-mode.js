@@ -27,7 +27,7 @@ for (const i of ['conversation', 'direct_answer', 'translate', 'math_solve', 'cr
 for (const i of ['code_task', 'research', 'news_latest', 'study_topic', 'github', 'data', 'link_analysis', 'knowledge_recall', 'docs', 'perf', 'compound_task']) {
   ok(isDirectIntent(i) === false, `${i} → agent pipeline`);
 }
-ok(DIRECT_INTENTS.size === 5, 'direct set has exactly the 5 conversational intents');
+ok(DIRECT_INTENTS.size === 10, `direct set has the 5 conversational + 5 plugin intents (${DIRECT_INTENTS.size})`);
 
 console.log('\n== 2. Mode resolution: default is AUTO ==');
 const idx = fs.readFileSync('./index.js', 'utf-8');
@@ -65,5 +65,32 @@ ok(modeDecls === 1, `exactly ONE mode declaration (${modeDecls}) — duplicate r
 const presetAfterMode = idxLines.slice(modeDecl).filter((l) => l.includes("const preset = resolvePreset")).length;
 ok(presetAfterMode === 0, `no preset declaration AFTER mode in the chat handler (${presetAfterMode}) — the duplicate is gone`);
 
-console.log(`\nB114+B116+B117 auto-mode: ${passed} passed, ${failedCount} failed`);
+console.log('\n== 5. B124 — plugin fast-path: no search for weather/crypto/currency/time/ip ==');
+const { detectPluginIntent } = await import('./src/services/Planner.js');
+const PLUGIN_QS = [
+  ['what is the weather in Nairobi', 'weather', 'weather-now'],
+  ['weather forecast for tokyo tomorrow', 'weather', 'weather-now'],
+  ['what is the price of bitcoin', 'crypto_price', 'crypto-price'],
+  ['how much is 5 sol in usd', 'crypto_price', 'crypto-price'],
+  ['convert 100 usd to ksh', 'currency_convert', 'currency-convert'],
+  ['exchange rate usd to kes', 'currency_convert', 'currency-convert'],
+  ['what time is it in machakos', 'time_now', 'time-now'],
+  ['current time in new york', 'time_now', 'time-now'],
+  ['what is my ip', 'ip_geo', 'ip-geo'],
+];
+for (const [q, intent, tool] of PLUGIN_QS) {
+  const d = detectPluginIntent(q);
+  ok(d && d.intent === intent && d.tool === tool, `"${q}" → ${intent} via ${tool}`);
+  ok(isDirectIntent(intent) === true, `${intent} is a DIRECT intent (no search pipeline)`);
+}
+ok(detectPluginIntent('what is the capital of kenya') === null, 'non-plugin question not misrouted');
+ok(detectPluginIntent('price of eggs in the market') === null, 'non-crypto "price of" not misrouted');
+// The direct path must offer plugin tools and NO web-search.
+const idx2 = fs.readFileSync('./index.js', 'utf-8');
+ok(/pluginDefs = listPluginTools\(\).filter/.test(idx2), 'direct path builds the plugin tool set');
+ok(/buildNativeSchemas\(pluginDefs\)/.test(idx2), 'direct path offers plugin tools to the model');
+ok(/generateWithToolsLoop\(prompt, JEXI_NORMAL_PROMPT, schemas/.test(idx2), 'direct path runs a tool loop (not bare text)');
+ok(!/web-search/.test(idx2.slice(idx2.indexOf('const pluginDefs'), idx2.indexOf('if (!text)'))), 'NO web-search in the direct tool set');
+
+console.log(`\nB114+B116+B117+B124 auto-mode: ${passed} passed, ${failedCount} failed`);
 process.exit(failedCount ? 1 : 0);

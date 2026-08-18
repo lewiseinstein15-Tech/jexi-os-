@@ -149,16 +149,43 @@ const CLASSIFIER_INTENTS = [
   'legal_task',
 ];
 
-/** B114 — intents that JEXI answers DIRECTLY (no tools/pipeline) in AUTO
- *  mode: conversational chat, simple facts/definitions, translations, math,
- *  and creative writing. Everything else routes to the agent pipeline. */
+/** B114 — intents that JEXI answers DIRECTLY (no search/agent pipeline) in
+ *  AUTO mode: conversational chat, simple facts/definitions, translations,
+ *  math, creative writing, and the PLUGIN-ANSWERABLE intents (B124) — the
+ *  plugin tools answer these without any web search. */
 export const DIRECT_INTENTS = new Set([
   'conversation', 'direct_answer', 'translate', 'math_solve', 'creative_writing',
+  'weather', 'crypto_price', 'currency_convert', 'time_now', 'ip_geo',
 ]);
 
 /** Is this intent answerable directly (AUTO-mode routing)? */
 export function isDirectIntent(intent) {
   return DIRECT_INTENTS.has(String(intent || ''));
+}
+
+/** B124 — PLUGIN FAST-PATH: deterministic detection of plugin-answerable
+ *  queries (weather / crypto price / currency conversion / time / IP). These
+ *  MUST NOT fall into research/web-search — the plugin tool answers them.
+ *  Returns null when the query is not plugin-answerable. */
+export function detectPluginIntent(q) {
+  const s = String(q || '').toLowerCase();
+  if (/\b(weather|forecast|temperature|humidity|rain|wind speed|sunny|cloudy|current conditions)\b/.test(s)) {
+    return { intent: 'weather', tool: 'weather-now', reasoning: 'Weather query — the weather plugin answers it directly, no web search.' };
+  }
+  if (/\b(bitcoin|btc|ethereum|eth|solana|sol|crypto|dogecoin|doge|ripple|xrp|cardano|ada|coin price|price of (bitcoin|ethereum|btc|eth|sol|doge|solana))\b/.test(s)) {
+    return { intent: 'crypto_price', tool: 'crypto-price', reasoning: 'Crypto price query — the crypto plugin answers it directly, no web search.' };
+  }
+  if (/\b(convert|exchange rate|currency)\b/.test(s)
+      || /\b(usd|kes|ksh|eur|gbp|jpy|inr|zar|dollars?|euros?|pounds?|shillings?|yen)\b\s*(to|in|into|in to)\s*\b(usd|kes|ksh|eur|gbp|jpy|inr|zar|dollars?|euros?|pounds?|shillings?|yen)\b/.test(s)) {
+    return { intent: 'currency_convert', tool: 'currency-convert', reasoning: 'Currency conversion — the currency plugin answers it directly, no web search.' };
+  }
+  if (/(what'?s the time|what time is it|current time|time in [a-z]|time now|local time|timezone|time zone)/.test(s)) {
+    return { intent: 'time_now', tool: 'time-now', reasoning: 'Time query — the timezone plugin answers it directly, no web search.' };
+  }
+  if (/\b(my ip|my ip address|ip address of|ip location|ip geo|where (is|am) i)\b/.test(s)) {
+    return { intent: 'ip_geo', tool: 'ip-geo', reasoning: 'IP query — the ip-geo plugin answers it directly, no web search.' };
+  }
+  return null;
 }
 
 export const ClassificationSchema = z.object({
@@ -327,6 +354,13 @@ export class Planner {
     const linkMatch = query.match(/https?:\/\/[^\s)'"]+/i);
     if (linkMatch && !/http:\/\/localhost|127\.0\.0\.1|\.onion/i.test(linkMatch[0])) {
       return { intent: 'link_analysis', tasks: ['browser', 'extractor', 'reasoning', 'memory'], reasoning: 'User shared a link — JEXI will open it with the browser and summarize.', payload: { url: linkMatch[0], fullQuery: query } };
+    }
+
+    // B124 — PLUGIN FAST-PATH (before the LLM): weather/crypto/currency/time/
+    // ip queries are answered directly with the plugin tools — never research.
+    const pluginCue = detectPluginIntent(q);
+    if (pluginCue) {
+      return { intent: pluginCue.intent, tasks: ['jexi'], reasoning: pluginCue.reasoning, plugin: pluginCue.tool };
     }
 
     // 0.5 Agent-team safety controls: /careful, /freeze, /guard <paths>, /unfreeze

@@ -8,9 +8,9 @@ import path from 'path';
 import { planner } from './src/services/Planner.js';
 import { orchestrator } from './src/services/Orchestrator.js';
 import { runSimpleTask } from './src/services/SimpleTask.js'; // B66 — Orchestrator-Workers SIMPLE fast path
-import { workerRoster } from './src/services/WorkerRouter.js'; // B69 — expose the REAL coworker structure to the UI
+import { workerRoster, executeNativeToolCalls } from './src/services/WorkerRouter.js'; // B69/B124 — coworker structure + gated plugin-tool executor for the direct path
 import { normalizeFinalAnswer } from './src/services/Formatting.js'; // B66 — normalize every final answer
-import { generateContent, resolveKeys, testAllProviders } from './src/services/LLMClient.js';
+import { generateContent, resolveKeys, testAllProviders , generateWithToolsLoop } from './src/services/LLMClient.js';
 import { learnFromExchange } from './src/services/PreferenceLearner.js';
 import { rollingConversationSummary, getRollingSummary } from './src/services/MemoryManager.js';
 import {
@@ -55,7 +55,7 @@ import { setPlanMode, isPlanMode, planModePromptSection, approvePlan, currentPla
 import { getPending, takeAnswers, formatAnswers, clearPending, answerPending } from './src/services/PendingQuestions.js'; // B110 — dsh tool-ask-user
 import { runRetention } from './src/services/SpillStore.js'; // B104 — spill retention
 import { knowledgeStatus, loadProjectKnowledge, knowledgeLoad } from './src/services/KnowledgeBase.js'; // B50 P2 — project knowledge
-import { getToolCatalog, TOOL_PROFILES, activeToolProfile, setToolProfile, executeTool } from './src/services/ToolRuntime.js';
+import { getToolCatalog, TOOL_PROFILES, activeToolProfile, setToolProfile, executeTool, buildNativeSchemas } from './src/services/ToolRuntime.js'; // B124 — plugin tools in the direct path
 import { runAgentLoop } from './src/services/AgentLoop.js';
 import { listWorkspace, readWorkspace, writeWorkspace, createCheckpoint, listCheckpoints, diffCheckpoint, rollbackCheckpoint } from './src/services/WorkspaceRuntime.js';
 import { listProcesses, getProcessLog, startProcess, stopProcess, deleteProcess, onProcessEvent } from './src/services/ProcessManager.js';
@@ -1987,7 +1987,9 @@ app.post('/api/chat', async (req, res) => {
         // them as trusted. LLM ones need >= 0.5 sanity. Simple questions
         // must NOT fall through to search/agents.
         autoDirect = !!dec && isDirectIntent(dec.intent) && (dec.confidence === undefined || dec.confidence >= 0.5);
-        if (autoDirect) sendEvent('log', { agent: 'JEXI', message: '⚡ Auto mode — this is a conversation question, answering directly (agent pipeline not needed).' });
+        if (autoDirect) sendEvent('log', { agent: 'JEXI', message: dec && dec.plugin
+          ? `⚡ Auto mode — answering with the ${dec.plugin} plugin, no search needed.`
+          : '⚡ Auto mode — this is a conversation question, answering directly (agent pipeline not needed).' });
         else sendEvent('log', { agent: 'Planner', message: `🛰 Auto mode — routed to the agent pipeline (intent: ${dec ? dec.intent : 'deterministic'}).` });
       } catch { autoDirect = false; }
     }
@@ -2254,16 +2256,31 @@ app.post('/api/chat', async (req, res) => {
       try { addChat('user', effectiveQuery); } catch (e) {}
       sendEvent('log', { agent: 'JEXI', message: autoDirect ? '💬 Answering directly — no pipeline needed for this one.' : '💬 Normal mode — answering directly.' });
       sendEvent('plan', { intent: 'normal_chat', complexity: 'NORMAL', steps: ['JEXI Core'], roster: ['JEXI Core'], mode: 'normal' });
+      const prompt = `${effectiveQuery}\n\n${conversationSummaryContext(convId)}${sessionRefInjected}`;
       let text = '';
-      try {
-        text = await generateContent(
-          `${effectiveQuery}\n\n${conversationSummaryContext(convId)}${sessionRefInjected}`,
-          JEXI_NORMAL_PROMPT,
-          null,
-          { prefer: '', temperature: 0.5 }
-        );
-      } catch (e) {
-        text = `### ⚠ JEXI OS\n\n${(e && e.message) || 'I could not answer right now.'}`;
+      // B124 — AUTO's direct path is TOOL-CAPABLE: the model can call the
+      // plugin tools (weather/crypto/currency/time/ip) — web-search is
+      // deliberately NOT in this set, so these queries literally cannot search.
+      if (mode === 'auto' || autoDirect) {
+        try {
+          const pluginDefs = listPluginTools().filter((p) => p && p.slug);
+          if (pluginDefs.length) {
+            const schemas = buildNativeSchemas(pluginDefs);
+            const res = await generateWithToolsLoop(prompt, JEXI_NORMAL_PROMPT, schemas, {
+              temperature: 0.4,
+              maxIterations: 4,
+              executeToolCalls: (calls) => executeNativeToolCalls(calls, { profile: activeToolProfile(), sendEvent, intent: 'direct_answer' }),
+            });
+            if (res && res.ok && res.text) text = res.text;
+          }
+        } catch (e) { /* fall through to plain generation */ }
+      }
+      if (!text) {
+        try {
+          text = await generateContent(prompt, JEXI_NORMAL_PROMPT, null, { prefer: '', temperature: 0.5 });
+        } catch (e) {
+          text = `### ⚠ JEXI OS\n\n${(e && e.message) || 'I could not answer right now.'}`;
+        }
       }
       done({ success: true, query: raw, summary: normalizeFinalAnswer(text || '...'), statistics: { executionTime: 0, agentsUsed: 0, complexity: 'NORMAL', confidence: 80 } });
       return;
