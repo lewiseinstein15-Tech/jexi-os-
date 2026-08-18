@@ -41,23 +41,48 @@ function ensureDir() {
   try { fs.mkdirSync(CONV_DIR, { recursive: true }); } catch { /* noop */ }
 }
 
-/** Append one event to a conversation's append-only log. */
+/** B130 — O(1) seq: read only the LAST line of the log (B119 lifecycle events
+ *  made the old full-file read ×2 per append the hottest path in chat). */
+function lastLineSeq(file) {
+  try {
+    const fd = fs.openSync(file, 'r');
+    try {
+      const size = fs.fstatSync(fd).size;
+      if (size === 0) return -1;
+      const len = Math.min(size, 2048);
+      const buf = Buffer.alloc(len);
+      fs.readSync(fd, buf, 0, len, Math.max(0, size - len));
+      const lines = buf.toString('utf8').split('\n').filter(Boolean);
+      for (let i = lines.length - 1; i >= 0; i--) {
+        try { const p = JSON.parse(lines[i]); if (p && Number.isInteger(p.seq)) return p.seq; } catch { /* partial line */ }
+      }
+      return -1;
+    } finally { fs.closeSync(fd); }
+  } catch { return -1; }
+}
+
+/** Append one event to a conversation's append-only log (O(1) amortized). */
 export function appendConversationEvent(convId, { role, text, kind = 'chat', meta }) {
   if (!convId) return null;
   ensureDir();
   const file = convFile(convId);
-  const events = loadConversationEvents(convId);
-  const seq = events.length ? events[events.length - 1].seq + 1 : 0;
+  let seq = 0;
+  if (fs.existsSync(file)) {
+    const last = lastLineSeq(file);
+    seq = last >= 0 ? last + 1 : 0;
+  }
   const ev = { seq, at: Date.now(), role: String(role || 'user'), text: String(text || '').slice(0, 20000), kind, ...(meta ? { meta } : {}) };
   try {
     fs.appendFileSync(file, JSON.stringify(ev) + '\n', 'utf-8');
   } catch (e) { /* memory must never break chat */ }
-  // Cap: keep the tail.
-  const all = loadConversationEvents(convId);
-  if (all.length > MAX_EVENTS_PER_CONV) {
+  // Cap: keep the tail — amortized (only every 64 appends).
+  if (seq > 0 && seq % 64 === 0) {
     try {
-      const tail = all.slice(all.length - MAX_EVENTS_PER_CONV);
-      fs.writeFileSync(file, tail.map((x) => JSON.stringify(x)).join('\n') + '\n', 'utf-8');
+      const all = loadConversationEvents(convId);
+      if (all.length > MAX_EVENTS_PER_CONV) {
+        const tail = all.slice(all.length - MAX_EVENTS_PER_CONV);
+        fs.writeFileSync(file, tail.map((x) => JSON.stringify(x)).join('\n') + '\n', 'utf-8');
+      }
     } catch { /* noop */ }
   }
   return ev;
@@ -154,8 +179,13 @@ export function exportConversation(convId, format = 'jsonl') {
   return { ok: true, format: 'jsonl', content: events.map((e) => JSON.stringify(e)).join('\n') };
 }
 
-/** List all conversations, newest-active first. */
+/** B130 — cached list (10s): recentSessionsBlock ran this per message and it
+ *  read EVERY conversation file each time. */
+let listCache = { at: 0, value: null };
+
+/** List all conversations, newest-active first (cached 10s). */
 export function listConversations() {
+  if (listCache.value && Date.now() - listCache.at < 10000) return listCache.value;
   ensureDir();
   try {
     const files = fs.readdirSync(CONV_DIR).filter((f) => f.endsWith('.jsonl'));
@@ -166,7 +196,8 @@ export function listConversations() {
       if (s) out.push(s);
     }
     out.sort((a, b) => b.lastActive - a.lastActive);
-    return out.slice(0, MAX_CONVERSATIONS);
+    listCache = { at: Date.now(), value: out.slice(0, MAX_CONVERSATIONS) };
+    return listCache.value;
   } catch { return []; }
 }
 

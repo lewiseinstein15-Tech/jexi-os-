@@ -1988,9 +1988,11 @@ app.post('/api/chat', async (req, res) => {
     // B114 — AUTO MODE: classify; conversational/direct intents get the fast
     // direct answer, everything else falls through to the agent pipeline.
     let autoDirect = false;
+    let autoPlan = null;
     if (mode === 'auto') {
       try {
         const dec = await planner.analyzeIntent(raw);
+        autoPlan = dec || null;
         // B121 — deterministic classifications carry no confidence; treat
         // them as trusted. LLM ones need >= 0.5 sanity. Simple questions
         // must NOT fall through to search/agents.
@@ -2280,17 +2282,20 @@ app.post('/api/chat', async (req, res) => {
       sendEvent('plan', { intent: 'normal_chat', complexity: 'NORMAL', steps: ['JEXI Core'], roster: ['JEXI Core'], mode: 'normal' });
       const prompt = `${effectiveQuery}\n\n${conversationSummaryContext(convId)}${sessionRefInjected}`;
       let text = '';
-      // B124 — AUTO's direct path is TOOL-CAPABLE: the model can call the
-      // plugin tools (weather/crypto/currency/time/ip) — web-search is
-      // deliberately NOT in this set, so these queries literally cannot search.
-      if (mode === 'auto' || autoDirect) {
+      // B130 — PERF: the tool loop runs ONLY for plugin-answerable intents
+      // (weather/crypto/currency/time/ip, where a real tool call is needed).
+      // Plain direct answers (greetings, facts, math, chat) get ONE fast call
+      // — the B124 version ran a 4-iteration tool loop on EVERY message,
+      // which made simple replies take forever.
+      const pluginIntent = autoPlan && autoPlan.plugin;
+      if (pluginIntent && (mode === 'auto' || autoDirect)) {
         try {
           const pluginDefs = listPluginTools().filter((p) => p && p.slug);
           if (pluginDefs.length) {
             const schemas = buildNativeSchemas(pluginDefs);
             const res = await generateWithToolsLoop(prompt, JEXI_NORMAL_PROMPT, schemas, {
               temperature: 0.4,
-              maxIterations: 4,
+              maxIterations: 2,
               executeToolCalls: (calls) => executeNativeToolCalls(calls, { profile: activeToolProfile(), sendEvent, intent: 'direct_answer' }),
             });
             if (res && res.ok && res.text) text = res.text;

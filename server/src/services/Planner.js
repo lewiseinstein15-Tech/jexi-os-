@@ -363,6 +363,12 @@ export class Planner {
       return { intent: pluginCue.intent, tasks: ['jexi'], reasoning: pluginCue.reasoning, plugin: pluginCue.tool };
     }
 
+    // B130 — GREETING FAST-PATH (deterministic, zero AI cost): greetings must
+    // never pay an LLM classification call — answer conversationally directly.
+    if (/^(hi|hello|hey|yo|howdy|sup|hola|good (morning|afternoon|evening)|whats up|what's up)[\s.!?]*$/i.test(q)) {
+      return { intent: 'conversation', tasks: ['jexi'], reasoning: 'Greeting — respond conversationally without any pipeline.' };
+    }
+
     // 0.5 Agent-team safety controls: /careful, /freeze, /guard <paths>, /unfreeze
     const scope = { mode: 'normal', paths: [] };
     const cmdMatch = q.match(/^\s*\/(careful|freeze|unfreeze|guard|team)\b(.*)$/i);
