@@ -98,6 +98,7 @@ import { appendConversationEvent, listConversations as listSessionConversations,
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines } from './src/services/JexiIdentity.js'; // canonical identity (name / creator / capabilities)
 import { JEXI_NORMAL_PROMPT, IDENTITY_QUESTION_RE } from './src/services/JexiPrompt.js'; // B103 — normal-mode prompt + deterministic identity-question detection
 import { isDirectIntent } from './src/services/Planner.js'; // B114 — AUTO mode: JEXI decides direct vs agent
+import { runDshResearch } from './src/services/DshResearch.js'; // B125 — dsh-style model-driven research (replaces the research team pipeline)
 import { setGoalEngine } from './src/services/PromptAssembly.js'; // B119 — goal state in prompts
 import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B119 — dsh lifecycle events
 import { DoAnythingAgent } from './src/services/DoAnythingAgent.js'; // B89 — free-form autonomous agent loop
@@ -1432,7 +1433,7 @@ setChatExecutor({
         saveRun(session, { plan, query, state: pausedState });
       },
     };
-    let results = plan.complexity === 'SIMPLE'
+    const results = plan.complexity === 'SIMPLE'
       ? await runSimpleTask(plan, query, sendEvent, opts)
       : await orchestrator.executePlan(plan, query, sendEvent, opts);
     return paused ? { ...results, paused: true } : results;
@@ -2506,9 +2507,21 @@ app.post('/api/chat', async (req, res) => {
     const codeModeHeader = String(req.headers['x-jexi-code-mode'] || req.body.codeMode || (preset.codeMode ? '1' : '0')).toLowerCase();
     const codeMode = codeModeHeader !== '0' && codeModeHeader !== 'off' && codeModeHeader !== 'false';
     const presetFlavor = mode === 'normal' ? '' : preset.flavor;
-    let results = plan.complexity === 'SIMPLE'
-      ? await runSimpleTask(plan, (executionQuery || effectiveQuery) + sessionRefInjected, sendEvent, { image, codeMode, convId, presetFlavor })
-      : await orchestrator.executePlan(plan, (executionQuery || effectiveQuery) + sessionRefInjected, sendEvent, {
+    // B125 — RESEARCH is now DSH-style: the model drives web_search +
+    // web_fetch itself (no team pipeline). Routes here for research intents.
+    let results = null;
+    if (plan.intent === 'research' || plan.intent === 'learning_research') {
+      results = await runDshResearch({
+        query: (executionQuery || effectiveQuery) + sessionRefInjected,
+        convId,
+        sendEvent,
+        profile: activeToolProfile(),
+      });
+      sendEvent('log', { agent: 'JEXI', message: '🎯 Research complete — here is the result.' });
+    } else if (plan.complexity === 'SIMPLE') {
+      results = await runSimpleTask(plan, (executionQuery || effectiveQuery) + sessionRefInjected, sendEvent, { image, codeMode, convId, presetFlavor });
+    } else {
+      results = await orchestrator.executePlan(plan, (executionQuery || effectiveQuery) + sessionRefInjected, sendEvent, {
           image,
           // B53 P2 — task scope for the run: the orchestrator gates memory reuse
       // and writes durable checkpoints keyed to this taskId.
@@ -2526,6 +2539,7 @@ app.post('/api/chat', async (req, res) => {
         saveOffer(convId, executionQuery || effectiveQuery);
       },
     });
+    }
 
     // B53 P2 — snapshot the finished task's workspace so a later "go back to
     // the calculator" restores the exact artifacts, and the NEXT product task

@@ -208,6 +208,9 @@ export const TOOL_OUTPUT_SCHEMAS = {
   // B122 — crypto + ip-geo contracts.
   'crypto-price': z.object({ ok: z.boolean(), kind: z.literal('crypto').optional(), coins: z.array(z.unknown()).optional(), currency: z.string().optional(), at: z.string().optional(), cached: z.boolean().optional(), error: z.string().optional() }).passthrough(),
   'ip-geo': z.object({ ok: z.boolean(), kind: z.literal('ipgeo').optional(), ip: z.string().optional(), country: z.string().optional(), countryCode: z.string().optional(), city: z.string().optional(), latitude: z.number().nullable().optional(), longitude: z.number().nullable().optional(), flag: z.string().nullable().optional(), connection: z.unknown().optional(), timezone: z.string().nullable().optional(), localTime: z.string().nullable().optional(), error: z.string().optional() }).passthrough(),
+  // B125 — DSH tool-web research contracts.
+  'web_search': z.object({ ok: z.boolean(), kind: z.literal('web-search-result').optional(), sources: z.array(z.object({ url: z.string(), title: z.string().optional(), snippet: z.string().optional(), publishedAt: z.string().optional() })).optional(), truncated: z.boolean().optional(), error: z.string().optional() }).passthrough(),
+  'web_fetch': z.object({ ok: z.boolean(), kind: z.literal('web-fetch-result').optional(), url: z.string().optional(), statusCode: z.number().optional(), body: z.unknown().optional(), truncated: z.boolean().optional(), error: z.string().optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),
