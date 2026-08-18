@@ -32,10 +32,12 @@ jobs:
         if: ${{ secrets.RENDER_DEPLOY_HOOK != '' }}
         env:
           HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
-          CLEAR: ${{ inputs.clear_cache == true && '?clearCache=true' || '' }}
+          CLEAR: ${{ inputs.clear_cache == true && 'true' || 'false' }}
         run: |
-          echo "Pinging Render deploy hook..."
-          curl -sS -m 60 -X POST "${HOOK}${CLEAR}" -H "Accept: application/json" -w "\nHTTP %{http_code}\n"
+          echo "Pinging Render deploy hook (clearCache=$CLEAR)..."
+          SUFFIX=""
+          if [ "$CLEAR" = "true" ]; then SUFFIX="?clearCache=true"; fi
+          curl -sS -m 60 -X POST "${HOOK}${SUFFIX}" -H "Accept: application/json" -w "\nHTTP %{http_code}\n"
 
       - name: Missing secret notice
         if: ${{ secrets.RENDER_DEPLOY_HOOK == '' }}
