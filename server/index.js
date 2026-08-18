@@ -100,6 +100,7 @@ import { JEXI_NORMAL_PROMPT, IDENTITY_QUESTION_RE } from './src/services/JexiPro
 import { isDirectIntent } from './src/services/Planner.js'; // B114 — AUTO mode: JEXI decides direct vs agent
 import { runDshResearch } from './src/services/DshResearch.js'; // B125 — dsh-style model-driven research (replaces the research team pipeline)
 import { runAutonomousCoding } from './src/services/AutonomousCoding.js'; // B126 — dsh-style autonomous coding (replaces the coding team)
+import { saveProjectCapsule, findProjectCapsule, listProjectCapsules, capsuleContext, normalizeProjectName } from './src/services/ProjectCapsules.js'; // B128 — durable project memory (continue any project from any conversation)
 import { setGoalEngine } from './src/services/PromptAssembly.js'; // B119 — goal state in prompts
 import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B119 — dsh lifecycle events
 import { DoAnythingAgent } from './src/services/DoAnythingAgent.js'; // B89 — free-form autonomous agent loop
@@ -1746,6 +1747,11 @@ app.post('/api/questions/answer', (req, res) => {
     res.status(400).json({ ok: false, error: (e && e.message) || String(e) });
   }
 });
+// B128 — project memory: durable capsules for continuing builds.
+app.get('/api/projects', (req, res) => {
+  res.json({ projects: listProjectCapsules() });
+});
+
 // B110 — plan-mode: approve a presented plan (frontend APPROVE button).
 app.post('/api/plan/:conv/approve', (req, res) => {
   const conv = String(req.params.conv).slice(0, 80);
@@ -1995,6 +2001,19 @@ app.post('/api/chat', async (req, res) => {
         else sendEvent('log', { agent: 'Planner', message: `🛰 Auto mode — routed to the agent pipeline (intent: ${dec ? dec.intent : 'deterministic'}).` });
       } catch { autoDirect = false; }
     }
+    // B128 — project memory: a continuation/change query targeting a known
+    // project loads its capsule into the turn (files, summary, preview URL).
+    let projectCapsuleCtx = '';
+    if (/^(continue|keep going|go back to|update|upgrade|modify|change|add to|finish|resume|improve|fix|extend|work on|make (it|the)|build on)\b/i.test(raw) || /\b(again|next|dark mode|add a|add an|change the|make it|update it)\b/i.test(raw)) {
+      try {
+        const cctx = capsuleContext(raw);
+        if (cctx) {
+          projectCapsuleCtx = cctx;
+          const cap = findProjectCapsule(raw);
+          if (cap) sendEvent('log', { agent: 'Memory', message: `💾 Continuing project "${cap.name}" — its files, summary and preview are loaded.` });
+        }
+      } catch { /* noop */ }
+    }
     // B110 — pending user answers (from ask_user_question) inject into this turn.
     const pendingAnswers = formatAnswers(takeAnswers(convId));
     // B109 — SESSION REFERENCES (dsh session-reference): @[label](dsh-session:…)
@@ -2231,6 +2250,7 @@ app.post('/api/chat', async (req, res) => {
     }
 
     let effectiveQuery = effectiveRaw;
+    if (projectCapsuleCtx) effectiveQuery = projectCapsuleCtx + effectiveQuery;
     // B110 — pending answers + plan-mode policy ride the query (plan mode's
     // plan:policy section, dsh plan-mode mirror).
     if (pendingAnswers) effectiveQuery = pendingAnswers + effectiveQuery;
@@ -2520,6 +2540,19 @@ app.post('/api/chat', async (req, res) => {
         sendEvent,
         profile: activeToolProfile(),
       });
+      // B128 — durable project memory: capsule the build so ANY conversation
+      // can continue it by name ("continue the todo app").
+      if (results.success) {
+        try {
+          saveProjectCapsule({
+            name: raw.replace(/^\/build\s+/i, '').replace(/^(please\s+)?(build|make|create|write)\s+(me\s+)?(a|an|the)?\s*/i, ''),
+            files: results.files || [],
+            summary: results.summary,
+            previewUrl: results.preview,
+            lastQuery: raw,
+          });
+        } catch { /* noop */ }
+      }
       sendEvent('log', { agent: 'JEXI', message: '🎯 Build complete — here is the result.' });
     } else if (plan.intent === 'research' || plan.intent === 'learning_research') {
       results = await runDshResearch({

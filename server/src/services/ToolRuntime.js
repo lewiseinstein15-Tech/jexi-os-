@@ -23,6 +23,7 @@
  */
 
 import { TOOL_REGISTRY, getTool, enforceToolAllowlist } from './ToolRegistry.js';
+import { WORKSPACE_DIR as CFG_WORKSPACE_DIR, PUBLIC_URL as CFG_PUBLIC_URL, MANAGER_URL as CFG_MANAGER_URL } from '../config.js'; // B127 — real workspace path + public base for URL sanitizing
 import { aggregateSearch } from './SearchEngine.js';
 import { extractContent, extractPdfText, downloadBookFromUrl } from './Extractor.js';
 import { runNewsTeam } from './NewsAgent.js';
@@ -217,6 +218,8 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'read': z.object({ ok: z.boolean(), kind: z.literal('read-result').optional(), path: z.string().optional(), content: z.string().optional(), error: z.string().optional() }).passthrough(),
   'edit': z.object({ ok: z.boolean(), kind: z.literal('edit-result').optional(), path: z.string().optional(), operation: z.string().optional(), after: z.string().optional(), error: z.string().optional() }).passthrough(),
   'list_files': z.object({ ok: z.boolean(), kind: z.literal('list-result').optional(), path: z.string().optional(), files: z.array(z.string()).optional(), error: z.string().optional() }).passthrough(),
+  // B127 — tappable preview URLs.
+  'preview-server': z.object({ ok: z.boolean(), kind: z.literal('preview').optional(), url: z.string().optional(), file: z.string().optional(), note: z.string().optional(), error: z.string().optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),
@@ -712,6 +715,24 @@ async function runEngine(slug, args, opts = {}) {
       };
     }
 
+    case 'preview-server': {
+      // B127 — REAL preview engine: returns the tappable public URL for the
+      // workspace's index.html (or the named file). On Render, PUBLIC_URL is
+      // https://jexi-os-brain.onrender.com → https://…/preview/<file>.
+      const { runFile } = await import('./Runner.js');
+      const name = String(args.name || 'index.html');
+      const file = name.endsWith('.html') ? name : `${name}.html`;
+      const out = await runFile(file, () => {});
+      if (!out.success) {
+        // Fall back to the URL even if the syntax check failed (the file
+        // exists) so the user can still open it.
+        const { PUBLIC_URL, MANAGER_URL } = await import('../config.js');
+        const base = PUBLIC_URL || MANAGER_URL;
+        return { ok: true, kind: 'preview', url: `${base}/preview/${encodeURIComponent(file)}`, file, note: out.output ? String(out.output).slice(0, 300) : undefined };
+      }
+      return { ok: true, kind: 'preview', url: out.url, file };
+    }
+
     case 'spill-read': {
       // B100 — dsh spill policy: retrieve the full body of a spilled result.
       const { readSpill } = await import('./SpillStore.js');
@@ -857,6 +878,30 @@ async function runEngine(slug, args, opts = {}) {
 }
 
 /** Normalize anything the engines return into a flat displayable string. */
+/** B127 — NEVER let a file:// path or the absolute workspace path reach the
+ *  model (it invents untappable links from them). Rewrites:
+ *    file://<abs-workspace>/x.html → <public>/preview/x.html
+ *    <abs-workspace>/x.html        → <public>/preview/x.html
+ *  Anything else file:// → stripped with a note.
+ */
+export function sanitizeModelOutput(text, extraWorkspace = null) {
+  let out = String(text || '');
+  const ws = extraWorkspace || CFG_WORKSPACE_DIR || WORKSPACE;
+  const base = (CFG_PUBLIC_URL || CFG_MANAGER_URL || '').replace(/\/+$/, '');
+  // 1) file://<workspace>/<file> → public preview URL
+  if (ws) {
+    const escWs = String(ws).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out = out.replace(new RegExp(`file://${escWs}/([^\s)'"\\)]+)`, 'g'), (m, f) => `${base}/preview/${encodeURIComponent(f)}`);
+    out = out.replace(new RegExp(`${escWs}/([^\s)'"\\)]+\\.html)`, 'g'), (m, f) => `${base}/preview/${encodeURIComponent(f)}`);
+    out = out.split(String(ws)).join('<workspace>');
+  }
+  // 2) any other file:// path → note
+  if (/file:\/\//i.test(out)) {
+    out = out.replace(/file:\/\/[^\s)'"\\)]+/gi, (m) => `${base || ''}/preview/${encodeURIComponent(m.replace(/^file:\/\//i, '').split('/').pop() || 'index.html')}`);
+  }
+  return out;
+}
+
 function formatResult(result) {
   if (result == null) return '';
   if (typeof result === 'string') return result;
@@ -1104,6 +1149,13 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
     if (/^(write|save|create|edit|upload|update|build|scaffold)/i.test(slug)) {
       try { observeHostMutationFromArgs(args); } catch { /* noop */ }
     }
+    // B127 — strip file:// and absolute workspace paths from model output
+    // BEFORE anything else (the model must only ever see tappable URLs).
+    try {
+      if (typeof result === 'string' && (result.includes('file://') || String(result).includes(CFG_WORKSPACE_DIR))) {
+        result = sanitizeModelOutput(result);
+      }
+    } catch { /* noop */ }
     // B100 — SPILL POLICY (dsh spill-policy mirror): oversized results are
     // saved to the spill store; the model receives a bounded preview + a
     // spill:// locator it can pull with spill-read when it actually needs it.
