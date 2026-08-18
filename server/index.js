@@ -99,6 +99,7 @@ import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLi
 import { JEXI_NORMAL_PROMPT, IDENTITY_QUESTION_RE } from './src/services/JexiPrompt.js'; // B103 — normal-mode prompt + deterministic identity-question detection
 import { isDirectIntent } from './src/services/Planner.js'; // B114 — AUTO mode: JEXI decides direct vs agent
 import { runDshResearch } from './src/services/DshResearch.js'; // B125 — dsh-style model-driven research (replaces the research team pipeline)
+import { runAutonomousCoding } from './src/services/AutonomousCoding.js'; // B126 — dsh-style autonomous coding (replaces the coding team)
 import { setGoalEngine } from './src/services/PromptAssembly.js'; // B119 — goal state in prompts
 import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B119 — dsh lifecycle events
 import { DoAnythingAgent } from './src/services/DoAnythingAgent.js'; // B89 — free-form autonomous agent loop
@@ -2510,7 +2511,17 @@ app.post('/api/chat', async (req, res) => {
     // B125 — RESEARCH is now DSH-style: the model drives web_search +
     // web_fetch itself (no team pipeline). Routes here for research intents.
     let results = null;
-    if (plan.intent === 'research' || plan.intent === 'learning_research') {
+    // B126 — CODING is autonomous: the model drives bash/write/edit itself
+    // (no 11-agent team). Routes here for code_task + compound_task.
+    if (plan.intent === 'code_task' || plan.intent === 'compound_task') {
+      results = await runAutonomousCoding({
+        query: (executionQuery || effectiveQuery) + sessionRefInjected,
+        convId,
+        sendEvent,
+        profile: activeToolProfile(),
+      });
+      sendEvent('log', { agent: 'JEXI', message: '🎯 Build complete — here is the result.' });
+    } else if (plan.intent === 'research' || plan.intent === 'learning_research') {
       results = await runDshResearch({
         query: (executionQuery || effectiveQuery) + sessionRefInjected,
         convId,

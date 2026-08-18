@@ -211,6 +211,12 @@ export const TOOL_OUTPUT_SCHEMAS = {
   // B125 — DSH tool-web research contracts.
   'web_search': z.object({ ok: z.boolean(), kind: z.literal('web-search-result').optional(), sources: z.array(z.object({ url: z.string(), title: z.string().optional(), snippet: z.string().optional(), publishedAt: z.string().optional() })).optional(), truncated: z.boolean().optional(), error: z.string().optional() }).passthrough(),
   'web_fetch': z.object({ ok: z.boolean(), kind: z.literal('web-fetch-result').optional(), url: z.string().optional(), statusCode: z.number().optional(), body: z.unknown().optional(), truncated: z.boolean().optional(), error: z.string().optional() }).passthrough(),
+  // B126 — autonomous coding contracts (DSH tool-bash/tool-fs).
+  'bash': z.object({ ok: z.boolean(), kind: z.literal('bash-result').optional(), command: z.string().optional(), output: z.string().optional(), code: z.number().nullable().optional(), durationMs: z.number().nullable().optional(), error: z.string().optional() }).passthrough(),
+  'write': z.object({ ok: z.boolean(), kind: z.literal('write-result').optional(), path: z.string().optional(), operation: z.string().optional(), before: z.string().nullable().optional(), after: z.string().optional(), size: z.number().optional(), error: z.string().optional() }).passthrough(),
+  'read': z.object({ ok: z.boolean(), kind: z.literal('read-result').optional(), path: z.string().optional(), content: z.string().optional(), error: z.string().optional() }).passthrough(),
+  'edit': z.object({ ok: z.boolean(), kind: z.literal('edit-result').optional(), path: z.string().optional(), operation: z.string().optional(), after: z.string().optional(), error: z.string().optional() }).passthrough(),
+  'list_files': z.object({ ok: z.boolean(), kind: z.literal('list-result').optional(), path: z.string().optional(), files: z.array(z.string()).optional(), error: z.string().optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),
