@@ -220,6 +220,8 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'list_files': z.object({ ok: z.boolean(), kind: z.literal('list-result').optional(), path: z.string().optional(), files: z.array(z.string()).optional(), error: z.string().optional() }).passthrough(),
   // B127 — tappable preview URLs.
   'preview-server': z.object({ ok: z.boolean(), kind: z.literal('preview').optional(), url: z.string().optional(), file: z.string().optional(), note: z.string().optional(), error: z.string().optional() }).passthrough(),
+  // B131 — LSP code intelligence contract (dsh tool-lsp).
+  'lsp': z.object({ ok: z.boolean(), kind: z.enum(['locations', 'hover']).optional(), locations: z.array(z.object({ uri: z.string(), range: z.unknown() })).optional(), resolvedWorkspaceUri: z.string().optional(), hover: z.unknown().nullable().optional(), error: z.string().optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),

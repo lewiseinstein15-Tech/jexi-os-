@@ -38,7 +38,7 @@ export async function runAutonomousCoding({ query, convId = null, sendEvent = ()
   emit('log', { agent: 'Coder', message: '🧑‍💻 Autonomous coding — I will write the files, run them, fix errors and verify myself (no team, no pipeline).' });
 
   const pluginTools = (() => { try { return listPluginTools(); } catch { return []; } })();
-  const want = new Set(['bash', 'write', 'read', 'edit', 'list_files', 'run_in_background', 'preview-server', 'skill-load']);
+  const want = new Set(['bash', 'write', 'read', 'edit', 'list_files', 'lsp', 'run_in_background', 'preview-server', 'skill-load']);
   const defs = pluginTools.filter((p) => p && want.has(p.slug));
   const schemas = buildNativeSchemas(defs);
 

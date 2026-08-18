@@ -36,8 +36,8 @@ setActivePluginContext(ctx);
 ok(failed.length === 0, `no plugin failed to load (failed: ${failed.map((f) => f.file).join(', ') || 'none'})`);
 ok(loaded.length >= 1, `at least one plugin loaded (${loaded.length}: ${loaded.map((p) => p.name).join(', ')})`);
 const pluginTools = listPluginTools();
-ok(pluginTools.length >= 12, `plugin tools mounted (${pluginTools.length}: ${pluginTools.map((t) => t.slug).join(', ')})`);
-for (const slug of ['weather-now', 'time-now', 'currency-convert', 'crypto-price', 'ip-geo', 'web_search', 'web_fetch', 'bash', 'write', 'read', 'edit', 'list_files']) {
+ok(pluginTools.length >= 13, `plugin tools mounted (${pluginTools.length}: ${pluginTools.map((t) => t.slug).join(', ')})`);
+for (const slug of ['weather-now', 'time-now', 'currency-convert', 'crypto-price', 'ip-geo', 'web_search', 'web_fetch', 'bash', 'write', 'read', 'edit', 'list_files', 'lsp']) {
   ok(pluginTools.some((t) => t.slug === slug), `${slug} mounted (every plugin is accessible)`);
 }
 
