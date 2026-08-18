@@ -69,6 +69,15 @@ import { listProcesses, getProcessLog, startProcess, stopProcess, deleteProcess,
 import { verifyDomainAnswer, detectDomain, deterministicChecks } from './src/services/DomainVerifier.js';
 import { runSubagents, decomposeQuery } from './src/services/SubagentRuntime.js';
 import { listHooks, addHook, updateHook, removeHook } from './src/services/HookEngine.js';
+import { setLaunchEnvironment, buildLaunchEnvironment } from './src/services/LaunchEnvironment.js'; // B135 — dsh launch-environment
+import { resolveJexiHome } from './src/services/HomePaths.js'; // B135 — dsh home-paths
+import { settingsFileStore } from './src/services/SettingsFile.js'; // B135 — dsh settings-file
+import { openSessionPersistence, sessionPersistenceStatus, persistSessionEvent } from './src/services/SessionPersistenceSqlite.js'; // B135 — dsh session-persistence-sqlite
+import { loadDefaultHookBridges, fireChatHooks, hookBridgeStatus } from './src/services/HookBridges.js'; // B135 — dsh hooks-codex / hooks-claude-code
+import { loadMcpServers, mcpServerStatus, connectMcpServer, disconnectMcpServer } from './src/services/McpClient.js'; // B135 — dsh mcp-client
+import { sandboxFacts, sandboxTempDir, revokeSandboxTempDir } from './src/services/SandboxLocal.js'; // B135 — dsh sandbox-local / e2b
+import { createStorageHub } from './src/services/StorageHub.js'; // B135 — dsh storage-json / storage-sqlite
+import { onConversationEvent } from './src/services/SessionConversations.js';
 import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services/PluginRegistry.js';
 import { loadPlugins, setActivePluginContext, getActivePluginContext, listPluginTools, listPluginSkills } from './src/services/PluginContext.js'; // B97 — deepseek-harness-style plugin seam
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications, setNotifyBroadcaster } from './src/services/NotificationCenter.js';
@@ -157,6 +166,29 @@ hydrateGoalJobsFromRedis().catch((e) => { recordError('goals', (e && e.message) 
     console.error('[Plugins] boot load error:', e.message);
   }
 })();
+
+// B135 — LAUNCH ENVIRONMENT + SETTINGS FILE + SQLITE SESSION MIRROR +
+// HOOK BRIDGES + MCP CLIENT (dsh batch: launch-environment, home-paths,
+// settings-file, session-persistence-sqlite, hooks-codex/claude-code,
+// mcp-client, sandbox-local). All fail-open: nothing here can break boot.
+(async () => {
+  try {
+    setLaunchEnvironment(buildLaunchEnvironment({ jexiHome: resolveJexiHome() }));
+    console.log(`[launch-environment] ✓ snapshot ready (JEXI_HOME → ${resolveJexiHome()})`);
+  } catch (e) { console.error('[launch-environment]', e.message); }
+})();
+try {
+  const store = settingsFileStore({ path: path.join(DATA_DIR, 'settings.yaml') });
+  console.log(`[settings-file] ✓ provider at ${store.filename}`);
+} catch (e) { console.warn('[settings-file]', e.message); }
+// Every conversation event is mirrored into the sqlite session store
+// (document-per-row, WAL) via the append observer — zero call-site churn.
+onConversationEvent((convId, ev) => { try { persistSessionEvent(convId, ev); } catch { /* noop */ } });
+openSessionPersistence(path.join(DATA_DIR, 'sessions.sqlite')).then((s) => {
+  console.log(`[session-persistence-sqlite] ${s.available ? '✓ sqlite mirror ready' : 'disabled — jsonl remains the source of truth'}`);
+}).catch(() => {});
+loadDefaultHookBridges().catch(() => {});
+loadMcpServers().catch(() => {});
 
 // B98 — SKILL AUTO-DISCOVERY: watch all skill roots (project/user/bundled)
 // so skills added at runtime are picked up without a restart. mtime rescans
@@ -1796,6 +1828,77 @@ app.post('/api/credentials', (req, res) => {
 });
 app.delete('/api/credentials/:key', (req, res) => res.json(deleteCredential(String(req.params.key || ''))));
 
+// B135 — storage hub (dsh storage-json/sqlite) + settings file + sandbox
+// facts + mcp client + session-persistence + hook bridges.
+let storageHub = null;
+const getStorageHub = async () => {
+  if (!storageHub) {
+    storageHub = await createStorageHub({ root: path.join(DATA_DIR, 'storage'), sqlitePath: path.join(DATA_DIR, 'storage.sqlite') });
+  }
+  return storageHub;
+};
+app.get('/api/storage', async (req, res) => {
+  try {
+    const hub = await getStorageHub();
+    res.json({ backends: Object.keys(hub.backends), units: hub.listUnits() });
+  } catch (e) { res.status(500).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+app.get('/api/storage/:unit', async (req, res) => {
+  try {
+    const hub = await getStorageHub();
+    const found = await hub.peek(String(req.params.unit || '').slice(0, 64));
+    if (!found) return res.status(404).json({ ok: false, error: `unit "${req.params.unit}" not found` });
+    res.json({ ok: true, ...found });
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+app.put('/api/storage/:unit', async (req, res) => {
+  try {
+    const hub = await getStorageHub();
+    const unit = await hub.open(String(req.params.unit || '').slice(0, 64));
+    const r = unit.set(undefined, (req.body || {}).value);
+    res.json({ ok: true, unit: unit.name, version: r.version });
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+app.delete('/api/storage/:unit', async (req, res) => {
+  try {
+    const hub = await getStorageHub();
+    const unit = await hub.open(String(req.params.unit || '').slice(0, 64));
+    unit.set(undefined, {});
+    res.json({ ok: true, unit: unit.name });
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+app.get('/api/settings/file', (req, res) => {
+  try {
+    res.json({ ok: true, filename: settingsFileStore().filename, settings: settingsFileStore().all() });
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+app.put('/api/settings/file', (req, res) => {
+  try {
+    const { namespace, key, value } = req.body || {};
+    const r = settingsFileStore().set(String(namespace || ''), key === undefined ? undefined : String(key), value);
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+app.get('/api/sandbox', (req, res) => {
+  const conv = String(req.query.conv || '').slice(0, 80) || null;
+  res.json(sandboxFacts(conv));
+});
+app.get('/api/sandbox/tmp/:conv', (req, res) => res.json(sandboxTempDir(String(req.params.conv || '').slice(0, 80))));
+app.delete('/api/sandbox/tmp/:conv', (req, res) => res.json(revokeSandboxTempDir(String(req.params.conv || '').slice(0, 80))));
+app.get('/api/mcp/servers', (req, res) => res.json({ servers: mcpServerStatus() }));
+app.post('/api/mcp/servers', async (req, res) => {
+  try {
+    const r = await connectMcpServer(req.body || {});
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+app.delete('/api/mcp/servers/:serverName', async (req, res) => {
+  const r = await disconnectMcpServer(String(req.params.serverName || ''));
+  res.status(r.ok ? 200 : 400).json(r);
+});
+app.get('/api/session-persistence', (req, res) => res.json(sessionPersistenceStatus()));
+app.get('/api/hooks/bridges', (req, res) => res.json({ bridges: hookBridgeStatus() }));
+
 // B133 — commands, anonymous identity, session invariants.
 app.get('/api/commands', (req, res) => res.json({ commands: listCommands() }));
 app.get('/api/identity/id', (req, res) => res.json({ userId: anonymousUserId() }));
@@ -1934,6 +2037,9 @@ function conversationSummaryContext(convId) {
   } catch { return ''; }
 }
 
+/** B135 — hook bridges fire SessionStart once per conversation per boot. */
+const sessionStartedConvs = new Set();
+
 app.post('/api/chat', async (req, res) => {
   const { query, image, files } = req.body;
   recordChat();
@@ -1968,10 +2074,23 @@ app.post('/api/chat', async (req, res) => {
   // B66 — per-session conversation memory: chat history reads/writes for this
   // request are scoped to this conversation (never the shared global blob).
   setActiveSession(convId);
+  // B135 — Codex/Claude Code hook bridges: SessionStart fires once per
+  // conversation per server lifetime, UserPromptSubmit on every message.
+  // Fail-open + fire-and-forget: hooks can never block or slow the reply.
+  try {
+    if (!sessionStartedConvs.has(convId)) {
+      sessionStartedConvs.add(convId);
+      fireChatHooks('SessionStart', { prompt: String(query || '').slice(0, 4000), convId, sessionId: convId }).catch(() => {});
+    }
+    fireChatHooks('UserPromptSubmit', { prompt: String(query || '').slice(0, 4000), convId, sessionId: convId }).catch(() => {});
+  } catch { /* noop */ }
   // A fresh run must never serve a stale previous result during recovery.
   clearResult(convId);
   // done = emit the terminal event; persistence is handled by sendEvent above.
   const done = (payload) => {
+    // B135 — Codex/Claude Code hook bridges: Stop fires on every terminal
+    // answer (fail-open, fire-and-forget).
+    try { fireChatHooks('Stop', { prompt: String(query || ''), convId, sessionId: convId }).catch(() => {}); } catch { /* noop */ }
     // B96 — persist JEXI's answer into the conversation log too.
     if (payload && payload.summary) {
       try { appendConversationEvent(convId, { role: 'jexi', text: String(payload.summary).slice(0, 20000), kind: 'chat' }); } catch (e) {}

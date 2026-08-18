@@ -29,7 +29,7 @@ const { buildNativeSchemas, TOOL_SCHEMAS } = await import('./src/services/ToolRu
 const { startJob, setJobExecutor } = await import('./src/services/BackgroundJobs.js');
 
 console.log('\n== 1. Registry: 3 new tools (196) ==');
-ok(TOOL_COUNT === 205, `registry count 193 → 205 (${TOOL_COUNT})`);
+ok(TOOL_COUNT === 206, `registry count 193 → 205 (${TOOL_COUNT})`);
 for (const slug of ['workflow', 'send_message', 'interrupt_agent']) {
   ok(TOOL_REGISTRY.some((t) => t.slug === slug), `${slug} registered`);
 }

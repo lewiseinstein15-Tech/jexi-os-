@@ -91,7 +91,7 @@ ok(e4.ok === false && /no identifier/.test(e4.error || ''), 'off-symbol cursor f
 
 console.log('\n== 7. contract + plugin-all coverage ==');
 const { TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
-ok(TOOL_COUNT === 205, `registry count unchanged by plugin (${TOOL_COUNT})`);
+ok(TOOL_COUNT === 206, `registry count unchanged by plugin (${TOOL_COUNT})`);
 
 console.log(`\nB131 lsp: ${passed} passed, ${failedCount} failed`);
 process.exit(failedCount ? 1 : 0);

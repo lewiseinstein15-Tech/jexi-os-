@@ -45,6 +45,7 @@ import { collectSystemStatus } from './SelfMonitor.js';
 import { loadSettings, saveSettings } from './SettingsManager.js';
 import { runHooks } from './HookEngine.js';
 import { classifyRisk } from './RiskGuard.js';
+import { fireToolHooks } from './HookBridges.js'; // B135 — Codex/Claude Code hook bridges (fail-open)
 
 /* ------------------------------------------------------------------ */
 /* Schemas — argument contracts for the executable tools.              */
@@ -85,6 +86,11 @@ export const TOOL_SCHEMAS = {
   },
   'sandbox_mode': {
     mode: { type: 'string', required: true, desc: 'read-only | workspace-write | danger-full-access' },
+  },
+  'ralph': {
+    objective: { type: 'string', required: true, desc: 'The immutable objective for the fresh-agent Ralph loop (one objective per call).' },
+    maxRounds: { type: 'number', desc: 'Optional round cap (default 12, deployment ceiling 64).' },
+    maxHandoffChars: { type: 'number', desc: 'Optional max serialized characters in one structured handoff (default 16384).' },
   },
   'create_goal': {
     objective: { type: 'string', required: true, desc: 'The concrete completion objective inferred from the direct human request.' },
@@ -268,6 +274,8 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'terminal_signal': z.object({ ok: z.boolean(), sessionId: z.string().optional(), accepted: z.boolean().optional(), status: z.string().optional(), error: z.string().optional() }).passthrough(),
   'terminal_close': z.object({ ok: z.boolean(), sessionId: z.string().optional(), closed: z.boolean().optional(), error: z.string().optional() }).passthrough(),
   'sandbox_mode': z.object({ ok: z.boolean(), mode: z.string().optional(), error: z.string().optional() }).passthrough(),
+  // B135 — tool-ralph contract (dsh): terminal status + rounds + bounded report.
+  'ralph': z.object({ ok: z.boolean(), status: z.enum(['complete', 'blocked', 'budget-limited', 'round-failed']).optional(), roundsStarted: z.number().optional(), report: z.unknown().nullable().optional(), lastReport: z.unknown().nullable().optional(), error: z.string().optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),
@@ -981,13 +989,32 @@ async function runEngine(slug, args, opts = {}) {
       return { kind: 'plan', plan: planGet() };
     }
 
+    case 'ralph': {
+      // B135 — dsh tool-ralph: fresh structured-output child per round with
+      // a bounded structured handoff; terminal statuses complete | blocked |
+      // budget-limited | round-failed.
+      const { runRalph } = await import('./RalphRunner.js');
+      const conv = opts.spillOwner || 'default';
+      const r = await runRalph({
+        objective: String(args.objective || ''),
+        maxRounds: Number(args.maxRounds) || undefined,
+        maxHandoffChars: Number(args.maxHandoffChars) || undefined,
+        signal: opts.signal,
+        sendEvent: (t, d) => opts.sendEvent(t, { ...(d || {}), subagent: 'ralph', conv }),
+      });
+      if (!r.ok) {
+        return { ok: false, kind: 'ralph', status: r.status, roundsStarted: r.roundsStarted, ...(r.report ? { report: r.report } : {}), ...(r.lastReport ? { lastReport: r.lastReport } : {}), error: r.error || `ralph ${r.status}` };
+      }
+      return { ok: true, kind: 'ralph', status: 'complete', roundsStarted: r.roundsStarted, report: r.report };
+    }
+
     default: {
       // B97 — PLUGIN SEAM: tools mounted by plugins (deepseek-harness style)
       // execute here, through the SAME permission/risk/approval pipeline.
       const pluginTool = getPluginTool(slug);
       if (pluginTool) {
         try {
-          const r = await pluginTool.handler(args || {});
+          const r = await pluginTool.handler(args || {}, { convId: opts.spillOwner || null });
           return { ok: !!r.ok, ...r };
         } catch (e) {
           return { ok: false, error: (e && e.message) || 'plugin tool failed' };
@@ -1221,6 +1248,18 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
       if (signal.aborted) controller.abort();
       else signal.addEventListener('abort', () => controller.abort(), { once: true });
     }
+    // B135 — Codex/Claude Code hook bridges: PreToolUse (blocking decisions
+    // honored, fail-open) then execution, then PostToolUse (record-only).
+    try {
+      const pre = await fireToolHooks('PreToolUse', { tool: slug, args, convId: spillOwner });
+      if (pre.blocked) {
+        clearTimeout(timer);
+        const hookBlocked = { ok: false, blocked: true, byHookBridge: true, tool: slug, error: pre.reason || `Blocked by a hook bridge (PreToolUse ${slug}).`, durationMs: Date.now() - started };
+        emit('tool.result', { tool: slug, ok: false, blocked: true, byHookBridge: true, error: hookBlocked.error, durationMs: hookBlocked.durationMs });
+        return hookBlocked;
+      }
+    } catch { /* a hook bridge must never block the harness */ }
+
     let result;
     try {
       result = await Promise.race([
@@ -1230,6 +1269,7 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
           sendEvent: emit,
           signal: controller.signal,
           intent,
+          spillOwner, // B135 — owners (persistent bash, ralph, questions) are per-conversation
         }),
         raceTimeout,
       ]);
@@ -1244,6 +1284,10 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
     } finally {
       clearTimeout(timer);
     }
+    // B135 — PostToolUse hook bridges (record-only, fail-open).
+    try {
+      await fireToolHooks('PostToolUse', { tool: slug, args, convId: spillOwner });
+    } catch { /* a hook bridge must never block the harness */ }
     // P4 — fail closed on malformed tool OUTPUT (never a silent empty reply).
     const outCheck = validateToolOutput(slug, result);
     if (!outCheck.ok) {
@@ -1253,8 +1297,10 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
     }
     // P8 — engines that honestly report failure (e.g. mcp-call) stay failures.
     if (result && typeof result === 'object' && result.ok === false) {
-      const msg = result.error?.message || String(result.error || 'tool reported failure');
-      const failed = { ok: false, tool: slug, code: result.error?.code, error: msg, durationMs: Date.now() - started };
+      const msg = result.error?.message || String(result.error || (result.kind ? `${result.kind} reported failure (code ${result.code ?? 'n/a'})` : 'tool reported failure'));
+      // B135 — carry the structured engine result through so the model sees
+      // real output/exit codes on failure (dsh presentResult parity).
+      const failed = { ok: false, tool: slug, code: result.code ?? result.error?.code, error: msg, ...(result.kind ? { result } : {}), durationMs: Date.now() - started };
       emit('tool.result', { tool: slug, ok: false, error: msg, durationMs: failed.durationMs });
       return failed;
     }

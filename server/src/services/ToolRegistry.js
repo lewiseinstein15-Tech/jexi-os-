@@ -307,6 +307,7 @@ export const TOOL_REGISTRY = [
   { slug: 'terminal_signal', name: 'Terminal Signal', type: 'Terminal', desc: 'Send a signal (SIGINT…) to a terminal session.', agents: ['devops', 'coder'], tier: 'exec', timeoutMs: 30000 },
   { slug: 'terminal_close', name: 'Terminal Close', type: 'Terminal', desc: 'Close a terminal session (frees its slot).', agents: ['devops', 'coder'], tier: 'exec', timeoutMs: 30000 },
   { slug: 'sandbox_mode', name: 'Sandbox Mode', type: 'System', desc: 'Set the session sandbox mode: read-only | workspace-write | danger-full-access (dsh sandbox-policy).', agents: ['guardrail'], tier: 'write_local', timeoutMs: 15000 },
+  { slug: 'ralph', name: 'Ralph Loop', type: 'Agent', desc: 'Iterate toward one immutable objective with a FRESH structured-output child per round and a bounded structured handoff between rounds (dsh tool-ralph). Use only when the user explicitly asks for Ralph / fresh-agent iteration.', agents: ['orchestrator', 'planner'], tier: 'exec', timeoutMs: 300000 },
   { slug: 'todo', name: 'Todo List', type: 'Productivity', desc: 'Manage a visible task list: add, list, complete.', agents: ['task-manager', 'planner'], tier: 'write_local' },
   { slug: 'plan', name: 'Plan', type: 'Productivity', desc: 'Create or update an explicit multi-step plan with per-step status.', agents: ['planner', 'orchestrator'], tier: 'write_local' },
 ];

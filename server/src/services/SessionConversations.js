@@ -62,6 +62,14 @@ function lastLineSeq(file) {
 }
 
 /** Append one event to a conversation's append-only log (O(1) amortized). */
+const eventObservers = new Set();
+
+/** Subscribe to every appended conversation event (e.g. the sqlite mirror). */
+export function onConversationEvent(fn) {
+  eventObservers.add(fn);
+  return () => eventObservers.delete(fn);
+}
+
 export function appendConversationEvent(convId, { role, text, kind = 'chat', meta }) {
   if (!convId) return null;
   ensureDir();
@@ -75,6 +83,7 @@ export function appendConversationEvent(convId, { role, text, kind = 'chat', met
   try {
     fs.appendFileSync(file, JSON.stringify(ev) + '\n', 'utf-8');
   } catch (e) { /* memory must never break chat */ }
+  for (const fn of eventObservers) { try { fn(convId, ev); } catch { /* an observer must never break chat */ } }
   // Cap: keep the tail — amortized (only every 64 appends).
   if (seq > 0 && seq % 64 === 0) {
     try {

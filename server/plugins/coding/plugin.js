@@ -53,31 +53,44 @@ You are the coder. You build working software YOURSELF with the coding tools —
 - Be honest: if a step fails after retries, say exactly what failed and what you tried.
 - Never leave TODO placeholders in a delivered file.`;
 
-/** DSH bash tool. */
+/** DSH bash tool — B135: PERSISTENT bash (dsh tool-bash-persistent). State
+ *  — current directory, exported env — survives across calls for the same
+ *  conversation (owner = convId threaded through the plugin handler meta). */
 function registerBash(ctx, unregisters) {
   const unregister = ctx.tools.register({
     slug: 'bash',
     name: 'Bash',
-    desc: 'Execute a bash command in the workspace. Use for running, building, and verifying code.',
+    desc: 'Run commands in a persistent bash shell. State, including the current directory and exported environment variables, persists across calls for this conversation (dsh tool-bash-persistent).',
     args: {
       command: { type: 'string', required: true, desc: 'The bash command to execute.' },
       description: { type: 'string', required: true, desc: 'Clear 5-10 word description of what the command does (shown in the UI).' },
       timeoutMs: { type: 'number', desc: 'Timeout in ms (default 30000, max 120000).' },
-      workdir: { type: 'string', desc: 'Working directory (default: the workspace root).' },
+      workdir: { type: 'string', desc: 'Change to this directory for this command (the shell keeps its own cwd afterwards).' },
+      reset: { type: 'boolean', desc: 'Reset the persistent shell before this command (fresh cwd + env).' },
     },
     timeoutMs: 120000,
-    handler: async (args) => {
+    handler: async (args, meta = {}) => {
       const command = String((args && args.command) || '').trim();
       if (!command) return { ok: false, error: 'command required' };
       const timeout = Math.min(Math.max(Number((args && args.timeoutMs) || 30000), 1000), 120000);
-      const out = await runCommand(command, { timeout, cwd: (args && args.workdir) || undefined });
+      const { runPersistentBash } = await import('../../src/services/BashPersistent.js');
+      const out = await runPersistentBash({
+        owner: meta.convId || 'default',
+        command,
+        timeoutMs: timeout,
+        maxOutputChars: MAX_OUTPUT_CHARS,
+        cwd: (args && args.workdir) || undefined,
+        reset: !!(args && args.reset),
+      });
       return {
-        ok: !!out.success,
+        ok: !!out.ok && out.error === undefined,
         kind: 'bash-result',
         command: command.slice(0, 300),
-        output: String(out.output || '').slice(0, MAX_OUTPUT_CHARS),
+        output: String(out.output || (out.error || '')).slice(0, MAX_OUTPUT_CHARS),
         code: out.code ?? null,
         durationMs: out.durationMs ?? null,
+        ...(out.truncated ? { truncated: true } : {}),
+        ...(out.reset ? { reset: out.reset } : {}),
       };
     },
   });
