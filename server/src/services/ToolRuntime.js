@@ -1015,6 +1015,14 @@ async function runEngine(slug, args, opts = {}) {
       if (pluginTool) {
         try {
           const r = await pluginTool.handler(args || {}, { convId: opts.spillOwner || null });
+          // B136 — a successful fs touch on a nested AGENTS.md marks it seen
+          // (dsh agent-instructions inbox reconciliation).
+          if (r && r.ok && (args.file_path || args.path)) {
+            try {
+              const { touchProjectInstructions } = await import('./AgentInstructions.js');
+              touchProjectInstructions(args.file_path || args.path);
+            } catch { /* noop */ }
+          }
           return { ok: !!r.ok, ...r };
         } catch (e) {
           return { ok: false, error: (e && e.message) || 'plugin tool failed' };

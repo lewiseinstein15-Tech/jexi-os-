@@ -95,6 +95,7 @@ export async function assemblePrompt({
   includeSkills = true,
   includeSessionRefs = true,
   includeState = true,
+  includeInstructions = true, // B136 — AGENTS.md baseline instructions section
   base = null,
   normalMode = false,
 } = {}) {
@@ -120,6 +121,21 @@ export async function assemblePrompt({
   if (includeSkills) {
     const skills = buildSkillCatalog(30);
     if (skills) sections.push(skills);
+  }
+
+  // -55 project instructions (B136 — dsh agent-instructions): AGENTS.md
+  // baseline files become working rules; rendered once per assembly and
+  // marked seen so only genuinely NEW versions re-enter the context.
+  if (includeInstructions) {
+    try {
+      const { loadBaselineInstructionSet, renderInstructionsBlock, markInstructionsSeen } = await import('./AgentInstructions.js');
+      const inst = loadBaselineInstructionSet();
+      const block = renderInstructionsBlock(inst);
+      if (block) {
+        sections.push(block);
+        markInstructionsSeen(inst);
+      }
+    } catch { /* the instructions section must never break the prompt */ }
   }
 
   // -50 live state: todo + plan + goal.

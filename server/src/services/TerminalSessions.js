@@ -12,6 +12,7 @@
 import { spawn } from 'child_process';
 import crypto from 'crypto';
 import { WORKSPACE_DIR } from '../config.js';
+import { shellEnv } from './ShellEnv.js'; // B136 — scrubbed JEXI shell environment
 
 const MAX_SESSIONS = 8;
 const MAX_BUFFER = 200 * 1024;
@@ -26,7 +27,7 @@ export function terminalOpen({ type = 'shell', name = null, cwd = null } = {}) {
   try {
     child = spawn(process.env.SHELL || '/bin/bash', ['-i'], {
       cwd: String(cwd || WORKSPACE_DIR || process.cwd()),
-      env: { ...process.env, TERM: 'dumb' },
+      env: { ...shellEnv({ convId: id }), TERM: 'dumb' },
     });
   } catch (e) {
     return { ok: false, error: `failed to spawn shell: ${(e && e.message) || e}` };

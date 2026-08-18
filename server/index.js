@@ -78,6 +78,14 @@ import { loadMcpServers, mcpServerStatus, connectMcpServer, disconnectMcpServer 
 import { sandboxFacts, sandboxTempDir, revokeSandboxTempDir } from './src/services/SandboxLocal.js'; // B135 — dsh sandbox-local / e2b
 import { createStorageHub } from './src/services/StorageHub.js'; // B135 — dsh storage-json / storage-sqlite
 import { onConversationEvent } from './src/services/SessionConversations.js';
+import { projectSession, projectedConversationBlock, projectionCacheStats, invalidateProjection } from './src/services/SessionProjection.js'; // B136 — dsh session-projection(+cache)
+import { agentInstructionsStatus, markInstructionsSeen, loadBaselineInstructionSet } from './src/services/AgentInstructions.js'; // B136 — dsh agent-instructions (AGENTS.md)
+import { checkFsOperation, effectiveFsRoots } from './src/services/FsSandbox.js'; // B136 — dsh fs-sandbox
+import { shellEnv } from './src/services/ShellEnv.js'; // B136 — dsh shell-env
+import { spawnManaged, killManaged, listManagedProcesses, reapManagedProcesses } from './src/services/SubprocessLocal.js'; // B136 — dsh subprocess-local
+import { initWorkspaceEntity, readWorkspaceEntity, workspaceEntityStatus, attachSession, updateWorkspaceEntity } from './src/services/WorkspaceEntity.js'; // B136 — dsh workspace entity
+import { writeBootProfile, readBootProfile, configDump, envSummary, featureFlags } from './src/services/BootProfile.js'; // B136 — dsh app-boot profile/config-dump
+import { pluginInventory } from './src/services/PluginInventory.js'; // B136 — dsh plugin-inventory
 import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services/PluginRegistry.js';
 import { loadPlugins, setActivePluginContext, getActivePluginContext, listPluginTools, listPluginSkills } from './src/services/PluginContext.js'; // B97 — deepseek-harness-style plugin seam
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications, setNotifyBroadcaster } from './src/services/NotificationCenter.js';
@@ -166,6 +174,22 @@ hydrateGoalJobsFromRedis().catch((e) => { recordError('goals', (e && e.message) 
     console.error('[Plugins] boot load error:', e.message);
   }
 })();
+
+// B136 — BOOT PROFILE + WORKSPACE ENTITY (dsh app-boot profile + workspace):
+// write the durable boot profile and ensure the workspace entity exists,
+// both fail-open. Subprocess records are reaped hourly.
+try {
+  writeBootProfile({ phase: 'B136', commit: process.env.RENDER_GIT_COMMIT || 'local' });
+  console.log('[boot-profile] ✓ written');
+} catch (e) { console.warn('[boot-profile]', e.message); }
+try {
+  const entity = initWorkspaceEntity(WORKSPACE_DIR);
+  console.log(`[workspace] ✓ entity ${entity && entity.id ? entity.id : '(read)'}`);
+} catch (e) { console.warn('[workspace]', e.message); }
+try {
+  const reapTimer = setInterval(() => { try { reapManagedProcesses(); } catch { /* noop */ } }, 60 * 60 * 1000);
+  if (reapTimer.unref) reapTimer.unref();
+} catch { /* noop */ }
 
 // B135 — LAUNCH ENVIRONMENT + SETTINGS FILE + SQLITE SESSION MIRROR +
 // HOOK BRIDGES + MCP CLIENT (dsh batch: launch-environment, home-paths,
@@ -1899,6 +1923,55 @@ app.delete('/api/mcp/servers/:serverName', async (req, res) => {
 app.get('/api/session-persistence', (req, res) => res.json(sessionPersistenceStatus()));
 app.get('/api/hooks/bridges', (req, res) => res.json({ bridges: hookBridgeStatus() }));
 
+// B136 — session projection (dsh session-projection + cache).
+app.get('/api/sessions/:conv/projection', (req, res) => {
+  const conv = String(req.params.conv || '').slice(0, 80);
+  res.json(projectSession({ convId: conv, maxChars: Number(req.query.maxChars) || 12000 }));
+});
+app.get('/api/projection/cache', (req, res) => res.json(projectionCacheStats()));
+
+// B136 — AGENTS.md instructions (dsh agent-instructions).
+app.get('/api/project/instructions', (req, res) => res.json(agentInstructionsStatus({ root: WORKSPACE_DIR })));
+app.post('/api/project/instructions/seen', (req, res) => {
+  try {
+    const inst = loadBaselineInstructionSet({ root: WORKSPACE_DIR });
+    markInstructionsSeen(inst);
+    res.json({ ok: true, marked: inst.length });
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+
+// B136 — fs sandbox probe (dsh fs-sandbox containment).
+app.get('/api/sandbox/fs-probe', (req, res) => {
+  const { op = 'read', path: target } = req.query;
+  const mode = String(req.query.mode || 'workspace-write');
+  res.json(checkFsOperation({ op, target, workspaceRoot: WORKSPACE_DIR, mode }));
+});
+
+// B136 — managed subprocesses (dsh subprocess-local).
+app.get('/api/subprocess', (req, res) => res.json({ processes: listManagedProcesses() }));
+app.delete('/api/subprocess/:id', async (req, res) => res.json(await killManaged(String(req.params.id || ''))));
+
+// B136 — workspace entity (dsh workspace).
+app.get('/api/workspace/entity', (req, res) => res.json(workspaceEntityStatus(WORKSPACE_DIR)));
+app.put('/api/workspace/entity', (req, res) => {
+  try {
+    const { name } = req.body || {};
+    const r = updateWorkspaceEntity(WORKSPACE_DIR, name ? { name: String(name).slice(0, 60) } : {});
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+
+// B136 — boot profile + config dump (dsh app-boot).
+app.get('/api/boot/profile', (req, res) => res.json({ profile: readBootProfile(), current: envSummary().length > 0 }));
+app.get('/api/boot/config', (req, res) => {
+  let settings = {};
+  try { settings = loadSettings(); } catch { /* noop */ }
+  res.json(configDump(settings));
+});
+
+// B136 — plugin inventory (dsh plugin-inventory).
+app.get('/api/plugins/inventory', (req, res) => res.json(pluginInventory()));
+
 // B133 — commands, anonymous identity, session invariants.
 app.get('/api/commands', (req, res) => res.json({ commands: listCommands() }));
 app.get('/api/identity/id', (req, res) => res.json({ userId: anonymousUserId() }));
@@ -2032,8 +2105,13 @@ function conversationSummaryContext(convId) {
     }
     const s = getRollingSummary();
     const base = s ? `\n\n[Earlier in this conversation: ${String(s).slice(0, 600)}]` : '';
+    // B136 — session-projection: a char-budgeted, newest-first view of this
+    // conversation with an explicit dropped-count marker (dsh projection),
+    // cached so the hot path never re-reads the log.
+    let projection = '';
+    try { projection = projectedConversationBlock(convId, { maxChars: 6000 }); } catch { /* noop */ }
     // B106 — session-reference: the model knows OTHER past conversations exist.
-    return base + recentSessionsBlock(convId, 5);
+    return base + projection + recentSessionsBlock(convId, 5);
   } catch { return ''; }
 }
 
@@ -2074,6 +2152,10 @@ app.post('/api/chat', async (req, res) => {
   // B66 — per-session conversation memory: chat history reads/writes for this
   // request are scoped to this conversation (never the shared global blob).
   setActiveSession(convId);
+  // B136 — the workspace entity tracks which sessions exist (bounded list).
+  try { attachSession(WORKSPACE_DIR, convId); } catch { /* noop */ }
+  // B136 — any append invalidates the conversation's projection cache.
+  try { invalidateProjection(convId); } catch { /* noop */ }
   // B135 — Codex/Claude Code hook bridges: SessionStart fires once per
   // conversation per server lifetime, UserPromptSubmit on every message.
   // Fail-open + fire-and-forget: hooks can never block or slow the reply.

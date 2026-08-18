@@ -62,7 +62,8 @@ export function createPluginContext({ services = {} } = {}) {
       register(def) {
         if (!def || !def.slug || typeof def.handler !== 'function') throw new Error('plugin tool needs slug + handler');
         if (registries.tools.has(def.slug)) throw new Error(`plugin tool "${def.slug}" already registered`);
-        registries.tools.set(def.slug, def);
+        const stamped = { ...def, _plugin: currentPluginName };
+        registries.tools.set(def.slug, stamped);
         return () => registries.tools.delete(def.slug);
       },
       list() { return [...registries.tools.values()]; },
@@ -72,7 +73,8 @@ export function createPluginContext({ services = {} } = {}) {
     skills: {
       register(def) {
         if (!def || !def.slug) throw new Error('plugin skill needs slug');
-        registries.skills.set(def.slug, def);
+        const stamped = { ...def, _plugin: currentPluginName };
+        registries.skills.set(def.slug, stamped);
         return () => registries.skills.delete(def.slug);
       },
       list() { return [...registries.skills.values()]; },
@@ -81,6 +83,14 @@ export function createPluginContext({ services = {} } = {}) {
   };
 
   return ctx;
+}
+
+/** The plugin currently being applied (stamped onto its registrations). */
+let currentPluginName = null;
+
+/** Set the plugin name during apply() so registrations carry their owner. */
+export function setCurrentPluginName(name) {
+  currentPluginName = name || null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -126,7 +136,13 @@ export async function loadPlugins({ dirs = [BUILTIN_PLUGIN_DIR, USER_PLUGIN_DIR]
       if (!manifest || typeof manifest.apply !== 'function') continue;
       const name = manifest.name || path.basename(path.dirname(file));
       if (enabled && !enabled(name)) continue;
-      const cleanup = await manifest.apply(ctx, { dir: path.dirname(file) }) || null;
+      setCurrentPluginName(name);
+      let cleanup = null;
+      try {
+        cleanup = await manifest.apply(ctx, { dir: path.dirname(file) }) || null;
+      } finally {
+        setCurrentPluginName(null);
+      }
       loaded.push({
         name,
         version: manifest.version || '1.0.0',

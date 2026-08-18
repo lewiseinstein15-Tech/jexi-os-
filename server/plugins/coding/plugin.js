@@ -21,10 +21,11 @@
  * context so discovery shows it (custom rank 300).
  */
 
-import fs from 'fs';
 import path from 'path';
 import { writeWorkspace, readWorkspace, listWorkspace } from '../../src/services/WorkspaceRuntime.js';
-import { runCommand } from '../../src/services/Runner.js';
+import { WORKSPACE_DIR as CFG_WORKSPACE_DIR } from '../../src/config.js'; // real workspace root (config, not cwd)
+import { effectiveSandboxMode } from '../../src/services/SandboxMode.js'; // B136 — fs-sandbox mode gate
+import { checkFsOperation } from '../../src/services/FsSandbox.js'; // B136 — fs-sandbox containment
 
 export const name = 'coding';
 export const version = '1.0.0';
@@ -52,6 +53,25 @@ You are the coder. You build working software YOURSELF with the coding tools —
 - Read before you edit; preserve unrelated parts of a file.
 - Be honest: if a step fails after retries, say exactly what failed and what you tried.
 - Never leave TODO placeholders in a delivered file.`;
+
+/**
+ * B136 — FS-SANDBOX MODE GATE (dsh fs-sandbox): the session's sandbox mode
+ * decides whether fs operations may write. read-only → no writes at all;
+ * workspace-write → writes inside the workspace; danger-full-access →
+ * everything (approval gates still apply upstream). Fail-closed.
+ */
+function fsGate(op, target, meta = {}) {
+  try {
+    const mode = effectiveSandboxMode(meta.convId || 'default');
+    // Resolve the target against the REAL workspace root (config), matching
+    // writeWorkspace/readWorkspace semantics — never the process cwd.
+    const root = CFG_WORKSPACE_DIR || process.cwd();
+    const abs = path.isAbsolute(String(target)) ? String(target) : path.resolve(root, String(target));
+    const g = checkFsOperation({ op, target: abs, workspaceRoot: root, mode });
+    if (!g.allowed) return { ok: false, blocked: true, fsSandbox: true, error: g.reason };
+  } catch { /* the gate must never break the tool */ }
+  return null;
+}
 
 /** DSH bash tool — B135: PERSISTENT bash (dsh tool-bash-persistent). State
  *  — current directory, exported env — survives across calls for the same
@@ -108,10 +128,12 @@ function registerWrite(ctx, unregisters) {
       content: { type: 'string', required: true, desc: 'Full text content to write.' },
     },
     timeoutMs: 30000,
-    handler: async (args) => {
+    handler: async (args, meta = {}) => {
       const filePath = String((args && args.file_path) || '').trim();
       const content = String((args && args.content) ?? '');
       if (!filePath) return { ok: false, error: 'file_path required' };
+      const gate = fsGate('write', filePath, meta);
+      if (gate) return gate;
       let before = null;
       try { before = readWorkspace(filePath); } catch { /* new file */ }
       const r = writeWorkspace(filePath, content);
@@ -137,9 +159,11 @@ function registerRead(ctx, unregisters) {
     desc: 'Read a UTF-8 text file from the workspace.',
     args: { file_path: { type: 'string', required: true, desc: 'Relative workspace path to read.' } },
     timeoutMs: 30000,
-    handler: async (args) => {
+    handler: async (args, meta = {}) => {
       const filePath = String((args && args.file_path) || '').trim();
       if (!filePath) return { ok: false, error: 'file_path required' };
+      const gate = fsGate('read', filePath, meta);
+      if (gate) return gate;
       try {
         const content = readWorkspace(filePath);
         return { ok: true, kind: 'read-result', path: filePath, content: String(content).slice(0, MAX_READ_CHARS) };
@@ -164,9 +188,11 @@ function registerEdit(ctx, unregisters) {
       full: { type: 'string', desc: 'When provided, replaces the ENTIRE file with this content.' },
     },
     timeoutMs: 30000,
-    handler: async (args) => {
+    handler: async (args, meta = {}) => {
       const filePath = String((args && args.file_path) || '').trim();
       if (!filePath) return { ok: false, error: 'file_path required' };
+      const gate = fsGate('edit', filePath, meta);
+      if (gate) return gate;
       let current;
       try { current = readWorkspace(filePath); } catch { return { ok: false, error: `file not found: ${filePath}` }; }
       const full = args && args.full;

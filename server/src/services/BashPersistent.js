@@ -20,6 +20,7 @@
 import { spawn } from 'child_process';
 import crypto from 'crypto';
 import { WORKSPACE_DIR } from '../config.js';
+import { shellEnv } from './ShellEnv.js'; // B136 — scrubbed JEXI shell environment
 
 const SHELL_PROMPT = ''; // PS1 is cleared; leftover prompts are stripped defensively
 const TRUNCATED_MESSAGE = '<response clipped><NOTE>To save on context only part of this file has been shown to you. You should retry this tool after you have searched inside the file with `grep -n` in order to find the line numbers of what you are looking for.</NOTE>';
@@ -94,7 +95,7 @@ export function getShell(owner, { cwd } = {}) {
   }
   const child = spawn('/bin/bash', ['-i'], {
     cwd: String(cwd || WORKSPACE_DIR || process.cwd()),
-    env: { ...process.env, TERM: 'dumb', PS1: '', PROMPT_COMMAND: '' },
+    env: { ...shellEnv({ convId: owner }), TERM: 'dumb', PS1: '', PROMPT_COMMAND: '' },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   const rec = { child, buffer: '', born: Date.now(), closed: false, cwd: String(cwd || WORKSPACE_DIR || process.cwd()) };
