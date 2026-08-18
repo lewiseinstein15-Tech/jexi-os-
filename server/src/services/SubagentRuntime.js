@@ -176,13 +176,24 @@ export async function runSubagents({ tasks, sendEvent, opts = {} }) {  if (typeo
   if (cancelled()) {
     aggregate = '';
   } else if (ok.length === 1) {
-    aggregate = ok[0].answer || ok[0].summary; // single subagent — no synthesis needed
+    // B137 — single subagent: prefer its explicit reports when the summary
+    // is thin (reports are the self-contained, parent-facing content).
+    const reports = Array.isArray(ok[0].reports) && ok[0].reports.length ? ok[0].reports.map((r) => r.text).join('\n\n') : '';
+    aggregate = ok[0].answer || ok[0].summary || reports; // single subagent — no synthesis needed
   } else if (ok.length > 1) {
     try {
       const { generateContent } = await import('./LLMClient.js');
       const { JEXI_SYSTEM_PROMPT } = await import('./JexiPrompt.js');
       const { preferencesBlock } = await import('./PreferenceLearner.js');
-      const parts = ok.map((r) => `## ${r.name}${r.isolated ? ' (isolated summary)' : ''}\n${String(r.isolated ? r.summary : r.answer).slice(0, 4000)}`).join('\n\n');
+      const parts = ok.map((r) => {
+        const body = String(r.isolated ? r.summary : r.answer).slice(0, 4000);
+        // B137 — explicit child reports (dsh tool-subagent-report) are
+        // parent-visible content, folded after the summary.
+        const reports = Array.isArray(r.reports) && r.reports.length
+          ? '\n\n[Explicit reports from this subagent:]\n' + r.reports.map((rep) => `- ${rep.text.slice(0, 1200)}`).join('\n')
+          : '';
+        return `## ${r.name}${r.isolated ? ' (isolated summary)' : ''}\n${body}${reports}`;
+      }).join('\n\n');
       aggregate = await generateContent(
         `Combine the sub-reports below into one clear final answer to the user's overall task. Merge overlaps, keep the best evidence, keep headings and LaTeX. Output only the final answer.\n\n${parts.slice(0, 16000)}`,
         JEXI_SYSTEM_PROMPT + preferencesBlock(),

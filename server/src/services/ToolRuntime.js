@@ -46,6 +46,7 @@ import { loadSettings, saveSettings } from './SettingsManager.js';
 import { runHooks } from './HookEngine.js';
 import { classifyRisk } from './RiskGuard.js';
 import { fireToolHooks } from './HookBridges.js'; // B135 — Codex/Claude Code hook bridges (fail-open)
+import { needsApproval } from './UserApproval.js'; // B137 — dsh user-approval (external-tier pause policy)
 
 /* ------------------------------------------------------------------ */
 /* Schemas — argument contracts for the executable tools.              */
@@ -91,6 +92,9 @@ export const TOOL_SCHEMAS = {
     objective: { type: 'string', required: true, desc: 'The immutable objective for the fresh-agent Ralph loop (one objective per call).' },
     maxRounds: { type: 'number', desc: 'Optional round cap (default 12, deployment ceiling 64).' },
     maxHandoffChars: { type: 'number', desc: 'Optional max serialized characters in one structured handoff (default 16384).' },
+  },
+  'report': {
+    output: { type: 'string', required: true, desc: 'Actionable, self-contained content for the agent that started you (summarize conclusions, reference shared paths).' },
   },
   'create_goal': {
     objective: { type: 'string', required: true, desc: 'The concrete completion objective inferred from the direct human request.' },
@@ -276,6 +280,8 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'sandbox_mode': z.object({ ok: z.boolean(), mode: z.string().optional(), error: z.string().optional() }).passthrough(),
   // B135 — tool-ralph contract (dsh): terminal status + rounds + bounded report.
   'ralph': z.object({ ok: z.boolean(), status: z.enum(['complete', 'blocked', 'budget-limited', 'round-failed']).optional(), roundsStarted: z.number().optional(), report: z.unknown().nullable().optional(), lastReport: z.unknown().nullable().optional(), error: z.string().optional() }).passthrough(),
+  // B137 — tool-subagent-report contract (dsh): child-scoped delivery.
+  'report': z.object({ ok: z.boolean(), report: z.object({ id: z.string(), at: z.number(), text: z.string() }).optional(), error: z.string().optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),
@@ -970,6 +976,14 @@ async function runEngine(slug, args, opts = {}) {
       return { kind: 'interrupt', accepted: !!r.accepted, status: r.status };
     }
 
+    case 'report': {
+      // B137 — dsh tool-subagent-report: child-scoped delivery to the parent.
+      const { deliverReport } = await import('./SubagentReport.js');
+      const r = deliverReport(opts.subagentId || null, String(args.output || ''));
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, kind: 'report', report: r.report };
+    }
+
     case 'todo': {
       // DSH todo: the model manages its own visible task list.
       const { todoList, todoAdd, todoComplete, todoRemove } = await import('./TodoStore.js');
@@ -1103,7 +1117,7 @@ export async function executeTool(params) {
   return result;
 }
 
-async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, confirm, codeTools, signal, spillOwner }) {
+async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, confirm, codeTools, signal, spillOwner, subagentId }) {
   const started = Date.now();
   const emit = (type, payload) => { try { if (typeof sendEvent === 'function') sendEvent(type, payload); } catch (e) {} };
   // B97 — PLUGIN SEAM: plugin-mounted tools are first-class. If the static
@@ -1206,7 +1220,11 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
   // sends something externally, or is irreversible ALWAYS requires ONE
   // explicit human approval showing the REAL finalized details (never
   // placeholders). read / write_local / exec run autonomously by default.
-  if (tier === 'external') {
+  // B137 — dsh user-approval: the session's approval policy decides whether
+  // external-tier actions pause. 'never' (via a permission preset) proceeds;
+  // the default 'ask' keeps the ONE-approval pause below.
+  const approvalPolicy = (() => { try { return needsApproval(spillOwner) ? 'ask' : 'never'; } catch { return 'ask'; } })();
+  if (tier === 'external' && approvalPolicy === 'ask') {
     const details = buildFinalizedDetails(slug, args);
     const payload = {
       risk: 'irreversible',
@@ -1278,6 +1296,7 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
           signal: controller.signal,
           intent,
           spillOwner, // B135 — owners (persistent bash, ralph, questions) are per-conversation
+          subagentId, // B137 — child-scoped report delivery
         }),
         raceTimeout,
       ]);

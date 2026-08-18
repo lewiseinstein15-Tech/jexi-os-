@@ -86,6 +86,12 @@ import { spawnManaged, killManaged, listManagedProcesses, reapManagedProcesses }
 import { initWorkspaceEntity, readWorkspaceEntity, workspaceEntityStatus, attachSession, updateWorkspaceEntity } from './src/services/WorkspaceEntity.js'; // B136 — dsh workspace entity
 import { writeBootProfile, readBootProfile, configDump, envSummary, featureFlags } from './src/services/BootProfile.js'; // B136 — dsh app-boot profile/config-dump
 import { pluginInventory } from './src/services/PluginInventory.js'; // B136 — dsh plugin-inventory
+import { effectiveApprovalPolicy, setApprovalPolicy, APPROVAL_POLICIES } from './src/services/UserApproval.js'; // B137 — dsh user-approval
+import { permissionsStatus, setPermissionPreset, PERMISSION_PRESET_NAMES } from './src/services/PermissionPresets.js'; // B137 — dsh permission-presets
+import { personaFlavor, personaStatus, saveUserPersonas } from './src/services/PersonaManager.js'; // B137 — dsh preset/persona
+import { scheduleRuntimeStatus } from './src/services/ScheduleRuntime.js'; // B137 — dsh schedule runtime view
+import { hostStatus, gatewayStatus } from './src/services/HostStatus.js'; // B137 — dsh host/webserver + api/gateway
+import { reportChannelStatus } from './src/services/SubagentReport.js'; // B137 — dsh tool-subagent-report
 import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services/PluginRegistry.js';
 import { loadPlugins, setActivePluginContext, getActivePluginContext, listPluginTools, listPluginSkills } from './src/services/PluginContext.js'; // B97 — deepseek-harness-style plugin seam
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications, setNotifyBroadcaster } from './src/services/NotificationCenter.js';
@@ -1972,6 +1978,50 @@ app.get('/api/boot/config', (req, res) => {
 // B136 — plugin inventory (dsh plugin-inventory).
 app.get('/api/plugins/inventory', (req, res) => res.json(pluginInventory()));
 
+// B137 — permission presets + approval policy (dsh interaction).
+app.get('/api/permissions', (req, res) => {
+  const conv = String(req.query.conv || '').slice(0, 80);
+  res.json(permissionsStatus(conv));
+});
+app.post('/api/permissions', (req, res) => {
+  try {
+    const { conv, preset, approval } = req.body || {};
+    if (preset) {
+      const r = setPermissionPreset(String(conv || '').slice(0, 80), String(preset));
+      return res.status(r.ok ? 200 : 400).json(r);
+    }
+    if (approval) {
+      const r = setApprovalPolicy(String(conv || '').slice(0, 80), String(approval));
+      return res.status(r.ok ? 200 : 400).json(r);
+    }
+    res.status(400).json({ ok: false, error: 'provide preset or approval' });
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+
+// B137 — personas (dsh preset/persona).
+app.get('/api/personas', (req, res) => res.json(personaStatus()));
+app.post('/api/personas', (req, res) => {
+  try {
+    const r = saveUserPersonas((req.body || {}).personas);
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+
+// B137 — schedule runtime view (dsh schedule).
+app.get('/api/schedule/runtime', (req, res) => res.json(scheduleRuntimeStatus(taskScheduler)));
+
+// B137 — host + gateway facts (dsh host/webserver + api/gateway).
+app.get('/api/host', (req, res) => {
+  res.json(hostStatus({ publicDir: path.join(SERVER_ROOT, 'public') }));
+});
+app.get('/api/gateway', (req, res) => {
+  const keyLocked = !!process.env.JEXI_API_KEY && process.env.JEXI_ALLOW_UNLOCKED !== '1';
+  res.json(gatewayStatus({ openPaths: OPEN_PATHS, keyLocked, allowUnlocked: process.env.JEXI_ALLOW_UNLOCKED === '1' }));
+});
+
+// B137 — live subagent report channels (dsh tool-subagent-report).
+app.get('/api/report/channels', (req, res) => res.json({ channels: reportChannelStatus() }));
+
 // B133 — commands, anonymous identity, session invariants.
 app.get('/api/commands', (req, res) => res.json({ commands: listCommands() }));
 app.get('/api/identity/id', (req, res) => res.json({ userId: anonymousUserId() }));
@@ -2817,7 +2867,11 @@ app.post('/api/chat', async (req, res) => {
     // x-jexi-code-mode header overrides it.
     const codeModeHeader = String(req.headers['x-jexi-code-mode'] || req.body.codeMode || (preset.codeMode ? '1' : '0')).toLowerCase();
     const codeMode = codeModeHeader !== '0' && codeModeHeader !== 'off' && codeModeHeader !== 'false';
-    const presetFlavor = mode === 'normal' ? '' : preset.flavor;
+    // B137 — persona (dsh preset/persona): the x-jexi-persona header adds a
+    // flavor overlay ON TOP of the preset flavor ('' when none selected).
+    const persona = String(req.headers['x-jexi-persona'] || '').trim();
+    const personaFlavorText = mode === 'normal' ? '' : personaFlavor(persona);
+    const presetFlavor = (mode === 'normal' ? '' : preset.flavor) + personaFlavorText;
     // B125 — RESEARCH is now DSH-style: the model drives web_search +
     // web_fetch itself (no team pipeline). Routes here for research intents.
     let results = null;

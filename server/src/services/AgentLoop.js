@@ -37,6 +37,7 @@ import { preferencesBlock } from './PreferenceLearner.js';
 import { assemblePrompt } from './PromptAssembly.js'; // B119 — dsh systemPrompt.assemble mirror
 import { lifecycleTurnStart, lifecycleStepStart, lifecycleToolCall, lifecycleToolResult, lifecycleStepEnd, lifecycleTurnEnd } from './SessionLifecycle.js'; // B119 — dsh session-event vocabulary
 import { providerPreferenceForIntent } from './ModelRouting.js';
+import { REPORT_GUIDANCE } from './SubagentReport.js'; // B137 — dsh tool-subagent-report guidance for children
 
 // B96 — DeepSeek-Harness-style loop: more steps per turn (the rate limiter
 // protects free tiers), with turn/step events streamed like dsh's event log.
@@ -154,7 +155,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         codeTools,
         presetFlavor: opts.presetFlavor || '',
         base: opts.systemPromptOverride || null,
-      }),
+      }) + (opts.subagentId ? `\n\n[You are a subagent. ${REPORT_GUIDANCE}]` : ''),
       schemas,
       {
         temperature: 0.3,
@@ -176,7 +177,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
             try { emit('tool/call', { callId: call.id, name: call.name, arguments: JSON.stringify(call.arguments || {}).slice(0, 500) }); } catch (e) {}
             // B119 — durable lifecycle events (dsh session-event vocabulary).
             try { lifecycleStepStart(convId, 1, callsMade); lifecycleToolCall(convId, 1, callsMade, call.id, call.name, call.arguments || {}); } catch { /* noop */ }
-            const r = await executeTool({ slug: call.name, args: call.arguments || {}, profile, sendEvent: emit, confirm: opts.confirm, codeTools: codeMode ? codeTools : undefined, spillOwner: opts.spillOwner });
+            const r = await executeTool({ slug: call.name, args: call.arguments || {}, profile, sendEvent: emit, confirm: opts.confirm, codeTools: codeMode ? codeTools : undefined, spillOwner: opts.spillOwner, ...(opts.subagentId ? { subagentId: opts.subagentId } : {}) });
             try { emit('tool/result', { callId: call.id, name: call.name, ok: !!r.ok, error: r.error || null }); } catch (e) {}
             try { lifecycleToolResult(convId, 1, callsMade, call.id, call.name, !!r.ok, r.error, r.durationMs); } catch { /* noop */ }
             try { emit('step/end', { turn: 1, step: callsMade }); } catch (e) {}

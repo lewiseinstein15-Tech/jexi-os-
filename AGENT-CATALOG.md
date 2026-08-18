@@ -1,6 +1,6 @@
 # JEXI OS — Agent & Skill Catalog
 
-**252 specialist agents · 508 skills · 206 tools · 1 orchestrator.** One plain-language request in,
+**252 specialist agents · 508 skills · 207 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
 > ⚙️ GENERATED FILE — updated 2026-08-18 by `cd server && npm run audit-roster`. Do not edit by hand.
@@ -14,7 +14,7 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 |---|---|
 | Agents | 252 (252 reachable — 100%) |
 | Skills | 508 |
-| Tools | 206 |
+| Tools | 207 |
 | Intents / teams | 155 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
@@ -1223,15 +1223,16 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 206 tools (grouped by type)
+## The 207 tools (grouped by type)
 
-### Agent (8)
+### Agent (9)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
 | `ask_user_question` | Orchestrator, Planner | undefined | Ask the user a concise question when you need confirmation, a choice, or missing information before proceeding. Answers arrive in the next message. |
 | `exit_plan_mode` | Planner, Orchestrator | undefined | Present the completed plan for user review — implementation begins only after approval (plan mode). |
 | `interrupt_agent` | Orchestrator, Planner | undefined | Request cancellation of a background subagent's current turn by its id (accepted no-op if already finished). |
 | `ralph` | Orchestrator, Planner | undefined | Iterate toward one immutable objective with a FRESH structured-output child per round and a bounded structured handoff between rounds (dsh tool-ralph). Use only when the user explicitly asks for Ralph / fresh-agent iteration. |
+| `report` | Orchestrator, Planner | undefined | Deliver a self-contained result to the agent that started you. Only callable inside a subagent run; reporting never ends your turn (dsh tool-subagent-report). |
 | `send_message` | Orchestrator, Planner | undefined | Send a message to a background subagent by id — it becomes its next turn (waits if currently working). |
 | `skill-load` | Planner, Orchestrator | undefined | Load a skill into context (progressive disclosure) — auto-discovered project/user/bundled skills. |
 | `subagent` | Orchestrator, Planner | undefined | Delegate a sub-task to a child agent with its own context; it reports back. |
