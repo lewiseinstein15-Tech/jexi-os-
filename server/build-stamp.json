@@ -1,6 +1,6 @@
 {
-  "commit": "5c768d3",
+  "commit": "live",
   "phase": "B119",
   "builtAt": "2026-08-17T21:05:00Z",
-  "note": "Bump this file on every push so /api/health exposes whether Render deployed the latest code."
+  "note": "Static fallback only \u2014 Render injects RENDER_GIT_COMMIT for the live value."
 }

@@ -2746,6 +2746,9 @@ let BUILD_STAMP = null;
 try {
   BUILD_STAMP = JSON.parse(fs.readFileSync(path.join(SERVER_ROOT, 'build-stamp.json'), 'utf-8'));
 } catch { /* noop */ }
+// B121 — Render injects RENDER_GIT_COMMIT on every deploy: the health stamp
+// then reports the ACTUAL live commit (the static file was going stale).
+const LIVE_COMMIT = process.env.RENDER_GIT_COMMIT || (BUILD_STAMP && BUILD_STAMP.commit) || 'unknown';
 
 app.get('/api/health', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -2753,7 +2756,7 @@ app.get('/api/health', (req, res) => {
     ok: true,
     name: 'JEXI OS Brain',
     version: '1.0.0',
-    build: BUILD_STAMP,
+    build: { ...(BUILD_STAMP || {}), commit: LIVE_COMMIT, live: true },
     instanceId: INSTANCE_ID,
     uptime: Math.round(process.uptime()),
     redis: isRedisActive(),
