@@ -3,6 +3,11 @@ apply plugin: 'com.android.application'
 android {
     namespace = "com.jexi.os"
     compileSdk = rootProject.ext.compileSdkVersion
+    // B152 — AGP 8+ doesn't generate BuildConfig by default; MainActivity uses
+    // BuildConfig.VERSION_CODE to clear the WebView cache on upgrades.
+    buildFeatures {
+        buildConfig true
+    }
 
     // Every build signs with the SAME committed keystore so a new APK installs
     // over the previous one. (Gradle's default auto-generated debug key is a
