@@ -383,3 +383,143 @@ html, body {
   .jx-msg { padding: 14px 12px; }
   .jx-composer { padding-left: 10px; padding-right: 10px; }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   RICH ANSWER RENDERER (B151) — monochrome, mobile-first
+   ════════════════════════════════════════════════════════════════ */
+.jx-rich { font-family: var(--mono); font-size: 13.5px; line-height: 1.7; color: var(--ink); }
+.jx-rich > *:first-child { margin-top: 0; }
+.jx-rich > *:last-child { margin-bottom: 0; }
+
+/* text */
+.jx-p { margin: 0 0 10px; color: var(--ink); overflow-wrap: anywhere; word-break: break-word; }
+.jx-p:last-child { margin-bottom: 0; }
+.jx-rich strong { font-weight: 700; color: #fff; }
+.jx-rich em { font-style: italic; }
+.jx-rich del { color: var(--faint); }
+
+/* headings — clear hierarchy, never noisy */
+.jx-h1 { font-size: 19px; font-weight: 800; letter-spacing: -.3px; margin: 22px 0 8px; color: #fff; line-height: 1.35; }
+.jx-h2 { font-size: 16.5px; font-weight: 700; letter-spacing: -.2px; margin: 20px 0 7px; color: #fff; line-height: 1.35; }
+.jx-h3 { font-size: 14.5px; font-weight: 700; margin: 16px 0 6px; color: #fff; }
+.jx-h4, .jx-h5, .jx-h6 { font-size: 13.5px; font-weight: 700; margin: 14px 0 5px; color: #e5e5e5; }
+.jx-rich h1:first-child, .jx-rich h2:first-child, .jx-rich h3:first-child { margin-top: 0; }
+
+/* lists */
+.jx-ul { margin: 0 0 10px; padding-left: 22px; list-style: none; }
+.jx-ul > li { position: relative; margin: 0 0 5px; padding-left: 14px; }
+.jx-ul > li::before { content: '—'; position: absolute; left: 0; color: var(--faint); }
+.jx-ol { margin: 0 0 10px; padding-left: 26px; list-style: decimal; }
+.jx-ol > li { margin: 0 0 5px; padding-left: 4px; }
+.jx-ol > li::marker { color: var(--muted); font-weight: 700; }
+/* nested lists */
+.jx-ul .jx-ul, .jx-ol .jx-ol, .jx-ul .jx-ol, .jx-ol .jx-ul { margin: 6px 0 4px; }
+.jx-ul .jx-ul > li::before { content: '·'; }
+.jx-ul .jx-ul > li { padding-left: 12px; color: var(--muted); }
+.jx-ol .jx-ol { list-style: lower-alpha; }
+.jx-ol .jx-ol .jx-ol { list-style: lower-roman; }
+
+/* checklists */
+.jx-task { display: flex; align-items: flex-start; gap: 9px; margin: 0 0 6px; padding-left: 0 !important; }
+.jx-task::before { display: none !important; }
+.jx-box {
+  flex-shrink: 0; width: 16px; height: 16px; margin-top: 2px;
+  border: 1.5px solid var(--line2); border-radius: 4px;
+  display: grid; place-items: center; font-size: 11px; line-height: 1;
+  color: transparent; transition: .12s;
+}
+.jx-box.checked { background: #fff; border-color: #fff; color: #000; }
+.jx-task.done .jx-task-text { color: var(--faint); text-decoration: line-through; }
+
+/* inline code */
+.jx-icode {
+  font-family: var(--mono); font-size: 12.5px; color: #fff;
+  background: var(--bg3); border: 1px solid var(--line); border-radius: 5px;
+  padding: 1px 6px; white-space: pre-wrap; word-break: break-all;
+}
+
+/* code blocks — dedicated container, header, copy, scroll */
+.jx-code { margin: 10px 0 12px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #050505; }
+.jx-code-h {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 12px; border-bottom: 1px solid var(--line); background: var(--bg2);
+}
+.jx-code-lang { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+.jx-code-copy {
+  font-size: 10.5px; color: var(--muted); background: none; border: 1px solid var(--line2);
+  border-radius: 5px; padding: 3px 10px; cursor: pointer; font-family: var(--mono);
+}
+.jx-code-copy:hover { color: #000; background: #fff; border-color: #fff; }
+.jx-code-pre {
+  margin: 0; padding: 12px 14px; overflow-x: auto; background: #050505;
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: #e8e8e8;
+  -webkit-overflow-scrolling: touch;
+}
+.jx-code-pre code { font-family: inherit; background: none; border: none; padding: 0; color: inherit; }
+/* syntax highlighting — grayscale only */
+.jx-code-pre .hljs-keyword, .jx-code-pre .hljs-selector-tag, .jx-code-pre .hljs-built_in { font-weight: 700; color: #fff; }
+.jx-code-pre .hljs-string, .jx-code-pre .hljs-attr, .jx-code-pre .hljs-regexp { color: #b8b8b8; font-style: italic; }
+.jx-code-pre .hljs-comment, .jx-code-pre .hljs-quote { color: #6a6a6a; font-style: italic; }
+.jx-code-pre .hljs-number, .jx-code-pre .hljs-literal { color: #cfcfcf; }
+.jx-code-pre .hljs-title, .jx-code-pre .hljs-function, .jx-code-pre .hljs-section { font-weight: 700; }
+.jx-code-pre .hljs-variable, .jx-code-pre .hljs-params, .jx-code-pre .hljs-property { color: #d5d5d5; }
+.jx-code-pre .hljs-type, .jx-code-pre .hljs-class, .jx-code-pre .hljs-title.class_ { color: #fff; font-weight: 700; }
+.jx-code-pre .hljs-meta, .jx-code-pre .hljs-tag { color: #7d7d7d; }
+.jx-code-pre .hljs-symbol, .jx-code-pre .hljs-bullet, .jx-code-pre .hljs-link { color: #aaa; }
+
+/* math — KaTeX inherits the monochrome palette */
+.jx-rich .katex { font-size: 1.02em; color: var(--ink); }
+.jx-rich .katex-display { margin: 12px 0; overflow-x: auto; overflow-y: hidden; padding: 4px 2px; }
+.jx-rich .katex-display > .katex { white-space: nowrap; }
+
+/* tables */
+.jx-table-wrap { margin: 10px 0 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 10px; }
+.jx-table { border-collapse: collapse; width: 100%; min-width: 420px; font-size: 12.5px; }
+.jx-table th { text-align: left; padding: 8px 12px; border-bottom: 1.5px solid var(--line2); color: #fff; font-weight: 700; background: var(--bg2); white-space: nowrap; }
+.jx-table td { padding: 8px 12px; border-bottom: 1px solid var(--line); color: var(--muted); vertical-align: top; }
+.jx-table tr:last-child td { border-bottom: none; }
+.jx-table td:first-child, .jx-table th:first-child { padding-left: 14px; }
+.jx-table td:last-child, .jx-table th:last-child { padding-right: 14px; }
+.jx-table td, .jx-table th { overflow-wrap: anywhere; word-break: break-word; }
+
+/* quotes */
+.jx-quote {
+  margin: 10px 0 12px; padding: 8px 14px;
+  border-left: 3px solid #fff; background: var(--bg2); border-radius: 0 8px 8px 0;
+  color: var(--muted); font-style: italic;
+}
+.jx-quote p { margin: 0 0 4px; color: inherit; }
+.jx-quote p:last-child { margin-bottom: 0; }
+
+/* callouts — distinct, still monochrome */
+.jx-callout { margin: 12px 0; border: 1px solid var(--line2); border-left: 3px solid #fff; border-radius: 0 10px 10px 0; padding: 10px 14px; background: var(--bg2); }
+.jx-callout-h { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+.jx-callout-ic { font-size: 13px; line-height: 1; }
+.jx-callout-label { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.jx-callout-body p { margin: 0 0 6px; color: var(--ink); }
+.jx-callout-body p:last-child { margin-bottom: 0; }
+.jx-callout-body .jx-ul, .jx-callout-body .jx-ol { margin: 6px 0; }
+/* soft distinction per kind via icon only — no color */
+.jx-callout-warning, .jx-callout-error { border-left-color: #fff; border-left-width: 3px; background: var(--bg2); }
+.jx-callout-warning .jx-callout-label, .jx-callout-error .jx-callout-label { color: #fff; }
+
+/* links */
+.jx-link { color: #fff; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; word-break: break-all; }
+.jx-link:hover { background: #fff; color: #000; text-decoration: none; }
+
+/* dividers */
+.jx-hr { border: none; border-top: 1px solid var(--line); margin: 16px 0; }
+
+/* images */
+.jx-img-inline { max-width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); margin: 8px 0; display: block; }
+
+/* tool / system output already rendered as steps — ensure nothing raw leaks */
+.jx-rich .jx-term { margin: 4px 0 10px; }
+
+@media (max-width: 900px) {
+  .jx-rich { font-size: 14px; }
+  .jx-h1 { font-size: 18px; }
+  .jx-h2 { font-size: 15.5px; }
+  .jx-code-pre { font-size: 12px; }
+  .jx-table { min-width: 360px; }
+}

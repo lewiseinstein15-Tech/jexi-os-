@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getBackendUrl, jexiFetch, getSessionId } from '../utils/helpers';
+import RichAnswer from './RichAnswer'; // B151 — ChatGPT-style rich answer rendering
 
 const SELF_CHECK_QUERY =
   'JEXI, run a full system self-check now. Check your health, memory, eyes and recent errors. If anything is wrong, tell me the exact source file and the fix.';
@@ -192,7 +193,7 @@ export default function ChatWindow({
             <div className="jx-gutter">{msg.role === 'user' ? 'A' : 'J'}</div>
             <div className="jx-body">
               {msg.image && <img className="jx-img" src={msg.image} alt="attachment" />}
-              <SimpleText text={msg.text} />
+              {msg.streaming ? <SimpleText text={msg.text} /> : <RichAnswer text={msg.text} />}
               {msg.role === 'jexi' && !isProcessing && (
                 <div className="jx-feedback">
                   <button

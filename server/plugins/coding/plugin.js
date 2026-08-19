@@ -39,6 +39,14 @@ const CODER_SKILL_BODY = `# Coder Skill (autonomous)
 
 You are the coder. You build working software YOURSELF with the coding tools — there is no team behind you.
 
+## Reviewing / analyzing an external repo (B151)
+When asked to review or analyze a repository:
+1. Clone it first: \`git clone --depth 1 <url> repo-name\` — a SHALLOW clone is fast and enough for review. Pass a generous timeout: \`timeoutMs: 300000\` (5 minutes — clones can exceed 2 minutes on slow links).
+2. Map the repo: \`ls -R | head -100\`, read \`README.md\`, \`package.json\` / \`pyproject.toml\` / \`Cargo.toml\`, and the main entry files.
+3. Inspect structure with \`lsp\` (goToDefinition / findReferences / hover) and targeted \`read\` on key files.
+4. If it has tests, run them: \`npm test\` / \`python -m pytest\` / \`go test ./...\` with a generous timeout.
+5. Deliver the analysis as a structured report: OVERVIEW → ARCHITECTURE → KEY FILES → STRENGTHS → ISSUES (with file:line) → SUGGESTED FIXES → VERDICT. Cite exact paths and lines. If a command times out or fails, say exactly which command and what happened — never guess.
+
 ## Loop (follow every time)
 1. **PLAN**: restate the deliverable as concrete files. A small app = 2-5 files (index.html, style.css, app.js — or package.json + src/).
 2. **WRITE**: create each file with \`write\` (or \`edit\` for targeted changes after \`read\`).
@@ -85,15 +93,15 @@ function registerBash(ctx, unregisters) {
     args: {
       command: { type: 'string', required: true, desc: 'The bash command to execute.' },
       description: { type: 'string', required: true, desc: 'Clear 5-10 word description of what the command does (shown in the UI).' },
-      timeoutMs: { type: 'number', desc: 'Timeout in ms (default 30000, max 120000).' },
+      timeoutMs: { type: 'number', desc: 'Timeout in ms (default 30000, max 300000 — repos can take a while).' },
       workdir: { type: 'string', desc: 'Change to this directory for this command (the shell keeps its own cwd afterwards).' },
       reset: { type: 'boolean', desc: 'Reset the persistent shell before this command (fresh cwd + env).' },
     },
-    timeoutMs: 120000,
+    timeoutMs: 300000,
     handler: async (args, meta = {}) => {
       const command = String((args && args.command) || '').trim();
       if (!command) return { ok: false, error: 'command required' };
-      const timeout = Math.min(Math.max(Number((args && args.timeoutMs) || 30000), 1000), 120000);
+      const timeout = Math.min(Math.max(Number((args && args.timeoutMs) || 30000), 1000), 300000);
       const { runPersistentBash } = await import('../../src/services/BashPersistent.js');
       const out = await runPersistentBash({
         owner: meta.convId || 'default',

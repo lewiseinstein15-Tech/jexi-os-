@@ -163,7 +163,7 @@ export async function runPersistentBash({ owner, command, timeoutMs = 30000, max
     resetNote = resetNote || SHELL_RESET_MESSAGE;
   }
 
-  const timeout = Math.min(Math.max(Number(timeoutMs) || 30000, 1000), 120000);
+  const timeout = Math.min(Math.max(Number(timeoutMs) || 30000, 1000), 300000); // B151 — 5min cap: repo clones/analyses exceed 2min
   const marker = markers();
   const prefix = cwd && !reset ? `cd ${quoteForBash(String(cwd))} 2>/dev/null; ` : '';
   const line = wrapCommand(prefix + cmd, marker);
