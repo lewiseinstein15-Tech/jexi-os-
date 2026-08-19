@@ -96,6 +96,12 @@ export const TOOL_SCHEMAS = {
   'report': {
     output: { type: 'string', required: true, desc: 'Actionable, self-contained content for the agent that started you (summarize conclusions, reference shared paths).' },
   },
+  'subagent': {
+    task: { type: 'string', required: true, desc: 'The sub-task to delegate to a child agent.' },
+    instructions: { type: 'string', desc: 'Optional instructions / context for the child.' },
+    depth: { type: 'number', desc: 'Optional recursion depth (default 1).' },
+    provider: { type: 'string', desc: 'Subagent provider: in-process (default), claude-code, codex, acp, dsh-sdk (B138 — external CLI providers).' },
+  },
   'create_goal': {
     objective: { type: 'string', required: true, desc: 'The concrete completion objective inferred from the direct human request.' },
     max_goal_rounds: { type: 'number', desc: 'Optional positive integer limit on automatic continuation rounds.' },
@@ -669,11 +675,24 @@ async function runEngine(slug, args, opts = {}) {
 
     case 'subagent': {
       // DSH tool-subagent: delegate a sub-task to a child agent (own context).
-      const { runSubagent } = await import('./SubagentRuntime.js');
+      // B138 — provider routing: external CLI providers (claude-code, codex,
+      // acp) run when their binary exists; anything else falls back to the
+      // in-process runtime (fail-open).
       const task = String(args.task || '').slice(0, 2000);
       if (!task) return { ok: false, error: 'subagent task required' };
+      const provider = String(args.provider || '').trim() || 'in-process';
+      const { isExternalProvider, resolveSubagentProvider, runExternalSubagent } = await import('./SubagentProviders.js');
+      if (isExternalProvider(provider)) {
+        const key = resolveSubagentProvider(provider);
+        const r = await runExternalSubagent({ provider: key, task, timeoutMs: 120000 });
+        if (!r.ok) {
+          return { ok: false, kind: 'subagent', task: task.slice(0, 120), provider: key, error: r.error || `external subagent failed (code ${r.code})`, ...(r.output ? { partial: r.output.slice(0, 2000) } : {}) };
+        }
+        return { kind: 'subagent', task: task.slice(0, 120), provider: key, report: String(r.output || '').slice(0, 3000) };
+      }
+      const { runSubagent } = await import('./SubagentRuntime.js');
       const report = await runSubagent(task, args.instructions || '', { depth: Number(args.depth) || 1 });
-      return { kind: 'subagent', task: task.slice(0, 120), report: String(report || '').slice(0, 3000) };
+      return { kind: 'subagent', task: task.slice(0, 120), provider: 'in-process', report: String(report || '').slice(0, 3000) };
     }
 
     case 'skill-load': {

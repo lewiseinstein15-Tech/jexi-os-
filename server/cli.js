@@ -52,6 +52,11 @@ async function selfTest() {
   const instructions = loadBaselineInstructionSet({ root: WORKSPACE_DIR });
   check('agent instructions load (0 is fine)', Array.isArray(instructions), `${instructions.length} files`);
 
+  // B138 — code-runtime worker bootstrap hardening self-checks.
+  const { workerBootstrapSelfCheck } = await import('./src/services/CodeRuntimeBootstrap.js');
+  const workerChecks = workerBootstrapSelfCheck();
+  check('code-runtime bootstrap checks pass', workerChecks.every((c) => c.ok), `${workerChecks.filter((c) => c.ok).length}/${workerChecks.length}`);
+
   const passed = results.filter((r) => r.ok).length;
   const out = { ok: passed === results.length, total: results.length, passed, results };
   return out;

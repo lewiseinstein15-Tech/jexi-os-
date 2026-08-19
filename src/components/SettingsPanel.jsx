@@ -75,6 +75,8 @@ export default function SettingsPanel() {
   const [codeMode, setCodeMode] = useState(() => (typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_code_mode') || '1') === '1' : true)); // B99 — PTC code mode
   const [plugins, setPlugins] = useState(null); // B121 — loaded plugins + their tools
   const [preset, setPreset] = useState(() => (typeof localStorage !== 'undefined' ? (localStorage.getItem('jexi_preset') || 'ptc') : 'ptc')); // B102 — dsh agent presets
+  const [permissions, setPermissions] = useState(null); // B138 — dsh permission-presets (sandbox × approval bundles)
+  const [permBusy, setPermBusy] = useState(false);
 
   const TIER_DEFS = [
     ['read', 'READ', 'Search & lookup — no side effects, always autonomous, never asks', 'text-[#34D399] border-[#34D399]/30 bg-[#34D399]/10'],
@@ -88,6 +90,13 @@ export default function SettingsPanel() {
     jexiFetch(`${getBackendUrl()}/api/plugins/runtime`)
       .then((r) => r.json())
       .then(setPlugins)
+
+    // B138 — permission presets (dsh ui-permission-presets): the session's
+    // sandbox × approval bundle and the selectable presets.
+    jexiFetch(`${getBackendUrl()}/api/permissions`)
+      .then((r) => r.json())
+      .then(setPermissions)
+      .catch(() => {})
       .catch(() => setPlugins(null));
   }, []);
 
@@ -614,6 +623,49 @@ export default function SettingsPanel() {
               ) : (
                 <p className="text-[7px] text-text-tertiary mt-1">Loading…</p>
               )}
+            </div>
+
+            {/* B138 — PERMISSION PRESETS (dsh permission-presets): one tap switches
+                the session's sandbox mode + approval policy bundle. */}
+            <div className="rounded-md border border-hairline bg-surface-1 px-2.5 py-2">
+              <p className="text-[9px] font-bold text-text-secondary tracking-wider flex items-center gap-1.5">
+                <Shield className="w-3 h-3 text-brand" /> PERMISSION PRESETS · {permissions?.preset ? String(permissions.preset).toUpperCase() : '…'}
+              </p>
+              <p className="text-[7px] text-text-tertiary mt-0.5 leading-snug">
+                Sandbox mode × approval policy in one bundle: Assistant (workspace-write + ask), Autonomous (workspace-write + never), Sandboxed (read-only), Full Access (danger-full-access + ask).
+              </p>
+              <div className="mt-1.5 grid grid-cols-2 gap-1">
+                {permissions?.presets?.map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    disabled={permBusy}
+                    onClick={async () => {
+                      setPermBusy(true);
+                      try {
+                        const r = await jexiFetch(`${getBackendUrl()}/api/permissions`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ conv: 'default', preset: p.key }),
+                        });
+                        setPermissions(await r.json());
+                      } catch { /* noop */ }
+                      setPermBusy(false);
+                    }}
+                    className={`text-left text-[7px] font-bold rounded px-1.5 py-1 border transition-colors ${
+                      permissions?.preset === p.key
+                        ? 'text-brand bg-brand-dim/40 border-brand-line/50'
+                        : 'text-text-secondary bg-surface-2 border-hairline hover:border-brand-line/40'
+                    }`}
+                  >
+                    {p.name}
+                    <span className="block text-[6px] font-medium text-text-tertiary mt-0.5 leading-tight">{p.description}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[7px] text-text-tertiary mt-1">
+                Sandbox: {permissions?.sandbox || '…'} · Approval: {permissions?.approval || '…'}
+              </p>
             </div>
 
             {/* Decisions */}

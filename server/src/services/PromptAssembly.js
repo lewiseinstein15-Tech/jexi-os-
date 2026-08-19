@@ -111,6 +111,14 @@ export async function assemblePrompt({
   const tz = timeContextBlock();
   if (!sections[sections.length - 1].includes('Current date and time:')) sections.push(tz);
 
+  // -75 terminal context (B138 — dsh tmux-context): only when JEXI runs
+  // inside a tmux session; empty elsewhere (never injected).
+  try {
+    const { tmuxContextBlock } = await import('./TmuxContext.js');
+    const tmux = tmuxContextBlock();
+    if (tmux) sections.push(tmux);
+  } catch { /* noop */ }
+
   // -70 session references (past conversations).
   if (includeSessionRefs && convId) {
     const refs = recentSessionsBlock(convId, 5);

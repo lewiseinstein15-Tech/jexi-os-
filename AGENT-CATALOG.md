@@ -3,7 +3,7 @@
 **252 specialist agents · 508 skills · 207 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
-> ⚙️ GENERATED FILE — updated 2026-08-18 by `cd server && npm run audit-roster`. Do not edit by hand.
+> ⚙️ GENERATED FILE — updated 2026-08-19 by `cd server && npm run audit-roster`. Do not edit by hand.
 > The audit (`node scripts/audit-roster.js --check`, wired into `npm test`) fails CI if this file drifts from the registries.
 
 ---

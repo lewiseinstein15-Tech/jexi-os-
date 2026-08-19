@@ -92,6 +92,12 @@ import { personaFlavor, personaStatus, saveUserPersonas } from './src/services/P
 import { scheduleRuntimeStatus } from './src/services/ScheduleRuntime.js'; // B137 — dsh schedule runtime view
 import { hostStatus, gatewayStatus } from './src/services/HostStatus.js'; // B137 — dsh host/webserver + api/gateway
 import { reportChannelStatus } from './src/services/SubagentReport.js'; // B137 — dsh tool-subagent-report
+import { subagentProviderStatus } from './src/services/SubagentProviders.js'; // B138 — external CLI subagent providers
+import { workerBootstrapSelfCheck, validateWorkerMessage } from './src/services/CodeRuntimeBootstrap.js'; // B138 — code-runtime worker hardening
+import { initConfigSnapshot, reloadConfig, configStatus, onConfigChange } from './src/services/ConfigReload.js'; // B138 — boot config hot-reload
+import { registerRemoteAgent, listRemoteAgents, unregisterRemoteAgent, remoteAgentsStatus, agentLookup } from './src/services/RemoteAgents.js'; // B138 — api/remotes mirror
+import { tmuxStatus } from './src/services/TmuxContext.js'; // B138 — dsh tmux-context
+import { validateTypingMessage, applyTypingOp, applyTypingScript } from './src/services/TypingProtocol.js'; // B138 — typert protocol mirror
 import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services/PluginRegistry.js';
 import { loadPlugins, setActivePluginContext, getActivePluginContext, listPluginTools, listPluginSkills } from './src/services/PluginContext.js'; // B97 — deepseek-harness-style plugin seam
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications, setNotifyBroadcaster } from './src/services/NotificationCenter.js';
@@ -210,6 +216,10 @@ try {
 try {
   const store = settingsFileStore({ path: path.join(DATA_DIR, 'settings.yaml') });
   console.log(`[settings-file] ✓ provider at ${store.filename}`);
+  // B138 — config hot-reload: settings-file changes re-fold the boot config
+  // snapshot and notify subscribers (fail-open).
+  initConfigSnapshot({ settings: store.all() });
+  store.onChange(() => { try { reloadConfig({ settings: store.all() }); } catch { /* noop */ } });
 } catch (e) { console.warn('[settings-file]', e.message); }
 // Every conversation event is mirrored into the sqlite session store
 // (document-per-row, WAL) via the append observer — zero call-site churn.
@@ -2021,6 +2031,48 @@ app.get('/api/gateway', (req, res) => {
 
 // B137 — live subagent report channels (dsh tool-subagent-report).
 app.get('/api/report/channels', (req, res) => res.json({ channels: reportChannelStatus() }));
+
+// B138 — subagent providers (external CLI availability).
+app.get('/api/subagent/providers', (req, res) => res.json({ providers: subagentProviderStatus() }));
+
+// B138 — boot config hot-reload + status.
+app.get('/api/config', (req, res) => res.json(configStatus()));
+app.post('/api/config/reload', (req, res) => {
+  try {
+    const r = reloadConfig({ settings: (() => { try { return settingsFileStore().all(); } catch { return {}; } })() });
+    res.json(r);
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+
+// B138 — remote agents (dsh api/remotes).
+app.get('/api/remotes', (req, res) => res.json(remoteAgentsStatus()));
+app.put('/api/remotes', (req, res) => {
+  try {
+    const r = registerRemoteAgent(req.body || {});
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+app.delete('/api/remotes/:handle', (req, res) => res.json(unregisterRemoteAgent(String(req.params.handle || ''))));
+app.get('/api/remotes/lookup/:handle', (req, res) => res.json(agentLookup(String(req.params.handle || ''))));
+
+// B138 — tmux context status.
+app.get('/api/tmux', (req, res) => res.json(tmuxStatus()));
+
+// B138 — typing protocol (dsh typert/protocol): pure validate + apply helpers.
+app.post('/api/typing/validate', (req, res) => {
+  try {
+    const r = validateTypingMessage((req.body || {}).message);
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+app.post('/api/typing/apply', (req, res) => {
+  try {
+    const { buffer, ops } = req.body || {};
+    const r = applyTypingScript(String(buffer || ''), Array.isArray(ops) ? ops : []);
+    res.json({ ok: true, buffer: r.buffer, log: r.log });
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+app.get('/api/code-runtime/bootstrap', (req, res) => res.json({ checks: workerBootstrapSelfCheck() }));
 
 // B133 — commands, anonymous identity, session invariants.
 app.get('/api/commands', (req, res) => res.json({ commands: listCommands() }));
