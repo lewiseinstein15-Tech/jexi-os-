@@ -69,9 +69,11 @@ section('A. MEMORY');
   const ks = searchKnowledge('optional chaining');
   ok('knowledge search finds content', Array.isArray(ks) && ks.some((k) => String(k.content).includes('optional chaining')));
 
-  // 4. Preferences learned + injected into prompts
+  // 4. Preferences learned + injected into prompts (deterministic: write a
+  // preference-labeled fact, then the block must surface it).
+  rememberUserFact('Amani prefers dark roast coffee', 0.8, 'preference');
   const prefs = preferencesBlock();
-  ok('preferences block renders', typeof prefs === 'string' && prefs.length > 0);
+  ok('preferences block renders with the learned preference', typeof prefs === 'string' && prefs.includes('dark roast'));
 
   // 5. Episodes
   const ep = await executeTool({ slug: 'episode-save', args: { ask: 'What did Amani plan?', reply: 'Amani planned the Zawadi weather app.' }, spillOwner: conv });
