@@ -254,7 +254,7 @@ console.log('\n== 10. Integration (prompt section + fs gate on plugin tools) =='
   const writeDef = listPluginTools2().find((t) => t.slug === 'write');
   ok('coding plugin args still validate (write schema on the def)', !!writeDef && writeDef.args && writeDef.args.file_path && writeDef.args.file_path.required === true);
   const { TOOL_REGISTRY, TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
-  ok('registry count stable at 206', TOOL_COUNT === 210 && TOOL_REGISTRY.some((t) => t.slug === 'ralph'));
+  ok('registry count stable at 206', TOOL_COUNT === 211 && TOOL_REGISTRY.some((t) => t.slug === 'ralph'));
   const { listPluginTools } = await import('./src/services/PluginContext.js');
   const tools = listPluginTools();
   ok('plugin tools still mounted', tools.length >= 13 && tools.some((t) => t.slug === 'write') && tools.some((t) => t.slug === 'bash'));

@@ -1,6 +1,6 @@
 # JEXI OS — Agent & Skill Catalog
 
-**252 specialist agents · 508 skills · 210 tools · 1 orchestrator.** One plain-language request in,
+**252 specialist agents · 508 skills · 211 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
 > ⚙️ GENERATED FILE — updated 2026-08-19 by `cd server && npm run audit-roster`. Do not edit by hand.
@@ -14,7 +14,7 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 |---|---|
 | Agents | 252 (252 reachable — 100%) |
 | Skills | 508 |
-| Tools | 210 |
+| Tools | 211 |
 | Intents / teams | 155 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
@@ -1223,7 +1223,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 210 tools (grouped by type)
+## The 211 tools (grouped by type)
 
 ### Agent (9)
 | Tool | Allowed agents | Engine | What it does |
@@ -1349,12 +1349,13 @@ This section and every table below are GENERATED from the live registries by `cd
 | `rubric-grade` | Grader, Teacher | SkillChain | Grade work against a rubric with feedback. |
 | `thesis-support` | Research Mentor, Academic Writer, Scholar | SkillChain | Support thesis structure, research and writing. |
 
-### Execution (3)
+### Execution (4)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
 | `code-fix` | Debugger, Coder | Architect.applyFix | Apply a fix to failing code and re-run until it is clean. |
 | `code-run` | Runner, Debugger, Coder, QA Lead | Runner | Execute generated code and capture real stdout and errors. |
 | `code-write` | Architect, Coder, Technical Writer, Shipper, Backend Engineer, Frontend Engineer | Architect | Generate and write project files into the workspace. |
+| `pwsh` | DevOps Agent, Coder | undefined | Run a command in a PowerShell-dialect shell (pwsh -NoProfile). Native C: paths and $env:NAME variables. Fail-open when pwsh is not installed (dsh tool-pwsh). |
 
 ### Goal (3)
 | Tool | Allowed agents | Engine | What it does |

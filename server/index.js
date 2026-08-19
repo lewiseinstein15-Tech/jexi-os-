@@ -106,6 +106,9 @@ import { parseCommand, tryExecuteCommandDialect, validateCommandDefinition } fro
 import { discoverPresets, createPreset, deletePreset, readComposition, writeComposition, presetsStatus } from './src/services/PresetDiscovery.js'; // B139 — preset discovery/authoring
 import { browseDirectories, directoryPickerStatus } from './src/services/DirectoryPicker.js'; // B139 — host/directory-picker
 import { bundleStatus } from './src/services/BundleBase.js'; // B140 — bundle/base manifest
+import { openDomain } from './src/services/StorageDomain.js'; // B141 — storage/storage-domain
+import { createApiProxy, validateApiArgs, apiProxyStatus } from './src/services/ApiProxy.js'; // B141 — host/apiproxy
+import { generateWorkspaceTypes } from './src/services/TypingGenerator.js'; // B141 — typert workspace mode
 import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services/PluginRegistry.js';
 import { loadPlugins, setActivePluginContext, getActivePluginContext, listPluginTools, listPluginSkills } from './src/services/PluginContext.js'; // B97 — deepseek-harness-style plugin seam
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications, setNotifyBroadcaster } from './src/services/NotificationCenter.js';
@@ -2165,6 +2168,41 @@ app.get('/api/directories/browse', (req, res) => {
 
 // B140 — bundle base manifest (dsh bundle/base): the pull-all parity tracker.
 app.get('/api/bundles', (req, res) => res.json(bundleStatus()));
+
+// B141 — storage domain (dsh storage-domain): typed KV tables.
+app.get('/api/storage/domain/:name', async (req, res) => {
+  try {
+    const domain = await openDomain(String(req.params.name || 'domain').slice(0, 40));
+    res.json(domain.status());
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+app.post('/api/storage/domain/:name/:table', async (req, res) => {
+  try {
+    const domain = await openDomain(String(req.params.name || 'domain').slice(0, 40));
+    const table = await domain.table(String(req.params.table || '').slice(0, 40), (req.body || {}).spec || null);
+    res.json({ ok: true, table: table.name, size: table.size });
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+
+// B141 — api proxy (dsh host/apiproxy): typed route validation.
+const jexiApiProxy = createApiProxy({});
+app.get('/api/apiproxy', (req, res) => res.json(apiProxyStatus(jexiApiProxy)));
+app.post('/api/apiproxy/validate', (req, res) => {
+  try {
+    const { route, args, schema } = req.body || {};
+    const r = schema ? validateApiArgs(args, schema) : jexiApiProxy.validate(String(route || ''), args);
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+
+// B141 — typert workspace generation.
+app.post('/api/typert/workspace', (req, res) => {
+  try {
+    const { root, emitTo } = req.body || {};
+    const r = generateWorkspaceTypes(String(root || ''), { emitTo: emitTo ? String(emitTo) : null });
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
 
 // B139 — commands dialect surface (DSH parseCommand contract).
 app.get('/api/commands/dialect', (req, res) => {

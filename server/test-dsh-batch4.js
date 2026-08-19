@@ -311,7 +311,7 @@ console.log('\n== 11. Registry ralph + persistent plugin bash ==');
 {
   const { TOOL_REGISTRY, TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
   ok('ralph in the registry', TOOL_REGISTRY.some((t) => t.slug === 'ralph'));
-  ok('registry count is 206', TOOL_COUNT === 210);
+  ok('registry count is 206', TOOL_COUNT === 211);
   const { executeTool, hasOutputContract, validateToolArgs } = await import('./src/services/ToolRuntime.js');
   ok('ralph has an output contract', hasOutputContract('ralph'));
   ok('ralph schema validates args', validateToolArgs('ralph', { objective: 'x' }).ok === true);

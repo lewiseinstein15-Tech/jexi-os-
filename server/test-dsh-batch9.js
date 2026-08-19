@@ -27,7 +27,7 @@ console.log('\n== 1. Schedule tools (dsh schedule tools) ==');
 {
   const { TOOL_REGISTRY, TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
   ok('three schedule tools in registry', ['schedule_create', 'schedule_list', 'schedule_delete'].every((s) => TOOL_REGISTRY.some((t) => t.slug === s)));
-  ok('registry count is 210', TOOL_COUNT === 210);
+  ok('registry count is 210', TOOL_COUNT === 211);
   const { executeTool, hasOutputContract, validateToolArgs } = await import('./src/services/ToolRuntime.js');
   ok('schedule tools have output contracts', hasOutputContract('schedule_create') && hasOutputContract('schedule_list') && hasOutputContract('schedule_delete'));
   ok('create validates query', validateToolArgs('schedule_create', { query: 'x', everySeconds: 60 }).ok === true);
@@ -55,7 +55,7 @@ console.log('\n== 2. Bundle base (manifest + parity tracker) ==');
   ok('manifest lists packages', manifest.packages.length > 100);
   const st = bundleStatus();
   ok('status counts', st.ok && st.counts.total === manifest.packages.length && st.counts.ported > 100);
-  ok('status includes registry facts', st.registryTools === 210);
+  ok('status includes registry facts', st.registryTools === 211);
   ok('parity doc has the tracker table', fs.readFileSync(PARITY_FILE, 'utf-8').includes('| ✅ core/session |'));
   const parity = fs.readFileSync(PARITY_FILE, 'utf-8');
   ok('parity doc has status legend', parity.includes('not-yet') && parity.includes('ported'));
@@ -171,7 +171,7 @@ console.log('\n== 6. Scrub parity + integration ==');
   const prompt = await assemblePrompt({ convId: 't-int-b140' });
   ok('prompt assembles', typeof prompt === 'string' && prompt.length > 500);
   const { TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
-  ok('registry stable at 210', TOOL_COUNT === 210);
+  ok('registry stable at 210', TOOL_COUNT === 211);
 }
 
 console.log(`\n${failures === 0 ? '🎉 ALL B140 CHECKS PASSED' : `💥 ${failures} FAILURES`}`);

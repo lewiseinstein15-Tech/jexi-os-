@@ -114,6 +114,11 @@ export const TOOL_SCHEMAS = {
   'schedule_delete': {
     id: { type: 'string', required: true, desc: 'The schedule id to delete.' },
   },
+  'pwsh': {
+    command: { type: 'string', required: true, desc: 'The PowerShell command to execute.' },
+    description: { type: 'string', required: true, desc: 'Clear 5-10 word description of what the command does (shown in the UI).' },
+    timeoutMs: { type: 'number', desc: 'Timeout in ms (default 30000, max 120000).' },
+  },
   'create_goal': {
     objective: { type: 'string', required: true, desc: 'The concrete completion objective inferred from the direct human request.' },
     max_goal_rounds: { type: 'number', desc: 'Optional positive integer limit on automatic continuation rounds.' },
@@ -304,6 +309,8 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'schedule_create': z.object({ ok: z.boolean(), schedule: z.unknown().nullable().optional(), error: z.string().optional() }).passthrough(),
   'schedule_list': z.object({ ok: z.boolean(), schedules: z.array(z.unknown()).optional(), error: z.string().optional() }).passthrough(),
   'schedule_delete': z.object({ ok: z.boolean(), id: z.string().optional(), error: z.string().optional() }).passthrough(),
+  // B141 — tool-pwsh contract (dsh): PowerShell-dialect result.
+  'pwsh': z.object({ ok: z.boolean(), kind: z.literal('pwsh-result').optional(), command: z.string().optional(), output: z.string().optional(), code: z.number().nullable().optional(), durationMs: z.number().nullable().optional(), error: z.string().optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),
@@ -1050,6 +1057,48 @@ async function runEngine(slug, args, opts = {}) {
       const removed = taskScheduler.remove(String(args.id || ''));
       if (!removed) return { ok: false, error: `no schedule "${args.id}"` };
       return { ok: true, kind: 'schedule', id: String(args.id) };
+    }
+
+    case 'pwsh': {
+      // B141 — dsh tool-pwsh: PowerShell-dialect execution (fail-open when
+      // pwsh is not installed). Same marker/truncation story as bash.
+      const { spawn } = await import('child_process');
+      const fs = await import('fs');
+      const { shellEnv } = await import('./ShellEnv.js');
+      const command = String(args.command || '').trim();
+      if (!command) return { ok: false, error: 'command required' };
+      const hasPwsh = String(process.env.PATH || '').split(':').some((d) => d && (fs.existsSync(`${d}/pwsh`) || fs.existsSync(`${d}/pwsh.exe`)));
+      if (!hasPwsh) return { ok: false, error: 'pwsh is not installed on this host — use the bash tool instead (dsh tool-pwsh fail-open).' };
+      const timeout = Math.min(Math.max(Number(args.timeoutMs) || 30000, 1000), 120000);
+      const started = Date.now();
+      const output = await new Promise((resolve) => {
+        let child;
+        try {
+          child = spawn('pwsh', ['-NoProfile', '-NonInteractive', '-Command', command], {
+            cwd: opts.spillOwner ? undefined : undefined,
+            env: shellEnv({ convId: opts.spillOwner || 'pwsh' }),
+            stdio: ['ignore', 'pipe', 'pipe'],
+          });
+        } catch (e) { resolve({ ok: false, output: '', code: null, error: `spawn failed: ${(e && e.message) || e}` }); return; }
+        let stdout = ''; let stderr = '';
+        child.stdout.on('data', (d) => { stdout = (stdout + d.toString('utf8')).slice(-12000); });
+        child.stderr.on('data', (d) => { stderr = (stderr + d.toString('utf8')).slice(-4000); });
+        const timer = setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* noop */ } }, timeout);
+        child.on('close', (code) => {
+          clearTimeout(timer);
+          resolve({ ok: code === 0, output: (stdout || stderr).slice(-12000), code, error: code === 0 ? null : (stderr || `pwsh exited ${code}`).slice(0, 2000) });
+        });
+        child.on('error', (e) => { clearTimeout(timer); resolve({ ok: false, output: '', code: null, error: (e && e.message) || 'spawn error' }); });
+      });
+      return {
+        ok: output.ok,
+        kind: 'pwsh-result',
+        command: command.slice(0, 300),
+        output: String(output.output || ''),
+        code: output.code ?? null,
+        durationMs: Date.now() - started,
+        ...(output.error ? { error: output.error } : {}),
+      };
     }
 
     case 'todo': {

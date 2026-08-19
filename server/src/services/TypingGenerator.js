@@ -179,3 +179,36 @@ export function loadTypertArtifacts(dir) {
 export function unloadTypertArtifacts(results) {
   for (const r of results) { try { if (r.unregister) r.unregister(); } catch { /* noop */ } }
 }
+
+/* ---------------- workspace mode (dsh typert/generator workspace) ------- */
+
+/**
+ * Workspace generation mode: scan a directory tree for manifests (typert.json
+ * or package.json with a typert section), register each, and emit one
+ * aggregated wire.ts per folder root. Returns { registered, emitted }.
+ */
+export function generateWorkspaceTypes(root, { emitTo = null } = {}) {
+  const out = { ok: true, root: String(root || ''), registered: [], emitted: [] };
+  if (!fs.existsSync(root)) return { ok: false, error: `workspace root not found: ${root}` };
+  const results = loadTypertArtifacts(root);
+  for (const r of results) {
+    if (r.ok) out.registered.push({ name: r.name, file: r.file });
+    else out.registered.push({ file: r.file, error: r.error });
+  }
+  if (emitTo) {
+    const merged = { name: path.basename(String(root)) || 'workspace', tools: [], skills: [] };
+    for (const r of results) {
+      if (!r.ok) continue;
+      try {
+        const raw = JSON.parse(fs.readFileSync(r.file, 'utf-8'));
+        if (Array.isArray(raw.tools)) merged.tools.push(...raw.tools);
+        if (Array.isArray(raw.skills)) merged.skills.push(...raw.skills);
+      } catch { /* skip broken */ }
+    }
+    const model = analyzeManifest(merged);
+    const e = emitTypes(model, emitTo);
+    if (e.ok) out.emitted.push(e.file);
+    else return { ok: false, error: e.error };
+  }
+  return out;
+}

@@ -1,6 +1,6 @@
 # DSH → JEXI Parity Tracker
 
-**Generated:** 2026-08-19T03:06:58.116Z · **Packages tracked:** 121 · **Ported:** 109 (90%) · **Partial:** 10 · **Not yet:** 2
+**Generated:** 2026-08-19T03:47:07.755Z · **Packages tracked:** 121 · **Ported:** 115 (95%) · **Partial:** 5 · **Not yet:** 1
 
 Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch that landed it. Regenerate with `node server/scripts/audit-bundles.js`.
 
@@ -143,7 +143,7 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
-| 🟡 host/apiproxy | partial | — | — |
+| ✅ host/apiproxy | ported | ApiProxy.js | B141 |
 | ✅ host/directory-picker | ported | DirectoryPicker.js | B139 |
 | ✅ host/directory-picker-browse | ported | DirectoryPicker.js (browse) | B139 |
 | ✅ host/frontend-static | ported | HostStatus.js (static facts) + express.static | B137 |
@@ -225,8 +225,8 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
 | ✅ sdk/client | ported | server/sdk/client.js | B140 |
-| 🟡 sdk/protocol | partial | — | — |
-| 🟡 sdk/server | partial | — | — |
+| ✅ sdk/protocol | ported | sdk/protocol.js | B141 |
+| ✅ sdk/server | ported | sdk/server.js | B141 |
 
 ## session (10)
 
@@ -258,7 +258,7 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 | ✅ shell/shell-env | ported | ShellEnv.js | B136 |
 | ✅ shell/tool-bash | ported | coding plugin bash tool | B126 |
 | ✅ shell/tool-bash-persistent | ported | BashPersistent.js | B135 |
-| ⬜ shell/tool-pwsh | not-yet | — | — |
+| ✅ shell/tool-pwsh | ported | pwsh tool | B141 |
 
 ## skill (1)
 
@@ -277,7 +277,7 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
 | ✅ storage/storage | ported | StorageHub.js | B135 |
-| 🟡 storage/storage-domain | partial | — | — |
+| ✅ storage/storage-domain | ported | StorageDomain.js | B141 |
 | ✅ storage/storage-json | ported | StorageHub.js (json backend) | B135 |
 | ✅ storage/storage-sqlite | ported | StorageHub.js (sqlite backend) | B135 |
 
@@ -313,7 +313,7 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
-| 🟡 test-support/llm-mock-server | partial | — | — |
+| ✅ test-support/llm-mock-server | ported | test-support/llm-mock-server.js | B141 |
 | ✅ test-support/llm-replay | ported | test-support/llm-replay.js | B137 |
 
 ## todo (1)
@@ -326,7 +326,7 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
-| ✅ typert/generator | ported | TypingGenerator.js | B139 |
+| ✅ typert/generator | ported | TypingGenerator.js (workspace mode) | B139/B141 |
 | ✅ typert/loader | ported | TypingGenerator.js (loader) | B139 |
 | ✅ typert/protocol | ported | TypingProtocol.js | B138 |
 | ✅ typert/registry | ported | TypingGenerator.js (registry) | B139 |
