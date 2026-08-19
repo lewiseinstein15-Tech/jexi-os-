@@ -112,8 +112,17 @@ console.log('\n== 3. pwsh tool (dsh tool-pwsh) ==');
   } finally {
     if (oldPath === undefined) delete process.env.PATH; else process.env.PATH = oldPath;
   }
-  const missing = await executeTool({ slug: 'pwsh', args: { command: 'x', description: 'x' }, spillOwner: 't-pwsh' });
-  ok('pwsh without binary fails honestly (fail-open)', missing.ok === false && /not installed/.test(String(missing.error)));
+  // Deterministic fail-open check: a PATH with NO pwsh anywhere (GitHub
+  // runners ship a real pwsh, so absence cannot be assumed).
+  const emptyBin = fs.mkdtempSync(path.join(os.tmpdir(), 'jexi-emptypath-'));
+  const oldPath2 = process.env.PATH;
+  process.env.PATH = emptyBin;
+  try {
+    const missing = await executeTool({ slug: 'pwsh', args: { command: 'x', description: 'x' }, spillOwner: 't-pwsh' });
+    ok('pwsh without binary fails honestly (fail-open)', missing.ok === false && /not installed/.test(String(missing.error)));
+  } finally {
+    if (oldPath2 === undefined) delete process.env.PATH; else process.env.PATH = oldPath2;
+  }
 }
 
 /* ══════════════ 4. STORAGE DOMAIN ══════════════ */
