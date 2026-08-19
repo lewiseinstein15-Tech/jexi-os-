@@ -48,3 +48,81 @@ export function helpText() {
   const lines = listCommands().map((c) => `- **/${c.name}** — ${c.description}`);
   return `### 📖 JEXI commands\n\n${lines.join('\n')}\n`;
 }
+
+/* ------------------------------------------------------------------ */
+/* B139 — DSH command dialect (interaction/commands full dialect)      */
+/* ------------------------------------------------------------------ */
+
+/** Command-name contract (dsh): lowercase start, [a-z0-9_-] body. */
+export const COMMAND_NAME_RE = /^[a-z][a-z0-9_-]*$/;
+
+/**
+ * Parse an exact slash command WITHOUT normalizing its trailing input
+ * (dsh parseCommand): `/<name>` + raw remainder, or undefined.
+ */
+export function parseCommand(line) {
+  const match = /^\/([a-z][a-z0-9_-]*)(?=$|[\t\n\r ])/u.exec(String(line || ''));
+  if (match === null) return undefined;
+  const name = match[1];
+  if (name === undefined) return undefined;
+  return Object.freeze({ name, rawInput: String(line).slice(match[0].length) });
+}
+
+/** Convert arbitrary abort reasons to one stable rejected Error. */
+export function commandAbortError(signal) {
+  if (signal && signal.reason instanceof Error) return signal.reason;
+  const reason = signal && typeof signal.reason === 'string' ? signal.reason : 'command aborted';
+  return new Error(reason);
+}
+
+/** Render arbitrary thrown values without trusting string coercion. */
+export function renderThrown(value) {
+  try { return String(value); } catch { return '<unrenderable thrown value>'; }
+}
+
+/** Stop awaiting an uncooperative handler once its signal aborts (dsh withAbort). */
+export function withCommandAbort(promise, signal) {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(commandAbortError(signal));
+  return new Promise((resolve, reject) => {
+    const onAbort = () => { signal.removeEventListener('abort', onAbort); reject(commandAbortError(signal)); };
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (value) => { signal.removeEventListener('abort', onAbort); resolve(value); },
+      (error) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error instanceof Error ? error : new Error(`command handler rejected with a non-Error value: ${renderThrown(error)}`));
+      },
+    );
+  });
+}
+
+/**
+ * Execute a message through the DSH dialect: parseCommand (strict name
+ * contract, raw input preserved), recordInput honored, abort-aware run.
+ * Returns { ok, matched, name, args?, result? } or null when not a command.
+ */
+export async function tryExecuteCommandDialect(raw, { signal = null, ctx = {} } = {}) {
+  const parsed = parseCommand(raw);
+  if (!parsed) return null;
+  const def = commands.get(parsed.name);
+  if (!def) return { ok: false, matched: parsed.name, error: `unknown command /${parsed.name} — try /help` };
+  const recordInput = def.recordInput !== false;
+  const invocation = { name: parsed.name, rawInput: parsed.rawInput, ctx, signal };
+  try {
+    const output = await withCommandAbort(Promise.resolve(def.run(invocation)), signal);
+    const result = output === undefined ? { ok: true, summary: `/${parsed.name} acknowledged.` } : output;
+    return { ok: true, matched: parsed.name, ...(recordInput ? { args: parsed.rawInput } : {}), result };
+  } catch (e) {
+    return { ok: false, matched: parsed.name, error: `/${parsed.name} failed: ${(e && e.message) || e}` };
+  }
+}
+
+/** Reject invalid command metadata before it reaches a UI protocol. */
+export function validateCommandDefinition(def) {
+  if (!def || typeof def.name !== 'string' || !COMMAND_NAME_RE.test(def.name)) {
+    throw new TypeError(`command name must match ${COMMAND_NAME_RE}`);
+  }
+  if (!String(def.description || '').trim()) throw new TypeError(`command "${def && def.name}" description must not be empty`);
+  return true;
+}

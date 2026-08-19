@@ -98,6 +98,13 @@ import { initConfigSnapshot, reloadConfig, configStatus, onConfigChange } from '
 import { registerRemoteAgent, listRemoteAgents, unregisterRemoteAgent, remoteAgentsStatus, agentLookup } from './src/services/RemoteAgents.js'; // B138 — api/remotes mirror
 import { tmuxStatus } from './src/services/TmuxContext.js'; // B138 — dsh tmux-context
 import { validateTypingMessage, applyTypingOp, applyTypingScript } from './src/services/TypingProtocol.js'; // B138 — typert protocol mirror
+import { generateTypes, registerTypertManifest, listTypertManifests, typertRegistryStatus, loadTypertArtifacts } from './src/services/TypingGenerator.js'; // B139 — typert generator/registry/loader
+import { checkTrustedHost, resolveBodyCap } from './src/services/ClientConnection.js'; // B139 — client/connection (trust fence + caps)
+import { publishHmrEvent, setHmrBroadcaster, hmrStatus } from './src/services/ClientHmr.js'; // B139 — client/hmr
+import { t, localeStatus } from './src/services/Locale.js'; // B139 — client/locale
+import { parseCommand, tryExecuteCommandDialect, validateCommandDefinition } from './src/services/CommandRegistry.js'; // B139 — commands dialect
+import { discoverPresets, createPreset, deletePreset, readComposition, writeComposition, presetsStatus } from './src/services/PresetDiscovery.js'; // B139 — preset discovery/authoring
+import { browseDirectories, directoryPickerStatus } from './src/services/DirectoryPicker.js'; // B139 — host/directory-picker
 import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services/PluginRegistry.js';
 import { loadPlugins, setActivePluginContext, getActivePluginContext, listPluginTools, listPluginSkills } from './src/services/PluginContext.js'; // B97 — deepseek-harness-style plugin seam
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications, setNotifyBroadcaster } from './src/services/NotificationCenter.js';
@@ -229,6 +236,15 @@ openSessionPersistence(path.join(DATA_DIR, 'sessions.sqlite')).then((s) => {
 }).catch(() => {});
 loadDefaultHookBridges().catch(() => {});
 loadMcpServers().catch(() => {});
+// B139 — typert loader: scan plugin folders for typert.json artifacts.
+try {
+  const artifacts = loadTypertArtifacts(path.join(process.cwd(), 'plugins'));
+  if (artifacts.length) console.log(`[typert] ✓ loaded ${artifacts.filter((r) => r.ok).length} artifact(s)${artifacts.some((r) => !r.ok) ? ' (failures: ' + artifacts.filter((r) => !r.ok).map((r) => r.file).join(', ') + ')' : ''}`);
+} catch (e) { console.warn('[typert]', e.message); }
+// B139 — HMR: settings-file changes publish hmr/update events to SSE watchers.
+try {
+  settingsFileStore().onChange((namespace, key) => { try { publishHmrEvent('settings', `${namespace}.${key || '*'}`); } catch { /* noop */ } });
+} catch { /* noop */ }
 
 // B98 — SKILL AUTO-DISCOVERY: watch all skill roots (project/user/bundled)
 // so skills added at runtime are picked up without a restart. mtime rescans
@@ -2073,6 +2089,76 @@ app.post('/api/typing/apply', (req, res) => {
   } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
 });
 app.get('/api/code-runtime/bootstrap', (req, res) => res.json({ checks: workerBootstrapSelfCheck() }));
+
+// B139 — typert generator + registry + loader.
+app.get('/api/typert/registry', (req, res) => res.json(typertRegistryStatus()));
+app.post('/api/typert/generate', (req, res) => {
+  try {
+    const { manifest, emitTo } = req.body || {};
+    const r = generateTypes(manifest || {}, { emitTo: emitTo ? String(emitTo) : null });
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+app.post('/api/typert/register', (req, res) => {
+  try {
+    const { name, manifest } = req.body || {};
+    const unregister = registerTypertManifest({ name: String(name || ''), manifest: manifest || {} });
+    res.json({ ok: true, name, unregistered: typeof unregister === 'function' });
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+
+// B139 — client connection facts (trust fence + body caps).
+app.get('/api/connection', (req, res) => {
+  const host = req.headers.host || '';
+  const trusted = checkTrustedHost(host, []);
+  const cap = resolveBodyCap({ maxBytes: 30 * 1024 * 1024 });
+  res.json({ ok: true, host, loopback: trusted.loopback === true, trusted: trusted.ok, bodyCapBytes: cap.ok ? cap.maxBytes : null });
+});
+
+// B139 — client HMR (event ring + status).
+app.get('/api/hmr', (req, res) => res.json(hmrStatus()));
+
+// B139 — locale.
+app.get('/api/locale', (req, res) => {
+  const tag = String(req.headers['x-jexi-locale'] || req.query.tag || 'en').toLowerCase();
+  res.json({ ok: true, tag, strings: localeStatus().strings, ...localeStatus() });
+});
+
+// B139 — preset discovery + authoring.
+app.get('/api/presets', (req, res) => res.json(presetsStatus()));
+app.put('/api/presets', (req, res) => {
+  try {
+    const { key, meta } = req.body || {};
+    const r = createPreset(String(key || ''), meta);
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+app.delete('/api/presets/:key', (req, res) => res.json(deletePreset(String(req.params.key || ''))));
+app.get('/api/presets/:key/composition', (req, res) => res.json(readComposition(String(req.params.key || ''))));
+app.put('/api/presets/:key/composition', (req, res) => {
+  try {
+    const r = writeComposition(String(req.params.key || ''), (req.body || {}).composition);
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+
+// B139 — directory picker.
+app.get('/api/directories', (req, res) => res.json(directoryPickerStatus()));
+app.get('/api/directories/browse', (req, res) => {
+  const r = browseDirectories({
+    base: req.query.base || WORKSPACE_DIR,
+    root: req.query.root || WORKSPACE_DIR,
+    showHidden: req.query.showHidden === 'true',
+    limit: Number(req.query.limit) || 200,
+  });
+  res.status(r.ok ? 200 : 400).json(r);
+});
+
+// B139 — commands dialect surface (DSH parseCommand contract).
+app.get('/api/commands/dialect', (req, res) => {
+  const sample = String(req.query.sample || '/help');
+  res.json({ ok: true, parsed: parseCommand(sample) || null });
+});
 
 // B133 — commands, anonymous identity, session invariants.
 app.get('/api/commands', (req, res) => res.json({ commands: listCommands() }));
