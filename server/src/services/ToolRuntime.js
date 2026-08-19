@@ -102,6 +102,18 @@ export const TOOL_SCHEMAS = {
     depth: { type: 'number', desc: 'Optional recursion depth (default 1).' },
     provider: { type: 'string', desc: 'Subagent provider: in-process (default), claude-code, codex, acp, dsh-sdk (B138 — external CLI providers).' },
   },
+  'schedule_create': {
+    query: { type: 'string', required: true, desc: 'The recurring task/goal query to run.' },
+    everySeconds: { type: 'number', desc: 'Run every N seconds (mutually exclusive with dailyAt).' },
+    dailyAt: { type: 'string', desc: 'Run daily at HH:MM (24h; mutually exclusive with everySeconds).' },
+    label: { type: 'string', desc: 'Optional human label.' },
+    kind: { type: 'string', desc: 'task (default) or goal.' },
+    autonomy: { type: 'string', desc: 'ask (default) or full for goal schedules.' },
+  },
+  'schedule_list': {},
+  'schedule_delete': {
+    id: { type: 'string', required: true, desc: 'The schedule id to delete.' },
+  },
   'create_goal': {
     objective: { type: 'string', required: true, desc: 'The concrete completion objective inferred from the direct human request.' },
     max_goal_rounds: { type: 'number', desc: 'Optional positive integer limit on automatic continuation rounds.' },
@@ -288,6 +300,10 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'ralph': z.object({ ok: z.boolean(), status: z.enum(['complete', 'blocked', 'budget-limited', 'round-failed']).optional(), roundsStarted: z.number().optional(), report: z.unknown().nullable().optional(), lastReport: z.unknown().nullable().optional(), error: z.string().optional() }).passthrough(),
   // B137 — tool-subagent-report contract (dsh): child-scoped delivery.
   'report': z.object({ ok: z.boolean(), report: z.object({ id: z.string(), at: z.number(), text: z.string() }).optional(), error: z.string().optional() }).passthrough(),
+  // B140 — schedule tools contracts (dsh schedule tools).
+  'schedule_create': z.object({ ok: z.boolean(), schedule: z.unknown().nullable().optional(), error: z.string().optional() }).passthrough(),
+  'schedule_list': z.object({ ok: z.boolean(), schedules: z.array(z.unknown()).optional(), error: z.string().optional() }).passthrough(),
+  'schedule_delete': z.object({ ok: z.boolean(), id: z.string().optional(), error: z.string().optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),
@@ -1001,6 +1017,39 @@ async function runEngine(slug, args, opts = {}) {
       const r = deliverReport(opts.subagentId || null, String(args.output || ''));
       if (!r.ok) return { ok: false, error: r.error };
       return { ok: true, kind: 'report', report: r.report };
+    }
+
+    case 'schedule_create': {
+      // B140 — dsh schedule_create: recurring task/goal schedules.
+      const { taskScheduler } = await import('./TaskScheduler.js');
+      if (!taskScheduler || typeof taskScheduler.create !== 'function') return { ok: false, error: 'scheduler unavailable' };
+      const r = taskScheduler.create({
+        query: String(args.query || ''),
+        everySeconds: Number(args.everySeconds) || undefined,
+        dailyAt: args.dailyAt || undefined,
+        label: args.label || '',
+        kind: args.kind || 'task',
+        autonomy: args.autonomy || 'ask',
+      });
+      if (r.error) return { ok: false, error: r.error };
+      return { ok: true, kind: 'schedule', schedule: r.schedule };
+    }
+
+    case 'schedule_list': {
+      // B140 — dsh schedule_list.
+      const { taskScheduler } = await import('./TaskScheduler.js');
+      if (!taskScheduler || typeof taskScheduler.list !== 'function') return { ok: false, error: 'scheduler unavailable' };
+      const schedules = taskScheduler.list().map((s) => taskScheduler.publicSchedule ? taskScheduler.publicSchedule(s) : s);
+      return { ok: true, kind: 'schedule', schedules };
+    }
+
+    case 'schedule_delete': {
+      // B140 — dsh schedule_delete.
+      const { taskScheduler } = await import('./TaskScheduler.js');
+      if (!taskScheduler || typeof taskScheduler.remove !== 'function') return { ok: false, error: 'scheduler unavailable' };
+      const removed = taskScheduler.remove(String(args.id || ''));
+      if (!removed) return { ok: false, error: `no schedule "${args.id}"` };
+      return { ok: true, kind: 'schedule', id: String(args.id) };
     }
 
     case 'todo': {

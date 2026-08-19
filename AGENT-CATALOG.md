@@ -1,6 +1,6 @@
 # JEXI OS — Agent & Skill Catalog
 
-**252 specialist agents · 508 skills · 207 tools · 1 orchestrator.** One plain-language request in,
+**252 specialist agents · 508 skills · 210 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
 > ⚙️ GENERATED FILE — updated 2026-08-19 by `cd server && npm run audit-roster`. Do not edit by hand.
@@ -14,7 +14,7 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 |---|---|
 | Agents | 252 (252 reachable — 100%) |
 | Skills | 508 |
-| Tools | 207 |
+| Tools | 210 |
 | Intents / teams | 155 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
@@ -1223,7 +1223,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 207 tools (grouped by type)
+## The 210 tools (grouped by type)
 
 ### Agent (9)
 | Tool | Allowed agents | Engine | What it does |
@@ -1524,6 +1524,13 @@ This section and every table below are GENERATED from the live registries by `cd
 | `destroy_sandbox` | Sandbox Agent, Runner | SandboxAgent | Tear down a sandbox workspace and release its resources. |
 | `run_in_sandbox` | Sandbox Agent, Runner | SandboxAgent | Execute a command inside an isolated workspace with strict limits. |
 | `snapshot_workspace` | Sandbox Agent | SandboxAgent | Capture a workspace state for rollback or reuse. |
+
+### Schedule (3)
+| Tool | Allowed agents | Engine | What it does |
+|---|---|---|---|
+| `schedule_create` | Task Manager, Planner | undefined | Create a recurring schedule: everySeconds (or dailyAt HH:MM) + a query to run (dsh schedule_create). |
+| `schedule_delete` | Task Manager, Planner | undefined | Delete a schedule by its id (dsh schedule_delete). |
+| `schedule_list` | Task Manager, Planner | undefined | List every schedule with cadence, status, and next run (dsh schedule_list). |
 
 ### Search (1)
 | Tool | Allowed agents | Engine | What it does |

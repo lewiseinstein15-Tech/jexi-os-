@@ -83,7 +83,7 @@ console.log('\n== 3. Subagent report (dsh tool-subagent-report) ==');
 
   const { TOOL_REGISTRY, TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
   ok('report in the registry', TOOL_REGISTRY.some((t) => t.slug === 'report'));
-  ok('registry count is 207', TOOL_COUNT === 207);
+  ok('registry count is 207', TOOL_COUNT === 210);
   const { hasOutputContract, validateToolArgs, executeTool } = await import('./src/services/ToolRuntime.js');
   ok('report has an output contract', hasOutputContract('report'));
   ok('report schema validates output', validateToolArgs('report', { output: 'x' }).ok === true);
@@ -185,7 +185,7 @@ console.log('\n== 8. Examples + integration ==');
 {
   ok('examples README exists', fs.existsSync(path.join(process.cwd(), 'examples', 'README.md')));
   const { TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
-  ok('registry stable at 207', TOOL_COUNT === 207);
+  ok('registry stable at 207', TOOL_COUNT === 210);
   const { assemblePrompt } = await import('./src/services/PromptAssembly.js');
   const prompt = await assemblePrompt({ convId: 't-int-b137' });
   ok('prompt still assembles', typeof prompt === 'string' && prompt.length > 500);

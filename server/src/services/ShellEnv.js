@@ -59,6 +59,17 @@ export function shellEnv({ extra = {}, convId = null } = {}) {
   return env;
 }
 
+/** dsh subprocess parity name: the scrubbed parent environment. */
+export function scrubbedParentEnv() {
+  const env = {};
+  for (const [name, value] of Object.entries(process.env)) {
+    if (value === undefined) continue;
+    if (looksLikeSecret(name, value)) continue;
+    env[name] = value;
+  }
+  return env;
+}
+
 /** Which ambient names were dropped (diagnostics, never values). */
 export function scrubbedNames() {
   const out = [];

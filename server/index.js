@@ -105,6 +105,7 @@ import { t, localeStatus } from './src/services/Locale.js'; // B139 — client/l
 import { parseCommand, tryExecuteCommandDialect, validateCommandDefinition } from './src/services/CommandRegistry.js'; // B139 — commands dialect
 import { discoverPresets, createPreset, deletePreset, readComposition, writeComposition, presetsStatus } from './src/services/PresetDiscovery.js'; // B139 — preset discovery/authoring
 import { browseDirectories, directoryPickerStatus } from './src/services/DirectoryPicker.js'; // B139 — host/directory-picker
+import { bundleStatus } from './src/services/BundleBase.js'; // B140 — bundle/base manifest
 import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services/PluginRegistry.js';
 import { loadPlugins, setActivePluginContext, getActivePluginContext, listPluginTools, listPluginSkills } from './src/services/PluginContext.js'; // B97 — deepseek-harness-style plugin seam
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications, setNotifyBroadcaster } from './src/services/NotificationCenter.js';
@@ -1956,6 +1957,14 @@ app.get('/api/session-persistence', (req, res) => res.json(sessionPersistenceSta
 app.get('/api/hooks/bridges', (req, res) => res.json({ bridges: hookBridgeStatus() }));
 
 // B136 — session projection (dsh session-projection + cache).
+app.get('/api/sessions/:conv', async (req, res) => {
+  // B140 — one conversation's summary (the client runtime's session cell).
+  const conv = String(req.params.conv || '').slice(0, 80);
+  try {
+    const { conversationSummary } = await import('./src/services/SessionConversations.js');
+    res.json(conversationSummary(conv));
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
 app.get('/api/sessions/:conv/projection', (req, res) => {
   const conv = String(req.params.conv || '').slice(0, 80);
   res.json(projectSession({ convId: conv, maxChars: Number(req.query.maxChars) || 12000 }));
@@ -2153,6 +2162,9 @@ app.get('/api/directories/browse', (req, res) => {
   });
   res.status(r.ok ? 200 : 400).json(r);
 });
+
+// B140 — bundle base manifest (dsh bundle/base): the pull-all parity tracker.
+app.get('/api/bundles', (req, res) => res.json(bundleStatus()));
 
 // B139 — commands dialect surface (DSH parseCommand contract).
 app.get('/api/commands/dialect', (req, res) => {
