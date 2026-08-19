@@ -89,6 +89,7 @@ export default function ChatWindow({
   const [fileAttachments, setFileAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [customAnswers, setCustomAnswers] = useState({});
+  const [plusOpen, setPlusOpen] = useState(false);
   const [cardBusy, setCardBusy] = useState(false);
   const scrollRef = useRef(null);
   const photoRef = useRef(null);
@@ -170,6 +171,7 @@ export default function ChatWindow({
   const submit = () => {
     if ((!input.trim() && !image && !fileAttachments.length) || isProcessing) return;
     onSend(input.trim(), image, fileAttachments.length ? fileAttachments : undefined);
+    setPlusOpen(false);
     setInput('');
     setImage(null);
     setFileAttachments([]);
@@ -312,12 +314,32 @@ export default function ChatWindow({
             onChange={(e) => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
           />
-          <button type="button" className="jx-act" title="Attach photo" onClick={() => photoRef.current?.click()}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.5-3.5L8 21" /></svg>
-          </button>
-          <button type="button" className="jx-act" title="Attach file" onClick={() => fileRef.current?.click()}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>
-          </button>
+          <div className="jx-plus-wrap">
+            <button type="button" className="jx-act" title="Add photo or file" aria-label="Add" onClick={() => setPlusOpen((o) => !o)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
+            </button>
+            {plusOpen && (
+              <>
+                <div className="jx-plus-backdrop" onClick={() => setPlusOpen(false)} />
+                <div className="jx-plus-menu">
+                  <button
+                    type="button"
+                    onClick={() => { setPlusOpen(false); photoRef.current?.click(); }}
+                  >
+                    <svg className="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.5-3.5L8 21" /></svg>
+                    Photo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setPlusOpen(false); fileRef.current?.click(); }}
+                  >
+                    <svg className="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>
+                    File
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
           <button type="button" className="jx-send" disabled={!isProcessing && (!input.trim() && !image && !fileAttachments.length)} onClick={isProcessing ? onStop : submit}>
             {isProcessing ? 'Stop' : 'Send'}
           </button>
