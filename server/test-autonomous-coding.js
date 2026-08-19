@@ -85,7 +85,10 @@ ok(res.statistics.fileCount === 1 && res.statistics.toolCalls === 2, 'statistics
 
 console.log('\n== 4. Runner: honest degraded result when providers fail ==');
 const bad = await runAutonomousCoding({ query: 'build x', __mockCompletions: [{ toolCalls: [] }] });
-ok(bad.success === false && /could not complete the build/i.test(bad.summary), 'degraded result is honest');
+// B146 — degraded builds now SUCCEED with a transparent answer: it says the
+// build could not complete, names the provider reasons, and tells the user
+// what to do (retry / add a key) instead of a vague failure.
+ok(bad.success === true && /could not complete the build/i.test(bad.summary) && /AI providers were temporarily unavailable/i.test(bad.summary), 'degraded result is honest + explains why (B146)');
 ok(Array.isArray(bad.files), 'files array always present');
 
 console.log('\n== 5. Routing: code_task → the autonomous runner ==');

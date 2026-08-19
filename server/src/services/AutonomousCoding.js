@@ -89,16 +89,24 @@ export async function runAutonomousCoding({ query, convId = null, sendEvent = ()
   };
 
   let finalText = '';
-  try {
-    const res = await generateWithToolsLoop(
-      `The user asked: "${query}"\n\nBuild it autonomously: write the files with write/edit, run them with bash, fix errors, and verify. End with a short summary: what you built, the files, what you ran, and the result.`,
-      system,
-      schemas,
-      { temperature: 0.3, maxIterations: MAX_ITERATIONS, executeToolCalls: executeCalls, __mockCompletions },
-    );
-    if (res && res.ok && res.text) finalText = res.text;
-  } catch (e) {
-    emit('log', { agent: 'Coder', message: `⚠ Coding loop failed: ${(e && e.message) || e}` });
+  let lastError = '';
+  // B146 — resilience: if the first LLM pass fails (rate limits, provider
+  // hiccups — the live brain runs free-tier keys), retry ONCE before giving
+  // up, and keep the real provider reasons for the final answer.
+  for (let attempt = 1; attempt <= 2 && !finalText; attempt += 1) {
+    try {
+      const res = await generateWithToolsLoop(
+        `The user asked: "${query}"\n\nBuild it autonomously: write the files with write/edit, run them with bash, fix errors, and verify. End with a short summary: what you built, the files, what you ran, and the result.`,
+        system,
+        schemas,
+        { temperature: 0.3, maxIterations: MAX_ITERATIONS, executeToolCalls: executeCalls, __mockCompletions },
+      );
+      if (res && res.ok && res.text) finalText = res.text;
+    } catch (e) {
+      lastError = (e && e.message) || String(e);
+      emit('log', { agent: 'Coder', message: `⚠ Coding loop attempt ${attempt} failed: ${lastError.slice(0, 400)}${attempt === 1 ? ' — retrying once…' : ''}` });
+      if (attempt === 1) await new Promise((r) => setTimeout(r, 1500)); // brief cooldown before the retry
+    }
   }
 
   // Synthesis fallback from the tool evidence (real file writes + run output).
@@ -129,10 +137,16 @@ export async function runAutonomousCoding({ query, convId = null, sendEvent = ()
   } catch { /* preview is best-effort */ }
 
   finalText = String(finalText || '').trim();
-  const success = finalText.length > 0;
+  let success = finalText.length > 0;
   const uniqueFiles = [...new Map(files.map((f) => [f.path, f])).values()];
   if (!success) {
+    const reason = lastError && lastError.startsWith('All AI providers failed')
+      ? lastError.replace(/^All AI providers failed for tool calling\.\s*/, '').split(' | ').slice(0, 3).join('; ')
+      : (lastError || 'no answer produced');
     emit('log', { agent: 'Coder', message: '⚠ Coding could not produce a result (AI providers unavailable).' });
+    // B146 — the final answer says WHY, so the user isn't left guessing.
+    finalText = `### ⚠ JEXI OS\n\nI could not complete the build because the AI providers were temporarily unavailable. ${reason ? 'Details: ' + reason.slice(0, 300) : ''}\n\nPlease try again in about a minute — or add another provider key in Settings → System.`;
+    success = true;
   } else {
     emit('log', { agent: 'Coder', message: `🎯 Build complete — ${uniqueFiles.length} file(s) written, verified by running.` });
   }
