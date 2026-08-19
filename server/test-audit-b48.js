@@ -116,9 +116,10 @@ const ok = (cond, label) => { console.log(`${cond ? '✅' : '❌'} ${label}`); i
  * ================================================================ */
 {
   const cw = fs.readFileSync('../src/components/ChatWindow.jsx', 'utf8');
-  ok(cw.includes('text-[13px]'), 'P4: JEXI answers render at a larger reading size');
+  const css = fs.readFileSync('../src/index.css', 'utf8');
+  ok(css.includes('.jx-body p { font-family: var(--mono); font-size: 13.5px'), 'P4: JEXI answers render in a comfortable reading size (mono 13.5px, v3)');
   ok(!cw.includes('rounded-tl-sm bg-surface-1 text-text-primary border border-hairline'), 'P4: the old bordered JEXI bubble is gone');
-  ok(cw.includes('>JEXI</span>'), 'P4: a small sender chip marks JEXI replies');
+  ok(cw.includes('jx-gutter') && cw.includes("msg.role === 'user' ? 'A' : 'J'"), 'P4: a small gutter chip marks who is speaking (J/A)');
   const mr = fs.readFileSync('../src/components/MarkdownRenderer.jsx', 'utf8');
   ok(mr.includes('size = \'text-[11px]\''), 'P4: MarkdownRenderer accepts a size override');
 }

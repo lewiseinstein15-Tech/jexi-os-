@@ -1,40 +1,84 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Square, ImagePlus, X, Stethoscope, Plus, Paperclip, FileText, Bot, MessageCircle, Loader2, ThumbsUp, ThumbsDown , Zap } from 'lucide-react';
 import { getBackendUrl, jexiFetch, getSessionId } from '../utils/helpers';
-import TypedMessage from './TypedMessage';
-import AgentPipeline from './AgentPipeline';
-
-const FEEDBACK_ICON = 'text-text-tertiary hover:text-brand';
 
 const SELF_CHECK_QUERY =
   'JEXI, run a full system self-check now. Check your health, memory, eyes and recent errors. If anything is wrong, tell me the exact source file and the fix.';
 
-function QuickAction({ icon: Icon, label, title, onClick }) {
+/* ── agent process steps (Cursor-style: spinner → check, terminal blocks) ── */
+function looksTerminal(msg) {
+  return /✓|✗|ALL TESTS|PASS|\$ |npm |node |error|compiled|running/i.test(String(msg || ''));
+}
+
+function ProcessSteps({ logs, done }) {
+  if (!logs || logs.length === 0) {
+    return (
+      <div className="jx-process">
+        <div className="jx-step">
+          <span className="ic"><span className="jx-spin" /></span>
+          <span className="label">thinking…</span>
+        </div>
+      </div>
+    );
+  }
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      aria-label={label}
-      className="w-10 h-10 flex items-center justify-center bg-surface-1 hover:bg-brand-dim border border-hairline hover:border-brand-line text-text-secondary hover:text-brand rounded-md transition-all duration-200 active:scale-95"
-    >
-      <Icon className="w-4 h-4" />
-      <span className="sr-only">{label}</span>
-    </button>
+    <div className="jx-process">
+      {logs.map((log, i) => {
+        const last = i === logs.length - 1;
+        const text = log && (log.message || log.text || '');
+        return (
+          <div key={i}>
+            <div className="jx-step">
+              <span className="ic">
+                {last && !done ? <span className="jx-spin" /> : (
+                  <svg className="jx-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M20 6 9 17l-5-5" /></svg>
+                )}
+              </span>
+              <span className="label">{String(text).split('\n')[0].slice(0, 90)}</span>
+            </div>
+            {looksTerminal(text) && text.split('\n').length > 1 && (
+              <div className="jx-term">{text}</div>
+            )}
+          </div>
+        );
+      })}
+      {done && logs.length > 0 && <div className="jx-recall" style={{ marginTop: 8 }}>— steps executed · verified by running —</div>}
+    </div>
   );
 }
 
-// §7: on narrow screens (<340px available width) the quick-action row collapses
-// into a single "+" that opens the actions in a bottom sheet — tap targets stay
-// >=40px and the row never squishes.
-const QUICK_ACTIONS = [
-  { icon: ImagePlus, label: 'PHOTO', title: 'Attach a photo (image analysis)', action: 'photo' },
-  { icon: Paperclip, label: 'FILE', title: 'Attach any file (PDF, code, text…)', action: 'file' },
-  { icon: Stethoscope, label: 'CHECK', title: 'Run a self-check — JEXI diagnoses her own system', action: 'check' },
-];
-
-// B92 — MODE TOGGLE: Agent mode (full multi-agent team) vs Normal mode
+/* ── flat markdown-ish renderer (b/code/pre/lists only — keeps it light) ── */
+function SimpleText({ text }) {
+  const parts = String(text || '').split('\n');
+  const out = [];
+  let inCode = false;
+  let codeBuf = [];
+  parts.forEach((line, idx) => {
+    if (line.trim().startsWith('```')) {
+      if (inCode) {
+        out.push(<pre key={`c${idx}`}>{codeBuf.join('\n')}</pre>);
+        codeBuf = [];
+        inCode = false;
+      } else {
+        inCode = true;
+      }
+      return;
+    }
+    if (inCode) { codeBuf.push(line); return; }
+    const bold = line.split(/(\*\*[^*]+\*\*)/g).map((seg, j) =>
+      seg.startsWith('**') && seg.endsWith('**')
+        ? <b key={j}>{seg.slice(2, -2)}</b>
+        : seg.includes('`')
+          ? seg.split(/(`[^`]+`)/g).map((s2, k) => s2.startsWith('`') && s2.endsWith('`') ? <code key={`${j}-${k}`}>{s2.slice(1, -1)}</code> : s2)
+          : seg
+    );
+    if (line.trim() === '') out.push(<p key={idx}>&nbsp;</p>);
+    else if (/^#{1,3}\s/.test(line)) out.push(<p key={idx}><b>{line.replace(/^#+\s*/, '')}</b></p>);
+    else if (/^\s*[-•]\s/.test(line)) out.push(<p key={idx}>— {line.replace(/^\s*[-•]\s*/, '')}</p>);
+    else out.push(<p key={idx}>{bold}</p>);
+  });
+  if (inCode) out.push(<pre key="c-end">{codeBuf.join('\n')}</pre>);
+  return <>{out}</>;
+}
 
 export default function ChatWindow({
   messages, logs, isProcessing, onSend, onStop,
@@ -42,14 +86,19 @@ export default function ChatWindow({
 }) {
   const [input, setInput] = useState('');
   const [image, setImage] = useState(null);
-  const [fileAttachments, setFileAttachments] = useState([]); // { id, name, kind }
+  const [fileAttachments, setFileAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
-  const [quickOpen, setQuickOpen] = useState(false);
-  const [customAnswers, setCustomAnswers] = useState({}); // B110 — question card custom inputs
+  const [customAnswers, setCustomAnswers] = useState({});
   const [cardBusy, setCardBusy] = useState(false);
+  const scrollRef = useRef(null);
+  const photoRef = useRef(null);
+  const fileRef = useRef(null);
 
-  // B110 — record answers to the model's pending questions, then nudge the
-  // loop to continue with them (dsh tool-ask-user: answer feeds the loop).
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, logs, isProcessing]);
+
   const answerQuestions = async (answers) => {
     setCardBusy(true);
     try {
@@ -59,417 +108,225 @@ export default function ChatWindow({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conv, answers }),
       });
-      onDismissQuestions && onDismissQuestions(null);
+      onDismissQuestions();
       onSend('Please continue — here are my answers to your questions.');
     } catch (e) { /* noop */ }
     setCardBusy(false);
   };
 
-  // B110 — approve a presented plan (plan mode → implementation).
-  const approvePlanNow = async () => {
+  const approvePlan = async () => {
     setCardBusy(true);
     try {
       const conv = (planReview && planReview.conv) || getSessionId();
-      await jexiFetch(`${getBackendUrl()}/api/plan/${conv}/approve`, { method: 'POST' });
-      onDismissPlan && onDismissPlan(null);
+      await jexiFetch(`${getBackendUrl()}/api/plan/${encodeURIComponent(conv)}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      onDismissPlan();
       onSend('approve the plan');
     } catch (e) { /* noop */ }
     setCardBusy(false);
   };
-  const fileRef = useRef(null);   // photo (image/*)
-  const anyFileRef = useRef(null); // any file
-  const scrollRef = useRef(null);
-  const qaRef = useRef(null);
-  const [narrowQA, setNarrowQA] = useState(false);
 
-  // §7: measure the quick-action row's real available width — below 340px it
-  // collapses to a single "+" that opens the actions in a sheet.
-  useEffect(() => {
-    const el = qaRef.current;
-    if (!el) return;
-    // Feature-guard: ResizeObserver needs Chrome 64+; on older WebViews fall
-    // back to a window resize listener so the app still boots.
-    if (typeof ResizeObserver === 'undefined') {
-      const onResize = () => setNarrowQA(el.clientWidth < 340);
-      window.addEventListener('resize', onResize);
-      onResize();
-      return () => window.removeEventListener('resize', onResize);
-    }
-    const ro = new ResizeObserver(() => setNarrowQA(el.clientWidth < 340));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  const runSelfCheck = () => onSend(SELF_CHECK_QUERY);
 
-  const runQuickAction = (action) => {
-    setQuickOpen(false);
-    if (action === 'photo') fileRef.current?.click();
-    else if (action === 'file') anyFileRef.current?.click();
-    else onSend(SELF_CHECK_QUERY);
-  };
-
-  // Upload an arbitrary file → backend → keep { id, name } to send with the message.
-  const handleAnyFile = async (e) => {
+  const onPhotoPicked = (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = '';
     if (!file) return;
-    if (file.size > 25 * 1024 * 1024) { alert('File too large (max 25 MB)'); return; }
-    setUploading(true);
-    try {
-      const buf = await file.arrayBuffer();
-      const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
-      const res = await jexiFetch(`${getBackendUrl()}/api/upload`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: file.name, data: b64 }),
-      });
-      const d = await res.json();
-      if (d.ok) setFileAttachments((prev) => [...prev, { id: d.id, name: d.name, kind: d.kind }]);
-      else alert(d.error || 'Upload failed');
-    } catch (err) { alert('Upload failed: ' + String(err.message || err)); }
-    setUploading(false);
-  };
-
-  // Auto-scroll to the newest content: when a new message lands AND while the
-  // agent pipeline streams live logs (the "JEXI AT WORK" panel grows as agents
-  // run — without `logs` in the deps the view stays stuck and you must scroll
-  // by hand during every task).
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages, isProcessing, logs]);
-
-  const handleFile = (e) => {
-    const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith('image/')) return;
     const reader = new FileReader();
     reader.onload = () => setImage(reader.result);
     reader.readAsDataURL(file);
-    e.target.value = '';
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const onFilesPicked = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    setUploading(true);
+    try {
+      for (const file of files) {
+        const data = await new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(String(r.result).split(',')[1] || '');
+          r.onerror = reject;
+          r.readAsDataURL(file);
+        });
+        const res = await jexiFetch(`${getBackendUrl()}/api/upload`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: file.name, data }),
+        });
+        if (res.ok) {
+          const rec = await res.json();
+          if (rec && rec.ok) setFileAttachments((p) => [...p, { id: rec.id, name: rec.name, kind: rec.kind }]);
+        }
+      }
+    } catch (err) { /* noop */ }
+    setUploading(false);
+  };
+
+  const submit = () => {
     if ((!input.trim() && !image && !fileAttachments.length) || isProcessing) return;
-    onSend(input, image, fileAttachments.length ? fileAttachments : undefined);
+    onSend(input.trim(), image, fileAttachments.length ? fileAttachments : undefined);
     setInput('');
     setImage(null);
     setFileAttachments([]);
   };
 
-  const canSend = (input.trim() || image || fileAttachments.length) && !isProcessing;
-
   return (
-    <div className="surface-card p-4 rounded-xl relative z-10 flex flex-col flex-1 min-h-0">
-      <div className="flex items-center gap-2 mb-3 flex-shrink-0">
-        <h2 className="text-[10px] font-bold text-brand tracking-wider">JEXI CHAT</h2>
-        {/* B117 — ONE mode: JEXI decides per query (direct answer or full team). */}
-        <span className="flex items-center gap-1 rounded-full border border-brand-line/50 bg-brand-dim/30 px-2.5 py-1 text-[8px] font-black tracking-wider text-brand ml-1">
-          <Zap className="w-2.5 h-2.5" /> AUTO · JEXI DECIDES
-        </span>
-        {isProcessing && (
-          <span className="ml-auto flex items-center gap-1.5 text-[8px] text-brand font-bold">
-            THINKING
-            <span className="flex gap-0.5">
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  className="typing-dot w-1 h-1 rounded-full bg-brand"
-                  style={{ animationDelay: `${i * 0.15}s` }}
-                />
-              ))}
-            </span>
-          </span>
-        )}
-      </div>
-
-      <div ref={scrollRef} className="space-y-3 mb-3 flex-1 min-h-0 overflow-y-auto pr-1">
-        {messages.length === 0 ? (
-          <div className="py-2 text-center">
-            <p className="text-[11px] text-text-tertiary">💬 Send a message — or use the quick actions below to attach photos/files, use your eyes, or run a self-check.</p>
+    <div className="jx-chatwrap" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      {/* messages */}
+      <div ref={scrollRef} className="jx-scroll">
+        {messages.length === 0 && !isProcessing && (
+          <div className="jx-view-inner">
+            <div className="jx-vtitle">JEXI</div>
+            <div className="jx-vsub">Your personal AI — it remembers everything and works step by step. Ask anything, or say “build an app”.</div>
           </div>
-        ) : (
-          messages.map((msg, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              {msg.role === 'user' ? (
-                <div className="max-w-[85%] p-3 rounded-lg rounded-tr-sm bg-gradient-to-br from-brand to-[#00B55C] text-[#04140D] font-medium text-[11px] shadow-[0_4px_18px_rgba(0,210,106,0.28)]">
-                  <div className="whitespace-pre-wrap break-words">
-                    {msg.image && <img src={msg.image} alt="attachment" className="max-w-[220px] rounded-lg mb-2 border border-black/20" />}
-                    {msg.text}
-                  </div>
-                </div>
-              ) : (
-                // Build 48, P4 — JEXI's answers live in a large open reading
-                // area, NOT a small boxed bubble: full width, no border/panel,
-                // larger type. Only the sender chip marks who is talking.
-                <div className="w-full">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-brand shadow-[0_0_8px_rgba(0,255,157,0.8)]" />
-                    <span className="text-[9px] font-bold tracking-[0.18em] text-brand">JEXI</span>
-                  </div>
-                  <TypedMessage text={msg.text} size="text-[13px]" />
-                  {!isProcessing && (
-                    <div className="flex items-center gap-1 mt-1 opacity-60 hover:opacity-100 transition-opacity">
-                      <button
-                        type="button"
-                        aria-label="Helpful"
-                        onClick={async () => {
-                          try {
-                            await jexiFetch(`${getBackendUrl()}/api/feedback`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ conversation: getSessionId(), seq: i, rating: 1 }),
-                            });
-                          } catch (e) { /* noop */ }
-                        }}
-                        className={`p-1 rounded ${FEEDBACK_ICON}`}
-                      >
-                        <ThumbsUp className="w-3 h-3" />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="Not helpful"
-                        onClick={async () => {
-                          try {
-                            await jexiFetch(`${getBackendUrl()}/api/feedback`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ conversation: getSessionId(), seq: i, rating: -1 }),
-                            });
-                          } catch (e) { /* noop */ }
-                        }}
-                        className={`p-1 rounded ${FEEDBACK_ICON} hover:text-status-error`}
-                      >
-                        <ThumbsDown className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )}
+        )}
+        {messages.map((msg, i) => (
+          <div key={i} className={`jx-msg ${msg.role === 'user' ? 'user' : 'jexi'}`}>
+            <div className="jx-gutter">{msg.role === 'user' ? 'A' : 'J'}</div>
+            <div className="jx-body">
+              {msg.image && <img className="jx-img" src={msg.image} alt="attachment" />}
+              <SimpleText text={msg.text} />
+              {msg.role === 'jexi' && !isProcessing && (
+                <div className="jx-feedback">
+                  <button
+                    type="button"
+                    title="Helpful"
+                    onClick={async () => {
+                      try {
+                        await jexiFetch(`${getBackendUrl()}/api/feedback`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ conversation: getSessionId(), seq: i, rating: 1 }),
+                        });
+                      } catch (e) { /* noop */ }
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /></svg>
+                  </button>
+                  <button
+                    type="button"
+                    title="Not helpful"
+                    onClick={async () => {
+                      try {
+                        await jexiFetch(`${getBackendUrl()}/api/feedback`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ conversation: getSessionId(), seq: i, rating: -1 }),
+                        });
+                      } catch (e) { /* noop */ }
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7 0h3a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3" /></svg>
+                  </button>
                 </div>
               )}
-            </motion.div>
-          ))
-        )}
-        {isProcessing && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex justify-start"
-          >
-            <div className="w-full bg-[#0a0a0c] border border-white/[0.07] rounded-lg overflow-hidden">
-              <AgentPipeline logs={logs} isProcessing />
             </div>
-          </motion.div>
+          </div>
+        ))}
+
+        {/* agent process block while working */}
+        {isProcessing && (
+          <div className="jx-msg jexi">
+            <div className="jx-gutter">J</div>
+            <div className="jx-body">
+              <ProcessSteps logs={logs} done={false} />
+            </div>
+          </div>
         )}
       </div>
 
-      {/* File attachment chips (B92 — any file) */}
-      {fileAttachments.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-2 flex-shrink-0">
-          {fileAttachments.map((a, i) => (
-            <span key={i} className="flex items-center gap-1.5 rounded-full border border-brand-line bg-brand-dim/30 pl-2 pr-1.5 py-1 text-[9px] text-brand">
-              {a.kind === 'image' ? <ImagePlus className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
-              <span className="max-w-[140px] truncate">{a.name}</span>
-              <button type="button" onClick={() => setFileAttachments((p) => p.filter((_, j) => j !== i))} className="hover:text-status-error"><X className="w-3 h-3" /></button>
-            </span>
-          ))}
-          {uploading && <span className="flex items-center gap-1 text-[9px] text-text-tertiary"><Loader2 className="w-3 h-3 animate-spin" /> uploading…</span>}
-        </div>
-      )}
-
-      {/* Image attachment preview */}
-      {image && (
-        <div className="relative inline-block mb-2 flex-shrink-0">
-          <img src={image} alt="attachment" className="w-16 h-16 object-cover rounded-lg border border-[#00D26A]/40" />
-          <button
-            type="button"
-            onClick={() => setImage(null)}
-            className="tap-target absolute -top-2 -right-2 w-7 h-7 flex items-center justify-center bg-black border border-gray-700 rounded-full text-gray-400 hover:text-white"
-            title="Remove attachment"
-          >
-            <X className="w-3 h-3" />
-          </button>
-        </div>
-      )}
-
-      {/* B110 — ask_user_question card (dsh tool-ask-user): the model parked
-          questions; the user answers inline and the loop continues. */}
+      {/* flat notices: questions / plan (no cards) */}
       {questions && questions.questions && questions.questions.length > 0 && (
-        <div className="rounded-xl border border-brand-line/60 bg-brand-dim/20 p-3 mb-2 flex-shrink-0 max-h-56 overflow-y-auto">
-          <p className="text-[9px] font-black tracking-[0.16em] text-brand mb-2 flex items-center gap-1.5">
-            <MessageCircle className="w-3 h-3" /> JEXI NEEDS YOUR INPUT
-          </p>
-          <div className="space-y-2.5">
-            {questions.questions.map((q, qi) => (
-              <div key={q.id} className="rounded-lg bg-surface-2 border border-hairline p-2.5">
-                <p className="text-[10px] text-text-primary font-semibold">{q.question}</p>
-                {q.options && q.options.length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {q.options.map((o) => (
-                      <button
-                        key={o.label}
-                        type="button"
-                        disabled={cardBusy}
-                        onClick={() => answerQuestions([{ id: q.id, selected: [o.label] }])}
-                        className="px-2 py-1 rounded-md border border-brand-line text-brand bg-brand-dim/40 text-[9px] font-bold hover:brightness-110 disabled:opacity-50"
-                      >
-                        {o.label}
-                        {o.description ? <span className="block font-normal text-text-tertiary text-[7px] mt-0.5 max-w-[160px]">{o.description}</span> : null}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <div className="mt-1.5 flex gap-1">
-                  <input
-                    value={customAnswers[q.id] || ''}
-                    onChange={(e) => setCustomAnswers((p) => ({ ...p, [q.id]: e.target.value }))}
-                    placeholder="Or type your own answer…"
-                    className="flex-1 bg-surface-1 border border-hairline rounded-md px-2 py-1.5 text-[10px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-brand-line"
-                  />
-                  <button
-                    type="button"
-                    disabled={cardBusy || !(customAnswers[q.id] || '').trim()}
-                    onClick={() => answerQuestions([{ id: q.id, selected: [], custom: (customAnswers[q.id] || '').trim() }])}
-                    className="px-2.5 py-1 rounded-md bg-brand text-[#04140D] text-[9px] font-bold hover:brightness-110 disabled:opacity-50"
-                  >
-                    SEND
-                  </button>
+        <div className="jx-notice">
+          <div className="nt">JEXI needs your input</div>
+          {questions.questions.map((q) => (
+            <div key={q.id}>
+              <div className="nq">{q.question}</div>
+              {q.options && q.options.length > 0 && (
+                <div className="opts">
+                  {q.options.map((o) => (
+                    <button key={o.label} type="button" className="opt" disabled={cardBusy} onClick={() => answerQuestions([{ id: q.id, selected: [o.label] }])}>
+                      {o.label}
+                    </button>
+                  ))}
                 </div>
+              )}
+              <div className="custom">
+                <input
+                  value={customAnswers[q.id] || ''}
+                  onChange={(e) => setCustomAnswers((p) => ({ ...p, [q.id]: e.target.value }))}
+                  placeholder="Type your answer…"
+                />
+                <button type="button" disabled={cardBusy} onClick={() => answerQuestions([{ id: q.id, selected: [customAnswers[q.id] || ''], custom: customAnswers[q.id] || '' }])}>
+                  Answer
+                </button>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       )}
-
-      {/* B110 — plan-mode review card (dsh exit_plan_mode): approve to start
-          implementation, or revise with feedback. */}
       {planReview && planReview.plan && (
-        <div className="rounded-xl border border-brand-line/60 bg-brand-dim/20 p-3 mb-2 flex-shrink-0 max-h-64 overflow-y-auto">
-          <p className="text-[9px] font-black tracking-[0.16em] text-brand mb-1.5 flex items-center gap-1.5">
-            <Bot className="w-3 h-3" /> PLAN READY FOR REVIEW
-          </p>
-          <p className="text-[8px] text-text-tertiary mb-1.5">Plan for visibility — execution continues automatically and updates stream below. The live preview link arrives with the implementation.</p>
-          <pre className="text-[10px] text-text-secondary leading-relaxed whitespace-pre-wrap font-sans max-h-36 overflow-y-auto">{String(planReview.plan).slice(0, 4000)}</pre>
-          <div className="mt-2 flex gap-1.5">
-            <button
-              type="button"
-              disabled={cardBusy}
-              onClick={approvePlanNow}
-              className="flex-1 px-2.5 py-2 rounded-md bg-brand text-[#04140D] text-[10px] font-bold hover:brightness-110 disabled:opacity-50"
-            >
-              ✓ APPROVE & START
-            </button>
-            <button
-              type="button"
-              onClick={() => onDismissPlan && onDismissPlan(null)}
-              className="flex-1 px-2.5 py-2 rounded-md border border-hairline text-text-secondary text-[10px] font-bold hover:border-hairline-strong"
-            >
-              SEND CHANGES
-            </button>
+        <div className="jx-notice">
+          <div className="nt">Plan ready — approve to execute</div>
+          <div className="plan-text">{planReview.plan}</div>
+          <div className="approve-row">
+            <button type="button" disabled={cardBusy} onClick={approvePlan}>Approve &amp; execute</button>
+            <button type="button" className="ghost" disabled={cardBusy} onClick={onDismissPlan}>Not now</button>
           </div>
         </div>
       )}
 
-      {/* Quick actions (spec §3A) — §7: collapse to a single "+" below 340px */}
-      <div ref={qaRef} className="flex gap-1.5 mb-2 flex-shrink-0 min-w-0">
-        {narrowQA ? (
-          <QuickAction icon={Plus} label="MORE" title="Quick actions" onClick={() => setQuickOpen(true)} />
-        ) : (
-          QUICK_ACTIONS.map((qa) => (
-            <QuickAction key={qa.label} icon={qa.icon} label={qa.label} title={qa.title} onClick={() => runQuickAction(qa.action)} />
-          ))
-        )}
+      {/* attachment chips */}
+      {(fileAttachments.length > 0 || image || uploading) && (
+        <div style={{ padding: '10px 24px 0' }}>
+          <div className="jx-chips">
+            {image && (
+              <span className="jx-chip">
+                📷 photo
+                <button type="button" onClick={() => setImage(null)}>✕</button>
+              </span>
+            )}
+            {fileAttachments.map((a, i) => (
+              <span key={i} className="jx-chip">
+                {a.kind === 'image' ? '🖼' : '📄'} {a.name}
+                <button type="button" onClick={() => setFileAttachments((p) => p.filter((_, j) => j !== i))}>✕</button>
+              </span>
+            ))}
+            {uploading && <span className="jx-chip">uploading…</span>}
+          </div>
+        </div>
+      )}
+
+      {/* composer */}
+      <div className="jx-composer">
+        <div className="jx-bar">
+          <textarea
+            rows={1}
+            value={input}
+            placeholder="Ask JEXI anything…"
+            onChange={(e) => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
+          />
+          <button type="button" className="jx-act" title="Attach photo" onClick={() => photoRef.current?.click()}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.5-3.5L8 21" /></svg>
+          </button>
+          <button type="button" className="jx-act" title="Attach file" onClick={() => fileRef.current?.click()}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>
+          </button>
+          <button type="button" className="jx-send" disabled={!isProcessing && (!input.trim() && !image && !fileAttachments.length)} onClick={isProcessing ? onStop : submit}>
+            {isProcessing ? 'Stop' : 'Send'}
+          </button>
+        </div>
+        <div className="jx-hint">JEXI works step by step — you see everything happening · files land in Workshop</div>
       </div>
 
-      {/* Input + send — floating frosted bar with a focus glow, pinned to the bottom */}
-      <form
-        onSubmit={handleSubmit}
-        className="surface-float flex gap-2 items-center rounded-xl p-1.5 pl-3 flex-shrink-0 transition-all duration-200 focus-within:border-brand-line focus-within:shadow-[0_0_0_3px_var(--brand-dim)]"
-      >
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleFile}
-        />
-        <input ref={anyFileRef} type="file" className="hidden" onChange={handleAnyFile} />
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Message JEXI..."
-          className="flex-1 bg-transparent text-text-primary placeholder-text-tertiary rounded-lg py-2 text-xs focus:outline-none"
-          disabled={isProcessing}
-        />
-        {isProcessing ? (
-          <button
-            type="button"
-            onClick={onStop}
-            className="w-10 h-10 flex items-center justify-center bg-status-error/10 text-status-error border border-status-error/40 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
-            title="Stop"
-          >
-            <Square className="w-4 h-4" />
-          </button>
-        ) : (
-          <button
-            type="submit"
-            disabled={!canSend}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-brand text-black disabled:bg-surface-2 disabled:text-text-tertiary transition-all duration-200 hover:scale-105 hover:shadow-[0_0_18px_rgba(0,255,157,0.4)] active:scale-95"
-            title="Send"
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        )}
-      </form>
-
-      {/* Quick-actions bottom sheet (§7 — sheets, not modals) */}
-      <AnimatePresence>
-        {quickOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end"
-            onClick={() => setQuickOpen(false)}
-          >
-            <motion.div
-              initial={{ y: 80, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 80, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full bg-surface-1 border-t border-hairline rounded-t-xl p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.4)]"
-            >
-              <div className="w-8 h-1 bg-white/15 rounded-full mx-auto mb-4" />
-              <p className="eyebrow mb-2">Quick actions</p>
-              <div className="space-y-2">
-                {QUICK_ACTIONS.map((qa) => (
-                  <button
-                    key={qa.label}
-                    type="button"
-                    onClick={() => runQuickAction(qa.action)}
-                    className="w-full flex items-center gap-3 bg-surface-2 border border-hairline hover:border-brand-line rounded-lg px-3 py-3 text-left transition-colors"
-                  >
-                    <span className="w-10 h-10 flex items-center justify-center bg-surface-1 border border-hairline rounded-md text-text-secondary">
-                      <qa.icon className="w-4 h-4" />
-                    </span>
-                    <span>
-                      <span className="block text-[12px] font-semibold text-text-primary">{qa.label}</span>
-                      <span className="block text-[10px] text-text-tertiary">{qa.title}</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <input ref={photoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onPhotoPicked} />
+      <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={onFilesPicked} />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { getBackendUrl, jexiFetch, backendErrorMessage, delay } from '../utils/helpers';
+import { getBackendUrl, jexiFetch, backendErrorMessage, delay, getSessionId, setSessionId } from '../utils/helpers';
 
 // A live agent loop streams events continuously. If the stream stays silent
 // this long (app backgrounded / proxy drop / host restart) the read is stuck
@@ -132,6 +132,8 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
 
 export const useJexiEngine = () => {
   const [messages, setMessages] = useState([]);
+  // v3 — the active conversation (set by History's "open conversation").
+  const sessionRef = useRef(getSessionId());
   const [logs, setLogs] = useState([]);
   const [websites, setWebsites] = useState([]);
   const [plan, setPlan] = useState(null); // { intent, steps, roster, skillsLine } from the /api/chat plan event
@@ -269,7 +271,7 @@ export const useJexiEngine = () => {
       const backendUrl = getBackendUrl();
       abortRef.current = new AbortController();
       // B117 — ONE MODE: no mode header; the server routes per query.
-      const headers = { 'Content-Type': 'application/json' };
+      const headers = { 'Content-Type': 'application/json', 'x-jexi-session': sessionRef.current };
       // B117 — ONE MODE: JEXI decides per query (direct answer vs full team).
       // No x-jexi-mode header is ever sent; the server routes automatically.
       // The dsh preset (standard/ptc/minimal/creator) still rides along and
@@ -358,5 +360,23 @@ export const useJexiEngine = () => {
   const [questions, setQuestions] = useState(null); // { conv, questions: [{id,question,header,options,multiSelect}] }
   const [planReview, setPlanReview] = useState(null); // { conv, plan }
 
-  return { messages, logs, websites, plan, isProcessing, runSearch, stopGeneration, pushMessage, questions, setQuestions, planReview, setPlanReview };
+  // v3 — open a past conversation from History: load its events as read-only
+  // messages and point the session at it so the next message CONTINUES it.
+  const openConversation = useCallback((convId, events) => {
+    const id = String(convId || '');
+    if (!id) return;
+    sessionRef.current = id;
+    setSessionId(id);
+    const msgs = (Array.isArray(events) ? events : [])
+      .filter((e) => e && (e.kind === 'chat' || !e.kind) && e.text)
+      .map((e) => ({ role: e.role === 'user' ? 'user' : 'jexi', text: String(e.text) }));
+    if (msgs.length === 0) msgs.push({ role: 'jexi', text: 'This conversation is empty — say something and I will start it up again.' });
+    setMessages(msgs);
+    setLogs([]);
+    setWebsites([]);
+    setPlan(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return { messages, logs, websites, plan, isProcessing, runSearch, stopGeneration, pushMessage, questions, setQuestions, planReview, setPlanReview, openConversation };
 };

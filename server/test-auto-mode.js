@@ -46,7 +46,11 @@ ok(/x-jexi-preset/.test(hook), 'preset header still rides along');
 const chat = fs.readFileSync('../src/components/ChatWindow.jsx', 'utf-8');
 ok(!/> AGENT</.test(chat) && !/> NORMAL</.test(chat), 'ChatWindow has NO agent/normal toggle buttons');
 ok(!/MODE_STORAGE|toggleMode/.test(chat), 'ChatWindow has no mode state/toggle');
-ok(/AUTO · JEXI DECIDES/.test(chat), 'ChatWindow shows the static AUTO badge');
+// v3 redesign: the badge is GONE entirely (monochrome minimal shell) — the
+// one-mode invariant now lives in the absence of any mode UI + the engine
+// never sending the mode header (checked above).
+ok(!/JEXI DECIDES/.test(chat) && !/MODE/.test(chat), 'ChatWindow has no mode badge at all (v3 minimal)');
+ok(/onSend\(input\.trim\(\)/.test(chat), 'send still calls onSend with the input (3-arg contract)');
 ok(!/onSend\([^)]*,\s*[^)]*,\s*[^)]*,\s*mode\)/.test(chat), 'send no longer passes a mode argument (the B117 freeze bug)');
 const home = fs.readFileSync('../src/components/HomeView.jsx', 'utf-8');
 ok(!/toggleMode/.test(home) && !/jexi_mode/.test(home), 'HomeView has no mode pill/toggle');

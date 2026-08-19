@@ -33,12 +33,28 @@ console.log('\n== 1. Schedule tools (dsh schedule tools) ==');
   ok('create validates query', validateToolArgs('schedule_create', { query: 'x', everySeconds: 60 }).ok === true);
   ok('create requires query', validateToolArgs('schedule_create', {}).ok === false);
   const parseRes = (r) => { try { return typeof r.result === 'string' ? JSON.parse(r.result) : (r.result || r); } catch { return r.result || r; } };
+  // Self-contained: clear every schedule first (repeated local runs and
+  // smoke tests can accumulate them, pushing the list result over the spill
+  // threshold and making the assertion environment-dependent).
+  const { taskScheduler } = await import('./src/services/TaskScheduler.js');
+  for (const s of taskScheduler.list()) taskScheduler.remove(s.id);
   const created = await executeTool({ slug: 'schedule_create', args: { query: 'B140 schedule test', everySeconds: 3600, label: 'B140 test' }, spillOwner: 't-sched' });
   const createdBody = parseRes(created);
   ok('schedule_create executes', created.ok === true && createdBody.schedule && createdBody.schedule.id);
   const schedId = createdBody.schedule.id;
   const listed = await executeTool({ slug: 'schedule_list', args: {}, spillOwner: 't-sched' });
-  ok('schedule_list returns the schedule', listed.ok === true && String(JSON.stringify(parseRes(listed))).includes(schedId));
+  // The list may exceed the spill threshold in busy environments — resolve
+  // through the spill locator so the assertion is environment-independent.
+  let listedRaw = typeof listed.result === 'string' ? listed.result : JSON.stringify(listed.result || listed);
+  let foundId = listedRaw.includes(schedId);
+  if (!foundId) {
+    const m = listedRaw.match(/spill:\/\/([^\s]+?\.txt)/);
+    if (m) {
+      const spill = await executeTool({ slug: 'spill-read', args: { locator: `spill://${m[1]}` }, spillOwner: 't-sched' });
+      foundId = String(spill.result || '').includes(schedId);
+    }
+  }
+  ok('schedule_list returns the schedule (even when spilled)', listed.ok === true && foundId);
   const deleted = await executeTool({ slug: 'schedule_delete', args: { id: schedId }, spillOwner: 't-sched' });
   ok('schedule_delete removes it', deleted.ok === true);
   const bad = await executeTool({ slug: 'schedule_delete', args: { id: 'nope-123' }, spillOwner: 't-sched' });
