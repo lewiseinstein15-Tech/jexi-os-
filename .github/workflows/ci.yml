@@ -19,6 +19,9 @@ jobs:
           node-version: 22
       - name: Install
         run: npm ci
+      - name: Install root deps (rich-render test needs react/react-markdown/esbuild)
+        working-directory: .
+        run: npm ci
       - name: Syntax check
         run: |
           for f in index.js src/services/*.js; do node --check "$f"; done
