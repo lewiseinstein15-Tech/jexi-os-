@@ -8,6 +8,18 @@ export default function WorkshopView() {
   const [copied, setCopied] = useState(null); // file name that was copied
   const [copiedAll, setCopiedAll] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+  // v3 — mobile APK: Workshop becomes Preview/Files tabs on narrow screens,
+  // side-by-side on desktop.
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobTab, setMobTab] = useState('preview');
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 900px)');
+    const on = (e) => { setIsMobile(e.matches); if (!e.matches) setMobTab('preview'); };
+    setIsMobile(mq.matches);
+    mq.addEventListener?.('change', on);
+    return () => mq.removeEventListener?.('change', on);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -69,9 +81,16 @@ export default function WorkshopView() {
           {projectName ? `${projectName} — ` : ''}the project we're working on · files land here when JEXI finishes · copy what you need
         </div>
       </div>
+      {/* mobile tabs */}
+      {isMobile && (
+        <div className="jx-ws-tabs">
+          <button type="button" className={mobTab === 'preview' ? 'active' : ''} onClick={() => setMobTab('preview')}>Preview</button>
+          <button type="button" className={mobTab === 'files' ? 'active' : ''} onClick={() => setMobTab('files')}>Files</button>
+        </div>
+      )}
       <div className="jx-ws-body">
         {/* preview */}
-        <div className="jx-preview">
+        <div className={`jx-preview${isMobile && mobTab !== 'preview' ? ' mob-hidden' : ''}`}>
           <div className="jx-pbar">
             <span className="dots"><i /><i /><i /></span>
             <span className="url">{previewUrl ? previewUrl.replace(/^https?:\/\//, '') : 'no preview yet'}</span>
@@ -88,7 +107,7 @@ export default function WorkshopView() {
           <div className="jx-ws-foot">preview updates live as JEXI edits — this project only</div>
         </div>
         {/* files */}
-        <div className="jx-files">
+        <div className={`jx-files${isMobile && mobTab !== 'files' ? ' mob-hidden' : ''}`}>
           <div className="jx-fh">
             <span>Files ({files.length})</span>
             <button type="button" onClick={copyAll}>{copiedAll ? '✓ all copied' : 'Copy all'}</button>

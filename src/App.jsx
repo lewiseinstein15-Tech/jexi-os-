@@ -124,7 +124,10 @@ export default function App() {
           </div>
         </header>
 
-        {/* hamburger menu */}
+        {/* drawer backdrop (native feel) */}
+        <div className={`jx-backdrop${menuOpen ? ' show' : ''}`} onClick={() => setMenuOpen(false)} aria-hidden="true" />
+
+        {/* hamburger menu (drawer) */}
         <nav className={`jx-menu${menuOpen ? ' open' : ''}`} onClick={(e) => e.stopPropagation()}>
           {Object.entries(VIEWS).map(([id, v]) => (
             <button
