@@ -64,9 +64,21 @@ export async function installAndroidUpdate({ onProgress } = {}) {
     all.set(c, offset);
     offset += c.byteLength;
   }
+  // B152 — validate the download is a real APK (ZIP magic bytes). A proxy
+  // error page or a GitHub hiccup can come back with HTTP 200 — writing that
+  // as the APK breaks the install and leaves the user stuck.
+  if (size < 4 || all[0] !== 0x50 || all[1] !== 0x4b || all[2] !== 0x03 || all[3] !== 0x04) {
+    throw new Error('Downloaded file is not a valid APK (the update server may have returned an error page). Try again in a minute.');
+  }
+
   const base64 = bytesToBase64(all);
 
   if (onProgress) onProgress(100);
+
+  // Remove any previous update APK first — a stale file can fail the install.
+  try {
+    await Filesystem.deleteFile({ path: APK_FILENAME, directory: Directory.Cache });
+  } catch (e) { /* nothing cached — fine */ }
 
   await Filesystem.writeFile({
     path: APK_FILENAME,
@@ -78,10 +90,15 @@ export async function installAndroidUpdate({ onProgress } = {}) {
 
   // Launches the Android package installer. First time, Android asks to allow
   // "install unknown apps" from JEXI OS — the system shows its own dialog.
+  try {
   await FileOpener.open({
     filePath: uri,
     contentType: 'application/vnd.android.package-archive',
   });
+
+  } catch (e) {
+    throw new Error(`Could not open the installer (${(e && e.message) || 'unknown'}). First time only: Settings → Apps → JEXI OS → "Install unknown apps" → Allow, then tap UPDATE again.`);
+  }
 
   return { uri };
 }

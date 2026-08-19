@@ -1,10 +1,13 @@
 package com.jexi.os;
 
 import android.Manifest;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.webkit.CookieManager;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 
 import androidx.core.app.ActivityCompat;
@@ -60,10 +63,41 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    /**
+     * B152 — FIX: after an APK upgrade (in-app UPDATE), the Android WebView can
+     * keep serving STALE cached assets — the old index.html plus old hashed
+     * JS/CSS files that no longer exist in the new bundle — which renders a
+     * white/broken screen until the user clears app data or re-installs.
+     *
+     * Fix: whenever the installed versionCode changes (upgrade or fresh
+     * install), wipe the WebView cache + cookies BEFORE the new page loads, so
+     * the new bundle always resolves its own assets.
+     */
+    private void clearWebViewCacheOnUpgrade() {
+        try {
+            final int current = BuildConfig.VERSION_CODE;
+            final SharedPreferences prefs = getSharedPreferences("jexi_meta", MODE_PRIVATE);
+            final int last = prefs.getInt("version_code", 0);
+            if (last != current) {
+                prefs.edit().putInt("version_code", current).apply();
+                getBridge().getWebView().postDelayed(() -> {
+                    try {
+                        WebView wv = getBridge().getWebView();
+                        if (wv == null) return;
+                        wv.clearCache(true);
+                        CookieManager.getInstance().removeAllCookies(null);
+                        wv.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
+                    } catch (Exception e) { /* best-effort */ }
+                }, 60);
+            }
+        } catch (Exception e) { /* best-effort */ }
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         ensureRuntimePermissions();
+        clearWebViewCacheOnUpgrade();
     }
 
     @Override
