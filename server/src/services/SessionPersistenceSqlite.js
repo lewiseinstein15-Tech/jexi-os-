@@ -150,3 +150,8 @@ export async function closeSessionPersistence() {
   db = null;
   available = false;
 }
+
+/** Direct handle for query surfaces (dsh session-query-sqlite). */
+export function getSessionPersistenceDb() {
+  return available ? db : null;
+}

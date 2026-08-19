@@ -111,6 +111,10 @@ import { createApiProxy, validateApiArgs, apiProxyStatus } from './src/services/
 import { generateWorkspaceTypes } from './src/services/TypingGenerator.js'; // B141 — typert workspace mode
 import { cordisInspectStatus, cordisInspectList, cordisInspectQuery } from './src/services/CordisInspect.js'; // B142 — extensions/tool-cordis
 import { cordisRunnerStatus } from './src/services/CordisRunner.js'; // B143 — extensions/cordis-host-runner
+import { querySessionLog, exportSessionLog, querySessionSqlite, searchSessions } from './src/services/SessionQuery.js'; // B144 — session-query packages
+import { BRAND, brandIdentity } from './src/services/Brand.js'; // B144 — util/brand
+import { retentionStatus } from './src/services/OutputRetention.js'; // B144 — util/output-retention
+import { webSearchProviderStatus } from './src/services/WebSearchProviders.js'; // B144 — web/web-search-* providers
 import { e2bStatus } from './src/services/SandboxLocal.js'; // B142 — e2b facts
 import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services/PluginRegistry.js';
 import { loadPlugins, setActivePluginContext, getActivePluginContext, listPluginTools, listPluginSkills } from './src/services/PluginContext.js'; // B97 — deepseek-harness-style plugin seam
@@ -2214,6 +2218,31 @@ app.get('/api/e2b', (req, res) => res.json(e2bStatus()));
 
 // B143 — dynamic cordis runner status (dsh extensions/cordis-host-runner).
 app.get('/api/cordis/runner', (req, res) => res.json(cordisRunnerStatus()));
+
+// B144 — session-query surfaces (dsh session-query packages).
+app.get('/api/session-query/search', (req, res) => res.json(searchSessions(String(req.query.q || ''))));
+
+app.get('/api/session-query/:conv', (req, res) => {
+  const conv = String(req.params.conv || '').slice(0, 80);
+  res.json(querySessionLog(conv, {
+    kind: req.query.kind || null,
+    role: req.query.role || null,
+    limit: Number(req.query.limit) || 200,
+    afterSeq: req.query.afterSeq !== undefined ? Number(req.query.afterSeq) : null,
+  }));
+});
+app.get('/api/session-query/:conv/export', (req, res) => {
+  const r = exportSessionLog(String(req.params.conv || '').slice(0, 80));
+  if (!r.ok) return res.status(400).json(r);
+  res.json(r);
+});
+app.get('/api/session-query/:conv/sqlite', (req, res) => {
+  res.json(querySessionSqlite(String(req.params.conv || '').slice(0, 80), { kind: req.query.kind || null, limit: Number(req.query.limit) || 100 }));
+});
+// B144 — brand + retention + web providers (dsh util/brand, util/output-retention, web/web-search-*).
+app.get('/api/brand', (req, res) => res.json({ ok: true, ...BRAND, identity: brandIdentity() }));
+app.get('/api/retention', (req, res) => res.json(retentionStatus()));
+app.get('/api/web/providers', (req, res) => res.json(webSearchProviderStatus()));
 
 // B141 — typert workspace generation.
 app.post('/api/typert/workspace', (req, res) => {

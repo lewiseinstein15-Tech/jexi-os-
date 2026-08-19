@@ -187,7 +187,7 @@ console.log('\n== 6. Parity 100% + integration ==');
 {
   const { bundleStatus } = await import('./src/services/BundleBase.js');
   const st = bundleStatus();
-  ok('ALL packages ported (123/123)', st.counts.total === 123 && st.counts.ported === 123 && st.counts.notYet === 0 && st.counts.partial === 0);
+  ok('ALL packages ported', st.counts.total >= 123 && st.counts.ported === st.counts.total && st.counts.notYet === 0 && st.counts.partial === 0);
   const parity = fs.readFileSync(path.join(SERVER_DIR, '..', 'DSH-PARITY.md'), 'utf-8');
   ok('parity doc says 100%', parity.includes('100%'));
   const { TOOL_COUNT } = await import('./src/services/ToolRegistry.js');

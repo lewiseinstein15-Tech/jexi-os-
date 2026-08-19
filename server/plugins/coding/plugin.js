@@ -21,6 +21,7 @@
  * context so discovery shows it (custom rank 300).
  */
 
+import fs from 'fs';
 import path from 'path';
 import { writeWorkspace, readWorkspace, listWorkspace } from '../../src/services/WorkspaceRuntime.js';
 import { WORKSPACE_DIR as CFG_WORKSPACE_DIR } from '../../src/config.js'; // real workspace root (config, not cwd)
@@ -244,6 +245,56 @@ function registerList(ctx, unregisters) {
 }
 
 /** Apply is called at boot with the plugin context. Return a cleanup fn. */
+/** DSH tool-fs-search (B144): search workspace files by name or content. */
+function registerFsSearch(ctx, unregisters) {
+  const unregister = ctx.tools.register({
+    slug: 'fs_search',
+    name: 'File Search',
+    desc: 'Search workspace files: by filename pattern (name) or by content substring (query). Bounded results (dsh tool-fs-search).',
+    args: {
+      query: { type: 'string', desc: 'Content substring to search for (case-insensitive).' },
+      name: { type: 'string', desc: 'Filename glob/pattern, e.g. *.md (case-insensitive).' },
+      path: { type: 'string', desc: 'Relative directory to search (default: workspace root).' },
+      limit: { type: 'number', desc: 'Max results (default 20, max 50).' },
+    },
+    timeoutMs: 30000,
+    handler: async (args) => {
+      const namePat = String((args && args.name) || '').trim();
+      const contentQ = String((args && args.query) || '').toLowerCase();
+      if (!namePat && !contentQ) return { ok: false, error: 'provide name and/or query' };
+      const root = path.resolve(CFG_WORKSPACE_DIR || process.cwd());
+      const base = args && args.path ? path.resolve(root, String(args.path)) : root;
+      if (!base.startsWith(root + path.sep) && base !== root) return { ok: false, error: 'search path must stay inside the workspace' };
+      const limit = Math.min(Math.max(Number((args && args.limit) || 20), 1), 50);
+      const results = [];
+      const walk = (dir, depth) => {
+        if (depth > 6 || results.length >= limit) return;
+        let entries;
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+        for (const e of entries) {
+          if (results.length >= limit) return;
+          if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+          const full = path.join(dir, e.name);
+          if (e.isDirectory()) { walk(full, depth + 1); continue; }
+          if (!e.isFile()) continue;
+          const rel = path.relative(root, full);
+          if (namePat && !e.name.toLowerCase().includes(namePat.toLowerCase().replace(/\*/g, ''))) continue;
+          if (contentQ) {
+            try {
+              const text = fs.readFileSync(full, 'utf8');
+              if (!text.toLowerCase().includes(contentQ)) continue;
+            } catch { continue; }
+          }
+          results.push({ name: e.name, path: rel, size: (() => { try { return fs.statSync(full).size; } catch { return null; } })() });
+        }
+      };
+      walk(base, 0);
+      return { ok: true, kind: 'fs-search-result', query: contentQ || null, name: namePat || null, count: results.length, truncated: results.length >= limit, results };
+    },
+  });
+  unregisters.push(unregister);
+}
+
 export async function apply(ctx) {
   const unregisters = [];
   registerBash(ctx, unregisters);
@@ -251,6 +302,8 @@ export async function apply(ctx) {
   registerRead(ctx, unregisters);
   registerEdit(ctx, unregisters);
   registerList(ctx, unregisters);
+
+  registerFsSearch(ctx, unregisters);
 
   const unregSkill = ctx.skills.register({
     slug: 'coder',

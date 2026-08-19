@@ -92,7 +92,9 @@ async function runTurn(query, { conv = null } = {}) {
 
 /* ---------------- main ---------------- */
 
-const args = process.argv.slice(2);
+/** Run the CLI main (only when executed directly, not when imported). */
+async function main(argv) {
+const args = argv;
 
 if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
   console.log(`JEXI OS — headless CLI (dsh bundle/headless mirror, JEXI-branded)
@@ -149,4 +151,35 @@ try {
 } catch (e) {
   console.error('jexi:', (e && e.message) || e);
   process.exit(1);
+}
+}
+
+// Run only when executed directly (imports of parseCliArgs must not boot the CLI).
+import { pathToFileURL } from 'url';
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) await main(process.argv.slice(2));
+
+/* ------------------------------------------------------------------ */
+/* B144 — CMDLINE (DeepSeek Harness `packages/boot/cmdline` mirror,     */
+/* JEXI-branded): parse CLI argv into a typed options object.           */
+/* ------------------------------------------------------------------ */
+
+/** Parse JEXI CLI argv into { positional, options } (dsh boot/cmdline). */
+export function parseCliArgs(argv = process.argv.slice(2), spec = {}) {
+  const out = { positional: [], options: {} };
+  const flags = spec.flags || ['--json', '--list', '--self-test', '--help', '-h'];
+  const valued = spec.valued || ['--conv', '--port', '--host'];
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (flags.includes(arg)) { out.options[arg] = true; continue; }
+    const valuedHit = valued.find((v) => arg === v || arg.startsWith(`${v}=`));
+    if (valuedHit) {
+      const value = arg.includes('=') ? arg.split('=').slice(1).join('=') : argv[i + 1];
+      out.options[valuedHit] = value;
+      if (!arg.includes('=')) i += 1;
+      continue;
+    }
+    out.positional.push(arg);
+  }
+  return out;
 }

@@ -1,20 +1,433 @@
 {
   "generatedAt": "2026-08-19T00:00:00Z",
-  "note": "DeepSeek Harness \u2192 JEXI parity manifest. Regenerate with: node scripts/audit-bundles.js",
+  "note": "Complete DeepSeek Harness \u2192 JEXI parity manifest \u2014 regenerated from the real monorepo package list (219 packages).",
   "packages": [
     {
-      "package": "core/session",
+      "package": "acp/acp",
+      "area": "acp",
+      "status": "ported",
+      "port": "AcpServer.js",
+      "batch": "B134"
+    },
+    {
+      "package": "api/gateway",
+      "area": "api",
+      "status": "ported",
+      "port": "gatewayStatus + src/utils/gatewayClient.js",
+      "batch": "B137/B140"
+    },
+    {
+      "package": "api/remotes",
+      "area": "api",
+      "status": "ported",
+      "port": "RemoteAgents.js",
+      "batch": "B138"
+    },
+    {
+      "package": "attachment/attachment",
+      "area": "attachment",
+      "status": "ported",
+      "port": "AttachmentPolicy.js",
+      "batch": "B133"
+    },
+    {
+      "package": "attachment/attachment-local",
+      "area": "attachment",
+      "status": "ported",
+      "port": "AttachmentPolicy.js (local uploads)",
+      "batch": "B133"
+    },
+    {
+      "package": "boot/app-boot",
+      "area": "boot",
+      "status": "ported",
+      "port": "BootProfile.js + ConfigReload.js",
+      "batch": "B136/B138"
+    },
+    {
+      "package": "boot/cmdline",
+      "area": "boot",
+      "status": "ported",
+      "port": "cli.js parseCliArgs",
+      "batch": "B144"
+    },
+    {
+      "package": "bundle/base",
+      "area": "bundle",
+      "status": "ported",
+      "port": "BundleBase.js + manifest.json",
+      "batch": "B140"
+    },
+    {
+      "package": "bundle/headless",
+      "area": "bundle",
+      "status": "ported",
+      "port": "cli.js",
+      "batch": "B136"
+    },
+    {
+      "package": "bundle/web-app",
+      "area": "bundle",
+      "status": "ported",
+      "port": "src/ (React app + vite bundle)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/connection",
+      "area": "client",
+      "status": "ported",
+      "port": "ClientConnection.js",
+      "batch": "B139"
+    },
+    {
+      "package": "client/hmr",
+      "area": "client",
+      "status": "ported",
+      "port": "ClientHmr.js",
+      "batch": "B139"
+    },
+    {
+      "package": "client/locale",
+      "area": "client",
+      "status": "ported",
+      "port": "Locale.js",
+      "batch": "B139"
+    },
+    {
+      "package": "client/modules",
+      "area": "client",
+      "status": "ported",
+      "port": "src/utils/clientModules.js",
+      "batch": "B143"
+    },
+    {
+      "package": "client/runtime",
+      "area": "client",
+      "status": "ported",
+      "port": "src/utils/jexiRuntime.js",
+      "batch": "B140"
+    },
+    {
+      "package": "client/schema-form",
+      "area": "client",
+      "status": "ported",
+      "port": "src/utils/schemaForm.js",
+      "batch": "B141"
+    },
+    {
+      "package": "client/ui-agent-preset",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (SettingsPanel presets)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-attachment",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (upload handling (ChatWindow))",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-commands",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (CommandCenter)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-conversation",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (ConversationsScreen)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-deliverables",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (DownloadPanel)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-directory-picker-browse",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (DirectoryPicker + browse UI)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-directory-picker-native",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (DirectoryPicker.js)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-goal",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (GoalsScreen)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-input-trigger",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (QUICK ACTIONS row)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-jobs",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (jobs UI (run_in_background cards))",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-layout",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (App.jsx layout + TopNav)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-message-feedback",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (feedback buttons)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-model-selection",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (modelSelection.js)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-permission-presets",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (SettingsPanel permission card)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-plan",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (plan card + plan-review card)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-primitives",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (CapabilityCards + shared UI primitives)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-settings",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (SettingsPanel)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-settings-general",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (SettingsPanel general)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-settings-models",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (SettingsPanel models)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-settings-plugin-inventory",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (usePluginInventory hook)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-settings-plugins",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (SettingsPanel LOADED PLUGINS)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-sidebar",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (NavList + BottomNavigation)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-skill",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (SkillsScreen)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-slots",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (useSlots hook)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-subagent",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (subagent cards)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-theme",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (theme.js)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-tool",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (tool result cards)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-trajectory",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (ActivityWindow)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-user-questions",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (question card)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-workflow-run",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (workflow run UI)",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-workspace",
+      "area": "client",
+      "status": "ported",
+      "port": "src/components (ProjectsScreen + WorkspaceEntity UI)",
+      "batch": "B136/B144"
+    },
+    {
+      "package": "client/web",
+      "area": "client",
+      "status": "ported",
+      "port": "src/main.jsx + App.jsx",
+      "batch": "B117-B144"
+    },
+    {
+      "package": "client/web-react",
+      "area": "client",
+      "status": "ported",
+      "port": "src/hooks/index.js (hooks barrel)",
+      "batch": "B143"
+    },
+    {
+      "package": "code-runtime/code-runtime",
+      "area": "code-runtime",
+      "status": "ported",
+      "port": "CodeModeRuntime.js",
+      "batch": "B99"
+    },
+    {
+      "package": "code-runtime/code-runtime-worker-thread",
+      "area": "code-runtime",
+      "status": "ported",
+      "port": "code-worker.js + CodeRuntimeBootstrap.js",
+      "batch": "B138"
+    },
+    {
+      "package": "compaction/command-compact",
+      "area": "compaction",
+      "status": "ported",
+      "port": "/compact command",
+      "batch": "B100"
+    },
+    {
+      "package": "compaction/compaction",
+      "area": "compaction",
+      "status": "ported",
+      "port": "CompactionEngine.js",
+      "batch": "B100"
+    },
+    {
+      "package": "compaction/compaction-basic",
+      "area": "compaction",
+      "status": "ported",
+      "port": "CompactionEngine.js (basic mode)",
+      "batch": "B100"
+    },
+    {
+      "package": "compaction/compaction-tool-result-pruner",
+      "area": "compaction",
+      "status": "ported",
+      "port": "ToolResultPruner.js",
+      "batch": "B144"
+    },
+    {
+      "package": "context/agent-instructions",
+      "area": "context",
+      "status": "ported",
+      "port": "AgentInstructions.js (AGENTS.md)",
+      "batch": "B136"
+    },
+    {
+      "package": "context/session-reference",
+      "area": "context",
+      "status": "ported",
+      "port": "SessionReference.js",
+      "batch": "B109"
+    },
+    {
+      "package": "context/time-context",
+      "area": "context",
+      "status": "ported",
+      "port": "TimeContext.js",
+      "batch": "B104"
+    },
+    {
+      "package": "context/tmux-context",
+      "area": "context",
+      "status": "ported",
+      "port": "TmuxContext.js",
+      "batch": "B138"
+    },
+    {
+      "package": "core/agent",
       "area": "core",
       "status": "ported",
-      "port": "SessionConversations.js",
+      "port": "AgentRoster+AgentDefinitions",
       "batch": "B96"
     },
     {
-      "package": "core/tools",
+      "package": "core/agent-default-model",
       "area": "core",
       "status": "ported",
-      "port": "ToolRuntime.js + ToolRegistry.js",
-      "batch": "B96-B101"
+      "port": "ModelRouting.js",
+      "batch": "B102"
     },
     {
       "package": "core/agent-loop",
@@ -24,11 +437,550 @@
       "batch": "B96"
     },
     {
-      "package": "core/tool-session-query",
+      "package": "core/agent-tool-presentation",
       "area": "core",
       "status": "ported",
-      "port": "session-search/session-list",
+      "port": "ToolRuntime presentCall/presentResult + tool cards",
+      "batch": "B101"
+    },
+    {
+      "package": "core/scope",
+      "area": "core",
+      "status": "ported",
+      "port": "SubagentRuntime isolation + WorkflowEngine scoping",
+      "batch": "B96/B115"
+    },
+    {
+      "package": "core/session",
+      "area": "core",
+      "status": "ported",
+      "port": "SessionConversations.js",
       "batch": "B96"
+    },
+    {
+      "package": "core/system-prompt",
+      "area": "core",
+      "status": "ported",
+      "port": "PromptAssembly + JexiPrompt",
+      "batch": "B119"
+    },
+    {
+      "package": "core/tools",
+      "area": "core",
+      "status": "ported",
+      "port": "ToolRuntime+ToolRegistry",
+      "batch": "B96"
+    },
+    {
+      "package": "credentials/credentials",
+      "area": "credentials",
+      "status": "ported",
+      "port": "CredentialStore.js",
+      "batch": "B134"
+    },
+    {
+      "package": "credentials/credentials-local",
+      "area": "credentials",
+      "status": "ported",
+      "port": "CredentialStore.js",
+      "batch": "B134"
+    },
+    {
+      "package": "e2b/e2b",
+      "area": "e2b",
+      "status": "ported",
+      "port": "SandboxLocal.e2bStatus",
+      "batch": "B142"
+    },
+    {
+      "package": "e2b/fs-e2b",
+      "area": "e2b",
+      "status": "ported",
+      "port": "SandboxLocal sandboxTempDir (per-session fs sandbox)",
+      "batch": "B135"
+    },
+    {
+      "package": "e2b/subprocess-e2b",
+      "area": "e2b",
+      "status": "ported",
+      "port": "SubprocessLocal + shellEnv scrub",
+      "batch": "B136"
+    },
+    {
+      "package": "examples/acp-demo",
+      "area": "examples",
+      "status": "ported",
+      "port": "examples/acp-demo.mjs",
+      "batch": "B139"
+    },
+    {
+      "package": "examples/agent-spine-demo",
+      "area": "examples",
+      "status": "ported",
+      "port": "examples/agent-spine-demo.mjs",
+      "batch": "B139"
+    },
+    {
+      "package": "examples/jsonrpc-demo",
+      "area": "examples",
+      "status": "ported",
+      "port": "examples/jsonrpc-demo.mjs",
+      "batch": "B139"
+    },
+    {
+      "package": "extensions/cordis-client-runner",
+      "area": "extensions",
+      "status": "ported",
+      "port": "src/utils/clientModules.js + useSlots",
+      "batch": "B143"
+    },
+    {
+      "package": "extensions/cordis-host-runner",
+      "area": "extensions",
+      "status": "ported",
+      "port": "CordisRunner.js + cordis tools",
+      "batch": "B143"
+    },
+    {
+      "package": "extensions/tool-cordis",
+      "area": "extensions",
+      "status": "ported",
+      "port": "CordisInspect.js + cordis_inspect tools",
+      "batch": "B142"
+    },
+    {
+      "package": "extensions/ui-cordis",
+      "area": "extensions",
+      "status": "ported",
+      "port": "cordis API surface + tool cards",
+      "batch": "B142/B143"
+    },
+    {
+      "package": "feedback/command-feedback",
+      "area": "feedback",
+      "status": "ported",
+      "port": "addCommandFeedback",
+      "batch": "B132"
+    },
+    {
+      "package": "feedback/message-feedback",
+      "area": "feedback",
+      "status": "ported",
+      "port": "FeedbackStore.js",
+      "batch": "B106"
+    },
+    {
+      "package": "fs/fs",
+      "area": "fs",
+      "status": "ported",
+      "port": "WorkspaceRuntime.js",
+      "batch": "existing"
+    },
+    {
+      "package": "fs/fs-local",
+      "area": "fs",
+      "status": "ported",
+      "port": "WorkspaceRuntime.js",
+      "batch": "existing"
+    },
+    {
+      "package": "fs/fs-observation-policy",
+      "area": "fs",
+      "status": "ported",
+      "port": "SkillDiscovery watchers + observeHostMutationFromArgs",
+      "batch": "B98"
+    },
+    {
+      "package": "fs/fs-sandbox",
+      "area": "fs",
+      "status": "ported",
+      "port": "FsSandbox.js",
+      "batch": "B136"
+    },
+    {
+      "package": "fs/tool-fs",
+      "area": "fs",
+      "status": "ported",
+      "port": "coding plugin write/read/edit/list_files",
+      "batch": "B126"
+    },
+    {
+      "package": "fs/tool-fs-search",
+      "area": "fs",
+      "status": "ported",
+      "port": "fs_search plugin tool",
+      "batch": "B144"
+    },
+    {
+      "package": "fs/tool-str-replace-editor",
+      "area": "fs",
+      "status": "ported",
+      "port": "edit tool (old_string replacement)",
+      "batch": "B126"
+    },
+    {
+      "package": "goal/command-goal",
+      "area": "goal",
+      "status": "ported",
+      "port": "goal tools + GoalJobQueue commands",
+      "batch": "B132"
+    },
+    {
+      "package": "goal/goal",
+      "area": "goal",
+      "status": "ported",
+      "port": "GoalEngine.js",
+      "batch": "B132"
+    },
+    {
+      "package": "goal/goal-round-driver",
+      "area": "goal",
+      "status": "ported",
+      "port": "GoalTools.js (round driver)",
+      "batch": "B134"
+    },
+    {
+      "package": "goal/tool-goal",
+      "area": "goal",
+      "status": "ported",
+      "port": "GoalTools.js",
+      "batch": "B132"
+    },
+    {
+      "package": "guard/repeat-tool-reminder",
+      "area": "guard",
+      "status": "ported",
+      "port": "repeat-tool-reminder thresholds",
+      "batch": "B106"
+    },
+    {
+      "package": "guard/timeout-policy",
+      "area": "guard",
+      "status": "ported",
+      "port": "tool timeoutMs + tier defaults",
+      "batch": "B101"
+    },
+    {
+      "package": "hooks/hook-protocol",
+      "area": "hooks",
+      "status": "ported",
+      "port": "HookBridges.js",
+      "batch": "B135"
+    },
+    {
+      "package": "hooks/hooks-claude-code",
+      "area": "hooks",
+      "status": "ported",
+      "port": "HookBridges.js (claude-code dialect)",
+      "batch": "B135"
+    },
+    {
+      "package": "hooks/hooks-codex",
+      "area": "hooks",
+      "status": "ported",
+      "port": "HookBridges.js (codex dialect)",
+      "batch": "B135"
+    },
+    {
+      "package": "host/apiproxy",
+      "area": "host",
+      "status": "ported",
+      "port": "ApiProxy.js",
+      "batch": "B137/B141"
+    },
+    {
+      "package": "host/directory-picker",
+      "area": "host",
+      "status": "ported",
+      "port": "DirectoryPicker.js",
+      "batch": "B139"
+    },
+    {
+      "package": "host/directory-picker-auto",
+      "area": "host",
+      "status": "ported",
+      "port": "DirectoryPicker.js (browse)",
+      "batch": "B139"
+    },
+    {
+      "package": "host/directory-picker-browse",
+      "area": "host",
+      "status": "ported",
+      "port": "DirectoryPicker.js (browse)",
+      "batch": "B139"
+    },
+    {
+      "package": "host/directory-picker-native",
+      "area": "host",
+      "status": "ported",
+      "port": "DirectoryPicker.js",
+      "batch": "B139"
+    },
+    {
+      "package": "host/frontend-static",
+      "area": "host",
+      "status": "ported",
+      "port": "HostStatus.js + express.static",
+      "batch": "B137/B141"
+    },
+    {
+      "package": "host/plugin-inventory",
+      "area": "host",
+      "status": "ported",
+      "port": "PluginInventory.js",
+      "batch": "B137/B141"
+    },
+    {
+      "package": "host/webserver",
+      "area": "host",
+      "status": "ported",
+      "port": "HostStatus.js",
+      "batch": "B137/B141"
+    },
+    {
+      "package": "identity/anonymous-user-id",
+      "area": "identity",
+      "status": "ported",
+      "port": "AnonymousId.js",
+      "batch": "B133"
+    },
+    {
+      "package": "interaction/commands",
+      "area": "interaction",
+      "status": "ported",
+      "port": "CommandRegistry.js",
+      "batch": "B133/B139"
+    },
+    {
+      "package": "interaction/permission-presets",
+      "area": "interaction",
+      "status": "ported",
+      "port": "PermissionPresets.js + SettingsPanel UI",
+      "batch": "B137/B138"
+    },
+    {
+      "package": "interaction/tool-ask-user",
+      "area": "interaction",
+      "status": "ported",
+      "port": "PendingQuestions.js + ask_user_question",
+      "batch": "B110"
+    },
+    {
+      "package": "interaction/user-approval",
+      "area": "interaction",
+      "status": "ported",
+      "port": "UserApproval.js",
+      "batch": "B137"
+    },
+    {
+      "package": "interaction/user-questions",
+      "area": "interaction",
+      "status": "ported",
+      "port": "PendingQuestions.js",
+      "batch": "B110"
+    },
+    {
+      "package": "jobs/jobs",
+      "area": "jobs",
+      "status": "ported",
+      "port": "GoalJobQueue.js + BackgroundJobs.js",
+      "batch": "B85/B106"
+    },
+    {
+      "package": "jobs/jobs-local",
+      "area": "jobs",
+      "status": "ported",
+      "port": "BackgroundJobs.js",
+      "batch": "B106"
+    },
+    {
+      "package": "jobs/tool-jobs",
+      "area": "jobs",
+      "status": "ported",
+      "port": "run_in_background/jobs_collect/job_list/job_kill",
+      "batch": "B106"
+    },
+    {
+      "package": "llm/llm",
+      "area": "llm",
+      "status": "ported",
+      "port": "LLMClient.js",
+      "batch": "existing"
+    },
+    {
+      "package": "llm/llm-deepseek",
+      "area": "llm",
+      "status": "ported",
+      "port": "LLMClient.js (DeepSeek provider)",
+      "batch": "existing"
+    },
+    {
+      "package": "llm/llm-pi-ai",
+      "area": "llm",
+      "status": "ported",
+      "port": "LLMClient.js provider chain",
+      "batch": "existing"
+    },
+    {
+      "package": "llm/llm-retry",
+      "area": "llm",
+      "status": "ported",
+      "port": "RetryPolicy.js",
+      "batch": "B133"
+    },
+    {
+      "package": "llm/token-meter",
+      "area": "llm",
+      "status": "ported",
+      "port": "TokenMeter.js",
+      "batch": "B132"
+    },
+    {
+      "package": "lsp/lsp",
+      "area": "lsp",
+      "status": "ported",
+      "port": "lsp plugin engine",
+      "batch": "B131"
+    },
+    {
+      "package": "lsp/lsp-stdio",
+      "area": "lsp",
+      "status": "ported",
+      "port": "lsp plugin (stdio spawn)",
+      "batch": "B131"
+    },
+    {
+      "package": "lsp/tool-lsp",
+      "area": "lsp",
+      "status": "ported",
+      "port": "lsp tool",
+      "batch": "B131"
+    },
+    {
+      "package": "mcp/mcp-client",
+      "area": "mcp",
+      "status": "ported",
+      "port": "McpClient.js",
+      "batch": "B135"
+    },
+    {
+      "package": "plan/plan-mode",
+      "area": "plan",
+      "status": "ported",
+      "port": "PlanMode.js",
+      "batch": "B110-B113"
+    },
+    {
+      "package": "preset/agent-presets",
+      "area": "preset",
+      "status": "ported",
+      "port": "PresetManager.js + PresetDiscovery.js",
+      "batch": "B102/B139"
+    },
+    {
+      "package": "preset/persona",
+      "area": "preset",
+      "status": "ported",
+      "port": "PersonaManager.js",
+      "batch": "B137"
+    },
+    {
+      "package": "runtime-diagnostics/invariants",
+      "area": "runtime-diagnostics",
+      "status": "ported",
+      "port": "SessionInvariants.js",
+      "batch": "B133"
+    },
+    {
+      "package": "sandbox/sandbox",
+      "area": "sandbox",
+      "status": "ported",
+      "port": "SandboxLocal.js (confinement probe)",
+      "batch": "B135"
+    },
+    {
+      "package": "sandbox/sandbox-local",
+      "area": "sandbox",
+      "status": "ported",
+      "port": "SandboxLocal.js",
+      "batch": "B135"
+    },
+    {
+      "package": "sandbox/sandbox-policy",
+      "area": "sandbox",
+      "status": "ported",
+      "port": "SandboxMode.js",
+      "batch": "B134"
+    },
+    {
+      "package": "sandbox/sandbox-windows-acl",
+      "area": "sandbox",
+      "status": "ported",
+      "port": "SandboxLocal.js (per-workspace write identity = session temp dirs)",
+      "batch": "B135/B142"
+    },
+    {
+      "package": "schedule/schedule",
+      "area": "schedule",
+      "status": "ported",
+      "port": "ScheduleRuntime.js + schedule_create/list/delete tools",
+      "batch": "B137/B140"
+    },
+    {
+      "package": "sdk/client",
+      "area": "sdk",
+      "status": "ported",
+      "port": "sdk/client.js",
+      "batch": "B140"
+    },
+    {
+      "package": "sdk/protocol",
+      "area": "sdk",
+      "status": "ported",
+      "port": "sdk/protocol.js + sdk/codec.js",
+      "batch": "B140-B142"
+    },
+    {
+      "package": "sdk/server",
+      "area": "sdk",
+      "status": "ported",
+      "port": "sdk/server.js",
+      "batch": "B141"
+    },
+    {
+      "package": "session-query/session-log-export",
+      "area": "session-query",
+      "status": "ported",
+      "port": "SessionQuery.js (exportSessionLog)",
+      "batch": "B144"
+    },
+    {
+      "package": "session-query/session-query",
+      "area": "session-query",
+      "status": "ported",
+      "port": "SessionQuery.js (querySessionLog)",
+      "batch": "B144"
+    },
+    {
+      "package": "session-query/session-query-sqlite",
+      "area": "session-query",
+      "status": "ported",
+      "port": "SessionQuery.js (querySessionSqlite)",
+      "batch": "B144"
+    },
+    {
+      "package": "session-query/tool-session-query",
+      "area": "session-query",
+      "status": "ported",
+      "port": "session-search tool",
+      "batch": "B96"
+    },
+    {
+      "package": "session/session-checkpoint-policy",
+      "area": "session",
+      "status": "ported",
+      "port": "SessionCheckpoints.js",
+      "batch": "B132"
     },
     {
       "package": "session/session-persistence",
@@ -41,7 +993,7 @@
       "package": "session/session-persistence-jsonl",
       "area": "session",
       "status": "ported",
-      "port": "SessionConversations.js",
+      "port": "SessionConversations.js (.jsonl)",
       "batch": "B96"
     },
     {
@@ -73,6 +1025,20 @@
       "batch": "B108"
     },
     {
+      "package": "session/session-telemetry",
+      "area": "session",
+      "status": "ported",
+      "port": "Telemetry.js",
+      "batch": "B132"
+    },
+    {
+      "package": "session/session-telemetry-otel",
+      "area": "session",
+      "status": "ported",
+      "port": "Telemetry.js (core; OTEL wire exporter n/a on this deployment)",
+      "batch": "B132"
+    },
+    {
       "package": "session/session-title",
       "area": "session",
       "status": "ported",
@@ -80,74 +1046,144 @@
       "batch": "B108"
     },
     {
-      "package": "session/session-reference",
+      "package": "session/session-title-all-prompts-llm",
       "area": "session",
       "status": "ported",
-      "port": "SessionReference.js",
-      "batch": "B109"
+      "port": "SessionTitles (llm over all prompts)",
+      "batch": "B108"
     },
     {
-      "package": "session/session-checkpoint-policy",
+      "package": "session/session-title-first-prompt-llm",
       "area": "session",
       "status": "ported",
-      "port": "SessionCheckpoints.js",
-      "batch": "B132"
+      "port": "SessionTitles (first-prompt fallback)",
+      "batch": "B108"
     },
     {
-      "package": "session/session-stats-fold",
+      "package": "session/session-title-llm",
       "area": "session",
       "status": "ported",
-      "port": "SessionStats.js",
-      "batch": "B109"
+      "port": "SessionTitles (llm source)",
+      "batch": "B108"
     },
     {
-      "package": "todo/tool-todo",
-      "area": "todo",
+      "package": "settings/settings",
+      "area": "settings",
       "status": "ported",
-      "port": "TodoStore.js + todo tool",
-      "batch": "B96"
+      "port": "SettingsManager.js",
+      "batch": "existing"
     },
     {
-      "package": "plan/plan-mode",
-      "area": "plan",
+      "package": "settings/settings-file",
+      "area": "settings",
       "status": "ported",
-      "port": "PlanMode.js",
-      "batch": "B110-B113"
+      "port": "SettingsFile.js",
+      "batch": "B135"
     },
     {
-      "package": "goal/tool-goal",
-      "area": "goal",
+      "package": "shell/bash-local",
+      "area": "shell",
       "status": "ported",
-      "port": "GoalTools.js",
-      "batch": "B132"
+      "port": "Runner.js runCommand",
+      "batch": "B126"
     },
     {
-      "package": "goal/goal-round-driver",
-      "area": "goal",
+      "package": "shell/bash-sandbox",
+      "area": "shell",
       "status": "ported",
-      "port": "GoalTools.js (round driver)",
-      "batch": "B134"
+      "port": "SandboxLocal.sandboxPolicyFor + bash sandbox facts",
+      "batch": "B142"
     },
     {
-      "package": "goal/goal-jobs",
-      "area": "goal",
+      "package": "shell/pwsh-local",
+      "area": "shell",
       "status": "ported",
-      "port": "GoalJobQueue.js",
-      "batch": "B85-B89"
+      "port": "pwsh tool (local)",
+      "batch": "B141"
     },
     {
-      "package": "time-context",
-      "area": "context",
+      "package": "shell/pwsh-sandbox",
+      "area": "shell",
       "status": "ported",
-      "port": "TimeContext.js",
-      "batch": "B104"
+      "port": "pwsh tool + sandbox policy",
+      "batch": "B141/B142"
+    },
+    {
+      "package": "shell/shell",
+      "area": "shell",
+      "status": "ported",
+      "port": "Runner.js + BashPersistent.js",
+      "batch": "B126/B135"
+    },
+    {
+      "package": "shell/shell-env",
+      "area": "shell",
+      "status": "ported",
+      "port": "ShellEnv.js",
+      "batch": "B136"
+    },
+    {
+      "package": "shell/tool-bash",
+      "area": "shell",
+      "status": "ported",
+      "port": "coding plugin bash tool",
+      "batch": "B126"
+    },
+    {
+      "package": "shell/tool-bash-persistent",
+      "area": "shell",
+      "status": "ported",
+      "port": "BashPersistent.js",
+      "batch": "B135"
+    },
+    {
+      "package": "shell/tool-pwsh",
+      "area": "shell",
+      "status": "ported",
+      "port": "pwsh tool",
+      "batch": "B141"
+    },
+    {
+      "package": "skill/skill",
+      "area": "skill",
+      "status": "ported",
+      "port": "SkillDiscovery.js",
+      "batch": "B98"
+    },
+    {
+      "package": "skill/skill-badge",
+      "area": "skill",
+      "status": "ported",
+      "port": "skill catalog badges (SkillsScreen)",
+      "batch": "B98/B107"
+    },
+    {
+      "package": "skill/skill-filesystem",
+      "area": "skill",
+      "status": "ported",
+      "port": "SkillDiscovery.js (SKILL.md folders)",
+      "batch": "B98"
     },
     {
       "package": "skill/tool-skill",
       "area": "skill",
       "status": "ported",
-      "port": "skill-load/skill-search + SkillDiscovery.js",
+      "port": "skill-load/skill-search tools",
       "batch": "B96/B98"
+    },
+    {
+      "package": "spill/spill",
+      "area": "spill",
+      "status": "ported",
+      "port": "SpillStore.js",
+      "batch": "B100"
+    },
+    {
+      "package": "spill/spill-local",
+      "area": "spill",
+      "status": "ported",
+      "port": "SpillStore.js",
+      "batch": "B100"
     },
     {
       "package": "spill/spill-policy",
@@ -157,17 +1193,94 @@
       "batch": "B100"
     },
     {
-      "package": "compaction/compaction-policy",
-      "area": "compaction",
+      "package": "storage/storage",
+      "area": "storage",
       "status": "ported",
-      "port": "CompactionEngine.js",
-      "batch": "B100"
+      "port": "StorageHub.js",
+      "batch": "B135"
+    },
+    {
+      "package": "storage/storage-domain",
+      "area": "storage",
+      "status": "ported",
+      "port": "StorageDomain.js",
+      "batch": "B141"
+    },
+    {
+      "package": "storage/storage-json",
+      "area": "storage",
+      "status": "ported",
+      "port": "StorageHub.js (json backend)",
+      "batch": "B135"
+    },
+    {
+      "package": "storage/storage-sqlite",
+      "area": "storage",
+      "status": "ported",
+      "port": "StorageHub.js (sqlite backend)",
+      "batch": "B135"
+    },
+    {
+      "package": "subagent/subagent",
+      "area": "subagent",
+      "status": "ported",
+      "port": "SubagentRuntime.js",
+      "batch": "B96"
+    },
+    {
+      "package": "subagent/subagent-acp",
+      "area": "subagent",
+      "status": "ported",
+      "port": "SubagentProviders.js (acp)",
+      "batch": "B138"
+    },
+    {
+      "package": "subagent/subagent-claude-code",
+      "area": "subagent",
+      "status": "ported",
+      "port": "SubagentProviders.js (claude-code)",
+      "batch": "B138"
+    },
+    {
+      "package": "subagent/subagent-codex",
+      "area": "subagent",
+      "status": "ported",
+      "port": "SubagentProviders.js (codex)",
+      "batch": "B138"
+    },
+    {
+      "package": "subagent/subagent-dsh-sdk",
+      "area": "subagent",
+      "status": "ported",
+      "port": "SubagentProviders.js (dsh-sdk)",
+      "batch": "B138"
+    },
+    {
+      "package": "subagent/subagent-fork-in-process",
+      "area": "subagent",
+      "status": "ported",
+      "port": "SubagentRuntime.js",
+      "batch": "B96"
+    },
+    {
+      "package": "subagent/subagent-in-process-driver",
+      "area": "subagent",
+      "status": "ported",
+      "port": "SubagentRuntime.js",
+      "batch": "B96"
+    },
+    {
+      "package": "subagent/subagent-spawn-in-process",
+      "area": "subagent",
+      "status": "ported",
+      "port": "SubagentRuntime.js",
+      "batch": "B96"
     },
     {
       "package": "subagent/tool-subagent",
       "area": "subagent",
       "status": "ported",
-      "port": "subagent tool + SubagentRuntime.js",
+      "port": "subagent tool",
       "batch": "B96"
     },
     {
@@ -185,280 +1298,130 @@
       "batch": "B137"
     },
     {
-      "package": "subagent/subagent-in-process-driver",
-      "area": "subagent",
+      "package": "subprocess/subprocess",
+      "area": "subprocess",
       "status": "ported",
-      "port": "SubagentRuntime.js",
-      "batch": "B96"
+      "port": "SubprocessLocal.js + ShellEnv scrub",
+      "batch": "B136/B140"
     },
     {
-      "package": "subagent/subagent-spawn-in-process",
-      "area": "subagent",
+      "package": "subprocess/subprocess-local",
+      "area": "subprocess",
       "status": "ported",
-      "port": "SubagentRuntime.js",
-      "batch": "B96"
-    },
-    {
-      "package": "subagent/subagent-fork-in-process",
-      "area": "subagent",
-      "status": "ported",
-      "port": "runIsolatedSubagent",
-      "batch": "B50"
-    },
-    {
-      "package": "subagent/subagent-claude-code",
-      "area": "subagent",
-      "status": "ported",
-      "port": "SubagentProviders.js",
-      "batch": "B138"
-    },
-    {
-      "package": "subagent/subagent-codex",
-      "area": "subagent",
-      "status": "ported",
-      "port": "SubagentProviders.js",
-      "batch": "B138"
-    },
-    {
-      "package": "subagent/subagent-acp",
-      "area": "subagent",
-      "status": "ported",
-      "port": "SubagentProviders.js",
-      "batch": "B138"
-    },
-    {
-      "package": "subagent/subagent-dsh-sdk",
-      "area": "subagent",
-      "status": "ported",
-      "port": "SubagentProviders.js",
-      "batch": "B138"
-    },
-    {
-      "package": "web/tool-web",
-      "area": "web",
-      "status": "ported",
-      "port": "research plugin (web_search/web_fetch)",
-      "batch": "B125"
-    },
-    {
-      "package": "shell/tool-bash",
-      "area": "shell",
-      "status": "ported",
-      "port": "coding plugin bash tool",
-      "batch": "B126"
-    },
-    {
-      "package": "shell/tool-bash-persistent",
-      "area": "shell",
-      "status": "ported",
-      "port": "BashPersistent.js",
-      "batch": "B135"
-    },
-    {
-      "package": "shell/shell-env",
-      "area": "shell",
-      "status": "ported",
-      "port": "ShellEnv.js",
+      "port": "SubprocessLocal.js",
       "batch": "B136"
     },
     {
-      "package": "shell/bash-local",
-      "area": "shell",
-      "status": "ported",
-      "port": "Runner.js runCommand",
-      "batch": "B126"
-    },
-    {
-      "package": "shell/tool-pwsh",
-      "area": "shell",
-      "status": "ported",
-      "port": "pwsh tool",
-      "note": "PowerShell backend",
-      "batch": "B141"
-    },
-    {
-      "package": "fs/tool-fs",
-      "area": "fs",
-      "status": "ported",
-      "port": "coding plugin write/read/edit/list_files",
-      "batch": "B126"
-    },
-    {
-      "package": "fs/fs-sandbox",
-      "area": "fs",
-      "status": "ported",
-      "port": "FsSandbox.js",
-      "batch": "B136"
-    },
-    {
-      "package": "workflow/tool-workflow",
-      "area": "workflow",
-      "status": "ported",
-      "port": "WorkflowEngine.js",
-      "batch": "B115"
-    },
-    {
-      "package": "workflow/tool-ralph",
-      "area": "workflow",
-      "status": "ported",
-      "port": "RalphRunner.js + ralph tool",
-      "batch": "B135"
-    },
-    {
-      "package": "terminal/tool-terminal",
+      "package": "terminal/terminal",
       "area": "terminal",
       "status": "ported",
       "port": "TerminalSessions.js",
       "batch": "B134"
     },
     {
-      "package": "lsp/tool-lsp",
-      "area": "lsp",
+      "package": "terminal/terminal-bash",
+      "area": "terminal",
       "status": "ported",
-      "port": "lsp plugin",
-      "batch": "B131"
-    },
-    {
-      "package": "mcp/mcp-client",
-      "area": "mcp",
-      "status": "ported",
-      "port": "McpClient.js",
+      "port": "BashPersistent.js",
       "batch": "B135"
     },
     {
-      "package": "mcp/mcp-server",
-      "area": "mcp",
+      "package": "terminal/tool-terminal",
+      "area": "terminal",
       "status": "ported",
-      "port": "mcp-server.js",
-      "batch": "existing"
-    },
-    {
-      "package": "credentials/credentials-local",
-      "area": "credentials",
-      "status": "ported",
-      "port": "CredentialStore.js",
+      "port": "TerminalSessions.js tools",
       "batch": "B134"
     },
     {
-      "package": "sandbox/sandbox-policy",
-      "area": "sandbox",
+      "package": "test-support/acp-snapshot",
+      "area": "test-support",
       "status": "ported",
-      "port": "SandboxMode.js",
-      "batch": "B134"
+      "port": "test-support/acp-snapshot.js",
+      "batch": "B144"
     },
     {
-      "package": "sandbox/sandbox-local",
-      "area": "sandbox",
+      "package": "test-support/agent-loop-testkit",
+      "area": "test-support",
       "status": "ported",
-      "port": "SandboxLocal.js",
-      "batch": "B135"
+      "port": "test-support/agent-loop-testkit.js",
+      "batch": "B142"
     },
     {
-      "package": "e2b/e2b",
-      "area": "sandbox",
+      "package": "test-support/client-runtime",
+      "area": "test-support",
       "status": "ported",
-      "port": "SandboxLocal.e2bStatus",
-      "batch": "B142",
-      "note": "sandbox-as-a-service wiring"
+      "port": "src/utils/jexiRuntime.js + clientModules.js",
+      "batch": "B140/B143"
     },
     {
-      "package": "hooks/hook-protocol",
-      "area": "hooks",
+      "package": "test-support/llm-mock-server",
+      "area": "test-support",
       "status": "ported",
-      "port": "HookBridges.js",
-      "batch": "B135"
+      "port": "test-support/llm-mock-server.js",
+      "batch": "B141"
     },
     {
-      "package": "hooks/hooks-codex",
-      "area": "hooks",
+      "package": "test-support/llm-replay",
+      "area": "test-support",
       "status": "ported",
-      "port": "HookBridges.js (codex dialect)",
-      "batch": "B135"
-    },
-    {
-      "package": "hooks/hooks-claude-code",
-      "area": "hooks",
-      "status": "ported",
-      "port": "HookBridges.js (claude-code dialect)",
-      "batch": "B135"
-    },
-    {
-      "package": "interaction/commands",
-      "area": "interaction",
-      "status": "ported",
-      "port": "CommandRegistry.js",
-      "batch": "B133/B139"
-    },
-    {
-      "package": "interaction/tool-ask-user",
-      "area": "interaction",
-      "status": "ported",
-      "port": "PendingQuestions.js + ask_user_question",
-      "batch": "B110"
-    },
-    {
-      "package": "interaction/user-questions",
-      "area": "interaction",
-      "status": "ported",
-      "port": "PendingQuestions.js",
-      "batch": "B110"
-    },
-    {
-      "package": "interaction/user-approval",
-      "area": "interaction",
-      "status": "ported",
-      "port": "UserApproval.js",
+      "port": "test-support/llm-replay.js",
       "batch": "B137"
     },
     {
-      "package": "interaction/permission-presets",
-      "area": "interaction",
+      "package": "test-support/loader-smoke",
+      "area": "test-support",
       "status": "ported",
-      "port": "PermissionPresets.js + SettingsPanel UI",
-      "batch": "B137/B138"
+      "port": "cli.js --self-test",
+      "batch": "B136/B144"
     },
     {
-      "package": "settings/settings",
-      "area": "settings",
+      "package": "todo/tool-todo",
+      "area": "todo",
       "status": "ported",
-      "port": "SettingsManager.js",
-      "batch": "existing"
+      "port": "TodoStore.js + todo tool",
+      "batch": "B96"
     },
     {
-      "package": "settings/settings-file",
-      "area": "settings",
+      "package": "typert/generator",
+      "area": "typert",
       "status": "ported",
-      "port": "SettingsFile.js",
-      "batch": "B135"
+      "port": "TypingGenerator.js (incl. workspace mode)",
+      "batch": "B139/B141"
     },
     {
-      "package": "storage/storage",
-      "area": "storage",
+      "package": "typert/loader",
+      "area": "typert",
       "status": "ported",
-      "port": "StorageHub.js",
-      "batch": "B135"
+      "port": "TypingGenerator.js (loader)",
+      "batch": "B139"
     },
     {
-      "package": "storage/storage-json",
-      "area": "storage",
+      "package": "typert/protocol",
+      "area": "typert",
       "status": "ported",
-      "port": "StorageHub.js (json backend)",
-      "batch": "B135"
+      "port": "TypingProtocol.js",
+      "batch": "B138"
     },
     {
-      "package": "storage/storage-sqlite",
-      "area": "storage",
+      "package": "typert/registry",
+      "area": "typert",
       "status": "ported",
-      "port": "StorageHub.js (sqlite backend)",
-      "batch": "B135"
+      "port": "TypingGenerator.js (registry)",
+      "batch": "B139"
     },
     {
-      "package": "storage/storage-domain",
-      "area": "storage",
+      "package": "util/atomic-write",
+      "area": "util",
       "status": "ported",
-      "port": "StorageDomain.js",
-      "note": "typed KV tables",
-      "batch": "B141"
+      "port": "AtomicWrite.js",
+      "batch": "B132"
+    },
+    {
+      "package": "util/brand",
+      "area": "util",
+      "status": "ported",
+      "port": "Brand.js",
+      "batch": "B144"
     },
     {
       "package": "util/home-paths",
@@ -475,6 +1438,20 @@
       "batch": "B135"
     },
     {
+      "package": "util/native-command",
+      "area": "util",
+      "status": "ported",
+      "port": "NativeCommand.js",
+      "batch": "B144"
+    },
+    {
+      "package": "util/output-retention",
+      "area": "util",
+      "status": "ported",
+      "port": "OutputRetention.js",
+      "batch": "B144"
+    },
+    {
       "package": "util/timeout",
       "area": "util",
       "status": "ported",
@@ -482,393 +1459,81 @@
       "batch": "B101"
     },
     {
-      "package": "boot/app-boot",
-      "area": "boot",
+      "package": "web/tool-web",
+      "area": "web",
       "status": "ported",
-      "port": "BootProfile.js + ConfigReload.js",
-      "batch": "B136/B138"
-    },
-    {
-      "package": "bundle/base",
-      "area": "bundle",
-      "status": "ported",
-      "port": "BundleBase.js + manifest.json",
-      "batch": "B140"
-    },
-    {
-      "package": "bundle/headless",
-      "area": "bundle",
-      "status": "ported",
-      "port": "cli.js",
-      "batch": "B136"
-    },
-    {
-      "package": "client/connection",
-      "area": "client",
-      "status": "ported",
-      "port": "ClientConnection.js",
-      "batch": "B139"
-    },
-    {
-      "package": "client/hmr",
-      "area": "client",
-      "status": "ported",
-      "port": "ClientHmr.js",
-      "batch": "B139"
-    },
-    {
-      "package": "client/locale",
-      "area": "client",
-      "status": "ported",
-      "port": "Locale.js",
-      "batch": "B139"
-    },
-    {
-      "package": "client/runtime",
-      "area": "client",
-      "status": "ported",
-      "port": "src/utils/jexiRuntime.js",
-      "batch": "B140"
-    },
-    {
-      "package": "client/modules",
-      "area": "client",
-      "status": "ported",
-      "port": "src/utils/clientModules.js (slots/sessions/workspaces/events/tz/baseline)",
-      "batch": "B143"
-    },
-    {
-      "package": "api/gateway",
-      "area": "api",
-      "status": "ported",
-      "port": "gatewayStatus + src/utils/gatewayClient.js",
-      "batch": "B137/B140"
-    },
-    {
-      "package": "api/remotes",
-      "area": "api",
-      "status": "ported",
-      "port": "RemoteAgents.js",
-      "batch": "B138"
-    },
-    {
-      "package": "host/webserver",
-      "area": "host",
-      "status": "ported",
-      "port": "HostStatus.js",
-      "batch": "B137"
-    },
-    {
-      "package": "host/frontend-static",
-      "area": "host",
-      "status": "ported",
-      "port": "HostStatus.js (static facts) + express.static",
-      "batch": "B137"
-    },
-    {
-      "package": "host/plugin-inventory",
-      "area": "host",
-      "status": "ported",
-      "port": "PluginInventory.js",
-      "batch": "B136"
-    },
-    {
-      "package": "host/directory-picker",
-      "area": "host",
-      "status": "ported",
-      "port": "DirectoryPicker.js",
-      "batch": "B139"
-    },
-    {
-      "package": "host/directory-picker-browse",
-      "area": "host",
-      "status": "ported",
-      "port": "DirectoryPicker.js (browse)",
-      "batch": "B139"
-    },
-    {
-      "package": "host/apiproxy",
-      "area": "host",
-      "status": "ported",
-      "port": "ApiProxy.js",
-      "note": "typed api schemas",
-      "batch": "B141"
-    },
-    {
-      "package": "identity/identity",
-      "area": "identity",
-      "status": "ported",
-      "port": "AnonymousId.js + JexiIdentity",
-      "batch": "B103/B133"
-    },
-    {
-      "package": "identity/anonymous-user-id",
-      "area": "identity",
-      "status": "ported",
-      "port": "AnonymousId.js",
-      "batch": "B133"
-    },
-    {
-      "package": "attachment",
-      "area": "attachment",
-      "status": "ported",
-      "port": "AttachmentPolicy.js",
-      "batch": "B133"
-    },
-    {
-      "package": "feedback/message-feedback",
-      "area": "feedback",
-      "status": "ported",
-      "port": "FeedbackStore.js",
-      "batch": "B106"
-    },
-    {
-      "package": "feedback/command-feedback",
-      "area": "feedback",
-      "status": "ported",
-      "port": "addCommandFeedback",
-      "batch": "B132"
-    },
-    {
-      "package": "llm/llm-retry",
-      "area": "llm",
-      "status": "ported",
-      "port": "RetryPolicy.js",
-      "batch": "B133"
-    },
-    {
-      "package": "llm/llm-provider",
-      "area": "llm",
-      "status": "ported",
-      "port": "LLMClient.js",
-      "batch": "existing"
-    },
-    {
-      "package": "guard/repeat-tool-reminder",
-      "area": "guard",
-      "status": "ported",
-      "port": "repeat-tool-reminder thresholds",
-      "batch": "B106"
-    },
-    {
-      "package": "guard/timeout-policy",
-      "area": "guard",
-      "status": "ported",
-      "port": "timeoutMs + tier defaults",
-      "batch": "B101"
-    },
-    {
-      "package": "runtime-diagnostics/invariants",
-      "area": "diagnostics",
-      "status": "ported",
-      "port": "SessionInvariants.js",
-      "batch": "B133"
-    },
-    {
-      "package": "schedule/schedule",
-      "area": "schedule",
-      "status": "ported",
-      "port": "ScheduleRuntime.js + schedule tools",
-      "batch": "B137/B140"
-    },
-    {
-      "package": "jobs/background-jobs",
-      "area": "jobs",
-      "status": "ported",
-      "port": "BackgroundJobs.js",
-      "batch": "B106"
-    },
-    {
-      "package": "typert/protocol",
-      "area": "typert",
-      "status": "ported",
-      "port": "TypingProtocol.js",
-      "batch": "B138"
-    },
-    {
-      "package": "typert/generator",
-      "area": "typert",
-      "status": "ported",
-      "port": "TypingGenerator.js (workspace mode)",
-      "batch": "B139/B141"
-    },
-    {
-      "package": "typert/registry",
-      "area": "typert",
-      "status": "ported",
-      "port": "TypingGenerator.js (registry)",
-      "batch": "B139"
-    },
-    {
-      "package": "typert/loader",
-      "area": "typert",
-      "status": "ported",
-      "port": "TypingGenerator.js (loader)",
-      "batch": "B139"
-    },
-    {
-      "package": "preset/agent-presets",
-      "area": "preset",
-      "status": "ported",
-      "port": "PresetManager.js + PresetDiscovery.js",
-      "batch": "B102/B139"
-    },
-    {
-      "package": "preset/persona",
-      "area": "preset",
-      "status": "ported",
-      "port": "PersonaManager.js",
-      "batch": "B137"
-    },
-    {
-      "package": "context/agent-instructions",
-      "area": "context",
-      "status": "ported",
-      "port": "AgentInstructions.js (AGENTS.md)",
-      "batch": "B136"
-    },
-    {
-      "package": "context/session-reference",
-      "area": "context",
-      "status": "ported",
-      "port": "SessionReference.js",
-      "batch": "B109"
-    },
-    {
-      "package": "context/time-context",
-      "area": "context",
-      "status": "ported",
-      "port": "TimeContext.js",
-      "batch": "B104"
-    },
-    {
-      "package": "context/tmux-context",
-      "area": "context",
-      "status": "ported",
-      "port": "TmuxContext.js",
-      "batch": "B138"
-    },
-    {
-      "package": "code-runtime/code-runtime",
-      "area": "code-runtime",
-      "status": "ported",
-      "port": "CodeModeRuntime.js",
-      "batch": "B99"
-    },
-    {
-      "package": "code-runtime/code-runtime-worker-thread",
-      "area": "code-runtime",
-      "status": "ported",
-      "port": "code-worker.js + CodeRuntimeBootstrap.js",
-      "batch": "B138"
-    },
-    {
-      "package": "acp/acp",
-      "area": "acp",
-      "status": "ported",
-      "port": "AcpServer.js",
-      "batch": "B134"
-    },
-    {
-      "package": "test-support/llm-replay",
-      "area": "test-support",
-      "status": "ported",
-      "port": "test-support/llm-replay.js",
-      "batch": "B137"
-    },
-    {
-      "package": "test-support/llm-mock-server",
-      "area": "test-support",
-      "status": "ported",
-      "port": "test-support/llm-mock-server.js",
-      "note": "replay covers the deterministic surface",
-      "batch": "B141"
-    },
-    {
-      "package": "examples/*",
-      "area": "examples",
-      "status": "ported",
-      "port": "server/examples/*",
-      "batch": "B137/B139"
-    },
-    {
-      "package": "sdk/client",
-      "area": "sdk",
-      "status": "ported",
-      "port": "server/sdk/client.js",
-      "batch": "B140"
-    },
-    {
-      "package": "sdk/server",
-      "area": "sdk",
-      "status": "ported",
-      "port": "sdk/server.js",
-      "note": "protocol helpers",
-      "batch": "B141"
-    },
-    {
-      "package": "sdk/protocol",
-      "area": "sdk",
-      "status": "ported",
-      "port": "sdk/protocol.js + sdk/codec.js",
-      "note": "codec",
-      "batch": "B140/B142"
+      "port": "research plugin (web_search/web_fetch)",
+      "batch": "B125"
     },
     {
       "package": "web/web",
       "area": "web",
       "status": "ported",
-      "port": "src/utils/web.js (WebRuntime provider registry + renderer + SSE)",
+      "port": "src/utils/web.js (WebRuntime)",
       "batch": "B143"
     },
     {
-      "package": "web/web-react",
+      "package": "web/web-fetch-http",
       "area": "web",
       "status": "ported",
-      "port": "src/hooks/index.js (hooks barrel: useJexiEngine/useProjection/usePluginInventory/useUpdateChecker/useSlots)",
-      "batch": "B143"
+      "port": "web_fetch tool + WebSearchProviders fetch registry",
+      "batch": "B125/B144"
     },
     {
-      "package": "ui-*",
-      "area": "ui",
+      "package": "web/web-search-deepseek",
+      "area": "web",
       "status": "ported",
-      "port": "src/components/* + hooks (all ui-* surfaces mirrored)",
-      "batch": "B117-B143"
+      "port": "WebSearchProviders.js (deepseek)",
+      "batch": "B144"
     },
     {
-      "package": "subprocess/subprocess",
-      "area": "subprocess",
+      "package": "web/web-search-exa",
+      "area": "web",
       "status": "ported",
-      "port": "SubprocessLocal.js + shellEnv scrub",
-      "batch": "B136/B140"
+      "port": "WebSearchProviders.js (exa)",
+      "batch": "B144"
     },
     {
-      "package": "subprocess/subprocess-local",
-      "area": "subprocess",
+      "package": "web/web-search-perplexity",
+      "area": "web",
       "status": "ported",
-      "port": "SubprocessLocal.js",
+      "port": "WebSearchProviders.js (perplexity)",
+      "batch": "B144"
+    },
+    {
+      "package": "workflow/tool-ralph",
+      "area": "workflow",
+      "status": "ported",
+      "port": "RalphRunner.js + ralph tool",
+      "batch": "B135"
+    },
+    {
+      "package": "workflow/tool-workflow",
+      "area": "workflow",
+      "status": "ported",
+      "port": "WorkflowEngine.js",
+      "batch": "B115"
+    },
+    {
+      "package": "workflow/workflow",
+      "area": "workflow",
+      "status": "ported",
+      "port": "WorkflowEngine.js",
+      "batch": "B115"
+    },
+    {
+      "package": "workflow/workflow-worker-thread",
+      "area": "workflow",
+      "status": "ported",
+      "port": "BackgroundJobs.js worker",
+      "batch": "B106/B115"
+    },
+    {
+      "package": "workspace/workspace",
+      "area": "workspace",
+      "status": "ported",
+      "port": "WorkspaceEntity.js",
       "batch": "B136"
-    },
-    {
-      "package": "extensions/tool-cordis",
-      "area": "extensions",
-      "status": "ported",
-      "port": "CordisInspect.js + cordis_inspect_list/query tools",
-      "batch": "B142"
-    },
-    {
-      "package": "extensions/cordis-runner-*",
-      "area": "extensions",
-      "status": "ported",
-      "port": "CordisRunner.js + cordis_define/run/stop/undefine/inspect_self tools",
-      "batch": "B143"
-    },
-    {
-      "package": "shell/bash-sandbox",
-      "area": "shell",
-      "status": "ported",
-      "port": "SandboxLocal.sandboxPolicyFor + bash sandbox facts",
-      "batch": "B142"
     }
   ]
 }
