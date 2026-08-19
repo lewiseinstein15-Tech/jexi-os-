@@ -109,6 +109,8 @@ import { bundleStatus } from './src/services/BundleBase.js'; // B140 — bundle/
 import { openDomain } from './src/services/StorageDomain.js'; // B141 — storage/storage-domain
 import { createApiProxy, validateApiArgs, apiProxyStatus } from './src/services/ApiProxy.js'; // B141 — host/apiproxy
 import { generateWorkspaceTypes } from './src/services/TypingGenerator.js'; // B141 — typert workspace mode
+import { cordisInspectStatus, cordisInspectList, cordisInspectQuery } from './src/services/CordisInspect.js'; // B142 — extensions/tool-cordis
+import { e2bStatus } from './src/services/SandboxLocal.js'; // B142 — e2b facts
 import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services/PluginRegistry.js';
 import { loadPlugins, setActivePluginContext, getActivePluginContext, listPluginTools, listPluginSkills } from './src/services/PluginContext.js'; // B97 — deepseek-harness-style plugin seam
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications, setNotifyBroadcaster } from './src/services/NotificationCenter.js';
@@ -2194,6 +2196,20 @@ app.post('/api/apiproxy/validate', (req, res) => {
     res.status(r.ok ? 200 : 400).json(r);
   } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
 });
+
+// B142 — cordis inspect (dsh extensions/tool-cordis): read-only introspection.
+app.get('/api/cordis/inspect', (req, res) => res.json(cordisInspectStatus()));
+app.get('/api/cordis/inspect/providers', (req, res) => res.json(cordisInspectList()));
+app.post('/api/cordis/inspect/query', (req, res) => {
+  try {
+    const { provider, method, input } = req.body || {};
+    const r = cordisInspectQuery({ provider: String(provider || ''), method: String(method || ''), input: input || {} });
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { res.status(400).json({ ok: false, error: (e && e.message) || String(e) }); }
+});
+
+// B142 — e2b sandbox-as-a-service facts.
+app.get('/api/e2b', (req, res) => res.json(e2bStatus()));
 
 // B141 — typert workspace generation.
 app.post('/api/typert/workspace', (req, res) => {

@@ -1,6 +1,6 @@
 # JEXI OS — Agent & Skill Catalog
 
-**252 specialist agents · 508 skills · 211 tools · 1 orchestrator.** One plain-language request in,
+**252 specialist agents · 508 skills · 213 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
 > ⚙️ GENERATED FILE — updated 2026-08-19 by `cd server && npm run audit-roster`. Do not edit by hand.
@@ -14,7 +14,7 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 |---|---|
 | Agents | 252 (252 reachable — 100%) |
 | Skills | 508 |
-| Tools | 211 |
+| Tools | 213 |
 | Intents / teams | 155 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
@@ -1223,7 +1223,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 211 tools (grouped by type)
+## The 213 tools (grouped by type)
 
 ### Agent (9)
 | Tool | Allowed agents | Engine | What it does |
@@ -1550,9 +1550,11 @@ This section and every table below are GENERATED from the live registries by `cd
 | `threat-model` | Risk Analyst, Penetration Tester | SkillChain | Model attack surfaces and rank risks. |
 | `vuln-scan` | Application Security Engineer, Penetration Tester | SkillChain | Scan an app or repo for exploitable vulnerabilities. |
 
-### System (3)
+### System (5)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
+| `cordis_inspect_list` | JEXI Core, Orchestrator | undefined | List every Cordis Inspect provider known to the host (plugins, tools, skills, services) with their read-only methods (dsh tool-cordis). |
+| `cordis_inspect_query` | JEXI Core, Orchestrator | undefined | Run a read-only inspect query: provider + method from cordis_inspect_list, input per the method schema. Cannot invoke business services or modify the runtime (dsh tool-cordis). |
 | `sandbox_mode` | Guardrail | undefined | Set the session sandbox mode: read-only | workspace-write | danger-full-access (dsh sandbox-policy). |
 | `self-diagnose` | Self-Diagnose | SelfMonitor | Read own health, memory, errors and source code to report root causes. |
 | `settings` | JEXI Core, Context Manager | SettingsManager | Read and update JEXI's settings and provider keys. |

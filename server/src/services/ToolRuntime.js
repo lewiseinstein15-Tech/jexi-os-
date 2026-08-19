@@ -119,6 +119,12 @@ export const TOOL_SCHEMAS = {
     description: { type: 'string', required: true, desc: 'Clear 5-10 word description of what the command does (shown in the UI).' },
     timeoutMs: { type: 'number', desc: 'Timeout in ms (default 30000, max 120000).' },
   },
+  'cordis_inspect_list': {},
+  'cordis_inspect_query': {
+    provider: { type: 'string', required: true, desc: 'Provider id from cordis_inspect_list (e.g. jexi:plugins).' },
+    method: { type: 'string', required: true, desc: 'Read-only method declared by the provider (e.g. listPlugins).' },
+    input: { type: 'object', desc: 'Optional method input (e.g. { slug }).' },
+  },
   'create_goal': {
     objective: { type: 'string', required: true, desc: 'The concrete completion objective inferred from the direct human request.' },
     max_goal_rounds: { type: 'number', desc: 'Optional positive integer limit on automatic continuation rounds.' },
@@ -311,6 +317,9 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'schedule_delete': z.object({ ok: z.boolean(), id: z.string().optional(), error: z.string().optional() }).passthrough(),
   // B141 — tool-pwsh contract (dsh): PowerShell-dialect result.
   'pwsh': z.object({ ok: z.boolean(), kind: z.literal('pwsh-result').optional(), command: z.string().optional(), output: z.string().optional(), code: z.number().nullable().optional(), durationMs: z.number().nullable().optional(), error: z.string().optional() }).passthrough(),
+  // B142 — cordis inspect contracts (dsh tool-cordis): read-only introspection.
+  'cordis_inspect_list': z.object({ ok: z.boolean(), providers: z.array(z.unknown()).optional(), error: z.string().optional() }).passthrough(),
+  'cordis_inspect_query': z.object({ ok: z.boolean(), provider: z.string().optional(), method: z.string().optional(), result: z.unknown().nullable().optional(), error: z.string().optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),
@@ -1099,6 +1108,20 @@ async function runEngine(slug, args, opts = {}) {
         durationMs: Date.now() - started,
         ...(output.error ? { error: output.error } : {}),
       };
+    }
+
+    case 'cordis_inspect_list': {
+      // B142 — dsh tool-cordis: list every inspect provider.
+      const { cordisInspectList } = await import('./CordisInspect.js');
+      return { ok: true, kind: 'cordis', ...cordisInspectList() };
+    }
+
+    case 'cordis_inspect_query': {
+      // B142 — dsh tool-cordis: one read-only inspect query.
+      const { cordisInspectQuery } = await import('./CordisInspect.js');
+      const r = cordisInspectQuery({ provider: String(args.provider || ''), method: String(args.method || ''), input: (args.input && typeof args.input === 'object') ? args.input : {} });
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, kind: 'cordis', provider: r.provider, method: r.method, result: r.result };
     }
 
     case 'todo': {

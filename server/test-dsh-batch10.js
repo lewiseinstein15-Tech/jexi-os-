@@ -97,7 +97,7 @@ console.log('\n== 3. pwsh tool (dsh tool-pwsh) ==');
 {
   const { TOOL_REGISTRY, TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
   ok('pwsh in registry', TOOL_REGISTRY.some((t) => t.slug === 'pwsh'));
-  ok('registry count is 211', TOOL_COUNT === 211);
+  ok('registry count is 211', TOOL_COUNT === 213);
   const { executeTool, hasOutputContract, validateToolArgs } = await import('./src/services/ToolRuntime.js');
   ok('pwsh has contract + schema', hasOutputContract('pwsh') && validateToolArgs('pwsh', { command: 'Get-Date', description: 'x' }).ok === true);
   ok('pwsh requires command', validateToolArgs('pwsh', { description: 'x' }).ok === false);
@@ -246,7 +246,7 @@ console.log('\n== 8. Typert workspace + integration ==');
   const { assemblePrompt } = await import('./src/services/PromptAssembly.js');
   ok('prompt assembles', (await assemblePrompt({ convId: 't-int-b141' })).length > 500);
   const { TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
-  ok('registry stable at 211', TOOL_COUNT === 211);
+  ok('registry stable at 211', TOOL_COUNT === 213);
 }
 
 console.log(`\n${failures === 0 ? '🎉 ALL B141 CHECKS PASSED' : `💥 ${failures} FAILURES`}`);

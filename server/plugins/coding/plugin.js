@@ -102,6 +102,13 @@ function registerBash(ctx, unregisters) {
         cwd: (args && args.workdir) || undefined,
         reset: !!(args && args.reset),
       });
+      // B142 — bash-sandbox facts (dsh SandboxBashExecutor): every result
+      // reports the mode + enforcement actually in play for this session.
+      let sandbox = null;
+      try {
+        const { sandboxPolicyFor } = await import('../../src/services/SandboxLocal.js');
+        sandbox = sandboxPolicyFor({ convId: meta.convId || 'default' });
+      } catch { /* noop */ }
       return {
         ok: !!out.ok && out.error === undefined,
         kind: 'bash-result',
@@ -109,6 +116,7 @@ function registerBash(ctx, unregisters) {
         output: String(out.output || (out.error || '')).slice(0, MAX_OUTPUT_CHARS),
         code: out.code ?? null,
         durationMs: out.durationMs ?? null,
+        ...(sandbox ? { sandbox } : {}),
         ...(out.truncated ? { truncated: true } : {}),
         ...(out.reset ? { reset: out.reset } : {}),
       };

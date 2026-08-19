@@ -356,9 +356,9 @@
     {
       "package": "e2b/e2b",
       "area": "sandbox",
-      "status": "partial",
-      "port": "SandboxLocal.js (confinement probe)",
-      "batch": "B135",
+      "status": "ported",
+      "port": "SandboxLocal.e2bStatus",
+      "batch": "B142",
       "note": "sandbox-as-a-service wiring"
     },
     {
@@ -811,9 +811,9 @@
       "package": "sdk/protocol",
       "area": "sdk",
       "status": "ported",
-      "port": "sdk/protocol.js",
+      "port": "sdk/protocol.js + sdk/codec.js",
       "note": "codec",
-      "batch": "B141"
+      "batch": "B140/B142"
     },
     {
       "package": "web/web",
@@ -835,8 +835,8 @@
       "package": "ui-*",
       "area": "ui",
       "status": "partial",
-      "port": "src/components/*",
-      "batch": "B117-B140",
+      "port": "src/components/* + hooks",
+      "batch": "B117-B142",
       "note": "frontend panels incrementally ported"
     },
     {
@@ -854,11 +854,25 @@
       "batch": "B136"
     },
     {
-      "package": "extensions/*",
+      "package": "extensions/tool-cordis",
       "area": "extensions",
-      "status": "not-yet",
+      "status": "ported",
+      "port": "CordisInspect.js + cordis_inspect_list/query tools",
+      "batch": "B142"
+    },
+    {
+      "package": "extensions/cordis-runner-*",
+      "area": "extensions",
+      "status": "partial",
       "port": null,
       "note": "cordis runner internals"
+    },
+    {
+      "package": "shell/bash-sandbox",
+      "area": "shell",
+      "status": "ported",
+      "port": "SandboxLocal.sandboxPolicyFor + bash sandbox facts",
+      "batch": "B142"
     }
   ]
 }

@@ -23,7 +23,8 @@ import { spawnSync } from 'child_process';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { DATA_DIR } from '../config.js';
+import { DATA_DIR, WORKSPACE_DIR } from '../config.js';
+import { effectiveSandboxMode, sandboxDenial } from './SandboxMode.js'; // B142 — per-session mode for bash-sandbox facts
 
 const TEMP_ROOT = path.join(DATA_DIR, 'sandbox-tmp');
 const TEMP_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h
@@ -159,4 +160,45 @@ export function sandboxFacts(convId = null) {
 /** Private scratch for one tool call (unused name kept for API symmetry). */
 export function freshScratchName() {
   return `scratch-${crypto.randomUUID().slice(0, 12)}`;
+}
+
+/* ------------------------------------------------------------------ */
+/* B142 — bash-sandbox (dsh shell/bash-sandbox mirror) + e2b facts    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Resolve the per-call sandbox policy for one session and report the facts
+ * the tool layer attaches to results (dsh SandboxBashExecutor):
+ *   { mode, enforcement, denied: {blocked, reason}? }
+ * denyForTier uses SandboxMode's sandboxDenial so read-only/workspace-write
+ * modes gate exec-tier runs exactly like every other tool.
+ */
+export function sandboxPolicyFor({ mode, tier = 'exec', convId = null }) {
+  const m = mode || effectiveSandboxMode(convId || 'default');
+  const denial = sandboxDenial(m, tier);
+  const facts = probeConfinement();
+  const policy = {
+    mode: m,
+    enforcement: denial ? 'denied' : facts.enforcement,
+    workspaceRoot: WORKSPACE_DIR || process.cwd(),
+  };
+  if (denial) policy.denied = denial;
+  return policy;
+}
+
+/** e2b-style sandbox-as-a-service status facts (dsh e2b mirror). */
+export function e2bStatus() {
+  const facts = probeConfinement();
+  const remoteUrl = process.env.E2B_URL || null;
+  return {
+    ok: true,
+    service: 'e2b-compatible',
+    mode: 'local',
+    remoteConfigured: !!remoteUrl,
+    remoteUrl: remoteUrl ? String(remoteUrl).replace(/\/+$/, '') : null,
+    enforcement: facts.enforcement,
+    wrappers: facts.wrappers,
+    notes: facts.notes,
+    tempRoot: TEMP_ROOT,
+  };
 }

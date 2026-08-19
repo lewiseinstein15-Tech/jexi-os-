@@ -1,6 +1,6 @@
 # DSH → JEXI Parity Tracker
 
-**Generated:** 2026-08-19T03:47:07.755Z · **Packages tracked:** 121 · **Ported:** 115 (95%) · **Partial:** 5 · **Not yet:** 1
+**Generated:** 2026-08-19T04:09:30.089Z · **Packages tracked:** 123 · **Ported:** 118 (96%) · **Partial:** 5 · **Not yet:** 0
 
 Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch that landed it. Regenerate with `node server/scripts/audit-bundles.js`.
 
@@ -96,11 +96,12 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 |---|---|---|---|
 | ✅ examples/* | ported | server/examples/* | B137/B139 |
 
-## extensions (1)
+## extensions (2)
 
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
-| ⬜ extensions/* | not-yet | — | — |
+| 🟡 extensions/cordis-runner-* | partial | — | — |
+| ✅ extensions/tool-cordis | ported | CordisInspect.js + cordis_inspect_list/query tools | B142 |
 
 ## feedback (2)
 
@@ -210,7 +211,7 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
-| 🟡 e2b/e2b | partial | SandboxLocal.js (confinement probe) | B135 |
+| ✅ e2b/e2b | ported | SandboxLocal.e2bStatus | B142 |
 | ✅ sandbox/sandbox-local | ported | SandboxLocal.js | B135 |
 | ✅ sandbox/sandbox-policy | ported | SandboxMode.js | B134 |
 
@@ -225,7 +226,7 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
 | ✅ sdk/client | ported | server/sdk/client.js | B140 |
-| ✅ sdk/protocol | ported | sdk/protocol.js | B141 |
+| ✅ sdk/protocol | ported | sdk/protocol.js + sdk/codec.js | B140/B142 |
 | ✅ sdk/server | ported | sdk/server.js | B141 |
 
 ## session (10)
@@ -250,11 +251,12 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 | ✅ settings/settings | ported | SettingsManager.js | existing |
 | ✅ settings/settings-file | ported | SettingsFile.js | B135 |
 
-## shell (5)
+## shell (6)
 
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
 | ✅ shell/bash-local | ported | Runner.js runCommand | B126 |
+| ✅ shell/bash-sandbox | ported | SandboxLocal.sandboxPolicyFor + bash sandbox facts | B142 |
 | ✅ shell/shell-env | ported | ShellEnv.js | B136 |
 | ✅ shell/tool-bash | ported | coding plugin bash tool | B126 |
 | ✅ shell/tool-bash-persistent | ported | BashPersistent.js | B135 |
@@ -335,7 +337,7 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
-| 🟡 ui-* | partial | src/components/* | B117-B140 |
+| 🟡 ui-* | partial | src/components/* + hooks | B117-B142 |
 
 ## util (3)
 

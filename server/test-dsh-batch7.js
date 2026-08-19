@@ -202,7 +202,7 @@ console.log('\n== 8. Frontend panel + integration ==');
   const panel = fs.readFileSync(path.join(__dirname_path(), '..', 'src', 'components', 'SettingsPanel.jsx'), 'utf-8');
   ok('SettingsPanel has the permission presets UI', panel.includes('PERMISSION PRESETS') && panel.includes('/api/permissions') && panel.includes('autonomous'));
   const { TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
-  ok('registry stable at 207', TOOL_COUNT === 211);
+  ok('registry stable at 207', TOOL_COUNT === 213);
   const { assemblePrompt } = await import('./src/services/PromptAssembly.js');
   const prompt = await assemblePrompt({ convId: 't-int-b138' });
   ok('prompt assembles (tmux section no-op outside tmux)', typeof prompt === 'string' && prompt.length > 500 && !prompt.includes('tmux session'));
