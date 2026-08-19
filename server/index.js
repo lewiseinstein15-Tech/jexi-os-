@@ -421,7 +421,7 @@ app.use((req, res, next) => {
 });
 
 // Rate limiting: protects your AI quota from runaway loops / abuse.
-const aiLimiter = rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests — JEXI is throttling to protect your quota. Try again in a minute.' } });
+const aiLimiter = rateLimit({ windowMs: 60_000, limit: 45, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests — JEXI is throttling to protect your quota. Try again in a minute.' } });
 const generalLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 600, standardHeaders: 'draft-7', legacyHeaders: false });
 app.use(['/api/chat', '/api/vision', '/api/knowledge/search', '/api/agent'], aiLimiter);
 app.use('/api', generalLimiter);
@@ -2869,6 +2869,7 @@ app.post('/api/chat', async (req, res) => {
               temperature: 0.4,
               maxIterations: 2,
               executeToolCalls: (calls) => executeNativeToolCalls(calls, { profile: activeToolProfile(), sendEvent, intent: 'direct_answer' }),
+              onToken: (t) => sendEvent('stream', { text: t }), // B150 — live answer typing
             });
             if (res && res.ok && res.text) text = res.text;
           }
@@ -2876,7 +2877,7 @@ app.post('/api/chat', async (req, res) => {
       }
       if (!text) {
         try {
-          text = await generateContent(prompt, JEXI_NORMAL_PROMPT, null, { prefer: '', temperature: 0.5 });
+          text = await generateContent(prompt, JEXI_NORMAL_PROMPT, null, { prefer: '', temperature: 0.5, onToken: (t) => sendEvent('stream', { text: t }) });
         } catch (e) {
           text = `### ⚠ JEXI OS\n\n${(e && e.message) || 'I could not answer right now.'}`;
         }

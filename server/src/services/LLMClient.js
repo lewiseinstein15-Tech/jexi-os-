@@ -459,8 +459,46 @@ const PROVIDER_CALLS = {
  * for coding, Qwen for memory, Grok for research…) instead of only
  * reordering a preference list.
  */
+/**
+ * B150 — streamed plain-text generation (OpenAI-compatible walk). Returns
+ * the full text while feeding deltas to onDelta; null when nothing streams.
+ */
+async function streamPlainText(prompt, system, opts, onDelta) {
+  const errors = [];
+  const order = opts.provider ? [opts.provider] : providerOrder(opts.prefer || '');
+  for (const provider of order) {
+    const cfg = providerToolConfig(provider, opts);
+    if (!cfg || !cfg.key) continue;
+    const base = cfg.baseUrl || (provider === 'groq' ? 'https://api.groq.com/openai/v1' : null);
+    if (!base) continue;
+    const slot = await takeSlot(provider);
+    if (!slot.ok) { errors.push(`${provider}: ${slot.reason} (rate limiter)`); continue; }
+    try {
+      const out = await streamOpenAICompletion({
+        baseUrl: base, key: cfg.key, model: cfg.models[0],
+        messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],
+        tools: [], temperature: opts.temperature ?? 0.4, onDelta, signal: opts.signal,
+      });
+      if (out.text) {
+        recordProviderSuccess(provider);
+        releaseSlot();
+        return out.text;
+      }
+    } catch (e) { errors.push(`${provider}: ${e.message}`); }
+    recordProviderFailure(provider);
+    releaseSlot();
+  }
+  return null;
+}
+
 export async function generateContent(prompt, systemInstruction = '', imageBase64 = null, opts = {}) {
   systemInstruction = appendTimeContext(systemInstruction); // B104 — time context on every call
+  // B150 — live token streaming when requested (the UI shows the answer as
+  // it is generated instead of a blank wait). Falls back on any failure.
+  if (typeof opts.onToken === 'function' && !imageBase64) {
+    const streamed = await streamPlainText(prompt, systemInstruction, opts, opts.onToken);
+    if (streamed) return streamed;
+  }
   const errors = [];
   const system = systemInstruction || 'You are JEXI OS, an expert AI operating system.';
 
@@ -584,12 +622,95 @@ function providerToolConfig(provider, opts) {
 }
 
 /**
+ * B150 — TOKEN STREAMING (dsh llm/stream mirror): OpenAI-compatible SSE
+ * stream for chat/completions. Accumulates text + tool_calls deltas and
+ * calls onDelta(text) per chunk so the UI renders the answer live.
+ */
+async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, temperature, onDelta, signal }) {
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  if (signal) { if (signal.aborted) controller.abort(); else signal.addEventListener('abort', onAbort, { once: true }); }
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  let doneRead = false;
+  try {
+    const res = await fetch(`${String(baseUrl).replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model,
+        messages,
+        ...(tools && tools.length ? { tools, tool_choice: 'auto' } : {}),
+        temperature: temperature ?? 0.3,
+        stream: true,
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const b = await res.text().catch(() => '');
+      throw new Error(`HTTP ${res.status} ${b.slice(0, 120)}`);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let text = '';
+    const rawToolCalls = [];
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t.startsWith('data:')) continue;
+        const payload = t.slice(5).trim();
+        if (payload === '[DONE]') { doneRead = true; break; }
+        let json;
+        try { json = JSON.parse(payload); } catch { continue; }
+        const delta = json && json.choices && json.choices[0] && json.choices[0].delta;
+        if (!delta) continue;
+        if (delta.content) {
+          text += delta.content;
+          try { onDelta(delta.content); } catch { /* a consumer must never break the stream */ }
+        }
+        if (delta.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            const idx = tc.index ?? rawToolCalls.length;
+            if (!rawToolCalls[idx]) rawToolCalls[idx] = { id: `call_${idx}`, type: 'function', function: { name: '', arguments: '' } };
+            if (tc.id) rawToolCalls[idx].id = tc.id;
+            if (tc.function && tc.function.name) rawToolCalls[idx].function.name += tc.function.name;
+            if (tc.function && tc.function.arguments) rawToolCalls[idx].function.arguments += tc.function.arguments;
+          }
+        }
+      }
+      if (doneRead) break;
+    }
+    const msg = { content: text || null, ...(rawToolCalls.length ? { tool_calls: rawToolCalls } : {}) };
+    return { text, toolCalls: parseToolCalls(msg), rawToolCalls, model };
+  } finally {
+    clearTimeout(timer);
+    if (signal) signal.removeEventListener('abort', onAbort);
+  }
+}
+
+/**
  * ONE native tool-calling request against one provider with a full message
  * history. Returns { text, toolCalls, rawToolCalls, model } or throws (the
  * caller decides provider/model fallback). rawToolCalls are the API's own
  * tool_calls objects — replayed verbatim into the next round's messages.
  */
 async function chatWithToolsOnce(provider, cfg, model, messages, tools, opts) {
+  // B150 — token streaming: when the caller wants live deltas, use the SSE
+  // path (every OpenAI-compatible provider, incl. Groq over REST).
+  if (typeof opts.onToken === 'function') {
+    const base = cfg.baseUrl || (provider === 'groq' ? 'https://api.groq.com/openai/v1' : null);
+    if (base && cfg.key) {
+      return streamOpenAICompletion({
+        baseUrl: base, key: cfg.key, model, messages, tools,
+        temperature: opts.temperature, onDelta: opts.onToken, signal: opts.signal,
+      });
+    }
+  }
   if (cfg.sdk) {
     const groq = new Groq({ apiKey: cfg.key });
     const completion = await groq.chat.completions.create(
@@ -647,7 +768,7 @@ async function runToolLoopForProvider(provider, messages, tools, opts, errors) {
     let lastErr = null;
     for (const m of candidates) {
       try {
-        round = await chatWithToolsOnce(provider, cfg, m, messages, tools, opts);
+        round = await chatWithToolsOnce(provider, cfg, m, messages, tools, { ...opts, onToken: opts.onToken });
         model = m;
         break;
       } catch (e) {

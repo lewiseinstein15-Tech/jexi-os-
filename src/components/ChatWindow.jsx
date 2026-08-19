@@ -306,16 +306,9 @@ export default function ChatWindow({
 
       {/* composer */}
       <div className="jx-composer">
-        <div className="jx-bar">
-          <textarea
-            rows={1}
-            value={input}
-            placeholder="Ask JEXI anything…"
-            onChange={(e) => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
-          />
+        <div className="jx-plus-row">
           <div className="jx-plus-wrap">
-            <button type="button" className="jx-act" title="Add photo or file" aria-label="Add" onClick={() => setPlusOpen((o) => !o)}>
+            <button type="button" className="jx-plus-top" title="Add photo or file" aria-label="Add" onClick={() => setPlusOpen((o) => !o)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
             </button>
             {plusOpen && (
@@ -340,6 +333,15 @@ export default function ChatWindow({
               </>
             )}
           </div>
+        </div>
+        <div className="jx-bar">
+          <textarea
+            rows={1}
+            value={input}
+            placeholder="Ask JEXI anything…"
+            onChange={(e) => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
+          />
           <button type="button" className="jx-send" disabled={!isProcessing && (!input.trim() && !image && !fileAttachments.length)} onClick={isProcessing ? onStop : submit}>
             {isProcessing ? 'Stop' : 'Send'}
           </button>

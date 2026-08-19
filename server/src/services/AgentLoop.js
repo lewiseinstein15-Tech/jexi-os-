@@ -162,6 +162,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         prefer,
         signal: opts.signal,
         maxIterations: MAX_ITERATIONS,
+        onToken: (t) => emit('stream', { text: t }), // B150 — live answer typing (dsh llm/stream)
         // Execute the model's native tool calls through the gated runtime —
         // the same permission/risk/approval path as every other tool call.
         executeToolCalls: async (calls) => {

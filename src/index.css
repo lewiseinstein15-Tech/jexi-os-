@@ -87,6 +87,10 @@ body {
 
 /* ── chat ── */
 .jx-msg { padding: 20px 24px; border-bottom: 1px solid var(--line); display: flex; gap: 14px; }
+.jx-chatwrap { min-height: 0; flex: 1; }
+.jx-scroll { flex: 1 1 0; min-height: 0; overflow-y: auto; }
+.jx-body { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+.jx-body p { overflow-wrap: anywhere; word-break: break-word; }
 .jx-gutter { flex-shrink: 0; width: 20px; font-size: 12px; font-weight: 800; line-height: 1.7; text-align: center; color: var(--faint); font-family: var(--mono); }
 .jx-msg.jexi .jx-gutter { color: #fff; }
 .jx-body { flex: 1; min-width: 0; max-width: 780px; }
@@ -132,7 +136,7 @@ body {
 .jx-notice .approve-row button.ghost { background: none; color: #fff; font-weight: 500; }
 
 /* ── composer ── */
-.jx-composer { padding: 14px 24px 18px; border-top: 1px solid var(--line); background: var(--bg); position: relative; z-index: 40; }
+.jx-composer { padding: 8px 24px calc(14px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); background: var(--bg); position: relative; z-index: 40; flex-shrink: 0; }
 .jx-bar { display: flex; align-items: center; gap: 10px; border: 1.5px solid #fff; border-radius: 10px; padding: 6px 8px 6px 16px; background: var(--bg); transition: .15s; }
 .jx-bar:focus-within { box-shadow: 0 0 0 3px rgba(255,255,255,.08); }
 .jx-bar textarea { flex: 1; border: none; outline: none; resize: none; font-family: var(--mono); font-size: 13.5px; line-height: 1.6; padding: 6px 0; max-height: 120px; background: transparent; color: #fff; }
@@ -350,12 +354,19 @@ html, body {
 
 
 /* ── plus (+) button menu for photo/file ── */
+.jx-plus-row { display: flex; align-items: center; padding: 0 0 8px; }
 .jx-plus-wrap { position: relative; flex-shrink: 0; }
 .jx-plus-backdrop { position: fixed; inset: 0; z-index: 65; }
+.jx-plus-top {
+  width: 42px; height: 42px; border: 1px solid var(--line2); border-radius: 12px;
+  background: transparent; color: #fff; display: grid; place-items: center; cursor: pointer;
+}
+.jx-plus-top:hover { border-color: #fff; background: var(--bg3); }
+.jx-plus-top svg { width: 19px; height: 19px; }
 .jx-plus-menu {
-  position: absolute; bottom: 48px; right: 0; z-index: 70;
+  position: absolute; top: 48px; left: 0; bottom: auto; right: auto; z-index: 70;
   background: #111; border: 1px solid #333; border-radius: 10px;
-  min-width: 168px; overflow: hidden; box-shadow: 0 12px 32px rgba(0,0,0,.55);
+  min-width: 176px; overflow: hidden; box-shadow: 0 12px 32px rgba(0,0,0,.55);
 }
 .jx-plus-menu button {
   display: flex; align-items: center; gap: 10px; width: 100%;
@@ -365,3 +376,10 @@ html, body {
 .jx-plus-menu button:hover { background: #222; }
 .jx-plus-menu button + button { border-top: 1px solid #222; }
 .jx-plus-menu .ic { width: 20px; height: 20px; flex-shrink: 0; }
+
+
+/* B150 — the composer is ALWAYS visible, even with a very long answer open */
+@media (max-width: 900px) {
+  .jx-msg { padding: 14px 12px; }
+  .jx-composer { padding-left: 10px; padding-right: 10px; }
+}

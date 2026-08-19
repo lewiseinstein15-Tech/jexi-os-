@@ -47,6 +47,23 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
     }
     if (data.type) { lastSeen = Date.now(); onEvent?.(); }
     if (data.type === 'log') setLogs(prev => [...prev, { agent: data.agent, message: data.message }]);
+    else if (data.type === 'stream') {
+      // B150 — live answer typing: append deltas to the current JEXI message
+      // (the answer appears as it is generated — no more blank wait).
+      const delta = String(data.text || '');
+      if (delta) {
+        setMessages(prev => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last && last.role === 'jexi' && last.streaming) {
+            next[next.length - 1] = { ...last, text: last.text + delta };
+          } else {
+            next.push({ role: 'jexi', text: delta, streaming: true });
+          }
+          return next;
+        });
+      }
+    }
     else if (data.type === 'website') setWebsites(prev => [...prev, data.site]);
     else if (data.type === 'plan') setPlan(prev => ({ ...prev, ...data }));
     // Build 47 — intelligence metadata (classification, task id, confidence).
@@ -70,7 +87,13 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
         if (data.files?.length) bits.push(`${data.files.length} files`);
         if (data.sources?.length) bits.push(`${data.sources.length} sources`);
         const footer = bits.length ? `\n\n---\n⚙️ ${bits.join(' · ')}` : '';
-        setMessages(prev => [...prev, { role: 'jexi', text: summary + footer, sources: data.sources, files: data.files }]);
+        setMessages(prev => {
+          const next = [...prev];
+          const idx = next.findIndex((m) => m.role === 'jexi' && m.streaming);
+          const finalMsg = { role: 'jexi', text: summary + footer, sources: data.sources, files: data.files };
+          if (idx >= 0) next[idx] = finalMsg; else next.push(finalMsg);
+          return next;
+        });
       } else if (data.recoverable) {
         // Build 48, P5 — the 15-min safety deadline fired, but the server-side
         // mission is STILL running and will persist its real outcome. Show the
