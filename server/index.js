@@ -110,6 +110,7 @@ import { openDomain } from './src/services/StorageDomain.js'; // B141 — storag
 import { createApiProxy, validateApiArgs, apiProxyStatus } from './src/services/ApiProxy.js'; // B141 — host/apiproxy
 import { generateWorkspaceTypes } from './src/services/TypingGenerator.js'; // B141 — typert workspace mode
 import { cordisInspectStatus, cordisInspectList, cordisInspectQuery } from './src/services/CordisInspect.js'; // B142 — extensions/tool-cordis
+import { cordisRunnerStatus } from './src/services/CordisRunner.js'; // B143 — extensions/cordis-host-runner
 import { e2bStatus } from './src/services/SandboxLocal.js'; // B142 — e2b facts
 import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services/PluginRegistry.js';
 import { loadPlugins, setActivePluginContext, getActivePluginContext, listPluginTools, listPluginSkills } from './src/services/PluginContext.js'; // B97 — deepseek-harness-style plugin seam
@@ -2210,6 +2211,9 @@ app.post('/api/cordis/inspect/query', (req, res) => {
 
 // B142 — e2b sandbox-as-a-service facts.
 app.get('/api/e2b', (req, res) => res.json(e2bStatus()));
+
+// B143 — dynamic cordis runner status (dsh extensions/cordis-host-runner).
+app.get('/api/cordis/runner', (req, res) => res.json(cordisRunnerStatus()));
 
 // B141 — typert workspace generation.
 app.post('/api/typert/workspace', (req, res) => {

@@ -30,7 +30,7 @@ const { TOOL_COUNT, TOOL_REGISTRY } = await import('./src/services/ToolRegistry.
 const { planGet } = await import('./src/services/PlanStore.js');
 
 console.log('\n== 1. Registry: the two new tools ==');
-ok(TOOL_COUNT === 213, `registry count 191 → 206 (${TOOL_COUNT})`);
+ok(TOOL_COUNT === 218, `registry count 191 → 206 (${TOOL_COUNT})`);
 ok(TOOL_REGISTRY.some((t) => t.slug === 'ask_user_question'), 'ask_user_question registered');
 ok(TOOL_REGISTRY.some((t) => t.slug === 'exit_plan_mode'), 'exit_plan_mode registered');
 

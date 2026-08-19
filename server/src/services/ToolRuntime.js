@@ -125,6 +125,23 @@ export const TOOL_SCHEMAS = {
     method: { type: 'string', required: true, desc: 'Read-only method declared by the provider (e.g. listPlugins).' },
     input: { type: 'object', desc: 'Optional method input (e.g. { slug }).' },
   },
+  'cordis_define': {
+    name: { type: 'string', required: true, desc: 'Plugin name matching ^[a-z][a-z0-9_-]{1,48}$.' },
+    purpose: { type: 'string', required: true, desc: 'Non-empty purpose statement.' },
+    code: { type: 'object', required: true, desc: '{ host: "<async (jexi, input) => cleanup fn body>" } — the host half evaluated against the live plugin seam.' },
+  },
+  'cordis_run': {
+    pluginId: { type: 'string', required: true, desc: 'The plugin id from cordis_define.' },
+    packageId: { type: 'string', required: true, desc: 'The package id from cordis_define.' },
+    input: { type: 'object', desc: 'Optional input passed to the host code.' },
+  },
+  'cordis_stop': {
+    pluginId: { type: 'string', required: true, desc: 'The plugin id whose run to stop.' },
+  },
+  'cordis_undefine': {
+    pluginId: { type: 'string', required: true, desc: 'The plugin id to remove.' },
+  },
+  'cordis_inspect_self': {},
   'create_goal': {
     objective: { type: 'string', required: true, desc: 'The concrete completion objective inferred from the direct human request.' },
     max_goal_rounds: { type: 'number', desc: 'Optional positive integer limit on automatic continuation rounds.' },
@@ -320,6 +337,12 @@ export const TOOL_OUTPUT_SCHEMAS = {
   // B142 — cordis inspect contracts (dsh tool-cordis): read-only introspection.
   'cordis_inspect_list': z.object({ ok: z.boolean(), providers: z.array(z.unknown()).optional(), error: z.string().optional() }).passthrough(),
   'cordis_inspect_query': z.object({ ok: z.boolean(), provider: z.string().optional(), method: z.string().optional(), result: z.unknown().nullable().optional(), error: z.string().optional() }).passthrough(),
+  // B143 — cordis runner contracts (dsh cordis-host-runner): define/run/stop/undefine/self.
+  'cordis_define': z.object({ ok: z.boolean(), pluginId: z.string().optional(), packageId: z.string().optional(), name: z.string().optional(), purpose: z.string().optional(), hasHostHalf: z.boolean().optional(), error: z.string().optional() }).passthrough(),
+  'cordis_run': z.object({ ok: z.boolean(), runId: z.string().optional(), pluginId: z.string().optional(), packageId: z.string().optional(), error: z.string().optional() }).passthrough(),
+  'cordis_stop': z.object({ ok: z.boolean(), pluginId: z.string().optional(), wasRunning: z.boolean().optional(), error: z.string().optional() }).passthrough(),
+  'cordis_undefine': z.object({ ok: z.boolean(), pluginId: z.string().optional(), wasRunning: z.boolean().optional(), error: z.string().optional() }).passthrough(),
+  'cordis_inspect_self': z.object({ ok: z.boolean(), plugins: z.array(z.unknown()).optional(), stateFile: z.string().optional(), error: z.string().optional() }).passthrough(),
   'todo': z.object({ kind: z.literal('todo'), todos: z.array(z.unknown()).optional() }).passthrough(),
   'plan': z.object({ kind: z.literal('plan'), plan: z.unknown().optional() }).passthrough(),
   'weather-now': z.object({ ok: z.boolean(), kind: z.literal('weather').optional(), city: z.string().optional(), tempC: z.unknown().optional(), desc: z.string().optional() }).passthrough(),
@@ -1122,6 +1145,42 @@ async function runEngine(slug, args, opts = {}) {
       const r = cordisInspectQuery({ provider: String(args.provider || ''), method: String(args.method || ''), input: (args.input && typeof args.input === 'object') ? args.input : {} });
       if (!r.ok) return { ok: false, error: r.error };
       return { ok: true, kind: 'cordis', provider: r.provider, method: r.method, result: r.result };
+    }
+
+    case 'cordis_define': {
+      // B143 — dsh tool-cordis cordis_define: define a dynamic plugin package.
+      const { cordisRunner } = await import('./CordisRunner.js');
+      const r = cordisRunner().define({ name: String(args.name || ''), purpose: String(args.purpose || ''), code: (args.code && typeof args.code === 'object') ? args.code : {} });
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, kind: 'cordis', pluginId: r.pluginId, packageId: r.packageId, name: r.name, purpose: r.purpose, hasHostHalf: r.hasHostHalf };
+    }
+
+    case 'cordis_run': {
+      // B143 — dsh tool-cordis cordis_run: evaluate host code against the live seam.
+      const { cordisRunner } = await import('./CordisRunner.js');
+      const r = await cordisRunner().run({ pluginId: String(args.pluginId || ''), packageId: String(args.packageId || ''), input: (args.input && typeof args.input === 'object') ? args.input : {} });
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, kind: 'cordis', runId: r.runId, pluginId: r.pluginId, packageId: r.packageId };
+    }
+
+    case 'cordis_stop': {
+      const { cordisRunner } = await import('./CordisRunner.js');
+      const r = await cordisRunner().stop({ pluginId: String(args.pluginId || '') });
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, kind: 'cordis', pluginId: r.pluginId, wasRunning: r.wasRunning };
+    }
+
+    case 'cordis_undefine': {
+      const { cordisRunner } = await import('./CordisRunner.js');
+      const r = await cordisRunner().undefine({ pluginId: String(args.pluginId || '') });
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, kind: 'cordis', pluginId: r.pluginId, wasRunning: r.wasRunning };
+    }
+
+    case 'cordis_inspect_self': {
+      const { cordisRunner } = await import('./CordisRunner.js');
+      const r = cordisRunner().inspectSelf();
+      return { ok: true, kind: 'cordis', ...r };
     }
 
     case 'todo': {

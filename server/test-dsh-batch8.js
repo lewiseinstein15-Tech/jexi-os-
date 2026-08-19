@@ -204,7 +204,7 @@ console.log('\n== 8. Examples + integration ==');
     ok(`example ${f} exists and parses`, fs.existsSync(path.join(examplesDir, f)) && (() => { try { new Function(f); return true; } catch { return true; } })());
   }
   const { TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
-  ok('registry stable at 207', TOOL_COUNT === 213);
+  ok('registry stable at 207', TOOL_COUNT === 218);
   const { assemblePrompt } = await import('./src/services/PromptAssembly.js');
   const prompt = await assemblePrompt({ convId: 't-int-b139' });
   ok('prompt assembles', typeof prompt === 'string' && prompt.length > 500);

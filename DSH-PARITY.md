@@ -1,6 +1,6 @@
 # DSH → JEXI Parity Tracker
 
-**Generated:** 2026-08-19T04:09:30.089Z · **Packages tracked:** 123 · **Ported:** 118 (96%) · **Partial:** 5 · **Not yet:** 0
+**Generated:** 2026-08-19T04:27:06.693Z · **Packages tracked:** 123 · **Ported:** 123 (100%) · **Partial:** 0 · **Not yet:** 0
 
 Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch that landed it. Regenerate with `node server/scripts/audit-bundles.js`.
 
@@ -43,7 +43,7 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 | ✅ client/connection | ported | ClientConnection.js | B139 |
 | ✅ client/hmr | ported | ClientHmr.js | B139 |
 | ✅ client/locale | ported | Locale.js | B139 |
-| 🟡 client/modules | partial | src/components (ui-* mirrors) | B117-B140 |
+| ✅ client/modules | ported | src/utils/clientModules.js (slots/sessions/workspaces/events/tz/baseline) | B143 |
 | ✅ client/runtime | ported | src/utils/jexiRuntime.js | B140 |
 
 ## code-runtime (2)
@@ -100,7 +100,7 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
-| 🟡 extensions/cordis-runner-* | partial | — | — |
+| ✅ extensions/cordis-runner-* | ported | CordisRunner.js + cordis_define/run/stop/undefine/inspect_self tools | B143 |
 | ✅ extensions/tool-cordis | ported | CordisInspect.js + cordis_inspect_list/query tools | B142 |
 
 ## feedback (2)
@@ -337,7 +337,7 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
-| 🟡 ui-* | partial | src/components/* + hooks | B117-B142 |
+| ✅ ui-* | ported | src/components/* + hooks (all ui-* surfaces mirrored) | B117-B143 |
 
 ## util (3)
 
@@ -352,8 +352,8 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
 | ✅ web/tool-web | ported | research plugin (web_search/web_fetch) | B125 |
-| 🟡 web/web | partial | src/ (React app) | B117-B140 |
-| 🟡 web/web-react | partial | src/hooks + components | B117-B140 |
+| ✅ web/web | ported | src/utils/web.js (WebRuntime provider registry + renderer + SSE) | B143 |
+| ✅ web/web-react | ported | src/hooks/index.js (hooks barrel: useJexiEngine/useProjection/usePluginInventory/useUpdateChecker/useSlots) | B143 |
 
 ## workflow (2)
 

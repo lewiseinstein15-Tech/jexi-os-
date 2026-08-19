@@ -1,6 +1,6 @@
 # JEXI OS — Agent & Skill Catalog
 
-**252 specialist agents · 508 skills · 213 tools · 1 orchestrator.** One plain-language request in,
+**252 specialist agents · 508 skills · 218 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
 > ⚙️ GENERATED FILE — updated 2026-08-19 by `cd server && npm run audit-roster`. Do not edit by hand.
@@ -14,7 +14,7 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 |---|---|
 | Agents | 252 (252 reachable — 100%) |
 | Skills | 508 |
-| Tools | 213 |
+| Tools | 218 |
 | Intents / teams | 155 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
@@ -1223,7 +1223,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 213 tools (grouped by type)
+## The 218 tools (grouped by type)
 
 ### Agent (9)
 | Tool | Allowed agents | Engine | What it does |
@@ -1550,11 +1550,16 @@ This section and every table below are GENERATED from the live registries by `cd
 | `threat-model` | Risk Analyst, Penetration Tester | SkillChain | Model attack surfaces and rank risks. |
 | `vuln-scan` | Application Security Engineer, Penetration Tester | SkillChain | Scan an app or repo for exploitable vulnerabilities. |
 
-### System (5)
+### System (10)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
+| `cordis_define` | JEXI Core, Orchestrator | undefined | Define a new dynamic Cordis plugin package: name, purpose, and host code body (dsh tool-cordis cordis_define). |
 | `cordis_inspect_list` | JEXI Core, Orchestrator | undefined | List every Cordis Inspect provider known to the host (plugins, tools, skills, services) with their read-only methods (dsh tool-cordis). |
 | `cordis_inspect_query` | JEXI Core, Orchestrator | undefined | Run a read-only inspect query: provider + method from cordis_inspect_list, input per the method schema. Cannot invoke business services or modify the runtime (dsh tool-cordis). |
+| `cordis_inspect_self` | JEXI Core, Orchestrator | undefined | Inspect the dynamic Cordis runner itself: plugins, packages, active runs (dsh tool-cordis cordis_inspect_self). |
+| `cordis_run` | JEXI Core, Orchestrator | undefined | Start (or update) the active run of a defined package — its host code is evaluated against the live plugin seam (dsh tool-cordis cordis_run). |
+| `cordis_stop` | JEXI Core, Orchestrator | undefined | Stop a dynamic plugin’s active run (cleanup runs, registrations withdrawn) (dsh tool-cordis cordis_stop). |
+| `cordis_undefine` | JEXI Core, Orchestrator | undefined | Remove a dynamic plugin and all its packages (dsh tool-cordis cordis_undefine). |
 | `sandbox_mode` | Guardrail | undefined | Set the session sandbox mode: read-only | workspace-write | danger-full-access (dsh sandbox-policy). |
 | `self-diagnose` | Self-Diagnose | SelfMonitor | Read own health, memory, errors and source code to report root causes. |
 | `settings` | JEXI Core, Context Manager | SettingsManager | Read and update JEXI's settings and provider keys. |

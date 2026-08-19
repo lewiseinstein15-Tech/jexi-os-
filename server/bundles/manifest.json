@@ -533,10 +533,9 @@
     {
       "package": "client/modules",
       "area": "client",
-      "status": "partial",
-      "port": "src/components (ui-* mirrors)",
-      "batch": "B117-B140",
-      "note": "frontend modules incrementally ported"
+      "status": "ported",
+      "port": "src/utils/clientModules.js (slots/sessions/workspaces/events/tz/baseline)",
+      "batch": "B143"
     },
     {
       "package": "api/gateway",
@@ -818,26 +817,23 @@
     {
       "package": "web/web",
       "area": "web",
-      "status": "partial",
-      "port": "src/ (React app)",
-      "batch": "B117-B140",
-      "note": "renderer surface"
+      "status": "ported",
+      "port": "src/utils/web.js (WebRuntime provider registry + renderer + SSE)",
+      "batch": "B143"
     },
     {
       "package": "web/web-react",
       "area": "web",
-      "status": "partial",
-      "port": "src/hooks + components",
-      "batch": "B117-B140",
-      "note": "React hooks mirror"
+      "status": "ported",
+      "port": "src/hooks/index.js (hooks barrel: useJexiEngine/useProjection/usePluginInventory/useUpdateChecker/useSlots)",
+      "batch": "B143"
     },
     {
       "package": "ui-*",
       "area": "ui",
-      "status": "partial",
-      "port": "src/components/* + hooks",
-      "batch": "B117-B142",
-      "note": "frontend panels incrementally ported"
+      "status": "ported",
+      "port": "src/components/* + hooks (all ui-* surfaces mirrored)",
+      "batch": "B117-B143"
     },
     {
       "package": "subprocess/subprocess",
@@ -863,9 +859,9 @@
     {
       "package": "extensions/cordis-runner-*",
       "area": "extensions",
-      "status": "partial",
-      "port": null,
-      "note": "cordis runner internals"
+      "status": "ported",
+      "port": "CordisRunner.js + cordis_define/run/stop/undefine/inspect_self tools",
+      "batch": "B143"
     },
     {
       "package": "shell/bash-sandbox",

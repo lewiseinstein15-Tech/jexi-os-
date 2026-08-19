@@ -62,7 +62,7 @@ console.log('\n== 2. Cordis inspect (dsh extensions/tool-cordis) ==');
   // Tool-level: registry + engine.
   const { TOOL_REGISTRY, TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
   ok('cordis tools in registry', TOOL_REGISTRY.some((t) => t.slug === 'cordis_inspect_list') && TOOL_REGISTRY.some((t) => t.slug === 'cordis_inspect_query'));
-  ok('registry count is 213', TOOL_COUNT === 213);
+  ok('registry count is 213', TOOL_COUNT === 218);
   const { executeTool, hasOutputContract, validateToolArgs } = await import('./src/services/ToolRuntime.js');
   ok('cordis contracts', hasOutputContract('cordis_inspect_list') && hasOutputContract('cordis_inspect_query'));
   ok('query validates provider/method', validateToolArgs('cordis_inspect_query', { provider: 'jexi:tools', method: 'listTools' }).ok === true);
@@ -121,7 +121,7 @@ console.log('\n== 6. Integration ==');
   const { assemblePrompt } = await import('./src/services/PromptAssembly.js');
   ok('prompt assembles', (await assemblePrompt({ convId: 't-int-b142' })).length > 500);
   const { TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
-  ok('registry stable at 213', TOOL_COUNT === 213);
+  ok('registry stable at 213', TOOL_COUNT === 218);
   const { bundleStatus } = await import('./src/services/BundleBase.js');
   const st = bundleStatus();
   ok('parity manifest reflects the new ports', st.counts.ported >= 115);
