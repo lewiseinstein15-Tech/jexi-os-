@@ -181,6 +181,7 @@ export const TOOL_SCHEMAS = {
   'profile-read': {},
   'semantic-search': { query: { type: 'string', required: true, desc: 'Semantic query' }, limit: { type: 'number' } },
   'episode-save': { ask: { type: 'string', required: true }, reply: { type: 'string', required: true } },
+  'episode-recall': { query: { type: 'string', required: true, desc: 'Search term for memorable past exchanges.' } },
   'code-run': { command: { type: 'string', required: true, desc: 'Shell command (sandboxed, time-boxed)' }, cwd: { type: 'string' } },
   'code-write': { filename: { type: 'string', required: true, desc: 'Workspace-relative path' }, content: { type: 'string', required: true, desc: 'File content' } },
   'summarize-doc': { text: { type: 'string', required: true, desc: 'Text to summarize' }, query: { type: 'string', desc: 'Focus question' } },
@@ -647,6 +648,24 @@ async function runEngine(slug, args, opts = {}) {
       const m = loadMemory();
       return { kind: 'profile', profile: m.userProfile || {}, facts: (m.userFacts || []).slice(0, 6) };
     }
+    case 'episode-recall': {
+      // B145 — session episodes recall: search recent memorable exchanges
+      // (ask/reply pairs) for the query (dsh archivist episode recall).
+      const { getRecentEpisodes } = await import('./MemoryManager.js');
+      const q = String(args.query || '').toLowerCase();
+      const episodes = getRecentEpisodes(30);
+      const hits = q
+        ? episodes.filter((e) => (e.ask + ' ' + e.reply).toLowerCase().includes(q)).slice(-6)
+        : episodes.slice(-6);
+      return {
+        ok: true,
+        kind: 'episode',
+        query: args.query || '',
+        episodes: hits.map((e) => ({ ask: e.ask, reply: e.reply.slice(0, 600), time: e.time })),
+        total: episodes.length,
+      };
+    }
+
     case 'episode-save': {
       await rememberEpisode(args.ask, args.reply);
       return { kind: 'stored', episode: args.ask.slice(0, 80) };

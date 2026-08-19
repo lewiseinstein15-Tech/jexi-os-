@@ -76,7 +76,7 @@ export async function runDshResearch({ query, convId = null, sendEvent = () => {
       } else {
         r = await executeTool({
           slug: call.name,
-          args: call.arguments || {},
+          args: (() => { try { return typeof call.arguments === 'string' ? JSON.parse(call.arguments) : (call.arguments || {}); } catch { return {}; } })(),
           profile,
           sendEvent: emit,
           intent: 'research',

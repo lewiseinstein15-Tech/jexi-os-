@@ -26,7 +26,7 @@
  *   agent.done  → { answer, stats }
  */
 
-import { Planner } from './Planner.js';
+import { planner } from './Planner.js'; // the singleton instance (the class itself has no statics)
 import { getTool } from './ToolRegistry.js';
 import { buildNativeSchemas, executeTool, activeToolProfile, TOOL_PROFILES, isToolDone } from './ToolRuntime.js';
 import { generateWithToolsLoop, generateContent } from './LLMClient.js';
@@ -56,10 +56,10 @@ export function repeatReminderFor(key, count) {
   return null;
 }
 
-/** Planner.analyzeIntent returns a plan (intent/teamSlugs/steps/tools/toolsLine). */
+/** planner.analyzeIntent returns a plan (intent/teamSlugs/steps/tools/toolsLine). */
 async function safePlan(query, image) {
   try {
-    return await Planner.analyzeIntent(query, image ? { image: true } : {});
+    return await planner.analyzeIntent(query, image ? { image: true } : {});
   } catch (e) {
     return { intent: 'research', teamSlugs: ['researcher'], steps: ['Researcher'], planSummary: 'Analyze and answer', tools: [], toolsLine: '', toolCount: 0 };
   }

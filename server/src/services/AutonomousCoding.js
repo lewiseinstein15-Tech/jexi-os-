@@ -65,9 +65,11 @@ export async function runAutonomousCoding({ query, convId = null, sendEvent = ()
     }
     const out = [];
     for (const call of calls || []) {
+      let callArgs = call.arguments || {};
+      if (typeof callArgs === 'string') { try { callArgs = JSON.parse(callArgs); } catch { callArgs = {}; } }
       const r = await executeTool({
         slug: call.name,
-        args: call.arguments || {},
+        args: callArgs,
         profile,
         sendEvent: emit,
         intent: 'code_task',
