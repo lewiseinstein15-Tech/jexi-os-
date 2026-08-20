@@ -1,10 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { DatabaseSync } from 'node:sqlite'; // Phase 3 — SQLite-backed memory core (built-in, no deps)
 import { MEMORY_FILE, KNOWLEDGE_DIR, WORKSPACE_DIR, DATA_DIR } from '../config.js';
 import { generateContent, resolveKeys, embedText } from './LLMClient.js';
-import { appendEvent } from './EventLog.js'; // B78 — every compaction is a first-class event
 
 /**
  * JEXI OS Memory Core
@@ -26,8 +24,6 @@ import { appendEvent } from './EventLog.js'; // B78 — every compaction is a fi
  */
 
 const MEMORY_REDIS_KEY = 'jexi:memory';
-const REDIS_BOOTSTAMPS_KEY = 'jexi:bootstamps';
-const REDIS_BOOT_TTL = 60 * 60 * 24 * 30; // 30 days — same window as the memory mirror
 
 const DEFAULT_MEMORY = {
   userProfile: { name: '', location: '', interests: [] },
@@ -51,16 +47,7 @@ const CAPS = { internetKnowledge: 150, codingKnowledge: 100, learnedAnswers: 100
 
 let cache = null;
 let redisClient = null;
-// Immutable intent: whether REDIS_URL was present in the environment at boot.
-// `redisEnabled` can be flipped off if client init fails; `redisConfigured`
-// stays true so health reports "configured but broken" instead of "unset".
-const redisConfigured = Boolean(process.env.REDIS_URL);
-let redisEnabled = redisConfigured;
-// Real connection state (not "a client object exists"): 'unset' | 'connecting' |
-// 'connected' | 'error'. Updated by every actual Redis command so /api/health
-// and the persistence probe report what is really happening.
-let redisStatus = redisEnabled ? 'connecting' : 'unset';
-let redisLastError = '';
+let redisEnabled = Boolean(process.env.REDIS_URL);
 let consolidated = false; // run the merge pass once per process (on boot)
 
 /* ------------------------------------------------------------------ */
@@ -110,102 +97,60 @@ function saveSessionHistory(history) {
   } catch (e) { /* memory must never break the chat */ }
 }
 
-/** Bound a Redis command with a hard timeout so a dead/slow server can never
- * hang the health probe. Returns the command's result or throws on timeout. */
-function withTimeout(promise, ms) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(`Redis command timed out after ${ms}ms`)), ms)),
-  ]);
-}
-
 /**
- * B66+B68 — persistence probe: prove memory survives a restart/redeploy. Each
- * process stamps BOTH persistence layers — DATA_DIR on disk AND Redis (when
- * REDIS_URL is configured). The probe then reports whether stamps from
- * PREVIOUS boots are still present after a restart/redeploy:
- *   - disk stamps survived  => persistent disk mounted at DATA_DIR
- *   - Redis stamps survived => REDIS_URL is a fully valid persistence backend
- *     (memory survives redeploys even without a disk)
- * Async because it performs a real Redis ping + stamp round-trip.
+ * B66 — persistence probe: prove memory survives a restart/redeploy. Each
+ * process stamps DATA_DIR with its own instance id; the probe reports whether
+ * stamps from PREVIOUS boots are still present (=> the disk is persistent).
+ * On Render this depends on a persistent disk being mounted at DATA_DIR —
+ * ephemeral containers lose it, exactly as the probe will report.
  */
-export async function memoryPersistenceProbe() {
+export function memoryPersistenceProbe() {
   const id = process.env.RENDER_INSTANCE_ID || process.env.POD_NAME || `boot-${Math.random().toString(36).slice(2, 10)}`;
-  const disk = { previousBootsSeen: [], persistent: false };
   try {
     fs.mkdirSync(DATA_DIR, { recursive: true });
     const mine = path.join(DATA_DIR, `.jexi-boot-${String(id).replace(/[^a-zA-Z0-9_-]/g, '')}.json`);
     fs.writeFileSync(mine, JSON.stringify({ boot: new Date().toISOString(), instance: id }), 'utf-8');
-    disk.previousBootsSeen = fs.readdirSync(DATA_DIR)
+    const previous = fs.readdirSync(DATA_DIR)
       .filter((f) => /^\.jexi-boot-/.test(f) && !f.endsWith(String(id).replace(/[^a-zA-Z0-9_-]/g, '') + '.json'))
       .map((f) => ({ file: f, mtime: fs.statSync(path.join(DATA_DIR, f)).mtime.toISOString() }));
-    disk.persistent = disk.previousBootsSeen.length > 0;
+    const sessionCount = (() => {
+      try { return fs.readdirSync(SESSIONS_DIR).filter((f) => f.endsWith('.json')).length; } catch (e) { return 0; }
+    })();
+    const redisConfigured = Boolean(process.env.REDIS_URL);
+    return {
+      dataDir: DATA_DIR,
+      instance: id,
+      previousBootsSeen: previous,
+      persistentDisk: previous.length > 0, // evidence-based, not assumed
+      redisConfigured, // B68 — a free-tier alternative: REDIS_URL survives restarts without a disk
+      sessionCount,
+      note: previous.length > 0
+        ? 'previous boot stamps survived — the memory directory is persistent across restarts'
+        : redisConfigured
+          ? 'no disk stamps found, but REDIS_URL is configured — memory persists via Redis across restarts (see the redis field in /api/health/memory)'
+          : 'no previous boot stamps found — disk persistence not yet proven (mount a persistent disk at DATA_DIR on Render, or set REDIS_URL for cross-restart memory)',
+    };
   } catch (e) {
-    disk.error = (e && e.message) || String(e);
+    return { dataDir: DATA_DIR, error: (e && e.message) || String(e), persistentDisk: false };
   }
-  const sessionCount = (() => {
-    try { return fs.readdirSync(SESSIONS_DIR).filter((f) => f.endsWith('.json')).length; } catch (e) { return 0; }
-  })();
+}
 
-  // --- Redis-backed persistence (B68): REDIS_URL is a first-class backend.
-  // --- Stamp Redis on every probe so a redeploy can prove the stamps
-  // --- survived — exactly the same evidence model as the disk stamps.
-  const redis = { configured: redisConfigured, connected: false, error: '', previousBootsSeen: [] };
-  if (redisConfigured) {
-    const r = await getRedis();
-    if (r) {
-      try {
-        await withTimeout(r.ping(), 5000);
-        redis.connected = true;
-        redisStatus = 'connected';
-        redisLastError = '';
-        const raw = await withTimeout(r.get(REDIS_BOOTSTAMPS_KEY), 5000);
-        const stamps = (() => { try { return JSON.parse(raw || '[]'); } catch (e) { return []; } })();
-        redis.previousBootsSeen = stamps
-          .filter((s) => s && s.instance !== id)
-          .map((s) => ({ instance: s.instance, boot: s.boot }));
-        const next = [...stamps.filter((s) => s && s.instance !== id), { instance: id, boot: new Date().toISOString() }].slice(-20);
-        await withTimeout(r.set(REDIS_BOOTSTAMPS_KEY, JSON.stringify(next), 'EX', REDIS_BOOT_TTL), 5000);
-      } catch (e) {
-        redis.error = (e && e.message) || String(e);
-        redisStatus = 'error';
-        redisLastError = redis.error;
-      }
-    } else if (redisLastError) {
-      // Client init failed (invalid REDIS_URL shape, import failure): surface
-      // the real reason instead of reporting a blank "not connected".
-      redis.error = redisLastError;
-    }
+/**
+ * B68 — live Redis durability probe: configured + actually reachable. Returns
+ * { configured, active, error? }. `active: true` means memory hydrates from /
+ * pushes to Redis and therefore survives restarts even on Render's free plan
+ * (which has no persistent disks).
+ */
+export async function probeRedis() {
+  if (!process.env.REDIS_URL) return { configured: false, active: false };
+  const r = await getRedis();
+  if (!r) return { configured: true, active: false, error: 'Redis client failed to init' };
+  try {
+    const pong = await r.ping();
+    return { configured: true, active: pong === 'PONG' };
+  } catch (e) {
+    return { configured: true, active: false, error: (e && e.message) || String(e) };
   }
-  const redisPersistent = redis.connected && redis.previousBootsSeen.length > 0;
-  const persistent = disk.persistent || redisPersistent;
-  let note;
-  if (redisPersistent) {
-    note = 'Redis-backed persistence PROVEN: boot stamps from previous boots survived in Redis (REDIS_URL) — memory survives redeploys without a persistent disk';
-  } else if (disk.persistent) {
-    note = 'previous boot stamps survived — the memory directory is persistent across restarts';
-  } else if (redis.connected) {
-    note = 'Redis connected (REDIS_URL) but no previous boot stamps seen yet — Redis-backed persistence will be proven after the next restart/redeploy';
-  } else if (redisConfigured && redis.error) {
-    note = `REDIS_URL is configured but the Redis connection failed: ${redis.error}`;
-  } else {
-    note = 'no previous boot stamps found — disk persistence not yet proven (mount a persistent disk at DATA_DIR on Render, or set REDIS_URL for cross-restart memory)';
-  }
-  return {
-    dataDir: DATA_DIR,
-    instance: id,
-    previousBootsSeen: disk.previousBootsSeen,
-    persistentDisk: disk.persistent,
-    persistent, // true when EITHER backend survived a restart
-    sessionCount,
-    redis: {
-      configured: redisConfigured,
-      connected: redis.connected,
-      error: redis.error,
-      previousBootsSeen: redis.previousBootsSeen,
-    },
-    note,
-  };
 }
 
 function ensureDirs() {
@@ -215,48 +160,20 @@ function ensureDirs() {
 
 /* ---------------- Redis (optional durable layer) ---------------- */
 
-export async function getRedis() {
+async function getRedis() {
   if (!redisEnabled) return null;
   if (redisClient) return redisClient;
   try {
-    // Normalize + validate the URL BEFORE constructing the client: ioredis
-    // throws a bare "Invalid URL" TypeError for e.g. `redis://:6379` (empty
-    // host) or leading whitespace — turn that into an actionable message the
-    // probe/health endpoint can show. Never echo the value (it may contain a
-    // password); only its shape/scheme is described.
-    let rawUrl = String(process.env.REDIS_URL || '').trim();
-    // Strip wrapping quotes ("rediss://…" / 'rediss://…' / `rediss://…`) — a
-    // classic paste artifact from env files that makes the URL unparseable.
-    rawUrl = rawUrl.replace(/^(['"`])([\s\S]*)\1$/, '$2').trim();
-    if (!/^rediss?:\/\//i.test(rawUrl)) {
-      const scheme = rawUrl.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:/)?.[0] || '(the value is not a URL)'; // scheme only, never credentials
-      throw new Error(`REDIS_URL does not start with redis:// or rediss:// — current value starts with "${scheme}" (expected redis://<user>:<password>@<host>:<port>)`);
-    }
-    if (!/^rediss?:\/\/.+/i.test(rawUrl) || rawUrl.includes('://:')) {
-      throw new Error('REDIS_URL is missing its hostname — expected redis://<user>:<password>@<host>:<port>');
-    }
     const { Redis } = await import('ioredis');
-    redisClient = new Redis(rawUrl, {
+    redisClient = new Redis(process.env.REDIS_URL, {
       lazyConnect: true,
       maxRetriesPerRequest: 2,
       enableReadyCheck: true,
-      connectTimeout: 8000,
-      // Fail fast instead of retrying forever: a wrong/blocked URL should
-      // surface in seconds, not hang the boot sequence.
-      retryStrategy: (times) => Math.min(times * 200, 4000),
-    });
-    // ioredis emits 'error' for connection failures; without a listener it
-    // throws uncaught and can crash the process. Track the real state instead.
-    redisClient.on('error', (e) => {
-      redisStatus = 'error';
-      redisLastError = (e && e.message) || String(e);
     });
     return redisClient;
   } catch (e) {
     console.error('[Memory] Redis client failed to init, using local file only:', e.message);
     redisEnabled = false;
-    redisStatus = 'error';
-    redisLastError = (e && e.message) || String(e);
     return null;
   }
 }
@@ -268,22 +185,18 @@ export async function hydrateFromRedis() {
   if (!r) return false;
   try {
     const raw = await r.get(MEMORY_REDIS_KEY);
-    redisStatus = 'connected';
-    redisLastError = '';
     if (raw) {
       const parsed = JSON.parse(raw);
       cache = { ...structuredClone(DEFAULT_MEMORY), ...parsed };
       migrate(cache);
       ensureDirs();
-      writeMemoryFile(JSON.stringify(cache, null, 2));
+      fs.writeFileSync(MEMORY_FILE, JSON.stringify(cache, null, 2), 'utf-8');
       console.log('[Memory] ✓ Hydrated memory core from Redis.');
       consolidateMemory();
       return true;
     }
   } catch (e) {
     console.error('[Memory] Redis hydrate failed, using local file:', e.message);
-    redisStatus = 'error';
-    redisLastError = (e && e.message) || String(e);
   }
   return false;
 }
@@ -292,25 +205,13 @@ async function redisPush(memory) {
   if (!redisEnabled) return;
   const r = await getRedis();
   if (!r) return;
-  try {
-    await r.set(MEMORY_REDIS_KEY, JSON.stringify(memory), 'EX', 60 * 60 * 24 * 30); // 30-day TTL
-    redisStatus = 'connected';
-    redisLastError = '';
-  } catch (e) {
-    console.error('[Memory] Redis write failed:', e.message);
-    redisStatus = 'error';
-    redisLastError = (e && e.message) || String(e);
-  }
+  try { await r.set(MEMORY_REDIS_KEY, JSON.stringify(memory), 'EX', 60 * 60 * 24 * 30); } // 30-day TTL
+  catch (e) { console.error('[Memory] Redis write failed:', e.message); }
 }
 
-/** True only when Redis is configured AND a real command has succeeded. */
+/** True when a Redis layer is configured (used by the load-balancer health check). */
 export function isRedisActive() {
-  return redisEnabled && redisStatus === 'connected';
-}
-
-/** Diagnostic detail for /api/health and the persistence probe. */
-export function redisConnectionInfo() {
-  return { configured: redisConfigured, status: redisStatus, error: redisLastError };
+  return redisEnabled && !!redisClient;
 }
 
 /* ---------------- Local JSON store ---------------- */
@@ -336,85 +237,15 @@ function migrate(mem) {
   if (!Array.isArray(mem.episodes)) mem.episodes = [];
 }
 
-/* ------------------------------------------------------------------ */
-/* Phase 3 — SQLite backing store for the memory core.                 */
-/*                                                                     */
-/* The memory core (the whole JSON document) lives in a single-row key- */
-/* value table in DATA_DIR/jexi-memory.db. SQLite gives us crash-safe,  */
-/* atomic writes and instant start (no full-file JSON parse at boot is  */
-/* required for correctness — the row read is O(1)). The legacy         */
-/* memory.json file remains as (a) the one-time migration source and    */
-/* (b) a mirror of every write, so downgrading or moving hosts loses    */
-/* nothing. Every access goes through try/catch — memory must never     */
-/* break the chat.                                                      */
-/* ------------------------------------------------------------------ */
-
-const SQLITE_FILE = path.join(DATA_DIR, 'jexi-memory.db');
-const SQLITE_KEY = 'memory:core';
-let db = null;
-
-function getDb() {
-  if (db) return db;
-  try {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    db = new DatabaseSync(SQLITE_FILE);
-    db.exec('CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);');
-    db.exec('PRAGMA journal_mode = WAL;');
-    db.exec('PRAGMA synchronous = NORMAL;');
-    return db;
-  } catch (e) {
-    console.error('[Memory] SQLite init error:', e.message);
-    return null;
-  }
-}
-
-function sqliteGet(key) {
-  try {
-    const row = getDb()?.prepare('SELECT value FROM kv WHERE key = ?').get(key);
-    return row ? row.value : null;
-  } catch (e) {
-    console.error('[Memory] SQLite read error:', e.message);
-    return null;
-  }
-}
-
-function sqliteSet(key, value) {
-  try {
-    getDb()?.prepare('INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
-    return true;
-  } catch (e) {
-    console.error('[Memory] SQLite write error:', e.message);
-    return false;
-  }
-}
-
 export function loadMemory() {
   ensureDirs();
   if (cache) return cache;
-
-  // 1) Primary: SQLite row (fast, atomic, crash-safe).
-  const sqliteRaw = sqliteGet(SQLITE_KEY);
-  if (sqliteRaw) {
-    try {
-      const parsed = JSON.parse(sqliteRaw);
-      cache = { ...structuredClone(DEFAULT_MEMORY), ...parsed };
-      migrate(cache);
-      if (!consolidated) consolidateMemory(); // merge near-duplicates once per boot
-      return cache;
-    } catch (e) {
-      console.error('[Memory] SQLite parse error (falling back to file):', e.message);
-    }
-  }
-
-  // 2) Migration source / fallback: the legacy JSON file. When found and the
-  //    SQLite row is missing, migrate the file into SQLite once.
   try {
     if (fs.existsSync(MEMORY_FILE)) {
       const parsed = JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf-8'));
       cache = { ...structuredClone(DEFAULT_MEMORY), ...parsed };
       migrate(cache);
-      if (!consolidated) consolidateMemory();
-      sqliteSet(SQLITE_KEY, JSON.stringify(cache, null, 2)); // one-time migration
+      if (!consolidated) consolidateMemory(); // merge near-duplicates once per boot
       return cache;
     }
   } catch (e) {
@@ -424,28 +255,10 @@ export function loadMemory() {
   return cache;
 }
 
-/**
- * Phase 2+3 — persistence: write to SQLite (primary) AND mirror to the
- * legacy JSON file via temp+fsync+rename (atomic, crash-safe, downgrade-safe).
- */
-function writeMemoryFile(content) {
-  ensureDirs();
-  sqliteSet(SQLITE_KEY, content);
-  const tmp = `${MEMORY_FILE}.tmp-${process.pid}-${Date.now().toString(36)}`;
-  const fd = fs.openSync(tmp, 'w');
-  try {
-    fs.writeSync(fd, content, null, 'utf-8');
-    fs.fsyncSync(fd);
-  } finally {
-    fs.closeSync(fd);
-  }
-  fs.renameSync(tmp, MEMORY_FILE);
-}
-
 export function saveMemory() {
   ensureDirs();
   try {
-    writeMemoryFile(JSON.stringify(loadMemory(), null, 2));
+    fs.writeFileSync(MEMORY_FILE, JSON.stringify(loadMemory(), null, 2), 'utf-8');
   } catch (e) {
     console.error('[Memory] save error:', e.message);
   }
@@ -938,22 +751,8 @@ export async function resolveConversationalQuery(query) {
 
 // Keep this many most-recent turns verbatim; everything older is compressed.
 const SUMMARY_RECENT_TURNS = 12;
-
-// B78 — TOKEN-THRESHOLD COMPACTION (replaces the fixed 28-turn counter).
-// The trigger is the ESTIMATED TOKEN count of the running conversation
-// (summary + every turn, ~4 chars/token), so:
-//   (a) a short but frequent chat no longer compacts too early and loses
-//       detail unnecessarily (it never crosses the ceiling), and
-//   (b) a few very long/dense turns blow past the ceiling and compact BEFORE
-//       they exceed what the underlying models can actually handle.
-// Default ceiling: 110,000 estimated tokens (within the 100k-135k band the
-// models in use can handle well). Override with JEXI_COMPACTION_TOKENS.
-const COMPACTION_TOKEN_THRESHOLD = Math.max(2000, Number(process.env.JEXI_COMPACTION_TOKENS) || 110000);
-
-/** Rough token estimate: ~4 chars/token for mixed English (tokenizer ballpark). */
-export function estimateTokens(text) {
-  return Math.ceil(String(text || '').length / 4);
-}
+// Only start compressing once the history is comfortably past the verbatim window.
+const SUMMARY_THRESHOLD = 28;
 
 /** Cached rolling summary of the whole conversation ('' until it exists). */
 export function getRollingSummary() {
@@ -964,35 +763,17 @@ export function getRollingSummary() {
  * Async context compaction — compress the turns older than the recent window
  * into one dense running summary (Mem0/DeepAgents pattern). No AI keys → the
  * cached summary is returned untouched; failures never break a chat.
- *
- * B78 — the trigger is TOKEN usage, not turn count: when the estimated token
- * size of the running context (summary + every chat turn) crosses
- * COMPACTION_TOKEN_THRESHOLD, the old turns are compressed into the summary
- * and a `context_compaction` event is appended to the event log (what
- * triggered it, how many tokens were in play, what got summarized).
- *
- * Test seam: `__generate` overrides the LLM call (the same contract as
- * generateContent) so tests can fire a real compaction without network/keys.
  */
-export async function rollingConversationSummary({ force = false, __generate } = {}) {
+export async function rollingConversationSummary({ force = false } = {}) {
   const mem = loadMemory();
   const turns = mem.chatHistory || [];
-  const old = turns.slice(0, Math.max(0, turns.length - SUMMARY_RECENT_TURNS));
-  const gen = typeof __generate === 'function' ? __generate : generateContent;
+  if (!force && turns.length < SUMMARY_THRESHOLD) return mem.conversationSummary || '';
 
-  // B78 — token-threshold trigger: estimate the running context and compact
-  // when it crosses the ceiling. `force` bypasses the check (manual refresh).
-  const currentTokens =
-    estimateTokens(mem.conversationSummary) +
-    turns.reduce((sum, h) => sum + estimateTokens(h.text || ''), 0);
-  const overThreshold = currentTokens >= COMPACTION_TOKEN_THRESHOLD;
-  if (!force) {
-    if (!overThreshold) return mem.conversationSummary || '';
-    if (old.length === 0) return mem.conversationSummary || '';
-  }
+  const old = turns.slice(0, Math.max(0, turns.length - SUMMARY_RECENT_TURNS));
+  if (!force && old.length === 0) return mem.conversationSummary || '';
 
   const keys = resolveKeys();
-  if (!keys.groqKey && !keys.geminiKey && !keys.openrouterKey && !force && typeof __generate !== 'function') return mem.conversationSummary || '';
+  if (!keys.groqKey && !keys.geminiKey && !keys.openrouterKey) return mem.conversationSummary || '';
 
   const prior = mem.conversationSummary ? `Previous running summary:\n${mem.conversationSummary}\n\n` : '';
   const text = old
@@ -1001,7 +782,7 @@ export async function rollingConversationSummary({ force = false, __generate } =
   if (!text.trim()) return mem.conversationSummary || '';
 
   try {
-    const summary = await gen(
+    const summary = await generateContent(
       `${prior}Compress this conversation into a dense running summary (max 400 words, bullet points). Keep: the user's goals, key decisions, facts about the user, open tasks, and anything JEXI promised or built. Drop small talk and repeats.\n\nCONVERSATION TO COMPRESS:\n${text.slice(0, 24000)}`,
       'You are JEXI OS\'s Context Manager. Output ONLY the compressed summary.'
     );
@@ -1009,19 +790,6 @@ export async function rollingConversationSummary({ force = false, __generate } =
     if (clean.length >= 20) {
       mem.conversationSummary = clean;
       saveMemory();
-      // B78 — every compaction is a first-class event in the event log.
-      try {
-        appendEvent('context_compaction', {
-          trigger: force ? 'manual' : 'token_threshold',
-          threshold: COMPACTION_TOKEN_THRESHOLD,
-          estimatedTokens: currentTokens,
-          turnsCompressed: old.length,
-          summaryLength: clean.length,
-          reason: force
-            ? 'forced by caller'
-            : `running context (${currentTokens} est. tokens) crossed the ${COMPACTION_TOKEN_THRESHOLD} token ceiling`,
-        });
-      } catch (e) { /* the event log must never break the chat */ }
     }
     return mem.conversationSummary || '';
   } catch (e) {
@@ -1050,7 +818,7 @@ export function clearMemory() {
   cache = structuredClone(DEFAULT_MEMORY);
   consolidated = false;
   ensureDirs();
-  try { writeMemoryFile(JSON.stringify(cache, null, 2)); } catch (e) {}
+  try { fs.writeFileSync(MEMORY_FILE, JSON.stringify(cache, null, 2), 'utf-8'); } catch (e) {}
   if (redisEnabled) { getRedis().then(r => { if (r) r.del(MEMORY_REDIS_KEY).catch(() => {}); }).catch(() => {}); }
   // Also wipe generated workspace files
   try {
