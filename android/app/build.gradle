@@ -31,7 +31,14 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         // versionCode MUST rise on every build or Android refuses the update.
         // The CI workflow passes github.run_number (build #N) as APK_BUILD_NUMBER.
-        def buildNumber = (System.getenv('APK_BUILD_NUMBER') ?: '1') as int
+        // Fallback: use epoch seconds so every local build also gets a unique code
+        // — this is what makes the WebView cache-busting in MainActivity actually work.
+        def buildNumber = System.getenv('APK_BUILD_NUMBER')
+        if (buildNumber == null || buildNumber.trim().isEmpty()) {
+            buildNumber = (System.currentTimeMillis() / 1000) as int
+        } else {
+            buildNumber = buildNumber.trim() as int
+        }
         versionCode buildNumber
         versionName "1.0.${buildNumber}"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
