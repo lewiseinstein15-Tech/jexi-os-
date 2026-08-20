@@ -68,90 +68,126 @@ const FALLBACK = { icon: Bot, color: 'text-gray-400' };
  * with a spinner on the active step and a checkmark on completed ones.
  * Turns JEXI from "chatbot with dots" into a visibly-working agent.
  */
+/** Format a timestamp as HH:MM:SS. */
+function timeStr() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+}
+
 export default function AgentPipeline({ logs = [], isProcessing }) {
-  // Preserve first-seen order of agents; keep their latest message.
+  // Preserve first-seen order of agents; keep their messages + timestamps.
   const order = [];
   const byAgent = {};
   for (const log of logs) {
     if (!log || !log.agent) continue;
-    if (!byAgent[log.agent]) { byAgent[log.agent] = []; order.push(log.agent); }
-    byAgent[log.agent].push(log.message);
+    if (!byAgent[log.agent]) { byAgent[log.agent] = { messages: [], firstSeen: timeStr() }; order.push(log.agent); }
+    byAgent[log.agent].messages.push({ text: log.message, time: timeStr() });
   }
 
+  const totalSteps = order.length;
+
   return (
-    <div className="overflow-hidden rounded-lg bg-[#0a0a0c]">
-      {/* header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-white/[0.03] border-b border-white/[0.06]">
-        <span className="relative flex w-1.5 h-1.5 flex-shrink-0">
-          <span className={`absolute inline-flex w-full h-full rounded-full bg-[#00FF9D] opacity-60 ${isProcessing ? 'animate-ping' : ''}`} />
-          <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-[#00FF9D]" />
+    <div className="overflow-hidden rounded-lg bg-[#0c0e12]">
+      {/* header — live streaming feel */}
+      <div className="flex items-center gap-2 px-3 py-2.5 bg-white/[0.03] border-b border-white/[0.06]">
+        <span className="relative flex w-2 h-2 flex-shrink-0">
+          <span className={`absolute inline-flex w-full h-full rounded-full bg-[#00FF9D] opacity-50 ${isProcessing ? 'animate-ping' : ''}`} />
+          <span className="relative inline-flex w-2 h-2 rounded-full bg-[#00FF9D]" />
         </span>
-        <span className="text-[8px] font-black text-[#00FF9D] tracking-widest">
-          {isProcessing ? 'JEXI AT WORK' : 'AGENT RUN'}
+        <span className="text-[9px] font-black text-[#00FF9D] tracking-widest">
+          {isProcessing ? 'JEXI THINKING' : 'AGENT RUN'}
         </span>
-        {isProcessing && <span className="ml-auto text-[8px] text-gray-500 font-bold animate-pulse">LIVE</span>}
-        {!isProcessing && order.length > 0 && (
-          <span className="ml-auto text-[8px] text-[#22c55e] font-black">✓ {order.length} STEP{order.length > 1 ? 'S' : ''}</span>
+        {isProcessing && (
+          <span className="ml-auto flex items-center gap-1.5">
+            <span className="text-[8px] text-gray-500 font-bold">STEP {totalSteps + 1}</span>
+            <span className="flex gap-0.5">
+              {[0, 1, 2].map((i) => (
+                <span key={i} className="typing-dot w-1 h-1 rounded-full bg-[#00FF9D]" style={{ animationDelay: `${i * 0.2}s` }} />
+              ))}
+            </span>
+          </span>
+        )}
+        {!isProcessing && totalSteps > 0 && (
+          <span className="ml-auto text-[8px] text-[#22c55e] font-black">✓ {totalSteps} STEP{totalSteps > 1 ? 'S' : ''}</span>
         )}
       </div>
 
       {isProcessing && <div className="shimmer-bar" />}
 
-      <AnimatePresence initial={false}>
-        {order.length === 0 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-3 py-3 flex items-center gap-2">
-            <Loader2 className="w-3 h-3 text-[#00FF9D] animate-spin" />
-            <span className="text-[9px] text-gray-500 italic">Assembling agents…</span>
-          </motion.div>
-        )}
+      <div className="max-h-[280px] overflow-y-auto">
+        <AnimatePresence initial={false}>
+          {totalSteps === 0 && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-3 py-3 flex items-center gap-2">
+              <Loader2 className="w-3 h-3 text-[#00FF9D] animate-spin" />
+              <span className="text-[9px] text-gray-500 italic">Planning the agent team…</span>
+            </motion.div>
+          )}
 
-        {order.map((agent, i) => {
-          const meta = AGENT_META[agent] || FALLBACK;
-          const Icon = meta.icon;
-          const lastMsg = byAgent[agent][byAgent[agent].length - 1];
-          const isRunning = isProcessing && i === order.length - 1;
-          return (
-            <motion.div
-              key={agent}
-              layout
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              className={`flex items-start gap-2.5 px-3 py-2 border-b border-white/[0.04] last:border-0 transition-colors duration-200 ${
-                isRunning ? 'bg-[#00FF9D]/[0.05]' : 'hover:bg-white/[0.02]'
-              }`}
-            >
-              {/* icon tile */}
-              <div className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded-md bg-white/[0.05] border border-white/[0.06] flex items-center justify-center ${meta.color}`}>
-                <Icon className="w-3 h-3" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className={`text-[8px] font-black tracking-wider ${meta.color}`}>{agent.toUpperCase()}</span>
-                  {isRunning ? (
-                    <Loader2 className="w-3 h-3 text-[#00FF9D] animate-spin flex-shrink-0" />
-                  ) : (
-                    <CheckCircle2 className="w-3 h-3 text-[#22c55e] flex-shrink-0" />
+          {order.map((agent, i) => {
+            const meta = AGENT_META[agent] || FALLBACK;
+            const Icon = meta.icon;
+            const agentData = byAgent[agent];
+            const lastMsg = agentData.messages[agentData.messages.length - 1];
+            const isRunning = isProcessing && i === order.length - 1;
+            const stepNum = i + 1;
+            return (
+              <motion.div
+                key={agent}
+                layout
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+                className={`flex items-start gap-2.5 px-3 py-2 border-b border-white/[0.04] last:border-0 transition-colors duration-300 ${
+                  isRunning ? 'bg-[#00FF9D]/[0.04]' : ''
+                }`}
+              >
+                {/* step number + icon */}
+                <div className="flex flex-col items-center gap-1 mt-0.5 flex-shrink-0">
+                  <div className="text-[7px] font-black text-gray-600 tabular-nums">{String(stepNum).padStart(2,'0')}</div>
+                  <div className={`w-6 h-6 rounded-md bg-white/[0.04] border border-white/[0.06] flex items-center justify-center ${meta.color}`}>
+                    <Icon className="w-3 h-3" />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[8px] font-black tracking-wider ${meta.color}`}>{agent.toUpperCase()}</span>
+                    {isRunning ? (
+                      <Loader2 className="w-3 h-3 text-[#00FF9D] animate-spin flex-shrink-0" />
+                    ) : (
+                      <CheckCircle2 className="w-3 h-3 text-[#22c55e] flex-shrink-0" />
+                    )}
+                    <span className="text-[7px] text-gray-600 ml-auto tabular-nums font-mono">{lastMsg.time}</span>
+                  </div>
+                  <p className={`text-[9px] mt-0.5 leading-snug ${isRunning ? 'text-gray-200' : 'text-gray-500'} break-words`}>
+                    {lastMsg.text}
+                  </p>
+                  {/* Show sub-messages for multi-step agents */}
+                  {agentData.messages.length > 1 && (
+                    <div className="mt-1 space-y-0.5">
+                      {agentData.messages.slice(0, -1).map((m, j) => (
+                        <div key={j} className="flex items-start gap-1.5">
+                          <span className="text-[6px] text-gray-600 mt-0.5">›</span>
+                          <span className="text-[8px] text-gray-600 leading-snug break-words">{m.text}</span>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
-                <p className={`text-[9px] mt-0.5 leading-snug ${isRunning ? 'text-gray-200' : 'text-gray-500'} break-words`}>
-                  {lastMsg}
-                </p>
-              </div>
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
 
-      {!isProcessing && order.length > 0 && (
+      {!isProcessing && totalSteps > 0 && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="px-3 py-2 bg-gradient-to-r from-[#00FF9D]/[0.08] via-[#22d3ee]/[0.05] to-transparent border-t border-[#00FF9D]/20 flex items-center gap-2"
+          className="px-3 py-2 bg-gradient-to-r from-white/[0.04] via-white/[0.02] to-transparent border-t border-white/[0.06] flex items-center gap-2"
         >
-          <Sparkles className="w-3 h-3 text-[#00FF9D]" />
-          <span className="text-[8px] font-black text-[#00FF9D] tracking-wider">MISSION COMPLETE</span>
+          <Sparkles className="w-3 h-3 text-white" />
+          <span className="text-[8px] font-black text-white tracking-wider">DONE</span>
         </motion.div>
       )}
     </div>

@@ -154,7 +154,7 @@ export default function ResearchScreen({ engine, onResearch }) {
                 animate={{ opacity: 1, y: 0 }}
                 className="flex justify-start"
               >
-                <div className="w-full bg-[#0a0a0c] border border-white/[0.07] rounded-lg overflow-hidden">
+                <div className="w-full bg-[#0c0e12] border border-white/[0.07] rounded-lg overflow-hidden">
                   <AgentPipeline logs={logs} isProcessing />
                 </div>
               </motion.div>

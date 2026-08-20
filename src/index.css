@@ -6,15 +6,15 @@
    JEXI OS — monochrome design system (v3: black · white · code font)
    ════════════════════════════════════════════════════════════════ */
 :root {
-  --bg: #0a0a0a;
-  --bg2: #111111;
-  --bg3: #171717;
+  --bg: #0f1115;
+  --bg2: #161a21;
+  --bg3: #1c2129;
   --ink: #ffffff;
   --muted: #9a9a9a;
   --faint: #5c5c5c;
   --faint2: #2c2c2c;
-  --line: #222222;
-  --line2: #333333;
+  --line: #1e2430;
+  --line2: #2a3140;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
@@ -28,12 +28,16 @@ body {
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
-  position: fixed; inset: 0; /* app shell: the page can never outgrow the screen */
+  position: fixed; inset: 0;
+  /* subtle noise texture over graphite base */
+  background-image:
+    radial-gradient(900px 520px at 88% -10%, rgba(74, 158, 255, 0.03), transparent 62%),
+    radial-gradient(760px 520px at -12% 8%, rgba(0, 210, 106, 0.02), transparent 62%);
 }
 ::selection { background: #fff; color: #000; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: #2c2c2c; border-radius: 8px; }
-::-webkit-scrollbar-thumb:hover { background: #444; }
+::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #3a4250; }
 * { box-sizing: border-box; }
 
 /* ── layout ── */
@@ -45,7 +49,7 @@ body {
 .jx-top {
   position: fixed; top: 0; left: 0; right: 0; height: 50px; z-index: 50;
   display: flex; align-items: center; gap: 12px; padding: 0 14px;
-  background: var(--bg); border-bottom: 1px solid var(--line);
+  background: var(--bg); border-bottom: 1px solid var(--line2);
 }
 .jx-burger {
   width: 36px; height: 36px; display: flex; flex-direction: column;
@@ -66,7 +70,7 @@ body {
 /* ── hamburger menu ── */
 .jx-menu {
   position: fixed; top: 50px; left: 0; z-index: 60; min-width: 230px;
-  background: var(--bg2); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  background: var(--bg2); border-right: 1px solid var(--line2); border-bottom: 1px solid var(--line2);
   padding: 8px; display: none;
 }
 .jx-menu.open { display: block; animation: jxdrop .16s ease; }
@@ -136,16 +140,16 @@ body {
 
 /* ── composer ── */
 .jx-composer { padding: 8px 24px calc(14px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); background: var(--bg); position: relative; z-index: 40; flex-shrink: 0; }
-.jx-bar { display: flex; align-items: center; gap: 10px; border: 1.5px solid #fff; border-radius: 10px; padding: 6px 8px 6px 16px; background: var(--bg); transition: .15s; }
-.jx-bar:focus-within { box-shadow: 0 0 0 3px rgba(255,255,255,.08); }
+.jx-bar { display: flex; align-items: center; gap: 10px; border: 1.5px solid var(--line2); border-radius: 12px; padding: 6px 8px 6px 16px; background: var(--bg2); transition: .2s; }
+.jx-bar:focus-within { border-color: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.06); }
 .jx-bar textarea { flex: 1; border: none; outline: none; resize: none; font-family: var(--mono); font-size: 13.5px; line-height: 1.6; padding: 6px 0; max-height: 120px; background: transparent; color: #fff; }
 .jx-bar textarea::placeholder { color: var(--faint); }
-.jx-act { width: 32px; height: 32px; border: 1px solid var(--line2); border-radius: 8px; background: transparent; display: grid; place-items: center; cursor: pointer; color: var(--muted); flex-shrink: 0; }
-.jx-act:hover { border-color: #fff; color: #fff; }
+.jx-act { width: 34px; height: 34px; border: 1px solid var(--line2); border-radius: 9px; background: transparent; display: grid; place-items: center; cursor: pointer; color: var(--muted); flex-shrink: 0; transition: .15s; }
+.jx-act:hover { border-color: var(--muted); color: #fff; }
 .jx-act svg { width: 15px; height: 15px; stroke-width: 1.8; }
-.jx-send { height: 32px; padding: 0 16px; border: none; border-radius: 8px; background: #fff; color: #000; font-size: 12.5px; font-weight: 700; cursor: pointer; flex-shrink: 0; font-family: var(--mono); }
-.jx-send:hover { background: #ddd; }
-.jx-send:disabled { opacity: .35; cursor: default; }
+.jx-send { height: 34px; padding: 0 16px; border: none; border-radius: 9px; background: #fff; color: #000; font-size: 12.5px; font-weight: 700; cursor: pointer; flex-shrink: 0; font-family: var(--mono); transition: .15s; }
+.jx-send:hover { background: #e8e8e8; transform: scale(1.02); }
+.jx-send:disabled { opacity: .25; cursor: default; transform: none; }
 .jx-hint { font-size: 10.5px; color: var(--faint); text-align: center; margin-top: 8px; font-family: var(--mono); }
 .jx-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .jx-chip { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line2); border-radius: 99px; padding: 4px 10px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
@@ -536,8 +540,8 @@ html, body {
 }
 .jx-user-bubble {
   max-width: 86%;
-  background: #1c1c1c;               /* clearly distinct from the page (0a0a0a) */
-  border: 1px solid #303030;
+  background: #1a1f28;
+  border: 1px solid #262d3a;
   border-radius: 14px 14px 4px 14px;
   padding: 10px 14px;
 }
@@ -556,11 +560,11 @@ html, body {
 .jx-avatar {
   flex-shrink: 0;
   width: 26px; height: 26px;
-  border: 1px solid #444;
+  border: 1px solid #2a3140;
   border-radius: 8px;
   display: grid; place-items: center;
   font-family: var(--mono); font-size: 12px; font-weight: 800;
-  color: #fff; background: #1a1a1a;
+  color: #fff; background: var(--bg3);
   margin-top: 2px;
 }
 

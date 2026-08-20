@@ -260,7 +260,7 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
             animate={{ opacity: 1, y: 0 }}
             className="flex justify-start"
           >
-            <div className="w-full bg-[#0a0a0c] border border-white/[0.07] rounded-lg overflow-hidden">
+            <div className="w-full border border-white/[0.06] rounded-lg overflow-hidden">
               <AgentPipeline logs={logs} isProcessing />
             </div>
           </motion.div>

@@ -160,7 +160,7 @@ function ensureDirs() {
 
 /* ---------------- Redis (optional durable layer) ---------------- */
 
-async function getRedis() {
+export async function getRedis() {
   if (!redisEnabled) return null;
   if (redisClient) return redisClient;
   try {
