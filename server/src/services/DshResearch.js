@@ -49,7 +49,14 @@ export async function runDshResearch({ query, convId = null, sendEvent = () => {
   // The research skill body (progressive) rides the system prompt.
   const skill = loadSkillForModel('research');
   const system = await assemblePrompt({ convId, codeMode: false, presetFlavor: '' })
-    + (skill ? `\n## RESEARCH SKILL (loaded)\n${String(skill.content).slice(0, 6000)}\n` : '');
+    + (skill ? `\n## RESEARCH SKILL (loaded)\n${String(skill.content).slice(0, 6000)}\n` : '')
+    + `\n## GITHUB REPOSITORY ANALYSIS (B154)\n` +
+      `When the user asks you to analyze or review a GitHub repository (they gave a github.com link, now or earlier in this conversation), do NOT just summarize the marketing page. Fetch the real repo data with web_fetch (these endpoints work without any key):\n` +
+      `- https://api.github.com/repos/{owner}/{repo} — metadata: description, language, stars, forks, open issues, license, default_branch, archived, topics, size, updated_at\n` +
+      `- https://api.github.com/repos/{owner}/{repo}/git/trees/{default_branch}?recursive=1 — full file tree (ignore node_modules/dist/build/vendor)\n` +
+      `- https://raw.githubusercontent.com/{owner}/{repo}/{default_branch}/README.md — the README (try README too)\n` +
+      `- https://raw.githubusercontent.com/{owner}/{repo}/{default_branch}/package.json (or requirements.txt / pyproject.toml / Cargo.toml / go.mod / Dockerfile) — key manifests\n` +
+      `Then deliver the report in EXACTLY these sections: ## OVERVIEW, ## ARCHITECTURE, ## KEY FILES, ## STRENGTHS, ## ISSUES (cite file paths), ## FIXES, ## VERDICT. Be specific and honest; never invent files.`;
 
   const sources = new Map();
   const toolContext = [];

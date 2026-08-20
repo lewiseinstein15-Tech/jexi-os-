@@ -39,10 +39,14 @@ export function chatEventLogger() {
                 if (ev.recoverable) {
                   appendEvent('error', { component: 'chat', message: 'request exceeded 15min deadline', fallback: 'result store keeps the terminal outcome; recovery poll follows' }, convId);
                 } else {
+                  // B154 — never log an "unknown" failure: fall back to the
+                  // first line of the summary so the real cause is visible.
+                  const rawErr = String(ev.error || '').trim();
+                  const summaryLine = String(ev.summary || '').replace(/[#*`>]/g, '').trim().split('\n')[0].slice(0, 200);
                   appendEvent('error', {
                     component: 'chat',
-                    message: String(ev.error || 'unknown chat failure').slice(0, 400),
-                    fallback: /All AI providers failed|No API keys configured/.test(String(ev.error || '')) ? 'degraded message returned' : 'raw error surfaced',
+                    message: (rawErr || summaryLine || 'unknown chat failure').slice(0, 400),
+                    fallback: /All AI providers failed|No API keys configured/.test(rawErr || summaryLine) ? 'degraded message returned' : 'raw error surfaced',
                   }, convId);
                 }
               }

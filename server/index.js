@@ -1516,11 +1516,17 @@ const travelBookingAgent = new TravelBookingAgent({
   },
 });
 // B91 — universal link agent: videos (frame-by-frame + transcript), social
-// (browser), articles (deep-read) — then applies the user's instruction.
+// (browser), articles (deep-read), GitHub repos (B154 — real analysis via the
+// GitHub API + file tree + README + structured report) — then applies the
+// user's instruction.
 const universalLinkAgent = new UniversalLinkAgent({
   analyzeVideo: async (url, ev) => {
     const { analyzeVideo } = await import('./src/services/VideoAnalyzer.js');
     return analyzeVideo(url, ev);
+  },
+  analyzeGithubRepo: async (url, opts) => {
+    const { analyzeGithubRepo } = await import('./src/services/GitHubRepo.js');
+    return analyzeGithubRepo(url, opts);
   },
   readPage: async (url) => {
     const { analyzeLink, extractContent } = await import('./src/services/Extractor.js');
@@ -2657,7 +2663,7 @@ app.post('/api/chat', async (req, res) => {
       const instruction = raw.replace(LINK_RE, '').trim();
       sendEvent('log', { agent: 'Link Agent', message: `🔗 Processing ${url.slice(0, 60)}…` });
       const out = await universalLinkAgent.run({ url, instruction, sendEvent });
-      done({ success: out.success !== false, query: raw, summary: normalizeFinalAnswer(out.summary || ''), sources: out.meta ? [{ title: out.meta.title || url.slice(0, 60), link: url }] : [] });
+      done({ success: out.success !== false, query: raw, error: out.error || undefined, summary: normalizeFinalAnswer(out.summary || ''), sources: out.meta ? [{ title: out.meta.title || out.meta.repo || url.slice(0, 60), link: url }] : [] });
       return;
     }
 
@@ -3246,7 +3252,7 @@ app.post('/api/chat', async (req, res) => {
       : results.success
         ? '✅ Task completed — the team finished, but returned no readable summary. Check the activity log above to see what ran.'
         : (results.error || 'The task failed — check the activity log for details.');
-    sendEvent('done', { success: results.success, query, summary: finalSummary, sources: results.sources || [], statistics: results.statistics, files: results.files || [] });
+    sendEvent('done', { success: results.success, query, error: results.error || undefined, summary: finalSummary, sources: results.sources || [], statistics: results.statistics, files: results.files || [] });
 
     // BUILD 47 — TASK STATE UPDATE: record what this turn completed so the next
     // "continue" resumes from here instead of restarting.

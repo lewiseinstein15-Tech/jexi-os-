@@ -8,7 +8,10 @@
  *      social (facebook/x/linkedin), article (any other page).
  *   2. WATCH/READ — videos are analyzed frame-by-frame + full timestamped
  *      transcript (VideoAnalyzer); social posts are read via the real
- *      browser; articles/pages are deep-read (Readability).
+ *      browser; articles/pages are deep-read (Readability); GitHub
+ *      repository links get a REAL repo analysis (B154 — metadata, file
+ *      tree, README + manifests, structured LLM report with deterministic
+ *      fallback).
  *   3. DO THE TASK — the user's instruction is applied to the extracted
  *      content by an LLM pass ("summarize it", "find the recipe",
  *      "what did he say about X at 2:30", "make a review"...).
@@ -19,6 +22,8 @@
  * Every dependency is injectable for tests; every failure degrades honestly.
  */
 
+import { classifyGithubUrl } from './GitHubRepo.js';
+
 export function classifyLink(url) {
   const u = String(url || '').trim();
   if (!u) return { type: 'unknown' };
@@ -26,19 +31,27 @@ export function classifyLink(url) {
   const host = u.toLowerCase();
   if (/youtube\.com|youtu\.be|tiktok\.com|instagram\.com|vimeo\.com/i.test(host)) return { type: 'video', platform: /youtube\.com|youtu\.be/.test(host) ? 'youtube' : /tiktok/.test(host) ? 'tiktok' : /instagram/.test(host) ? 'instagram' : 'vimeo' };
   if (/facebook\.com|fb\.watch|fb\.com|twitter\.com|x\.com|linkedin\.com|threads\.net|reddit\.com/i.test(host)) return { type: 'social', platform: 'social' };
+  // B154 — real GitHub repository analysis (API + tree + README + LLM report),
+  // never the generic article deep-read that returned navigation garbage.
+  if (host.includes('github.com') || host.includes('githubusercontent.com')) {
+    const g = classifyGithubUrl(u);
+    if (g && g.type === 'repo') return { type: 'github-repo', platform: 'github', owner: g.owner, repo: g.repo };
+  }
   return { type: 'article' };
 }
 
 export class UniversalLinkAgent {
-  /**
-   * @param {object} deps
-   * @param {function} [deps.analyzeVideo]  — (url, {sendEvent}) => Promise<{summary, transcript?, frames?}> (VideoAnalyzer.analyzeVideo)
-   * @param {function} [deps.readPage]      — (url) => Promise<{title, text}> (Extractor.analyzeLink or browser)
-   * @param {function} [deps.generateContent] — (prompt, system, image, opts) => Promise<string>
-   */
+/**
+ * @param {object} deps
+ * @param {function} [deps.analyzeVideo]  — (url, {sendEvent}) => Promise<{summary, transcript?, frames?}> (VideoAnalyzer.analyzeVideo)
+ * @param {function} [deps.readPage]      — (url) => Promise<{title, text}> (Extractor.analyzeLink or browser)
+ * @param {function} [deps.analyzeGithubRepo] — (url, {instruction, sendEvent, generateContent}) => Promise<{success, summary, meta}> (GitHubRepo.analyzeGithubRepo)
+ * @param {function} [deps.generateContent] — (prompt, system, image, opts) => Promise<string>
+ */
   constructor(deps = {}) {
     this.analyzeVideo = deps.analyzeVideo || null;
     this.readPage = deps.readPage || null;
+    this.analyzeGithubRepo = deps.analyzeGithubRepo || null;
     this.generateContent = deps.generateContent || null;
   }
 
@@ -57,7 +70,25 @@ export class UniversalLinkAgent {
     let content = null;
     let contentMeta = {};
     try {
-      if (cls.type === 'video') {
+      if (cls.type === 'github-repo') {
+        // B154 — real GitHub repository analysis (API metadata + file tree +
+        // README/manifests + structured report; deterministic fallback).
+        if (!this.analyzeGithubRepo) throw new Error('github analysis unavailable');
+        emit('link.content', { kind: 'github-repo', note: `analyzing ${cls.owner}/${cls.repo} — metadata, file tree, README…` });
+        const g = await this.analyzeGithubRepo(link, { instruction: task, sendEvent, generateContent: this.generateContent });
+        if (!g || g.success === false) {
+          return {
+            success: false,
+            error: (g && g.error) || 'github analysis failed',
+            summary: (g && g.summary) || '### ⚠ JEXI OS\n\nI could not analyze that GitHub repository right now — please try again in a minute.',
+          };
+        }
+        contentMeta = g.meta || { kind: 'github-repo' };
+        content = g.summary || '';
+        // The report IS the final answer — the analyzer already emitted
+        // link.answer/done; skip the generic LLM pass below.
+        return { success: true, summary: content, meta: contentMeta, url: link };
+      } else if (cls.type === 'video') {
         if (!this.analyzeVideo) throw new Error('video analysis unavailable');
         emit('link.content', { kind: 'video', note: 'watching frame-by-frame + reading the transcript…' });
         const v = await this.analyzeVideo(link, { sendEvent });
