@@ -11,6 +11,14 @@ import { setupFcm, armFcmForegroundRetry } from './utils/fcmSetup'
 // app), with retries + foreground re-registration + on-device diagnostics.
 // Both are best-effort: unsupported browsers / denied permission silently skip.
 window.addEventListener('load', () => {
+  // B153 — native APK: remove any previously-registered service worker and
+  // its caches once (defence in depth against stale cached bundles).
+  try {
+    if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) {
+      if ('caches' in window) caches.keys().then((ks) => Promise.all(ks.map((k) => caches.delete(k)))).catch(() => {})
+      if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {})
+    }
+  } catch (e) { /* best-effort */ }
   setupPushSubscription().catch(() => {})
   setupFcm().catch(() => {})
   armFcmForegroundRetry()

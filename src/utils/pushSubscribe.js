@@ -23,6 +23,9 @@ function urlBase64ToUint8Array(base64String) {
 export async function setupPushSubscription() {
   try {
     if (typeof window === 'undefined') return false;
+    // B153 — native APK: FCM handles push; a service worker on the local
+    // origin adds stale-cache risk with zero benefit.
+    if (typeof window !== 'undefined' && window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) return false;
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
     if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') return false;
 

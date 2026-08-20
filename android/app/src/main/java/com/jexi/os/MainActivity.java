@@ -10,6 +10,8 @@ import android.webkit.CookieManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
+import java.io.File;
+
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -64,40 +66,61 @@ public class MainActivity extends BridgeActivity {
     }
 
     /**
-     * B152 — FIX: after an APK upgrade (in-app UPDATE), the Android WebView can
-     * keep serving STALE cached assets — the old index.html plus old hashed
-     * JS/CSS files that no longer exist in the new bundle — which renders a
-     * white/broken screen until the user clears app data or re-installs.
+     * B152/B153 — FIX: after an APK upgrade (in-app UPDATE) the Android WebView
+     * kept serving its STALE cached bundle (old index.html + old hashed
+     * assets) — the white/broken screen — because the previous fix ran AFTER
+     * the page had already started loading from cache.
      *
-     * Fix: whenever the installed versionCode changes (upgrade or fresh
-     * install), wipe the WebView cache + cookies BEFORE the new page loads, so
-     * the new bundle always resolves its own assets.
+     * Real fix: whenever versionCode changes (upgrade or fresh install),
+     * DELETE the ENTIRE WebView data directory (regular cache, HTTP cache,
+     * Service Worker storage) BEFORE the bridge creates/loads the WebView.
+     * The WebView then starts with zero cache and must load the fresh bundle
+     * from the APK's assets. clearCache() alone is not enough — it never
+     * clears the per-origin HTTP cache of the local server.
      */
-    private void clearWebViewCacheOnUpgrade() {
+    private void deleteRecursive(File f) {
+        if (f == null || !f.exists()) return;
+        if (f.isDirectory()) {
+            File[] kids = f.listFiles();
+            if (kids != null) for (File k : kids) deleteRecursive(k);
+        }
+        //noinspection ResultOfMethodCallIgnored
+        f.delete();
+    }
+
+    private void wipeWebViewDataOnUpgrade() {
         try {
             final int current = BuildConfig.VERSION_CODE;
             final SharedPreferences prefs = getSharedPreferences("jexi_meta", MODE_PRIVATE);
             final int last = prefs.getInt("version_code", 0);
             if (last != current) {
                 prefs.edit().putInt("version_code", current).apply();
-                getBridge().getWebView().postDelayed(() -> {
-                    try {
-                        WebView wv = getBridge().getWebView();
-                        if (wv == null) return;
-                        wv.clearCache(true);
-                        CookieManager.getInstance().removeAllCookies(null);
-                        wv.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
-                    } catch (Exception e) { /* best-effort */ }
-                }, 60);
+                // Run BEFORE super.onCreate() — the WebView does not exist yet,
+                // so no in-flight load can re-seed from the old cache.
+                deleteRecursive(getDir("app_webview", MODE_PRIVATE));
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    CookieManager.getInstance().removeAllCookies(null);
+                }
             }
-        } catch (Exception e) { /* best-effort */ }
+        } catch (Exception e) { /* best-effort — the app still opens */ }
     }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // MUST run before super.onCreate: that is when Capacitor creates the
+        // WebView and begins loading the page from cache.
+        wipeWebViewDataOnUpgrade();
         super.onCreate(savedInstanceState);
         ensureRuntimePermissions();
-        clearWebViewCacheOnUpgrade();
+        // Second layer: even on a non-upgrade launch, force the local bundle
+        // to bypass any residual HTTP cache.
+        getBridge().getWebView().postDelayed(() -> {
+            try {
+                WebView wv = getBridge().getWebView();
+                if (wv == null) return;
+                wv.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
+            } catch (Exception e) { /* best-effort */ }
+        }, 80);
     }
 
     @Override

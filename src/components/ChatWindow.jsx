@@ -91,6 +91,18 @@ export default function ChatWindow({
   const [uploading, setUploading] = useState(false);
   const [customAnswers, setCustomAnswers] = useState({});
   const [plusOpen, setPlusOpen] = useState(false);
+  const [copiedMsg, setCopiedMsg] = useState(null); // index of the message whose text was copied
+  const copyMsg = async (text, idx) => {
+    try { await navigator.clipboard.writeText(String(text || '')); } catch (e) { /* noop */ }
+    setCopiedMsg(idx);
+    setTimeout(() => setCopiedMsg((c) => (c === idx ? null : c)), 1400);
+  };
+  // Regenerate: re-send the user's message that preceded this AI answer.
+  const regenerate = (idx) => {
+    for (let i = idx - 1; i >= 0; i--) {
+      if (messages[i] && messages[i].role === 'user') { onSend(String(messages[i].text || '')); return; }
+    }
+  };
   const [cardBusy, setCardBusy] = useState(false);
   const scrollRef = useRef(null);
   const photoRef = useRef(null);
@@ -189,47 +201,63 @@ export default function ChatWindow({
           </div>
         )}
         {messages.map((msg, i) => (
-          <div key={i} className={`jx-msg ${msg.role === 'user' ? 'user' : 'jexi'}`}>
-            <div className="jx-gutter">{msg.role === 'user' ? 'A' : 'J'}</div>
-            <div className="jx-body">
-              {msg.image && <img className="jx-img" src={msg.image} alt="attachment" />}
-              {msg.streaming ? <SimpleText text={msg.text} /> : <RichAnswer text={msg.text} />}
-              {msg.role === 'jexi' && !isProcessing && (
-                <div className="jx-feedback">
-                  <button
-                    type="button"
-                    title="Helpful"
-                    onClick={async () => {
-                      try {
-                        await jexiFetch(`${getBackendUrl()}/api/feedback`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ conversation: getSessionId(), seq: i, rating: 1 }),
-                        });
-                      } catch (e) { /* noop */ }
-                    }}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /></svg>
-                  </button>
-                  <button
-                    type="button"
-                    title="Not helpful"
-                    onClick={async () => {
-                      try {
-                        await jexiFetch(`${getBackendUrl()}/api/feedback`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ conversation: getSessionId(), seq: i, rating: -1 }),
-                        });
-                      } catch (e) { /* noop */ }
-                    }}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7 0h3a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3" /></svg>
-                  </button>
-                </div>
-              )}
+          msg.role === 'user' ? (
+            <div key={i} className="jx-msg user">
+              <div className="jx-user-bubble">
+                {msg.image && <img className="jx-img" src={msg.image} alt="attachment" />}
+                <SimpleText text={msg.text} />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div key={i} className="jx-msg jexi">
+              <div className="jx-avatar" aria-hidden="true">J</div>
+              <div className="jx-body">
+                {msg.streaming ? <SimpleText text={msg.text} /> : <RichAnswer text={msg.text} />}
+                {msg.role === 'jexi' && !isProcessing && !msg.streaming && (
+                  <div className="jx-actions">
+                    <button type="button" className="jx-act-mini" onClick={() => copyMsg(msg.text, i)}>
+                      {copiedMsg === i ? '✓ Copied' : 'Copy'}
+                    </button>
+                    <button type="button" className="jx-act-mini" onClick={() => regenerate(i)}>
+                      Regenerate
+                    </button>
+                    <button
+                      type="button"
+                      className="jx-act-mini"
+                      title="Helpful"
+                      onClick={async () => {
+                        try {
+                          await jexiFetch(`${getBackendUrl()}/api/feedback`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ conversation: getSessionId(), seq: i, rating: 1 }),
+                          });
+                        } catch (e) { /* noop */ }
+                      }}
+                    >
+                      Helpful
+                    </button>
+                    <button
+                      type="button"
+                      className="jx-act-mini"
+                      title="Not helpful"
+                      onClick={async () => {
+                        try {
+                          await jexiFetch(`${getBackendUrl()}/api/feedback`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ conversation: getSessionId(), seq: i, rating: -1 }),
+                          });
+                        } catch (e) { /* noop */ }
+                      }}
+                    >
+                      Not helpful
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )
         ))}
 
         {/* agent process block while working */}

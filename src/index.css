@@ -523,3 +523,66 @@ html, body {
   .jx-code-pre { font-size: 12px; }
   .jx-table { min-width: 360px; }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   B153 — CHAT MESSAGE UI (spec): user vs AI distinct, monochrome,
+   mobile-first. User = right-aligned subtle surface bubble; AI = left
+   with a J avatar + full-width rich content + action buttons.
+   ════════════════════════════════════════════════════════════════ */
+
+/* USER message — right-aligned, distinct subtle surface, compact */
+.jx-msg.user {
+  justify-content: flex-end;
+  padding: 10px 24px 10px 40px;
+}
+.jx-user-bubble {
+  max-width: 86%;
+  background: #161616;               /* distinct from the page (0a0a0a) */
+  border: 1px solid #282828;
+  border-radius: 14px 14px 4px 14px;
+  padding: 10px 14px;
+}
+.jx-user-bubble p {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  line-height: 1.6;
+  margin: 0;
+  color: #f2f2f2;
+  overflow-wrap: anywhere; word-break: break-word;
+}
+.jx-user-bubble .jx-img { max-width: 220px; }
+
+/* AI message — left, avatar + full-width body */
+.jx-msg.jexi { align-items: flex-start; }
+.jx-avatar {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  border: 1px solid #444;
+  border-radius: 8px;
+  display: grid; place-items: center;
+  font-family: var(--mono); font-size: 12px; font-weight: 800;
+  color: #fff; background: #1a1a1a;
+  margin-top: 2px;
+}
+
+/* message actions — Copy / Regenerate / feedback (subtle, monochrome) */
+.jx-actions {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 10px;
+  opacity: .5; transition: opacity .15s;
+}
+.jx-msg.jexi:hover .jx-actions { opacity: 1; }
+.jx-act-mini {
+  font-family: var(--mono); font-size: 10.5px; color: var(--muted);
+  background: none; border: 1px solid var(--line2); border-radius: 6px;
+  padding: 4px 10px; cursor: pointer; min-height: 28px;
+}
+.jx-act-mini:hover { color: #000; background: #fff; border-color: #fff; }
+
+@media (max-width: 900px) {
+  .jx-msg.user { padding: 10px 12px 10px 40px; }
+  .jx-user-bubble { max-width: 92%; }
+  .jx-msg.jexi { padding-left: 12px; }
+  .jx-avatar { width: 24px; height: 24px; font-size: 11px; }
+  .jx-actions { opacity: 1; } /* always visible on touch */
+}
