@@ -70,7 +70,7 @@ export default function App() {
   // Native polish: match the phone's status bar to the black theme.
   useEffect(() => {
     if (window.Capacitor?.isNativePlatform?.()) {
-      StatusBar.setBackgroundColor({ color: '#0a0a0a' }).catch(() => {});
+      StatusBar.setBackgroundColor({ color: '#0f1115' }).catch(() => {});
       StatusBar.setStyle({ style: 'LIGHT' }).catch(() => {});
     }
   }, []);

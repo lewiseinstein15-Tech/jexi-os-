@@ -8,6 +8,8 @@ export default {
         'surface-1': '#0C1117',
         'surface-2': '#111820',
         'surface-3': '#161F29',
+        'surface-card': '#0e1319',
+        'surface-float': '#0e1319',
         hairline: 'rgba(255,255,255,0.06)',
         'hairline-strong': 'rgba(255,255,255,0.10)',
         // Text
