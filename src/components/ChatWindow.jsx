@@ -212,7 +212,14 @@ export default function ChatWindow({
             <div key={i} className="jx-msg jexi">
               <div className="jx-avatar" aria-hidden="true">J</div>
               <div className="jx-body">
-                {msg.streaming ? <SimpleText text={msg.text} /> : <RichAnswer text={msg.text} />}
+                {msg.streaming ? (
+                  <div>
+                    <SimpleText text={msg.text} />
+                    <span className="jx-caret" aria-hidden="true" />
+                  </div>
+                ) : (
+                  <RichAnswer text={msg.text} />
+                )}
                 {msg.role === 'jexi' && !isProcessing && !msg.streaming && (
                   <div className="jx-actions">
                     <button type="button" className="jx-act-mini" onClick={() => copyMsg(msg.text, i)}>
@@ -263,7 +270,7 @@ export default function ChatWindow({
         {/* agent process block while working */}
         {isProcessing && (
           <div className="jx-msg jexi">
-            <div className="jx-gutter">J</div>
+            <div className="jx-avatar" aria-hidden="true">J</div>
             <div className="jx-body">
               <ProcessSteps logs={logs} done={false} />
             </div>

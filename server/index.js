@@ -11,7 +11,7 @@ import { runSimpleTask } from './src/services/SimpleTask.js'; // B66 — Orchest
 import { workerRoster, executeNativeToolCalls } from './src/services/WorkerRouter.js'; // B69/B124 — coworker structure + gated plugin-tool executor for the direct path
 import { normalizeFinalAnswer } from './src/services/Formatting.js'; // B66 — normalize every final answer
 import { generateContent, resolveKeys, testAllProviders , generateWithToolsLoop } from './src/services/LLMClient.js';
-import { learnFromExchange } from './src/services/PreferenceLearner.js';
+import { learnFromExchange, recallPreferences } from './src/services/PreferenceLearner.js';
 import { rollingConversationSummary, getRollingSummary } from './src/services/MemoryManager.js';
 import {
   recordBoot, recordChat, recordVision, recordError,
@@ -36,6 +36,7 @@ import {
   // B66 — per-session conversation memory + persistence probe
   // B68 — redisConnectionInfo for truthful health reporting
   setActiveSession, clearActiveSession, memoryPersistenceProbe, redisConnectionInfo,
+  topUserFacts, getRecentEpisodes, // B155 — long-term memory in the direct path
 } from './src/services/MemoryManager.js';
 import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
 import { skillFolder, SKILL_META } from './src/services/SkillChain.js'; // B50 P1 — progressive skill folders
@@ -2386,6 +2387,7 @@ function lastUserChatText(convId) {
 
 function conversationSummaryContext(convId) {
   try {
+    const bits = [];
     // B100 — compaction-aware: if this conversation has a checkpoint, render
     // checkpoint + retained tail instead of the ever-growing transcript.
     if (convId) {
@@ -2393,18 +2395,42 @@ function conversationSummaryContext(convId) {
       if (checkpoint) {
         const tailText = tail.filter((e) => e.role === 'jexi' || e.role === 'user')
           .slice(-6).map((e) => `${e.role === 'user' ? 'You' : 'JEXI'}: ${String(e.text).replace(/\s+/g, ' ').slice(0, 300)}`).join('\n');
-        return `\n\n[Earlier in this conversation — compacted checkpoint: ${String(checkpoint.text).slice(0, 2000)}]\n[Recent turns retained verbatim:\n${tailText.slice(0, 1500)}]`;
+        bits.push(`[Earlier in this conversation — compacted checkpoint: ${String(checkpoint.text).slice(0, 2000)}]\n[Recent turns retained verbatim:\n${tailText.slice(0, 1500)}]`);
       }
     }
     const s = getRollingSummary();
-    const base = s ? `\n\n[Earlier in this conversation: ${String(s).slice(0, 600)}]` : '';
+    if (s) bits.push(`[Earlier in this conversation: ${String(s).slice(0, 600)}]`);
     // B136 — session-projection: a char-budgeted, newest-first view of this
     // conversation with an explicit dropped-count marker (dsh projection),
     // cached so the hot path never re-reads the log.
-    let projection = '';
-    try { projection = projectedConversationBlock(convId, { maxChars: 6000 }); } catch { /* noop */ }
+    try {
+      const projection = projectedConversationBlock(convId, { maxChars: 6000 });
+      if (projection) bits.push(projection);
+    } catch { /* noop */ }
+    // B155 — LONG-TERM MEMORY in the direct path (was agent-pipeline only):
+    // learned facts, user profile, preferences and episodic memory must be
+    // visible to EVERY answer, not just tool-loop turns. This is what makes
+    // "I told you my name is X" → "what's my name?" actually remember.
+    try {
+      const mem = loadMemory();
+      const profile = (mem && mem.userProfile) || {};
+      const memBits = [];
+      if (profile.name) memBits.push(`User's name: ${profile.name}`);
+      if (profile.location) memBits.push(`User's location: ${profile.location}`);
+      const facts = topUserFacts(6);
+      if (facts.length) memBits.push(...facts);
+      const prefs = recallPreferences(4);
+      if (prefs.length) memBits.push(...prefs);
+      const episodes = getRecentEpisodes(3);
+      if (episodes.length) {
+        memBits.push('Earlier sessions:' + episodes.map((e) => `\n- User asked "${String(e.ask).slice(0, 80)}" → I replied about ${String(e.reply).slice(0, 120)}`).join(''));
+      }
+      if (memBits.length) bits.push(`[What I remember about the user:\n${memBits.join('\n')}]`);
+    } catch { /* memory must never break the chat */ }
     // B106 — session-reference: the model knows OTHER past conversations exist.
-    return base + projection + recentSessionsBlock(convId, 5);
+    const refs = recentSessionsBlock(convId, 5);
+    if (refs) bits.push(refs);
+    return bits.length ? `\n\n${bits.join('\n')}` : '';
   } catch { return ''; }
 }
 
@@ -2511,6 +2537,12 @@ app.post('/api/chat', async (req, res) => {
     let raw = String(query || '').trim();
     // B96 — append the user message to the conversation's durable log.
     try { appendConversationEvent(convId, { role: 'user', text: raw, kind: 'chat' }); } catch (e) {}
+    // B155 — EVERY message (direct AND agent pipeline) goes through addChat:
+    // it mirrors the turn into the session history AND extracts lasting facts
+    // ("my name is X", "I live in Y") into long-term memory. Previously this
+    // only ran on the direct path, so facts said to the agent pipeline were
+    // never remembered.
+    try { addChat('user', raw); } catch (e) {}
     // B119 — dsh lifecycle: the user message is also a typed session event.
     try { lifecycleUserMessage(convId, 1, raw); } catch { /* noop */ }
     // B116-fix — HOIST preset+mode BEFORE any use: the auto-routing block and
@@ -2855,7 +2887,6 @@ app.post('/api/chat', async (req, res) => {
     // or run the agent pipeline. 'normal'/'agent' stay as explicit overrides
     // (preset + mode are hoisted at the top of this handler — B116-fix).
     if ((mode === 'normal' || autoDirect) && !image) {
-      try { addChat('user', effectiveQuery); } catch (e) {}
       sendEvent('log', { agent: 'JEXI', message: autoDirect ? '💬 Answering directly — no pipeline needed for this one.' : '💬 Normal mode — answering directly.' });
       sendEvent('plan', { intent: 'normal_chat', complexity: 'NORMAL', steps: ['JEXI Core'], roster: ['JEXI Core'], mode: 'normal' });
       const prompt = `${effectiveQuery}\n\n${conversationSummaryContext(convId)}${sessionRefInjected}`;

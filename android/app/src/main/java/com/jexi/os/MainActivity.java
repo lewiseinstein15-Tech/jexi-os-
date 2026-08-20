@@ -71,12 +71,13 @@ public class MainActivity extends BridgeActivity {
      * assets) — the white/broken screen — because the previous fix ran AFTER
      * the page had already started loading from cache.
      *
-     * Real fix: whenever versionCode changes (upgrade or fresh install),
-     * DELETE the ENTIRE WebView data directory (regular cache, HTTP cache,
-     * Service Worker storage) BEFORE the bridge creates/loads the WebView.
-     * The WebView then starts with zero cache and must load the fresh bundle
-     * from the APK's assets. clearCache() alone is not enough — it never
-     * clears the per-origin HTTP cache of the local server.
+     * B153 did it by deleting the ENTIRE app_webview directory — which also
+     * deleted the app's localStorage (session id, access key, settings) and
+     * therefore wiped conversation identity on every upgrade: JEXI "forgot"
+     * everything after each update. B155 fixes that: only the CACHE and
+     * SERVICE WORKER subdirectories are deleted (that is all the stale-bundle
+     * bug needs — localStorage never serves HTML/JS), so identity, settings
+     * and remembered conversations survive every update.
      */
     private void deleteRecursive(File f) {
         if (f == null || !f.exists()) return;
@@ -88,6 +89,16 @@ public class MainActivity extends BridgeActivity {
         f.delete();
     }
 
+    /** Cache/SW dirs that can hold a STALE BUNDLE — safe to delete on upgrade.
+     *  Deliberately NOT included: Local Storage, Web Data, Session Storage,
+     *  IndexedDB, blob_storage, databases, File System, Cookies — those hold
+     *  the user's identity, access key, settings and history. */
+    private static final String[] CACHE_SUBDIRS = {
+            "Cache", "HTTP Cache", "Code Cache", "GPUCache",
+            "DawnCache", "DawnGraphiteCache", "GrShaderCache", "ShaderCache",
+            "Service Worker",
+    };
+
     private void wipeWebViewDataOnUpgrade() {
         try {
             final int current = BuildConfig.VERSION_CODE;
@@ -97,7 +108,10 @@ public class MainActivity extends BridgeActivity {
                 prefs.edit().putInt("version_code", current).apply();
                 // Run BEFORE super.onCreate() — the WebView does not exist yet,
                 // so no in-flight load can re-seed from the old cache.
-                deleteRecursive(getDir("app_webview", MODE_PRIVATE));
+                final File webview = getDir("app_webview", MODE_PRIVATE);
+                for (String sub : CACHE_SUBDIRS) {
+                    deleteRecursive(new File(webview, sub));
+                }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     CookieManager.getInstance().removeAllCookies(null);
                 }

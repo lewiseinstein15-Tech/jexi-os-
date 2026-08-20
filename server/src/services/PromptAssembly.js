@@ -125,6 +125,19 @@ export async function assemblePrompt({
     if (refs) sections.push(refs);
   }
 
+  // -68 current conversation tail (B155 — dsh session-projection mirror):
+  // the last few user/JEXI turns of THIS conversation, so autonomous runners
+  // (research / coding loops) keep the thread instead of starting fresh.
+  // Callers that already inject their own conversation context (SimpleTask)
+  // disable session refs entirely, so nothing is ever duplicated.
+  if (includeSessionRefs && convId) {
+    try {
+      const { projectedConversationBlock } = await import('./SessionProjection.js');
+      const tail = projectedConversationBlock(convId, { maxChars: 4000 });
+      if (tail) sections.push(tail);
+    } catch { /* the tail must never break the prompt */ }
+  }
+
   // -60 skill catalog (metadata only).
   if (includeSkills) {
     const skills = buildSkillCatalog(30);

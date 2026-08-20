@@ -3,6 +3,9 @@ import { ArrowDownToLine, Loader2, X, CheckCircle2 } from 'lucide-react';
 import useUpdateChecker, { APK_DOWNLOAD_URL } from '../hooks/useUpdateChecker';
 import useApkInstaller from '../hooks/useApkInstaller';
 
+// B155 — monochrome only (black & white + grays, per the design rule).
+// The old banner used the banned #00FF9D green brand; now it matches the
+// flat black/white chat UI exactly like every other surface.
 export default function UpdateBanner() {
   const { enabled, latest, updateAvailable, checking, dismissed, dismiss } = useUpdateChecker();
   const installer = useApkInstaller();
@@ -33,14 +36,14 @@ export default function UpdateBanner() {
           transition={{ duration: 0.25, ease: 'easeInOut' }}
           className="overflow-hidden"
         >
-          <div className="mx-3 mt-3 rounded-xl bg-[#00FF9D]/10 border border-[#00FF9D]/40 px-3 py-2.5">
+          <div className="mx-3 mt-3 rounded-xl bg-[#171717] border border-[#333333] px-3 py-2.5">
             <div className="flex items-center gap-2.5">
               <span className="relative flex w-2 h-2 flex-shrink-0">
-                <span className="absolute inline-flex w-full h-full rounded-full bg-[#00FF9D] opacity-60 animate-ping" />
-                <span className="relative inline-flex w-2 h-2 rounded-full bg-[#00FF9D]" />
+                <span className="absolute inline-flex w-full h-full rounded-full bg-white opacity-40 animate-ping" />
+                <span className="relative inline-flex w-2 h-2 rounded-full bg-white" />
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-black text-[#00FF9D] tracking-wide">
+                <p className="text-[10px] font-black text-white tracking-wide">
                   NEW UPDATE READY — build #{latest.number}
                 </p>
                 <p className="text-[8px] text-gray-400 truncate">
@@ -50,7 +53,7 @@ export default function UpdateBanner() {
               <button
                 onClick={handleUpdate}
                 disabled={installer.busy}
-                className="flex-shrink-0 bg-[#00FF9D] text-black rounded-lg px-3 py-1.5 text-[9px] font-black tracking-wide flex items-center gap-1.5 shadow-[0_0_20px_rgba(0,255,157,0.35)] disabled:opacity-80 disabled:cursor-wait min-w-[86px] justify-center"
+                className="flex-shrink-0 bg-white text-black rounded-lg px-3 py-1.5 text-[9px] font-black tracking-wide flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-wait min-w-[86px] justify-center"
               >
                 {installer.busy ? (
                   <Loader2 className="w-3 h-3 animate-spin" />
@@ -71,9 +74,9 @@ export default function UpdateBanner() {
 
             {/* progress bar while downloading / installing */}
             {installer.busy && (
-              <div className="mt-2 h-1.5 rounded-full bg-black/40 overflow-hidden">
+              <div className="mt-2 h-1.5 rounded-full bg-black/60 overflow-hidden">
                 <motion.div
-                  className="h-full rounded-full bg-[#00FF9D]"
+                  className="h-full rounded-full bg-white"
                   animate={{
                     width: installer.phase === 'installing' ? '100%' : `${Math.max(4, installer.progress)}%`,
                   }}
@@ -82,14 +85,14 @@ export default function UpdateBanner() {
               </div>
             )}
 
-            {/* success / error guidance */}
+            {/* success / error guidance — monochrome */}
             {installer.phase === 'done' && (
-              <p className="mt-2 text-[8px] font-bold text-[#22c55e] flex items-center gap-1">
+              <p className="mt-2 text-[8px] font-bold text-gray-200 flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" /> Installer opened — tap INSTALL in the Android dialog, then reopen JEXI OS.
               </p>
             )}
             {installer.phase === 'error' && (
-              <div className="mt-2 text-[8px] text-[#f87171] leading-relaxed">
+              <div className="mt-2 text-[8px] text-gray-200 leading-relaxed">
                 <p className="font-bold">Install was blocked: {installer.error}</p>
                 <p className="text-gray-400 mt-0.5">
                   First time only: Settings → Apps → JEXI OS → “Install unknown apps” → Allow, then tap UPDATE again.
@@ -97,13 +100,13 @@ export default function UpdateBanner() {
                 <div className="flex gap-2 mt-1">
                   <button
                     onClick={() => installer.start()}
-                    className="bg-[#f87171]/20 border border-[#f87171]/40 text-[#f87171] rounded-md px-2 py-1 font-bold"
+                    className="bg-white text-black rounded-md px-2 py-1 font-bold"
                   >
                     RETRY
                   </button>
                   <button
                     onClick={() => window.open(APK_DOWNLOAD_URL, '_system', 'noopener')}
-                    className="text-gray-400 border border-gray-700 rounded-md px-2 py-1 font-bold"
+                    className="text-gray-300 border border-gray-700 rounded-md px-2 py-1 font-bold"
                   >
                     USE BROWSER INSTEAD
                   </button>
