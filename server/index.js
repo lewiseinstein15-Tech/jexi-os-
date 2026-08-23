@@ -837,6 +837,25 @@ app.get('/api/roster', (req, res) => {
   res.type('json').send(rosterCache.json);
 });
 
+// === SYSTEM METRICS (New enhancement) ===
+app.get('/api/system/metrics', (req, res) => {
+  const mem = process.memoryUsage();
+  res.json({
+    ok: true,
+    version: '1.2.0',
+    agents: AGENT_ROSTER.length,
+    skills: SKILL_REGISTRY.length,
+    tools: getToolCatalog().length,
+    uptime: process.uptime(),
+    node: process.version,
+    memory: {
+      rss: Math.round(mem.rss / 1024 / 1024) + 'MB',
+      heapUsed: Math.round(mem.heapUsed / 1024 / 1024) + 'MB',
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 // === FIRST-CLASS SKILLS (roadmap stage 13) ===
 // The 495-skill registry is user-invocable: browse it (grouped by category,
 // searchable), then invoke one — the invoke call resolves the owning agent and
