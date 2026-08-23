@@ -28,6 +28,7 @@ ENV PLAYWRIGHT_BROWSERS_PATH=0
 
 # Frontend build -> served from server/public by Express
 COPY package*.json index.html vite.config.js tailwind.config.js postcss.config.js ./
+COPY public ./public
 COPY src ./src
 RUN npm ci --no-audit --no-fund && npm run build && mkdir -p server/public && cp -r dist/* server/public/
 

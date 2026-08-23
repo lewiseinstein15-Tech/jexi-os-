@@ -145,7 +145,7 @@ export default function GoalsScreen() {
     setLogs((prev) => ({ ...prev, [jobId]: [] }));
     (async () => {
       try {
-        const res = await fetch(`${getBackendUrl()}/api/goals/${jobId}/stream`, { signal: controller.signal });
+        const res = await jexiFetch(`${getBackendUrl()}/api/goals/${jobId}/stream`, { signal: controller.signal });
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
@@ -213,7 +213,7 @@ export default function GoalsScreen() {
     if (!answer) return;
     setAnswering((prev) => ({ ...prev, [jobId]: true }));
     try {
-      await fetch(`${getBackendUrl()}/api/goals/${jobId}/info`, {
+      await jexiFetch(`${getBackendUrl()}/api/goals/${jobId}/info`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answer }),

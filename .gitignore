@@ -25,3 +25,6 @@ server/jexi-workspace/
 # Firebase service account (private key — NEVER commit)
 server/firebase-service-account.json
 .aider*
+
+__pycache__/
+*.pyc
