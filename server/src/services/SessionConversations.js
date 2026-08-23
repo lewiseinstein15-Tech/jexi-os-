@@ -148,6 +148,7 @@ export function conversationSummary(convId) {
     approxTokens: stats.approxTokens ?? null,
     durationMs: stats.durationMs ?? null,
     compactions: stats.compactions ?? 0,
+    firstMessage: firstUser ? String(firstUser.text).replace(/\s+/g, ' ').slice(0, 200) : '',
     createdAt: events[0].at,
     lastActive: events[events.length - 1].at,
   };

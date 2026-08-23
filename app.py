@@ -1,123 +1,58 @@
-from flask import Flask, request, render_template_string, session
-import subprocess
+"""
+Optional local helper (not the JEXI brain).
+
+The Node/Express server in `server/` is the real product. This Flask wrapper
+was a leftover Aider playground that:
+  - used a hardcoded secret key
+  - pointed at a Codespaces path that does not exist here
+  - auto-committed and pushed every prompt to GitHub
+
+Those behaviours are disabled. Run the real stack instead:
+
+    cd server && npm start
+    npm run dev
+"""
+
+from flask import Flask, render_template_string
 import os
 
 app = Flask(__name__)
-app.secret_key = 'jexi-secret-key-change-this'
-REPO = "/workspaces/jexi-os-"
-MODEL = "groq/llama3-8b-8192"
+app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.urandom(32)
 
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Jexi AI Agent</title>
+    <title>JEXI — use the Node app</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d0d0d; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; }
-        .header { background: #1a1a1a; padding: 20px; text-align: center; border-bottom: 1px solid #333; }
-        .header h1 { color: #00ff88; font-size: 24px; font-weight: 600; }
-        .chat-container { flex: 1; overflow-y: auto; padding: 20px; max-width: 900px; margin: 0 auto; width: 100%; }
-        .message { margin-bottom: 20px; display: flex; align-items: flex-start; }
-        .message.user { justify-content: flex-end; }
-        .message.assistant { justify-content: flex-start; }
-        .message-content { max-width: 80%; padding: 15px 20px; border-radius: 18px; line-height: 1.5; font-size: 15px; white-space: pre-wrap; word-wrap: break-word; }
-        .user .message-content { background: #00ff88; color: #000; border-bottom-right-radius: 4px; }
-        .assistant .message-content { background: #1a1a1a; color: #e0e0e0; border-bottom-left-radius: 4px; border: 1px solid #333; }
-        .input-container { background: #1a1a1a; padding: 20px; border-top: 1px solid #333; }
-        .input-wrapper { max-width: 900px; margin: 0 auto; display: flex; gap: 10px; }
-        textarea { flex: 1; background: #0d0d0d; color: #e0e0e0; border: 1px solid #333; border-radius: 12px; padding: 15px; font-size: 15px; resize: none; min-height: 60px; max-height: 150px; font-family: inherit; }
-        textarea:focus { outline: none; border-color: #00ff88; }
-        button { background: #00ff88; color: #000; border: none; border-radius: 12px; padding: 0 30px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        button:hover { background: #00cc6a; }
-        button:disabled { background: #333; color: #666; cursor: not-allowed; }
-        .loading { display: none; text-align: center; padding: 10px; color: #00ff88; font-style: italic; }
-        .loading.show { display: block; }
-        .error { color: #ff4444; background: #330000; padding: 10px; border-radius: 8px; margin: 10px 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+               background: #0d0d0d; color: #e0e0e0; min-height: 100vh;
+               display: flex; align-items: center; justify-content: center; margin: 0; }
+        .box { max-width: 560px; padding: 32px; border: 1px solid #333; border-radius: 16px; }
+        h1 { color: #e0e0e0; font-size: 22px; }
+        code { background: #1a1a1a; padding: 2px 6px; border-radius: 4px; }
+        a { color: #ccc; }
     </style>
 </head>
 <body>
-    <div class="header"><h1>🤖 Jexi AI Agent</h1></div>
-    <div class="chat-container" id="chatContainer">
-        {% if error %}
-            <div class="error">{{ error }}</div>
-        {% endif %}
-        {% if messages %}
-            {% for msg in messages %}
-                <div class="message {{ msg.role }}">
-                    <div class="message-content">{{ msg.content }}</div>
-                </div>
-            {% endfor %}
-        {% else %}
-            <div class="message assistant">
-                <div class="message-content">👋 Hello! I'm Jexi, your AI coding assistant. What would you like me to build for you today?</div>
-            </div>
-        {% endif %}
+    <div class="box">
+        <h1>This is not the JEXI app</h1>
+        <p>The real JEXI OS brain is the Express server in <code>server/</code>.</p>
+        <p>Start it with:</p>
+        <p><code>cd server && npm start</code></p>
+        <p>Then the UI: <code>npm run dev</code> and open <code>http://localhost:3000</code>.</p>
     </div>
-    <div class="loading" id="loading"> Jexi is coding...</div>
-    <div class="input-container">
-        <form method="POST" id="chatForm" class="input-wrapper">
-            <textarea name="prompt" id="promptInput" placeholder="Tell me what to build..." required>{{ current_prompt }}</textarea>
-            <button type="submit" id="sendBtn">Send</button>
-        </form>
-    </div>
-    <script>
-        document.getElementById('chatForm').addEventListener('submit', function() {
-            document.getElementById('loading').classList.add('show');
-            document.getElementById('sendBtn').disabled = true;
-            document.getElementById('sendBtn').textContent = 'Working...';
-        });
-        const chat = document.getElementById('chatContainer');
-        chat.scrollTop = chat.scrollHeight;
-    </script>
 </body>
 </html>
 """
 
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    if 'messages' not in session:
-        session['messages'] = []
-    
-    error = None
-    
-    if request.method == 'POST':
-        prompt = request.form.get('prompt', '').strip()
-        if prompt:
-            session['messages'].append({'role': 'user', 'content': prompt})
-            
-            # Run Aider
-            try:
-                # We pass the API key directly to aider just in case
-                env = os.environ.copy()
-                cmd = ["aider", "--model", MODEL, "--yes-always", "--message", prompt]
-                result = subprocess.run(cmd, cwd=REPO, capture_output=True, text=True, timeout=120, env=env)
-                response = result.stdout.strip()
-                if result.stderr:
-                    response += "\n\n" + result.stderr.strip()
-                if not response:
-                    response = "✅ Task completed successfully!"
-            except subprocess.TimeoutExpired:
-                response = "⏳ The task is taking too long. Jexi is still working in the background - check the terminal for progress!"
-            except Exception as e:
-                response = f"⚠️ Error: {str(e)}"
-                error = str(e)
-            
-            session['messages'].append({'role': 'assistant', 'content': response})
-            session.modified = True
-            
-            # Auto-commit to GitHub
-            try:
-                subprocess.run(["git", "add", "."], cwd=REPO, capture_output=True, timeout=10)
-                subprocess.run(["git", "commit", "-m", f"Jexi: {prompt[:30]}..."], cwd=REPO, capture_output=True, timeout=10)
-                subprocess.run(["git", "push"], cwd=REPO, capture_output=True, timeout=10)
-            except:
-                pass 
-        
-        return render_template_string(HTML, messages=session['messages'], current_prompt='', error=error)
-    
-    return render_template_string(HTML, messages=session['messages'], current_prompt='', error=None)
+    return render_template_string(HTML)
+
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='127.0.0.1', port=int(os.environ.get('PORT', 5000)), debug=False)

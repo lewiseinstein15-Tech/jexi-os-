@@ -67,6 +67,23 @@ import { mountMcp } from './mcp-server.js';
 import { taskManager } from './src/services/TaskManager.js';
 import { taskScheduler } from './src/services/TaskScheduler.js';
 import { PORT, WORKSPACE_DIR, DATA_DIR, SERVER_ROOT } from './src/config.js';
+import { resolveInside } from './src/services/PathSafety.js';
+import { mountSurface } from './src/routes/surface.js';
+import { goalEngine } from './src/services/GoalEngine.js';
+import {
+  setGoalExecutor, setGoalNotifier, hydrateGoalJobsFromRedis,
+} from './src/services/GoalJobQueue.js';
+import { notifyGoalComplete, setGoalCallConnector } from './src/services/GoalNotifier.js';
+import {
+  appendConversationEvent,
+} from './src/services/SessionConversations.js';
+import * as SessionConversations from './src/services/SessionConversations.js';
+import { writeBootProfile } from './src/services/BootProfile.js';
+import { buildLaunchEnvironment, setLaunchEnvironment } from './src/services/LaunchEnvironment.js';
+import { initConfigSnapshot } from './src/services/ConfigReload.js';
+import { openSessionPersistence } from './src/services/SessionPersistenceSqlite.js';
+import { loadPlugins, setActivePluginContext } from './src/services/PluginContext.js';
+import { startSkillWatcher } from './src/services/SkillDiscovery.js';
 
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
 // everything across restarts/redeploys (non-blocking).
@@ -85,6 +102,27 @@ process.on('unhandledRejection', (e) => { recordError('process', (e && e.message
 // config + env. Agents reach them through the gated `connector-call`
 // tool; providers reach JEXI through /webhooks/connectors/<name>.
 registerConnectors();
+
+// Boot profile + launch env + config snapshot (documented in .env.example
+// and B136/B138, but never actually called from the server entrypoint).
+try { setLaunchEnvironment(buildLaunchEnvironment()); } catch (e) { recordError('boot', e.message); }
+try { initConfigSnapshot({ env: process.env, settings: loadSettings() }); } catch (e) { recordError('boot', e.message); }
+try { writeBootProfile({ phase: 'B156', commit: process.env.RENDER_GIT_COMMIT || 'local' }); } catch (e) { recordError('boot', e.message); }
+globalThis.__jexiSessionConversations = SessionConversations;
+openSessionPersistence(path.join(DATA_DIR, 'sessions.sqlite')).catch((e) => recordError('boot', e.message));
+loadPlugins({ services: {} }).then(({ ctx }) => {
+  if (ctx) setActivePluginContext(ctx);
+  try { startSkillWatcher(); } catch { /* optional */ }
+}).catch((e) => recordError('plugins', e.message));
+
+// Goal jobs: inject real planner/orchestrator and resume after restart.
+goalEngine.planner = planner;
+goalEngine.orchestrator = orchestrator;
+goalEngine.generateContent = generateContent;
+setGoalExecutor(goalEngine);
+setGoalNotifier(notifyGoalComplete);
+setGoalCallConnector(callConnector);
+hydrateGoalJobsFromRedis().catch((e) => recordError('goals', e.message));
 
 // B61/B66 — Email auto-reply loop: when a verified inbound email arrives,
 // JEXI generates the reply and sends it back automatically via the
@@ -150,7 +188,7 @@ app.use(cors({ origin: CORS_ALLOWLIST }));
 // else under /api/* (chat, vision, knowledge, memory, desktop, settings write,
 // APK proxy) is gated when JEXI_API_KEY is set.
 // NOTE: mounted on the app root (not '/api') so req.path keeps its full form.
-const OPEN_PATHS = ['/api/health', '/api/settings/status', '/api/metrics'];
+const OPEN_PATHS = ['/api/health', '/api/settings/status', '/api/metrics', '/api/update/version', '/api/brand'];
 app.use((req, res, next) => {
   if (!API_KEY || req.method === 'OPTIONS') return next();
   if (!req.path.startsWith('/api')) return next();
@@ -363,19 +401,24 @@ app.post('/api/desktop/restart', async (req, res) => {
 });
 
 // === FILE VIEWER & PREVIEW ENDPOINTS ===
+const escapeHtml = (s) => String(s).replace(/[&<>"'`]/g, (c) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;',
+}[c]));
+
 app.get('/api/files/:filename', (req, res) => {
   try {
-    const filePath = path.join(WORKSPACE_DIR, req.params.filename);
+    const filePath = resolveInside(WORKSPACE_DIR, req.params.filename);
     if (!fs.existsSync(filePath)) return res.status(404).send('File not found');
     const content = fs.readFileSync(filePath, 'utf-8');
     const ext = path.extname(req.params.filename).substring(1);
-    res.send(`<!DOCTYPE html><html><head><title>JEXI Workspace - ${req.params.filename}</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{background:#0a0a0a;color:#eee;font-family:monospace;padding:20px;margin:0}h2{color:#00FF9D;font-family:sans-serif}.toolbar{display:flex;gap:10px;margin-bottom:15px;align-items:center}a{color:#00d4ff;text-decoration:none;padding:8px 15px;background:#1a1a1a;border-radius:5px;font-family:sans-serif}a:hover{background:#00d4ff;color:#000}pre{background:#111;padding:15px;border-radius:8px;overflow-x:auto;border:1px solid #333;font-size:14px}.meta{color:#888;font-size:12px;margin-bottom:10px;font-family:sans-serif}</style></head><body><div class="toolbar"><h2>📄 ${req.params.filename}</h2><a href="/">← Back to JEXI</a></div><div class="meta">Type: ${ext} | Size: ${content.length} chars</div><pre><code>${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre></body></html>`);
-  } catch (e) { res.status(500).send('Error: ' + e.message); }
+    const safeName = escapeHtml(req.params.filename);
+    res.send(`<!DOCTYPE html><html><head><title>JEXI Workspace - ${safeName}</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{background:#0a0a0a;color:#eee;font-family:monospace;padding:20px;margin:0}h2{color:#00FF9D;font-family:sans-serif}.toolbar{display:flex;gap:10px;margin-bottom:15px;align-items:center}a{color:#00d4ff;text-decoration:none;padding:8px 15px;background:#1a1a1a;border-radius:5px;font-family:sans-serif}a:hover{background:#00d4ff;color:#000}pre{background:#111;padding:15px;border-radius:8px;overflow-x:auto;border:1px solid #333;font-size:14px}.meta{color:#888;font-size:12px;margin-bottom:10px;font-family:sans-serif}</style></head><body><div class="toolbar"><h2>📄 ${safeName}</h2><a href="/">← Back to JEXI</a></div><div class="meta">Type: ${escapeHtml(ext)} | Size: ${content.length} chars</div><pre><code>${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre></body></html>`);
+  } catch (e) { res.status(400).send('Error: ' + e.message); }
 });
 
 app.get('/preview/:filename', (req, res) => {
   try {
-    const filePath = path.join(WORKSPACE_DIR, req.params.filename);
+    const filePath = resolveInside(WORKSPACE_DIR, req.params.filename);
     if (!fs.existsSync(filePath)) return res.status(404).send('File not found');
     const content = fs.readFileSync(filePath, 'utf-8');
     const ext = path.extname(req.params.filename).substring(1);
@@ -595,7 +638,19 @@ app.post('/api/notifications/clear', (req, res) => res.json(clearNotifications()
 // === MODEL ROUTING (roadmap stage 24 — per-domain provider preference) ===
 // Exposes the intent → provider map; AgentLoop honors it via opts.prefer.
 app.get('/api/models', (req, res) => {
-  res.json({ routing: modelRoutingTable(), preferenceFor: (intent) => providerPreferenceForIntent(intent) });
+  const routing = modelRoutingTable();
+  const workers = [
+    { slug: 'coder', role: 'Coding / GitHub operations', providers: ['groq', 'gemini'], fallback: ['openrouter', 'cerebras'] },
+    { slug: 'researcher', role: 'Research / realtime information', providers: ['openrouter', 'groq'], fallback: ['gemini'] },
+    { slug: 'memory', role: 'Memory / conversation continuity', providers: ['groq'], fallback: ['openrouter'] },
+    { slug: 'fallback', role: 'General fallback — last resort only', providers: ['mistral', 'xai', 'huggingface'], fallback: [] },
+  ];
+  res.json({
+    ok: true,
+    routing,
+    workers,
+    preferenceFor: Object.fromEntries(routing.map((r) => [r.intent, providerPreferenceForIntent(r.intent)])),
+  });
 });
 
 // === RISK GUARD / TRUST (roadmap stage 17) ===
@@ -1096,7 +1151,16 @@ app.post('/api/chat', async (req, res) => {
   // A fresh run must never serve a stale previous result during recovery.
   clearResult(convId);
   // done = emit the terminal event; persistence is handled by sendEvent above.
-  const done = (payload) => sendEvent('done', payload);
+  const rememberTurn = (role, text) => {
+    const t = String(text || '').trim();
+    if (!t) return;
+    try { addChat(role, t); } catch { /* memory must never break chat */ }
+    try { appendConversationEvent(convId, { role, text: t, kind: 'chat' }); } catch { /* same */ }
+  };
+  const done = (payload) => {
+    sendEvent('done', payload);
+    if (payload && payload.summary) rememberTurn('jexi', payload.summary);
+  };
 
   // Heartbeat: Cloudflare's proxy in front of Render kills streams that stay
   // silent too long (deep-reads and LLM calls pause for 10-30s). A tiny event
@@ -1123,6 +1187,7 @@ app.post('/api/chat', async (req, res) => {
 
   try {
     const raw = String(query || '').trim();
+    if (raw) rememberTurn('user', raw);
     const pendingOffer = loadOffer(convId);
     const hasPending = Boolean(pendingOffer);
     let effectiveQuery = raw;
@@ -1279,7 +1344,7 @@ app.post('/api/chat', async (req, res) => {
     const safety = scanPromptSafety(effectiveQuery || raw);
     if (!safety.safe) {
       sendEvent('log', { agent: 'Guardrail', message: `🛡 ${safety.reason}` });
-      sendEvent('done', { success: false, blocked: true, query, summary: blockExplanation(safety), statistics: { executionTime: 0, agentsUsed: 0, confidence: 0 } });
+      done({ success: false, blocked: true, query, summary: blockExplanation(safety), statistics: { executionTime: 0, agentsUsed: 0, confidence: 0 } });
       return;
     }
 
@@ -1364,7 +1429,7 @@ app.post('/api/chat', async (req, res) => {
       : results.success
         ? '✅ Task completed — the team finished, but returned no readable summary. Check the activity log above to see what ran.'
         : (results.error || 'The task failed — check the activity log for details.');
-    sendEvent('done', { success: results.success, query, summary: finalSummary, sources: results.sources || [], statistics: results.statistics, files: results.files || [] });
+    done({ success: results.success, query, summary: finalSummary, sources: results.sources || [], statistics: results.statistics, files: results.files || [] });
 
     // BUILD 47 — TASK STATE UPDATE: record what this turn completed so the next
     // "continue" resumes from here instead of restarting.
@@ -1409,7 +1474,7 @@ app.post('/api/chat', async (req, res) => {
         summary: '### ⚠ JEXI OS — degraded mode\n\nI\'m having trouble reaching my usual AI resources right now, so I can\'t produce a full answer at the moment. No provider completed the request.\n\nWhat you can do:\n- Try again in a minute or two — rate limits and temporary outages usually clear quickly.\n- Check that your model keys are valid in **Settings → Models** (and the matching env vars on Render).\n- If you run a local model (Ollama), set \`OLLAMA_BASE_URL\` and I\'ll route through it automatically.\n\nI\'m not going to guess or pretend — that\'s the honest status right now.',
       });
     } else {
-      sendEvent('done', { success: false, error: error.message });
+      done({ success: false, error: error.message });
     }
   } finally { finished = true; clearTimeout(deadline); clearActiveSession(); finish(); }
 });
@@ -1496,8 +1561,8 @@ app.get('/api/schedules', (req, res) => {
 });
 
 app.post('/api/schedules', (req, res) => {
-  const { query, everySeconds, label, image } = req.body || {};
-  const result = taskScheduler.create({ query, everySeconds, label, image });
+  const { query, everySeconds, label, image, kind, autonomy, dailyAt } = req.body || {};
+  const result = taskScheduler.create({ query, everySeconds, label, image, kind, autonomy, dailyAt });
   if (result.error) return res.status(400).json({ success: false, error: result.error });
   res.json({ success: true, schedule: result.schedule });
 });
@@ -1531,7 +1596,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
     name: 'JEXI OS Brain',
-    version: '1.0.0',
+    version: '1.2.0',
     instanceId: INSTANCE_ID,
     uptime: Math.round(process.uptime()),
     redis: isRedisActive(),
@@ -1611,6 +1676,20 @@ if (fs.existsSync(publicDir)) {
 </div>
 </div></body></html>`);
   });
+}
+
+const publicDirForSurface = path.join(SERVER_ROOT, 'public');
+mountSurface(app, {
+  publicDir: fs.existsSync(publicDirForSurface) ? publicDirForSurface : null,
+  openPaths: OPEN_PATHS,
+  keyLocked: !!API_KEY && process.env.JEXI_ALLOW_UNLOCKED !== '1',
+  allowUnlocked: process.env.JEXI_ALLOW_UNLOCKED === '1',
+  scheduler: taskScheduler,
+});
+
+if (process.env.NODE_ENV === 'production' && !API_KEY && process.env.JEXI_ALLOW_UNLOCKED !== '1') {
+  console.error('Refusing to start: JEXI_API_KEY is required in production (or set JEXI_ALLOW_UNLOCKED=1 for an explicit unlocked deploy).');
+  process.exit(1);
 }
 
 app.listen(PORT, '0.0.0.0', () => {

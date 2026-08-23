@@ -29,7 +29,10 @@ const ok = (cond, name, extra = '') => {
 console.log('\n== API surface: frontend calls ↔ server routes ==');
 /* ------------------------------------------------------------------ */
 const srcDir = path.join(ROOT, 'src');
-const serverFile = fs.readFileSync(path.join(ROOT, 'server', 'index.js'), 'utf-8');
+const serverFile = [
+  fs.readFileSync(path.join(ROOT, 'server', 'index.js'), 'utf-8'),
+  fs.readFileSync(path.join(ROOT, 'server', 'src', 'routes', 'surface.js'), 'utf-8'),
+].join('\n');
 
 function walk(dir, acc = []) {
   for (const f of fs.readdirSync(dir)) {

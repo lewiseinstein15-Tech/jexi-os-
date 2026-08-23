@@ -18,7 +18,7 @@ const STREAM_STALE_MS = 60000;
  * exactly why JEXI finished a task in the logs while the chat showed no answer.
  * Buffer partial lines until the newline arrives.
  */
-async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable } = {}) {
+async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable, setQuestions, setPlanReview } = {}) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -68,8 +68,8 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
     else if (data.type === 'plan') setPlan(prev => ({ ...prev, ...data }));
     // Build 47 — intelligence metadata (classification, task id, confidence).
     else if (data.type === 'intel') setPlan(prev => ({ ...prev, intel: data }));
-    else if (data.type === 'ask.user') setQuestions(data);
-    else if (data.type === 'plan.review') setPlanReview(data);
+    else if (data.type === 'ask.user') setQuestions?.(data);
+    else if (data.type === 'plan.review') setPlanReview?.(data);
     else if (data.type === 'done') {
       sawDone = true;
       if (data.success) {
@@ -161,6 +161,8 @@ export const useJexiEngine = () => {
   const [websites, setWebsites] = useState([]);
   const [plan, setPlan] = useState(null); // { intent, steps, roster, skillsLine } from the /api/chat plan event
   const [isProcessing, setIsProcessing] = useState(false);
+  const [questions, setQuestions] = useState(null); // { conv, questions: [...] }
+  const [planReview, setPlanReview] = useState(null); // { conv, plan }
   const abortRef = useRef(null);
   const watchdogFiredRef = useRef(false);
   const recoverRef = useRef(null); // AbortController for the auto-recovery poll
@@ -290,8 +292,8 @@ export const useJexiEngine = () => {
     const onDrop = async () => { await recoverResult(); };
     const onRecoverable = () => { setTimeout(() => { recoverResult(); }, 1500); };
 
+    const backendUrl = getBackendUrl();
     try {
-      const backendUrl = getBackendUrl();
       abortRef.current = new AbortController();
       // B117 — ONE MODE: no mode header; the server routes per query.
       const headers = { 'Content-Type': 'application/json', 'x-jexi-session': sessionRef.current };
@@ -329,11 +331,11 @@ export const useJexiEngine = () => {
           signal: abortRef.current.signal,
         });
         if (!retry.ok) throw new Error(`Backend replied HTTP ${retry.status}`);
-        await consumeStream(retry, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable });
+        await consumeStream(retry, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable, setQuestions, setPlanReview });
         return;
       }
       if (!res.ok) throw new Error(`Backend replied HTTP ${res.status}`);
-      await consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable });
+      await consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable, setQuestions, setPlanReview });
     } catch (error) {
       // Aborted by the user (STOP) — don't show a scary network error.
       if (error?.name === 'AbortError') {
@@ -378,10 +380,6 @@ export const useJexiEngine = () => {
     if (!text) return;
     setMessages(prev => [...prev, { role, text }]);
   }, []);
-
-  // B110 — ask_user_question cards + plan-mode review card state.
-  const [questions, setQuestions] = useState(null); // { conv, questions: [{id,question,header,options,multiSelect}] }
-  const [planReview, setPlanReview] = useState(null); // { conv, plan }
 
   // v3 — open a past conversation from History: load its events as read-only
   // messages and point the session at it so the next message CONTINUES it.
