@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Square, ImagePlus, X, Camera, Stethoscope, Plus, Copy, Check, RefreshCw, Sparkles } from 'lucide-react';
 import TypedMessage from './TypedMessage';
+import MarkdownRenderer from './MarkdownRenderer';
 import VisionPanel from './VisionPanel';
 import AgentPipeline from './AgentPipeline';
 
@@ -125,10 +126,25 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
     else onSend(SELF_CHECK_QUERY);
   };
 
-  // Auto-scroll to newest content
+  // Auto-scroll — but ONLY while the reader is already at the bottom.
+  // Fix: the old code forced scrollTop to the bottom on EVERY stream event,
+  // so during a long streaming answer any attempt to scroll up was instantly
+  // yanked back — the answer was literally unscrollable. Now a scroll listener
+  // tracks whether the user is near the bottom (~120px) and only then do we
+  // pin to the newest content; scroll up and the view stays exactly where
+  // the reader put it.
+  const stickToBottomRef = useRef(true);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  }, []);
+
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (el && stickToBottomRef.current) {
+      el.scrollTop = el.scrollHeight;
     }
   }, [messages, isProcessing, logs]);
 
@@ -156,10 +172,15 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
 
 
       {/* Messages scroll area */}
-      <div ref={scrollRef} className="space-y-4 mb-3 flex-1 min-h-0 overflow-y-auto pr-1">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="space-y-4 mb-3 flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
         {messages.length === 0 && !isProcessing ? (
-          /* Empty state — minimal welcome */
-          <div className="flex-1 flex flex-col items-center justify-center py-16">
+          /* Empty state — minimal welcome, vertically centered */
+          <div className="min-h-[55vh] flex flex-col items-center justify-center py-16">
             <div className="w-12 h-12 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center mb-4">
               <Sparkles className="w-5 h-5 text-brand" />
             </div>
@@ -197,7 +218,15 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
                     </div>
                     <span className="text-[9px] font-bold tracking-[0.18em] text-brand">JEXI</span>
                   </div>
-                  <TypedMessage text={msg.text} size="text-[13px]" />
+                  {/* Streaming messages arrive progressively already — render
+                      them directly (no typewriter) so the content never
+                      re-flows mid-scroll. The typewriter reveal runs once,
+                      on the completed answer. */}
+                  {msg.streaming ? (
+                    <MarkdownRenderer content={msg.text} size="text-[13px]" />
+                  ) : (
+                    <TypedMessage text={msg.text} size="text-[13px]" />
+                  )}
                   <MessageActions text={msg.text} onRegenerate={i === messages.length - 1 ? () => onSend(msg.text) : null} />
                 </div>                )}
             </motion.div>
