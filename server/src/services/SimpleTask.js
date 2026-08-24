@@ -100,6 +100,20 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
   } catch (e) {}
 
   const prompt = `The user asked: "${query}"\n\n${ctx ? `Conversation context:\n${ctx.slice(0, 4000)}\n\n` : ''}Answer directly and completely. ${FORMAT_RULES}`;
+
+  // B157 — LIVE STREAMING + ANSWER PRESERVATION. Every token the coworker
+  // emits streams straight to the UI (the answer types itself live, like a
+  // real AI system), AND the full streamed text is accumulated here. If the
+  // worker's final text ever comes back empty (a provider quirk), the
+  // streamed content IS the answer — it must never be discarded in favor of
+  // a "no readable summary" notice.
+  let streamedAnswer = '';
+  const onToken = (t) => {
+    const delta = String(t || '');
+    if (!delta) return;
+    streamedAnswer += delta;
+    emit('stream', { text: delta });
+  };
   // B105 — plugin tools join the SIMPLE-path tool set (weather-now etc.);
   // normalizeTools in LLMClient turns def-shaped lists into provider schemas.
   const coworkerTools = (() => {
@@ -129,6 +143,7 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
     intent: plan.intent,
     profile: opts.profile,
     sendEvent: emit,
+    onToken,
     confirm: opts.confirm,
     signal: opts.signal,
     maxIterations: opts.maxIterations || 4,
@@ -148,8 +163,11 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
     emit('log', { agent: 'Orchestrator', message: `🔧 Coworker used ${results.statistics.toolCalls} native tool call(s) (${results.statistics.iterations} round${results.statistics.iterations === 1 ? '' : 's'}).` });
   }
 
-  if (res.ok && res.text) {
-    const summary = normalizeFinalAnswer(res.text);
+  // Success = the worker finished AND produced content — the live-streamed
+  // text counts (fixes "✅ Task completed — no readable summary": the answer
+  // had streamed to the UI and was then thrown away at the done event).
+  if (res.ok && ((res.text && res.text.trim()) || streamedAnswer.trim())) {
+    const summary = normalizeFinalAnswer(res.text || streamedAnswer);
     results.summary = summary;
     try { addChat('assistant', summary); } catch (e) {}
     emit('agent.done', {
@@ -161,8 +179,8 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
 
   // Truthful failure — never paper over it, never a bare error string.
   results.success = false;
-  results.error = res.text || 'The coworker could not complete the task.';
-  results.summary = normalizeFinalAnswer(res.text || results.error);
+  results.error = (res.text && res.text.trim()) || streamedAnswer.trim() || 'The coworker could not complete the task.';
+  results.summary = normalizeFinalAnswer(results.error);
   emit('log', { agent: 'System', message: `⚠ Coworker ${role} could not complete the task — reported honestly.` });
   emit('agent.done', { answer: results.summary, stats: { complexity: 'SIMPLE', failed: true, durationMs: results.statistics.executionTime } });
   return results;

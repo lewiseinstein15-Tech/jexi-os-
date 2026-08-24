@@ -76,9 +76,10 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
         // ALWAYS show an answer on success — never a silent drop. Even if
         // the backend returns no summary, the user must see the outcome
         // (this is the root of "she finished in the logs but never answered").
-        const summary = (data.summary && String(data.summary).trim())
-          ? data.summary
-          : '✅ Task completed — the team finished, but returned no readable summary. Check the activity log above to see what ran.';
+        // B157 — the summary is finalized INSIDE setMessages so the already-
+        // streamed text can be kept: if the server's summary is empty but the
+        // answer streamed live, the streamed content IS the answer — it must
+        // never be swapped for a "no readable summary" notice.
         const stats = data.statistics || {};
         const bits = [];
         if (stats.agentsUsed) bits.push(`${stats.agentsUsed} agents`);
@@ -90,6 +91,12 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
         setMessages(prev => {
           const next = [...prev];
           const idx = next.findIndex((m) => m.role === 'jexi' && m.streaming);
+          const streamed = idx >= 0 ? String(next[idx].text || '') : '';
+          const summary = (data.summary && String(data.summary).trim())
+            ? data.summary
+            : (streamed.trim()
+              ? streamed
+              : '✅ Task completed — the team finished, but returned no readable summary. Check the activity log above to see what ran.');
           const finalMsg = { role: 'jexi', text: summary + footer, sources: data.sources, files: data.files };
           if (idx >= 0) next[idx] = finalMsg; else next.push(finalMsg);
           return next;

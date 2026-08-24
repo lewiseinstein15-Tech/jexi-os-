@@ -217,6 +217,10 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
           maxIterations: opts.maxIterations,
           signal: opts.signal,
           __mockCompletions: opts.__mockCompletions, // test seam
+          // B157 — LIVE STREAMING: the coworker's answer tokens stream to the
+          // UI as they are generated (dsh llm/stream pattern) — no more blank
+          // wait while the model works.
+          onToken: (typeof opts.onToken === 'function') ? opts.onToken : undefined,
           // Execute the model's native tool calls through the gated runtime.
           executeToolCalls: (calls) => executeNativeToolCalls(calls, { ...opts, codeTools }),
         });
@@ -242,7 +246,7 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
     const label = p.model ? `${p.key}(${p.model})` : p.key;
     logCall(p, 'text');
     try {
-      const res = await generateContentSafe(prompt, system, null, { provider: p.key, model: p.model, temperature: opts.temperature });
+      const res = await generateContentSafe(prompt, system, null, { provider: p.key, model: p.model, temperature: opts.temperature, onToken: (typeof opts.onToken === 'function') ? opts.onToken : undefined });
       if (res.ok && res.text) {
         logResult({ ok: true, mode: 'text', provider: res.provider || p.key, model: res.model || p.model || null, degraded: !!res.degraded, local: !!res.local });
         return { ok: true, text: res.text, degraded: !!res.degraded, local: !!res.local, worker: role, provider: res.provider || p.key, model: res.model || p.model || null, attempts };

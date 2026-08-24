@@ -1137,7 +1137,13 @@ app.post('/api/chat', async (req, res) => {
   // recoverable after a stream drop, regardless of which call site emits it.
   // Interim markers (recoverable: true, e.g. the 15-min deadline notice) are
   // NOT persisted — the store only ever holds a REAL outcome.
+  // B157 - every stream delta of this turn is accumulated so the final
+  // answer can NEVER be lost: if a path returns success with an empty
+  // summary, the content that already streamed to the user IS the answer
+  // (root fix for the "Task completed - no readable summary" reply).
+  let streamedAnswer = '';
   const sendEvent = (type, data) => {
+    if (type === 'stream' && data && data.text) streamedAnswer += String(data.text);
     if (type === 'done' && data && !data.recoverable) { try { saveResult(convId, data); } catch (e) {} }
     try { res.write(JSON.stringify({ type, ...data }) + '\n'); } catch (e) {}
   };
@@ -1426,8 +1432,10 @@ app.post('/api/chat', async (req, res) => {
     // the user, regardless of which coworker produced the content.
     const finalSummary = results.summary && String(results.summary).trim()
       ? normalizeFinalAnswer(results.summary)
-      : results.success
-        ? '✅ Task completed — the team finished, but returned no readable summary. Check the activity log above to see what ran.'
+      : results.success && streamedAnswer.trim()
+        ? normalizeFinalAnswer(streamedAnswer) // B157 - streamed content IS the answer
+        : results.success
+          ? '✅ Task completed — the team finished, but returned no readable summary. Check the activity log above to see what ran.'
         : (results.error || 'The task failed — check the activity log for details.');
     done({ success: results.success, query, summary: finalSummary, sources: results.sources || [], statistics: results.statistics, files: results.files || [] });
 
