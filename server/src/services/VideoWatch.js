@@ -44,9 +44,21 @@ const run = (bin, args, { timeoutMs = 120000, maxBuffer = 8 * 1024 * 1024 } = {}
 
 const which = (bin) => run('which', [bin], { timeoutMs: 3000 }).then((r) => r.ok);
 
+/** Resolve the yt-dlp binary: PATH first, then the repo-local ./bin install
+ *  (Render's native runtime drops the static binary at ./bin/yt-dlp and the
+ *  startCommand puts it on PATH — probe both so PATH quirks never disable it). */
+export function resolveYtDlp() {
+  const candidates = ['yt-dlp', path.join(process.cwd(), 'bin', 'yt-dlp'), path.join(process.cwd(), 'bin', 'yt-dlp_linux')];
+  for (const c of candidates) {
+    try { if (fs.existsSync(c)) return c; } catch { /* keep looking */ }
+  }
+  return null;
+}
+
 export async function videoWatchDeps() {
-  const [ytdlp, ffmpeg, ffprobe] = await Promise.all([which('yt-dlp'), which('ffmpeg'), which('ffprobe')]);
-  return { ytdlp, ffmpeg, ffprobe, ok: ytdlp && ffmpeg && ffprobe };
+  const [ffmpeg, ffprobe] = await Promise.all([which('ffmpeg'), which('ffprobe')]);
+  const ytdlp = resolveYtDlp();
+  return { ytdlp: !!ytdlp, ffmpeg, ffprobe, ok: !!ytdlp && ffmpeg && ffprobe };
 }
 
 function workdirFor(id) {
@@ -63,7 +75,7 @@ const URL_RE = /^https?:\/\/\S+$/i;
 export function isHttpUrl(s) { return URL_RE.test(String(s || '').trim()); }
 
 async function ytdlpJson(url) {
-  const r = await run('yt-dlp', ['-J', '--no-warnings', '--skip-download', '--no-playlist', url], { timeoutMs: 60000 });
+  const r = await run(resolveYtDlp() || 'yt-dlp', ['-J', '--no-warnings', '--skip-download', '--no-playlist', url], { timeoutMs: 60000 });
   if (!r.ok) return { ok: false, error: (r.stderr || r.error || '').split('\n').filter((l) => l.includes('ERROR'))[0] || 'yt-dlp metadata failed' };
   try { return { ok: true, info: JSON.parse(r.stdout) }; } catch { return { ok: false, error: 'yt-dlp metadata: bad json' }; }
 }
@@ -77,7 +89,7 @@ async function downloadVideo(url, dir, say) {
   }
   say('⬇️', `downloading "${String(info.title || 'video').slice(0, 70)}" (${fmt(info.duration)})…`);
   const out = path.join(dir, 'video.%(ext)s');
-  const dl = await run('yt-dlp', [
+  const dl = await run(resolveYtDlp() || 'yt-dlp', [
     '-f', 'bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/b',
     '--max-filesize', MAX_FILESIZE,
     '--no-playlist', '--no-warnings', '-o', out, url,
@@ -124,7 +136,7 @@ export function parseVtt(vtt) {
 }
 
 async function captionsTranscript(url, dir) {
-  const r = await run('yt-dlp', [
+  const r = await run(resolveYtDlp() || 'yt-dlp', [
     '--skip-download', '--no-playlist', '--no-warnings',
     '--write-auto-subs', '--write-subs', '--sub-langs', 'en.*,en',
     '--sub-format', 'vtt', '-o', path.join(dir, 'cap'), url,

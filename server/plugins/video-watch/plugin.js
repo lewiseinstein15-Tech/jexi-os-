@@ -15,7 +15,10 @@ export const name = 'video-watch';
 export const version = '1.0.0';
 export const inject = ['tools'];
 
-async function runWatch(invocation) {
+async function runWatch(a, b = {}) {
+  // The registry calls run(text, ctx); the DSH dialect calls
+  // run({ name, rawInput, ctx, signal }). Accept both.
+  const invocation = typeof a === 'string' ? { rawInput: a, ctx: b, signal: b?.signal || null } : (a || {});
   const parsed = parseWatchCommand(invocation.rawInput || '');
   if (!parsed) {
     const deps = await videoWatchDeps();
