@@ -195,7 +195,7 @@ app.use(cors({ origin: CORS_ALLOWLIST }));
 // else under /api/* (chat, vision, knowledge, memory, desktop, settings write,
 // APK proxy) is gated when JEXI_API_KEY is set.
 // NOTE: mounted on the app root (not '/api') so req.path keeps its full form.
-const OPEN_PATHS = ['/api/health', '/api/settings/status', '/api/metrics', '/api/update/version', '/api/brand'];
+const OPEN_PATHS = ['/api/health', '/api/settings/status', '/api/metrics', '/api/update/version', '/api/brand', '/api/team']; // B162b: /api/team open — coworker NAMES only, no secrets; doubles as a deploy fingerprint
 app.use((req, res, next) => {
   if (!API_KEY || req.method === 'OPTIONS') return next();
   if (!req.path.startsWith('/api')) return next();
