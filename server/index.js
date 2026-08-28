@@ -8,6 +8,7 @@ import path from 'path';
 import { planner } from './src/services/Planner.js';
 import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B158 — user/message lifecycle event
 import { sanitizeStreamText, teamRoster } from './src/services/ModelCoworkers.js'; // B162 — named model coworkers in every log line
+import { tryExecuteCommand, helpText } from './src/services/CommandRegistry.js'; // B167 — /watch + friends
 import { setGoalEngine } from './src/services/PromptAssembly.js'; // B158 — goals reach every assembled prompt
 import { orchestrator } from './src/services/Orchestrator.js';
 import { runSimpleTask } from './src/services/SimpleTask.js'; // B66 — Orchestrator-Workers SIMPLE fast path
@@ -1214,6 +1215,22 @@ app.post('/api/chat', async (req, res) => {
     const raw = String(query || '').trim();
     if (raw) {
       rememberTurn('user', raw);
+      // B167 — slash commands run BEFORE the model sees the message
+      // (/watch <video> [question] and friends, dsh interaction/commands).
+      if (raw.startsWith('/')) {
+        const cmd = await tryExecuteCommand(raw, { sendEvent, convId, signal: null });
+        if (cmd) {
+          if (cmd.ok) {
+            const summary = (cmd.result && cmd.result.summary) || `/${cmd.matched} done.`;
+            sendEvent('log', { agent: 'Commands', message: `✓ /${cmd.matched} finished.` });
+            done({ success: true, summary });
+          } else {
+            done({ success: false, error: cmd.error, summary: `⚠️ ${cmd.error}` });
+          }
+          finish();
+          return;
+        }
+      }
       // B119/B158 — dsh user/message lifecycle event: the user's turn is part
       // of the replayable session log (was dropped in the B157 route refactor).
       try { lifecycleUserMessage(conversationId(req), 1, raw); } catch { /* lifecycle must never break chat */ }

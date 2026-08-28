@@ -15,7 +15,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libasound2 libpango-1.0-0 libcairo2 libglib2.0-0 libx11-6 libx11-xcb1 \
     libxext6 libxi6 libxtst6 libxrender1 libxss1 \
     ca-certificates fonts-liberation \
-    && rm -rf /var/lib/apt/lists/*
+    # B167 — /watch (video): ffmpeg for frames/audio + pip for yt-dlp
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir yt-dlp || (curl -L https://github.com/yt-dlp/yt-dlp/raw/master/yt-dlp -o /usr/local/bin/yt-dlp && chmod +x /usr/local/bin/yt-dlp)
 
 WORKDIR /app
 
