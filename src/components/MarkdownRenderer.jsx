@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
+import { chartSvg } from '../utils/chartSvg'; // B169 — real charts for numbers
 import rehypeKatex from 'rehype-katex';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
@@ -260,6 +261,24 @@ function CopyButton({ text }) {
 /* ------------------------------------------------------------------ */
 let diagramSeq = 0;
 
+/* B169 — REAL CHARTS: a ```chart fence becomes a visible graph */
+function ChartBlock({ spec }) {
+  const { svg, error } = useMemo(() => chartSvg(spec), [spec]);
+  if (error) {
+    return (
+      <div className="markdown-code-container my-3">
+        <div className="px-3 py-2 text-[10px] text-status-error">{error}</div>
+      </div>
+    );
+  }
+  return (
+    <div
+      className="my-3 rounded-xl border border-hairline bg-[#0d1017] p-2 overflow-x-auto"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  );
+}
+
 function MermaidBlock({ code }) {
   const ref = useRef(null);
   const [svg, setSvg] = useState(null);
@@ -464,9 +483,14 @@ export default function MarkdownRenderer({ content, size = 'text-[11px]' }) {
             const langMatch = /language-([\w-]+)/.exec(className || '');
             const lang = langMatch ? langMatch[1] : '';
 
-            // Mermaid
+            // Mermaid (diagrams/flowcharts)
             if (lang === 'mermaid') {
               return <MermaidBlock code={String(children).replace(/\n$/, '')} />;
+            }
+
+            // Charts (B169 — numbers become real graphs: bar/line/pie)
+            if (lang === 'chart') {
+              return <ChartBlock spec={String(children).replace(/\n$/, '')} />;
             }
 
             // Fenced code block (has language class)

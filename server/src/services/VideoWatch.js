@@ -37,11 +37,48 @@ const MAX_HOOK_FRAMES = 8;
 const MAX_FRAMES_TO_DESCRIBE = 18;
 
 /* yt-dlp extras: alternate YouTube player clients avoid the datacenter
- * 'sign in to confirm you're not a bot' wall; cookies optional via env. */
+ * 'sign in to confirm you're not a bot' wall. */
 const YTDLP_EXTRA = [
   '--extractor-args', 'youtube:player_client=android,web_embedded,tv',
-  ...(process.env.YTDLP_COOKIES ? ['--cookies', process.env.YTDLP_COOKIES] : []),
 ];
+
+/* B169 — COOKIES FIX (YouTube's server bot-wall): paste a Netscape
+ * cookies.txt exported from your browser (logged into youtube.com) as the
+ * Render env var YTDLP_COOKIES (raw) or YTDLP_COOKIES_B64 (base64, single
+ * line). Written to a temp file once per process and passed to yt-dlp. */
+let __cookiesFile = null;
+export function resolveCookiesFile() {
+  if (__cookiesFile) return __cookiesFile;
+  let raw = process.env.YTDLP_COOKIES || '';
+  let b64 = process.env.YTDLP_COOKIES_B64 || '';
+  if (!raw && !b64) {
+    try {
+      const st = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'settings.json'), 'utf-8'));
+      raw = st.ytdlpCookies || '';
+      b64 = st.ytdlpCookiesB64 || '';
+    } catch { /* none */ }
+  }
+  let content = raw.includes('\n') || raw.startsWith('#') ? raw : '';
+  if (!content && b64) {
+    try { content = Buffer.from(b64, 'base64').toString('utf-8'); } catch { /* bad b64 */ }
+  }
+  if (!content || !content.includes('.youtube.com')) return null;
+  try {
+    __cookiesFile = path.join(os.tmpdir(), `jexi-yt-cookies-${process.pid}.txt`);
+    fs.writeFileSync(__cookiesFile, content.endsWith('\n') ? content : content + '\n', { mode: 0o600 });
+    return __cookiesFile;
+  } catch { return null; }
+}
+
+/** Test hook: forget the memoized cookies file (env changes reach the next call). */
+export function __resetCookiesFile() { if (__cookiesFile) { try { fs.unlinkSync(__cookiesFile); } catch { /* gone */ } } __cookiesFile = null; }
+
+function ytdlpArgs(extra = []) {
+  const args = ['--extractor-args', 'youtube:player_client=android,web_embedded,tv', ...extra];
+  const ck = resolveCookiesFile();
+  if (ck) args.push('--cookies', ck);
+  return args;
+}
 
 const run = (bin, args, { timeoutMs = 120000, maxBuffer = 8 * 1024 * 1024 } = {}) => new Promise((resolve) => {
   execFile(bin, args, { timeout: timeoutMs, maxBuffer }, (err, stdout, stderr) => {
@@ -82,7 +119,7 @@ const URL_RE = /^https?:\/\/\S+$/i;
 export function isHttpUrl(s) { return URL_RE.test(String(s || '').trim()); }
 
 async function ytdlpJson(url) {
-  const r = await run(resolveYtDlp() || 'yt-dlp', ['-J', '--no-warnings', '--skip-download', '--no-playlist', ...YTDLP_EXTRA, url], { timeoutMs: 60000 });
+  const r = await run(resolveYtDlp() || 'yt-dlp', ['-J', '--no-warnings', '--skip-download', '--no-playlist', ...ytdlpArgs(), url], { timeoutMs: 60000 });
   if (!r.ok) return { ok: false, error: (r.stderr || r.error || '').split('\n').filter((l) => l.includes('ERROR'))[0] || 'yt-dlp metadata failed' };
   try { return { ok: true, info: JSON.parse(r.stdout) }; } catch { return { ok: false, error: 'yt-dlp metadata: bad json' }; }
 }
@@ -96,12 +133,10 @@ async function downloadVideo(url, dir, say) {
   }
   say('⬇️', `downloading "${String(info.title || 'video').slice(0, 70)}" (${fmt(info.duration)})…`);
   const out = path.join(dir, 'video.%(ext)s');
-  const dl = await run(resolveYtDlp() || 'yt-dlp', [
-    ...YTDLP_EXTRA,
+  const dl = await run(resolveYtDlp() || 'yt-dlp', ytdlpArgs([
     '-f', 'bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/b',
     '--max-filesize', MAX_FILESIZE,
-    '--no-playlist', '--no-warnings', '-o', out, url,
-  ], { timeoutMs: 300000 });
+    '--no-playlist', '--no-warnings', '-o', out, url]), { timeoutMs: 300000 });
   const file = fs.readdirSync(dir).find((f) => f.startsWith('video.'));
   if (!file) return { ok: false, error: `download failed (${(dl.stderr || '').split('\n').filter((l) => l.includes('ERROR'))[0] || 'no file — too large or blocked'})` };
   return { ok: true, file: path.join(dir, file), title: info.title || file, duration: info.duration || 0, uploader: info.uploader || '', webpage: info.webpage_url || url };
@@ -144,12 +179,10 @@ export function parseVtt(vtt) {
 }
 
 async function captionsTranscript(url, dir) {
-  const r = await run(resolveYtDlp() || 'yt-dlp', [
-    ...YTDLP_EXTRA,
+  const r = await run(resolveYtDlp() || 'yt-dlp', ytdlpArgs([
     '--skip-download', '--no-playlist', '--no-warnings',
     '--write-auto-subs', '--write-subs', '--sub-langs', 'en.*,en',
-    '--sub-format', 'vtt', '-o', path.join(dir, 'cap'), url,
-  ], { timeoutMs: 90000 });
+    '--sub-format', 'vtt', '-o', path.join(dir, 'cap'), url]), { timeoutMs: 90000 });
   const vtt = fs.readdirSync(dir).find((f) => f.startsWith('cap') && f.endsWith('.vtt'));
   if (!vtt) return { ok: false };
   const segs = parseVtt(fs.readFileSync(path.join(dir, vtt), 'utf-8'));

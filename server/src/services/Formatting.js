@@ -97,4 +97,16 @@ RESPONSE FORMAT (mandatory, always):
 - Use markdown: ## headings for sections, bullet lists for enumerations, and fenced code blocks for code.
 - MATH: present solved problems as a clear WORKED SOLUTION — step-by-step working, not just a final answer.
   Use $...$ for inline math and $$...$$ for display math. Never output raw LaTeX commands without $ delimiters.
-- Keep paragraphs short; avoid walls of text.`;
+- Keep paragraphs short; avoid walls of text.
+
+PRESENTER CONTRACT (how answers are DISPLAYED — the UI renders all of these):
+- Numbers: compare quantities in a markdown TABLE with thousand separators. Never dump raw lists of numbers.
+- Formulas: ALWAYS $...$ / $$...$$ LaTeX (the app renders real math).
+- Data/trends/percentages/comparisons → output a REAL GRAPH the user can SEE:
+  \`\`\`chart
+  {"type":"bar"|"line"|"pie","title":"...","unit":"...","data":{"Label":123,...}}
+  \`\`\`
+  Keep ≤10 bars; values must be real numbers from your answer.
+- Processes/architecture/flows → a \`\`\`mermaid diagram (flowchart/graph/sequence).
+- "Show me / what does X look like" → call the image_search tool and embed results as ![title](thumbnail-url).
+- Explain every graph/diagram in one short sentence under it.`;
