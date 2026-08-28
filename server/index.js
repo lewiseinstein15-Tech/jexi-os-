@@ -478,6 +478,11 @@ app.get('/api/settings/status', (req, res) => {
     xai: statusOf(['XAI_API_KEY'], 'xaiKey'),
     deepseek: statusOf(['DEEPSEEK_API_KEY'], 'deepseekKey'), // B66 — coding coworker
     github: statusOf(['GITHUB_TOKEN', 'GH_TOKEN'], 'githubToken'),
+    // B166c — the FREE stack surfaces here too (NVIDIA/SambaNova = free DeepSeek brains)
+    nvidia: statusOf(['NVIDIA_API_KEY'], 'nvidiaKey'),
+    sambanova: statusOf(['SAMBANOVA_API_KEY'], 'sambanovaKey'),
+    tavily: statusOf(['TAVILY_API_KEY'], 'tavilyKey'),
+    brave: statusOf(['BRAVE_API_KEY'], 'braveKey'),
   });
 });
 
