@@ -539,9 +539,11 @@ function available(p, { includeAcademic = false } = {}) {
 }
 
 function noteSuccess(id) { health.delete(id); }
-function noteFailure(id) {
+function noteFailure(id, err) {
   const h = health.get(id) || { fails: 0, until: 0 };
   h.fails += 1;
+  h.lastError = String((err && err.message) || err || 'unknown').slice(0, 200);
+  h.lastErrorAt = new Date().toISOString();
   if (h.fails >= FAIL_LIMIT) { h.until = Date.now() + COOLDOWN_MS; h.fails = 0; }
   health.set(id, h);
 }
@@ -556,6 +558,7 @@ export function webSearchHealth() {
       configured: p.configured(),
       cooling: !!(h && h.until > Date.now()),
       cooldownLeftSec: h && h.until > Date.now() ? Math.ceil((h.until - Date.now()) / 1000) : 0,
+      ...(h && h.lastError ? { lastError: h.lastError, lastErrorAt: h.lastErrorAt } : {}),
     };
   });
 }
@@ -587,7 +590,7 @@ export async function providerSearch(providerId, req, { signal } = {}) {
     };
   } catch (e) {
     const isWeb = e instanceof WebError;
-    noteFailure(p.id);
+    noteFailure(p.id, e);
     if (signal && signal.aborted) throw new WebError(WEB_ERRORS.ABORTED, 'aborted');
     throw isWeb ? e : new WebError(WEB_ERRORS.PROVIDER_ERROR, (e && e.message) || String(e));
   }
