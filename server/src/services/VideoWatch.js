@@ -199,7 +199,7 @@ async function extractFrames(file, dir, duration, say) {
 
 /* ─────────────────── 4. VISION: describe every frame ─────────────────── */
 
-async function describeFrames(frames, say) {
+async function describeFrames(frames, say, seams = {}) {
   const picked = frames.slice(0, MAX_FRAMES_TO_DESCRIBE);
   const descriptions = [];
   let i = 0;
@@ -208,7 +208,7 @@ async function describeFrames(frames, say) {
     say('👀', `looking at frame ${i}/${picked.length}${f.t !== null ? ` (${fmt(f.t)})` : ''}…`);
     try {
       const b64 = `data:image/jpeg;base64,${fs.readFileSync(f.file).toString('base64')}`;
-      const desc = opts.__seams?.vision ? await opts.__seams.vision(f, b64) : await generateContent(
+      const desc = seams?.vision ? await seams.vision(f, b64) : await generateContent(
         `Describe this video frame in 1-2 short sentences. Timestamp ${f.t !== null ? fmt(f.t) : 'unknown'}${f.kind === 'hook' ? ' (opening seconds — the hook)' : ' (scene cut)'}. Note any on-screen text, people, actions, and visual style.`,
         'You are JEXI\'s video analyst. Be concrete and brief.',
         b64,
@@ -317,7 +317,7 @@ export async function watchVideo({ input, question = '', sendEvent = () => {}, s
     }
 
     // VISION
-    const descriptions = frames.length ? await describeFrames(frames, say) : [];
+    const descriptions = frames.length ? await describeFrames(frames, say, opts.__seams) : [];
     if (!descriptions.length && transcript.segments.length) {
       say('👀', 'no frames to look at — answering from the transcript alone.');
     }
