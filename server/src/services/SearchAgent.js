@@ -299,7 +299,8 @@ export async function runSearchTeam(query, sendEvent, opts = {}) {
 
   // 2. Searcher (parallel across engines + sub-queries, with cache)
   const { merged } = await parallelSearch(plan.subQueries);
-  sendEvent?.('log', { agent: 'Searcher', message: `🔍 Found ${merged.length} candidate sources across engines.` });
+  const engineNames = [...new Set(merged.flatMap((m) => m.engines || [m.source]))];
+  sendEvent?.('log', { agent: 'Searcher', message: `🔍 Whole-internet scan done — ${merged.length} sources from ${engineNames.length} engines (${engineNames.slice(0, 4).join(' · ')}${engineNames.length > 4 ? '…' : ''}).` });
   if (merged.length === 0) return { summary: '', sources: [] };
 
   // 3. Re-ranker (relevance to the actual question, not just domain trust)

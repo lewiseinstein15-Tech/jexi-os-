@@ -1,252 +1,128 @@
-import fetch from 'node-fetch';
-import * as cheerio from 'cheerio';
+/**
+ * B164 — SEARCH ENGINE, REBUILT ON THE DSH WEB SEAM.
+ * The old pipeline (scattered fetch functions, Wikipedia-heavy in practice
+ * because datacenter IPs got the HTML engines blocked) is REPLACED: every
+ * search now goes through WebSearch.js (the ctx.web port) — the DSH trio
+ * (deepseek-official / exa / perplexity) when keys exist, plus the keyless
+ * whole-web engines (DuckDuckGo ×2, Mojeek, Bing, SearXNG, Wikipedia,
+ * arXiv) with health-aware cooldowns, URL-canonical dedup and cross-engine
+ * rank fusion.
+ *
+ * Exported API kept identical for the 8 importers:
+ *   isAcademicQuery(query) · aggregateSearch(query, engine?) →
+ *   [{ title, link, snippet, source }] · researchTopic(query, sendEvent)
+ */
 
-// Domains we never surface (ads, spam, login walls, low-quality aggregators)
-const BAD_DOMAINS = ['pinterest.com', 'facebook.com', 'instagram.com', 'tiktok.com', 'quora.com', 'reddit.com', 'medium.com', 'w3schools.com', 'spammy', 'adf.ly', 'bit.ly'];
-const BAD_SNIPPET_MARKERS = ['cookie', 'sign up', 'subscribe to', 'advertisement', 'sponsored'];
+import {
+  activeSearchProviders, providerSearch, webSearchHealth, canonicalUrl,
+} from './WebSearch.js';
 
-// Domains we rank above others (trusted, high-quality)
-const TRUSTED_DOMAINS = ['wikipedia.org', '.edu', '.gov', '.org', 'arxiv.org', 'github.com', 'mdn.', 'developer.', 'stackoverflow.com', 'geeksforgeeks.org', 'khanacademy.org', 'britannica.com', 'coursera.org', 'mit.edu', 'stanford.edu', 'openstax.org', 'docs.'];
-const TRUSTED_LABELS = ['wikipedia', 'official', 'documentation', 'docs', 'university', '.edu', '.gov', 'arxiv', 'github', 'khan', 'britannica', 'openstax'];
+// Trusted-source ranking (kept — it works).
+const TRUSTED_DOMAINS = ['wikipedia.org', '.edu', '.gov', '.org', 'arxiv.org', 'github.com', 'mdn.', 'developer.', 'stackoverflow.com', 'geeksforgeeks.org', 'khanacademy.org', 'britannica.com', 'coursera.org', 'mit.edu', 'stanford.edu', 'openstax.org', 'docs.', 'nature.com', 'sciencedirect.com', 'reuters.com', 'bbc.com', 'nasa.gov', 'who.int'];
 
-function isGarbage(r) {
-  const blob = `${r.title} ${r.snippet || ''}`.toLowerCase();
-  if (BAD_SNIPPET_MARKERS.some(m => blob.includes(m))) return true;
-  try {
-    const host = new URL(r.link).hostname;
-    if (BAD_DOMAINS.some(d => host.includes(d) || host === d)) return true;
-    if (r.link.includes('ad_domain=') || host === 'duckduckgo.com') return true; // DDG ad redirects
-  } catch (e) { return true; }
-  return false;
+const ACADEMIC_MARKERS = /\b(paper|arxiv|study|survey|thesis|journal|algorithm|theory|methodology|scientific|experiment|dataset|preprint|research paper)\b/i;
+export function isAcademicQuery(query) {
+  return ACADEMIC_MARKERS.test(String(query || ''));
 }
 
-function trustedScore(r) {
+function trustedScore(url) {
   let score = 0;
   try {
-    const url = r.link.toLowerCase();
-    const host = new URL(r.link).hostname;
-    if (TRUSTED_DOMAINS.some(d => host.includes(d) || url.includes(d))) score += 3;
-    const blob = `${r.title} ${r.snippet || ''}`.toLowerCase();
-    if (TRUSTED_LABELS.some(l => blob.includes(l))) score += 1;
+    const host = new URL(url).hostname;
+    if (TRUSTED_DOMAINS.some((d) => host.includes(d))) score += 3;
     if (url.startsWith('https://')) score += 1;
-  } catch (e) {}
+  } catch { /* unparseable */ }
   return score;
-}
-
-/**
- * Direct fetch first, then retry through a server-side fetch proxy (allorigins).
- * Datacenter IPs (Render) are blacklisted by most HTML engines — the proxy
- * fetches from its own infrastructure and usually gets through.
- */
-async function fetchWithFallback(url, headers, timeoutMs) {
-  try {
-    const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeoutMs) });
-    if (res.ok) return res;
-  } catch (e) {}
-  try {
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(timeoutMs + 5000) });
-    if (res.ok) return res;
-  } catch (e) {}
-  return null;
 }
 
 function extractCoreQuery(query) {
   if (query.includes(':')) return query;
   let q = query.toLowerCase();
   q = q.replace(/[^a-z0-9\s]/g, ' ');
-  const stopWords = new Set(['research', 'the', 'how', 'to', 'explain', 'step', 'by', 'look', 'for', 'computer', 'science', 'video', 'lectures', 'github', 'repositories', 'notes', 'tutorial', 'do', 'on', 'this', 'unit', 'in', 'is', 'name', 'go', 'learn', 'everything', 'about', 'create', 'detailed', 'and', 'it', 'works', 'what', 'why', 'please', 'give', 'me', 'can', 'you', 'i', 'need', 'used', 'modern', 'with', 'code', 'implementations', 'its', 'a', 'an', 'of', 'mechanism', 'visit', 'following', 'url', 'https', 'www', 'build', 'make', 'build me', 'app', 'application', 'website', 'system', 'me', 'please']);
-  const words = q.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
+  const stopWords = new Set(['research', 'the', 'how', 'to', 'explain', 'step', 'by', 'look', 'for', 'do', 'on', 'this', 'in', 'is', 'name', 'go', 'learn', 'everything', 'about', 'and', 'it', 'works', 'what', 'why', 'please', 'give', 'me', 'can', 'you', 'i', 'need', 'with', 'its', 'a', 'an', 'of', 'visit', 'following', 'url', 'build', 'make', 'app', 'website', 'system']);
+  const words = q.split(/\s+/).filter((w) => w.length > 2 && !stopWords.has(w));
   return words.slice(0, 8).join(' ');
 }
 
-async function fetchSearXNG(query, category = 'general') {
-  // Try every public instance IN PARALLEL (instances go down / block IPs
-  // regularly) and take the healthiest pool — faster and far more resilient
-  // than the old sequential loop.
-  const instances = ['https://search.sapti.me', 'https://searx.be', 'https://search.bus-hit.me', 'https://paulgo.io', 'https://priv.au', 'https://opnxng.com'];
-  const attempts = instances.map(async (instance) => {
-    try {
-      const url = `${instance}/search?q=${encodeURIComponent(query)}&format=json&categories=${category}`;
-      const res = await fetchWithFallback(url, { 'User-Agent': 'Mozilla/5.0' }, 6000);
-      if (!res) throw new Error('blocked or empty');
-      const data = await res.json();
-      if (data?.results?.length > 0) {
-        return data.results
-          .slice(0, 8)
-          .map(r => ({ title: r.title, link: r.url, snippet: r.content, source: 'SearXNG' }))
-          .filter(r => !isGarbage(r));
+/**
+ * Fan one query across EVERY active provider in parallel (dsh web seam),
+ * then fuse: reciprocal-rank-style agreement (a page found by N engines
+ * ranks above a page found by one) + trusted-domain boost. Returns the
+ * legacy shape so every importer keeps working.
+ */
+export async function aggregateSearch(query, specificEngine = null, opts = {}) {
+  const coreQuery = extractCoreQuery(query) || String(query || '');
+  if (!coreQuery.trim()) return [];
+
+  const wantAcademic = isAcademicQuery(coreQuery);
+  // `__providers` is the hermetic-test injection point (no real network).
+  const actives = opts.__providers || activeSearchProviders({ includeAcademic: wantAcademic });
+  const chosen = specificEngine
+    ? actives.filter((p) => p.id === specificEngine || p.name.toLowerCase() === String(specificEngine).toLowerCase())
+    : actives;
+
+  const settled = await Promise.allSettled(chosen.map((p) => providerSearch(p.id, { query: coreQuery, maxResults: 8 })));
+
+  // Fuse: rank position (engine's own order) + cross-engine agreement.
+  const fused = new Map(); // canonical url → { entry, engines:Set, bestRank }
+  chosen.forEach((p, i) => {
+    const r = settled[i];
+    if (r.status !== 'fulfilled' || !r.value) return;
+    (r.value.sources || []).forEach((s, rank) => {
+      const c = canonicalUrl(s.url);
+      if (!c) return;
+      const prev = fused.get(c);
+      if (prev) {
+        prev.engines.add(p.name);
+        prev.bestRank = Math.min(prev.bestRank, rank);
+        if (!prev.entry.snippet && s.snippet) prev.entry.snippet = s.snippet;
+      } else {
+        fused.set(c, {
+          entry: { title: s.title || s.url, link: s.url, snippet: s.snippet || '', source: p.name },
+          engines: new Set([p.name]),
+          bestRank: rank,
+        });
       }
-      throw new Error('empty');
-    } catch (e) { return null; }
+    });
   });
-  const settled = await Promise.allSettled(attempts);
-  const pools = settled.filter(r => r.status === 'fulfilled' && r.value && r.value.length > 0).map(r => r.value);
-  if (!pools.length) return [];
-  pools.sort((a, b) => b.length - a.length);
-  return pools[0];
-}
 
-async function fetchDDG(query) {
-  try {
-    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-    const res = await fetchWithFallback(url, { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, 8000);
-    if (!res) throw new Error('DDG blocked');
-    const $ = cheerio.load(await res.text());
-    const results = [];
-    $('.result').slice(0, 8).each((i, el) => {
-      const title = $(el).find('.result__a').text().trim();
-      let link = $(el).find('.result__a').attr('href') || '';
-      const uddg = link.match(/uddg=([^&]+)/);
-      if (uddg) link = decodeURIComponent(uddg[1]);
-      const snippet = $(el).find('.result__snippet').text().trim();
-      if (title && link) results.push({ title, link, snippet, source: 'DuckDuckGo' });
-    });
-    return results.filter(r => !isGarbage(r));
-  } catch (e) { return []; }
-}
+  const scored = [...fused.values()].map((f) => ({
+    ...f,
+    score: (f.engines.size * 4) - f.bestRank + trustedScore(f.entry.link),
+  }));
+  scored.sort((a, b) => b.score - a.score);
 
-async function fetchDDGLite(query) {
-  // DDG's lite endpoint is more bot-tolerant than the html one.
-  try {
-    const url = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`;
-    const res = await fetchWithFallback(url, { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, 8000);
-    if (!res) throw new Error('DDGLite blocked');
-    const $ = cheerio.load(await res.text());
-    const results = [];
-    $('a.result-link').each((i, el) => {
-      let link = $(el).attr('href') || '';
-      const uddg = link.match(/uddg=([^&]+)/);
-      if (uddg) link = decodeURIComponent(uddg[1]);
-      const title = $(el).text().trim();
-      const snippet = $(el).closest('tr').find('.result-snippet').text().trim();
-      if (title && link) results.push({ title, link, snippet, source: 'DuckDuckGo' });
-    });
-    return results.filter(r => !isGarbage(r));
-  } catch (e) { return []; }
-}
-
-async function fetchMojeek(query) {
-  // Mojeek is a bot-tolerant independent index — a good last-resort engine.
-  try {
-    const url = `https://www.mojeek.com/search?q=${encodeURIComponent(query)}`;
-    const res = await fetchWithFallback(url, { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, 8000);
-    if (!res) throw new Error(`Mojeek ${res.status}`);
-    const $ = cheerio.load(await res.text());
-    const results = [];
-    $('ul.results-standard li').each((i, el) => {
-      const a = $(el).find('h2 a').first();
-      const title = a.text().trim();
-      const link = a.attr('href') || '';
-      const snippet = $(el).find('p.s').text().trim();
-      if (title && link && !link.includes('mojeek.com')) results.push({ title, link, snippet, source: 'Mojeek' });
-    });
-    return results.filter(r => !isGarbage(r));
-  } catch (e) { return []; }
-}
-
-async function fetchBing(query) {
-  try {
-    const url = `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
-    const res = await fetchWithFallback(url, { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, 8000);
-    if (!res) throw new Error(`Bing ${res.status}`);
-    const $ = cheerio.load(await res.text());
-    const results = [];
-    $('li.b_algo').slice(0, 8).each((i, el) => {
-      const a = $(el).find('h2 a').first();
-      const title = a.text().trim();
-      const link = a.attr('href') || '';
-      const snippet = $(el).find('.b_caption p').first().text().trim();
-      if (title && link && !link.includes('bing.com')) results.push({ title, link, snippet, source: 'Bing' });
-    });
-    return results.filter(r => !isGarbage(r));
-  } catch (e) { return []; }
-}
-
-/** arXiv is for academic queries only — consumer/product questions must not
- *  be polluted by research-paper PDFs that merely share keywords. */
-const ACADEMIC_MARKERS = /\b(paper|arxiv|study|survey|thesis|journal|algorithm|theory|methodology|scientific|experiment|dataset|preprint|research paper)\b/i;
-export function isAcademicQuery(query) {
-  return ACADEMIC_MARKERS.test(String(query || ''));
-}
-
-async function fetchWiki(query) {
-  // Wikipedia's API is a real API — works from any IP (datacenter included)
-  // and aligns with JEXI's trusted-source ranking.
-  try {
-    const url = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=5`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'JEXI-OS/1.0 (research agent)' }, signal: AbortSignal.timeout(8000) });
-    if (!res.ok) throw new Error(`Wiki ${res.status}`);
-    const data = await res.json();
-    const results = (data?.query?.search || []).map(r => ({
-      title: r.title,
-      link: `https://en.wikipedia.org/wiki/${encodeURIComponent(r.title.replace(/ /g, '_'))}`,
-      snippet: String(r.snippet || '').replace(/<[^>]+>/g, ''),
-      source: 'Wikipedia',
-    }));
-    return results.filter(r => !isGarbage(r));
-  } catch (e) { return []; }
-}
-
-async function fetchArxiv(query) {
-  try {
-    const url = `http://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&max_results=4`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    const $ = cheerio.load(await res.text(), { xml: true });
-    const results = [];
-    $('entry').each((i, el) => {
-      const title = $(el).find('title').text().trim().replace(/\n/g, ' ');
-      const id = $(el).find('id').text().trim().replace(/abs\//, 'pdf/');
-      const snippet = $(el).find('summary').text().trim().replace(/\n/g, ' ').slice(0, 300);
-      if (title && id) results.push({ title, link: id + '.pdf', snippet, source: 'arXiv' });
-    });
-    return results;
-  } catch (e) { return []; }
-}
-
-export async function aggregateSearch(query, specificEngine = null) {
-  const coreQuery = extractCoreQuery(query);
-  if (!coreQuery) return [];
-
-  const wantArxiv = isAcademicQuery(coreQuery);
-  const engines = {
-    searx: fetchSearXNG(coreQuery, 'general'),
-    ddg: fetchDDG(coreQuery),
-    ddglite: fetchDDGLite(coreQuery),
-    mojeek: fetchMojeek(coreQuery),
-    bing: fetchBing(coreQuery),
-    wiki: fetchWiki(coreQuery),
-    ...(wantArxiv ? { arxiv: fetchArxiv(coreQuery) } : {}),
-  };
-
-  let combined;
-  if (specificEngine === 'videos') {
-    combined = await fetchSearXNG(coreQuery, 'videos');
-  } else if (specificEngine && engines[specificEngine]) {
-    combined = await engines[specificEngine];
-  } else {
-    const [searx, ddg, ddglite, mojeek, bing, wiki, arxiv = []] = await Promise.all([
-      engines.searx, engines.ddg, engines.ddglite, engines.mojeek, engines.bing, engines.wiki,
-      engines.arxiv || Promise.resolve([]),
-    ]);
-    combined = [...(wantArxiv ? arxiv : []), ...wiki, ...searx, ...ddg, ...ddglite, ...mojeek, ...bing];
+  // DIVERSITY CAP: one engine may contribute at most 4 of the 10 (a blocked
+  // web must never degrade back into a single-source firehose).
+  const perEngine = new Map();
+  const diversified = [];
+  for (const f of scored) {
+    const lead = [...f.engines][0];
+    const n = perEngine.get(lead) || 0;
+    if (n >= 4) continue;
+    perEngine.set(lead, n + 1);
+    diversified.push(f);
+    if (diversified.length === 10) break;
   }
 
-  // Dedupe by link, then rank: trusted first, then by source
-  const seen = new Set();
-  const unique = combined.filter(r => {
-    if (!r.link || seen.has(r.link)) return false;
-    seen.add(r.link);
-    return true;
-  });
-
-  unique.sort((a, b) => trustedScore(b) - trustedScore(a) || 0);
-  return unique.slice(0, 10);
+  // Legacy shape — max 10, engines listed on multi-engine finds.
+  return diversified.map((f) => ({
+    ...f.entry,
+    ...(f.engines.size > 1 ? { engines: [...f.engines] } : {}),
+  }));
 }
 
+/** Health snapshot for the settings surface (replaces the old static list). */
+export function searchEngineStatus() {
+  return { providers: webSearchHealth() };
+}
+
+/** Learning fast-path (kept): stream one line, search, summarize snippets. */
 export async function researchTopic(query, sendEvent) {
-  sendEvent('log', { agent: 'Researcher', message: `Learning how to: ${query}` });
+  const engines = activeSearchProviders({});
+  sendEvent?.('log', { agent: 'Researcher', message: `🔍 Scanning the whole internet — ${engines.length} engines in parallel…` });
   const sources = await aggregateSearch(`how to ${query}`);
-  const knowledge = sources.map(s => `- ${s.title}: ${s.snippet}`).join('\n');
+  const knowledge = sources.map((s) => `- ${s.title}: ${s.snippet}`).join('\n');
+  sendEvent?.('log', { agent: 'Researcher', message: `✓ ${sources.length} sources from ${new Set(sources.map((s) => s.source)).size} engines.` });
   return { knowledge, sources, summary: `Learned from ${sources.length} resources.` };
 }

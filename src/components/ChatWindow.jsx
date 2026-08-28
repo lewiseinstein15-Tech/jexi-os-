@@ -226,7 +226,10 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
                       re-flows mid-scroll. The typewriter reveal runs once,
                       on the completed answer. */}
                   {msg.streaming ? (
-                    <MarkdownRenderer content={msg.text} size="text-[13px]" />
+                    <div className="jx-streaming-text">
+                      <MarkdownRenderer content={msg.text} size="text-[13px]" />
+                      <span className="jx-caret" aria-hidden="true" />
+                    </div>
                   ) : (
                     <TypedMessage text={msg.text} size="text-[13px]" />
                   )}

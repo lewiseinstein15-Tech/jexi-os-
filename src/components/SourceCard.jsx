@@ -17,7 +17,12 @@ export default function SourceCard({ source, index }) {
         <img src={getFavicon(source.link)} alt="" className="w-8 h-8 rounded-md mt-0.5" />
         <div className="flex-1 min-w-0">
           <h4 className="text-[11px] font-bold text-gray-200 truncate">{source.title}</h4>
-          <p className="text-[9px] text-[#00FF9D] mb-1">{getDomain(source.link)}</p>
+          <p className="text-[9px] text-[#00FF9D] mb-1">
+            {getDomain(source.link)}
+            {(source.engines || []).length > 1 && (
+              <span className="ml-1 text-[8px] text-gray-500">· found by {source.engines.length} engines</span>
+            )}
+          </p>
           <p className="text-[10px] text-gray-400 line-clamp-2">{source.snippet}</p>
         </div>
         <ExternalLink className="w-3 h-3 text-gray-500 mt-1" />

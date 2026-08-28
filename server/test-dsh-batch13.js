@@ -109,11 +109,14 @@ console.log('\n== 3. Brand + retention + native command ==');
 /* ══════════════ 4. WEB SEARCH PROVIDERS + TOOL RESULT PRUNER ══════════════ */
 console.log('\n== 4. Web providers + tool result pruner ==');
 {
-  const { webSearchProviderStatus, WEB_SEARCH_PROVIDERS } = await import('./src/services/WebSearchProviders.js');
-  ok('provider table has 9 search providers', WEB_SEARCH_PROVIDERS.length >= 9);
-  ok('keyed providers present', WEB_SEARCH_PROVIDERS.some((p) => p.id === 'exa') && WEB_SEARCH_PROVIDERS.some((p) => p.id === 'perplexity') && WEB_SEARCH_PROVIDERS.some((p) => p.id === 'deepseek'));
+  const { webSearchProviderStatus } = await import('./src/services/WebSearchProviders.js');
+  // B164 — the static table became the LIVE seam registry (15 providers:
+  // DSH trio + datacenter-proof keyless + HTML engines + verticals).
+  const live = webSearchProviderStatus().search;
+  ok('live provider registry has 15 search providers', live.length >= 15);
+  ok('keyed providers present', live.some((p) => p.id === 'exa') && live.some((p) => p.id === 'perplexity') && live.some((p) => p.id === 'deepseek-official'));
   const st = webSearchProviderStatus();
-  ok('status shape', st.ok && st.search.length >= 9 && st.fetch.length >= 1 && st.resolvedSearch === 'searx');
+  ok('status shape (B164 live seam)', st.ok && st.search.length >= 15 && st.fetch.length >= 1 && typeof st.resolvedSearch === 'string');
 
   const { pruneToolResult } = await import('./src/services/ToolResultPruner.js');
   const small = pruneToolResult({ text: 'tiny', convId: 't-prune' });
