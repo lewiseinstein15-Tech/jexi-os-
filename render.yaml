@@ -13,8 +13,11 @@ services:
     # Install deps first; if the apt/deps step fails on Render's build image,
     # still download the browser so the build can't be killed by it.
     # PLAYWRIGHT_BROWSERS_PATH=0 puts Chromium inside node_modules (persists to runtime).
-    buildCommand: npm ci && (PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium || PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium)
-    startCommand: npm start
+    # B167 — /watch needs ffmpeg (apt) + yt-dlp (static Linux binary, no
+    # python needed) on Render's NATIVE runtime; the repo Dockerfile only
+    # applies to Docker-mode deploys. Both land in ./bin and ride PATH at start.
+    buildCommand: (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg || echo "apt ffmpeg failed — /watch degrades to captions-only") && npm ci && (PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium || PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium) && (mkdir -p bin && curl -L --fail -o bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux && chmod +x bin/yt-dlp || echo "yt-dlp download failed — /watch URL mode degrades")
+    startCommand: PATH="$PWD/bin:$PATH" npm start
     healthCheckPath: /api/health
     envVars:
       # Pin the Node version used for build AND runtime.
