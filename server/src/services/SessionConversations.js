@@ -21,7 +21,7 @@ import fs from 'fs';
 import path from 'path';
 import { DATA_DIR } from '../config.js';
 import { getEvents } from './EventLog.js'; // B108 — tool-call stats per session
-import { getStoredTitleRecord, clearStoredTitle, fallbackTitleFor } from './SessionTitles.js'; // B108/B109 — dsh session-title (pinned llm/user titles, word-capped fallback)
+import { getStoredTitleRecord, clearAllStoredTitles, fallbackTitleFor } from './SessionTitles.js'; // B108/B109 — dsh session-title (pinned llm/user titles, word-capped fallback)
 import { sessionStats } from './SessionStats.js'; // B109 — dsh session-stats projection fold
 
 const CONV_DIR = path.join(DATA_DIR, 'conversations');
@@ -35,6 +35,26 @@ function convFile(convId) {
 /** Absolute path of a conversation's log file (shared with CompactionEngine). */
 export function conversationFilePath(convId) {
   return convFile(convId);
+}
+
+/**
+ * B162d — wipe EVERY stored conversation (chat-history files + pinned
+ * titles). Used by the deep memory clear so "erase everything" really is
+ * everything. Returns the number of session files removed.
+ */
+export function clearAllConversations() {
+  let removed = 0;
+  try {
+    if (fs.existsSync(CONV_DIR)) {
+      for (const f of fs.readdirSync(CONV_DIR)) {
+        if (f.endsWith('.jsonl')) {
+          try { fs.unlinkSync(path.join(CONV_DIR, f)); removed += 1; } catch { /* keep going */ }
+        }
+      }
+    }
+  } catch { /* best-effort */ }
+  try { clearAllStoredTitles(); } catch { /* titles best-effort */ }
+  return removed;
 }
 
 function ensureDir() {

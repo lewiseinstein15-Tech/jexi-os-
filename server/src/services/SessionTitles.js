@@ -66,6 +66,12 @@ export function setStoredTitle(convId, title, source = 'user', messageSeqs = [])
 }
 
 /** Forget a conversation's title (delete path). */
+/** B162d — wipe every stored session title (deep memory clear). */
+export function clearAllStoredTitles() {
+  try { store = {}; persist(); } catch { /* best-effort */ }
+  try { attempted = new Set(); } catch { /* best-effort */ }
+}
+
 export function clearStoredTitle(convId) {
   const s = loadStore();
   delete s[String(convId || '')];

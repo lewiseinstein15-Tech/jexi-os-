@@ -4,6 +4,8 @@ import crypto from 'crypto';
 import { MEMORY_FILE, KNOWLEDGE_DIR, WORKSPACE_DIR, DATA_DIR } from '../config.js';
 import { generateContent, resolveKeys, embedText } from './LLMClient.js';
 import { appendEvent } from './EventLog.js'; // B78/B158 — context_compaction events (dsh compaction/* mirror)
+import { clearEventLog } from './EventLog.js'; // B162d — deep clear
+import { clearAllConversations } from './SessionConversations.js'; // B162d — deep clear
 
 /**
  * JEXI OS Memory Core
@@ -941,6 +943,11 @@ export function clearMemory() {
   try {
     if (fs.existsSync(WORKSPACE_DIR)) fs.readdirSync(WORKSPACE_DIR).forEach(f => fs.unlinkSync(path.join(WORKSPACE_DIR, f)));
   } catch (e) {}
+  // B162d — a memory clear must be COMPLETE: conversation logs (chat
+  // history), their pinned titles and the durable event log go too, so
+  // nothing from before the wipe can resurface in a later prompt.
+  try { clearAllConversations(); } catch { /* sessions best-effort */ }
+  try { clearEventLog(); } catch { /* events best-effort */ }
 }
 
 /* ------------------------------------------------------------------ */

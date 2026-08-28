@@ -163,6 +163,14 @@ export function getEvents({ session, limit = 50, type } = {}) {
   return list.slice(-Math.min(Math.max(1, Number(limit) || 50), 500));
 }
 
+/** B162d — wipe the whole durable event log (deep memory clear). */
+export function clearEventLog() {
+  try {
+    cache = { version: 1, events: [] }; // same shape as load()'s default
+    persist();
+  } catch { /* best-effort */ }
+}
+
 /** Diagnostic counts for /api/events and the health surface. */
 export function eventLogStats() {
   const store = load();
