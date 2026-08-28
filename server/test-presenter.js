@@ -83,6 +83,19 @@ console.log('\n== 3. cookies fix (YouTube server wall) ==');
   ok('no cookies → null (player-client workaround still applies)', VW.resolveCookiesFile() === null);
 }
 
+/* ══════════════ 3b. PICTURE INTENT (B170) ══════════════ */
+console.log('\n== 3b. natural picture intent ==');
+{
+  const { detectPictureIntent } = await import('./src/services/ImageSearch.js');
+  ok('"show me a picture of a giraffe" → subject extracted', detectPictureIntent('show me a picture of a giraffe')?.subject === 'giraffe');
+  ok('"what does a blue whale look like" → detected', !!detectPictureIntent('what does a blue whale look like'));
+  ok('build requests NOT hijacked', detectPictureIntent('build me a website') === null);
+  ok('URLs left to the video/research paths', detectPictureIntent('show me a picture of https://youtu.be/x') === null);
+  ok('normal explanations NOT hijacked', detectPictureIntent('explain photosynthesis') === null);
+  const idx = fs.readFileSync('./index.js', 'utf-8');
+  ok('chat route handles picture intent before planning', idx.includes('B170 — NATURAL PICTURE INTENT'));
+}
+
 /* ══════════════ 4. PRESENTER CONTRACT + RENDERER WIRING ══════════════ */
 console.log('\n== 4. presenter contract + renderer wiring ==');
 {

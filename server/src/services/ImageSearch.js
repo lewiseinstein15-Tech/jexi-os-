@@ -53,3 +53,29 @@ export async function imageSearch(query, { limit = 4 } = {}) {
     return { ok: false, error: `commons: ${(e && e.message) || e}` };
   }
 }
+
+
+/* ══════════════════ B170 — NATURAL PICTURE INTENT ══════════════════ */
+
+const PICTURE_RE = /\b(show|draw|display|find)\b[^.?!]{0,40}\b(picture|photo|image|pic)\b\s*(of|for|with)?\b|\b(picture|photo|image|pic)\s+of\b|\bwhat\s+(does|do)\b[^.?!]{0,30}\blook\s+like\b/i;
+const BUILD_RE = /\b(build|make|create|generate|design|code|app|website|logo\s+for)\b/i;
+
+/**
+ * Detect "show me a picture of X" from a plain sentence.
+ * → { subject, question } | null. Never fires on build requests, video
+ * URLs (the watch pipeline owns those), or long pastes.
+ */
+export function detectPictureIntent(text) {
+  const raw = String(text || '').trim();
+  if (!raw || raw.length > 200) return null;
+  if (/https?:\/\/\S+/.test(raw)) return null;          // links → video/research paths
+  if (BUILD_RE.test(raw) && !/\bshow\b/i.test(raw)) return null;
+  if (!PICTURE_RE.test(raw)) return null;
+  const subject = raw
+    .replace(/^(hey\s+jexi[,:]?\s+)?(can\s+you\s+)?(please\s+)?(show|draw|display|find)\b/i, ' ')
+    .replace(/\b(me|us|a|an|the|some|of|for|with|picture|photo|image|pic|real|actual|good|nice|please)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (subject.length < 3) return null;
+  return { subject: subject.slice(0, 100), question: raw.slice(0, 150) };
+}

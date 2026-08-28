@@ -10,6 +10,7 @@ import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B1
 import { sanitizeStreamText, teamRoster } from './src/services/ModelCoworkers.js'; // B162 — named model coworkers in every log line
 import { tryExecuteCommand, helpText } from './src/services/CommandRegistry.js'; // B167 — /watch + friends
 import { detectVideoWatchIntent, resolveTitleToVideo, watchVideo } from './src/services/VideoWatch.js'; // B168 — natural video intent
+import { imageSearch, detectPictureIntent } from './src/services/ImageSearch.js'; // B170 — natural picture intent
 import { setGoalEngine } from './src/services/PromptAssembly.js'; // B158 — goals reach every assembled prompt
 import { orchestrator } from './src/services/Orchestrator.js';
 import { runSimpleTask } from './src/services/SimpleTask.js'; // B66 — Orchestrator-Workers SIMPLE fast path
@@ -1230,6 +1231,37 @@ app.post('/api/chat', async (req, res) => {
           }
           finish();
           return;
+        }
+      }
+
+      // B170 — NATURAL PICTURE INTENT: "show me a picture of X" → real
+      // images embedded in the answer (Commons, free) + a one-line explainer.
+      // Failure falls through to normal planning — never blocks the chat.
+      {
+        const pic = detectPictureIntent(raw);
+        if (pic) {
+          try {
+            sendEvent('log', { agent: 'Presenter', message: `🖼 Finding real pictures of "${pic.subject}"…` });
+            const found = await imageSearch(pic.subject, { limit: 3 });
+            if (found.ok) {
+              let caption = '';
+              try {
+                caption = String(await generateContent(`Write ONE short, interesting sentence about ${pic.subject} for a picture caption. No quotes.`, 'You write tight image captions.'))
+                  .trim().replace(/^["']|["']$/g, '').slice(0, 160);
+              } catch { /* caption optional */ }
+              const imgs = found.images.map((im) => `![${im.title.replace(/[\[\]]/g, '')}](${im.thumb})`).join('\n\n');
+              done({
+                success: true,
+                summary: `### 🖼 ${pic.subject.charAt(0).toUpperCase() + pic.subject.slice(1)}\n\n${caption ? caption + '\n\n' : ''}${imgs}\n\n*Source: Wikimedia Commons — tap an image for the full-size version + license.*`,
+                sources: found.images.map((im) => ({ title: im.title, link: im.descriptionUrl || im.url })),
+              });
+              finish();
+              return;
+            }
+            sendEvent('log', { agent: 'Presenter', message: `⚠ no pictures found (${found.error}) — answering normally.` });
+          } catch (e) {
+            sendEvent('log', { agent: 'Presenter', message: `⚠ picture search skipped — continuing normally.` });
+          }
         }
       }
 
