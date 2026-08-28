@@ -72,7 +72,11 @@ console.log('\n== 3. dependency honesty ==');
 
 /* ══════════════ 4. E2E — REAL VIDEO, REAL FRAMES ══════════════ */
 console.log('\n== 4. end-to-end (generated video, real ffmpeg) ==');
-{
+const ffmpegOk = await new Promise((res) => { execFile('ffmpeg', ['-version'], (e) => res(!e)); });
+if (!ffmpegOk) {
+  console.log('⏭ E2E video tests — SKIPPED (no ffmpeg on this host; CI and Render install it)');
+  ok('E2E skipped honestly without ffmpeg', true);
+} else {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jexi-watch-e2e-'));
   const vid = path.join(dir, 'demo.mp4');
   // Two visually distinct segments → forces a detectable scene cut at 3s.
