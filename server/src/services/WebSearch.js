@@ -544,7 +544,17 @@ function noteFailure(id, err) {
   h.fails += 1;
   h.lastError = String((err && err.message) || err || 'unknown').slice(0, 200);
   h.lastErrorAt = new Date().toISOString();
-  if (h.fails >= FAIL_LIMIT) { h.until = Date.now() + COOLDOWN_MS; h.fails = 0; }
+  // 401/402 are ACCOUNT problems (bad key / no credit), not transient: retrying
+  // every 10 minutes just burns a model turn. Cool down for 6 hours instead.
+  const permanent = /HTTP 40[12]/.test(h.lastError);
+  if (permanent) {
+    h.until = Date.now() + 6 * 60 * 60 * 1000;
+    h.fails = 0;
+    h.actionNeeded = h.lastError.includes('402') ? 'add credit to this provider account' : 'check the API key';
+  } else if (h.fails >= FAIL_LIMIT) {
+    h.until = Date.now() + COOLDOWN_MS;
+    h.fails = 0;
+  }
   health.set(id, h);
 }
 
@@ -559,6 +569,7 @@ export function webSearchHealth() {
       cooling: !!(h && h.until > Date.now()),
       cooldownLeftSec: h && h.until > Date.now() ? Math.ceil((h.until - Date.now()) / 1000) : 0,
       ...(h && h.lastError ? { lastError: h.lastError, lastErrorAt: h.lastErrorAt } : {}),
+      ...(h && h.actionNeeded ? { actionNeeded: h.actionNeeded } : {}),
     };
   });
 }
