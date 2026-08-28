@@ -6,6 +6,7 @@
  */
 
 import fetch from 'node-fetch';
+import { generateContent } from './LLMClient.js'; // B171 — vision-verified pictures
 
 const UA = 'JEXI-OS/1.0 (image search; research agent)';
 
@@ -55,27 +56,86 @@ export async function imageSearch(query, { limit = 4 } = {}) {
 }
 
 
-/* ══════════════════ B170 — NATURAL PICTURE INTENT ══════════════════ */
-
-const PICTURE_RE = /\b(show|draw|display|find)\b[^.?!]{0,40}\b(picture|photo|image|pic)\b\s*(of|for|with)?\b|\b(picture|photo|image|pic)\s+of\b|\bwhat\s+(does|do)\b[^.?!]{0,30}\blook\s+like\b/i;
-const BUILD_RE = /\b(build|make|create|generate|design|code|app|website|logo\s+for)\b/i;
+/* ══════════════════ B171 — DSH-STYLE PRESENTER (verified blocks) ══════════════════
+ * DSH principle ported: the TOOL guarantees what gets displayed. Pictures
+ * are verified by vision before being shown; generated pics are real
+ * generated images (Pollinations, free, no key) — never "here's a prompt
+ * for DALL·E" excuses. */
 
 /**
- * Detect "show me a picture of X" from a plain sentence.
- * → { subject, question } | null. Never fires on build requests, video
- * URLs (the watch pipeline owns those), or long pastes.
+ * Vision-verify candidate images against the subject: return them ordered,
+ * with the first one the vision model CONFIRMS shows the subject moved to
+ * the front. Falls back to the original order when vision is unavailable.
+ */
+export async function verifyImagesWithVision(subject, images, { max = 3 } = {}) {
+  const candidates = images.slice(0, max);
+  for (const img of candidates) {
+    try {
+      const b64 = `data:image/jpeg;base64,${Buffer.from(await (await fetch(img.thumb, { signal: AbortSignal.timeout(10000), headers: { 'User-Agent': UA } })).arrayBuffer()).toString('base64')}`;
+      const verdict = await generateContent(
+        `Does this image actually show: ${subject}? Answer only YES or NO.`,
+        'You verify image search results. Answer strictly YES or NO.',
+        b64,
+      );
+      if (/\bYES\b/i.test(String(verdict || '').slice(0, 20))) {
+        img.verified = true;
+        return [img, ...images.filter((x) => x !== img)];
+      }
+      img.rejected = String(verdict || 'NO').slice(0, 40);
+    } catch { /* vision unavailable — keep order */ }
+  }
+  return images;
+}
+
+/** Free AI image generation (Pollinations) — no key, no card, no signup. */
+export function generatedImageUrl(prompt, { width = 768, height = 512 } = {}) {
+  const clean = String(prompt || '').trim().slice(0, 300);
+  if (!clean) return null;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(clean)}?width=${width}&height=${height}&nologo=true&seed=${Math.floor(Math.random() * 99999)}`;
+}
+
+const SHOW_RE = /\b(shows?|find|displays?|see|look\s+at)\b[^.?!]{0,40}\b(picture|photo|image|pic)\b|\b(picture|photo|image|pic)\s+of\b|\bwhat\s+(does|do)\b[^.?!]{0,30}\blook\s+like\b/i;
+const GEN_RE = /\b(generate|draw|create|make|paint|design)\b[^.?!]{0,40}\b(picture|photo|image|pic|art)\b|\b(draw|paint)\b\s+(me\s+)?(a|an|the)\b/i;
+const BLOCK_WORDS = /\b(build|code|app|website|logo\s+file|icon\s+file|diagram\s+of\s+the\s+system|architecture)\b/i;
+
+/**
+ * B171 — one detector, two modes:
+ *   { mode: 'find', subject }     → real photos (Commons + vision verify)
+ *   { mode: 'generate', subject } → AI-generated image (Pollinations)
+ * Never fires on links (video path owns them) or engineering build requests.
  */
 export function detectPictureIntent(text) {
   const raw = String(text || '').trim();
   if (!raw || raw.length > 200) return null;
-  if (/https?:\/\/\S+/.test(raw)) return null;          // links → video/research paths
-  if (BUILD_RE.test(raw) && !/\bshow\b/i.test(raw)) return null;
-  if (!PICTURE_RE.test(raw)) return null;
-  const subject = raw
-    .replace(/^(hey\s+jexi[,:]?\s+)?(can\s+you\s+)?(please\s+)?(show|draw|display|find)\b/i, ' ')
-    .replace(/\b(me|us|a|an|the|some|of|for|with|picture|photo|image|pic|real|actual|good|nice|please)\b/gi, ' ')
+  if (/https?:\/\/\S+/.test(raw)) return null;
+  // one filler-word stripper for BOTH modes — content words survive
+  const strip = (t) => t
+    .replace(/^(hey\s+jexi[,:]?\s+)?(can\s+you\s+)?(please\s+)?/i, ' ')
+    .replace(/\b(me|us|a|an|the|some|of|for|with|shows?|find|displays?|see|look|at|picture|photo|image|pic|art|real|actual|good|nice|please|someone|somebody|generate|draw|create|make|paint|design|what|does|do|like|want|to)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (GEN_RE.test(raw) && !BLOCK_WORDS.test(raw)) {
+    const subject = strip(raw);
+    if (subject.length >= 3) return { mode: 'generate', subject: subject.slice(0, 120), question: raw.slice(0, 150) };
+  }
+  if (SHOW_RE.test(raw) && !BLOCK_WORDS.test(raw)) {
+    const subject = strip(raw);
+    if (subject.length >= 3) return { mode: 'find', subject: subject.slice(0, 100), question: raw.slice(0, 150) };
+  }
+  return null;
+}
+
+/** B171 — correction follow-up: "no I mean a lion ANIMAL" right after a
+ *  picture answer re-fires the picture path with the corrected subject. */
+export function detectCorrectionToPicture(text) {
+  const raw = String(text || '').trim();
+  if (!raw || raw.length > 120) return null;
+  if (!/^(no+|not\s+that)\b[,.!\s]/i.test(raw) || !/\bi\s+mean\b/i.test(raw)) return null;
+  const subject = raw.split(/\bi\s+mean\b/i)[1]
+    .replace(/\b(a|an|the|is|was|actual|real|animal|bird|insect|fish|plant|car|plane|plane|not)\b/gi, ' ')
+    .replace(/[^a-zA-Z0-9\s-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   if (subject.length < 3) return null;
-  return { subject: subject.slice(0, 100), question: raw.slice(0, 150) };
+  return { mode: 'find', subject: subject.slice(0, 100), question: raw.slice(0, 150), corrected: true };
 }

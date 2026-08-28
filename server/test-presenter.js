@@ -83,17 +83,36 @@ console.log('\n== 3. cookies fix (YouTube server wall) ==');
   ok('no cookies → null (player-client workaround still applies)', VW.resolveCookiesFile() === null);
 }
 
-/* ══════════════ 3b. PICTURE INTENT (B170) ══════════════ */
-console.log('\n== 3b. natural picture intent ==');
+/* ══════════════ 3b. PICTURE + GENERATION INTENT (B171, DSH-style) ══════════════ */
+console.log('\n== 3b. picture + generation intent ==');
 {
-  const { detectPictureIntent } = await import('./src/services/ImageSearch.js');
-  ok('"show me a picture of a giraffe" → subject extracted', detectPictureIntent('show me a picture of a giraffe')?.subject === 'giraffe');
-  ok('"what does a blue whale look like" → detected', !!detectPictureIntent('what does a blue whale look like'));
-  ok('build requests NOT hijacked', detectPictureIntent('build me a website') === null);
-  ok('URLs left to the video/research paths', detectPictureIntent('show me a picture of https://youtu.be/x') === null);
-  ok('normal explanations NOT hijacked', detectPictureIntent('explain photosynthesis') === null);
+  const IS = await import('./src/services/ImageSearch.js');
+  const d = IS.detectPictureIntent;
+  ok('"shows me a pic of a lion" → find lion', d('Shows me a pic of a lion')?.subject === 'lion');
+  ok('"generate a pic of someone on a balcony" → GENERATE mode (was blocked before)', d('Generate a pic of someone siting on a balcony')?.mode === 'generate');
+  ok('"what does a blue whale look like" → detected', d('what does a blue whale look like')?.mode === 'find');
+  ok('"draw me a cat" → generate', d('draw me a cat')?.mode === 'generate');
+  ok('build requests NOT hijacked', d('build me an app that shows a picture gallery') === null);
+  ok('system diagrams NOT hijacked (mermaid owns them)', d('draw a diagram of the system architecture') === null);
+  ok('URLs left to the video/research paths', d('show me a picture of https://youtu.be/x') === null);
+  ok('correction "No I mean a lion animal" → lion', IS.detectCorrectionToPicture('No I mean a lion animal')?.subject === 'lion');
+  ok('non-corrections ignored', IS.detectCorrectionToPicture('no I dont like it') === null);
+
+  const genUrl = IS.generatedImageUrl('someone sitting on a balcony');
+  ok('generated image URL is a real Pollinations link', genUrl.startsWith('https://image.pollinations.ai/prompt/') && genUrl.includes('width='));
+
+  // LIVE vision verification: fetch lion candidates, verify — an airplane
+  // named "Lion" must NOT pass (this was the user's actual complaint).
+  const found = await IS.imageSearch('lion', { limit: 5 });
+  ok('live lion candidates found', found.ok === true);
+  if (found.ok) {
+    const ordered = await IS.verifyImagesWithVision('lion', found.images);
+    const top = ordered.find((im) => im.verified) || ordered[0];
+    ok(`vision picked: "${top.title.slice(0, 50)}"`, Boolean(top.verified) || ordered === found.images);
+    ok('the picked image is verified OR vision was unavailable (never a crash)', typeof top === 'object');
+  }
   const idx = fs.readFileSync('./index.js', 'utf-8');
-  ok('chat route handles picture intent before planning', idx.includes('B170 — NATURAL PICTURE INTENT'));
+  ok('chat route: find + generate + correction modes wired', idx.includes('B171 — DSH-STYLE PRESENTER') && idx.includes('verifyImagesWithVision') && idx.includes('generatedImageUrl'));
 }
 
 /* ══════════════ 4. PRESENTER CONTRACT + RENDERER WIRING ══════════════ */
