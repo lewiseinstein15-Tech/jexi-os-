@@ -650,6 +650,10 @@ function providerToolConfig(provider, opts) {
     cerebras: { key: keys.cerebrasKey, baseUrl: 'https://api.cerebras.ai/v1', models: [opts.model || CEREBRAS_MODELS[0]] },
     deepinfra: { key: keys.deepinfraKey, baseUrl: 'https://api.deepinfra.com/v1/openai', models: [opts.model || DEEPINFRA_MODELS[0]] },
     mistral: { key: keys.mistralKey, baseUrl: 'https://api.mistral.ai/v1', models: [opts.model || MISTRAL_MODELS[0]] },
+    // B166 — the FREE DeepSeek lanes (email-only signup, no card). The coder
+    // chain already leads with these; the tool loop can finally reach them.
+    nvidia: { key: keys.nvidiaKey, baseUrl: process.env.NVIDIA_API_URL || 'https://integrate.api.nvidia.com/v1', models: [opts.model || NVIDIA_MODELS[0]] },
+    sambanova: { key: keys.sambanovaKey, baseUrl: 'https://api.sambanova.ai/v1', models: [opts.model || SAMBANOVA_MODELS[0]] },
   }[provider];
 }
 

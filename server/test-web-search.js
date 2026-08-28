@@ -94,6 +94,35 @@ console.log('\n== 3. exa + perplexity endpoint mapping ==');
   __testFetch.fn = null;
 }
 
+/* ══════════════ 3b. FREE-TIER SEARCH APIS (tavily + brave) ══════════════ */
+console.log('\n== 3b. Free-tier search APIs ==');
+{
+  process.env.TAVILY_API_KEY = 'tvly-test';
+  __testFetch.fn = async (url, opts) => ({
+    ok: true, json: async () => ({
+      answer: 'tavily generated answer',
+      results: [{ url: 'https://tv.com/1', title: 'Tavily hit', content: 'tavily content', published_date: '2026-05-01' }],
+    }),
+  });
+  const tv = await WS.providerSearch('tavily', { query: 'q' });
+  ok('tavily: POST /search → sources + generated answer', tv.content === 'tavily generated answer' && tv.sources[0].url === 'https://tv.com/1' && tv.sources[0].publishedAt === '2026-05-01');
+  delete process.env.TAVILY_API_KEY;
+
+  process.env.BRAVE_API_KEY = 'brave-test';
+  __testFetch.fn = async (url, opts) => ({
+    ok: true, json: async () => ({ web: { results: [{ url: 'https://br.com/1', title: 'Brave hit', description: 'brave <b>desc</b>', age: '2 days ago' }] } }),
+  });
+  const br = await WS.providerSearch('brave', { query: 'q' });
+  ok('brave: GET web/search → sources, html stripped from snippet', br.sources[0].url === 'https://br.com/1' && br.sources[0].snippet === 'brave desc' && br.sources[0].publishedAt === '2 days ago');
+  delete process.env.BRAVE_API_KEY;
+
+  // unconfigured → honest credential-missing (they stay out of rotation free)
+  let threw = false;
+  try { await WS.providerSearch('tavily', { query: 'q' }); } catch (e) { threw = e.code === 'WEB_PROVIDER_CREDENTIAL_MISSING'; }
+  ok('free-tier APIs stay OUT of rotation until the (free) key is pasted', threw);
+  __testFetch.fn = null;
+}
+
 /* ══════════════ 4. SEAM GUARANTEES — dedup + truncation + cooldown ══════════════ */
 console.log('\n== 4. Seam guarantees ==');
 {

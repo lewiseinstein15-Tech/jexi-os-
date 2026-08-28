@@ -128,6 +128,8 @@ const KEY_ALIASES = {
   DEEPSEEK_API_KEY: ['deepseek_api_key', 'deepseekkey', 'deepseek'],
   EXA_API_KEY: ['exa_api_key', 'exakey', 'exa'],
   PERPLEXITY_API_KEY: ['perplexity_api_key', 'perplexitykey', 'perplexity'],
+  TAVILY_API_KEY: ['tavily_api_key', 'tavilykey', 'tavily'],
+  BRAVE_API_KEY: ['brave_api_key', 'bravekey', 'brave'],
 };
 
 function keyFor(envName) {
@@ -296,6 +298,75 @@ export const arxivProvider = {
       if (title && id) sources.push({ url: id, title, snippet });
     });
     if (!sources.length) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'arxiv empty');
+    return { sources };
+  },
+};
+
+/* ══════════════════ FREE-TIER SEARCH APIS (email signup only, NO card) ═══
+ * Tavily: 1,000 searches/month free — purpose-built for AI agents.
+ * Brave:  2,000 searches/month free — independent index.
+ * Paste the key in Settings (or env) and these join the rotation per call. */
+
+export const tavilyProvider = {
+  id: 'tavily', name: 'Tavily', keyless: false,
+  envKey: 'TAVILY_API_KEY',
+  configured() { return !!keyFor(this.envKey); },
+  async search(req, signal) {
+    const apiKey = keyFor(this.envKey);
+    if (!apiKey) throw new WebError(WEB_ERRORS.CREDENTIAL_MISSING, 'TAVILY_API_KEY not set (free at app.tavily.com — 1,000/month, no card)');
+    const res = await httpCall('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      signal,
+      body: JSON.stringify({ query: req.query, max_results: req.maxResults ?? 8, search_depth: 'basic' }),
+    }).catch((e) => { throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `tavily: ${e.message}`); });
+    if (!res.ok) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `tavily HTTP ${res.status}`);
+    const data = await res.json().catch(() => { throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'tavily: bad json'); });
+    const sources = (data.results || []).map((r) => ({ url: r.url, title: r.title, snippet: r.content ? String(r.content).slice(0, 300) : undefined, ...(r.published_date ? { publishedAt: r.published_date } : {}) }));
+    if (!sources.length) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'tavily empty');
+    return { ...(data.answer ? { content: String(data.answer).slice(0, 2000) } : {}), sources: sources.filter((x) => !isGarbageUrl(x.url)) };
+  },
+};
+
+export const braveProvider = {
+  id: 'brave', name: 'Brave Search', keyless: false,
+  envKey: 'BRAVE_API_KEY',
+  configured() { return !!keyFor(this.envKey); },
+  async search(req, signal) {
+    const apiKey = keyFor(this.envKey);
+    if (!apiKey) throw new WebError(WEB_ERRORS.CREDENTIAL_MISSING, 'BRAVE_API_KEY not set (free at brave.com/search/api — 2,000/month, no card)');
+    const res = await httpCall(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(req.query)}&count=${req.maxResults ?? 8}`, {
+      headers: { Accept: 'application/json', 'X-Subscription-Token': apiKey },
+      signal,
+    }).catch((e) => { throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `brave: ${e.message}`); });
+    if (!res.ok) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `brave HTTP ${res.status}`);
+    const data = await res.json().catch(() => { throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'brave: bad json'); });
+    const sources = (data?.web?.results || []).map((r) => ({
+      url: r.url, title: r.title,
+      snippet: r.description ? String(r.description).replace(/<[^>]+>/g, '').slice(0, 300) : undefined,
+      ...(r.age ? { publishedAt: r.age } : {}),
+    }));
+    if (!sources.length) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'brave empty');
+    return { sources: sources.filter((x) => !isGarbageUrl(x.url)) };
+  },
+};
+
+export const stackoverflowProvider = {
+  id: 'stackoverflow', name: 'Stack Overflow', keyless: true,
+  configured: () => true,
+  async search(req) {
+    // Free Stack Exchange API — datacenter-friendly, no key, no card. Empty
+    // for non-code questions, so it self-regulates out of the rotation.
+    const url = `https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&q=${encodeURIComponent(req.query)}&site=stackoverflow&pagesize=6&filter=!nNPvSNVZBP`; // title+link+score+tags
+    const res = await fetch(url, { headers: { 'User-Agent': BROWSER_UA }, signal: AbortSignal.timeout(9000) });
+    if (!res.ok) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `stackoverflow ${res.status}`);
+    const data = await res.json();
+    const sources = (data.items || []).map((q) => ({
+      url: q.link,
+      title: String(q.title || '').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&'),
+      snippet: `score ${q.score} · ${q.is_answered ? 'answered' : 'unanswered'} · ${(q.tags || []).slice(0, 4).join(', ')}`,
+    }));
+    if (!sources.length) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'stackoverflow empty');
     return { sources };
   },
 };
@@ -520,10 +591,11 @@ export const perplexityProvider = {
 /** Registry + order. Keyed DSH providers first WHEN configured; the keyless
  *  whole-web engines always follow — search works with zero keys. */
 export const SEARCH_PROVIDERS = [
-  deepseekSearchProvider, exaProvider, perplexityProvider,   // DSH trio (keyed)
+  tavilyProvider, braveProvider,                              // free-tier APIs (email-only keys)
+  deepseekSearchProvider, exaProvider, perplexityProvider,   // DSH trio (paid keys)
   googleNewsRssProvider, ddgInstantProvider, marginaliaProvider, hnSearchProvider, // datacenter-proof
   ddgHtmlProvider, ddgLiteProvider, mojeekProvider, bingProvider, searxngProvider, // HTML engines
-  wikipediaProvider, arxivProvider, openAlexProvider,        // verticals
+  wikipediaProvider, arxivProvider, openAlexProvider, stackoverflowProvider, // verticals
 ];
 
 const COOLDOWN_MS = 10 * 60 * 1000;
