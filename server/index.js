@@ -6,6 +6,8 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { planner } from './src/services/Planner.js';
+import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B158 — user/message lifecycle event
+import { setGoalEngine } from './src/services/PromptAssembly.js'; // B158 — goals reach every assembled prompt
 import { orchestrator } from './src/services/Orchestrator.js';
 import { runSimpleTask } from './src/services/SimpleTask.js'; // B66 — Orchestrator-Workers SIMPLE fast path
 import { normalizeFinalAnswer } from './src/services/Formatting.js'; // B66 — normalize every final answer
@@ -118,6 +120,10 @@ loadPlugins({ services: {} }).then(({ ctx }) => {
 // Goal jobs: inject real planner/orchestrator and resume after restart.
 goalEngine.planner = planner;
 goalEngine.orchestrator = orchestrator;
+// B158 — RE-WIRED (regression fix): PromptAssembly owns a goal-engine ref
+// (setGoalEngine) so live goals reach every assembled prompt; the call was
+// dropped in an earlier refactor and goals silently stopped appearing.
+setGoalEngine(goalEngine);
 goalEngine.generateContent = generateContent;
 setGoalExecutor(goalEngine);
 setGoalNotifier(notifyGoalComplete);
@@ -1193,7 +1199,12 @@ app.post('/api/chat', async (req, res) => {
 
   try {
     const raw = String(query || '').trim();
-    if (raw) rememberTurn('user', raw);
+    if (raw) {
+      rememberTurn('user', raw);
+      // B119/B158 — dsh user/message lifecycle event: the user's turn is part
+      // of the replayable session log (was dropped in the B157 route refactor).
+      try { lifecycleUserMessage(conversationId(req), 1, raw); } catch { /* lifecycle must never break chat */ }
+    }
     const pendingOffer = loadOffer(convId);
     const hasPending = Boolean(pendingOffer);
     let effectiveQuery = raw;

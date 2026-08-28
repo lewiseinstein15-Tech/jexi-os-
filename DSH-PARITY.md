@@ -1,6 +1,6 @@
 # DSH → JEXI Parity Tracker
 
-**Generated:** 2026-08-19T04:47:33.194Z · **Packages tracked:** 219 · **Ported:** 219 (100%) · **Partial:** 0 · **Not yet:** 0
+**Generated:** 2026-08-28T00:21:24.100Z · **Packages tracked:** 229 · **Ported:** 229 (100%) · **Partial:** 0 · **Not yet:** 0
 
 Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch that landed it. Regenerate with `node server/scripts/audit-bundles.js`.
 
@@ -39,7 +39,7 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 | ✅ bundle/headless | ported | cli.js | B136 |
 | ✅ bundle/web-app | ported | src/ (React app + vite bundle) | B117-B144 |
 
-## client (39)
+## client (42)
 
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
@@ -51,6 +51,7 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 | ✅ client/schema-form | ported | src/utils/schemaForm.js | B141 |
 | ✅ client/ui-agent-preset | ported | src/components (SettingsPanel presets) | B117-B144 |
 | ✅ client/ui-attachment | ported | src/components (upload handling (ChatWindow)) | B117-B144 |
+| ✅ client/ui-brand-official | ported | src/brand/official.jsx (+ App sidebar slots) | B160 |
 | ✅ client/ui-commands | ported | src/components (CommandCenter) | B117-B144 |
 | ✅ client/ui-conversation | ported | src/components (ConversationsScreen) | B117-B144 |
 | ✅ client/ui-deliverables | ported | src/components (DownloadPanel) | B117-B144 |
@@ -65,6 +66,8 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 | ✅ client/ui-permission-presets | ported | src/components (SettingsPanel permission card) | B117-B144 |
 | ✅ client/ui-plan | ported | src/components (plan card + plan-review card) | B117-B144 |
 | ✅ client/ui-primitives | ported | src/components (CapabilityCards + shared UI primitives) | B117-B144 |
+| ✅ client/ui-reference | ported | src/utils/referenceSource.js | B160 |
+| ✅ client/ui-renderer | ported | src/utils/uiRenderer.jsx (slot registry + assembled root) | B160 |
 | ✅ client/ui-settings | ported | src/components (SettingsPanel) | B117-B144 |
 | ✅ client/ui-settings-general | ported | src/components (SettingsPanel general) | B117-B144 |
 | ✅ client/ui-settings-models | ported | src/components (SettingsPanel models) | B117-B144 |
@@ -83,11 +86,12 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 | ✅ client/web | ported | src/main.jsx + App.jsx | B117-B144 |
 | ✅ client/web-react | ported | src/hooks/index.js (hooks barrel) | B143 |
 
-## code-runtime (2)
+## code-runtime (3)
 
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
 | ✅ code-runtime/code-runtime | ported | CodeModeRuntime.js | B99 |
+| ✅ code-runtime/code-runtime-python | ported | CodeRuntimePython.js + plugins/python-run | B160 |
 | ✅ code-runtime/code-runtime-worker-thread | ported | code-worker.js + CodeRuntimeBootstrap.js | B138 |
 
 ## compaction (4)
@@ -99,11 +103,13 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 | ✅ compaction/compaction-basic | ported | CompactionEngine.js (basic mode) | B100 |
 | ✅ compaction/compaction-tool-result-pruner | ported | ToolResultPruner.js | B144 |
 
-## context (4)
+## context (6)
 
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
 | ✅ context/agent-instructions | ported | AgentInstructions.js (AGENTS.md) | B136 |
+| ✅ context/file-reference | ported | FileReference.js (grammar + snapshots) | B160 |
+| ✅ context/file-reference-local | ported | FileReference.js (bounded fuzzy index) | B160 |
 | ✅ context/session-reference | ported | SessionReference.js | B109 |
 | ✅ context/time-context | ported | TimeContext.js | B104 |
 | ✅ context/tmux-context | ported | TmuxContext.js | B138 |
@@ -121,10 +127,11 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 | ✅ core/system-prompt | ported | PromptAssembly + JexiPrompt | B119 |
 | ✅ core/tools | ported | ToolRuntime+ToolRegistry | B96 |
 
-## credentials (2)
+## credentials (3)
 
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
+| ✅ credentials/authorization | ported | Authorization.js (conversation credential flows) | B160 |
 | ✅ credentials/credentials | ported | CredentialStore.js | B134 |
 | ✅ credentials/credentials-local | ported | CredentialStore.js | B134 |
 
@@ -143,6 +150,13 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 | ✅ examples/acp-demo | ported | examples/acp-demo.mjs | B139 |
 | ✅ examples/agent-spine-demo | ported | examples/agent-spine-demo.mjs | B139 |
 | ✅ examples/jsonrpc-demo | ported | examples/jsonrpc-demo.mjs | B139 |
+
+## experimental (2)
+
+| Package | Status | JEXI port | Batch |
+|---|---|---|---|
+| ✅ experimental/agent-team | ported | AgentTeams.js (roster + mailbox + task DAG) | B160 |
+| ✅ experimental/tool-agent-team | ported | plugins/agent-team (8 model-facing tools) | B160 |
 
 ## extensions (4)
 
@@ -333,7 +347,7 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 | ✅ settings/settings | ported | SettingsManager.js | existing |
 | ✅ settings/settings-file | ported | SettingsFile.js | B135 |
 
-## shell (9)
+## shell (10)
 
 | Package | Status | JEXI port | Batch |
 |---|---|---|---|
@@ -346,6 +360,7 @@ Every DeepSeek Harness package JEXI has pulled, its JEXI port, and the batch tha
 | ✅ shell/tool-bash | ported | coding plugin bash tool | B126 |
 | ✅ shell/tool-bash-persistent | ported | BashPersistent.js | B135 |
 | ✅ shell/tool-pwsh | ported | pwsh tool | B141 |
+| ✅ shell/tool-pwsh-persistent | ported | PwshPersistent.js | B160 |
 
 ## skill (4)
 

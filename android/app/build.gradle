@@ -30,12 +30,26 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // versionCode MUST rise on every build or Android refuses the update.
-        // The CI workflow passes github.run_number (build #N) as APK_BUILD_NUMBER.
-        // Fallback: use epoch seconds so every local build also gets a unique code
-        // — this is what makes the WebView cache-busting in MainActivity actually work.
+        //
+        // ⚠️ B158 — THE DOWNGRADE TRAP (why updates broke on the phone):
+        // CI passes github.run_number (a small number, ~hundreds) while the
+        // old local fallback used epoch SECONDS (~1.75 billion). Anyone who
+        // ever installed a locally-built APK could NEVER take a CI update —
+        // every Release build had a LOWER versionCode and Android rejects
+        // that with INSTALL_FAILED_VERSION_DOWNGRADE ("App not installed").
+        //
+        // Scheme (both directions safe forever):
+        //   CI builds:   1,000,000 + run_number   (always the newest)
+        //   Local builds: hours since 2026-01-01  (~8,760/yr → stays under
+        //                1,000,000 until the year 2139)
+        // Local builds therefore can NEVER outrank a CI build again.
         def buildNumber = System.getenv('APK_BUILD_NUMBER')
         if (buildNumber == null || buildNumber.trim().isEmpty()) {
-            buildNumber = (System.currentTimeMillis() / 1000) as int
+            def hoursSince2026 = (System.currentTimeMillis() / 3600000L) - 561796L  // 2026-01-01T00:00Z in epoch hours
+            buildNumber = Math.max(1, (int) hoursSince2026) as int
+        } else if ((buildNumber.trim() as int) < 1000000) {
+            // A raw run number from CI → lift it into the CI range.
+            buildNumber = 1000000 + (buildNumber.trim() as int)
         } else {
             buildNumber = buildNumber.trim() as int
         }

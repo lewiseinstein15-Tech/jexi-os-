@@ -1,8 +1,25 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+// B158 — bake a per-build stamp into <meta name="jexi-build">. The inline
+// bootstrap in index.html compares it with the last-seen stamp and wipes
+// caches + Service Workers when it changes, so a stale bundle can never
+// survive an update. 'dev' never triggers a wipe (local dev reloads are free).
+function jexiBuildStamp() {
+  const stamp =
+    process.env.VITE_BUILD_SHA ||
+    process.env.VITE_APP_VERSION ||
+    (process.env.NODE_ENV === 'production' ? String(Date.now()) : 'dev')
+  return {
+    name: 'jexi-build-stamp',
+    transformIndexHtml(html) {
+      return html.replace('<meta name="jexi-build" content="dev" />', `<meta name="jexi-build" content="${stamp}" />`)
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), jexiBuildStamp()],
   // Relative base: works on Vercel (root) and GitHub Pages (subpath)
   base: './',
   // Pin the dependency scanner to the real app entry. Without this, Vite

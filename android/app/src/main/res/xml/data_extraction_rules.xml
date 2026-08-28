@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- B158 — Android 12+ data-extraction rules (same policy as backup_rules.xml):
+     keep the user's real data (localStorage identity, settings, conversation
+     history), never restore caches or Service Workers that can hold a stale
+     app bundle from an older version. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="app_webview/Cache" />
+        <exclude domain="file" path="app_webview/HTTP Cache" />
+        <exclude domain="file" path="app_webview/Code Cache" />
+        <exclude domain="file" path="app_webview/GPUCache" />
+        <exclude domain="file" path="app_webview/GrShaderCache" />
+        <exclude domain="file" path="app_webview/ShaderCache" />
+        <exclude domain="file" path="app_webview/Service Worker" />
+        <exclude domain="file" path="app_webview/Shared Dictionary" />
+        <exclude domain="file" path="cache" />
+        <exclude domain="file" path="code_cache" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="app_webview/Cache" />
+        <exclude domain="file" path="app_webview/HTTP Cache" />
+        <exclude domain="file" path="app_webview/Code Cache" />
+        <exclude domain="file" path="app_webview/GPUCache" />
+        <exclude domain="file" path="app_webview/GrShaderCache" />
+        <exclude domain="file" path="app_webview/ShaderCache" />
+        <exclude domain="file" path="app_webview/Service Worker" />
+        <exclude domain="file" path="app_webview/Shared Dictionary" />
+        <exclude domain="file" path="cache" />
+        <exclude domain="file" path="code_cache" />
+    </device-transfer>
+</data-extraction-rules>

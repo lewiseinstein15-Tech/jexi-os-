@@ -119,8 +119,11 @@ const ok = (cond, label) => { console.log(`${cond ? '✅' : '❌'} ${label}`); i
   const css = fs.readFileSync('../src/index.css', 'utf8');
   ok(css.includes('.jx-body p { font-family: var(--mono); font-size: 13.5px'), 'P4: JEXI answers render in a comfortable reading size (mono 13.5px, v3)');
   ok(!cw.includes('rounded-tl-sm bg-surface-1 text-text-primary border border-hairline'), 'P4: the old bordered JEXI bubble is gone');
-  ok(cw.includes('jx-avatar') && cw.includes('jx-user-bubble'), 'P4 (B153): AI has a J avatar + user messages use a distinct bubble');
-  ok(cw.includes('Regenerate') && cw.includes('copyMsg'), 'P4 (B153): AI messages have Copy + Regenerate actions');
+  // B157-era markers: the B153 jx-avatar/jx-user-bubble classes were replaced
+  // by the spark avatar + brand-gradient user bubble; Copy/Regenerate live in
+  // the MessageActions component (handleCopy / onRegenerate).
+  ok(/from-brand\/30.*flex items-center justify-center/s.test(cw) && cw.includes("msg.role === 'user' ? 'justify-end'") && /rounded-tr-sm bg-gradient-to-br from-brand/.test(cw), 'P4 (B157): AI has an avatar + user messages use a distinct brand bubble (right-aligned)');
+  ok(cw.includes('MessageActions') && cw.includes('handleCopy') && cw.includes('onRegenerate'), 'P4 (B157): AI messages have Copy + Regenerate actions');
   const mr = fs.readFileSync('../src/components/MarkdownRenderer.jsx', 'utf8');
   ok(mr.includes('size = \'text-[11px]\''), 'P4: MarkdownRenderer accepts a size override');
 }

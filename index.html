@@ -9,6 +9,12 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
+    <!-- B158 — build stamp: replaced at build time by the jexi-build-stamp
+         plugin in vite.config.js. The bootstrap script below compares it with
+         the last-seen stamp and, when it changes, wipes every CacheStorage
+         entry + Service Worker BEFORE the app bundle loads — killing any
+         stale cached bundle deterministically, on every platform. -->
+    <meta name="jexi-build" content="dev" />
     <title>JEXI</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -21,6 +27,87 @@
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0a0f'/%3E%3Crect x='1.5' y='1.5' width='29' height='29' rx='6' fill='none' stroke='%2300ff9d' stroke-opacity='0.45'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='17' font-weight='900' fill='%2300ff9d' text-anchor='middle'%3EJ%3C/text%3E%3C/svg%3E"
     />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
+    <script>
+      /* ═══ B158 — BOOTSTRAP GUARD (plain ES5, runs before the app bundle) ═══
+         Two jobs, both fixes for "the app breaks after an APK update":
+         1) BUILD-STAMP HANDSHAKE — if this build's stamp differs from the last
+            one the device saw, wipe CacheStorage + Service Workers NOW, before
+            the bundle loads (the app-level cleanup only runs if the new bundle
+            is healthy — this one runs even when it isn't; it also protects the
+            web deploy, where an old Service Worker from a previous release can
+            serve a stale bundle forever). Never touches localStorage (identity,
+            settings and conversation history always survive updates).
+         2) BLANK-SCREEN WATCHDOG — if React still hasn't painted anything into
+            #root after 10 s (bundle crashed, WebView too old, stale script),
+            show a minimal recovery screen with Reload and a full Reset, so the
+            user is never trapped on a black screen after a bad update. */
+      (function () {
+        try {
+          var meta = document.querySelector('meta[name="jexi-build"]');
+          var stamp = meta ? String(meta.getAttribute('content') || '') : '';
+          var KEY = 'jexi_build_stamp';
+          var prev = null;
+          try { prev = window.localStorage.getItem(KEY); } catch (e) {}
+          if (stamp && stamp !== 'dev' && stamp !== prev) {
+            try { window.localStorage.setItem(KEY, stamp); } catch (e) {}
+            if (window.caches && caches.keys) {
+              caches.keys().then(function (ks) {
+                for (var i = 0; i < ks.length; i++) caches.delete(ks[i]);
+              }).catch(function () {});
+            }
+            if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+              navigator.serviceWorker.getRegistrations().then(function (rs) {
+                for (var j = 0; j < rs.length; j++) rs[j].unregister();
+              }).catch(function () {});
+            }
+          }
+        } catch (e) { /* never block boot */ }
+
+        window.setTimeout(function () {
+          try {
+            var root = document.getElementById('root');
+            if (root && root.childElementCount > 0) return; /* app painted — all good */
+            if (window.__jexiRecoveryShown) return;
+            window.__jexiRecoveryShown = true;
+            var dark = 'background:#0f1115;color:#fff;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;';
+            var box = document.createElement('div');
+            box.setAttribute('style', 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px;' + dark);
+            var card = document.createElement('div');
+            card.setAttribute('style', 'max-width:420px;width:100%;background:#161a21;border:1px solid #2a3140;border-radius:14px;padding:28px;text-align:center;');
+            card.innerHTML =
+              '<div style="font-size:30px;margin-bottom:10px;">⚡</div>' +
+              '<div style="font-weight:800;font-size:17px;margin-bottom:8px;">JEXI didn\u2019t start</div>' +
+              '<div style="font-size:13px;color:#9a9a9a;line-height:1.55;margin-bottom:20px;">' +
+              'The app hit a problem while loading. Reload usually fixes it. ' +
+              'If it keeps happening, Reset app data (your conversations will be cleared) ' +
+              'or reinstall from the latest APK release.</div>';
+            function btn(label, bg, fg, fn) {
+              var b = document.createElement('button');
+              b.textContent = label;
+              b.setAttribute('style', 'width:100%;padding:12px;margin-top:8px;border-radius:9px;border:1px solid #2a3140;background:' + bg + ';color:' + fg + ';font-size:14px;font-weight:700;cursor:pointer;');
+              b.onclick = fn;
+              return b;
+            }
+            card.appendChild(btn('Reload', '#ffffff', '#0f1115', function () { window.location.reload(true); }));
+            card.appendChild(btn('Reset app data & reload', '#161a21', '#ffffff', function () {
+              try {
+                try { window.localStorage.clear(); } catch (e) {}
+                try { window.sessionStorage.clear(); } catch (e) {}
+                if (window.caches && caches.keys) {
+                  caches.keys().then(function (ks) { for (var i = 0; i < ks.length; i++) caches.delete(ks[i]); }).catch(function () {});
+                }
+                if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+                  navigator.serviceWorker.getRegistrations().then(function (rs) { for (var j = 0; j < rs.length; j++) rs[j].unregister(); }).catch(function () {});
+                }
+              } catch (e) {}
+              window.location.reload(true);
+            }));
+            box.appendChild(card);
+            document.body.appendChild(box);
+          } catch (e) { /* nothing more we can do */ }
+        }, 10000);
+      })();
+    </script>
   </head>
   <body class="bg-[#050505]">
     <div id="root"></div>

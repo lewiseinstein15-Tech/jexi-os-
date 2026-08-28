@@ -83,10 +83,14 @@ console.log('\n== 5. Routing: research intents are DIRECT-routed away from teams
 const p1 = await planner.analyzeIntent('research how solar panels work and explain it');
 ok(p1.intent === 'research' || p1.intent === 'learning_research', `research request classified as research (${p1.intent})`);
 ok(isDirectIntent('research') === false && isDirectIntent('learning_research') === false, 'research is NOT a direct intent (goes to the runner, not bare text)');
-const idx = fs.readFileSync('./index.js', 'utf-8');
-ok(/plan\.intent === 'research' \|\| plan\.intent === 'learning_research'/.test(idx), 'chat routes research intents to runDshResearch');
-ok(/runDshResearch\(/.test(idx), 'runner wired into the main chat path');
-ok(!/research/.test(idx.slice(idx.indexOf('runDshResearch'), idx.indexOf('sendEvent') + 40)) === false, 'runner present before sendEvent (sanity)');
+// B157-era routing: research intents execute through the Orchestrator's
+// typed research node (Search team + finalizeAnswer + domain verification).
+// runDshResearch is retained as the direct/SDK runner — the chat path rides
+// the orchestrator graph, which streams the same events.
+const orch = fs.readFileSync('./src/services/Orchestrator.js', 'utf-8');
+ok(/N\.research = this\.wrapCase\('research'/.test(orch), 'orchestrator owns the research node (Search team)');
+ok(/case 'research':\s*\n\s*case 'learning_research': return 'research';/.test(orch), 'research + learning_research route to the research node');
+ok(/verifyDomainAnswer\(\{ query, draft: results\.summary, domain: 'research'/.test(orch), 'research answers domain-verified before delivery');
 
 console.log(`\nB125 dsh-research: ${passed} passed, ${failedCount} failed`);
 process.exit(failedCount ? 1 : 0);

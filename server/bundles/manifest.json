@@ -1,6 +1,6 @@
 {
   "generatedAt": "2026-08-19T00:00:00Z",
-  "note": "Complete DeepSeek Harness \u2192 JEXI parity manifest \u2014 regenerated from the real monorepo package list (219 packages).",
+  "note": "Complete DeepSeek Harness → JEXI parity manifest — regenerated from the real monorepo package list (219 packages).",
   "packages": [
     {
       "package": "acp/acp",
@@ -112,7 +112,8 @@
       "area": "client",
       "status": "ported",
       "port": "src/utils/schemaForm.js",
-      "batch": "B141"
+      "batch": "B141",
+      "note": "upstream removed this package after B141 — JEXI port retained (used by SettingsPanel schema forms)"
     },
     {
       "package": "client/ui-agent-preset",
@@ -127,6 +128,13 @@
       "status": "ported",
       "port": "src/components (upload handling (ChatWindow))",
       "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-brand-official",
+      "area": "client",
+      "status": "ported",
+      "port": "src/brand/official.jsx (+ App sidebar slots)",
+      "batch": "B160"
     },
     {
       "package": "client/ui-commands",
@@ -225,6 +233,20 @@
       "status": "ported",
       "port": "src/components (CapabilityCards + shared UI primitives)",
       "batch": "B117-B144"
+    },
+    {
+      "package": "client/ui-reference",
+      "area": "client",
+      "status": "ported",
+      "port": "src/utils/referenceSource.js",
+      "batch": "B160"
+    },
+    {
+      "package": "client/ui-renderer",
+      "area": "client",
+      "status": "ported",
+      "port": "src/utils/uiRenderer.jsx (slot registry + assembled root)",
+      "batch": "B160"
     },
     {
       "package": "client/ui-settings",
@@ -343,7 +365,8 @@
       "area": "client",
       "status": "ported",
       "port": "src/hooks/index.js (hooks barrel)",
-      "batch": "B143"
+      "batch": "B143",
+      "note": "upstream removed this package after B143 — JEXI port retained (src/hooks barrel is used app-wide)"
     },
     {
       "package": "code-runtime/code-runtime",
@@ -351,6 +374,13 @@
       "status": "ported",
       "port": "CodeModeRuntime.js",
       "batch": "B99"
+    },
+    {
+      "package": "code-runtime/code-runtime-python",
+      "area": "code-runtime",
+      "status": "ported",
+      "port": "CodeRuntimePython.js + plugins/python-run",
+      "batch": "B160"
     },
     {
       "package": "code-runtime/code-runtime-worker-thread",
@@ -393,6 +423,20 @@
       "status": "ported",
       "port": "AgentInstructions.js (AGENTS.md)",
       "batch": "B136"
+    },
+    {
+      "package": "context/file-reference",
+      "area": "context",
+      "status": "ported",
+      "port": "FileReference.js (grammar + snapshots)",
+      "batch": "B160"
+    },
+    {
+      "package": "context/file-reference-local",
+      "area": "context",
+      "status": "ported",
+      "port": "FileReference.js (bounded fuzzy index)",
+      "batch": "B160"
     },
     {
       "package": "context/session-reference",
@@ -472,6 +516,13 @@
       "batch": "B96"
     },
     {
+      "package": "credentials/authorization",
+      "area": "credentials",
+      "status": "ported",
+      "port": "Authorization.js (conversation credential flows)",
+      "batch": "B160"
+    },
+    {
       "package": "credentials/credentials",
       "area": "credentials",
       "status": "ported",
@@ -526,6 +577,20 @@
       "status": "ported",
       "port": "examples/jsonrpc-demo.mjs",
       "batch": "B139"
+    },
+    {
+      "package": "experimental/agent-team",
+      "area": "experimental",
+      "status": "ported",
+      "port": "AgentTeams.js (roster + mailbox + task DAG)",
+      "batch": "B160"
+    },
+    {
+      "package": "experimental/tool-agent-team",
+      "area": "experimental",
+      "status": "ported",
+      "port": "plugins/agent-team (8 model-facing tools)",
+      "batch": "B160"
     },
     {
       "package": "extensions/cordis-client-runner",
@@ -1144,6 +1209,13 @@
       "batch": "B141"
     },
     {
+      "package": "shell/tool-pwsh-persistent",
+      "area": "shell",
+      "status": "ported",
+      "port": "PwshPersistent.js",
+      "batch": "B160"
+    },
+    {
       "package": "skill/skill",
       "area": "skill",
       "status": "ported",
@@ -1535,5 +1607,14 @@
       "port": "WorkspaceEntity.js",
       "batch": "B136"
     }
-  ]
+  ],
+  "sync": {
+    "lastPulled": "2026-08-27T23:18:59.323Z",
+    "upstreamCommit": "master@b150a551b8d465e31e418e1b2eaf5e79bbb7d28e",
+    "packageCount": 229,
+    "retainedPorts": [
+      "client/schema-form",
+      "client/web-react"
+    ]
+  }
 }

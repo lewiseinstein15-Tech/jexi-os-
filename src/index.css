@@ -860,3 +860,94 @@ html, body {
 .katex .mopen, .katex .mclose { color: #c9c9cf; }
 .katex .mpunct { color: #7c8794; }
 .katex .mop { color: #82aaff; }
+
+/* ════════════════════════════════════════════════════════════════
+   B159 — LIVE STEP FEED (streaming step-by-step indicator)
+   ════════════════════════════════════════════════════════════════ */
+.jx-process { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 2px; }
+.jx-pipe-head { display: flex; align-items: center; justify-content: space-between; font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--faint); margin-bottom: 4px; }
+.jx-pipe-count { font-weight: 700; }
+.jx-pipe-time { font-variant-numeric: tabular-nums; }
+.jx-step { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-family: var(--mono); font-size: 12.5px; color: var(--muted); min-width: 0; }
+.jx-step .ic { flex-shrink: 0; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; }
+.jx-step .label { font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%; flex-shrink: 1; }
+.jx-step .detail { color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.jx-step.current .label { color: #fff; }
+.jx-step.current .detail { color: var(--muted); }
+.jx-step.done .label, .jx-step.done .detail { opacity: .55; }
+.jx-step.done .jx-check { opacity: .8; animation: none; }
+.jx-step .jx-check { width: 14px; height: 14px; color: #fff; }
+.jx-spin { width: 13px; height: 13px; border: 2px solid var(--line2); border-top-color: #fff; border-radius: 50%; animation: jxrot .7s linear infinite; flex-shrink: 0; }
+
+/* top-bar status: keep the live step on one tidy line */
+.jx-stat { max-width: 46vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (min-width: 1024px) { .jx-stat { max-width: 420px; } }
+
+/* ════════════════════════════════════════════════════════════════
+   B159 — TRUE RESPONSIVE TIERS: phone (<601) · tablet (601–1023) ·
+   laptop/desktop (≥1024, persistent sidebar — no hamburger)
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── LAPTOP / DESKTOP (≥1024px): permanent left rail ── */
+@media (min-width: 1024px) {
+  :root { --rail: 228px; }
+  /* the drawer becomes a persistent sidebar */
+  .jx-menu {
+    transform: none !important;
+    box-shadow: none;
+    width: var(--rail);
+    min-width: var(--rail);
+    border-bottom: none;
+    padding-top: 16px;
+  }
+  .jx-backdrop { display: none !important; }
+  .jx-burger { display: none; }
+  .jx-top { left: var(--rail); }
+  .jx-menu .jx-mi { min-height: 44px; font-size: 13.5px; }
+  /* content column centers in the remaining space */
+  .jx-main { margin-left: var(--rail); }
+  .jx-view-inner { max-width: 880px; padding: 34px 40px 60px; }
+  .jx-msg { padding: 22px 40px; justify-content: center; }
+  .jx-msg .jx-body { max-width: 780px; }
+  .jx-notice { padding: 16px 40px; }
+  .jx-notice .plan-text, .jx-notice .nq { max-width: 860px; }
+  .jx-composer { padding-left: 40px; padding-right: 40px; padding-bottom: 22px; }
+  .jx-composer .jx-bar { max-width: 828px; margin: 0 auto; }
+  .jx-composer .jx-hint { max-width: 828px; margin: 8px auto 0; }
+  .jx-composer .jx-chips { max-width: 828px; margin: 0 auto 8px; }
+  .jx-composer .jx-plus-row { max-width: 828px; margin: 0 auto; }
+  .jx-vtitle { font-size: 24px; }
+  /* hover niceties only make sense with a pointer */
+  .jx-row:hover .t { color: #fff; }
+  .jx-code-pre { font-size: 13px; }
+}
+
+/* ── TABLET (601–1023px): roomier phone, centered chat column ── */
+@media (min-width: 601px) and (max-width: 1023px) {
+  .jx-view-inner { max-width: 720px; padding: 26px 28px 48px; }
+  .jx-msg { padding: 18px 28px; justify-content: center; }
+  .jx-msg .jx-body { max-width: 640px; }
+  .jx-notice { padding: 16px 28px; }
+  .jx-composer { padding-left: 28px; padding-right: 28px; }
+  .jx-composer .jx-bar { max-width: 700px; margin: 0 auto; }
+  .jx-composer .jx-hint { max-width: 700px; margin: 8px auto 0; }
+  .jx-composer .jx-chips { max-width: 700px; margin: 0 auto 8px; }
+  .jx-composer .jx-plus-row { max-width: 700px; margin: 0 auto; }
+  .jx-body p { font-size: 14px; }
+  .jx-act { width: 40px; height: 40px; }
+  .jx-send { height: 40px; }
+  /* two-pane workshop already splits; give the preview a fair min height */
+  .jx-preview { min-height: 380px; }
+}
+
+/* ── extra-short landscape phones: keep the composer reachable ── */
+@media (max-height: 480px) and (orientation: landscape) {
+  .jx-composer { padding-top: 6px; padding-bottom: 8px; }
+  .jx-bar textarea { max-height: 76px; }
+  .jx-msg { padding-top: 10px; padding-bottom: 10px; }
+}
+
+/* B160 — sidebar brand occupants (dsh ui-brand-official) */
+.jx-brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 14px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.jx-brandname { display: flex; flex-direction: column; line-height: 1.15; font-weight: 800; font-size: 14px; letter-spacing: .2px; color: var(--ink); }
+.jx-brandname .jx-brandsub { font-size: 9px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); margin-top: 2px; }

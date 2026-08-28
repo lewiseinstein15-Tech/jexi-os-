@@ -9,6 +9,7 @@ import WorkshopView from './components/WorkshopView';
 import SettingsView from './components/SettingsView';
 import UpdateBanner from './components/UpdateBanner';
 import BootSplash from './components/BootSplash'; // B79 — branded loading screen on open (never a blank screen)
+import { SidebarBrandMark, SidebarBrandName } from './brand/official'; // B160 — dsh ui-brand-official
 import ErrorBoundary from './components/ErrorBoundary';
 
 const VIEWS = {
@@ -43,22 +44,42 @@ export default function App() {
   // B79 — REAL loading page on open (never a blank frame, never a fake
   // flash): the branded splash stays up until the shell has painted AND the
   // backend is reachable. Hard cap so the splash can never trap the app.
+  //
+  // B158 — SELF-HEALING BACKEND URL: a localStorage override (set on an older
+  // build, or pointing at a backend that later died) wins over the URL baked
+  // into THIS APK — which made the freshly-updated app look "broken" even
+  // though its own baked backend was perfectly healthy. If the override
+  // fails its health check but the baked URL answers, drop the override
+  // automatically and continue on the healthy brain.
   useEffect(() => {
     let alive = true;
     let done = false;
     const finish = () => { if (alive && !done) { done = true; setBooted(true); } };
+    const ping = async (base, ms) => {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), ms);
+      try {
+        const res = await fetch(`${base}/api/health`, { signal: ctrl.signal, cache: 'no-store' });
+        return res.ok;
+      } catch (e) { return false; }
+      finally { clearTimeout(t); }
+    };
     const minDelay = new Promise((r) => setTimeout(r, 1400));
     const health = (async () => {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 12000);
-      try {
-        const res = await fetch(`${getBackendUrl()}/api/health`, { signal: ctrl.signal, cache: 'no-store' });
-        if (alive && res.ok) {
-          setBootStatus('Brain online');
-          await new Promise((r) => setTimeout(r, 400));
-        }
-      } catch (e) { /* brain still sleeping — the hard cap releases us */ }
-      finally { clearTimeout(t); }
+      const baked = import.meta.env.VITE_JEXI_BACKEND_URL || '';
+      const stored = localStorage.getItem('jexi_backend_url') || '';
+      const ok = await ping(getBackendUrl(), 12000);
+      if (!alive) return;
+      if (!ok && stored && baked && stored !== baked && await ping(baked, 6000)) {
+        // The saved override is dead but this build's own brain is alive —
+        // recover onto it (settings still let the user re-point later).
+        localStorage.removeItem('jexi_backend_url');
+        window.dispatchEvent(new CustomEvent('jexi:backend-url', { detail: baked }));
+        setBootStatus('Brain online (recovered)');
+      } else if (ok) {
+        setBootStatus('Brain online');
+      }
+      await new Promise((r) => setTimeout(r, 400));
     })();
     Promise.race([
       Promise.all([minDelay, health]),
@@ -119,7 +140,11 @@ export default function App() {
           <div className="jx-right">
             <div className={`jx-stat${engine.isProcessing ? ' working' : ''}`}>
               <span className="dot" />
-              {engine.isProcessing ? 'Working…' : 'Online'}
+              {engine.isProcessing
+                ? (engine.logs.length
+                    ? `${engine.logs[engine.logs.length - 1]?.agent || 'JEXI'} — ${(engine.logs[engine.logs.length - 1]?.message || 'working…').slice(0, 46)}`
+                    : 'Working…')
+                : 'Online'}
             </div>
           </div>
         </header>
@@ -129,6 +154,11 @@ export default function App() {
 
         {/* hamburger menu (drawer) */}
         <nav className={`jx-menu${menuOpen ? ' open' : ''}`} onClick={(e) => e.stopPropagation()}>
+          {/* B160 — dsh ui-brand-official: sidebar brand occupants */}
+          <div className="jx-brand">
+            <SidebarBrandMark />
+            <SidebarBrandName />
+          </div>
           {Object.entries(VIEWS).map(([id, v]) => (
             <button
               key={id}

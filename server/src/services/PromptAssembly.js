@@ -98,6 +98,7 @@ export async function assemblePrompt({
   includeInstructions = true, // B136 — AGENTS.md baseline instructions section
   base = null,
   normalMode = false,
+  userText = null, // B160 — raw user message; @file mentions become file references
 } = {}) {
   const sections = [];
 
@@ -123,6 +124,20 @@ export async function assemblePrompt({
   if (includeSessionRefs && convId) {
     const refs = recentSessionsBlock(convId, 5);
     if (refs) sections.push(refs);
+  }
+
+  // -72 file references (B160 — dsh file-reference/file-reference-local):
+  // @file mentions in the user's message become guarded, bounded read-only
+  // snapshots of those workspace files.
+  if (userText) {
+    try {
+      const { parseFileReferences, renderFileReferenceSnapshot } = await import('./FileReference.js');
+      const mentioned = parseFileReferences(userText);
+      if (mentioned.length) {
+        const snap = renderFileReferenceSnapshot(mentioned);
+        if (snap.text) sections.push(snap.text);
+      }
+    } catch { /* file references are best-effort */ }
   }
 
   // -68 current conversation tail (B155 — dsh session-projection mirror):

@@ -3,6 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { MEMORY_FILE, KNOWLEDGE_DIR, WORKSPACE_DIR, DATA_DIR } from '../config.js';
 import { generateContent, resolveKeys, embedText } from './LLMClient.js';
+import { appendEvent } from './EventLog.js'; // B78/B158 — context_compaction events (dsh compaction/* mirror)
 
 /**
  * JEXI OS Memory Core
@@ -122,7 +123,11 @@ export function memoryPersistenceProbe() {
       instance: id,
       previousBootsSeen: previous,
       persistentDisk: previous.length > 0, // evidence-based, not assumed
+      persistent: previous.length > 0, // B158 — disk-only summary (the child probe ORs in Redis proof)
       redisConfigured, // B68 — a free-tier alternative: REDIS_URL survives restarts without a disk
+      // B158 — sync summary (the async boot-stamp probe enriches this to
+      // { configured, connected, previousBootsSeen } in the probe child).
+      redis: { configured: redisConfigured },
       sessionCount,
       note: previous.length > 0
         ? 'previous boot stamps survived — the memory directory is persistent across restarts'
@@ -132,6 +137,76 @@ export function memoryPersistenceProbe() {
     };
   } catch (e) {
     return { dataDir: DATA_DIR, error: (e && e.message) || String(e), persistentDisk: false };
+  }
+}
+
+/**
+ * B158 — normalize a REDIS_URL pasted with whitespace or wrapping quotes
+ * (classic env-file mis-pastes). Returns '' when nothing usable remains.
+ */
+export function normalizeRedisUrl(raw) {
+  let u = String(raw || '').trim();
+  if ((u.startsWith('"') && u.endsWith('"')) || (u.startsWith("'") && u.endsWith("'"))) u = u.slice(1, -1).trim();
+  return u;
+}
+
+/**
+ * B158 — validate a Redis connection string BEFORE handing it to ioredis so
+ * misconfigurations get actionable errors (naming the scheme/hostname) instead
+ * of bare TypeErrors. Allowed: redis:// rediss:// or a bare host:port.
+ */
+function validateRedisUrl(url) {
+  const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//.exec(url);
+  if (scheme && !['redis', 'rediss'].includes(scheme[1].toLowerCase())) {
+    throw new Error(`REDIS_URL scheme "${scheme[1]}:" is not a Redis scheme — use redis:// or rediss:// (the value starts with ${scheme[1]}:)`);
+  }
+  if (scheme) {
+    let u;
+    try { u = new URL(url); } catch { throw new Error('Invalid REDIS_URL — could not parse a hostname from it'); }
+    if (!u.hostname) throw new Error('Invalid REDIS_URL — no hostname could be parsed from it');
+  } else if (!/^[^:\s]+:\d+$/.test(url)) {
+    throw new Error('Invalid REDIS_URL — expected redis://host:port, rediss://host:port or host:port');
+  }
+  return true;
+}
+
+/**
+ * B68/B158 — REDIS BOOT-STAMP PROBE (the durability proof the B68 test always
+ * wanted): connects a THROWAWAY client (never the app client), stamps this
+ * boot under `jexi:boot:<id>`, and reports every stamp from PREVIOUS boots
+ * still present in Redis — evidence that memory survives restarts/redeploys
+ * even without a persistent disk (Render free tier).
+ */
+export async function redisBootProbe() {
+  const url = normalizeRedisUrl(process.env.REDIS_URL);
+  if (!url) return { configured: false, connected: false, previousBootsSeen: [] };
+  const id = process.env.RENDER_INSTANCE_ID || process.env.POD_NAME || `boot-${Math.random().toString(36).slice(2, 10)}`;
+  let r = null;
+  try {
+    validateRedisUrl(url); // throws an actionable error naming the cause
+    const { Redis } = await import('ioredis');
+    r = new Redis(url, { lazyConnect: true, maxRetriesPerRequest: 1, enableReadyCheck: true, connectTimeout: 3000, commandTimeout: 5000 });
+    // Bounded: an unresponsive server must never hang a boot (withTimeout).
+    await Promise.race([
+      r.connect(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('Redis probe timed out after 6500 ms (unresponsive server)')), 6500)),
+    ]);
+    const mine = `jexi:boot:${String(id).replace(/[^a-zA-Z0-9_-]/g, '')}`;
+    const keys = await r.keys('jexi:boot:*');
+    const previousBootsSeen = [];
+    for (const k of keys || []) {
+      if (k === mine) continue;
+      try {
+        const v = JSON.parse(String(await r.get(k) || '{}'));
+        previousBootsSeen.push({ instance: v.instance || k.replace(/^jexi:boot:/, ''), at: v.boot || null });
+      } catch { /* corrupt stamp — ignore */ }
+    }
+    await r.set(mine, JSON.stringify({ boot: new Date().toISOString(), instance: id }), 'EX', 60 * 60 * 24 * 7);
+    return { configured: true, connected: true, previousBootsSeen, error: undefined };
+  } catch (e) {
+    return { configured: true, connected: false, previousBootsSeen: [], error: (e && e.message) || String(e) };
+  } finally {
+    try { if (r) await r.disconnect(); } catch { /* best-effort */ }
   }
 }
 
@@ -165,10 +240,11 @@ export async function getRedis() {
   if (redisClient) return redisClient;
   try {
     const { Redis } = await import('ioredis');
-    redisClient = new Redis(process.env.REDIS_URL, {
+    redisClient = new Redis(normalizeRedisUrl(process.env.REDIS_URL), { // B158 — tolerate whitespace/quoted mis-pastes
       lazyConnect: true,
       maxRetriesPerRequest: 2,
       enableReadyCheck: true,
+      commandTimeout: 3000, // B158 — an unresponsive Redis must never hang a boot/hydrate
     });
     return redisClient;
   } catch (e) {
@@ -197,6 +273,12 @@ export async function hydrateFromRedis() {
     }
   } catch (e) {
     console.error('[Memory] Redis hydrate failed, using local file:', e.message);
+    // B158 — a proven-dead Redis must not keep reporting "active" in health
+    // checks: close the client and disable the layer (process is honest, and
+    // disk/JSON remains the source of truth).
+    try { if (redisClient) redisClient.disconnect(); } catch { /* best-effort */ }
+    redisClient = null;
+    redisEnabled = false;
   }
   return false;
 }
@@ -212,6 +294,22 @@ async function redisPush(memory) {
 /** True when a Redis layer is configured (used by the load-balancer health check). */
 export function isRedisActive() {
   return redisEnabled && !!redisClient;
+}
+
+/**
+ * B68/B158 — truthful health summary for /api/health/memory and the LB:
+ *   { configured, status: 'unset'|'ready'|'connecting'|'down'|'off', error? }
+ * 'unset' = no REDIS_URL at all; 'off' = configured but disabled after a
+ * proven failure; 'down' = configured but the client is not connected.
+ */
+export function redisConnectionInfo() {
+  if (!process.env.REDIS_URL) return { configured: false, status: 'unset' };
+  if (!redisEnabled) return { configured: true, status: 'off', error: 'disabled after a connection failure this process' };
+  if (!redisClient) return { configured: true, status: 'connecting' };
+  const st = String(redisClient.status || 'unknown');
+  if (st === 'ready') return { configured: true, status: 'ready' };
+  if (st === 'connecting' || st === 'connect' || st === 'reconnecting' || st === 'wait') return { configured: true, status: 'connecting' };
+  return { configured: true, status: 'down', error: `client status: ${st}` };
 }
 
 /* ---------------- Local JSON store ---------------- */
@@ -764,15 +862,26 @@ export function getRollingSummary() {
  * into one dense running summary (Mem0/DeepAgents pattern). No AI keys → the
  * cached summary is returned untouched; failures never break a chat.
  */
-export async function rollingConversationSummary({ force = false } = {}) {
+export async function rollingConversationSummary({ force = false, __generate = null } = {}) {
   const mem = loadMemory();
   const turns = mem.chatHistory || [];
-  if (!force && turns.length < SUMMARY_THRESHOLD) return mem.conversationSummary || '';
+  // B78/B158 — token-pressure estimate (chars/4 ≈ tokens) + optional explicit
+  // threshold (JEXI_COMPACTION_TOKENS). Compaction fires on EITHER the turn
+  // count threshold or token pressure — mirrors dsh compaction triggers.
+  const estimatedTokens = Math.ceil(turns.reduce((a, h) => a + String(h.text || '').length, 0) / 4);
+  const tokenThreshold = Number(process.env.JEXI_COMPACTION_TOKENS || 0) || null;
+  if (!force && turns.length < SUMMARY_THRESHOLD && !(tokenThreshold && estimatedTokens >= tokenThreshold)) {
+    return mem.conversationSummary || '';
+  }
 
   const old = turns.slice(0, Math.max(0, turns.length - SUMMARY_RECENT_TURNS));
   if (!force && old.length === 0) return mem.conversationSummary || '';
 
-  const keys = resolveKeys();
+  // B78 — __generate is the TEST SEAM (a deterministic generator so tests
+  // prove the compaction path without any key). Production keeps the
+  // provider router.
+  const gen = typeof __generate === 'function' ? __generate : null;
+  const keys = gen ? { groqKey: true } : resolveKeys();
   if (!keys.groqKey && !keys.geminiKey && !keys.openrouterKey) return mem.conversationSummary || '';
 
   const prior = mem.conversationSummary ? `Previous running summary:\n${mem.conversationSummary}\n\n` : '';
@@ -782,14 +891,22 @@ export async function rollingConversationSummary({ force = false } = {}) {
   if (!text.trim()) return mem.conversationSummary || '';
 
   try {
-    const summary = await generateContent(
-      `${prior}Compress this conversation into a dense running summary (max 400 words, bullet points). Keep: the user's goals, key decisions, facts about the user, open tasks, and anything JEXI promised or built. Drop small talk and repeats.\n\nCONVERSATION TO COMPRESS:\n${text.slice(0, 24000)}`,
-      'You are JEXI OS\'s Context Manager. Output ONLY the compressed summary.'
-    );
+    const prompt = `${prior}Compress this conversation into a dense running summary (max 400 words, bullet points). Keep: the user's goals, key decisions, facts about the user, open tasks, and anything JEXI promised or built. Drop small talk and repeats.\n\nCONVERSATION TO COMPRESS:\n${text.slice(0, 24000)}`;
+    const system = 'You are JEXI OS\'s Context Manager. Output ONLY the compressed summary.';
+    const summary = await (gen ? gen() : generateContent(prompt, system)); // await BOTH — the seam is async too
     const clean = String(summary || '').trim().slice(0, 2500);
     if (clean.length >= 20) {
       mem.conversationSummary = clean;
       saveMemory();
+      // B78/B158 — the durable event log records the compaction (dsh
+      // compaction/* events) with the real trigger + metrics.
+      try {
+        appendEvent('context_compaction', {
+          trigger: force ? 'manual' : 'token_threshold',
+          ...(force ? {} : { threshold: tokenThreshold || SUMMARY_THRESHOLD, estimatedTokens }),
+          turnsCompressed: old.length,
+        });
+      } catch { /* the event log must never break a compaction */ }
     }
     return mem.conversationSummary || '';
   } catch (e) {

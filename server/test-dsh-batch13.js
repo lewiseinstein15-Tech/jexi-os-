@@ -2,7 +2,7 @@
  * B144 — PULL-COMPLETENESS TEST ("Make sure you have pulled every plugin
  * and everything else").
  *
- *   Manifest completeness   → all 219 real DSH packages tracked, 100% ported
+ *   Manifest completeness   → all 229 DSH packages tracked (227 upstream + 2 retained ports), 100% ported
  *   session-query packages  → SessionQuery.js (log/export/sqlite/search)
  *   util/brand              → Brand.js
  *   util/output-retention   → OutputRetention.js
@@ -30,8 +30,8 @@ console.log('\n== 1. Manifest completeness (every DSH package tracked) ==');
 {
   const { bundleStatus } = await import('./src/services/BundleBase.js');
   const st = bundleStatus();
-  ok('manifest tracks ALL 219 real packages', st.counts.total === 219);
-  ok('every package ported (0 partial, 0 not-yet)', st.counts.ported === 219 && st.counts.partial === 0 && st.counts.notYet === 0);
+  ok('manifest tracks ALL 229 packages', st.counts.total === 229);
+  ok('every package ported (0 partial, 0 not-yet)', st.counts.ported === 229 && st.counts.partial === 0 && st.counts.notYet === 0);
   const names = st.packages.map((p) => p.package);
   ok('package names unique', new Set(names).size === names.length);
   ok('no wildcard entries (every name is a real DSH package)', !names.some((n) => n.includes('*')));
@@ -42,10 +42,10 @@ console.log('\n== 1. Manifest completeness (every DSH package tracked) ==');
     ok(`tracked: ${pkg}`, names.includes(pkg));
   }
   const parity = fs.readFileSync(path.join(SERVER_DIR, '..', 'DSH-PARITY.md'), 'utf-8');
-  ok('parity doc says 219/100%', parity.includes('219') && parity.includes('100%'));
+  ok('parity doc says 229/100%', parity.includes("229") && parity.includes('100%'));
   // Manifest file itself parses and matches the generator shape.
   const manifest = JSON.parse(fs.readFileSync(path.join(SERVER_DIR, 'bundles', 'manifest.json'), 'utf-8'));
-  ok('manifest file has 219 packages', manifest.packages.length === 219);
+  ok('manifest file has 229 packages', manifest.packages.length === 229);
 }
 
 /* ══════════════ 2. SESSION QUERY ══════════════ */

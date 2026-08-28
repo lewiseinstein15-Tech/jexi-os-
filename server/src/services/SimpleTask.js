@@ -134,6 +134,7 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
     presetFlavor: opts.presetFlavor || '',
     includeSessionRefs: false, // conversationContext below already injects them
     includeState: false,       // the coworker focuses on its mandate
+    userText: prompt, // B160 — @file mentions → file references
   }) + orchestratorPromptFragment() + coworkerMandate;
   const res = await runWorker(role, prompt, system, {
     temperature: 0.4,

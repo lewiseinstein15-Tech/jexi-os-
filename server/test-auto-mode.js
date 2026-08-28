@@ -29,14 +29,21 @@ for (const i of ['code_task', 'research', 'news_latest', 'study_topic', 'github'
 }
 ok(DIRECT_INTENTS.size === 10, `direct set has the 5 conversational + 5 plugin intents (${DIRECT_INTENTS.size})`);
 
-console.log('\n== 2. Mode resolution: default is AUTO ==');
+console.log('\n== 2. Mode resolution: default is AUTO (B158-era: planner-complexity routing) ==');
+// B114/B117 implemented auto-mode with inline flags in index.js
+// (`let autoDirect`, `isDirectIntent(dec.intent)`, …). B66/B157 moved that
+// routing INTO the Planner: every task is classified, SIMPLE intents
+// (single-shot, conversational + direct answers) take the runSimpleTask
+// fast path and everything else runs the agent pipeline — the same
+// "default is auto, preset never forces agent" behavior, one layer down.
 const idx = fs.readFileSync('./index.js', 'utf-8');
-ok(/preset\.mode === 'normal' \? 'normal' : 'auto'/.test(idx), 'server defaults to auto when no mode header (preset never forces agent)');
-ok(/let autoDirect = false;/.test(idx), 'auto-routing flag present');
-ok(/isDirectIntent\(dec\.intent\)/.test(idx), 'routing uses isDirectIntent');
-ok(/dec\.confidence === undefined \|\| dec\.confidence >= 0\.5/.test(idx), 'deterministic (no confidence) trusted; LLM needs ≥ 0.5');
-ok(/preset\.mode === 'normal' \? 'normal' : 'auto'/.test(idx), 'preset no longer forces agent — only minimal forces direct');
-ok(/\(mode === 'normal' \|\| autoDirect\) && !image/.test(idx), 'direct block runs for normal OR autoDirect');
+const plannerSrc = fs.readFileSync('./src/services/Planner.js', 'utf-8');
+ok(/plan\.complexity === 'SIMPLE'/.test(idx), 'server routes SIMPLE plans to the fast path (auto-direct)');
+ok(/runSimpleTask/.test(idx), 'simple fast path wired (runSimpleTask)');
+ok(/SIMPLE_INTENTS\s*=\s*new Set\[?\(?\[?/.test(plannerSrc) || /SIMPLE_INTENTS = new Set/.test(plannerSrc), 'planner owns the SIMPLE (direct) intent set');
+ok(/plan\.complexity = SIMPLE_INTENTS\.has\(plan\.intent\) \? 'SIMPLE' : 'COMPLEX'/.test(plannerSrc), 'auto-routing classifies every task (default AUTO, no mode header needed)');
+ok(/export function isDirectIntent/.test(plannerSrc), 'routing still exposes isDirectIntent');
+ok(!/x-jexi-mode/.test(idx), 'no forced-mode header on the server (preset never forces agent)');
 
 console.log('\n== 3. Frontend: ONE mode — no toggle, JEXI decides (B117) ==');
 const hook = fs.readFileSync('../src/hooks/useJexiEngine.js', 'utf-8');
@@ -50,7 +57,7 @@ ok(!/MODE_STORAGE|toggleMode/.test(chat), 'ChatWindow has no mode state/toggle')
 // one-mode invariant now lives in the absence of any mode UI + the engine
 // never sending the mode header (checked above).
 ok(!/JEXI DECIDES/.test(chat) && !/MODE/.test(chat), 'ChatWindow has no mode badge at all (v3 minimal)');
-ok(/onSend\(input\.trim\(\)/.test(chat), 'send still calls onSend with the input (3-arg contract)');
+ok(/onSend\(input, image\)/.test(chat), 'send still calls onSend with the input (image rides along)');
 ok(!/onSend\([^)]*,\s*[^)]*,\s*[^)]*,\s*mode\)/.test(chat), 'send no longer passes a mode argument (the B117 freeze bug)');
 const home = fs.readFileSync('../src/components/HomeView.jsx', 'utf-8');
 ok(!/toggleMode/.test(home) && !/jexi_mode/.test(home), 'HomeView has no mode pill/toggle');
@@ -58,16 +65,19 @@ ok(/ONE MODE · JEXI DECIDES/.test(home), 'Home shows the one-mode badge');
 const settings = fs.readFileSync('../src/components/SettingsPanel.jsx', 'utf-8');
 ok(!/jexi_mode/.test(settings), 'presets no longer write jexi_mode');
 
-console.log('\n== 4. Regression: no TDZ crash (B116-fix) ==');
+console.log('\n== 4. Regression: classification BEFORE dispatch (B66/B157-era TDZ successor) ==');
+// The old TDZ regression watched `const mode` vs the auto block in index.js.
+// Routing now lives in the Planner: complexity is set during planning and
+// index.js dispatches on it — a plan can never reach runSimpleTask
+// unclassified. Same invariant, new shape.
 const idxLines = idx.split('\n');
-const modeDecl = idxLines.findIndex((l) => l.includes("const mode = String(req.body.mode"));
-const autoUse = idxLines.findIndex((l) => l.includes("if (mode === 'auto')"));
-ok(modeDecl !== -1 && autoUse !== -1, 'both lines present');
-ok(modeDecl < autoUse, `mode declared BEFORE the auto block (decl ${modeDecl} < use ${autoUse}) — no "Cannot access 'mode' before initialization"`);
-const modeDecls = idxLines.filter((l) => l.includes("const mode = String(req.body.mode")).length;
-ok(modeDecls === 1, `exactly ONE mode declaration (${modeDecls}) — duplicate removed`);
-const presetAfterMode = idxLines.slice(modeDecl).filter((l) => l.includes("const preset = resolvePreset")).length;
-ok(presetAfterMode === 0, `no preset declaration AFTER mode in the chat handler (${presetAfterMode}) — the duplicate is gone`);
+const classifyUses = plannerSrc.includes("plan.complexity = SIMPLE_INTENTS.has(plan.intent) ? 'SIMPLE' : 'COMPLEX'");
+const dispatchLine = idxLines.findIndex((l) => l.includes("plan.complexity === 'SIMPLE'"));
+const simpleCall = idxLines.findIndex((l) => l.includes('await runSimpleTask'));
+ok(classifyUses, 'planner classifies EVERY plan (SIMPLE/COMPLEX) before dispatch');
+ok(dispatchLine !== -1 && simpleCall !== -1 && dispatchLine < simpleCall, `dispatch checks complexity BEFORE runSimpleTask (check ${dispatchLine} < call ${simpleCall})`);
+ok(idxLines.filter((l) => l.includes('runSimpleTask(')).length === 1, 'exactly ONE runSimpleTask call site');
+ok(!/const mode = String\(req\.body\.mode/.test(idx), 'no legacy per-request mode variable left in the handler');
 
 console.log('\n== 5. B124 — plugin fast-path: no search for weather/crypto/currency/time/ip ==');
 const { detectPluginIntent } = await import('./src/services/Planner.js');
@@ -90,11 +100,12 @@ for (const [q, intent, tool] of PLUGIN_QS) {
 ok(detectPluginIntent('what is the capital of kenya') === null, 'non-plugin question not misrouted');
 ok(detectPluginIntent('price of eggs in the market') === null, 'non-crypto "price of" not misrouted');
 // The direct path must offer plugin tools and NO web-search.
-const idx2 = fs.readFileSync('./index.js', 'utf-8');
-ok(/pluginDefs = listPluginTools\(\).filter/.test(idx2), 'direct path builds the plugin tool set');
-ok(/buildNativeSchemas\(pluginDefs\)/.test(idx2), 'direct path offers plugin tools to the model');
-ok(/generateWithToolsLoop\(prompt, JEXI_NORMAL_PROMPT, schemas/.test(idx2), 'direct path runs a tool loop (not bare text)');
-ok(!/web-search/.test(idx2.slice(idx2.indexOf('const pluginDefs'), idx2.indexOf('if (!text)'))), 'NO web-search in the direct tool set');
+const st = fs.readFileSync('./src/services/SimpleTask.js', 'utf-8');
+const al = fs.readFileSync('./src/services/AgentLoop.js', 'utf-8');
+ok(/listPluginTools\(\)\.filter/.test(st), 'direct path builds the plugin tool set');
+ok(/buildNativeSchemas\(/.test(al), 'tool schemas are built for the model (native function calling)');
+ok(/generateWithToolsLoop/.test(al), 'direct path runs a tool loop (not bare text)');
+ok(!/web-search/.test(st.slice(st.indexOf('listPluginTools()'), st.indexOf('const system =') > 0 ? st.indexOf('const system =') : undefined)), 'NO web-search in the SIMPLE tool set');
 
 console.log(`\nB114+B116+B117+B124 auto-mode: ${passed} passed, ${failedCount} failed`);
 process.exit(failedCount ? 1 : 0);

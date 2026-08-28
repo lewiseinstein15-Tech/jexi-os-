@@ -94,9 +94,15 @@ ok(Array.isArray(bad.files), 'files array always present');
 console.log('\n== 5. Routing: code_task → the autonomous runner ==');
 const p1 = await planner.analyzeIntent('build me a todo app');
 ok(p1.intent === 'code_task' || p1.intent === 'compound_task', `build classified as code (${p1.intent})`);
-const idx = fs.readFileSync('./index.js', 'utf-8');
-ok(/plan\.intent === 'code_task' \|\| plan\.intent === 'compound_task'/.test(idx), 'chat routes code intents to runAutonomousCoding');
-ok(/runAutonomousCoding\(/.test(idx), 'runner wired into the main chat path');
+// B157-era routing: code tasks execute through the Orchestrator's typed
+// coding subgraph (codePipeline → debugger loop ↺ → qaGate → codeReview →
+// securityGate → criticGate → reflector → shipper) with the first-class
+// CodingLoop fix-loop. runAutonomousCoding is retained as the direct/SDK
+// runner — the chat path rides the orchestrator graph.
+const orch = fs.readFileSync('./src/services/Orchestrator.js', 'utf-8');
+ok(/case 'code_task': return 'codePipeline';/.test(orch), 'code_task routes to the coding subgraph');
+ok(/N\.codePipeline = async \(state\) =>/.test(orch), 'coding pipeline node streams the build');
+ok(/runCodingLoop\(/.test(orch), 'fix-debug loop wired (write → run → observe)');
 
 console.log(`\nB126 autonomous-coding: ${passed} passed, ${failedCount} failed`);
 process.exit(failedCount ? 1 : 0);

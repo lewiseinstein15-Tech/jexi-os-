@@ -16,9 +16,22 @@
  * earlier), plus `_isRedisActive` so the parent can assert the real status.
  */
 import fs from 'fs';
-import { memoryPersistenceProbe, isRedisActive } from '../src/services/MemoryManager.js';
+import { memoryPersistenceProbe, redisBootProbe, hydrateFromRedis, isRedisActive } from '../src/services/MemoryManager.js';
 
 const probe = await memoryPersistenceProbe();
+// B158 — the Redis side of the durability proof: boot-stamps + previous-boot
+// evidence from a real (throwaway) ioredis connection.
+probe.redis = await redisBootProbe();
+// Exercise the REAL app path too (hydrate initializes the app client).
+try { await hydrateFromRedis(); } catch { /* probe still reports honestly */ }
 probe._isRedisActive = isRedisActive();
+const redisProven = Boolean(probe.redis && probe.redis.configured && probe.redis.connected && probe.redis.previousBootsSeen.length > 0);
+probe.persistent = Boolean(probe.persistentDisk) || redisProven;
+if (redisProven) probe.note = `Redis-backed persistence PROVEN — ${probe.redis.previousBootsSeen.length} previous boot stamp(s) survived in Redis across processes. ${probe.note || ''}`;
+// B158 — a configured-but-broken Redis is reported BY NAME, never as a
+// generic "not proven" (the operator must see the actual failure).
+if (probe.redis && probe.redis.configured && !probe.redis.connected) {
+  probe.note = `Redis connection failed: ${probe.redis.error || 'unknown error'} — ${probe.note || ''}`;
+}
 fs.writeSync(1, JSON.stringify(probe) + '\n');
 process.exit(0);

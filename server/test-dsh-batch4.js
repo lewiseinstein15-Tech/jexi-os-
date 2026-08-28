@@ -19,6 +19,17 @@ import path from 'path';
 import express from 'express';
 import { setTimeout as sleep } from 'timers/promises';
 
+/* B158 — node:sqlite is a Node ≥ 22.5 built-in. The sqlite backend degrades to
+   JSON on older Node BY DESIGN, so these assertions SKIP (not fail) there.
+   CI runs Node 22, where they execute fully. */
+let sqliteSupported = null;
+async function nodeSqliteAvailable() {
+  if (sqliteSupported === null) {
+    try { await import('node:sqlite'); sqliteSupported = true; } catch { sqliteSupported = false; } }
+  return sqliteSupported;
+}
+
+
 let failures = 0;
 const ok = (name, cond) => {
   console.log(`${cond ? '✅' : '❌'} ${name}`);
@@ -94,7 +105,9 @@ console.log('\n== 4. Storage hub (dsh storage-json + storage-sqlite) ==');
   const { createStorageHub, StorageError, UNIT_NAME_RE } = await import('./src/services/StorageHub.js');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jexi-storage-'));
   const hub = await createStorageHub({ root: path.join(dir, 'units'), sqlitePath: path.join(dir, 'store.sqlite') });
-  ok('both backends registered', !!hub.backends.json && !!hub.backends.sqlite);
+  const hasSqlite = await nodeSqliteAvailable();
+  if (hasSqlite) ok('both backends registered', !!hub.backends.json && !!hub.backends.sqlite);
+  else { console.log('⏭ both backends registered — SKIPPED (node:sqlite needs Node ≥ 22.5; json backend active)'); ok('json backend registered (sqlite degrades by design on this Node)', !!hub.backends.json); }
   const unit = await hub.open('prefs', 'json');
   ok('json unit set/get', unit.set('k', { deep: true }).version >= 1 && unit.get('k').deep === true);
   ok('version stamp increments', unit.set('x', 1).version === unit.version);
@@ -109,7 +122,8 @@ console.log('\n== 4. Storage hub (dsh storage-json + storage-sqlite) ==');
   ok('sqlite unit set/get', s1.get('note') === 'hello sqlite');
   ok('unit name pattern', UNIT_NAME_RE.test('a.b_c-1') && !UNIT_NAME_RE.test('UPPER'));
   const list = hub.listUnits();
-  ok('listUnits sees both backends', list.some((u) => u.name === 'prefs' && u.backend === 'json') && list.some((u) => u.name === 'memories' && u.backend === 'sqlite'));
+  if (hasSqlite) ok('listUnits sees both backends', list.some((u) => u.name === 'prefs' && u.backend === 'json') && list.some((u) => u.name === 'memories' && u.backend === 'sqlite'));
+  else { console.log('⏭ listUnits sees both backends — SKIPPED (Node < 22.5)'); ok('listUnits sees the json backend', list.some((u) => u.name === 'prefs' && u.backend === 'json')); }
   const peeked = await hub.peek('prefs');
   ok('peek reads without taking a handle', peeked && peeked.value.k && peeked.value.k.deep === true);
   await hub.close();
@@ -124,15 +138,17 @@ console.log('\n== 5. Session persistence sqlite (dsh session-persistence-sqlite)
   const { openSessionPersistence, sessionRevision, sessionPersistenceStatus, persistSessionEvent, closeSessionPersistence } = await import('./src/services/SessionPersistenceSqlite.js');
   const { appendConversationEvent, onConversationEvent } = await import('./src/services/SessionConversations.js');
   const r = await openSessionPersistence(':memory:');
-  ok('sqlite mirror available', r.available === true);
+  const mirrorOk = await nodeSqliteAvailable();
+  if (!mirrorOk) console.log('⏭ sqlite session mirror checks — SKIPPED (node:sqlite needs Node ≥ 22.5)');
+  else ok('sqlite mirror available', r.available === true);
   const off = onConversationEvent((convId, ev) => persistSessionEvent(convId, ev));
   appendConversationEvent('t-batch4-conv', { role: 'user', text: 'hello', kind: 'chat' });
   appendConversationEvent('t-batch4-conv', { role: 'jexi', text: 'hi there', kind: 'chat', meta: { m: 1 } });
   await sleep(300); // batched flush
   const rev = sessionRevision('t-batch4-conv');
-  ok('revision reflects appended seqs', rev && rev.revision >= 1);
+  if (mirrorOk) ok('revision reflects appended seqs', rev && rev.revision >= 1);
   const status = sessionPersistenceStatus();
-  ok('status reports rows', status.available && status.sessions >= 1 && status.events >= 2);
+  if (mirrorOk) ok('status reports rows', status.available && status.sessions >= 1 && status.events >= 2);
   off();
   await closeSessionPersistence();
 }

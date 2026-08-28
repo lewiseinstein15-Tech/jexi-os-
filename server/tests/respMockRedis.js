@@ -98,6 +98,16 @@ export function startMockRedis({ mode = 'normal' } = {}) {
               }
               break;
             }
+            case 'KEYS': {
+              // B158 — glob pattern scan (jexi:boot:* boot-stamps for the
+              // persistence probe). Responds as a RESP array of bulk strings.
+              const pattern = String(args[1] || '*');
+              const re = new RegExp('^' + pattern.split('*').map((x) => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$');
+              const hits = [...store.keys()].filter((k) => re.test(k) && !((store.get(k) || {}).ttlAt && store.get(k).ttlAt < Date.now()));
+              socket.write(`*${hits.length}\r\n`);
+              for (const k of hits) socket.write(`$${Buffer.byteLength(k)}\r\n${k}\r\n`);
+              break;
+            }
             case 'DEL': {
               let n = 0;
               for (const key of args.slice(1)) if (store.delete(key)) n++;

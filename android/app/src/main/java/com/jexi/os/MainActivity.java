@@ -96,7 +96,7 @@ public class MainActivity extends BridgeActivity {
     private static final String[] CACHE_SUBDIRS = {
             "Cache", "HTTP Cache", "Code Cache", "GPUCache",
             "DawnCache", "DawnGraphiteCache", "GrShaderCache", "ShaderCache",
-            "Service Worker",
+            "Service Worker", "Shared Dictionary",
     };
 
     private void wipeWebViewDataOnUpgrade() {

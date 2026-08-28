@@ -155,6 +155,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         codeTools,
         presetFlavor: opts.presetFlavor || '',
         base: opts.systemPromptOverride || null,
+        userText: query, // B160 — @file mentions → file references
       }) + (opts.subagentId ? `\n\n[You are a subagent. ${REPORT_GUIDANCE}]` : ''),
       schemas,
       {

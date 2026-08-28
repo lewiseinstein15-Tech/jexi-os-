@@ -24,6 +24,14 @@ import { setTimeout as sleep } from 'timers/promises';
 import os from 'os';
 import { pathToFileURL } from 'url';
 
+/* B158 — node:sqlite (Node ≥ 22.5) gates the sqlite session mirror; the JSON
+   store is the source of truth everywhere. Skip mirror assertions on older
+   Node instead of failing (CI's Node 22 runs them fully). */
+let __nodeSqlite = null;
+try { await import('node:sqlite'); __nodeSqlite = true; } catch { __nodeSqlite = false; }
+if (!__nodeSqlite) console.log('⏭ sqlite mirror assertions — SKIPPED (node:sqlite needs Node ≥ 22.5; JSON store active)');
+
+
 let failures = 0;
 let passes = 0;
 const ok = (name, cond, extra = '') => {
@@ -251,9 +259,9 @@ section('C. CONVERSATION CONTINUITY (no loss, no hallucination)');
   await sleep(400); // flush
   offMirror();
   const rev = sessionRevision(conv);
-  ok('sqlite mirror tracks the revision', rev && rev.revision >= 6);
+  if (__nodeSqlite) ok('sqlite mirror tracks the revision', rev && rev.revision >= 6);
   const sp = sessionPersistenceStatus();
-  ok('sqlite mirror has rows (all turns mirrored)', sp.available && sp.events >= 7);
+  if (__nodeSqlite) ok('sqlite mirror has rows (all turns mirrored)', sp.available && sp.events >= 7);
 
   // 3. Projection (what the model sees) contains every fact — the anti-hallucination guarantee
   const proj = projectSession({ convId: conv, maxChars: 4000 });
@@ -579,7 +587,7 @@ section('H. LIFECYCLE & PERSISTENCE');
   ok('hook engine fail-open', hooks && typeof hooks.allowed === 'boolean');
 
   const sp = sessionPersistenceStatus();
-  ok('sqlite mirror status', sp.available === true);
+  if (__nodeSqlite) ok('sqlite mirror status', sp.available === true);
 }
 
 /* ═══════════════════════ I. API SURFACE (live server) ═══════════════════════ */

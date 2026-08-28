@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  B158 — backup rules. allowBackup=true without exclusions could restore a
+  STALE WebView cache / Service Worker directory into a fresh install
+  (uninstall → reinstall → auto-restore), which resurrects the exact
+  "broken after update" state the cache-wipe in MainActivity removes.
+  We back up ONLY real user data (localStorage identity/settings/history
+  live inside app_webview/Local Storage — kept), never caches.
+-->
+<full-backup-content>
+    <exclude domain="file" path="app_webview/Cache" />
+    <exclude domain="file" path="app_webview/HTTP Cache" />
+    <exclude domain="file" path="app_webview/Code Cache" />
+    <exclude domain="file" path="app_webview/GPUCache" />
+    <exclude domain="file" path="app_webview/GrShaderCache" />
+    <exclude domain="file" path="app_webview/ShaderCache" />
+    <exclude domain="file" path="app_webview/Service Worker" />
+    <exclude domain="file" path="app_webview/Shared Dictionary" />
+    <exclude domain="file" path="cache" />
+    <exclude domain="file" path="code_cache" />
+</full-backup-content>

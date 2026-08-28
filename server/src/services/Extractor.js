@@ -1,3 +1,4 @@
+import './NodeCompat.js'; // B160 — must run before jsdom loads (undici markAsUncloneable shim for Node 20)
 import fetch from 'node-fetch';
 import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
