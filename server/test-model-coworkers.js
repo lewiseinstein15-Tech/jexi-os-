@@ -94,6 +94,12 @@ console.log('\n== 3. Streaming wires ==');
   ok('central sanitizer on every log/agent.log line', idx.includes("data.message = sanitizeStreamText(data.message)"));
   ok('/api/team serves the named roster', idx.includes("app.get('/api/team'"));
 
+  // B162b — the UI actually CONSUMES the events the named lines ride on
+  ok("engine consumes 'agent.log' (join/writing lines were dropped before)",
+    /data\.type === 'log' \|\| data\.type === 'agent\.log'/.test(fs.readFileSync(path.join(ROOT, 'src/hooks/useJexiEngine.js'), 'utf-8')));
+  const llm2 = fs.readFileSync('./src/services/LLMClient.js', 'utf-8');
+  ok('Gemini streams natively with name meta (generateContentStream)', llm2.includes('generateContentStream(parts)') && llm2.includes("opts.onToken(piece, { provider: 'gemini', model: modelName })"));
+  ok('non-streaming providers still emit once WITH meta (streamedAny fallback)', llm2.includes('streamedAny') && llm2.includes('opts.onToken(text, { provider, model: opts.model || null })'));
   const hook = fs.readFileSync(path.join(ROOT, 'src/hooks/useJexiEngine.js'), 'utf-8');
   ok('engine carries `by` onto the streaming message', hook.includes('by: last.by || data.by') && hook.includes('...(data.by ? { by: data.by } : {})'));
   const chat = fs.readFileSync(path.join(ROOT, 'src/components/ChatWindow.jsx'), 'utf-8');

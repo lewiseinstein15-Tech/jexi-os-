@@ -227,6 +227,25 @@ async function tryGemini(prompt, system, imageBase64, opts, errors) {
           },
         });
       }
+      // B162b — NATIVE Gemini streaming: when the caller wants live deltas,
+      // stream them (with provider+model meta so the UI can name the
+      // coworker). Falls through to the plain call on any stream failure.
+      if (typeof opts.onToken === 'function' && !imageBase64) {
+        try {
+          const stream = await model.generateContentStream(parts);
+          let streamed = '';
+          for await (const chunk of stream.stream) {
+            const piece = (typeof chunk.text === 'function' ? chunk.text() : '') || '';
+            if (!piece) continue;
+            streamed += piece;
+            try { opts.onToken(piece, { provider: 'gemini', model: modelName }); } catch { /* consumer must never break the stream */ }
+          }
+          if (streamed.trim()) return streamed.trim();
+          errors.push(`Gemini(${modelName}) streamed an empty response`);
+        } catch (e) {
+          errors.push(`Gemini(${modelName}) stream failed: ${e.message}`);
+        }
+      }
       const result = await model.generateContent(parts);
       const text = result.response.text();
       if (text) return text.trim();
@@ -497,8 +516,12 @@ export async function generateContent(prompt, systemInstruction = '', imageBase6
   systemInstruction = appendTimeContext(systemInstruction); // B104 — time context on every call
   // B150 — live token streaming when requested (the UI shows the answer as
   // it is generated instead of a blank wait). Falls back on any failure.
+  let streamedAny = false; // B162b — has any delta reached the consumer yet?
   if (typeof opts.onToken === 'function' && !imageBase64) {
-    const streamed = await streamPlainText(prompt, systemInstruction, opts, opts.onToken);
+    const streamed = await streamPlainText(prompt, systemInstruction, opts, (t, meta) => {
+      streamedAny = true;
+      opts.onToken(t, meta);
+    });
     if (streamed) return streamed;
   }
   const errors = [];
@@ -522,6 +545,13 @@ export async function generateContent(prompt, systemInstruction = '', imageBase6
       if (text) {
         recordProviderSuccess(provider);
         releaseSlot();
+        // B162b — if this provider answered WITHOUT streaming deltas (SDK
+        // paths), emit the whole text once WITH provider+model meta: the UI
+        // still gets the ✍️ writer step + named header instead of silence.
+        if (typeof opts.onToken === 'function' && !streamedAny) {
+          streamedAny = true;
+          try { opts.onToken(text, { provider, model: opts.model || null }); } catch { /* never break */ }
+        }
         return text;
       }
     } catch (e) {

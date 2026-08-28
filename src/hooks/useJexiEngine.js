@@ -46,7 +46,12 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
       return;
     }
     if (data.type) { lastSeen = Date.now(); onEvent?.(); }
-    if (data.type === 'log') setLogs(prev => [...prev, { agent: data.agent, message: data.message }]);
+    // B162b — 'agent.log' events (the named coworker join/writing lines)
+    // were silently DROPPED by the UI: only 'log' was consumed. Both feed
+    // the live step feed now.
+    if (data.type === 'log' || data.type === 'agent.log') {
+      setLogs(prev => [...prev, { agent: data.agent || 'JEXI', message: data.message }]);
+    }
     else if (data.type === 'stream') {
       // B150 — live answer typing: append deltas to the current JEXI message
       // (the answer appears as it is generated — no more blank wait).
