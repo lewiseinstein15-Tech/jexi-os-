@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import { planner } from './src/services/Planner.js';
 import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B158 — user/message lifecycle event
+import { sanitizeStreamText, teamRoster } from './src/services/ModelCoworkers.js'; // B162 — named model coworkers in every log line
 import { setGoalEngine } from './src/services/PromptAssembly.js'; // B158 — goals reach every assembled prompt
 import { orchestrator } from './src/services/Orchestrator.js';
 import { runSimpleTask } from './src/services/SimpleTask.js'; // B66 — Orchestrator-Workers SIMPLE fast path
@@ -775,6 +776,8 @@ function maskConnectorAuth(auth = {}) {
 // === PLUGIN SYSTEM (roadmap stage 21 — feature bundles) ===
 // Built-in plugins contribute agents/skills/tools; toggle them at runtime.
 app.get('/api/plugins', (req, res) => res.json({ plugins: listRegistryPlugins() }));
+// B162 — the named coworker roster (people names only; no raw model IDs).
+app.get('/api/team', (req, res) => res.json({ team: teamRoster() }));
 app.post('/api/plugins/:id/toggle', (req, res) => {
   try { res.json({ success: true, ...togglePlugin(req.params.id) }); }
   catch (e) { res.status(400).json({ success: false, error: (e && e.message) || String(e) }); }
@@ -1149,6 +1152,11 @@ app.post('/api/chat', async (req, res) => {
   // (root fix for the "Task completed - no readable summary" reply).
   let streamedAnswer = '';
   const sendEvent = (type, data) => {
+    // B162 — named coworkers: raw model IDs are masked in every streamed log
+    // line before it reaches the UI (answers/summaries are untouched).
+    if (data && typeof data === 'object' && (type === 'log' || type === 'agent.log') && typeof data.message === 'string') {
+      data.message = sanitizeStreamText(data.message);
+    }
     if (type === 'stream' && data && data.text) streamedAnswer += String(data.text);
     if (type === 'done' && data && !data.recoverable) { try { saveResult(convId, data); } catch (e) {} }
     try { res.write(JSON.stringify({ type, ...data }) + '\n'); } catch (e) {}

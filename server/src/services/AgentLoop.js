@@ -35,6 +35,7 @@ import { buildSkillCatalog } from './SkillDiscovery.js'; // B98 — dsh-style av
 import { listPluginTools } from './PluginContext.js'; // B105 — plugin tools are visible to the model (weather-now etc.)
 import { preferencesBlock } from './PreferenceLearner.js';
 import { assemblePrompt } from './PromptAssembly.js'; // B119 — dsh systemPrompt.assemble mirror
+import { coworkerName } from './ModelCoworkers.js'; // B162 — named model coworkers
 import { lifecycleTurnStart, lifecycleStepStart, lifecycleToolCall, lifecycleToolResult, lifecycleStepEnd, lifecycleTurnEnd } from './SessionLifecycle.js'; // B119 — dsh session-event vocabulary
 import { providerPreferenceForIntent } from './ModelRouting.js';
 import { REPORT_GUIDANCE } from './SubagentReport.js'; // B137 — dsh tool-subagent-report guidance for children
@@ -144,6 +145,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
 
   // B119 — dsh lifecycle: the whole turn is replayable from the session log.
   const convId = opts.spillOwner || null;
+  let announcedWriter = false; // B162 — one '✍️ writing…' step per answer
   try { lifecycleTurnStart(convId, 1); } catch { /* noop */ }
 
   try {
@@ -163,7 +165,16 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         prefer,
         signal: opts.signal,
         maxIterations: MAX_ITERATIONS,
-        onToken: (t) => emit('stream', { text: t }), // B150 — live answer typing (dsh llm/stream)
+        // B150 — live answer typing (dsh llm/stream). B162 — deltas name the
+        // coworker writing them; a visible "✍️ <name> is writing…" step runs once.
+        onToken: (t, meta) => {
+          const by = meta ? coworkerName(meta.provider, meta.model) : undefined;
+          if (!announcedWriter) {
+            announcedWriter = true;
+            emit('log', { agent: by || 'JEXI', message: '✍️ is writing your answer…' });
+          }
+          emit('stream', { text: t, ...(by ? { by } : {}) });
+        },
         // Execute the model's native tool calls through the gated runtime —
         // the same permission/risk/approval path as every other tool call.
         executeToolCalls: async (calls) => {

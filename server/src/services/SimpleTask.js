@@ -17,16 +17,17 @@ import { addChat } from './MemoryManager.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { assemblePrompt } from './PromptAssembly.js'; // B119 — dsh prompt assembly
 import { preferencesBlock } from './PreferenceLearner.js';
-import { runWorker, coworkerFor } from './WorkerRouter.js';
+import { runWorker, coworkerFor, coworkerChain } from './WorkerRouter.js';
+import { coworkerName, coworkerLeadName } from './ModelCoworkers.js'; // B162 — named model coworkers
 import { listPluginTools } from './PluginContext.js'; // B105 — plugin tools visible to SIMPLE-path coworkers
 import { normalizeFinalAnswer, FORMAT_RULES } from './Formatting.js';
 import { loadCoworker, orchestratorPromptFragment } from './CoworkerFiles.js'; // B78 — filesystem-native coworker mandates
 import { appendEvent } from './EventLog.js'; // B78 — orchestrator decisions are first-class events
 
 const COWORKER_LABELS = {
-  coder: 'Coder (DeepSeek/Qwen)',
-  memory: 'Memory (Qwen/Gemini)',
-  researcher: 'Researcher (Grok/Groq/OpenRouter)',
+  coder: 'Coding & GitHub',
+  memory: 'Memory & continuity',
+  researcher: 'Research & realtime info',
 };
 
 /**
@@ -85,7 +86,9 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
   // appended to every run.
   const coworkerFile = loadCoworker(role);
   const coworkerMandate = coworkerFile ? `\n\nCOWORKER MANDATE (${coworkerFile.file}):\n${coworkerFile.body.slice(0, 4000)}` : '';
-  emit('agent.log', { message: `🧑‍💻 Coworker assigned: ${COWORKER_LABELS[role] || role} (${role})${coworkerFile ? ` — mandate loaded from ${coworkerFile.file}` : ''}.` });
+  // B162 — named coworkers: only the PEOPLE name is shown (no model IDs).
+  const leadName = coworkerLeadName(role, coworkerChain(role));
+  emit('agent.log', { message: `🧑‍💻 ${leadName} joined the task — ${COWORKER_LABELS[role] || role}${coworkerFile ? ` · mandate loaded` : ''}.` });
   try {
     appendEvent('orchestrator_decision', {
       complexity: 'SIMPLE',
@@ -108,11 +111,19 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
   // streamed content IS the answer — it must never be discarded in favor of
   // a "no readable summary" notice.
   let streamedAnswer = '';
-  const onToken = (t) => {
+  let announcedWriter = false;
+  const onToken = (t, meta) => {
     const delta = String(t || '');
     if (!delta) return;
     streamedAnswer += delta;
-    emit('stream', { text: delta });
+    // B162 — the delta carries the named coworker writing it; once, a visible
+    // "✍️ <name> is writing…" step enters the live feed.
+    const by = meta ? coworkerName(meta.provider, meta.model) : undefined;
+    if (!announcedWriter) {
+      announcedWriter = true;
+      emit('log', { agent: by || leadName, message: '✍️ is writing your answer…' });
+    }
+    emit('stream', { text: delta, ...(by ? { by } : {}) });
   };
   // B105 — plugin tools join the SIMPLE-path tool set (weather-now etc.);
   // normalizeTools in LLMClient turns def-shaped lists into provider schemas.

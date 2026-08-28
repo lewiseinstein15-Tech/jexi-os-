@@ -9,6 +9,7 @@ export default function SettingsView() {
   const [version, setVersion] = useState(null);
   const [memory, setMemory] = useState(null);
   const [erasing, setErasing] = useState(false);
+  const [team, setTeam] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -23,6 +24,10 @@ export default function SettingsView() {
       try {
         const v = await jexiFetch(`${getBackendUrl()}/api/update/version`);
         if (v.ok) setVersion(await v.json());
+      } catch (e) { /* noop */ }
+      try {
+        const t = await jexiFetch(`${getBackendUrl()}/api/team`);
+        if (t.ok) setTeam((await t.json()).team || []);
       } catch (e) { /* noop */ }
       try {
         const m = await jexiFetch(`${getBackendUrl()}/api/memory`);
@@ -75,6 +80,17 @@ export default function SettingsView() {
         <div className="jx-setline">
           <div className="lab"><b>AI providers</b><span>all healthy right now</span></div>
           <span className="jx-st on">{providerCount !== null ? `${providerCount} configured` : '…'}</span>
+        </div>
+
+        <div className="jx-grp">Meet the team</div>
+        <div className="jx-setline" style={{ alignItems: 'flex-start', flexDirection: 'column', gap: 6 }}>
+          <div className="lab"><b>Coworkers</b><span>the minds JEXI works with — you see their names while they work</span></div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingTop: 4 }}>
+            {(team || []).map((m) => (
+              <span key={m.name} className="jx-st on" title={m.hint || m.name}>{m.name}</span>
+            ))}
+            {!team && <span className="jx-st">…</span>}
+          </div>
         </div>
 
         <div className="jx-grp">Workshop</div>

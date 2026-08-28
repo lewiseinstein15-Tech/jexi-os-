@@ -477,7 +477,9 @@ async function streamPlainText(prompt, system, opts, onDelta) {
       const out = await streamOpenAICompletion({
         baseUrl: base, key: cfg.key, model: cfg.models[0],
         messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],
-        tools: [], temperature: opts.temperature ?? 0.4, onDelta, signal: opts.signal,
+        tools: [], temperature: opts.temperature ?? 0.4,
+        // B162 — deltas carry the provider+model so the UI can name the coworker
+        onDelta: (t) => onDelta(t, { provider, model: cfg.models[0] }), signal: opts.signal,
       });
       if (out.text) {
         recordProviderSuccess(provider);
@@ -707,7 +709,9 @@ async function chatWithToolsOnce(provider, cfg, model, messages, tools, opts) {
     if (base && cfg.key) {
       return streamOpenAICompletion({
         baseUrl: base, key: cfg.key, model, messages, tools,
-        temperature: opts.temperature, onDelta: opts.onToken, signal: opts.signal,
+        temperature: opts.temperature,
+        // B162 — deltas carry the provider+model so the UI can name the coworker
+        onDelta: (t) => opts.onToken(t, { provider, model }), signal: opts.signal,
       });
     }
   }

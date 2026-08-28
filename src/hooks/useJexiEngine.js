@@ -56,9 +56,10 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
           const next = [...prev];
           const last = next[next.length - 1];
           if (last && last.role === 'jexi' && last.streaming) {
-            next[next.length - 1] = { ...last, text: last.text + delta };
+            // B162 — keep the named coworker writing this answer
+            next[next.length - 1] = { ...last, text: last.text + delta, by: last.by || data.by };
           } else {
-            next.push({ role: 'jexi', text: delta, streaming: true });
+            next.push({ role: 'jexi', text: delta, streaming: true, ...(data.by ? { by: data.by } : {}) });
           }
           return next;
         });

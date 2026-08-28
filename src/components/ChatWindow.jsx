@@ -216,7 +216,10 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
                     <div className="w-5 h-5 rounded-full bg-gradient-to-br from-brand/30 to-brand/10 border border-brand/20 flex items-center justify-center flex-shrink-0">
                       <Sparkles className="w-2.5 h-2.5 text-brand" />
                     </div>
-                    <span className="text-[9px] font-bold tracking-[0.18em] text-brand">JEXI</span>
+                    <span className="text-[9px] font-bold tracking-[0.18em] text-brand">
+                      {msg.streaming && msg.by ? String(msg.by).toUpperCase() : 'JEXI'}
+                      {msg.streaming ? ' · WRITING…' : ''}
+                    </span>
                   </div>
                   {/* Streaming messages arrive progressively already — render
                       them directly (no typewriter) so the content never
