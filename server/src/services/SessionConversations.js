@@ -21,7 +21,7 @@ import fs from 'fs';
 import path from 'path';
 import { DATA_DIR } from '../config.js';
 import { getEvents } from './EventLog.js'; // B108 — tool-call stats per session
-import { getStoredTitleRecord, clearAllStoredTitles, fallbackTitleFor } from './SessionTitles.js'; // B108/B109 — dsh session-title (pinned llm/user titles, word-capped fallback)
+import { getStoredTitleRecord, clearStoredTitle, clearAllStoredTitles, fallbackTitleFor } from './SessionTitles.js'; // B108/B109 — dsh session-title (pinned llm/user titles, word-capped fallback)
 import { sessionStats } from './SessionStats.js'; // B109 — dsh session-stats projection fold
 
 const CONV_DIR = path.join(DATA_DIR, 'conversations');
