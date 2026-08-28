@@ -35,6 +35,7 @@
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import { resolveCredential } from './CredentialStore.js';
+import { loadSettings } from './SettingsManager.js'; // B166b — Settings keys reach the next search
 
 /* ══════════════════ WebError (dsh web WebError mirror) ══════════════════ */
 
@@ -137,6 +138,14 @@ function keyFor(envName) {
   for (const n of names) {
     try { const v = resolveCredential(n); if (v) return v; } catch { /* store absent */ }
   }
+  // B166b — keys pasted in Settings (or installed via the settings API)
+  // reach the NEXT search without a restart.
+  try {
+    const st = loadSettings() || {};
+    const camel = envName.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    if (st[camel]) return String(st[camel]);
+    for (const n of names) if (st[n]) return String(st[n]);
+  } catch { /* settings absent */ }
   return process.env[envName] || '';
 }
 
