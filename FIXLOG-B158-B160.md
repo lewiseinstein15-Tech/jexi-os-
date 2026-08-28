@@ -76,3 +76,29 @@ Manifest: **229 tracked** (227 upstream + 2 retained ports annotated as removed-
 ## Verified live (smoke)
 
 Brain boots; `/api/health` reports providers/redis; `/api/chat` streams the full DSH-style event chain (continuity resolution → intel → planner → orchestrator complexity → plan with roster/skills/tools → coworker assignment); `/api/memory/search` live.
+
+---
+
+## B161 — HOTFIX: "can't scroll, composer invisible" (reported from a phone screenshot)
+
+**Symptom:** with a conversation longer than the screen, the chat would not
+scroll and the input bar/send button were pushed off-screen.
+
+**Reproduced headlessly (Chromium, real measurements):** with 40 messages the
+scroll container's clientHeight grew to 4128px (should stay 650px) →
+`scrollable:false`, composer at y=4306 (viewport 844px).
+
+**Root cause:** one missing link in the bounded-height flex chain —
+`.jx-main` had `min-width:0` but NOT `min-height:0`, so as a column-flex child
+its min-height defaulted to `auto` (= content height). The whole column then
+grew instead of the scroll area scrolling. (Present on every viewport — it
+surfaced with the B157 chat redesign; my build was the first APK shipped after
+it, which is why it appeared "after the update".)
+
+**Fix (one line):** `min-height: 0` added to the layout chain rule
+(`.jx-main, .jx-view, .jx-chatwrap, .jx-ws, .jx-scroll`).
+
+**Verified after fix (long-chat probe):**
+- Phone 390×844: scroll area 650px · scrolls (scrollTop=300 sticks) · composer bottom 828 < 844 ✓
+- Tablet 820×1180: 986px · scrolls · composer 1164 < 1180 ✓
+- Laptop 1280×800: 606px · scrolls · composer 784 < 800 ✓

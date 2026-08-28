@@ -42,7 +42,15 @@ body {
 
 /* ── layout ── */
 .jx-app { display: flex; height: 100vh; height: 100dvh; width: 100vw; max-width: 100vw; overflow: hidden; }
-.jx-main, .jx-view, .jx-chatwrap, .jx-ws, .jx-scroll { min-width: 0; max-width: 100%; }
+/* B161 — FIX (phone: "can't scroll, composer gone"): every box in the
+   height chain must be BOUNDED. Without min-height:0, a flex child's
+   min-height defaults to auto = content height — so with a long
+   conversation .jx-main grew to the full content height (4128px measured),
+   the scroll area never had a reason to scroll, and the composer was
+   pushed thousands of px below the screen. One line restores the chain:
+   .jx-app (100dvh) → .jx-view (min-height:0) → .jx-main (min-height:0) →
+   ChatWindow root (min-h-0) → scroll area (min-h-0, overflow-y:auto). */
+.jx-main, .jx-view, .jx-chatwrap, .jx-ws, .jx-scroll { min-width: 0; max-width: 100%; min-height: 0; }
 .jx-main { flex: 1; display: flex; flex-direction: column; min-width: 0; margin-top: 50px; }
 
 /* ── top bar ── */
