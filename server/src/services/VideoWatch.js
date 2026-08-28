@@ -358,6 +358,65 @@ export async function watchVideo({ input, question = '', sendEvent = () => {}, s
   }
 }
 
+/* ══════════════════ B168 — NATURAL INTENT (no slash command needed) ══════════════════ */
+
+const VIDEO_URL_RE = /https?:\/\/[^\s]*?(youtube\.com|youtu\.be|tiktok\.com|vimeo\.com|instagram\.com|twitter\.com|x\.com|dailymotion\.com|facebook\.com|twitch\.tv)[^\s]*/i;
+const DIRECT_FILE_RE = /https?:\/\/[^\s]+\.(mp4|mov|webm|mkv|avi)(\?[^\s]*)?$/i;
+const PLATFORM_WORD = /\b(youtube|tiktok|vimeo|instagram|reel)\b/i;
+const INTENT_WORD = /\b(link|url|video|vid|watch|clip|lecture)\b/i;
+const TITLE_STRIP = /^(hey\s+jexi[,:]?\s+)?(can you\s+)?(please\s+)?(what('s| is)|watch|check|analyze|review|open|look at|see)\b/i;
+
+/**
+ * Detect "the user wants me to WATCH a video" from a plain sentence.
+ *   → { url }        when a video URL (or direct video file) is present
+ *   → { searchTitle, question } when only a TITLE + intent words ("what this
+ *                     youtube link CS50P lecture") — resolve via search
+ *   → null           otherwise (normal chat/planning continues untouched)
+ * Conservative on purpose: long requests (>300 chars) and question-y
+ * generic matches never hijack the pipeline.
+ */
+export function detectVideoWatchIntent(text) {
+  const raw = String(text || '').trim();
+  if (!raw || raw.length > 300 || raw.startsWith('/')) return null;
+  const urlMatch = raw.match(VIDEO_URL_RE) || raw.match(DIRECT_FILE_RE);
+  if (urlMatch) {
+    const question = raw.replace(urlMatch[0], ' ').replace(TITLE_STRIP, '').trim();
+    return { url: urlMatch[0], question: question.length > 3 && !/^\W*$/.test(question) ? question : '' };
+  }
+  // Title-only: require an explicit watch-style opener or a "this/that
+  // <platform> link" shape so generic questions ("how do I download youtube
+  // videos") never hijack the chat into a video pipeline.
+  const opener = /^(hey\s+jexi[,:]?\s*)?(can\s+you\s*)?(please\s*)?(what('|\u2019)?s|what|watch|check|analyz|review|open|look|see|tell)\b/i.test(raw);
+  const thisLink = /\b(this|that)\s+(youtube|tiktok|vimeo|instagram)|\b(youtube|tiktok|vimeo)\s+(link|video)\b/i.test(raw);
+  if ((opener || thisLink) && PLATFORM_WORD.test(raw) && INTENT_WORD.test(raw)) {
+    let title = raw
+      .replace(/https?:\/\/\S+/g, ' ')
+      .replace(/\b(this|that|the|on|in|of|about|for|to|and|is|what|whats|how|me|my|please|can|you)\b/gi, ' ')
+      .replace(/\b(youtube|tiktok|vimeo|instagram|link|url|video|vid|watch|clip|lecture|check|analyze|review|open|look|at|see)\b/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (title.length >= 8) {
+      const question = raw.replace(TITLE_STRIP, '').trim();
+      return { searchTitle: title.slice(0, 120), question: question.length > 3 ? question : 'summarize this video' };
+    }
+  }
+  return null;
+}
+
+/** Resolve a title to a real video via yt-dlp search (top hit). */
+export async function resolveTitleToVideo(title) {
+  const bin = resolveYtDlp() || 'yt-dlp';
+  const r = await run(bin, ['-J', '--flat-playlist', '--no-warnings', '--playlist-items', '1', `ytsearch1:${title}`], { timeoutMs: 45000 });
+  if (!r.ok) return null;
+  try {
+    const info = JSON.parse(r.stdout);
+    const entry = info.entries && info.entries[0];
+    if (entry && entry.url) return { url: entry.url, title: entry.title || title };
+    if (entry && entry.id) return { url: `https://www.youtube.com/watch?v=${entry.id}`, title: entry.title || title };
+  } catch { /* bad json */ }
+  return null;
+}
+
 /** Parse "/watch <url-or-path> [question]" (claude-watch command shape). */
 export function parseWatchCommand(text) {
   const m = String(text || '').trim().match(/^\/watch\s+(\S+)(?:\s+([\s\S]+))?$/i);

@@ -9,6 +9,7 @@ import { planner } from './src/services/Planner.js';
 import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B158 — user/message lifecycle event
 import { sanitizeStreamText, teamRoster } from './src/services/ModelCoworkers.js'; // B162 — named model coworkers in every log line
 import { tryExecuteCommand, helpText } from './src/services/CommandRegistry.js'; // B167 — /watch + friends
+import { detectVideoWatchIntent, resolveTitleToVideo, watchVideo } from './src/services/VideoWatch.js'; // B168 — natural video intent
 import { setGoalEngine } from './src/services/PromptAssembly.js'; // B158 — goals reach every assembled prompt
 import { orchestrator } from './src/services/Orchestrator.js';
 import { runSimpleTask } from './src/services/SimpleTask.js'; // B66 — Orchestrator-Workers SIMPLE fast path
@@ -1229,6 +1230,37 @@ app.post('/api/chat', async (req, res) => {
           }
           finish();
           return;
+        }
+      }
+
+      // B168 — NATURAL VIDEO INTENT: "what this youtube link <title>" or any
+      // pasted video URL watches the video WITHOUT needing the /watch command.
+      // Failure falls through to normal planning — never blocks the chat.
+      {
+        const intent = detectVideoWatchIntent(raw);
+        if (intent) {
+          try {
+            let input = intent.url || null;
+            if (!input && intent.searchTitle) {
+              sendEvent('log', { agent: 'Video Analyst', message: `📺 finding that video ("${intent.searchTitle.slice(0, 60)}")…` });
+              const found = await resolveTitleToVideo(intent.searchTitle);
+              if (found) { input = found.url; sendEvent('log', { agent: 'Video Analyst', message: `▶ matched: ${String(found.title).slice(0, 70)}` }); }
+            }
+            if (input) {
+              const watched = await watchVideo({ input, question: intent.question || '', sendEvent, signal: null });
+              if (watched.ok) {
+                done({
+                  success: true,
+                  summary: `### 📺 ${watched.title}\n\n${watched.answer}\n\n---\n⚙️ watched ${watched.frames} frames · transcript: ${watched.transcriptSource || 'none'} (${watched.segments} segments) — detected automatically, no /watch needed`,
+                });
+                finish();
+                return;
+              }
+              sendEvent('log', { agent: 'Video Analyst', message: `⚠ couldn't watch that (${String(watched.error).slice(0, 110)}) — answering normally instead.` });
+            }
+          } catch (e) {
+            sendEvent('log', { agent: 'Video Analyst', message: `⚠ video watch skipped (${String(e && e.message || e).slice(0, 90)}) — continuing normally.` });
+          }
         }
       }
       // B119/B158 — dsh user/message lifecycle event: the user's turn is part

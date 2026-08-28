@@ -39,6 +39,20 @@ console.log('\n== 1. /watch command parsing ==');
   ok('http url detection', VW.isHttpUrl('https://x.y/z') && !VW.isHttpUrl('file.mov'));
 }
 
+/* ══════════════ 1b. NATURAL INTENT (B168 — no slash command needed) ══════════════ */
+console.log('\n== 1b. natural video intent detection ==');
+{
+  const d = VW.detectVideoWatchIntent;
+  const theirs = d("What this YouTube link CS50's Introduction to Programming with Python — Harvard CS50P");
+  ok('their real message → title extracted for video search', theirs && theirs.searchTitle.includes('CS50') && !/youtube|link/i.test(theirs.searchTitle));
+  ok('pasted URL → direct watch', d('hey check this https://youtu.be/abc123').url === 'https://youtu.be/abc123');
+  ok('tiktok URL detected', d('https://www.tiktok.com/@user/video/123 whats happening?').url.includes('tiktok.com'));
+  ok('generic question NOT hijacked', d('how do I download youtube videos for free') === null);
+  ok('normal build request NOT hijacked', d('build me a website like youtube') === null);
+  ok('short greeting NOT hijacked', d('hello') === null);
+  ok('slash commands left to the registry', d('/watch https://youtu.be/x') === null);
+}
+
 /* ══════════════ 2. VTT PARSING ══════════════ */
 console.log('\n== 2. caption (vtt) parsing ==');
 {
