@@ -122,8 +122,19 @@ async function fetchWithFallback(url, headers, timeoutMs) {
 
 /* ══════════════════ credential resolution (per call) ═════════════════════ */
 
+/** env name → every stored alias that may hold it (dsh: credentials are
+ *  resolved per call, so a key saved in Settings reaches the NEXT search). */
+const KEY_ALIASES = {
+  DEEPSEEK_API_KEY: ['deepseek_api_key', 'deepseekkey', 'deepseek'],
+  EXA_API_KEY: ['exa_api_key', 'exakey', 'exa'],
+  PERPLEXITY_API_KEY: ['perplexity_api_key', 'perplexitykey', 'perplexity'],
+};
+
 function keyFor(envName) {
-  try { const v = resolveCredential(envName.toLowerCase()); if (v) return v; } catch { /* store absent */ }
+  const names = [envName.toLowerCase(), ...(KEY_ALIASES[envName] || [])];
+  for (const n of names) {
+    try { const v = resolveCredential(n); if (v) return v; } catch { /* store absent */ }
+  }
   return process.env[envName] || '';
 }
 

@@ -1059,12 +1059,35 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
         return state;
       }
 
-      // 2. Plan the project (coder pass — follows the team's build plan)
-      let project;
+      // 2. BUILD — B165: the DSH CODING LOOP (one agent + real tools:
+      // str_replace_editor · shell · python · github) replaces the one-shot
+      // "write every file in one prompt" coder pass. It iterates against
+      // REAL program output (view → edit → run → observe → fix) exactly like
+      // dsh's minimal/standard coding preset. Falls back to the legacy
+      // one-shot ONLY when the loop produced nothing (e.g. no AI key).
+      let project = null;
       try {
-        project = await generateCode(c.teamPlan ? `${effQuery}\n\nIMPLEMENT THIS PLAN:\n${c.teamPlan}` : effQuery, sendEvent);
+        const { runDshCoding } = await import('./DshCoding.js');
+        const built = await runDshCoding({
+          goal: effQuery,
+          plan: c.teamPlan || '',
+          sendEvent,
+          signal: state.context.opts?.signal || null,
+          owner: state.context.opts?.taskId || 'coding',
+        });
+        if (built && built.files && built.files.length) {
+          project = { files: built.files, entryPoint: built.entryPoint };
+          if (built.summary) results.statistics.buildNotes = built.summary.slice(0, 600);
+        }
       } catch (e) {
-        sendEvent('log', { agent: 'Architect', message: `⚠ Planning failed: ${e.message}` });
+        sendEvent('log', { agent: 'Coding Loop', message: `⚠ DSH coding loop failed (${e.message}) — falling back to the one-shot builder.` });
+      }
+      if (!project || !project.files || !project.files.length) {
+        try {
+          project = await generateCode(c.teamPlan ? `${effQuery}\n\nIMPLEMENT THIS PLAN:\n${c.teamPlan}` : effQuery, sendEvent);
+        } catch (e) {
+          sendEvent('log', { agent: 'Architect', message: `⚠ Planning failed: ${e.message}` });
+        }
       }
 
       if (project && project.files && project.files.length > 0) {
