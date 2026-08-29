@@ -1171,6 +1171,10 @@ app.post('/api/chat', async (req, res) => {
     if (data && typeof data === 'object' && (type === 'log' || type === 'agent.log') && typeof data.message === 'string') {
       data.message = sanitizeStreamText(data.message);
     }
+    // B173 — reasoning text gets the same model-id masking as log lines
+    if (data && typeof data === 'object' && type === 'think' && typeof data.text === 'string') {
+      data.text = sanitizeStreamText(data.text);
+    }
     if (type === 'stream' && data && data.text) {
       if (__firstTokenMs === null) __firstTokenMs = Date.now() - __t0;
       if (data.by) __writerName = data.by;

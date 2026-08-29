@@ -25,6 +25,8 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
   // Whether a completion event arrived. If the stream just ends (proxy drop,
   // host restart mid-task), the user must never be left hanging with no reply.
   let sawDone = false;
+  let thinkT0 = null; // B173 — reasoning-channel bookkeeping (dsh ReasoningRow)
+  let thinkMs = null;
   let lastSeen = Date.now();
   // Watchdog: while the task runs, the server streams logs continuously. If the
   // stream goes silent (app backgrounded and the WebView suspended the socket,
@@ -52,6 +54,23 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
     if (data.type === 'log' || data.type === 'agent.log') {
       setLogs(prev => [...prev, { agent: data.agent || 'JEXI', message: data.message }]);
     }
+    else if (data.type === 'think') {
+      // B173 — reasoning deltas build the Think row on the streaming message
+      const delta = String(data.text || '');
+      if (delta) {
+        if (thinkT0 === null) thinkT0 = Date.now();
+        setMessages(prev => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last && last.role === 'jexi' && last.streaming) {
+            next[next.length - 1] = { ...last, thinking: (last.thinking || '') + delta, by: last.by || data.by };
+          } else {
+            next.push({ role: 'jexi', text: '', thinking: delta, streaming: true, thinkT0: Date.now(), ...(data.by ? { by: data.by } : {}) });
+          }
+          return next;
+        });
+      }
+    }
     else if (data.type === 'stream') {
       // B150 — live answer typing: append deltas to the current JEXI message
       // (the answer appears as it is generated — no more blank wait).
@@ -61,8 +80,9 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
           const next = [...prev];
           const last = next[next.length - 1];
           if (last && last.role === 'jexi' && last.streaming) {
-            // B162 — keep the named coworker writing this answer
-            next[next.length - 1] = { ...last, text: last.text + delta, by: last.by || data.by };
+            // B173 — the first answer token ends the Think row's live phase
+            if (thinkT0 !== null && thinkMs === null) thinkMs = Date.now() - thinkT0;
+            next[next.length - 1] = { ...last, text: last.text + delta, by: last.by || data.by, ...(thinkMs !== null && last.thinkMs === undefined ? { thinkMs } : {}) };
           } else {
             next.push({ role: 'jexi', text: delta, streaming: true, ...(data.by ? { by: data.by } : {}) });
           }
@@ -103,7 +123,13 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
             : (streamed.trim()
               ? streamed
               : '✅ Task completed — the team finished, but returned no readable summary. Check the activity log above to see what ran.');
-          const finalMsg = { role: 'jexi', text: summary + footer, sources: data.sources, files: data.files };
+          const cur = next[idx];
+          const finalMsg = {
+            role: 'jexi', text: summary + footer, sources: data.sources, files: data.files,
+            // B173 — the Think row survives the turn (tap to review reasoning)
+            ...(cur && cur.thinking ? { thinking: cur.thinking } : {}),
+            ...(cur && cur.thinkMs !== undefined ? { thinkMs: cur.thinkMs } : (thinkMs !== null ? { thinkMs } : {})),
+          };
           if (idx >= 0) next[idx] = finalMsg; else next.push(finalMsg);
           return next;
         });

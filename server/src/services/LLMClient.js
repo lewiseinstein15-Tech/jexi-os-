@@ -499,7 +499,10 @@ async function streamPlainText(prompt, system, opts, onDelta) {
         messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],
         tools: [], temperature: opts.temperature ?? 0.4,
         // B162 — deltas carry the provider+model so the UI can name the coworker
-        onDelta: (t) => onDelta(t, { provider, model: cfg.models[0] }), signal: opts.signal,
+        onDelta: (t) => onDelta(t, { provider, model: cfg.models[0] }),
+        // B173 — reasoning deltas ride their own channel with the same meta
+        ...(typeof opts.onThink === 'function' ? { onThink: (t) => opts.onThink(t, { provider, model: cfg.models[0] }) } : {}),
+        signal: opts.signal,
       });
       out.tookMs = Date.now() - __st0;
       if (out.text) {
@@ -665,7 +668,7 @@ function providerToolConfig(provider, opts) {
  * stream for chat/completions. Accumulates text + tool_calls deltas and
  * calls onDelta(text) per chunk so the UI renders the answer live.
  */
-async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, temperature, onDelta, signal }) {
+async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, temperature, onDelta, onThink, signal }) {
   const controller = new AbortController();
   const onAbort = () => controller.abort();
   if (signal) { if (signal.aborted) controller.abort(); else signal.addEventListener('abort', onAbort, { once: true }); }
@@ -692,6 +695,7 @@ async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, te
     const decoder = new TextDecoder();
     let buf = '';
     let text = '';
+    let think = ''; // B173 — reasoning tokens (dsh ReasoningRow parity)
     const rawToolCalls = [];
     for (;;) {
       const { done, value } = await reader.read();
@@ -708,6 +712,14 @@ async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, te
         try { json = JSON.parse(payload); } catch { continue; }
         const delta = json && json.choices && json.choices[0] && json.choices[0].delta;
         if (!delta) continue;
+        // B173 — reasoning/thinking tokens stream to their own channel
+        // (delta.reasoning_content: DeepSeek convention, delta.reasoning:
+        // OpenRouter convention). Never mixed into the answer text.
+        const reasoning = delta.reasoning_content ?? delta.reasoning;
+        if (reasoning) {
+          think += reasoning;
+          try { onThink?.(reasoning); } catch { /* never break the stream */ }
+        }
         if (delta.content) {
           text += delta.content;
           try { onDelta(delta.content); } catch { /* a consumer must never break the stream */ }
@@ -725,7 +737,7 @@ async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, te
       if (doneRead) break;
     }
     const msg = { content: text || null, ...(rawToolCalls.length ? { tool_calls: rawToolCalls } : {}) };
-    return { text, toolCalls: parseToolCalls(msg), rawToolCalls, model };
+    return { text, think, toolCalls: parseToolCalls(msg), rawToolCalls, model };
   } finally {
     clearTimeout(timer);
     if (signal) signal.removeEventListener('abort', onAbort);
@@ -748,7 +760,10 @@ async function chatWithToolsOnce(provider, cfg, model, messages, tools, opts) {
         baseUrl: base, key: cfg.key, model, messages, tools,
         temperature: opts.temperature,
         // B162 — deltas carry the provider+model so the UI can name the coworker
-        onDelta: (t) => opts.onToken(t, { provider, model }), signal: opts.signal,
+        onDelta: (t) => opts.onToken(t, { provider, model }),
+        // B173 — reasoning deltas ride their own channel with the same meta
+        ...(typeof opts.onThink === 'function' ? { onThink: (t) => opts.onThink(t, { provider, model }) } : {}),
+        signal: opts.signal,
       });
     }
   }

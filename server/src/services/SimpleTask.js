@@ -114,6 +114,13 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
   // a "no readable summary" notice.
   let streamedAnswer = '';
   let announcedWriter = false;
+  // B173 — reasoning streams into its own channel (dsh ReasoningRow)
+  const onThink = (t, meta) => {
+    const delta = String(t || '');
+    if (!delta) return;
+    const by = meta ? coworkerName(meta.provider, meta.model) : undefined;
+    emit('think', { text: delta, ...(by ? { by } : {}) });
+  };
   const onToken = (t, meta) => {
     const delta = String(t || '');
     if (!delta) return;
@@ -165,6 +172,7 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
     profile: opts.profile,
     sendEvent: emit,
     onToken,
+    onThink,
     confirm: opts.confirm,
     signal: opts.signal,
     maxIterations: opts.maxIterations || 4,

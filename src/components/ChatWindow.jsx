@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Square, ImagePlus, X, Camera, Stethoscope, Plus, Copy, Check, RefreshCw, Sparkles } from 'lucide-react';
 import TypedMessage from './TypedMessage';
+import ThinkRow from './ThinkRow'; // B173 — dsh ReasoningRow
 import MarkdownRenderer from './MarkdownRenderer';
 import VisionPanel from './VisionPanel';
 import AgentPipeline from './AgentPipeline';
@@ -225,6 +226,14 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
                       them directly (no typewriter) so the content never
                       re-flows mid-scroll. The typewriter reveal runs once,
                       on the completed answer. */}
+                  {(msg.thinking || msg.thinkMs !== undefined) && (
+                    <ThinkRow
+                      text={msg.thinking || ''}
+                      active={Boolean(msg.streaming && !msg.text)}
+                      ms={msg.thinkMs}
+                      by={msg.by}
+                    />
+                  )}
                   {msg.streaming ? (
                     <div className="jx-streaming-text">
                       <MarkdownRenderer content={msg.text} size="text-[13px]" />

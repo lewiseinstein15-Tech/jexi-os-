@@ -87,11 +87,15 @@ export default function AgentPipeline({ logs = [], isProcessing }) {
       </div>
       {done.map((l, i) => <StepRow key={`d${i}-${l.agent}-${l.message?.slice?.(0, 24) || ''}`} log={l} state="done" />)}
       {current && <StepRow key={`c-${current.agent}-${current.message?.slice?.(0, 24) || ''}`} log={current} state="current" />}
+      {/* B173 — dead-air narration: rotating phases + the live timer, so the
+          wait before the first event is honest instead of a flat 'thinking…' */}
       {!current && (
         <div className="jx-step current">
           <span className="ic"><span className="jx-spin" /></span>
           <span className="label">JEXI</span>
-          <span className="detail">thinking…</span>
+          <span className="detail">
+            {elapsed < 2.5 ? 'reading your message…' : elapsed < 6 ? 'planning the best approach…' : elapsed < 12 ? 'gathering what she needs…' : 'almost ready…'}
+          </span>
         </div>
       )}
     </div>

@@ -167,6 +167,11 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         maxIterations: MAX_ITERATIONS,
         // B150 — live answer typing (dsh llm/stream). B162 — deltas name the
         // coworker writing them; a visible "✍️ <name> is writing…" step runs once.
+        // B173 — reasoning streams into its own channel (dsh ReasoningRow)
+        onThink: (t, meta) => {
+          const by = meta ? coworkerName(meta.provider, meta.model) : undefined;
+          emit('think', { text: t, ...(by ? { by } : {}) });
+        },
         onToken: (t, meta) => {
           const by = meta ? coworkerName(meta.provider, meta.model) : undefined;
           if (!announcedWriter) {

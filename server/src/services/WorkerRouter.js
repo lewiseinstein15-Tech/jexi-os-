@@ -221,6 +221,7 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
           // UI as they are generated (dsh llm/stream pattern) — no more blank
           // wait while the model works.
           onToken: (typeof opts.onToken === 'function') ? opts.onToken : undefined,
+          onThink: (typeof opts.onThink === 'function') ? opts.onThink : undefined, // B173 — reasoning channel
           // Execute the model's native tool calls through the gated runtime.
           executeToolCalls: (calls) => executeNativeToolCalls(calls, { ...opts, codeTools }),
         });
@@ -246,7 +247,7 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
     const label = p.model ? `${p.key}(${p.model})` : p.key;
     logCall(p, 'text');
     try {
-      const res = await generateContentSafe(prompt, system, null, { provider: p.key, model: p.model, temperature: opts.temperature, onToken: (typeof opts.onToken === 'function') ? opts.onToken : undefined });
+      const res = await generateContentSafe(prompt, system, null, { provider: p.key, model: p.model, temperature: opts.temperature, onToken: (typeof opts.onToken === 'function') ? opts.onToken : undefined, onThink: (typeof opts.onThink === 'function') ? opts.onThink : undefined });
       if (res.ok && res.text) {
         logResult({ ok: true, mode: 'text', provider: res.provider || p.key, model: res.model || p.model || null, degraded: !!res.degraded, local: !!res.local });
         return { ok: true, text: res.text, degraded: !!res.degraded, local: !!res.local, worker: role, provider: res.provider || p.key, model: res.model || p.model || null, attempts };
