@@ -81,10 +81,26 @@ function balanceMathDelimiters(text) {
  * Normalize a coworker's raw output into a clean, consistent final answer.
  * Structural only — never rewrites the model's content or facts.
  */
+/**
+ * B174c — MATH DELIMITER NORMALIZER. Some model lanes emit LaTeX with
+ * \( ... \) / \[ ... \] delimiters, which remark-math does NOT parse —
+ * the UI showed raw \frac{2}{3} garbage. Convert both forms to $ / $$ so
+ * EVERY math style renders. Applied centrally: stream releases, think text
+ * and done summaries all pass through this.
+ */
+export function normalizeMathDelimiters(text) {
+  let out = String(text || '');
+  if (!out.includes('\\(') && !out.includes('\\[')) return out;
+  out = out.replace(/\\\[([\s\S]*?)\\\]/g, (_, body) => `$$\n${String(body).trim()}\n$$`);
+  out = out.replace(/\\\(([\s\S]*?)\\\)/g, (_, body) => `$${String(body).trim()}$`);
+  return out;
+}
+
 export function normalizeFinalAnswer(text) { // B66
   if (!text || !String(text).trim()) return '';
   let out = String(text);
   out = collapseBlankLines(out);
+  out = normalizeMathDelimiters(out); // B174c — \( \) / \[ \] → $ / $$
   out = wrapBareLatexLines(out);
   out = balanceMathDelimiters(out);
   out = trimLines(out);

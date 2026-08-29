@@ -59,6 +59,21 @@ console.log('\n== 2. real math answer streams with even-$ parity ==');
   ok('everything released by flush', shown === TRAIN);
 }
 
+/* ══════════════ 2b. DELIMITER NORMALIZATION (B174c — the real user bug) ══════════════ */
+console.log('\n== 2b. \\( \\) and \\[ \\] become renderable math ==');
+{
+  const { normalizeMathDelimiters } = await import('./src/services/Formatting.js');
+  const t = normalizeMathDelimiters('To solve \\( \\frac{2}{3} + \\frac{1}{4} \\), find the LCM. \\[ x = 12 \\]');
+  ok('\\( ... \\) → $ ... $', t.includes('$\\frac{2}{3} + \\frac{1}{4}$'));
+  ok('\\[ ... \\] → $$ ... $$', t.includes('$$') && t.includes('x = 12'));
+  ok('text without latex passes untouched', normalizeMathDelimiters('plain answer 42') === 'plain answer 42');
+  const idx = fs.readFileSync('./index.js', 'utf-8');
+  ok('done summaries + stream releases + think text all normalized',
+    idx.includes('normalizeMathDelimiters(data.summary)')
+    && idx.includes('normalizeMathDelimiters(mathStream.push')
+    && idx.includes('sanitizeStreamText(normalizeMathDelimiters'));
+}
+
 /* ══════════════ 3. WIRING ══════════════ */
 console.log('\n== 3. wiring ==');
 {

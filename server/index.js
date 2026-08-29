@@ -8,7 +8,7 @@ import path from 'path';
 import { planner } from './src/services/Planner.js';
 import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B158 — user/message lifecycle event
 import { sanitizeStreamText, teamRoster } from './src/services/ModelCoworkers.js'; // B162 — named model coworkers in every log line
-import { createMathStreamBuffer } from './src/services/Formatting.js'; // B174 — math-safe streaming
+import { createMathStreamBuffer, normalizeMathDelimiters } from './src/services/Formatting.js'; // B174 — math-safe streaming + B174c delimiter normalization
 import { tryExecuteCommand, helpText } from './src/services/CommandRegistry.js'; // B167 — /watch + friends
 import { detectVideoWatchIntent, resolveTitleToVideo, watchVideo } from './src/services/VideoWatch.js'; // B168 — natural video intent
 import { imageSearch, detectPictureIntent, detectCorrectionToPicture, verifyImagesWithVision, generatedImageUrl } from './src/services/ImageSearch.js'; // B171 — DSH-style presenter
@@ -1175,14 +1175,18 @@ app.post('/api/chat', async (req, res) => {
     }
     // B173 — reasoning text gets the same model-id masking as log lines
     if (data && typeof data === 'object' && type === 'think' && typeof data.text === 'string') {
-      data.text = sanitizeStreamText(data.text);
+      data.text = sanitizeStreamText(normalizeMathDelimiters(data.text));
+    }
+    // B174c — every done summary carries renderable math ($ / $$ only)
+    if (data && typeof data === 'object' && type === 'done' && typeof data.summary === 'string') {
+      data.summary = normalizeMathDelimiters(data.summary);
     }
     if (type === 'stream' && data && data.text) {
       if (__firstTokenMs === null) __firstTokenMs = Date.now() - __t0;
       if (data.by) __writerName = data.by;
       // B174 — hold incomplete math back so live answers never show
       // half-typed LaTeX; closed formulas release whole.
-      const safe = mathStream.push(data.text);
+      const safe = normalizeMathDelimiters(mathStream.push(data.text));
       streamedAnswer += safe;
       if (!safe) return; // nothing safe to show yet — skip this event
       data = { ...data, text: safe };
