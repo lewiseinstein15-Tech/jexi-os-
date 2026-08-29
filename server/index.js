@@ -8,6 +8,7 @@ import path from 'path';
 import { planner } from './src/services/Planner.js';
 import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B158 — user/message lifecycle event
 import { sanitizeStreamText, teamRoster } from './src/services/ModelCoworkers.js'; // B162 — named model coworkers in every log line
+import { createMathStreamBuffer } from './src/services/Formatting.js'; // B174 — math-safe streaming
 import { tryExecuteCommand, helpText } from './src/services/CommandRegistry.js'; // B167 — /watch + friends
 import { detectVideoWatchIntent, resolveTitleToVideo, watchVideo } from './src/services/VideoWatch.js'; // B168 — natural video intent
 import { imageSearch, detectPictureIntent, detectCorrectionToPicture, verifyImagesWithVision, generatedImageUrl } from './src/services/ImageSearch.js'; // B171 — DSH-style presenter
@@ -1159,6 +1160,7 @@ app.post('/api/chat', async (req, res) => {
   // summary, the content that already streamed to the user IS the answer
   // (root fix for the "Task completed - no readable summary" reply).
   let streamedAnswer = '';
+  const mathStream = createMathStreamBuffer(); // B174 — formulas arrive WHOLE
   // B172 — SPEED TELEMETRY (dsh-style per-turn diagnostics): request clock,
   // time-to-first-token and the named writer ride every done event, and one
   // visible ⚡ line lands in the step feed so speed is observable, not guessed.
@@ -1178,9 +1180,21 @@ app.post('/api/chat', async (req, res) => {
     if (type === 'stream' && data && data.text) {
       if (__firstTokenMs === null) __firstTokenMs = Date.now() - __t0;
       if (data.by) __writerName = data.by;
-      streamedAnswer += String(data.text);
+      // B174 — hold incomplete math back so live answers never show
+      // half-typed LaTeX; closed formulas release whole.
+      const safe = mathStream.push(data.text);
+      streamedAnswer += safe;
+      if (!safe) return; // nothing safe to show yet — skip this event
+      data = { ...data, text: safe };
     }
-    if (type === 'done' && data && !data.recoverable) { try { saveResult(convId, data); } catch (e) {} }
+    if (type === 'done' && data && !data.recoverable) {
+      // B174 — release any held tail before the turn ends
+      try {
+        const tail = mathStream.flush();
+        if (tail) { streamedAnswer += tail; res.write(JSON.stringify({ type: 'stream', text: tail, ...(__writerName ? { by: __writerName } : {}) }) + '\n'); }
+      } catch (e) { /* never break the done */ }
+      try { saveResult(convId, data); } catch (e) {}
+    }
     try { res.write(JSON.stringify({ type, ...data }) + '\n'); } catch (e) {}
   };
 

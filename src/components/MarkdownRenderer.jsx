@@ -414,7 +414,7 @@ export default function MarkdownRenderer({ content, size = 'text-[11px]' }) {
     <div className={`markdown-body ${size} leading-relaxed`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
+        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: 'ignore', errorColor: '#ffb020' }]]}
         components={{
           /* --- Headings -------------------------------------------- */
           h1: ({ node, children, ...props }) => {

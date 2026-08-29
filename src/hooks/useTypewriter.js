@@ -30,15 +30,22 @@ export function useTypewriter(text, { baseSpeed = 16 } = {}) {
 
     shownRef.current = '';
     setOut('');
-    const chunk = Math.max(2, Math.min(14, Math.floor(text.length / 110)));
+    // B174 — LINE-CHUNKED reveal: finished answers appear one whole line at a
+    // time (fast cadence, same ~2-4s feel) so a formula is NEVER sliced
+    // mid-LaTeX — char-by-char typing showed "\frac{\te…" garbage while
+    // racing the reveal. Lines land complete and render as real math.
+    const lineEnds = [];
+    for (let i = text.indexOf('\n'); i !== -1; i = text.indexOf('\n', i + 1)) lineEnds.push(i + 1);
+    lineEnds.push(text.length);
+    const linesPerTick = Math.max(1, Math.round(lineEnds.length / 45));
+    let li = 0;
     const id = setInterval(() => {
-      setOut(prev => {
-        const next = prev.length + chunk;
-        const value = next >= text.length ? text : text.slice(0, next);
-        shownRef.current = value;
-        return value;
-      });
-    }, baseSpeed);
+      li = Math.min(lineEnds.length, li + linesPerTick);
+      const value = text.slice(0, lineEnds[li - 1] || text.length);
+      shownRef.current = value;
+      setOut(value);
+      if (li >= lineEnds.length) clearInterval(id);
+    }, Math.max(baseSpeed, 45));
     return () => clearInterval(id);
   }, [text, baseSpeed]);
 

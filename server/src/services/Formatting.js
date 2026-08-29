@@ -110,3 +110,44 @@ PRESENTER CONTRACT (how answers are DISPLAYED — the UI renders all of these):
 - Processes/architecture/flows → a \`\`\`mermaid diagram (flowchart/graph/sequence).
 - "Show me / what does X look like" → call the image_search tool and embed results as ![title](thumbnail-url).
 - Explain every graph/diagram in one short sentence under it.`;
+
+/* ══════════════════ B174 — MATH-SAFE STREAM BUFFER ══════════════════
+ * Live answers used to show HALF-TYPED LaTeX ("\\frac{\\te…") — unreadable.
+ * dsh streams structured blocks that only surface when complete; this is the
+ * text equivalent for math: an incomplete $ span (or a trailing \\command)
+ * is held back until it closes, then released whole. The answer still types
+ * live — formulas just arrive finished and render properly. */
+export function createMathStreamBuffer() {
+  let buf = '';
+  let emitted = 0;
+  /** How much of buf is safe to show: never inside an unclosed $ span,
+   *  never with a half-typed backslash command at the tail. */
+  function safeLen() {
+    let safe = buf.length;
+    const rest = buf.slice(emitted);
+    const dollars = (rest.match(/\$/g) || []).length;
+    if (dollars % 2 === 1) {
+      const lastDollar = buf.lastIndexOf('$');
+      if (lastDollar >= emitted) safe = Math.min(safe, lastDollar); // >= : a $ AT the boundary starts an unclosed span too
+    }
+    const m = /[\\][a-zA-Z]{0,11}$/.exec(buf);
+    if (m && m.index >= emitted) safe = Math.min(safe, m.index);
+    return Math.max(emitted, Math.min(buf.length, safe));
+  }
+  return {
+    /** Feed one delta → the text safe to emit now (possibly ''). */
+    push(delta) {
+      buf += String(delta || '');
+      const safe = safeLen();
+      const out = buf.slice(emitted, safe);
+      emitted = safe;
+      return out;
+    },
+    /** Release everything held (call before the final event). */
+    flush() {
+      const out = buf.slice(emitted);
+      emitted = buf.length;
+      return out;
+    },
+  };
+}
