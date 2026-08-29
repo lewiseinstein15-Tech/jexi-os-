@@ -451,9 +451,11 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
     // Word-bound the verb tokens: /compute/ would otherwise match "comPUTER" and
     // /solve/ would match "reSOLVED" — sending "how do computers work" to the
     // math team. No 'ing' ending: "quantum COMPUTING" is a field, not the verb.
-    const mathCompute = /(\bcalculat(?:e|es|ed)\b|\bcomput(?:e|es|ed)\b|\bsolv(?:e|es|ed)\b|integrate|derivative|differentiate|sum of|multiply|divide|sqrt|square root|equation|formula|percentage|what is \d|\d+\s*[+\-×÷*\/]\s*\d|\^2|\$\$)/i;
+    const mathCompute = /(\bcalculat(?:e|es|ed)\b|\bcomput(?:e|es|ed)\b|\bsolv(?:e|es|ed)\b|integrate|derivative|differentiate|limit|sum of|multiply|divide|sqrt|square root|equation|formula|percentage|what is \d|\d+\s*[+\-×÷*\/]\s*\d|\^2|\$\$)/i;
     const mathTopic = /(math|algebra|calculus|geometry|trigonometry)/i;
-    const mathAsk = /(\bcalculat(?:e|es|ed)\b|\bcomput(?:e|es|ed)\b|\bsolv(?:e|es|ed)\b|problem|question|homework|how (do|can) (i|you) (solve|do|find)|work (out|this) out)/i;
+    // B176: a bare math VERB ('Integrate x^2', 'Differentiate x^3') is itself
+    // the ask — without these the request fell through to the coding team.
+    const mathAsk = /(\bcalculat(?:e|es|ed)\b|\bcomput(?:e|es|ed)\b|\bsolv(?:e|es|ed)\b|\bintegrate\b|\bderivative\b|\bdifferentiat(?:e|ion)\b|\blimit of\b|\bsum of\b|problem|question|homework|how (do|can) (i|you) (solve|do|find)|work (out|this) out)/i;
     if ((mathCompute.test(q) || (mathTopic.test(q) && mathAsk.test(q))) && !this.isCoding(scopedQuery)) {
       return { intent: 'math_solve', tasks: ['reasoning', 'memory'], reasoning: 'Mathematical question — solve with structured LaTeX steps.' };
     }

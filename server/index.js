@@ -1212,8 +1212,11 @@ app.post('/api/chat', async (req, res) => {
   clearResult(convId);
   // done = emit the terminal event; persistence is handled by sendEvent above.
   const rememberTurn = (role, text) => {
-    const t = String(text || '').trim();
+    // B176: jexi answers are stored in RENDERABLE math dialect ($ / $$) no
+    // matter which lane produced them — history renders clean forever.
+    let t = String(text || '').trim();
     if (!t) return;
+    if (role === 'jexi') { try { t = normalizeMathDelimiters(t); } catch { /* never block */ } }
     try { addChat(role, t); } catch { /* memory must never break chat */ }
     try { appendConversationEvent(convId, { role, text: t, kind: 'chat' }); } catch { /* same */ }
   };

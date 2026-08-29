@@ -63,6 +63,17 @@ export function preprocessMath(text) {
   //    least balanced instead of showing raw.
   out = out.replace(/\\\[([\s\S]*?)\\\]/g, (_, body) => `$$${body.trim()}$$`);
   out = out.replace(/\\\(([\s\S]*?)\\\)/g, (_, body) => `$${body.trim()}$`);
+  // NESTED dialects: models sometimes write \[ ... $$...$$ ... \] — after
+  // pair-conversion that becomes a $$-wrapped $$ body. Collapse any run of
+  // 3+ dollars first, then unwrap double-wrapped display math. (Function
+  // replacements only — '$' patterns in strings are escape traps.)
+  out = out.replace(/\${3,}/g, (m) => (m.length % 2 === 0 ? '$$' : '$'));
+  out = out.replace(/\$\$([\s\S]*?)\$\$/g, (m, b) => {
+    const inner = b.trim();
+    if (inner.startsWith('$$') && inner.endsWith('$$') && inner.length > 4) return inner;
+    return m;
+  });
+
   // Unclosed OPENERS (truncated/old text): wrap the remainder of the LINE
   // so the span is balanced; stray closers unwrap to plain brackets.
   out = out.replace(/\\\((.*)$/gm, (_, body) => `$${body}$`);
