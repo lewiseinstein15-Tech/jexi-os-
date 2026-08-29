@@ -120,16 +120,25 @@ PRESENTER CONTRACT (how answers are DISPLAYED — the UI renders all of these):
 export function createMathStreamBuffer() {
   let buf = '';
   let emitted = 0;
-  /** How much of buf is safe to show: never inside an unclosed $ span,
-   *  never with a half-typed backslash command at the tail. */
+  /** Exact scan: the safe cut is the end of the last CLOSED math span.
+   *  Handles $inline$ AND $$display$$ (a display block stays held until its
+   *  closing $$ lands — nothing raw ever shows mid-block), skips \\$ escapes. */
   function safeLen() {
     let safe = buf.length;
-    const rest = buf.slice(emitted);
-    const dollars = (rest.match(/\$/g) || []).length;
-    if (dollars % 2 === 1) {
-      const lastDollar = buf.lastIndexOf('$');
-      if (lastDollar >= emitted) safe = Math.min(safe, lastDollar); // >= : a $ AT the boundary starts an unclosed span too
+    let open = null;       // '$' | '$$' | null
+    let openStart = -1;
+    for (let i = 0; i < buf.length; i++) {
+      const c = buf[i];
+      if (c === '\\') { i++; continue; } // skip escaped char (incl. \$)
+      if (c === '$') {
+        const disp = buf[i + 1] === '$';
+        if (open === null) { open = disp ? '$$' : '$'; openStart = i; i += disp ? 1 : 0; }
+        else if (open === '$$' && disp) { open = null; i += 1; }
+        else if (open === '$' && !disp) { open = null; }
+        // $ inside $$-block or $$ inside $-span: treat as content, keep scanning
+      }
     }
+    if (open !== null && openStart >= 0) safe = Math.min(safe, openStart);
     const m = /[\\][a-zA-Z]{0,11}$/.exec(buf);
     if (m && m.index >= emitted) safe = Math.min(safe, m.index);
     return Math.max(emitted, Math.min(buf.length, safe));
