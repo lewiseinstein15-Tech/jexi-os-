@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { chartSvg } from '../utils/chartSvg'; // B169 — real charts for numbers
+import { preprocessMath } from '../utils/mathPreprocess'; // B176 — every math dialect renders
 import rehypeKatex from 'rehype-katex';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
@@ -396,19 +397,14 @@ function HorizontalDivider() {
 /* ------------------------------------------------------------------ */
 export default function MarkdownRenderer({ content, size = 'text-[11px]' }) {
   /* --- Pre-processing ------------------------------------------------ */
-  // 1. Clean up empty math blocks
-  let cleanContent = (content || '').replace(/\$\$\s*\$\$/g, '').replace(/\$\s*\$/g, '');
+  // B176 — THE math root fix: every dialect ($, \( \), \[ \], bare LaTeX)
+  // normalizes to $-dialect HERE, before the parser — covers streaming,
+  // finished answers AND old history. Code blocks/inline code are protected
+  // inside preprocessMath and restored untouched.
+  let cleanContent = useMemo(() => preprocessMath(content || ''), [content]);
 
-  // 2. Auto-wrap lone LaTeX commands in $$ (skip fenced code blocks)
-  let inFence = false;
-  cleanContent = cleanContent.split('\n').map(line => {
-    const trimmed = line.trim();
-    if (/^```/.test(trimmed)) { inFence = !inFence; return line; }
-    if (!inFence && trimmed.startsWith('\\') && !trimmed.includes('$$') && !trimmed.startsWith('```')) {
-      return `$$ ${trimmed} $$`;
-    }
-    return line;
-  }).join('\n');
+  // Clean up empty math blocks left after normalization
+  cleanContent = cleanContent.replace(/\$\$\s*\$\$/g, '').replace(/\$\s+\$/g, '');
 
   return (
     <div className={`markdown-body ${size} leading-relaxed`}>

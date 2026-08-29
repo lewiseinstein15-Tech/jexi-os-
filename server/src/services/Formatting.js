@@ -160,9 +160,21 @@ export function createMathStreamBuffer() {
     return Math.max(emitted, Math.min(buf.length, safe));
   }
   return {
-    /** Feed one delta → the text safe to emit now (possibly ''). */
+    /** Feed one delta → the text safe to emit now (possibly '').
+     *  B176: the delta is FIRST normalized from \( \)/\[ \] dialect to
+     *  $ dialect, so non-$ openers stream through the SAME hold-back logic
+     *  (raw `\(\frac{d}{dx}` never shows mid-stream). Trailing lone
+     *  backslashes are held by the existing command-tail rule, so a
+     *  delimiter split across chunks waits for its other half. */
     push(delta) {
-      buf += String(delta || '');
+      // pair-normalize, then convert any LEFTOVER (still-unclosed) \( / \[
+      // openers and stray closers to $ / $$ so the span scanner holds them
+      // exactly like native $ spans — raw LaTeX never emits mid-stream.
+      buf += normalizeMathDelimiters(String(delta || ''))
+        .replace(/\\\(/g, '$')
+        .replace(/\\\[/g, '$$')
+        .replace(/\\\)/g, '$')
+        .replace(/\\\]/g, '$$');
       const safe = safeLen();
       const out = buf.slice(emitted, safe);
       emitted = safe;

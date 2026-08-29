@@ -74,6 +74,39 @@ console.log('\n== 2b. \\( \\) and \\[ \\] become renderable math ==');
     && idx.includes('sanitizeStreamText(normalizeMathDelimiters'));
 }
 
+/* ══════════════ 2c. CLIENT PREPROCESSOR (B176 — the root fix) ══════════════ */
+console.log('\n== 2c. client-side preprocessor (every render path) ==');
+{
+  const { preprocessMath } = await import(path.join(ROOT, 'src/utils/mathPreprocess.js'));
+  const cases = [
+    ['\\( \\frac{d}{dx}(x^n) = n \\cdot x^{n-1} \\', 'pair dialect → $'],
+    ["The derivative \\( f'(x) = 3 + 10x \\) is linear", 'inline pair in prose'],
+    ['d/dx rule: \\frac{d}{dx}(5x^2) = 10x', 'bare latex mid-line → wrapped'],
+    ['\\[ \\int_0^1 x^2 \\, dx \\]', 'display pair → $$'],
+    ['\\boxed{\\frac{11}{12}}', 'boxed bare → wrapped'],
+    ['\\sqrt{x} + \\sum_{i=1}^{n} i', 'roots + sums'],
+  ];
+  let allOk = true;
+  for (const [t, name] of cases) {
+    const out = preprocessMath(t);
+    const good = /\\[a-zA-Z]{2,}\{/.test(out) === false || out.includes('$');
+    const noRawDialect = !/\\\(|\\\[/.test(out);
+    const balanced = (out.match(/(?<!\$)\$(?!\$)/g) || []).length % 2 === 0;
+    const pass = noRawDialect && balanced && out.includes('$');
+    if (!pass) allOk = false;
+    ok(`preprocess: ${name}`, pass);
+  }
+  ok('code fence protected (latex in code stays code)', preprocessMath('```python\n# \\frac{x}{y}\n```').includes('\\frac{x}{y}'));
+  ok('inline code protected', preprocessMath('inline `\\frac{x}{y}` code').includes('`\\frac{x}{y}`'));
+  ok('plain text untouched', preprocessMath('plain answer 42') === 'plain answer 42');
+  ok('$ dialect passes through untouched', preprocessMath('$\\sum_{i=1}^{n} i$ fine') === '$\\sum_{i=1}^{n} i$ fine');
+  ok('odd-$ balance guard drops the stray dollar', ((preprocessMath('5\$ and \\(x^2\\)').match(/(?<!\$)\$(?!\$)/g) || []).length % 2) === 0);
+  const mr = fs.readFileSync(path.join(ROOT, 'src/components/MarkdownRenderer.jsx'), 'utf-8');
+  ok('MarkdownRenderer preprocesses EVERY message before parsing', mr.includes('preprocessMath(content') && mr.includes('useMemo(() => preprocessMath'));
+  const css = fs.readFileSync(path.join(ROOT, 'src/index.css'), 'utf-8');
+  ok('katex dark-UI styling (centered display, mobile overflow-safe)', css.includes('.katex-display') && css.includes('overflow-x: auto'));
+}
+
 /* ══════════════ 3. WIRING ══════════════ */
 console.log('\n== 3. wiring ==');
 {
