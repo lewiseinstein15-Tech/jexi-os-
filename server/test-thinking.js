@@ -105,7 +105,8 @@ console.log('\n== 3. engine + UI wiring ==');
   ok('dead-air narration replaces flat "thinking…"', pipe.includes('reading your message…') && pipe.includes('planning the best approach') && !pipe.includes('"detail">thinking…'));
 
   const idx = fs.readFileSync('./index.js', 'utf-8');
-  ok('chat route sanitizes think text (model ids never leak)', idx.includes("type === 'think'") && idx.includes('data.text = sanitizeStreamText(data.text)'));
+  ok('chat route sanitizes think text (model ids never leak, B174c: math-normalized first)',
+    idx.includes("type === 'think'") && idx.includes('sanitizeStreamText(normalizeMathDelimiters(data.text))'));
   const al = fs.readFileSync('./src/services/AgentLoop.js', 'utf-8');
   const st = fs.readFileSync('./src/services/SimpleTask.js', 'utf-8');
   ok("AgentLoop + SimpleTask emit 'think' events with the writer name", al.includes("emit('think'") && st.includes("emit('think'"));
