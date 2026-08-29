@@ -493,6 +493,7 @@ async function streamPlainText(prompt, system, opts, onDelta) {
     const slot = await takeSlot(provider);
     if (!slot.ok) { errors.push(`${provider}: ${slot.reason} (rate limiter)`); continue; }
     try {
+      const __st0 = Date.now(); // B172 — stream duration feeds speed routing
       const out = await streamOpenAICompletion({
         baseUrl: base, key: cfg.key, model: cfg.models[0],
         messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],
@@ -500,8 +501,9 @@ async function streamPlainText(prompt, system, opts, onDelta) {
         // B162 — deltas carry the provider+model so the UI can name the coworker
         onDelta: (t) => onDelta(t, { provider, model: cfg.models[0] }), signal: opts.signal,
       });
+      out.tookMs = Date.now() - __st0;
       if (out.text) {
-        recordProviderSuccess(provider);
+        recordProviderSuccess(provider, out.tookMs);
         releaseSlot();
         return out.text;
       }
@@ -541,9 +543,10 @@ export async function generateContent(prompt, systemInstruction = '', imageBase6
       continue;
     }
     try {
+      const __t0 = Date.now(); // B172 — measure real latency for speed routing
       const text = await call(prompt, system, imageBase64, opts, errors);
       if (text) {
-        recordProviderSuccess(provider);
+        recordProviderSuccess(provider, Date.now() - __t0);
         releaseSlot();
         // B162b — if this provider answered WITHOUT streaming deltas (SDK
         // paths), emit the whole text once WITH provider+model meta: the UI

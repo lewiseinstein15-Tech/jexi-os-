@@ -26,18 +26,32 @@ const CONSECUTIVE_COOLDOWN = 3;    // 3 consecutive failures → cooldown
 const health = new Map();
 
 function h(key) {
-  if (!health.has(key)) health.set(key, { fails: 0, lastFail: 0, cooldownUntil: 0, calls: 0, ok: 0 });
+  if (!health.has(key)) health.set(key, { fails: 0, lastFail: 0, cooldownUntil: 0, calls: 0, ok: 0, latencyEma: null, lastLatency: null });
   return health.get(key);
 }
 
-/** Record a success — resets the failure streak and clears any cooldown. */
-export function recordProviderSuccess(key) {
+/**
+ * Record a success — resets the failure streak, clears any cooldown, and
+ * folds the call's latency into an EMA (B172, dsh delegate-router style:
+ * light work goes to the FASTEST healthy provider, measured — not guessed).
+ */
+export function recordProviderSuccess(key, latencyMs = null) {
   const s = h(key);
   s.calls++;
   s.ok++;
   s.fails = 0;
   s.lastFail = 0;
   s.cooldownUntil = 0;
+  if (Number.isFinite(latencyMs) && latencyMs > 0) {
+    s.lastLatency = Math.round(latencyMs);
+    s.latencyEma = s.latencyEma == null ? Math.round(latencyMs) : Math.round(s.latencyEma * 0.6 + latencyMs * 0.4);
+  }
+}
+
+/** Measured EMA latency for a provider (null = never measured). */
+export function providerLatency(key) {
+  const s = health.get(key);
+  return s ? s.latencyEma : null;
 }
 
 /** Record a failure — starts/extends a cooldown after CONSECUTIVE_COOLDOWN. */
@@ -83,11 +97,28 @@ export function markProviderUnavailable(key, minutes = 60) {
  */
 const EXTRA_PROVIDERS = ['mistral', 'nvidia'];
 
-// Load spreading (B77): rotate the healthy head of the DEFAULT order so no
-// single free provider is always first. Daily rate limits (Gemini 1,500 RPD,
-// Groq 1,000 RPD, OpenRouter-free 50 RPD) get spread across the big three
-// instead of hammering one until it 429s.
-let rotationTick = 0;
+/* B172 — SPEED-AWARE ROUTING (replaces B77's random rotation). DSH's
+ * delegate-router principle: route by MEASURED latency, deterministically.
+ * Random rotation made every request a lottery — a greeting sometimes landed
+ * on a slow provider (13.5s) and sometimes a fast one (7s). Now the healthy
+ * head is sorted by its measured EMA latency (unmeasured providers keep
+ * their base position between the measured ones, so a fresh provider is
+ * still tried and gets measured). Rate limits stay protected the honest
+ * way: when the fastest provider 429s it enters cooldown and the next
+ * fastest serves while it rests. */
+function speedSortedHead(head) {
+  const measured = head.filter((k) => providerLatency(k) != null);
+  if (measured.length < 2) return head; // not enough data — keep base order
+  const bySpeed = [...measured].sort((a, b) => providerLatency(a) - providerLatency(b));
+  // stable merge: unmeasured providers keep relative base order after the
+  // measured ones they interrupted, so nothing is starved before it's tried
+  const out = [];
+  let mi = 0;
+  for (const k of head) {
+    if (providerLatency(k) != null) { out.push(bySpeed[mi++]); } else { out.push(k); }
+  }
+  return out;
+}
 
 /**
  * Ordered provider keys for a request, adjusted by health.
@@ -109,16 +140,11 @@ export function providerOrder(prefer = '') {
   const cooling = base.filter((k) => providerInCooldown(k));
 
   if (!prefer) {
-    // B77 — rotate the healthy head (first 3) of the default order. The slow
-    // tail (vLLM → HuggingFace) never rotates, so "huggingface stays last"
-    // holds. Preference-biased orders stay deterministic (those paths need
-    // the bias — Gemini-first for code/vision, OpenRouter-first for Seed).
-    const head = healthy.slice(0, 3);
+    // B172 — deterministic: the healthy head is sorted by MEASURED latency
+    // (fastest first). The slow tail (vLLM → HuggingFace) never reorders.
+    const head = speedSortedHead(healthy.slice(0, 3));
     const tail = healthy.slice(3);
-    rotationTick++;
-    const shift = head.length ? rotationTick % head.length : 0;
-    const rotated = [...head.slice(shift), ...head.slice(0, shift)];
-    return [...rotated, ...tail, ...cooling];
+    return [...head, ...tail, ...cooling];
   }
   return [...healthy, ...cooling];
 }

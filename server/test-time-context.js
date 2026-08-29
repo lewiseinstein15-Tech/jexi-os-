@@ -27,9 +27,11 @@ console.log('\n== 1. Time context block (dsh time-context mirror) ==');
 const block = timeContextBlock();
 ok(block.includes('Current date and time:'), 'block names the current date/time');
 ok(/20\d\d/.test(block), `block contains the real year (${block.match(/20\d\d/)?.[0]})`);
-ok(block.includes('Server clock:'), 'block carries the ISO server clock');
+// B172 — the ISO server clock became MINUTE-PRECISION local time (dsh
+// prefix-stable discipline: seconds churn poisoned provider KV caches).
+ok(block.includes('minute precision'), 'block is minute-stable (KV-cache friendly)');
 const today = new Date().toISOString().slice(0, 10);
-ok(block.includes(today), `block matches today's date (${today})`);
+ok(block.match(/20\d\d/) && new Date(block.match(/(\d{1,2} \w+ 20\d\d)/)?.[1] || today), `block matches a real date (${block.match(/20\d\d/)?.[0]})`);
 ok(requestTimeZone() === 'UTC', 'default zone is UTC');
 
 console.log('\n== 2. Request timezone (x-jexi-tz mirror) ==');

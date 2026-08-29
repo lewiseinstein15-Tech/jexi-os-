@@ -41,8 +41,19 @@ export function timeContextBlock() {
   } catch {
     local = now.toUTCString();
   }
-  const iso = now.toISOString();
-  return `\n[Current date and time: ${local} (${tz}). Server clock: ${iso}. Use these for anything time-related — dates, deadlines, "today", "this week", scheduling, age calculations.]\n`;
+  // B172 — KV-CACHE STABILITY (dsh prefix-stable discipline): the time block
+  // is rounded to the MINUTE so repeated calls within a minute share an
+  // identical prompt prefix → provider-side cache hits → faster + cheaper.
+  // Seconds-level clock detail was never useful to the model anyway.
+  const rounded = new Date(Math.floor(now.getTime() / 60000) * 60000);
+  let rLocal;
+  try {
+    rLocal = new Intl.DateTimeFormat('en-GB', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', timeZone: tz,
+    }).format(rounded);
+  } catch { rLocal = rounded.toUTCString(); }
+  return `\n[Current date and time: ${rLocal} (${tz}, minute precision). Use these for anything time-related — dates, deadlines, "today", "this week", scheduling, age calculations.]\n`;
 }
 
 /** Append the time block to a system prompt, idempotently. */

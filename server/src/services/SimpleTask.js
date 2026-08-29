@@ -38,6 +38,8 @@ const COWORKER_LABELS = {
  * one write — all safe/write_local, so they run autonomously under the
  * default profile, and all inside the conversation/direct_answer allowlist.
  */
+let SIMPLE_TOOL_SPARSE = false; // B172 — greeting fast lane
+
 const SIMPLE_TOOL_DEFS = [
   { slug: 'memory-recall', name: 'Memory Recall', desc: 'Retrieve remembered facts, preferences and prior answers about the user or a topic.', schema: { query: { type: 'string', required: true, desc: 'What to recall' }, limit: { type: 'number', desc: 'Max matches' } } },
   { slug: 'memory-write', name: 'Memory Write', desc: 'Store a durable fact or preference the user explicitly wants remembered.', schema: { fact: { type: 'string', required: true, desc: 'Fact or preference to store' }, label: { type: 'string', desc: 'Optional label' } } },
@@ -125,11 +127,18 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
     }
     emit('stream', { text: delta, ...(by ? { by } : {}) });
   };
-  // B105 — plugin tools join the SIMPLE-path tool set (weather-now etc.);
-  // normalizeTools in LLMClient turns def-shaped lists into provider schemas.
+  // B172 — GREETING FAST LANE (dsh one-step minimal turn): a pure greeting
+  // needs NO tools — offering 23 tool schemas burns tokens and slows the
+  // first word. Trim to the 3 memory essentials so hi/hello answers in one
+  // lean step (AutoTool pruning: small sets decide faster AND more reliably).
+  const isPureGreeting = plan.intent === 'conversation' && /^(hi+|hey+|hello+|yo|habari|jambo|sasa|good\s+(morning|afternoon|evening|day))\b[!,.\s]*$/i.test(String(query || '').trim());
+  if (isPureGreeting) {
+    SIMPLE_TOOL_SPARSE = true;
+  }
   const coworkerTools = (() => {
     try {
       const plugins = listPluginTools().filter((p) => p && p.slug && !SIMPLE_TOOL_DEFS.some((d) => d.slug === p.slug));
+      if (SIMPLE_TOOL_SPARSE) return SIMPLE_TOOL_DEFS.filter((d) => ['memory-recall', 'rolling-summary', 'profile-read'].includes(d.slug));
       const extra = SIMPLE_TOOL_DEFS.some((d) => d.slug === 'ask_user_question') ? [] : [{
         slug: 'ask_user_question', name: 'Ask User',
         desc: 'Ask the user a question when you need confirmation or missing information.',

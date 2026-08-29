@@ -1159,13 +1159,23 @@ app.post('/api/chat', async (req, res) => {
   // summary, the content that already streamed to the user IS the answer
   // (root fix for the "Task completed - no readable summary" reply).
   let streamedAnswer = '';
+  // B172 — SPEED TELEMETRY (dsh-style per-turn diagnostics): request clock,
+  // time-to-first-token and the named writer ride every done event, and one
+  // visible ⚡ line lands in the step feed so speed is observable, not guessed.
+  const __t0 = Date.now();
+  let __firstTokenMs = null;
+  let __writerName = null;
   const sendEvent = (type, data) => {
     // B162 — named coworkers: raw model IDs are masked in every streamed log
     // line before it reaches the UI (answers/summaries are untouched).
     if (data && typeof data === 'object' && (type === 'log' || type === 'agent.log') && typeof data.message === 'string') {
       data.message = sanitizeStreamText(data.message);
     }
-    if (type === 'stream' && data && data.text) streamedAnswer += String(data.text);
+    if (type === 'stream' && data && data.text) {
+      if (__firstTokenMs === null) __firstTokenMs = Date.now() - __t0;
+      if (data.by) __writerName = data.by;
+      streamedAnswer += String(data.text);
+    }
     if (type === 'done' && data && !data.recoverable) { try { saveResult(convId, data); } catch (e) {} }
     try { res.write(JSON.stringify({ type, ...data }) + '\n'); } catch (e) {}
   };
@@ -1186,6 +1196,14 @@ app.post('/api/chat', async (req, res) => {
     try { appendConversationEvent(convId, { role, text: t, kind: 'chat' }); } catch { /* same */ }
   };
   const done = (payload) => {
+    // B172 — timings on the terminal event (telemetry + honest UX)
+    if (payload && typeof payload === 'object') {
+      const totalMs = Date.now() - __t0;
+      payload.statistics = { ...(payload.statistics || {}), timings: { totalMs, firstTokenMs: __firstTokenMs, ...( __writerName ? { writer: __writerName } : {}) } };
+      if (payload.success !== false && totalMs > 0) {
+        try { sendEvent('log', { agent: 'System', message: `⚡ answered in ${(totalMs / 1000).toFixed(1)}s${__firstTokenMs !== null ? ` · first word in ${(__firstTokenMs / 1000).toFixed(1)}s` : ''}${__writerName ? ` · by ${__writerName}` : ''}.` }); } catch { /* never break the done */ }
+      }
+    }
     sendEvent('done', payload);
     if (payload && payload.summary) rememberTurn('jexi', payload.summary);
   };
