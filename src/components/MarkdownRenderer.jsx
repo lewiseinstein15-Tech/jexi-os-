@@ -501,7 +501,7 @@ export default function MarkdownRenderer({ content, size = 'text-[11px]' }) {
                     <CopyButton text={codeText} />
                   </div>
                   <pre className="markdown-code-block relative group">
-                    <HighlightedCode code={codeText} language={lang} />
+                    <HighlightedCode code={codeText} language={['js','jsx','javascript','ts','tsx','typescript','python','py','json','bash','sh','html','css','java','go','rust','sql','yaml','xml','md'].includes(lang) ? lang : undefined} />
                   </pre>
                 </div>
               );
