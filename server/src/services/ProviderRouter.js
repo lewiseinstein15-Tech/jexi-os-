@@ -25,6 +25,12 @@ const CONSECUTIVE_COOLDOWN = 3;    // 3 consecutive failures → cooldown
 /** Provider health state (in-memory — resets on restart, which is fine). */
 const health = new Map();
 
+/* B172c — LATENCY PRIORS (dsh config-default + measured-override): until a
+ * provider is measured on THIS host, route by well-known tier speed —
+ * Groq is the fastest free tier, Gemini next, OpenRouter free models are the
+ * slowest lane. First call after a cold start no longer fumbles the order. */
+const LATENCY_PRIORS_MS = { groq: 1200, gemini: 2500, openrouter: 8000, mistral: 4000, nvidia: 4000, sambanova: 3000, vllm: 3000, huggingface: 20000 };
+
 function h(key) {
   if (!health.has(key)) health.set(key, { fails: 0, lastFail: 0, cooldownUntil: 0, calls: 0, ok: 0, latencyEma: null, lastLatency: null });
   return health.get(key);
@@ -48,10 +54,11 @@ export function recordProviderSuccess(key, latencyMs = null) {
   }
 }
 
-/** Measured EMA latency for a provider (null = never measured). */
+/** Effective latency for routing: measured EMA, else the tier prior. */
 export function providerLatency(key) {
   const s = health.get(key);
-  return s ? s.latencyEma : null;
+  if (s && s.latencyEma != null) return s.latencyEma;
+  return LATENCY_PRIORS_MS[key] ?? 6000;
 }
 
 /** Record a failure — starts/extends a cooldown after CONSECUTIVE_COOLDOWN. */
@@ -107,8 +114,7 @@ const EXTRA_PROVIDERS = ['mistral', 'nvidia'];
  * way: when the fastest provider 429s it enters cooldown and the next
  * fastest serves while it rests. */
 function speedSortedHead(head) {
-  const measured = head.filter((k) => providerLatency(k) != null);
-  if (measured.length < 2) return head; // not enough data — keep base order
+  const measured = head; // priors cover never-measured providers (B172c)
   const bySpeed = [...measured].sort((a, b) => providerLatency(a) - providerLatency(b));
   // stable merge: unmeasured providers keep relative base order after the
   // measured ones they interrupted, so nothing is starved before it's tried
