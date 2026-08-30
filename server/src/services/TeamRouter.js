@@ -58,7 +58,15 @@ export async function runTeam(team, query, { sendEvent = () => {}, convId = null
       owner: convId || 'dev-team',
     });
     if (built && built.files && built.files.length) {
-      return `### 🛠 Built by Ada (Dev)\n\n${built.summary || `${built.files.length} file(s) created and run.`}\n\n**Files:** ${built.files.map((f) => `\`${f.name}\``).join(', ')}`;
+      // B186 — surface a REAL preview link when the build is a web app
+      const { WORKSPACE_DIR } = await import('../config.js');
+      const { getBackendBase } = { getBackendBase: () => '' }; // relative link works on same origin
+      const entry = built.files.find((f) => /^index\.html$/i.test(f.name)) || built.files.find((f) => /\.html$/i.test(f.name));
+      const filesLine = built.files.slice(0, 8).map((f) => `\`${f.name}\``).join(', ') + (built.files.length > 8 ? ` +${built.files.length - 8} more` : '');
+      const preview = entry
+        ? `\n\n**🔗 Live preview:** [Open ${entry.name}](/preview/${encodeURIComponent(entry.name)})`
+        : '\n\n*Tip: ask for a web version (\'as a web app with index.html\') and I can give you a live preview link.*';
+      return `### 🛠 Built by Ada (Dev)\n\n${built.summary || `${built.files.length} file(s) created and run.`}\n\n**Files:** ${filesLine}${preview}`;
     }
     return null; // loop produced nothing → fall back to the classic pipeline
   }

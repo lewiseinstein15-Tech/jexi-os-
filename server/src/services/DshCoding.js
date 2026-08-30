@@ -128,6 +128,16 @@ async function executeBash(args, owner) {
   });
 }
 
+// B186 — junk filter (module scope): venv internals, caches, lockfiles and
+// dot-dirs are NEVER reported as the agent's work (the user's weather-app
+// build listed venv/bin/activate as a deliverable — ugly and wrong).
+const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '__pycache__', '.venv', 'venv', 'env', '.cache', '.pytest_cache', '.mypy_cache', '.ruff_cache', 'target', 'coverage', '.next', 'out', 'site-packages', 'vendor']);
+const isJunkPath = (name) =>
+  SKIP_DIRS.has(name) || name.startsWith('.') ||
+  /^(venv|\.venv|env)\//.test(name) ||
+  /\/(venv|\.venv|env|node_modules|__pycache__)\//.test(name) ||
+  /^(package-lock|bun\.lock|poetry\.lock|Pipfile\.lock|\.python-version)/.test(name);
+
 /** Snapshot the workspace files the loop touched (the pipeline's deliverable). */
 function snapshotWorkspace(before) {
   const files = [];
@@ -135,14 +145,13 @@ function snapshotWorkspace(before) {
     if (depth > 4 || files.length > 60) return;
     let entries = [];
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-    const skip = new Set(['node_modules', '.git', 'dist', 'build', '__pycache__', '.venv']);
     for (const e of entries) {
-      if (skip.has(e.name) || e.name.startsWith('.')) continue;
+      if (SKIP_DIRS.has(e.name) || e.name.startsWith('.')) continue;
       const full = path.join(dir, e.name);
       if (e.isDirectory()) walk(full, depth + 1);
       else if (e.isFile()) {
         const rel = path.relative(WORKSPACE_DIR, full).replace(/\\/g, '/');
-        if (before.has(rel)) continue; // untouched — not ours
+        if (before.has(rel) || isJunkPath(rel)) continue; // untouched or junk — not ours
         const code = fs.readFileSync(full, 'utf-8');
         if (code.length <= 200 * 1024) files.push({ name: rel, code });
       }
@@ -158,7 +167,7 @@ function beforeSet() {
     const walk = (dir, depth) => {
       if (depth > 4) return;
       for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-        if (e.name === 'node_modules' || e.name === '.git' || e.name.startsWith('.')) continue;
+        if (SKIP_DIRS.has(e.name) || e.name.startsWith('.')) continue;
         const full = path.join(dir, e.name);
         if (e.isDirectory()) walk(full, depth + 1);
         else set.add(path.relative(WORKSPACE_DIR, full).replace(/\\/g, '/'));
