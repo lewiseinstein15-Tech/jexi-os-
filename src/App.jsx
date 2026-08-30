@@ -8,6 +8,7 @@ import HistoryView from './components/HistoryView';
 import WorkshopView from './components/WorkshopView';
 import SettingsView from './components/SettingsView';
 import UpdateBanner from './components/UpdateBanner';
+import { discoverBrainUrl, setBrainUrl } from './utils/updateCenter'; // B179 — brain discovery self-heal
 import BootSplash from './components/BootSplash'; // B79 — branded loading screen on open (never a blank screen)
 import { SidebarBrandMark, SidebarBrandName } from './brand/official'; // B160 — dsh ui-brand-official
 import ErrorBoundary from './components/ErrorBoundary';
@@ -68,16 +69,27 @@ export default function App() {
     const health = (async () => {
       const baked = import.meta.env.VITE_JEXI_BACKEND_URL || '';
       const stored = localStorage.getItem('jexi_backend_url') || '';
-      const ok = await ping(getBackendUrl(), 12000);
+      let ok = await ping(getBackendUrl(), 12000);
       if (!alive) return;
       if (!ok && stored && baked && stored !== baked && await ping(baked, 6000)) {
         // The saved override is dead but this build's own brain is alive —
         // recover onto it (settings still let the user re-point later).
-        localStorage.removeItem('jexi_backend_url');
-        window.dispatchEvent(new CustomEvent('jexi:backend-url', { detail: baked }));
+        setBrainUrl('');
+        setBrainUrl(baked);
+        ok = true;
         setBootStatus('Brain online (recovered)');
       } else if (ok) {
         setBootStatus('Brain online');
+      } else {
+        // B179 — BOTH known URLs are dead (the brain moved again). Ask the
+        // website — it always carries the current brain address (brain.json)
+        // — so an installed app can never be stranded by a server move.
+        setBootStatus('Finding JEXI’s new home…');
+        const discovered = await discoverBrainUrl();
+        if (alive && discovered && discovered !== getBackendUrl()) {
+          setBrainUrl(discovered);
+          setBootStatus('Found her — connecting…');
+        }
       }
       await new Promise((r) => setTimeout(r, 400));
     })();

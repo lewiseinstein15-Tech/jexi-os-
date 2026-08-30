@@ -19,6 +19,10 @@ jobs:
         run: |
           npm ci
           npm run build
+          # B179 — brain.json: the APKs' lifeline. If the brain ever moves,
+          # installed apps fetch this and self-heal.
+          printf '{\"brain\": \"%s\"}' "${{ vars.BACKEND_URL || 'https://jexi-brain-image.onrender.com' }}" > dist/brain.json
+          cat dist/brain.json
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

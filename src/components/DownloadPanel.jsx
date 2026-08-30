@@ -2,11 +2,8 @@ import { motion } from 'framer-motion';
 import {
   Smartphone, Download, ShieldCheck, Zap, CheckCircle2, PlayCircle, Github, Sparkles, Wifi, Star, RefreshCw, Loader2, AlertTriangle
 } from 'lucide-react';
-import useUpdateChecker from '../hooks/useUpdateChecker';
-import useApkInstaller from '../hooks/useApkInstaller';
+import { checkForUpdate, downloadAndInstall, APK_URL } from '../utils/updateCenter';
 
-// Permanent direct link — GitHub always points this at the newest "Latest" release.
-const APK_URL = 'https://github.com/lewiseinstein15-Tech/jexi-os-/releases/latest/download/app-debug.apk';
 const RELEASES_URL = 'https://github.com/lewiseinstein15-Tech/jexi-os-/releases';
 
 const fadeUp = {
@@ -14,9 +11,11 @@ const fadeUp = {
   animate: { opacity: 1, y: 0 },
 };
 
+import { useState } from 'react';
+
 export default function DownloadPanel() {
-  const updater = useUpdateChecker();
-  const installer = useApkInstaller();
+  const [phase, setPhase] = useState('idle');
+  const [progress, setProgress] = useState(0);
 
   const buttonLabel = () => {
     const base = updater.updateAvailable ? `UPDATE TO BUILD #${updater.latest.number}` : 'DOWNLOAD JEXI OS APK';

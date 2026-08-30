@@ -169,7 +169,8 @@ console.log('\n== 4. Web runtime (provider registry + renderer + SSE) ==');
 console.log('\n== 5. Hooks barrel + ui-slots + model selection ==');
 {
   const barrel = fs.readFileSync(path.join(SRC_DIR, 'hooks', 'index.js'), 'utf-8');
-  for (const hook of ['useJexiEngine', 'useUpdateChecker', 'useProjection', 'usePluginInventory', 'useSlots']) {
+  // B179 — useUpdateChecker was deleted with the rebuilt update system (updateCenter.js)
+  for (const hook of ['useJexiEngine', 'useProjection', 'usePluginInventory', 'useSlots']) {
     ok(`hooks barrel exports ${hook}`, barrel.includes(hook));
   }
   const slotsHook = fs.readFileSync(path.join(SRC_DIR, 'hooks', 'useSlots.js'), 'utf-8');

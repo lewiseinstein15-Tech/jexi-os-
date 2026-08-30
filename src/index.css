@@ -989,3 +989,17 @@ html, body {
   .markdown-body .katex { font-size: 1.02em; }
   .markdown-body .katex-display { margin: 10px 0; }
 }
+
+/* ═══ B179 — update banner (minimal, unbreakable) ═══ */
+.jx-updbar { position: fixed; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); z-index: 80; background: #161a21; border: 1px solid var(--line2); border-radius: 12px; padding: 10px 12px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.jx-upd-row { display: flex; align-items: center; gap: 10px; }
+.jx-upd-ic { font-size: 17px; }
+.jx-upd-txt { flex: 1; min-width: 0; }
+.jx-upd-txt b { display: block; font-size: 12.5px; color: #fff; }
+.jx-upd-txt span { display: block; font-size: 10.5px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+.jx-upd-btn { border: none; background: #fff; color: #000; font: 700 12px var(--mono); border-radius: 8px; padding: 8px 14px; cursor: pointer; text-decoration: none; }
+.jx-upd-spin { width: 16px; height: 16px; border: 2px solid var(--line2); border-top-color: #fff; border-radius: 50%; animation: jxrot .7s linear infinite; }
+.jx-upd-err { font-size: 10.5px; color: #ffb020; font-family: var(--mono); margin-top: 8px; }
+.jx-upd-err a { color: #fff; }
+.jx-upd-prog { height: 3px; background: var(--line); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+.jx-upd-prog i { display: block; height: 100%; background: #00ff9d; transition: width .3s; }
