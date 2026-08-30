@@ -13,6 +13,7 @@ import { tryExecuteCommand, helpText, registerCommand } from './src/services/Com
 import { listProfiles, loadProfile, searchMemory, rememberFor } from './src/services/AgentProfiles.js'; // B180 — Hermes profiles
 import { delegate, scheduleJob, dispatchJob, jobStatuses, cancelJob, startGateway, runAgentTask, parseNaturalSchedule } from './src/services/AgentGateway.js'; // B180 — gateway
 import { saveSkill, recallSkills, autoSkill } from './src/services/SkillLoop.js'; // B180 — skill loop
+import { routeToTeam, runTeam } from './src/services/TeamRouter.js'; // B183 — Nova's dispatcher
 import { detectVideoWatchIntent, resolveTitleToVideo, watchVideo } from './src/services/VideoWatch.js'; // B168 — natural video intent
 import { imageSearch, detectPictureIntent, detectCorrectionToPicture, verifyImagesWithVision, generatedImageUrl } from './src/services/ImageSearch.js'; // B171 — DSH-style presenter
 import { setGoalEngine } from './src/services/PromptAssembly.js'; // B158 — goals reach every assembled prompt
@@ -1302,6 +1303,24 @@ app.post('/api/chat', async (req, res) => {
           finish();
           return;
         }
+      }
+
+      // B183 — NOVA'S DISPATCHER: route clear team-shaped work to the agent
+      // team (Ada/Kito/Tari/Zuri) before the heavy pipeline spins up.
+      try {
+        const route = routeToTeam(raw, plan || {});
+        if (route) {
+          sendEvent('log', { agent: 'Nova', message: `🧭 ${route.why} → ${route.team} team.` });
+          const summary = await runTeam(route.team, effectiveQuery || raw, { sendEvent, convId, plan });
+          if (summary) {
+            done({ success: true, summary, statistics: { routedTeam: route.team } });
+            finish();
+            return;
+          }
+          sendEvent('log', { agent: 'Nova', message: '↩ team lane returned no result — continuing with the standard pipeline.' });
+        }
+      } catch (e) {
+        sendEvent('log', { agent: 'Nova', message: `⚠ team routing skipped (${String(e && e.message || e).slice(0, 80)}) — standard pipeline.` });
       }
 
       // B171 — DSH-STYLE PRESENTER (verified pictures + real generation):

@@ -1003,3 +1003,22 @@ html, body {
 .jx-upd-err a { color: #fff; }
 .jx-upd-prog { height: 3px; background: var(--line); border-radius: 3px; margin-top: 8px; overflow: hidden; }
 .jx-upd-prog i { display: block; height: 100%; background: #00ff9d; transition: width .3s; }
+
+
+/* ═══ B183 — STREAMING UPGRADE ═══ */
+/* the Think row breathes while she works (pulse on the icon ring) */
+.jx-think.live { animation: jx-breathe 2.4s ease-in-out infinite; }
+@keyframes jx-breathe { 0%,100% { border-left-color: var(--line2); } 50% { border-left-color: #7c4dff; } }
+
+/* the streaming answer's last line gets a fading shimmer tail */
+.jx-streaming-text > *:last-child { position: relative; }
+.jx-caret { box-shadow: 0 0 10px rgba(0,255,157,.55); }
+
+/* word-level fade-in: streaming words appear softly instead of popping */
+.jx-streaming-text .markdown-body { animation: jx-fadein .18s ease-out; }
+@keyframes jx-fadein { from { opacity: .55; } to { opacity: 1; } }
+
+/* writer badge pulse while a coworker types */
+.jx-writer { display: inline-flex; align-items: center; gap: 5px; }
+.jx-writer .dot { width: 6px; height: 6px; border-radius: 50%; background: #00ff9d; animation: jx-pingdot 1.1s ease-in-out infinite; }
+@keyframes jx-pingdot { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.6); opacity: .55; } }
