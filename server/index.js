@@ -1308,7 +1308,7 @@ app.post('/api/chat', async (req, res) => {
       // B183 — NOVA'S DISPATCHER: route clear team-shaped work to the agent
       // team (Ada/Kito/Tari/Zuri) before the heavy pipeline spins up.
       try {
-        const route = routeToTeam(raw, plan || {});
+        const route = routeToTeam(raw, {}); // plan isn't classified yet — route on the raw ask
         if (route) {
           sendEvent('log', { agent: 'Nova', message: `🧭 ${route.why} → ${route.team} team.` });
           const summary = await runTeam(route.team, effectiveQuery || raw, { sendEvent, convId, plan });

@@ -33,6 +33,7 @@ console.log('\n== 1. Nova dispatcher routes real chat to the team ==');
   const idx = fs.readFileSync('./index.js', 'utf-8');
   ok('chat pipeline dispatches through Nova before the heavy pipeline', idx.includes("B183 — NOVA'S DISPATCHER") && idx.includes('routeToTeam(raw'));
   ok('team failures fall through to the standard pipeline (never blocks chat)', idx.includes('team lane returned no result'));
+  ok('dispatcher does NOT touch `plan` before its declaration (live B183 crash)', !idx.includes('routeToTeam(raw, plan'));
 }
 
 /* 2. scheduler lane end-to-end (real job created) */
