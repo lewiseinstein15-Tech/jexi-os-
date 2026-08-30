@@ -15,7 +15,7 @@ jobs:
         # Point the free GitHub Pages frontend at the Render backend.
         # Change this if your Render service URL differs.
         env:
-          VITE_JEXI_BACKEND_URL: https://jexi-os-brain.onrender.com
+          VITE_JEXI_BACKEND_URL: ${{ vars.BACKEND_URL || 'https://jexi-os-brain.onrender.com' }}
         run: |
           npm ci
           npm run build

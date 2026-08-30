@@ -50,6 +50,13 @@ async function resetBrowser() {
 }
 
 export async function ensureBrowser() {
+  // B178 — small-RAM hosts (Koyeb free 512MB): Chromium can OOM the whole
+  // brain. Set JEXI_NO_BROWSER=1 to disable it there — search, research,
+  // /watch and vision all work without a browser; only remote browser
+  // control is unavailable (honest error, never a crash).
+  if (process.env.JEXI_NO_BROWSER === '1') {
+    return { ok: false, error: 'Browser control disabled on this host (JEXI_NO_BROWSER=1) — search, research and video analysis still work.' };
+  }
   // Fast path: browser is genuinely alive.
   if (isAlive()) return { ok: true };
 

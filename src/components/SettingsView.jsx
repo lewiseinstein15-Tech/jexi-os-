@@ -69,8 +69,22 @@ export default function SettingsView() {
 
         <div className="jx-grp">Connection</div>
         <div className="jx-setline">
-          <div className="lab"><b>Backend</b><span>{getBackendUrl()}</span></div>
+          <div className="lab"><b>Backend</b><span>{getBackendUrl() || 'same origin'}</span></div>
           <span className={`jx-st${health ? ' on' : ''}`}>{health ? '● live' : '…'}</span>
+        </div>
+        <div className="jx-setline">
+          <div className="lab"><b>Server address</b><span>move JEXI anywhere</span></div>
+          <input
+            type="url"
+            defaultValue={getBackendUrl()}
+            placeholder="https://… (empty = default)"
+            onChange={(e) => {
+              const v = e.target.value.trim();
+              if (v) localStorage.setItem('jexi_backend_url', v.replace(/\/$/, ''));
+              else localStorage.removeItem('jexi_backend_url');
+              window.dispatchEvent(new CustomEvent('jexi:backend-url', { detail: v }));
+            }}
+          />
         </div>
         <div className="jx-setline">
           <div className="lab"><b>Access key</b><span>your private lock</span></div>
