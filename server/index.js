@@ -1311,7 +1311,7 @@ app.post('/api/chat', async (req, res) => {
         const route = routeToTeam(raw, {}); // plan isn't classified yet — route on the raw ask
         if (route) {
           sendEvent('log', { agent: 'Nova', message: `🧭 ${route.why} → ${route.team} team.` });
-          const summary = await runTeam(route.team, effectiveQuery || raw, { sendEvent, convId, plan });
+          const summary = await runTeam(route.team, raw, { sendEvent, convId, plan: {} });
           if (summary) {
             done({ success: true, summary, statistics: { routedTeam: route.team } });
             finish();

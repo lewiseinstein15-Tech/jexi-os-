@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Square, ImagePlus, X, Camera, Stethoscope, Plus, Copy, Check, RefreshCw, Sparkles } from 'lucide-react';
 import TypedMessage from './TypedMessage';
 import ThinkRow from './ThinkRow'; // B173 — dsh ReasoningRow
+import ActionFeed from './ActionFeed'; // B184 — arena-style action timeline
 import MarkdownRenderer from './MarkdownRenderer';
 import VisionPanel from './VisionPanel';
 import AgentPipeline from './AgentPipeline';
@@ -247,6 +248,11 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
                 </div>                )}
             </motion.div>
           ))
+        )}
+
+        {/* B184 — ACTION FEED: her own words on what she did, live */}
+        {(isProcessing || (logs.length > 0 && !messages.some((m) => m.role === 'jexi' && !m.streaming))) && (
+          <ActionFeed logs={logs} isProcessing={isProcessing} />
         )}
 
         {/* Inline processing indicator — no card, just a streaming line */}

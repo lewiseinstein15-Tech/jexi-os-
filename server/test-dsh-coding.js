@@ -87,11 +87,11 @@ console.log('\n== 3. DSH coding loop — edits + RUNS code for real ==');
   });
 
   ok('loop produced the file', built.ok && built.files.some((f) => f.name === 'b165loop/calc.js'));
-  ok('loop RAN the code (bash executed for real)', events.some((m) => m.includes('ran: node b165loop/calc.js')));
-  ok('run observed exit 0', events.some((m) => m.includes('exit 0')));
+  ok('loop RAN the code (bash executed for real)', events.some((m) => /I ran .?node b165loop\/calc\.js/.test(m) || m.includes('ran: node b165loop/calc.js')));
+  ok('run observed success', events.some((m) => m.includes('→ success')));
   ok('editor streamed its steps', events.some((m) => m.includes('created b165loop/calc.js')));
   ok('summary kept', built.summary.includes('prints 30'));
-  ok('finish line reports edits + runs', events.some((m) => m.includes('loop finished') && m.includes('1 edits')));
+  ok('finish line reports what she did', events.some((m) => m.includes('✅ Done') && m.includes('ran the code')));
 
   // observe→fix discipline: a failing first attempt must be patched and re-run
   const ev2 = [];
@@ -107,8 +107,8 @@ console.log('\n== 3. DSH coding loop — edits + RUNS code for real ==');
       { toolCalls: [], text: 'Fixed and verified.' },
     ],
   });
-  ok('observe→fix→re-run discipline works (exit 1 then exit 0)',
-    ev2.some((m) => m.includes('exit 1')) && ev2.some((m) => m.includes('exit 0')) && fixed.ok);
+  ok('observe→fix→re-run discipline works',
+    ev2.some((m) => /exit 1|failed/.test(m)) && ev2.some((m) => /success|fixed it/.test(m)) && fixed.ok);
 }
 
 /* ══════════════ 4. WIRING ══════════════ */

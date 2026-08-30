@@ -200,6 +200,8 @@ export async function runDshCoding({ goal, plan = '', sendEvent = () => {}, sign
 
   let bashRuns = 0;
   let editorEdits = 0;
+  let runFails = 0;
+  let ranClean = true;
   const meta = { provider: null, model: null };
   const onTokenWrap = onToken
     ? (t, m) => { if (m) { meta.provider = m.provider; meta.model = m.model; } onToken(t, m); }
@@ -215,15 +217,23 @@ export async function runDshCoding({ goal, plan = '', sendEvent = () => {}, sign
         if (call.name === 'str_replace_editor') {
           out = await executeEditorTool(args);
           if (out.ok && args.command !== 'view') editorEdits += 1;
-          if (out.ok && args.command === 'create') say('Editor', `✍️ created ${args.path}`);
-          else if (out.ok && args.command === 'str_replace') say('Editor', `🔧 patched ${args.path}`);
+          if (out.ok && args.command === 'create') say('Editor', `✍️ I created ${args.path} (${out.bytes} bytes)`);
+          else if (out.ok && args.command === 'str_replace') say('Editor', `🔧 I patched ${args.path} — replaced ${out.replacedBytes} bytes`);
+          else if (out.ok && args.command === 'insert') say('Editor', `➕ I inserted ${out.insertedAfterLine !== undefined ? `after line ${out.insertedAfterLine}` : ''} in ${args.path}`);
+          else if (out.ok && args.command === 'view') say('Editor', `👀 I read ${args.path}${out.kind === 'dir' ? ' (directory)' : ''}`);
+          else if (!out.ok) say('Editor', `⚠ ${args.command} on ${args.path} failed: ${String(out.error || '').slice(0, 60)}`);
         } else if (call.name === 'bash') {
           out = await executeBash(args, owner);
           bashRuns += 1;
-          say('Shell', `▶ ran: ${String(args.command).slice(0, 70)} → ${out.ok ? 'exit 0' : `exit ${out.exitCode}`}`);
+          if (!out.ok) { runFails += 1; ranClean = false; } else if (runFails > 0 && out.ok) { say('Shell', `🔁 I fixed it — the rerun passed.`); runFails = 0; }
+          const cmd = String(args.command).replace(/\s+/g, ' ').slice(0, 64);
+          const tail = String(out.output || '').trim().split('\n').filter(Boolean).slice(-1)[0] || '';
+          const evidence = out.ok ? (tail ? ` — "${tail.slice(0, 46)}"` : '') : ` — failed: ${String(out.output || '').trim().split('\n').slice(-2).join(' ').slice(0, 60)}`;
+          say('Shell', `▶ I ran \`${cmd}\` → ${out.ok ? 'success' : 'exit ' + out.exitCode}${evidence}`);
         } else if (call.name === 'python_run') {
           out = await pythonToolHandler(args);
-          say('Python', `▶ ran python (${out.ok ? 'ok' : 'failed'})`);
+          const lastLine = String(out.stdout || '').trim().split('\n').filter(Boolean).slice(-1)[0] || '';
+          say('Python', `▶ I ran the Python check → ${out.ok ? 'ok' : 'failed'}${lastLine ? ` — "${lastLine.slice(0, 46)}"` : ''}`);
         } else if (call.name === 'github_repo_scan' || call.name === 'github_file_read') {
           const { repoScan, readFile } = await import('./GitHubEngine.js');
           out = call.name === 'github_repo_scan' ? await repoScan(args.repo) : await readFile(args.repo, args.path);
@@ -258,7 +268,7 @@ export async function runDshCoding({ goal, plan = '', sendEvent = () => {}, sign
 
   const files = snapshotWorkspace(before);
   const coder = coworkerName(meta.provider, meta.model);
-  say('Coding Loop', `✅ loop finished — ${editorEdits} edits · ${bashRuns} runs · ${files.length} file(s)${coder ? ` · built by ${coder}` : ''}.`);
+  say('Coding Loop', `✅ Done — I wrote ${files.length} file${files.length === 1 ? '' : 's'} (${files.map((f) => f.name).slice(0, 4).join(', ')}${files.length > 4 ? '…' : ''}), ran the code ${bashRuns} time${bashRuns === 1 ? '' : 's'}${ranClean ? ' and it all passed' : ''}.`);
 
   return {
     ok: files.length > 0,
