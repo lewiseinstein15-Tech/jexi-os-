@@ -1,0 +1,67 @@
+# B178 — Build the SLIM Docker image on GitHub Actions (FREE 2000 min/mo)
+# and publish it to the GitHub Container Registry. Render then deploys the
+# READY image — its free plan build minutes are never consumed.
+# Render free also runs one always-on web service 24/7 (750 hrs/mo).
+
+name: Publish Docker image
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'server/**'
+      - 'src/**'
+      - 'public/**'
+      - 'Dockerfile.slim'
+      - 'package.json'
+      - 'index.html'
+      - 'vite.config.js'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  # GHCR requires lowercase
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lowercase image name
+        id: name
+        run: echo "image=$(echo "$REGISTRY/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push slim image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.slim
+          push: true
+          tags: |
+            ${{ steps.name.outputs.image }}:latest
+            ${{ steps.name.outputs.image }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          echo "### 🐳 Image published" >> $GITHUB_STEP_SUMMARY
+          echo '```
+          ${{ steps.name.outputs.image }}:latest
+          ```' >> $GITHUB_STEP_SUMMARY
+          echo "Point Render (Deploy an existing image) at this URL — free plan, zero build minutes." >> $GITHUB_STEP_SUMMARY
