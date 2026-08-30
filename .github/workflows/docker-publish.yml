@@ -42,9 +42,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Lowercase image name
+      - name: Sanitize image name (lowercase + trim trailing dashes — the repo is 'jexi-os-')
         id: name
-        run: echo "image=$(echo "$REGISTRY/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+        run: |
+          IMG="$(echo "$REGISTRY/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[-_.]+$//')"
+          echo "image=$IMG" >> "$GITHUB_OUTPUT"
+          echo "IMAGE=$IMG" >> "$GITHUB_ENV"
 
       - name: Build and push slim image
         uses: docker/build-push-action@v6
