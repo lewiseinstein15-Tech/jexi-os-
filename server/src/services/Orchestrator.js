@@ -538,7 +538,28 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
     });
 
     N.linkAnalysis = this.wrapCase('linkAnalysis', async ({ results, sendEvent, query, plan }) => {
-      const url = plan.payload.url;
+      // B177 — CRASH FIX: "analyze: YouTube video — <title>" mentions a video
+      // but contains NO link → plan.payload is undefined and the old
+      // `plan.payload.url` threw ("reading 'url'"), killing the whole turn.
+      // Guarded: no URL means research/describe the topic instead.
+      const url = plan?.payload?.url;
+      if (!url) {
+        sendEvent('log', { agent: 'Vision', message: '🔎 No link in that message — finding out about it instead.' });
+        let describe = '';
+        try {
+          describe = String(await generateContent(
+            `The user asked: "${String(query).slice(0, 400)}"\nThere is no actual link in the message. Answer helpfully: if they meant a specific video/topic, explain what it is; if they meant to paste a link, ask them to send the link so you can watch/analyze it directly.`,
+            JEXI_SYSTEM_PROMPT,
+          ) || '').trim();
+        } catch (e) { /* providers may be down — static answer still helps */ }
+        if (!describe) {
+          describe = `I don't see a link in that message. Send me the actual link (YouTube, TikTok, etc.) and I'll analyze it for you.`;
+        }
+        try { addChat('jexi', describe); } catch (e) {}
+        results.summary = describe;
+        results.statistics.confidence = 70;
+        return results;
+      }
       sendEvent('log', { agent: 'Vision', message: `🌐 Opening link: ${url}` });
       sendEvent('website', { site: { title: url, url, favicon: `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=64`, status: 'reading' } });
 
@@ -564,7 +585,7 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
 
       // Use the browser agent (her eyes) — falls back to server-side reading
       const agent = new ComputerUseAgent();
-      const result = await agent.executeTask(plan.payload.fullQuery || query, sendEvent, { intent: 'link_analysis' });
+      const result = await agent.executeTask(plan?.payload?.fullQuery || query, sendEvent, { intent: 'link_analysis' });
 
       if (result.output && result.output.length > 0) {
         const reply = result.output.includes('###') ? result.output : `### 🔗 LINK ANALYSIS\n\n${result.output}`;

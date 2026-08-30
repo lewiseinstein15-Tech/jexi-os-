@@ -39,7 +39,42 @@ const GROQ_VISION_MODELS = [
   'meta-llama/llama-4-scout-17b-16e-instruct',
   'meta-llama/llama-3.2-11b-vision-preview',
 ];
-const GROQ_TEXT_MODEL = 'llama-3.1-8b-instant';
+// B177 — Groq RETIRED llama-3.1-8b-instant (404 model_not_found, 106 failed
+// calls). Default to a long-lived tier and self-heal at runtime: on a
+// model_not_found the client asks /models which names still exist, picks the
+// best match and caches it for the process lifetime.
+const GROQ_TEXT_MODEL = process.env.GROQ_TEXT_MODEL || 'llama-3.3-70b-versatile';
+let groqModelCache = null; // discovered fallback model id
+
+const GROQ_MODEL_PREFERENCE = [
+  /llama-3\.3-70b/i, /llama-3\.1-8b-instruct/i, /gpt-oss-120b/i, /gpt-oss-20b/i,
+  /llama-3\.1/i, /llama-3/i, /qwen/i, /deepseek/i, /moonshot/i, /openai/i,
+];
+
+/** Pure picker (test-exported): choose the best model id from a list. */
+export function __pickGroqModel(ids) {
+  const list = (ids || []).filter((id) => !/whisper|tts|guard|embed|vision/i.test(id));
+  for (const re of GROQ_MODEL_PREFERENCE) {
+    const hit = list.find((id) => re.test(id));
+    if (hit) return hit;
+  }
+  return list[0] || null;
+}
+
+async function discoverGroqModel(groqKey) {
+  if (groqModelCache) return groqModelCache;
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/models', {
+      headers: { Authorization: `Bearer ${groqKey}` }, signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const ids = (data.data || []).map((m) => m.id).filter((id) => !/whisper|tts|guard|embed|vision/i.test(id));
+    const picked = __pickGroqModel(ids);
+    if (picked) { groqModelCache = picked; console.log(`[LLMClient] Groq model fallback → ${picked}`); return picked; }
+  } catch { /* offline/probe failed */ }
+  return null;
+}
 
 // Seed-family (ByteDance) + FREE text models via OpenRouter. SeedRealtime
 // itself has NO public API yet — it is free only inside the Doubao app — but
@@ -202,6 +237,20 @@ async function tryGroq(prompt, system, imageBase64, opts, errors) {
       if (text) return text.trim();
       errors.push(`Groq(${model}) returned an empty response`);
     } catch (e) {
+      // B177 — model retired? discover a live one and retry ONCE
+      if (/model_not_found|does not exist/i.test(String(e.message))) {
+        const discovered = await discoverGroqModel(groqKey);
+        if (discovered && discovered !== model) {
+          try {
+            const completion = await groq.chat.completions.create(
+              { messages, model: discovered, temperature: opts.temperature ?? 0.4 },
+              { timeout: TIMEOUT_MS },
+            );
+            const text2 = completion.choices[0]?.message?.content || '';
+            if (text2) return text2.trim();
+          } catch (e2) { errors.push(`Groq(${discovered}): ${e2.message}`); }
+        }
+      }
       errors.push(`Groq(${model}): ${e.message}`);
       console.error('[LLMClient] Groq failed:', e.message);
     }
@@ -649,7 +698,7 @@ function parseToolCalls(msg) {
 function providerToolConfig(provider, opts) {
   const keys = resolveKeys();
   return {
-    groq: { key: keys.groqKey, baseUrl: null, sdk: true, models: [opts.model || GROQ_TEXT_MODEL] },
+    groq: { key: keys.groqKey, baseUrl: null, sdk: true, models: [opts.model || groqModelCache || GROQ_TEXT_MODEL] },
     openrouter: { key: keys.openrouterKey, baseUrl: 'https://openrouter.ai/api/v1', models: [opts.model || OPENROUTER_TEXT_MODELS[0]] },
     deepseek: { key: keys.deepseekKey, baseUrl: 'https://api.deepseek.com/v1', models: [opts.model || 'deepseek-chat'] },
     xai: { key: keys.xaiKey, baseUrl: 'https://api.x.ai/v1', models: [opts.model || XAI_MODELS[0]] },
