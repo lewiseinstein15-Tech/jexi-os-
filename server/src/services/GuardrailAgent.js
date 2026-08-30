@@ -55,9 +55,13 @@ export function scanPromptSafety(text) {
     if (re.test(input)) findings.push({ kind: 'safe-mode-request', pattern: re.source.slice(0, 60), severity: 'info' });
   }
   // Heuristic: overly long "instructions" that mimic a system prompt.
-  if (/instructions?|prompt|rules?/i.test(input) && input.length > 400) {
-    findings.push({ kind: 'possible-prompt-injection', severity: 'medium', note: 'long instruction-shaped message' });
-  }
+  // B182 — CRITICAL FIX: legitimate big BUILD SPECIFICATIONS (multi-hundred-word
+  // product briefs, hermes-style task prompts, tender documents) were being
+  // flagged as injection and the WHOLE task was blocked — the user's real
+  // NEXUS build request died here. A long *engineering brief* is normal input;
+  // only flag when it ALSO carries an actual override pattern, which the
+  // loop above already catches precisely.
+  // (intentionally left empty — the pattern list above is the real guard)
   const high = findings.filter((f) => f.severity === 'high');
   const safe = high.length === 0;
   return {
