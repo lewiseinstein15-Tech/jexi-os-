@@ -215,16 +215,16 @@ async function tryGroq(prompt, system, imageBase64, opts, errors) {
   const groq = new Groq({ apiKey: groqKey });
   const models = imageBase64 ? GROQ_VISION_MODELS : (opts.model ? [opts.model] : [GROQ_TEXT_MODEL]);
   for (const model of models) {
+    const messages = [ // hoisted: the B177 model-not-found retry reuses it
+      { role: 'system', content: system },
+      {
+        role: 'user',
+        content: imageBase64
+          ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: imageBase64 } }]
+          : prompt,
+      },
+    ];
     try {
-      const messages = [
-        { role: 'system', content: system },
-        {
-          role: 'user',
-          content: imageBase64
-            ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: imageBase64 } }]
-            : prompt,
-        },
-      ];
       const completion = await groq.chat.completions.create(
         {
           messages,

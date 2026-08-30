@@ -1779,7 +1779,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
     name: 'JEXI OS Brain',
-    version: '1.2.0',
+    version: '1.4.0', // B177 deploy marker — /api/health shows which build is live
     instanceId: INSTANCE_ID,
     uptime: Math.round(process.uptime()),
     redis: isRedisActive(),
