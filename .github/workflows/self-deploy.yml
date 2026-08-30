@@ -1,0 +1,49 @@
+# B181 — SELF-DEPLOY: Render's free PIPELINE minutes refill on the 1st of
+# each month. This workflow pings the deploy hook automatically just after
+# midnight UTC on the 1st (with retries, in case the reset lands a little
+# later), so the newest Docker image goes live WITHOUT anyone touching the
+# dashboard. Also has a manual "Run workflow" button for any other day.
+
+name: Self-deploy brain (monthly refill)
+
+on:
+  schedule:
+    # just after the Render free-tier monthly reset
+    - cron: '12 0 1 * *'
+    # a second attempt later in the morning, in case the first was still gated
+    - cron: '17 6 1 * *'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the Render deploy hook (pulls the latest image)
+        env:
+          HOOK: ${{ secrets.RENDER_IMAGE_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::warning::RENDER_IMAGE_DEPLOY_HOOK secret is empty — add it (Render → jexi-brain-image → Settings → Deploy Hook → create, then repo Settings → Secrets → Actions)."
+            exit 0
+          fi
+          for attempt in 1 2 3; do
+            echo "--- deploy attempt $attempt ---"
+            if curl -sS -m 90 -X POST "$HOOK" -H "Accept: application/json" -w "\nHTTP %{http_code}\n"; then
+              echo "Deploy triggered. Render pulls the image and restarts (2-4 min)."
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "Render did not accept the deploy after 3 attempts (minutes may not be refilled yet, or the service is busy)."
+          exit 1
+
+      - name: Verify the new build went live (version marker)
+        if: ${{ secrets.RENDER_IMAGE_DEPLOY_HOOK != '' }}
+        run: |
+          sleep 240
+          for i in 1 2 3 4 5 6; do
+            V=$(curl -s -m 20 https://jexi-brain-image.onrender.com/api/health | grep -oE '"version":"[^"]+"' | head -1 || true)
+            echo "attempt $i: $V"
+            [ -n "$V" ] && break
+            sleep 60
+          done
