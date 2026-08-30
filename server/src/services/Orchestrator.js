@@ -1122,9 +1122,37 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
         sendEvent('log', { agent: 'Coder', message: `✓ Created ${project.files.length} file(s)` });
         c.entryPoint = project.entryPoint || project.files[0]?.name;
       } else {
-        results.summary = "### 💻 JEXI CODING AGENT\n\nI couldn't generate the code. Please rephrase your request with more detail.";
-        results.statistics.confidence = 40;
-        c.done = true;
+        // B185 — NEVER ask the user to "rephrase": JEXI rephrases it HERSELF
+        // and retries the build once with a sharper, more specific brief.
+        sendEvent('log', { agent: 'Ada', message: '⚠ first build pass came back empty — rewriting the brief myself and retrying…' });
+        let retried = false;
+        try {
+          const { generateContent } = await import('./LLMClient.js');
+          const sharper = String(await generateContent(
+            `Rewrite this build request into a precise, concrete implementation brief for a coding agent: name the exact files to create, the features, and the tech. Request: "${effQuery}". Output ONLY the brief.`,
+            'You write crisp engineering briefs.',
+          ) || '').trim();
+          if (sharper.length > 60) {
+            sendEvent('log', { agent: 'Ada', message: `📝 self-rewritten brief: ${sharer(sharper).slice(0, 90)}…` });
+            project = await generateCode(sharper, sendEvent);
+            if (project && project.files && project.files.length) {
+              fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
+              const allowedWrite2 = makeScopeGuard(scope);
+              project.files.forEach(f => {
+                if (allowedWrite2(f.name)) fs.writeFileSync(path.join(WORKSPACE_DIR, f.name), f.code, 'utf-8');
+              });
+              c.entryPoint = project.entryPoint || project.files[0]?.name;
+              retried = true;
+            }
+          }
+        } catch (e) { /* self-rephrase best-effort */ }
+        if (!retried) {
+          results.summary = '### 💻 Build did not complete\n\nI tried twice (including rewriting the brief myself) but could not produce a working build this time. This is usually a temporary limit on the free AI providers — ask me again in a minute and I will take it from the top.';
+          results.statistics.confidence = 40;
+          c.done = true;
+        } else {
+          sendEvent('log', { agent: 'Ada', message: `✓ Self-rephrase worked — ${project.files.length} file(s) created.` });
+        }
       }
       return state; // edge → debugger
     };

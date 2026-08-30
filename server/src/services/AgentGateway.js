@@ -40,6 +40,43 @@ function loadJobs() {
 }
 function persist() { fs.writeFileSync(JOBS_FILE, JSON.stringify(jobs, null, 2), 'utf-8'); }
 
+/* B185 — INTER-AGENT MESSAGES (Hermes delegates message each other): a
+ * subordinate can ASK another agent a question mid-task (e.g. Ada asks Kito
+ * to look something up) — a bounded, structured side-channel, never free
+ * chatter. Returns the answering agent's envelope. */
+const QUESTION_BUDGET = 2; // per task
+const questions = new Map(); // agent → count
+export async function agentAsk(fromAgent, toAgent, question, { sendEvent = () => {}, seams = null } = {}) {
+  const used = questions.get(fromAgent) || 0;
+  if (used >= QUESTION_BUDGET) return { status: 'error', agent: toAgent, error: 'question budget used' };
+  if (!loadProfile(toAgent)) return { status: 'error', agent: toAgent, error: `unknown agent ${toAgent}` };
+  questions.set(fromAgent, used + 1);
+  const from = loadProfile(fromAgent);
+  sendEvent('log', { agent: from?.displayName || fromAgent, message: `💬 asks ${loadProfile(toAgent).displayName}: ${String(question).slice(0, 70)}…` });
+  const brief = `Another JEXI agent (${from?.displayName || fromAgent}) needs this to finish its task. Answer ONLY this, briefly and concretely:\n\n${question}`;
+  const env = await runAgentTask(toAgent, brief, { sendEvent, seams, parentAgent: fromAgent });
+  sendEvent('log', { agent: loadProfile(toAgent).displayName, message: `💬 answered ${from?.displayName || fromAgent}.` });
+  return env;
+}
+
+/* B185 — LANE ROTATION: each agent cycles through DIFFERENT model lanes on
+ * retry so the team uses many models, not one. Named per the coworker roster. */
+const LANES = [
+  { prefer: 'groq', name: 'Leonardo/Luna' },
+  { prefer: 'gemini', name: 'Maya' },
+  { prefer: 'openrouter', name: 'Sasha/Nemo' },
+  { prefer: 'mistral', name: 'Milo/Marcel' },
+  { prefer: 'nvidia', name: 'Wei (DeepSeek)' },
+  null, // null = router's own health order (no preference)
+];
+const laneTick = new Map();
+function pickAlternateLane(agent) {
+  const n = (laneTick.get(agent) || 0) + 1;
+  laneTick.set(agent, n);
+  const lane = LANES[n % LANES.length] || LANES[0];
+  return { prefer: lane ? lane.prefer : undefined, name: lane ? lane.name : 'auto-router', reason: 'the lead lane came back empty' };
+}
+
 /* ─────────── structured result envelopes (hermes delegate contract) ─────────── */
 
 const OK = (agent, result, extra = {}) => ({ status: 'success', agent, result: String(result || '').trim(), artifacts: [], skills: [], tookMs: 0, ...extra });
@@ -72,10 +109,23 @@ export async function runAgentTask(agentName, brief, { sendEvent = () => {}, sea
       text = await seams.generate({ agent: agentName, brief, skills, prompt: prompt.full, soul: profile.soul });
     } else {
       const { generateContent } = await import('./LLMClient.js');
-      const out = await generateContent(prompt.full, `You are ${profile.displayName}, a JEXI agent. Stay in role.`, null, {
-        prefer: profile.config.model?.prefer || undefined,
-        temperature: profile.config.model?.temperature ?? 0.3,
-      });
+      // B185 — MULTI-MODEL: never one brain. The profile's preference leads,
+      // then the provider ROUTER walks every healthy provider (each a named
+      // coworker — Maya, Leonardo, Wei…) — and each retry for the same task
+      // rotates the lane so a task is never glued to one model.
+      const prefer = profile.config.model?.prefer || undefined;
+      const temperature = profile.config.model?.temperature ?? 0.3;
+      let out = '';
+      try {
+        out = await generateContent(prompt.full, `You are ${profile.displayName}, a JEXI agent. Stay in role.`, null, { prefer, temperature });
+      } catch (e) { out = ''; }
+      if (!String(out || '').trim()) {
+        const lane = pickAlternateLane(agentName);
+        sendEvent('log', { agent: profile.displayName, message: `↻ ${lane.reason} — switching to a different coworker (${lane.name}).` });
+        try {
+          out = await generateContent(prompt.full, `You are ${profile.displayName}, a JEXI agent. Stay in role.`, null, { prefer: lane.prefer, temperature });
+        } catch (e2) { out = ''; }
+      }
       text = String(out || '');
     }
     if (!text.trim()) throw new Error('the model returned nothing');
@@ -99,6 +149,7 @@ export async function delegate(agentNames, briefs, { mode = 'parallel', sendEven
   const list = Array.isArray(agentNames) ? agentNames : [agentNames];
   const bs = Array.isArray(briefs) ? briefs : [briefs];
   const primary = loadProfile('orchestrator');
+  questions.clear(); // fresh question budget per delegation
   sendEvent('log', { agent: primary?.displayName || 'Nova', message: `🧭 Delegating to ${list.join(mode === 'parallel' ? ' (in parallel) · ' : ' (in sequence) · ')}.` });
   const out = [];
   if (mode === 'sequential') {

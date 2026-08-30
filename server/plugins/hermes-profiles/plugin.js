@@ -8,7 +8,7 @@
  *   - /agents        : see the team, jobs and recent skills in chat
  */
 
-import { delegate, scheduleJob, jobStatuses, cancelJob } from '../../src/services/AgentGateway.js';
+import { delegate, scheduleJob, jobStatuses, cancelJob, agentAsk } from '../../src/services/AgentGateway.js';
 import { listProfiles } from '../../src/services/AgentProfiles.js';
 import { recallSkills } from '../../src/services/SkillLoop.js';
 import { registerCommand } from '../../src/services/CommandRegistry.js';
@@ -61,6 +61,18 @@ export async function apply(ctx) {
     desc: 'Cancel a scheduled agent job by id.',
     args: { id: { type: 'string', required: true } },
     handler: async (a) => ({ ok: cancelJob(a.id) }),
+  });
+
+  reg({
+    slug: 'agent_ask',
+    name: 'Ask Another Agent',
+    desc: 'Ask a fellow JEXI agent a specific question mid-task (bounded to 2 per task). Agents: dev (Ada), research (Kito), comms (Zuri), scheduler (Tari). Use when you need another specialist input to finish your work.',
+    args: {
+      from: { type: 'string', required: true, desc: 'your agent name' },
+      to: { type: 'string', required: true, desc: 'agent to ask' },
+      question: { type: 'string', required: true, desc: 'the specific question' },
+    },
+    handler: async (a, o = {}) => agentAsk(a.from, a.to, a.question, { sendEvent: o.sendEvent || (() => {}) }),
   });
 
   reg({
