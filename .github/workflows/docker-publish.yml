@@ -61,6 +61,12 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Trigger Render image deploy (pulls the fresh image)
+        run: |
+          curl -sS -m 60 -X POST "$RENDER_IMAGE_DEPLOY_HOOK" -H "Accept: application/json" || echo "hook not set - enable Auto-Deploy on the Render service"
+        env:
+          RENDER_IMAGE_DEPLOY_HOOK: ${{ secrets.RENDER_IMAGE_DEPLOY_HOOK }}
+
       - name: Summary
         run: |
           echo "### 🐳 Image published" >> $GITHUB_STEP_SUMMARY
