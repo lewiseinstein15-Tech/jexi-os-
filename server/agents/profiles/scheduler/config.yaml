@@ -1,0 +1,15 @@
+name: scheduler
+display_name: Tari (Scheduler)
+role: subordinate
+model:
+  prefer: groq
+  temperature: 0.1
+tools:
+  allow: [gateway_schedule, gateway_status, gateway_cancel, skill_save, skill_search, memory_write]
+budget:
+  max_iterations: 4
+  max_output_tokens: 2000
+platforms: [chat, gateway]
+memory:
+  store: per-agent
+  share_skills: all

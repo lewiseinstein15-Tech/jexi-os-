@@ -1,0 +1,15 @@
+name: research
+display_name: Kito (Research)
+role: subordinate
+model:
+  prefer: gemini
+  temperature: 0.3
+tools:
+  allow: [web_search, deep_read, browser, image_search, skill_save, skill_search, memory_write]
+budget:
+  max_iterations: 10
+  max_output_tokens: 6000
+platforms: [chat, gateway]
+memory:
+  store: per-agent
+  share_skills: all

@@ -9,7 +9,10 @@ import { planner } from './src/services/Planner.js';
 import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B158 — user/message lifecycle event
 import { sanitizeStreamText, teamRoster } from './src/services/ModelCoworkers.js'; // B162 — named model coworkers in every log line
 import { createMathStreamBuffer, normalizeMathDelimiters } from './src/services/Formatting.js'; // B174 — math-safe streaming + B174c delimiter normalization
-import { tryExecuteCommand, helpText } from './src/services/CommandRegistry.js'; // B167 — /watch + friends
+import { tryExecuteCommand, helpText, registerCommand } from './src/services/CommandRegistry.js'; // B167 — /watch + friends
+import { listProfiles, loadProfile, searchMemory, rememberFor } from './src/services/AgentProfiles.js'; // B180 — Hermes profiles
+import { delegate, scheduleJob, dispatchJob, jobStatuses, cancelJob, startGateway, runAgentTask, parseNaturalSchedule } from './src/services/AgentGateway.js'; // B180 — gateway
+import { saveSkill, recallSkills, autoSkill } from './src/services/SkillLoop.js'; // B180 — skill loop
 import { detectVideoWatchIntent, resolveTitleToVideo, watchVideo } from './src/services/VideoWatch.js'; // B168 — natural video intent
 import { imageSearch, detectPictureIntent, detectCorrectionToPicture, verifyImagesWithVision, generatedImageUrl } from './src/services/ImageSearch.js'; // B171 — DSH-style presenter
 import { setGoalEngine } from './src/services/PromptAssembly.js'; // B158 — goals reach every assembled prompt
@@ -117,6 +120,8 @@ try { initConfigSnapshot({ env: process.env, settings: loadSettings() }); } catc
 try { writeBootProfile({ phase: 'B156', commit: process.env.RENDER_GIT_COMMIT || 'local' }); } catch (e) { recordError('boot', e.message); }
 globalThis.__jexiSessionConversations = SessionConversations;
 openSessionPersistence(path.join(DATA_DIR, 'sessions.sqlite')).catch((e) => recordError('boot', e.message));
+try { startGateway(); console.log('[Gateway] agent gateway started (jobs resume + 60s tick)'); } catch (e) { console.error('[Gateway] failed:', e.message); }
+
 loadPlugins({ services: {} }).then(({ ctx }) => {
   if (ctx) setActivePluginContext(ctx);
   try { startSkillWatcher(); } catch { /* optional */ }
@@ -787,6 +792,28 @@ function maskConnectorAuth(auth = {}) {
 app.get('/api/plugins', (req, res) => res.json({ plugins: listRegistryPlugins() }));
 // B162 — the named coworker roster (people names only; no raw model IDs).
 app.get('/api/team', (req, res) => res.json({ team: teamRoster() }));
+// B180 — the Hermes-style agent surface
+app.get('/api/agents/profiles', (req, res) => res.json({ profiles: listProfiles().map((p) => ({ name: p.name, displayName: p.displayName, role: p.role, tools: p.config.tools, model: p.config.model })) }));
+app.get('/api/agents/:name/memory', (req, res) => res.json({ agent: req.params.name, memories: searchMemory(req.params.name, String(req.query.q || ''), { limit: 10 }) }));
+app.post('/api/agents/delegate', async (req, res) => {
+  const { agents, briefs, mode } = req.body || {};
+  if (!agents) return res.status(400).json({ error: 'agents required' });
+  const envelopes = await delegate(agents, briefs || 'handle the task', { mode: mode || 'parallel' });
+  res.json({ envelopes });
+});
+app.get('/api/gateway/jobs', (req, res) => res.json({ jobs: jobStatuses() }));
+app.post('/api/gateway/schedule', (req, res) => {
+  const { agent, prompt, schedule, deliver } = req.body || {};
+  if (!prompt || !schedule) return res.status(400).json({ error: 'prompt and schedule required' });
+  res.json(scheduleJob({ agent: agent || 'orchestrator', prompt, schedule, deliver }));
+});
+app.post('/api/gateway/dispatch', (req, res) => {
+  const { agent, prompt, deliver } = req.body || {};
+  if (!prompt) return res.status(400).json({ error: 'prompt required' });
+  res.json(dispatchJob({ agent: agent || 'research', prompt, deliver }));
+});
+app.delete('/api/gateway/jobs/:id', (req, res) => res.json({ ok: cancelJob(req.params.id) }));
+app.get('/api/skills/:agent', (req, res) => res.json({ agent: req.params.agent, skills: recallSkills(req.params.agent, String(req.query.q || ''), { limit: 10, includeForeign: false }) }));
 app.post('/api/plugins/:id/toggle', (req, res) => {
   try { res.json({ success: true, ...togglePlugin(req.params.id) }); }
   catch (e) { res.status(400).json({ success: false, error: (e && e.message) || String(e) }); }
@@ -1881,3 +1908,21 @@ app.listen(PORT, '0.0.0.0', () => {
   // boot: on small hosts (512MB) a permanently-open browser + concurrent page
   // parsing during search was OOM-killing the process mid-request.
 });
+
+// B180 — /refine: force-save what just worked as a reusable skill
+try {
+  registerCommand({
+    name: 'refine',
+    description: 'save what just worked as a reusable skill — /refine [agent]',
+    async run(invocation) {
+      const raw = typeof invocation === 'string' ? invocation : (invocation.rawInput || '');
+      const agent = (raw.replace(/^\/refine\s*/i, '').trim() || 'orchestrator').split(/\s+/)[0];
+      const profile = loadProfile(agent);
+      if (!profile) return { ok: false, summary: `No profile "${agent}". Profiles: ${listProfiles().map((p) => p.name).join(', ')}` };
+      const mem = searchMemory(agent, '', { limit: 1 });
+      const last = mem[0]?.text || 'no prior task recorded yet';
+      const skill = await autoSkill(agent, { task: last.slice(0, 200), result: last }, null);
+      return { ok: skill.ok, summary: skill.ok ? `### 🧠 Skill saved\n\n**${skill.name}** → \`${skill.file}\`\n\nNext similar task starts from this precedent.` : `Could not save: ${skill.error}` };
+    },
+  });
+} catch (e) { /* already registered */ }

@@ -1,0 +1,20 @@
+# JEXI agent profile — Hermes Agent pattern (config.yaml + SOUL.md + memory)
+name: orchestrator
+display_name: Nova (Orchestrator)
+role: primary
+model:
+  prefer: groq            # fastest lane first; router falls back automatically
+  temperature: 0.3
+tools:
+  allow: [web_search, deep_read, delegate_task, gateway_status, skill_save, skill_search, memory_write]
+  deny: [shell]           # the orchestrator coordinates; subordinates execute
+budget:
+  max_iterations: 8
+  max_output_tokens: 4000
+platforms: [chat, apk, web]
+delegation:
+  subordinates: [dev, research, comms, scheduler]
+  parallel: true
+memory:
+  store: per-agent        # agents/orchestrator/memory.jsonl — isolated
+  share_skills: all       # may read every agent's skill store

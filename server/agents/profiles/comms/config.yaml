@@ -1,0 +1,15 @@
+name: comms
+display_name: Zuri (Comms & Delivery)
+role: subordinate
+model:
+  prefer: mistral
+  temperature: 0.4
+tools:
+  allow: [connector_send, connector_status, write_file, skill_save, skill_search, memory_write]
+budget:
+  max_iterations: 6
+  max_output_tokens: 3000
+platforms: [chat, gateway, email]
+memory:
+  store: per-agent
+  share_skills: all

@@ -1,0 +1,15 @@
+name: dev
+display_name: Ada (Dev)
+role: subordinate
+model:
+  prefer: nvidia            # free DeepSeek lane for code
+  temperature: 0.2
+tools:
+  allow: [str_replace_editor, shell, python_run, github_repo_scan, github_file_read, github_file_edit, web_search, skill_save, skill_search, memory_write]
+budget:
+  max_iterations: 14
+  max_output_tokens: 8000
+platforms: [chat, gateway]
+memory:
+  store: per-agent
+  share_skills: all
