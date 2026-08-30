@@ -25,7 +25,7 @@ jobs:
         env:
           # Change target without editing the file: repo Settings -> Variables ->
           # Actions -> add KEEPALIVE_URL (e.g. https://your-user-jexi-os.hf.space)
-          TARGET: ${{ vars.KEEPALIVE_URL || 'https://jexi-os-brain.onrender.com' }}
+          TARGET: ${{ vars.KEEPALIVE_URL || 'https://jexi-brain-image.onrender.com' }}
         run: |
           curl -s -m 30 -o /dev/null -w 'Primary:  HTTP %{http_code} in %{time_total}s\n' \
             "$TARGET/api/health" || echo 'primary ping failed (server may be restarting)'
