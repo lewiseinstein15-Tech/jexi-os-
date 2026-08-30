@@ -13,10 +13,9 @@ No new account. No card. Same Render you already know.
 
 ## Your part — ~8 minutes
 
-### 1. Make the package public (one click, after the first build finishes)
-- Your repo → **Packages** (right sidebar) → **jexi-os-** → **Package settings**
-  → Danger Zone → **Change visibility** → **Public**
-- (Needed so Render can pull it without login. The image contains no secrets.)
+### 1. ✅ Already done for you
+The image is built and public: `ghcr.io/lewiseinstein15-tech/jexi-os-:latest`
+(verified pullable anonymously — no login needed anywhere).
 
 ### 2. Create the new brain service
 - **dashboard.render.com** → **New +** → **Web Service**
