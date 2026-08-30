@@ -14,13 +14,13 @@ No new account. No card. Same Render you already know.
 ## Your part — ~8 minutes
 
 ### 1. ✅ Already done for you
-The image is built and public: `ghcr.io/lewiseinstein15-tech/jexi-os-:latest`
+The image is built and public: `ghcr.io/lewiseinstein15-tech/jexi-os:latest`
 (verified pullable anonymously — no login needed anywhere).
 
 ### 2. Create the new brain service
 - **dashboard.render.com** → **New +** → **Web Service**
 - Choose **"Deploy an existing image from a registry"**
-- Image URL: **`ghcr.io/lewiseinstein15-tech/jexi-os-:latest`**
+- Image URL: **`ghcr.io/lewiseinstein15-tech/jexi-os:latest`**
 - Name: `jexi-brain-image` · Region: Frankfurt (closest free) · Instance: **Free**
 - Health check path: **`/api/health`**
 
