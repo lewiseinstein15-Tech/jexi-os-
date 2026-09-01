@@ -1256,8 +1256,24 @@ app.post('/api/chat', async (req, res) => {
 
   const done = (payload) => {
     // B187 — sanitize links BEFORE anything leaves the server
-    if (payload && typeof payload === 'object' && typeof payload.summary === 'string' && /localhost|127\.0\.0\.1|192\.168\.|10\.\d+\./i.test(payload.summary)) {
-      try { payload.summary = sanitizeOutgoingLinks(payload.summary, PUBLIC_BASE); } catch { /* never block */ }
+    if (payload && typeof payload === 'object' && typeof payload.summary === 'string') {
+      try {
+        let sum = payload.summary;
+        if (/localhost|127\.0\.0\.1|192\.168\.|10\.\d+\./i.test(sum)) sum = sanitizeOutgoingLinks(sum, PUBLIC_BASE);
+        // a bare/pathless brain link next to "preview" wording is useless —
+        // point it at the actual workspace preview file when one exists.
+        if (/preview/i.test(sum)) {
+          const bare = new RegExp(`${PUBLIC_BASE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/?(\s|\)|$|\.|,)`, 'i');
+          if (bare.test(sum)) {
+            try {
+              const files = (listWorkspace() || []).map((f) => f.name || String(f));
+              const target = files.find((f) => /^index\.html$/i.test(f)) || files.find((f) => /\.html$/i.test(f));
+              if (target) sum = sum.replace(bare, `${PUBLIC_BASE}/preview/${encodeURIComponent(target)}$1`);
+            } catch { /* workspace listing unavailable */ }
+          }
+        }
+        payload.summary = sum;
+      } catch { /* never block the answer */ }
     }
     // B172 — timings on the terminal event (telemetry + honest UX)
     if (payload && typeof payload === 'object') {

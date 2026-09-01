@@ -19,7 +19,7 @@ console.log('\n== 2. chat route applies it to every summary ==');
 {
   const idx = fs.readFileSync('./index.js', 'utf-8');
   ok('PUBLIC_BASE computed from the request headers', idx.includes("x-forwarded-host"));
-  ok('done() rewrites localhost summaries', idx.includes('sanitizeOutgoingLinks(payload.summary'));
+  ok("done() rewrites localhost summaries + rescues bare links", idx.includes("sanitizeOutgoingLinks(sum") && idx.includes("/preview/"));
 }
 
 console.log('\n== 3. taught: no localhost, act-don\'t-ask ==');
