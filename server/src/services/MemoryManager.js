@@ -1092,8 +1092,22 @@ export async function searchCodingKnowledge(query) {
   const mem = loadMemory();
   const list = mem.codingKnowledge;
   if (!list.length) return null;
-  const hits = await hybridSearch(list, query, { relevanceFloor: 0.25, limit: 1 });
-  return hits.length ? hits[0].entry : null;
+  // B189 — PRECISION GATE (the wrong-app bug): 'give me the preview link'
+  // matched an old expense-tracker solution at a loose 0.25 floor and she
+  // delivered the WRONG app. Reuse now requires (a) a much higher search
+  // score AND (b) real word overlap between the stored goal and THIS ask.
+  const hits = await hybridSearch(list, query, { relevanceFloor: 0.55, limit: 3 });
+  if (!hits.length) return null;
+  const qWords = new Set(String(query || '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3));
+  for (const h of hits) {
+    const goal = String(h.entry?.goal || h.entry?.query || '');
+    const gWords = new Set(goal.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3));
+    if (!qWords.size || !gWords.size) continue;
+    let overlap = 0;
+    for (const w of qWords) if (gWords.has(w)) overlap += 1;
+    if (overlap >= Math.max(2, Math.floor(qWords.size * 0.4))) return h.entry;
+  }
+  return null; // nothing genuinely matches — build fresh
 }
 
 /* ------------------------------------------------------------------ */

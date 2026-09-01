@@ -15,6 +15,10 @@ import { recallSkills } from './SkillLoop.js';
 
 const DEV_RE = /\b(build|create|make|code|develop|implement|fix|debug|refactor|deploy)\b[^.?!]{0,60}\b(app|application|website|web ?app|api|server|backend|frontend|game|tool|script|site|system|cli|bot|program|calculator|dashboard|tracker|clone)\b/i;
 const DEV_RE2 = /\b(fix|debug|refactor)\b[^.?!]{0,50}\b(bug|error|crash|page|component|function|code|test|file)\b/i; // 'fix the bug in my login page'
+// B189 — PREVIEW-LINK INTENT: 'give/where is the preview link' means the user
+// wants the working web app NOW → build (or rebuild) it as a web app via Ada,
+// never ask 'shall I?'. Matches 'link', 'preview', 'open it', 'show me it'.
+const PREVIEW_RE = /\b(give|show|send|where|what|need|want|open|see)\b[^.?!]{0,30}\b(link|url|preview|site|page)\b|\bpreview link\b|\bopen (it|the app)\b/i;
 const RESEARCH_RE = /\b(research|compare|investigate|find out|latest|news|what('s| is) (new|happening)|sources? on|deep dive|analysis of|market|statistics|data on)\b/i;
 const SCHEDULE_RE = /\b(every (morning|day|evening|hour|week|weekday)|daily|weekly|each day|every \d+ (minutes?|hours?)|at \d{1,2}(:\d{2})? ?(am|pm) (every|each)|remind me (every|daily|weekly)|run this (every|daily|weekly))\b/i;
 const DELIVER_RE = /\b(send|email|deliver|notify|message me|ping me|push to github|open a pr|commit and push)\b/i;
@@ -23,6 +27,9 @@ const DELIVER_RE = /\b(send|email|deliver|notify|message me|ping me|push to gith
 export function routeToTeam(query, plan = {}) {
   const q = String(query || '');
   if (SCHEDULE_RE.test(q)) return { team: 'scheduler', why: 'recurring/scheduled work detected' };
+  // B189 — a preview/link ask routes to dev with a CANONICAL web-app brief
+  // (never 'shall I build it?'), so the deliverable is a published web app.
+  if (PREVIEW_RE.test(q)) return { team: 'dev', why: 'wants the live app/link', brief: `${q}\n(Build a complete single-file web app (index.html) that fulfils the user's underlying request. Publish it.)` };
   if (/remind me|notify me/.test(q) && DELIVER_RE.test(q)) return { team: 'comms', why: 'delivery/reminder request' };
   // research wins over dev only when the dev signal is absent (compound
   // "research then build" goes to dev, which researches inside its loop)
@@ -35,7 +42,7 @@ export function routeToTeam(query, plan = {}) {
  * Handle a routed request with the named team. Returns the final summary
  * (already user-ready) or null to fall through to the normal pipeline.
  */
-export async function runTeam(team, query, { sendEvent = () => {}, convId = null, plan = {} } = {}) {
+export async function runTeam(team, query, { sendEvent = () => {}, convId = null, plan = {}, brief = null } = {}) {
   if (team === 'scheduler') {
     const { parseNaturalSchedule } = await import('./AgentGateway.js');
     const sched = parseNaturalSchedule(query);
@@ -52,7 +59,7 @@ export async function runTeam(team, query, { sendEvent = () => {}, convId = null
     const skills = recallSkills('dev', query, { limit: 2 });
     if (skills.length) sendEvent('log', { agent: 'Ada', message: `📚 reusing ${skills.length} saved skill(s): ${skills.map((s) => s.name).join(', ')}.` });
     const built = await runDshCoding({
-      goal: query,
+      goal: route?.brief || query,
       plan: '',
       sendEvent,
       owner: convId || 'dev-team',

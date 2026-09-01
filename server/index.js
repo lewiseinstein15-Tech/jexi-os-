@@ -128,6 +128,22 @@ try { startGateway(); console.log('[Gateway] agent gateway started (jobs resume 
 // B188 — workspace TTL sweep on boot: finished projects clean themselves
 sweepWorkspace().then((r) => { if (r.cleared.length) console.log('[Workspace] swept:', r.cleared.join(', ')); }).catch(() => {});
 
+// B189 — COLD-START WARMUP: the free instance restarts often; the first user
+// message used to pay 30-50s warming module caches + provider sockets. Warm
+// them at boot in the background (tiny classify + tiny generate + one
+// planner regex pass) so the user's first 'hello' answers in seconds.
+(async () => {
+  try {
+    const t0 = Date.now();
+    await import('./src/services/LLMClient.js').then(async (m) => {
+      await m.generateContent('Reply with just: ok', 'You are a warmup ping.', null, { temperature: 0 });
+    });
+    const { planner } = await import('./src/services/Planner.js');
+    await planner.analyzeIntent('hello');
+    console.log(`[Warmup] brain warm in ${Date.now() - t0}ms — first user message will be fast`);
+  } catch (e) { console.error('[Warmup] skipped:', e.message); }
+})();
+
 loadPlugins({ services: {} }).then(({ ctx }) => {
   if (ctx) setActivePluginContext(ctx);
   try { startSkillWatcher(); } catch { /* optional */ }
@@ -1344,7 +1360,7 @@ app.post('/api/chat', async (req, res) => {
         const route = routeToTeam(raw, {}); // plan isn't classified yet — route on the raw ask
         if (route) {
           sendEvent('log', { agent: 'Nova', message: `🧭 ${route.why} → ${route.team} team.` });
-          const summary = await runTeam(route.team, raw, { sendEvent, convId, plan: {} });
+          const summary = await runTeam(route.team, raw, { sendEvent, convId, plan: {}, brief: route.brief || null });
           if (summary) {
             done({ success: true, summary, statistics: { routedTeam: route.team } });
             finish();

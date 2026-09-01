@@ -44,6 +44,17 @@ import { setTaskCheckpoint } from './TaskRegistry.js'; // B53 P6 — durable tas
 import { loadCoworker, orchestratorPromptFragment } from './CoworkerFiles.js'; // B78 — filesystem-native coworker + orchestrator rules
 import { appendEvent } from './EventLog.js'; // B78 — orchestrator decisions are first-class events
 
+// B189 — deliverable titles: strip conversational filler so a summary is
+// never headed "Yeah and give me the preview link is ready".
+function titleFor(q) {
+  return String(q)
+    .replace(/^(yeah|yes|ok|okay|please|pls)[,!.\s]+/gi, '')
+    .replace(/\b(give me|send me|show me|i want|and|then)\b/gi, ' ')
+    .replace(/\s+/g, ' ').trim()
+    .replace(/^\w/, (c) => c.toUpperCase())
+    .slice(0, 60) || 'Your build';
+}
+
 function readWorkspaceFile(name) {
   try {
     const filePath = resolveInside(WORKSPACE_DIR, name);
@@ -1047,7 +1058,7 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
         if (remembered) {
           sendEvent('log', { agent: 'Memory Agent', message: '✓ Found a solution I built before — reusing it.' });
           // B51 P1 — no "RECALLED FROM MEMORY / I solved this before" narration.
-          results.summary = `## ${effQuery}\n\n${remembered.solution}${remembered.files?.length ? `\n\n**Files:** ${remembered.files.join(', ')}` : ''}`;
+          results.summary = `## ${titleFor(effQuery)}\n\n${remembered.solution}${remembered.files?.length ? `\n\n**Files:** ${remembered.files.join(', ')}` : ''}`;
           results.statistics.confidence = 95;
           c.done = true;
           return state; // edge → responder
