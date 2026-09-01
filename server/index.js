@@ -8,7 +8,8 @@ import path from 'path';
 import { planner } from './src/services/Planner.js';
 import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B158 — user/message lifecycle event
 import { sanitizeStreamText, teamRoster } from './src/services/ModelCoworkers.js'; // B162 — named model coworkers in every log line
-import { createMathStreamBuffer, normalizeMathDelimiters } from './src/services/Formatting.js'; // B174 — math-safe streaming + B174c delimiter normalization
+import { createMathStreamBuffer, normalizeMathDelimiters } from './src/services/Formatting.js';
+import { sanitizeOutgoingLinks } from './src/services/Formatting.js'; // B187 — never send localhost links // B174 — math-safe streaming + B174c delimiter normalization
 import { tryExecuteCommand, helpText, registerCommand } from './src/services/CommandRegistry.js'; // B167 — /watch + friends
 import { listProfiles, loadProfile, searchMemory, rememberFor } from './src/services/AgentProfiles.js'; // B180 — Hermes profiles
 import { delegate, scheduleJob, dispatchJob, jobStatuses, cancelJob, startGateway, runAgentTask, parseNaturalSchedule } from './src/services/AgentGateway.js'; // B180 — gateway
@@ -1248,7 +1249,16 @@ app.post('/api/chat', async (req, res) => {
     try { addChat(role, t); } catch { /* memory must never break chat */ }
     try { appendConversationEvent(convId, { role, text: t, kind: 'chat' }); } catch { /* same */ }
   };
+  // B187 — the PUBLIC base URL: links must work on the user's PHONE, and
+  // localhost never does. Computed from the request itself (Render's proxy
+  // sets x-forwarded-host), so it is correct on every host.
+  const PUBLIC_BASE = `${req.protocol}://${(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim()}`;
+
   const done = (payload) => {
+    // B187 — sanitize links BEFORE anything leaves the server
+    if (payload && typeof payload === 'object' && typeof payload.summary === 'string' && /localhost|127\.0\.0\.1|192\.168\.|10\.\d+\./i.test(payload.summary)) {
+      try { payload.summary = sanitizeOutgoingLinks(payload.summary, PUBLIC_BASE); } catch { /* never block */ }
+    }
     // B172 — timings on the terminal event (telemetry + honest UX)
     if (payload && typeof payload === 'object') {
       const totalMs = Date.now() - __t0;

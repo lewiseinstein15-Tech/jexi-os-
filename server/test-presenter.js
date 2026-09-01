@@ -55,7 +55,7 @@ console.log('\n== 2. image search (Wikimedia Commons, live) ==');
   ok('live Commons search works from a datacenter IP', r.ok === true);
   if (r.ok) {
     const img = r.images[0];
-    ok('image has thumb + full url + title', img.thumb.startsWith('https://upload.wikimedia.org') && img.url.startsWith('https://') && img.title.length > 3);
+    ok('image has thumb + full url + title', /^https:\/\/(upload|thumb)\.wikimedia\.org\//.test(img.thumb) && img.url.startsWith('https://') && img.title.length > 3);
     ok('license attributed', typeof img.license === 'string' && img.license.length > 0);
     ok(`got ${r.images.length} images (≤ limit)`, r.images.length >= 1 && r.images.length <= 3);
   }

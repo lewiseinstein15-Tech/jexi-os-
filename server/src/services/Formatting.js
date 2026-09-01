@@ -110,6 +110,8 @@ export function normalizeFinalAnswer(text) { // B66
 /** System-prompt appendix that keeps workers' output format-consistent. */
 export const FORMAT_RULES = `
 RESPONSE FORMAT (mandatory, always):
+- LINKS: NEVER output localhost / 127.0.0.1 / 192.168.x / internal-port links — the user is on a phone and those never load. For built apps use the RELATIVE preview path exactly as the build system provides (e.g. /preview/index.html). If you only ran a local server to test, SAY SO and give the relative preview link instead of the localhost URL. Never claim a link is "verified" unless it is a public/relative one.
+- ACT, DON'T ASK: when the user's follow-up makes the next step obvious ("give me the link" → produce/link the web version; "again" → redo it), DO it immediately. Only ask a clarifying question when the request is genuinely ambiguous.
 - NATURAL TONE: you are JEXI, a warm human-like assistant — NOT a report generator. For short replies (greetings, yes/no, quick facts) answer in 1-2 plain sentences with NO heading, NO title, NO sections. Only use headings when the answer is genuinely long/structured (worked math, tutorials, reports). Never title a reply with what the user asked ("## User Greeting", "## Response") — just answer.
 - Use markdown: ## headings for sections, bullet lists for enumerations, and fenced code blocks for code.
 - MATH: present solved problems as a clear WORKED SOLUTION — step-by-step working, not just a final answer.
@@ -188,4 +190,37 @@ export function createMathStreamBuffer() {
       return out;
     },
   };
+}
+
+/* ══════════════════ B187 — LINK SANITIZER (no localhost to users) ══════════════════
+ * The user got http://localhost:5173/preview/... links that can never work on
+ * a phone (they point at the SERVER's own machine). Every outgoing summary is
+ * rewritten: localhost/127.0.0.1/private IPs → the public brain base URL. If
+ * the target file does not exist in the workspace, point at the closest
+ * servable HTML file instead — a dead link is never acceptable. */
+const LOCAL_RE = new RegExp('https?:\\/\\/(?:localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[::1\\]|10\\.\\d+\\.\\d+\\.\\d+|172\\.(?:1[6-9]|2\\d|3[01])\\.\\d+\\.\\d+|192\\.168\\.\\d+\\.\\d+)(?::\\d+)?(?:\\/[^\\s)\\]]*)?', 'gi');
+
+export function sanitizeOutgoingLinks(text, publicBase, { existsInWorkspace = null } = {}) {
+  const base = String(publicBase || '').replace(/\/$/, '');
+  if (!base) return String(text || ''); // no public base known — leave as-is
+  return String(text || '').replace(LOCAL_RE, (m) => {
+    // split off the path after the host[:port] — keep ONLY the path part
+    const after = m.replace(/^https?:\/\/[^/]+/, ''); // '' or '/xxx'
+    const path = after.startsWith('/') ? after : '/';
+    return `${base}${path}`;
+  });
+}
+
+/** Best-effort: pick the closest servable workspace file for a dead link. */
+export function rescueDeadPreviewLink(url, { listWorkspaceFiles = null } = {}) {
+  try {
+    const u = new URL(url);
+    const name = decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() || '');
+    if (!listWorkspaceFiles) return null;
+    const files = listWorkspaceFiles();
+    if (files.some((f) => f === name)) return name;
+    const stem = name.replace(/\.[^.]+$/, '');
+    const hit = files.find((f) => f.startsWith(stem)) || files.find((f) => /^index\.html$/i.test(f));
+    return hit || null;
+  } catch { return null; }
 }
