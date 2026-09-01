@@ -59,7 +59,7 @@ export async function runTeam(team, query, { sendEvent = () => {}, convId = null
     const skills = recallSkills('dev', query, { limit: 2 });
     if (skills.length) sendEvent('log', { agent: 'Ada', message: `📚 reusing ${skills.length} saved skill(s): ${skills.map((s) => s.name).join(', ')}.` });
     let built = await runDshCoding({
-      goal: route?.brief || query,
+      goal: brief || query,
       plan: '',
       sendEvent,
       owner: convId || 'dev-team',
@@ -71,7 +71,7 @@ export async function runTeam(team, query, { sendEvent = () => {}, convId = null
       try {
         sendEvent('log', { agent: 'Ada', message: '🔁 switching to my reliable builder — the smart loop only talked.' });
         const { generateCode } = await import('./Architect.js');
-        const project = await generateCode(route?.brief || query, sendEvent);
+        const project = await generateCode(brief || query, sendEvent);
         if (project && project.files && project.files.length) {
           const { WORKSPACE_DIR } = await import('../config.js');
           const fs = await import('fs');
