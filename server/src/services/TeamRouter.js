@@ -63,9 +63,29 @@ export async function runTeam(team, query, { sendEvent = () => {}, convId = null
       const { getBackendBase } = { getBackendBase: () => '' }; // relative link works on same origin
       const entry = built.files.find((f) => /^index\.html$/i.test(f.name)) || built.files.find((f) => /\.html$/i.test(f.name));
       const filesLine = built.files.slice(0, 8).map((f) => `\`${f.name}\``).join(', ') + (built.files.length > 8 ? ` +${built.files.length - 8} more` : '');
-      const preview = entry
-        ? `\n\n**🔗 Live preview:** [Open ${entry.name}](/preview/${encodeURIComponent(entry.name)})`
-        : '\n\n*Tip: ask for a web version (\'as a web app with index.html\') and I can give you a live preview link.*';
+      // B188 — publish web builds to the SEPARATE workspace home (free Pages)
+      // and hand the user a real PUBLIC link that works on any phone.
+      let preview = '';
+      if (entry) {
+        try {
+          const { publishProject } = await import('./WorkspacePublisher.js');
+          sendEvent('log', { agent: 'Ada', message: '🚀 publishing to my workspace…' });
+          const pub = await publishProject({
+            name: slugFor(query),
+            title: String(query).slice(0, 60),
+            brief: String(query).slice(0, 160),
+            files: built.files.map((f) => ({ name: f.name, code: f.code })),
+            entry: entry.name,
+          });
+          preview = pub.ok
+            ? `\n\n**🔗 Open it live (works on any device):** ${pub.url}\n*Also on my workspace home: ${pub.indexUrl} — auto-cleans when the project is done.*`
+            : `\n\n**🔗 Live preview:** [Open ${entry.name}](/preview/${encodeURIComponent(entry.name)})`;
+        } catch (e) {
+          preview = `\n\n**🔗 Live preview:** [Open ${entry.name}](/preview/${encodeURIComponent(entry.name)})`;
+        }
+      } else {
+        preview = '\n\n*Tip: ask for a web version (\'as a web app with index.html\') and I\'ll publish it to my workspace with a live public link.*';
+      }
       return `### 🛠 Built by Ada (Dev)\n\n${built.summary || `${built.files.length} file(s) created and run.`}\n\n**Files:** ${filesLine}${preview}`;
     }
     return null; // loop produced nothing → fall back to the classic pipeline
@@ -93,4 +113,8 @@ export function teamStatusLine() {
   const jobs = jobStatuses();
   const active = jobs.filter((j) => j.nextRun < Number.MAX_SAFE_INTEGER).length;
   return active;
+}
+
+function slugFor(q) {
+  return String(q).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').split('-').slice(0, 5).join('-').slice(0, 40) || 'project';
 }

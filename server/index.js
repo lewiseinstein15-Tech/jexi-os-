@@ -15,6 +15,7 @@ import { listProfiles, loadProfile, searchMemory, rememberFor } from './src/serv
 import { delegate, scheduleJob, dispatchJob, jobStatuses, cancelJob, startGateway, runAgentTask, parseNaturalSchedule } from './src/services/AgentGateway.js'; // B180 — gateway
 import { saveSkill, recallSkills, autoSkill } from './src/services/SkillLoop.js'; // B180 — skill loop
 import { routeToTeam, runTeam } from './src/services/TeamRouter.js'; // B183 — Nova's dispatcher
+import { publishProject, clearProject, sweepWorkspace, listPublished, workspaceHome } from './src/services/WorkspacePublisher.js'; // B188 — the separate build home
 import { detectVideoWatchIntent, resolveTitleToVideo, watchVideo } from './src/services/VideoWatch.js'; // B168 — natural video intent
 import { imageSearch, detectPictureIntent, detectCorrectionToPicture, verifyImagesWithVision, generatedImageUrl } from './src/services/ImageSearch.js'; // B171 — DSH-style presenter
 import { setGoalEngine } from './src/services/PromptAssembly.js'; // B158 — goals reach every assembled prompt
@@ -123,6 +124,9 @@ try { writeBootProfile({ phase: 'B156', commit: process.env.RENDER_GIT_COMMIT ||
 globalThis.__jexiSessionConversations = SessionConversations;
 openSessionPersistence(path.join(DATA_DIR, 'sessions.sqlite')).catch((e) => recordError('boot', e.message));
 try { startGateway(); console.log('[Gateway] agent gateway started (jobs resume + 60s tick)'); } catch (e) { console.error('[Gateway] failed:', e.message); }
+
+// B188 — workspace TTL sweep on boot: finished projects clean themselves
+sweepWorkspace().then((r) => { if (r.cleared.length) console.log('[Workspace] swept:', r.cleared.join(', ')); }).catch(() => {});
 
 loadPlugins({ services: {} }).then(({ ctx }) => {
   if (ctx) setActivePluginContext(ctx);
@@ -815,6 +819,10 @@ app.post('/api/gateway/dispatch', (req, res) => {
   res.json(dispatchJob({ agent: agent || 'research', prompt, deliver }));
 });
 app.delete('/api/gateway/jobs/:id', (req, res) => res.json({ ok: cancelJob(req.params.id) }));
+app.get('/api/workspace-admin/list', async (req, res) => res.json({ ok: true, home: workspaceHome(), projects: await listPublished() }));
+app.post('/api/workspace-admin/publish', async (req, res) => res.json(await publishProject(req.body || {})));
+app.post('/api/workspace-admin/clear', async (req, res) => res.json(await clearProject(String(req.body?.project || ''))));
+app.post('/api/workspace-admin/sweep', async (req, res) => res.json(await sweepWorkspace({ force: Boolean(req.body?.force) })));
 app.get('/api/skills/:agent', (req, res) => res.json({ agent: req.params.agent, skills: recallSkills(req.params.agent, String(req.query.q || ''), { limit: 10, includeForeign: false }) }));
 app.post('/api/plugins/:id/toggle', (req, res) => {
   try { res.json({ success: true, ...togglePlugin(req.params.id) }); }
@@ -1347,6 +1355,27 @@ app.post('/api/chat', async (req, res) => {
       } catch (e) {
         sendEvent('log', { agent: 'Nova', message: `⚠ team routing skipped (${String(e && e.message || e).slice(0, 80)}) — standard pipeline.` });
       }
+
+      // B188 — WORKSPACE INTENT: "publish it/my app", "clear my workspace",
+      // "done with <project>" — the separate build home, in plain language.
+      try {
+        const low = raw.toLowerCase();
+        if (/^(\/workspace)\b/.test(low) || /publish (it|this|my app|the app|my project|the project|to your workspace)/.test(low) || /clear (my|the) workspace|done with (the |my )?(project|app)|delete (my|the) (project|app)/.test(low)) {
+          const wantsClear = /clear|done with|delete/.test(low);
+          if (wantsClear) {
+            const m = low.match(/done with (?:the |my )?([a-z0-9- ]{2,30})|delete (?:my |the )?([a-z0-9- ]{2,30})/);
+            const proj = (m?.[1] || m?.[2] || '').trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            const r = proj ? await clearProject(proj) : await sweepWorkspace({ force: true });
+            done({ success: true, summary: r.ok ? `### 🧹 Workspace cleared\n\n${r.cleared?.length ? `Removed: ${r.cleared.join(', ')}.` : 'Swept clean.'} Home: ${workspaceHome()}` : `Nothing to clear (${r.error || 'already empty'}).` });
+            finish(); return;
+          }
+          const projects = await listPublished();
+          done({ success: true, summary: projects.length
+            ? `### ⚡ My Workspace — ${workspaceHome()}\n\n${projects.map((p) => `- **${p.title}** → [open](${p.url}) · expires ${new Date(p.expiresAt).toLocaleString()}`).join('\n')}\n\n_Say "done with <name>" to clear one._`
+            : `### ⚡ My Workspace — ${workspaceHome()}\n\nEmpty for now. Build something ("build me a todo app as a web app") and I'll publish it there automatically with a live public link.` });
+          finish(); return;
+        }
+      } catch (e) { /* workspace intent is best-effort — never blocks chat */ }
 
       // B171 — DSH-STYLE PRESENTER (verified pictures + real generation):
       // "show me a picture of X" → Commons + VISION VERIFICATION (never an
