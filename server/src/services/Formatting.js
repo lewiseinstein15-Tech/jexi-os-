@@ -224,3 +224,45 @@ export function rescueDeadPreviewLink(url, { listWorkspaceFiles = null } = {}) {
     return hit || null;
   } catch { return null; }
 }
+
+/* ══════════════════ B187c — LINK-SAFE STREAM ══════════════════
+ * localhost links also leaked through STREAM deltas (the summary sanitizer
+ * never sees them — the client renders the stream directly). This buffer
+ * holds back any partial URL from the last 'http' onward until it completes,
+ * then rewrites localhost → the public base before emitting. Same contract
+ * as the math buffer. */
+export function createLinkSafeStream(publicBase) {
+  const base = String(publicBase || '').replace(/\/$/, '');
+  let pending = '';
+  const LOCAL = /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|10\.\d+\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)(?::\d+)?(?:\/[^\s)\]]*)?/gi;
+  const rewrite = (t) => t.replace(LOCAL, (m) => {
+    const after = m.replace(/^https?:\/\/[^/]+/, '');
+    return `${base}${after.startsWith('/') ? after : '/'}`;
+  });
+  return {
+    push(delta) {
+      pending += String(delta || '');
+      // find the LAST potentially-incomplete URL start
+      const lastHttp = pending.lastIndexOf('http');
+      let safe = lastHttp === -1 ? pending : pending.slice(0, lastHttp);
+      let hold = lastHttp === -1 ? '' : pending.slice(lastHttp);
+      // inside `hold`, any URL that has clearly TERMINATED (followed by
+      // whitespace/paren/quote/end-punct) is complete → release it too
+      const doneInHold = hold.match(/^([^\s)\]'"]*?)(https?:\/\/[^\s)\]'"]+[\s)\]'",.!?]|$)([\s\S]*)$/);
+      if (doneInHold && doneInHold[2] && /[\s)\]'",.!?]/.test(doneInHold[2].slice(-1))) {
+        safe += doneInHold[1] + doneInHold[2];
+        hold = doneInHold[3];
+      } else if (doneInHold && doneInHold[2] && doneInHold[3] === '' && /[\s)\]'",.!?]/.test(doneInHold[2].slice(-1))) {
+        safe += doneInHold[1] + doneInHold[2];
+        hold = '';
+      }
+      pending = hold;
+      return rewrite(safe);
+    },
+    flush() {
+      const out = rewrite(pending);
+      pending = '';
+      return out;
+    },
+  };
+}

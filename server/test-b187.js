@@ -32,5 +32,19 @@ console.log('\n== 3. taught: no localhost, act-don\'t-ask ==');
   ok('coding agent prompt requires relative /preview links', dsh.includes('RELATIVE (/preview/<file>)'));
 }
 
+/* B187c — the stream itself never carries localhost */
+console.log('\n== B187c: stream link-safety ==');
+{
+  const F = await import('./src/services/Formatting.js');
+  const b = F.createLinkSafeStream('https://brain.example');
+  const all = b.push('open http://local') + b.push('host:5173/app now') + b.flush();
+  ok('localhost streamed in pieces still comes out public', !all.includes('localhost') && all.includes('https://brain.example/app'));
+  const c = F.createLinkSafeStream('https://x.io');
+  ok('plain text passes through instantly', c.push('hello world ') === 'hello world ');
+  const idx = fs.readFileSync('./index.js', 'utf-8');
+  ok('chat route pipes stream deltas through the link-safe buffer', idx.includes('linkSafe.push(normalizeMathDelimiters'));
+  ok('done() flushes the link-safe tail', idx.includes('linkSafe.flush()'));
+}
+
 console.log(failures === 0 ? '\n🎉 B187 CHECKS PASSED' : `\n💥 ${failures} FAILURES`);
 process.exit(failures ? 1 : 0);

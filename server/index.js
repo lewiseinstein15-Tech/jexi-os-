@@ -9,7 +9,7 @@ import { planner } from './src/services/Planner.js';
 import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B158 — user/message lifecycle event
 import { sanitizeStreamText, teamRoster } from './src/services/ModelCoworkers.js'; // B162 — named model coworkers in every log line
 import { createMathStreamBuffer, normalizeMathDelimiters } from './src/services/Formatting.js';
-import { sanitizeOutgoingLinks } from './src/services/Formatting.js'; // B187 — never send localhost links // B174 — math-safe streaming + B174c delimiter normalization
+import { sanitizeOutgoingLinks, createLinkSafeStream } from './src/services/Formatting.js'; // B187 — never send localhost links // B174 — math-safe streaming + B174c delimiter normalization
 import { tryExecuteCommand, helpText, registerCommand } from './src/services/CommandRegistry.js'; // B167 — /watch + friends
 import { listProfiles, loadProfile, searchMemory, rememberFor } from './src/services/AgentProfiles.js'; // B180 — Hermes profiles
 import { delegate, scheduleJob, dispatchJob, jobStatuses, cancelJob, startGateway, runAgentTask, parseNaturalSchedule } from './src/services/AgentGateway.js'; // B180 — gateway
@@ -1189,7 +1189,10 @@ app.post('/api/chat', async (req, res) => {
   // summary, the content that already streamed to the user IS the answer
   // (root fix for the "Task completed - no readable summary" reply).
   let streamedAnswer = '';
+  // B187 — the PUBLIC base URL (computed early: the link-safe stream needs it)
+  const PUBLIC_BASE = `${req.protocol}://${(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim()}`;
   const mathStream = createMathStreamBuffer(); // B174 — formulas arrive WHOLE
+  const linkSafe = createLinkSafeStream(PUBLIC_BASE); // B187c — localhost never streams
   // B172 — SPEED TELEMETRY (dsh-style per-turn diagnostics): request clock,
   // time-to-first-token and the named writer ride every done event, and one
   // visible ⚡ line lands in the step feed so speed is observable, not guessed.
@@ -1215,7 +1218,7 @@ app.post('/api/chat', async (req, res) => {
       if (data.by) __writerName = data.by;
       // B174 — hold incomplete math back so live answers never show
       // half-typed LaTeX; closed formulas release whole.
-      const safe = normalizeMathDelimiters(mathStream.push(data.text));
+      const safe = linkSafe.push(normalizeMathDelimiters(mathStream.push(data.text)));
       streamedAnswer += safe;
       if (!safe) return; // nothing safe to show yet — skip this event
       data = { ...data, text: safe };
@@ -1223,7 +1226,7 @@ app.post('/api/chat', async (req, res) => {
     if (type === 'done' && data && !data.recoverable) {
       // B174 — release any held tail before the turn ends
       try {
-        const tail = mathStream.flush();
+        const tail = linkSafe.push(mathStream.flush());
         if (tail) { streamedAnswer += tail; res.write(JSON.stringify({ type: 'stream', text: tail, ...(__writerName ? { by: __writerName } : {}) }) + '\n'); }
       } catch (e) { /* never break the done */ }
       try { saveResult(convId, data); } catch (e) {}
@@ -1249,11 +1252,6 @@ app.post('/api/chat', async (req, res) => {
     try { addChat(role, t); } catch { /* memory must never break chat */ }
     try { appendConversationEvent(convId, { role, text: t, kind: 'chat' }); } catch { /* same */ }
   };
-  // B187 — the PUBLIC base URL: links must work on the user's PHONE, and
-  // localhost never does. Computed from the request itself (Render's proxy
-  // sets x-forwarded-host), so it is correct on every host.
-  const PUBLIC_BASE = `${req.protocol}://${(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim()}`;
-
   const done = (payload) => {
     // B187 — sanitize links BEFORE anything leaves the server
     if (payload && typeof payload === 'object' && typeof payload.summary === 'string') {
@@ -1283,6 +1281,7 @@ app.post('/api/chat', async (req, res) => {
         try { sendEvent('log', { agent: 'System', message: `⚡ answered in ${(totalMs / 1000).toFixed(1)}s${__firstTokenMs !== null ? ` · first word in ${(__firstTokenMs / 1000).toFixed(1)}s` : ''}${__writerName ? ` · by ${__writerName}` : ''}.` }); } catch { /* never break the done */ }
       }
     }
+    try { const tail = linkSafe.flush(); if (tail) res.write(JSON.stringify({ type: 'stream', text: tail }) + '\n'); } catch (e) { /* never break done */ }
     sendEvent('done', payload);
     if (payload && payload.summary) rememberTurn('jexi', payload.summary);
   };
