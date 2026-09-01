@@ -29,7 +29,7 @@ export function routeToTeam(query, plan = {}) {
   if (SCHEDULE_RE.test(q)) return { team: 'scheduler', why: 'recurring/scheduled work detected' };
   // B189 — a preview/link ask routes to dev with a CANONICAL web-app brief
   // (never 'shall I build it?'), so the deliverable is a published web app.
-  if (PREVIEW_RE.test(q)) return { team: 'dev', why: 'wants the live app/link', brief: `${q}\n(Build a complete single-file web app (index.html) that fulfils the user's underlying request. Publish it.)` };
+  if (PREVIEW_RE.test(q)) return { team: 'dev', why: 'wants the live app now', brief: `${q}\n(Build a complete single-file web app (index.html) that fulfils the user's underlying request. Publish it.)` };
   if (/remind me|notify me/.test(q) && DELIVER_RE.test(q)) return { team: 'comms', why: 'delivery/reminder request' };
   // research wins over dev only when the dev signal is absent (compound
   // "research then build" goes to dev, which researches inside its loop)
@@ -58,12 +58,30 @@ export async function runTeam(team, query, { sendEvent = () => {}, convId = null
     sendEvent('log', { agent: profile?.displayName || 'Ada', message: '🧑‍💻 Ada (Dev) taking this — build → run → fix loop.' });
     const skills = recallSkills('dev', query, { limit: 2 });
     if (skills.length) sendEvent('log', { agent: 'Ada', message: `📚 reusing ${skills.length} saved skill(s): ${skills.map((s) => s.name).join(', ')}.` });
-    const built = await runDshCoding({
+    let built = await runDshCoding({
       goal: route?.brief || query,
       plan: '',
       sendEvent,
       owner: convId || 'dev-team',
     });
+    // B189c — GUARANTEED BUILD: if the tool loop replied with text instead of
+    // building (free models sometimes skip tools), fall back to the classic
+    // deterministic builder so the user ALWAYS gets files + a live link.
+    if (!built || !built.files || !built.files.length) {
+      try {
+        sendEvent('log', { agent: 'Ada', message: '🔁 switching to my reliable builder — the smart loop only talked.' });
+        const { generateCode } = await import('./Architect.js');
+        const project = await generateCode(route?.brief || query, sendEvent);
+        if (project && project.files && project.files.length) {
+          const { WORKSPACE_DIR } = await import('../config.js');
+          const fs = await import('fs');
+          const path = await import('path');
+          fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
+          for (const f of project.files) fs.writeFileSync(path.join(WORKSPACE_DIR, f.name), f.code, 'utf-8');
+          built = { files: project.files, entryPoint: project.entryPoint || project.files[0]?.name, summary: `${project.files.length} file(s) created.` };
+        }
+      } catch (e) { /* classic fallback failed too — return null to fall through */ }
+    }
     if (built && built.files && built.files.length) {
       // B186 — surface a REAL preview link when the build is a web app
       const { WORKSPACE_DIR } = await import('../config.js');
