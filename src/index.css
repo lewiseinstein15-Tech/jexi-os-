@@ -1085,10 +1085,16 @@ html, body {
 .jx-suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 0 14px; }
 .jx-suggest button { font-family: var(--mono); font-size: 10.5px; color: #d8dce4; background: var(--glass); border: 1px solid var(--glass-line); border-radius: 99px; padding: 8px 14px; cursor: pointer; transition: .15s; }
 .jx-suggest button:hover { border-color: var(--mag2); color: #fff; box-shadow: 0 0 16px rgba(168,85,247,.18); }
+/* B194 — THE LAYOUT CHAIN AT EVERY WIDTH (the phone jump bug): the
+   workbench/stage must be bounded flex containers always, not only ≥1140px.
+   Without this, the chat column's height followed its CONTENT — sending a
+   message shrank the orb hero and the whole composer jumped 131px. */
+.jx-workbench { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.jx-stage { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 @media (min-width: 1140px) {
-  .jx-workbench { display: flex; flex: 1; min-height: 0; }
+  .jx-workbench { flex-direction: row; }
   .jx-widgets { width: 252px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; padding: 18px 0 18px 20px; overflow-y: auto; }
-  .jx-stage { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .jx-stage { flex: 1; min-width: 0; }
 }
 @media (max-width: 1139px) { .jx-widgets { display: none; } }
 .jx-bar:focus-within { border-color: var(--mag2); box-shadow: 0 0 0 3px rgba(168,85,247,.14), 0 0 24px rgba(168,85,247,.10); }
@@ -1136,3 +1142,44 @@ html, body {
 .hover\:bg-\[\#00ff9d11\]\:hover { background: rgba(168,85,247,.10) !important; }
 a { color: #b96bff; }
 a:hover { color: #d9b3ff; }
+
+/* ═══ B194 — the composer behaves like a real app ═══ */
+/* clean bounded chat column (replaces the old tailwind surface-card wrapper
+   that fought the layout chain on phones) */
+.jx-chatroot {
+  display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0;
+  padding: 10px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: rgba(10, 10, 16, 0.55);
+  border: 1px solid var(--glass-line); border-radius: 18px 18px 0 0;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+}
+/* the textarea: autosizes 1→5 rows, Enter sends, Shift+Enter new-lines,
+   16px font kills the iOS/Android auto-zoom, no resize handle */
+.jx-input {
+  flex: 1; min-width: 0; border: none; outline: none; resize: none;
+  background: transparent; color: #fff;
+  font-family: var(--mono); font-size: 16px; line-height: 1.45;
+  padding: 9px 2px; max-height: 120px; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.jx-input::placeholder { color: var(--faint); }
+.jx-input:disabled { opacity: .55; }
+/* send / stop buttons: real-app hit area + press feedback */
+.jx-sendbtn {
+  width: 42px; height: 42px; border: none; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer; flex-shrink: 0;
+  background: var(--mag2); color: #fff;
+  transition: transform .12s ease, box-shadow .18s ease, background .18s ease, opacity .18s ease;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.jx-sendbtn:not(:disabled):active { transform: scale(.9); }
+.jx-sendbtn:not(:disabled):hover { box-shadow: 0 0 18px rgba(168,85,247,.4); }
+.jx-sendbtn:disabled { background: var(--bg3); color: var(--faint); cursor: default; }
+.jx-sendbtn.stop { background: transparent; color: #ff6b6b; border: 1px solid rgba(255,107,107,.45); }
+.jx-sendbtn.stop:active { transform: scale(.9); background: rgba(255,107,107,.1); }
+/* form row stays tight */
+form.surface-float { flex-shrink: 0; }
+/* keyboard open on phones: keep composer above the keyboard (visual viewport) */
+@supports (height: 100dvh) {
+  .jx-app { padding-bottom: env(safe-area-inset-bottom, 0px); }
+}

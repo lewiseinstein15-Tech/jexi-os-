@@ -152,6 +152,18 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
     }
   }, [messages, isProcessing, logs]);
 
+  const taRef = useRef(null);
+
+  /* B194 — composer behaves like real chat apps:
+     textarea autosizes 1→5 rows; Enter sends; Shift+Enter new-lines;
+     after sending, the keyboard closes and the field resets its height. */
+  const autosize = () => {
+    const el = taRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(120, el.scrollHeight)}px`;
+  };
+
   const handleFile = (e) => {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith('image/')) return;
@@ -162,17 +174,22 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
   };
 
   const handleSubmit = (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if ((!input.trim() && !image) || isProcessing) return;
     onSend(input, image);
     setInput('');
     setImage(null);
+    // real-app behavior: shrink the field and drop the keyboard
+    requestAnimationFrame(() => {
+      if (taRef.current) { taRef.current.style.height = 'auto'; }
+      if (window.innerWidth < 900 && taRef.current?.blur) taRef.current.blur();
+    });
   };
 
   const canSend = (input.trim() || image) && !isProcessing;
 
   return (
-    <div className="surface-card p-4 rounded-xl relative z-10 flex flex-col flex-1 min-h-0">
+    <div className="jx-chatroot">
 
 
       {/* Messages scroll area */}
@@ -326,30 +343,24 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
           className="hidden"
           onChange={handleFile}
         />
-        <input
-          type="text"
+        <textarea
+          ref={taRef}
+          rows={1}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Message JEXI..."
-          className="flex-1 bg-transparent text-text-primary placeholder-text-tertiary rounded-lg py-2 text-xs focus:outline-none"
+          onChange={(e) => { setInput(e.target.value); autosize(); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(e); }
+          }}
+          placeholder="Message JEXI…"
+          className="jx-input"
           disabled={isProcessing}
         />
         {isProcessing ? (
-          <button
-            type="button"
-            onClick={onStop}
-            className="w-10 h-10 flex items-center justify-center bg-status-error/10 text-status-error border border-status-error/40 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
-            title="Stop"
-          >
+          <button type="button" onClick={onStop} className="jx-sendbtn stop" title="Stop" aria-label="Stop">
             <Square className="w-4 h-4" />
           </button>
         ) : (
-          <button
-            type="submit"
-            disabled={!canSend}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-brand text-black disabled:bg-surface-2 disabled:text-text-tertiary transition-all duration-200 hover:scale-105 hover:shadow-[0_0_18px_rgba(0,255,157,0.4)] active:scale-95"
-            title="Send"
-          >
+          <button type="submit" disabled={!canSend} className="jx-sendbtn" title="Send" aria-label="Send">
             <Send className="w-4 h-4" />
           </button>
         )}
