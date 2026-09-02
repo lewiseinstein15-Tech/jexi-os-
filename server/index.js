@@ -12,6 +12,8 @@ import { createMathStreamBuffer, normalizeMathDelimiters } from './src/services/
 import { sanitizeOutgoingLinks, createLinkSafeStream } from './src/services/Formatting.js'; // B187 — never send localhost links // B174 — math-safe streaming + B174c delimiter normalization
 import { tryExecuteCommand, helpText, registerCommand } from './src/services/CommandRegistry.js'; // B167 — /watch + friends
 import { listProfiles, loadProfile, searchMemory, rememberFor } from './src/services/AgentProfiles.js'; // B180 — Hermes profiles
+import { profileCoverage, generateAllProfiles, ensureProfile } from './src/services/ProfileCompleteness.js'; // B191 — every agent profiled
+import { saveProject, listProjects, resumeBrief, updateProject, closeProject, findProject } from './src/services/ProjectMemory.js'; // B191 — project memory
 import { delegate, scheduleJob, dispatchJob, jobStatuses, cancelJob, startGateway, runAgentTask, parseNaturalSchedule } from './src/services/AgentGateway.js'; // B180 — gateway
 import { saveSkill, recallSkills, autoSkill } from './src/services/SkillLoop.js'; // B180 — skill loop
 import { routeToTeam, runTeam } from './src/services/TeamRouter.js'; // B183 — Nova's dispatcher
@@ -127,6 +129,14 @@ try { startGateway(); console.log('[Gateway] agent gateway started (jobs resume 
 
 // B188 — workspace TTL sweep on boot: finished projects clean themselves
 sweepWorkspace().then((r) => { if (r.cleared.length) console.log('[Workspace] swept:', r.cleared.join(', ')); }).catch(() => {});
+
+// B191 — profile completeness: every planner-deployable agent gets a Hermes
+// profile (hand-written named ones + auto-generated from the roster).
+try {
+  const made = generateAllProfiles();
+  const cov = profileCoverage();
+  console.log(`[Profiles] ${cov.named.length} named + ${made.length} generated = ${cov.covered}/${cov.coverable} agents profiled`);
+} catch (e) { console.error('[Profiles] generation failed:', e.message); }
 
 // B189 — COLD-START WARMUP: the free instance restarts often; the first user
 // message used to pay 30-50s warming module caches + provider sockets. Warm
@@ -815,6 +825,7 @@ app.get('/api/plugins', (req, res) => res.json({ plugins: listRegistryPlugins() 
 // B162 — the named coworker roster (people names only; no raw model IDs).
 app.get('/api/team', (req, res) => res.json({ team: teamRoster() }));
 // B180 — the Hermes-style agent surface
+app.get('/api/agents/coverage', (req, res) => res.json(profileCoverage()));
 app.get('/api/agents/profiles', (req, res) => res.json({ profiles: listProfiles().map((p) => ({ name: p.name, displayName: p.displayName, role: p.role, tools: p.config.tools, model: p.config.model })) }));
 app.get('/api/agents/:name/memory', (req, res) => res.json({ agent: req.params.name, memories: searchMemory(req.params.name, String(req.query.q || ''), { limit: 10 }) }));
 app.post('/api/agents/delegate', async (req, res) => {
@@ -1371,6 +1382,49 @@ app.post('/api/chat', async (req, res) => {
       } catch (e) {
         sendEvent('log', { agent: 'Nova', message: `⚠ team routing skipped (${String(e && e.message || e).slice(0, 80)}) — standard pipeline.` });
       }
+
+      // B191 — PROJECT MEMORY: "remember this project", "continue project X",
+      // "my projects", "project X is done" — durable, resumable work units.
+      try {
+        const low = raw.toLowerCase();
+        if (/remember (this|the) (project|app|build)/.test(low) || /save (this|the) (project|app|build)/.test(low)) {
+          const asName = raw.match(/\b(?:as|called|named)\s+["']?([\w -]{2,40})["']?/i)?.[1];
+          const lastJexi = [...(loadConversationEvents(convId, 8) || [])].reverse().find((e) => e.role === 'jexi');
+          const firstUser = (loadConversationEvents(convId, 8) || []).find((e) => e.role === 'user');
+          const proj = saveProject({
+            name: (asName || firstUser?.text || 'My project').slice(0, 60),
+            goal: String(firstUser?.text || effectiveQuery || raw).slice(0, 400),
+            conversationId: convId,
+            notes: String(lastJexi?.text || '').slice(0, 1500),
+          });
+          done({ success: true, summary: `### 💾 Project saved — **${proj.name}**\n\nI'll remember the goal, the files and this conversation. Days from now, just say **\"continue ${proj.name}\"** (or \"continue my project\") and I'll pick up exactly here — no re-explaining.` });
+          finish(); return;
+        }
+        if (/continue (my|the) (project|app|build)|resume (my|the|it)/.test(low)) {
+          const named = raw.match(/continue (?:my |the )?(?:project |app |build )?["']?([\w -]{2,40})["']?/i)?.[1];
+          const proj = (named && findProject(named)) || listProjects({ includeDone: false })[0];
+          if (proj) {
+            const brief = resumeBrief(proj.id);
+            sendEvent('log', { agent: 'Memory', message: `💾 Resuming "${proj.name}" — restoring goal, files and decisions.` });
+            // route the RESTORE BRIEF through the normal pipeline (keeps teams/tools)
+            effectiveQuery = `Continue this project.\n\n${brief}`;
+          } else {
+            done({ success: true, summary: "I couldn't find a saved project to continue. Say **remember this project** first, or tell me what to build." });
+            finish(); return;
+          }
+        } else if (/my projects|show (my )?projects|project list/.test(low)) {
+          const ps = listProjects();
+          done({ success: true, summary: ps.length
+            ? `### 💾 My projects\n\n${ps.map((x) => `- **${x.name}** (${x.status}, ${x.files} files, updated ${new Date(x.updatedAt).toLocaleDateString()}) — next: ${x.nextSteps?.[0] || 'open-ended'}`).join('\n')}\n\n_Say \"continue <name>\" to pick one back up._`
+            : '### 💾 My projects\n\nNone saved yet. After any build, say **remember this project** and I will keep it resumable forever.' });
+          finish(); return;
+        } else if (/(project|app|build) ["']?[\w -]+["']? is done|finish (the |my )?(project|app|build)/.test(low)) {
+          const named = raw.match(/(?:project|app|build) ["']?([\w -]{2,40})["']? is done/i)?.[1] || raw.match(/finish (?:the |my )?(?:project|app|build) ([\w -]{2,40})/i)?.[1];
+          const proj = closeProject(named || listProjects({ includeDone: false })[0]?.id);
+          done({ success: true, summary: proj ? `🏁 **${proj.name}** marked done — kept in the archive for reference.` : 'No matching project to close.' });
+          finish(); return;
+        }
+      } catch (e) { /* project memory is best-effort — never blocks chat */ }
 
       // B188 — WORKSPACE INTENT: "publish it/my app", "clear my workspace",
       // "done with <project>" — the separate build home, in plain language.

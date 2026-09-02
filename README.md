@@ -1,194 +1,127 @@
-# 🧠 JEXI OS — Multi-Agent AI Operating System
+# ⚡ JEXI OS — Your Personal AI Operating System
 
-**JEXI OS** turns one AI coding agent into a **virtual team of 207 specialized agents (495 skills · 151 tools)** — each with a focused mandate, strict deliverables, and enforced review gates — all orchestrated through one chat interface.
+**JEXI** is a multi-agent AI system you can talk to like a person. She plans, builds, researches, remembers, schedules, and ships — streaming every step live so you always see what she's doing.
 
-Ask it to **"build an app that tracks my water intake"** and JEXI plans a team, then runs Product → Designer → Engineer → Coder → Runner → QA → Reviewer → Security → Shipper → Reflector in sequence, streaming live logs, writing real files you can preview and download, and reporting a full build report in chat.
-
----
-
-## ✨ The Specialist Team
-
-JEXI runs a **roster of 207 specialists (495 skills · 151 tools)** — the Planner composes a small focused team per task, never all of them at once. Here are the core specialists you'll see most often; the **full 207-agent catalog** (with every skill and tool) is in [AGENT-CATALOG.md](AGENT-CATALOG.md).
-
-| # | Agent | What it does |
-|---|-------|--------------|
-| 01 | **Product Manager** | Defines requirements, scope modes, success criteria |
-| 02 | **Designer** | UI/UX design system, layouts, visual spec |
-| 03 | **Engineer** | Architecture, build plan, technical approach |
-| 04 | **Coder** | Writes the actual code, fixes debug loops |
-| 05 | **QA Lead** | Runs the app, verifies against spec, PASS/FAIL gate |
-| 06 | **Reviewer** | Code review with APPROVED/CHANGES-REQUESTED gate |
-| 07 | **Shipper** | Release notes, handoff summary |
-| 08 | **Security Officer** | Security review with CLEARED/FLAGGED gate |
-| 09 | **Reflector** | Retrospective on the completed mission |
-| 10 | **Search Agent** | Web research with re-ranking + source synthesis |
-| 11 | **News Agent** | Live headlines from free feeds (no API key) |
-| 12 | **Memory Agent** | Long-term memory: tf-idf, recency×importance×relevance scoring, consolidation |
-| 13 | **Computer Use Agent** | Real browser control — numbered elements, click/type/scroll |
-| 14 | **Vision Agent** | Webcam eyes + on-device face/gesture landmarking |
-| 15 | **Video Analyst** | Watches videos frame-by-frame — timestamped captions, sampled frames, key moments (YouTube, TikTok, Instagram, Vimeo, direct files) |
-| 16 | **GitHub Agent** | Commit, push, PRs, issues — powered by your token |
-| 17 | **Data Agent** | Data analysis, statistics |
-| 18 | **DevOps Agent** | Deploy config, infrastructure |
-| 19 | **Writer Agent** | Long-form writing |
-| 20 | **Translator Agent** | Translation between languages |
-| 21 | **Perf Agent** | Performance analysis & optimization |
-
-The **Planner** reads your request and picks the right team — including *compound tasks* (e.g. "research X, then build Y" runs the Research team, then hands its findings to the Coding team).
+> One chat box. Behind it: a 5-agent delegation team (Hermes-style profiles), 213 profiled specialists, 18 search engines, a coding loop that runs and fixes real code, isolated per-agent memory, a self-improving skill loop, and her own workspace where builds go live on the public internet — all on **100% free infrastructure, no credit card**.
 
 ---
 
-## 🚀 Quick Start (local)
+## 🌐 Use JEXI
 
-```bash
-# Terminal 1 — the Brain (Express backend, port 3002)
-cd server && npm ci && npm start
-
-# Terminal 2 — the UI (Vite, port 3000, proxies /api → 3002)
-npm ci && npm run dev
-```
-
-Open http://localhost:3000 and say *"build an app that tracks my water intake"*.
-
-> Without an AI key, research, news, memory and book-library features still work.
-> Add a key in **Settings** (or set env vars) to unlock app-building, vision and full chat.
-
-## 🔑 Environment Variables
-
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| `GROQ_API_KEY` | one of the two | Fast chat/code generation (Groq) |
-| `GEMINI_API_KEY` | one of the two | Code tasks & vision (Gemini, preferred for code) |
-| `OPENROUTER_API_KEY` | optional | **Seed vision + free text** (ByteDance `bytedance-seed/seed-2.0-mini`, Seed 1.6, free Llama/DeepSeek routes) |
-| `CEREBRAS_API_KEY` | optional | **Cerebras free tier** (GPT-OSS 120B, no card) — extra fallback |
-| `DEEPINFRA_API_KEY` | optional | **DeepInfra free tier** (Llama 3.1 8B etc., no card) — extra fallback |
-| `MISTRAL_API_KEY` | optional | **Mistral free Experiment tier** (open models, no card) — extra fallback |
-| `XAI_API_KEY` | optional | **Grok (xAI)** — `grok-4.6` frontier models via api.x.ai/v1 (OpenAI-compatible) — extra fallback |
-| `HF_TOKEN` | optional | **HuggingFace free Inference API** (text) — last-resort provider when the others rate-limit (often blocked from datacenter IPs — usually skipped) |
-| `GITHUB_TOKEN` | optional | GitHub Agent (commit/push/PRs) |
-| `JEXI_API_KEY` | optional | **Locks the API** — all requests must send `x-jexi-key` |
-| `JEXI_MCP_KEY` | optional | **Locks the MCP endpoint** (`/mcp`) — clients must send `Authorization: Bearer <key>` |
-| `CORS_ORIGINS` | optional | Comma-separated browser origins allowed to call the API |
-| `REDIS_URL` | optional | Shared memory across instances/restarts |
-| `DATA_DIR` | optional | Persistent data location (defaults to `server/data`) |
-| `PORT` | optional | Backend port (default 3002) |
-
-Env vars always win over values pasted in the Settings panel — ideal for Render/Vercel/serverless.
-
-## 🧠 The 207-Specialist Roster, 495 Skills, Auto Tool Routing, Provider Router & Verification Loop
-
-Inspired by the research on open-source agent frameworks (OmniRoute's provider auto-fallback, Atomic Agents' role catalog, LangGraph's loop/graph engineering, MetaGPT's SOP teams), JEXI's brain now has four layers:
-
-**1. Agent Roster — 207 specialists.** A catalog of specialist roles (Planner, Product, Designer, Engineer, Coder, QA, Reviewer, Critic, Security, Shipper, Tool Router, Toolsmith, Context Manager, Archivist, Document Analyst, Data Engineer, Guardrail, Researcher, Searcher, Synthesizer, Fact Checker, Translator, Data Analyst, DevOps, GitHub, Vision, Computer Use and more). The Planner **composes only the small subset a task needs** — the whole trick of running big rosters is that the catalog is large but the active team is small and focused. Every plan announces it live: `Roster (207 specialists) → 6 deployed for this task.`
-
-**2. Skill Registry — 495 skills.** Every specialist masters a set of named skills (web search, citation, fact-grounding, code generation, QA gates, translation reflection loops, math LaTeX, rolling-summary, context-compaction, episodic-memory, document-rag, tool-selection, critical-review, guardrails, …). The pipeline streams which skills a task will use.
-
-**2.5 Auto Tool Routing — 151 tools, picked per task.** JEXI has a first-class **Tool Registry** (Web Search, Deep Read, Browser Control, Memory Recall, Rolling Summary, Knowledge Search, Book Library, Run Code, Write Files, Fix & Re-run, Code Review, Security Scan, Fact Check, GitHub CLI, Data Crunch, Chart Builder, Self Diagnose, Translate, … — the smolagents/OpenAI Agents SDK pattern: tools are atomic actions, skills are workflows). For **every** task the Tool Router derives the exact tool set from the composed team automatically — `Auto-selected tools for this task (6): Web Search · Deep Read · Fact Check · …` — no manual tool instruction is ever needed, and the tool set is kept small on purpose (AutoTool-style pruning so decisions stay reliable).
-
-**3. Provider Router — auto-fallback across every key.** OmniRoute-style: Groq → Gemini → OpenRouter (Seed vision + free text) → Cerebras → DeepInfra → Mistral → Grok (xAI) → HuggingFace (free Inference API) — every provider optional, keyed by `GROQ_API_KEY` / `GEMINI_API_KEY` / `OPENROUTER_API_KEY` / `CEREBRAS_API_KEY` / `DEEPINFRA_API_KEY` / `MISTRAL_API_KEY` / `XAI_API_KEY` / `HF_TOKEN`. If a provider rate-limits or errors 3× it enters a 30s cooldown and the router slides to the next healthy provider automatically — one dead key never kills a task. `get_health`/`/api/health` report live per-provider health (never keys).
-
-**4. Verification Loop — anti-hallucination.** After research/learning/knowledge answers are synthesized, a Critic re-reads the draft against the sources it cites, flags invented or unsupported claims, and a revision pass fixes them — bounded to 2 rounds so it always terminates. With no AI keys or for short answers it no-ops instantly, so it never slows a plain reply.
-
-**5. Layered Conversation Memory — remembers like a real AI.** A three-layer memory (the Mem0 / DeepAgents / OpenAI sessions pattern): recent turns stay verbatim, older turns are compressed into a **rolling running summary** (Context Manager), memorable exchanges are kept as **episodes** (Archivist), and anything JEXI already researched is **recalled from her mind** and injected into the next reply ("I remembered this from my mind."). Long conversation replies also pass the anti-hallucination loop, so JEXI doesn't invent facts while chatting.
-
-**5.4 Conversational Continuity — never forgets the thread.** Ask "what is computer science?", then say "give me a roadmap for a beginner in this course" — JEXI resolves "this course" against the recent conversation before planning (the Conversational-RAG / LlamaIndex condense_question pattern): a context-dependent message is rewritten into a self-contained query using the transcript (one cheap LLM call, only when needed; deterministic topic-anchor fallback with no key), the resolved query is what the Planner classifies and the Search Team searches, and the recent thread is injected into the Search Team's analyzer + synthesizer so answers stay in the flow. Watch for the live `🧠 Continuity — resolved …` log event.
-
-**5.5 Hybrid Vector Memory — the TencentDB-Agent-Memory pattern.** Every memory (research, code solutions, user facts) also gets a **vector embedding** via Groq's free `nomic-embed-text-v1.5` (rides the existing `GROQ_API_KEY` — no new key). Recall fuses **keyword tf-idf + vector cosine** (TencentDB's "BM25 + vector + RRF" idea), so JEXI finds memories *semantically* — "machine intelligence" can surface her notes on "neural networks" even when no word matches. Each task's specialists are also **equipped with the memories they need** (Coder → past solutions, Researcher → past research — the "agent loadout" idea), and retrieval is capped by count + character budget so memory never floods the context window. Try it: `GET /api/memory/search?q=...` (locked behind `x-jexi-key` when the API is locked). Run a live per-provider key test at `GET /api/health/providers` to see exactly which AI keys work end-to-end.
-
-## 🧪 Testing
-
-```bash
-npm test          # runs all 15 backend test suites (routing, agents, books, memory, perf, PDF…)
-```
-
-See [TEST.md](TEST.md) for the suite list.
+| Where | Link |
+|---|---|
+| **Web (always newest)** | https://lewiseinstein15-Tech.github.io/jexi-os-/ |
+| **Android app (APK)** | https://github.com/lewiseinstein15-Tech/jexi-os-/releases/latest/download/app-debug.apk |
+| **Her build workspace** (live apps she made) | https://lewiseinstein15-tech.github.io/jexi-workspace/ |
 
 ---
 
-## 🔌 Model Context Protocol (MCP)
+## ✨ What she does
 
-JEXI exposes a **Model Context Protocol** server so AI assistants (Claude Desktop, Cursor, Claude Code, ChatGPT…) can securely call JEXI's tools and read her data — the same brain the chat UI uses, over one endpoint: **`/mcp`**.
+### 🤖 The agent team (Hermes Agent architecture)
+- **Nova** (orchestrator) receives every request and delegates: **Ada** (dev), **Kito** (research), **Zuri** (comms/delivery), **Tari** (scheduler)
+- Each agent = its own **profile**: `config.yaml` (model lane, allowed tools, budgets) + `SOUL.md` (identity) + **isolated memory** + **auto-saved skills**
+- **213/213 planner-deployable agents have profiles** — 5 hand-crafted + the rest auto-generated from the roster (`/api/agents/coverage`)
+- Agents **talk to each other** mid-task (`agent_ask`, bounded to 2 questions/task) and return **structured envelopes** — parallel or sequential
+- **Multi-model by design**: tasks rotate across all free providers (Groq, Gemini, OpenRouter, Mistral, NVIDIA, …) — never glued to one brain
 
-### Start it
+### 🛠 Building (the DSH coding loop)
+- One agent + real tools: `str_replace_editor` → shell → python → GitHub — **write → run → observe the exact error → fix → re-run**
+- Narrates every action in first person: *"I created index.html (412 bytes)" · "I ran `node app.js` → success" · "🔁 I fixed it — the rerun passed"*
+- If a first pass comes back empty she **rewrites the brief herself** and retries (never asks you to rephrase)
+- Guaranteed build: if the smart loop stalls, the classic builder delivers — never a text-only reply to a build request
 
-It's mounted inside the main server — just run JEXI normally:
+### 🚀 Her workspace (separate build home)
+- Finished web builds **auto-publish** to a dedicated free site with a **public link that works on any phone**
+- Portfolio-style index of every project; **auto-cleans 24h after publish** or on demand ("done with X", "clear my workspace")
+- Zero localhost links, ever — enforced in every summary AND every live stream token
 
-```bash
-cd server && npm start        # http://127.0.0.1:3002/mcp
-# or standalone on its own port:
-node mcp-server.js            # http://127.0.0.1:3457/mcp
-```
+### 💾 Project memory
+- "remember this project" → goal, files, decisions, next steps and the conversation are saved durably
+- Days later: "continue my project" → a full **restore brief** — she picks up exactly where she stopped
+- "my projects" lists them; "project X is done" archives it
 
-Your deployed instance exposes it at `https://<your-host>/mcp` (e.g. `https://jexi-os-brain.onrender.com/mcp`) — you can point Claude Desktop / Cursor straight at that public URL instead of localhost.
+### 🧠 Memory & self-improvement
+- Per-agent isolated memory (no context bleed) + hybrid keyword/vector recall
+- **Skill loop**: after every task she saves what worked as a portable skill (agentskills.io format); before every task she recalls precedent — `/refine` forces a save
+- Conversation continuity: rolling summaries, episodes, learned facts/preferences
 
-### Exposed tools (allowlist)
+### 🔎 Whole-internet search (18 engines)
+- **Tavily** (free key) + DeepSeek Search + Google News + DuckDuckGo ×2 + Mojeek + Bing + SearXNG + Marginalia + HN + DDG Answers + Wikipedia + arXiv + OpenAlex + Stack Overflow + Brave (optional)
+- Health-aware rotation, cross-engine rank fusion, **diversity cap** (no single source floods results)
 
-| Tool | What it does |
-|------|--------------|
-| `ask_jexi` | Run any task/question through JEXI's full agent team (planner → agents → verified result) |
-| `memory_lookup` | Read what JEXI remembers about you (profile, facts, memory stats) |
-| `knowledge_search` | Search the saved knowledge library |
-| `list_books` | List books in the library |
-| `get_health` | Check brain status + which AI providers are configured |
+### 📺 Video watching (`/watch`)
+- Paste a link (TikTok/Instagram/Vimeo/X/direct) or just say *"what is this YouTube video about ___"*
+- Downloads → transcript (captions or free Whisper on Groq) → **scene-cut frames + 0–10s hook microscope** → answers with timestamps
 
-### Exposed resources (read-only)
+### 🎨 The presenter (answers that look right)
+- Real rendered **math** (KaTeX; every LaTeX dialect normalized, no half-typed formulas mid-stream)
+- **Charts** (bar/line/pie, drawn as real graphs), **mermaid diagrams**, **vision-verified pictures**, AI **image generation** (free), tables with thousand separators
+- Named coworkers stream live: *MAYA · WRITING…*, 💭 Think row, ⚡ per-answer speed line
 
-| Resource | Contents |
-|----------|----------|
-| `memory://user` | User profile + learned preferences/facts |
-| `memory://chat` | Recent chat history |
-| `knowledge://structure` | Knowledge library structure & status |
-| `knowledge://files/{category}` | Knowledge files for a category |
+### ⏰ Autonomy & delivery
+- Natural-language scheduling: *"every morning at 8am give me tech news"* — no cron syntax
+- Jobs run **unattended, survive restarts**, and **deliver** results (file + email + chat) without being asked
+- `/agents` shows the team, jobs and recent skills; `/workspace` shows published builds
 
-> **Safety:** this is a deliberate minimal surface — the only action tool is `ask_jexi`, which runs JEXI's own safe planner (no destructive operations are exposed: no memory wipe, no deletes, no settings writes). Unknown tools are rejected automatically by the SDK. Set `JEXI_MCP_KEY` to require a bearer token on every MCP request.
+### 🐙 GitHub engine
+- Scan any repo, read files, **edit + commit via API**, full repo/PR review — `GITHUB_TOKEN` already wired
 
-### Connect Claude Desktop
-
-Add to `claude_desktop_config.json` (`~/Library/Application Support/Claude/` on macOS):
-
-```json
-{
-  "mcpServers": {
-    "jexi-os": {
-      "type": "http",
-      "url": "http://127.0.0.1:3002/mcp",
-      "headers": { "Authorization": "Bearer YOUR_JEXI_MCP_KEY_IF_SET" }
-    }
-  }
-}
-```
-
-### Connect Cursor
-
-Cursor → **Settings → MCP → + Add new MCP server** → mode **HTTP** → URL `http://127.0.0.1:3002/mcp` (add the bearer header if `JEXI_MCP_KEY` is set). Then ask Cursor to use the `ask_jexi` tool.
-
-### Test it
-
-```bash
-npx @modelcontextprotocol/inspector --url http://127.0.0.1:3002/mcp
-# or with curl:
-curl -X POST http://127.0.0.1:3002/mcp \
-  -H 'Content-Type: application/json' \
-  -H 'Accept: application/json, text/event-stream' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}'
-```
-
-A full example client config lives in [`mcp.example.json`](mcp.example.json).
-
-## 🚢 Deployment
-
-- **Render (backend):** the repo ships a [render.yaml](render.yaml) blueprint — New → Blueprint → pick repo. Free tier included.
-- **Frontend:** GitHub Pages workflow (`.github/workflows/deploy.yml`) or Vercel (set `VITE_JEXI_BACKEND_URL` to your Render URL).
-- **Docker / Hugging Face Spaces:** `docker build -t jexi-os . && docker compose up -d` (see [Dockerfile](Dockerfile)).
-- **Scaling:** [SCALING.md](SCALING.md) covers Redis-mirrored memory and the Cloudflare Worker load balancer.
-- **Android app:** [ANDROID.md](ANDROID.md) builds the Capacitor APK.
-
-Full instructions: **[DEPLOY.md](DEPLOY.md)**.
-
-## 📚 Built-in Knowledge
-
-JEXI reads books & news herself — Wikipedia, Project Gutenberg, arXiv, Open Library, Google News/BBC RSS — no API keys. Say *"study calculus"* and she distills the topic into your knowledge library for good. Upload your own PDFs/TXT/MD in the **Knowledge** tab too.
+### 🔐 Self-healing APK
+- In-app updates with ZIP validation + browser fallback
+- If her brain ever moves servers, installed apps **find the new home automatically** (brain.json discovery) — an app can never be stranded
+- Boot warmup: the first message after a server restart answers in seconds
 
 ---
 
-Built for **Lewis Einstein** (AI & ML Engineer) — the entire team works for you, 24/7, free.
+## 🗣 Try these
+
+```
+build me a quiz app as a web app          → Ada builds + publishes it live
+give me the preview link                  → a working public link, no questions
+what is 2/3 + 1/4? show working          → textbook math
+compare rust vs go for backends           → sourced research + a chart
+show me a picture of a cheetah            → vision-verified photo
+every morning at 8am give me AI news      → scheduled + delivered
+remember this project  …  continue it     → resumes days later
+/agents · /workspace · /refine · /watch   → the command surface
+```
+
+---
+
+## 🏗 Architecture (quick map)
+
+```
+chat ──► Nova's dispatcher (TeamRouter)
+          ├─ build/fix → Ada (DSH coding loop) ──► workspace publish
+          ├─ research → Kito (18-engine seam, fusion + diversity cap)
+          ├─ schedule → Tari (NL jobs, restart-safe, delivery)
+          └─ else → classic orchestrator graph (213 profiled specialists)
+memory: per-agent stores · skills (agentskills.io) · project memory
+hosting: Render image (GH Actions builds it — zero build minutes)
+         + GitHub Pages (app) + GitHub Pages (workspace) — all free
+```
+
+Key modules: `AgentProfiles` · `AgentGateway` · `SkillLoop` · `TeamRouter` · `DshCoding` · `WebSearch` · `VideoWatch` · `WorkspacePublisher` · `ProjectMemory` · `ProfileCompleteness` · `updateCenter`
+
+---
+
+## 🧪 Quality
+
+- **~3,930 automated checks**, 0 failures (`cd server && npm test`)
+- CI on every push; live smoke tests for math/search/pictures/video/builds
+- Every fix traced from real chat logs → regression test
+
+## 🔧 Self-hosting
+
+```bash
+# brain
+cd server && npm ci && npm start          # port 3002, DATA_DIR for memory
+# web
+npm ci && npm run dev                     # proxies /api → 3002
+```
+Env keys: any of GROQ/GEMINI/OPENROUTER/MISTRAL/NVIDIA/SAMBANOVA/TAVILY (all free tiers) + GITHUB_TOKEN. `JEXI_API_KEY` locks the API. Full guide: `DEPLOY-IMAGE-RENDER.md`.
+
+---
+
+*Built by Lewis & the JEXI agent · MIT · 100% free-tier infrastructure, no credit card, ever.*
