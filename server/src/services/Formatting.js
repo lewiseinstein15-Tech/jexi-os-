@@ -201,7 +201,7 @@ export function createMathStreamBuffer() {
  * servable HTML file instead — a dead link is never acceptable. */
 const LOCAL_RE = new RegExp('https?:\\/\\/(?:localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[::1\\]|10\\.\\d+\\.\\d+\\.\\d+|172\\.(?:1[6-9]|2\\d|3[01])\\.\\d+\\.\\d+|192\\.168\\.\\d+\\.\\d+)(?::\\d+)?(?:\\/[^\\s)\\]]*)?', 'gi');
 
-export function sanitizeOutgoingLinks(text, publicBase, { existsInWorkspace = null } = {}) {
+export function sanitizeOutgoingLinks(text, publicBase, { _existsInWorkspace = null } = {}) {
   const base = String(publicBase || '').replace(/\/$/, '');
   if (!base) return String(text || ''); // no public base known — leave as-is
   return String(text || '').replace(LOCAL_RE, (m) => {
@@ -250,12 +250,9 @@ export function createLinkSafeStream(publicBase) {
       // inside `hold`, any URL that has clearly TERMINATED (followed by
       // whitespace/paren/quote/end-punct) is complete → release it too
       const doneInHold = hold.match(/^([^\s)\]'"]*?)(https?:\/\/[^\s)\]'"]+[\s)\]'",.!?]|$)([\s\S]*)$/);
-      if (doneInHold && doneInHold[2] && /[\s)\]'",.!?]/.test(doneInHold[2].slice(-1))) {
+      if (doneInHold && doneInHold[2] && doneInHold[2].length > 0 && /[\s)\]'",.!?]/.test(doneInHold[2].slice(-1))) {
         safe += doneInHold[1] + doneInHold[2];
-        hold = doneInHold[3];
-      } else if (doneInHold && doneInHold[2] && doneInHold[3] === '' && /[\s)\]'",.!?]/.test(doneInHold[2].slice(-1))) {
-        safe += doneInHold[1] + doneInHold[2];
-        hold = '';
+        hold = doneInHold[3] || '';
       }
       pending = hold;
       return rewrite(safe);

@@ -1144,7 +1144,7 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
             'You write crisp engineering briefs.',
           ) || '').trim();
           if (sharper.length > 60) {
-            sendEvent('log', { agent: 'Ada', message: `📝 self-rewritten brief: ${sharer(sharper).slice(0, 90)}…` });
+            sendEvent('log', { agent: 'Ada', message: `📝 self-rewritten brief: ${String(sharper).replace(/\\s+/g, ' ').slice(0, 90)}…` });
             project = await generateCode(sharper, sendEvent);
             if (project && project.files && project.files.length) {
               fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
