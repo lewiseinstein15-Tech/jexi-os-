@@ -5,6 +5,7 @@ import TypedMessage from './TypedMessage';
 import ThinkRow from './ThinkRow'; // B173 — dsh ReasoningRow
 import ActionFeed from './ActionFeed'; // B184 — arena-style action timeline
 import OrbCore from './OrbCore'; // B192 — the presence orb (empty state)
+import Composer from './Composer'; // B195 — isolated, real-app input
 import MarkdownRenderer from './MarkdownRenderer';
 import VisionPanel from './VisionPanel';
 import AgentPipeline from './AgentPipeline';
@@ -105,7 +106,6 @@ function MessageActions({ text, onRegenerate }) {
 /* Main ChatWindow                                                      */
 /* ------------------------------------------------------------------ */
 export default function ChatWindow({ messages, logs, isProcessing, onSend, onStop, onVisionResult }) {
-  const [input, setInput] = useState('');
   const [image, setImage] = useState(null);
   const [visionOpen, setVisionOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -152,18 +152,6 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
     }
   }, [messages, isProcessing, logs]);
 
-  const taRef = useRef(null);
-
-  /* B194 — composer behaves like real chat apps:
-     textarea autosizes 1→5 rows; Enter sends; Shift+Enter new-lines;
-     after sending, the keyboard closes and the field resets its height. */
-  const autosize = () => {
-    const el = taRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(120, el.scrollHeight)}px`;
-  };
-
   const handleFile = (e) => {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith('image/')) return;
@@ -173,20 +161,11 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
     e.target.value = '';
   };
 
-  const handleSubmit = (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-    if ((!input.trim() && !image) || isProcessing) return;
-    onSend(input, image);
-    setInput('');
+  const handleComposerSend = (t) => {
+    if (isProcessing) return; // queueing is handled inside Composer
+    onSend(t, image);
     setImage(null);
-    // real-app behavior: shrink the field and drop the keyboard
-    requestAnimationFrame(() => {
-      if (taRef.current) { taRef.current.style.height = 'auto'; }
-      if (window.innerWidth < 900 && taRef.current?.blur) taRef.current.blur();
-    });
   };
-
-  const canSend = (input.trim() || image) && !isProcessing;
 
   return (
     <div className="jx-chatroot">
@@ -331,40 +310,8 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
         </button>
       </div>
 
-      {/* Input bar */}
-      <form
-        onSubmit={handleSubmit}
-        className="surface-float flex gap-2 items-center rounded-xl p-1.5 pl-3 flex-shrink-0 transition-all duration-200 focus-within:border-brand-line focus-within:shadow-[0_0_0_3px_var(--brand-dim)]"
-      >
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleFile}
-        />
-        <textarea
-          ref={taRef}
-          rows={1}
-          value={input}
-          onChange={(e) => { setInput(e.target.value); autosize(); }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(e); }
-          }}
-          placeholder="Message JEXI…"
-          className="jx-input"
-          disabled={isProcessing}
-        />
-        {isProcessing ? (
-          <button type="button" onClick={onStop} className="jx-sendbtn stop" title="Stop" aria-label="Stop">
-            <Square className="w-4 h-4" />
-          </button>
-        ) : (
-          <button type="submit" disabled={!canSend} className="jx-sendbtn" title="Send" aria-label="Send">
-            <Send className="w-4 h-4" />
-          </button>
-        )}
-      </form>
+      {/* B195 — isolated composer: typing never re-renders the chat */}
+      <Composer isProcessing={isProcessing} onSendText={handleComposerSend} onStop={onStop} />
 
 
       <VisionPanel

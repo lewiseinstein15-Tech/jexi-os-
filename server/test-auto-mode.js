@@ -57,7 +57,7 @@ ok(!/MODE_STORAGE|toggleMode/.test(chat), 'ChatWindow has no mode state/toggle')
 // one-mode invariant now lives in the absence of any mode UI + the engine
 // never sending the mode header (checked above).
 ok(!/JEXI DECIDES/.test(chat) && !/MODE/.test(chat), 'ChatWindow has no mode badge at all (v3 minimal)');
-ok(/onSend\(input, image\)/.test(chat), 'send still calls onSend with the input (image rides along)');
+ok(/onSend\(t, image\)/.test(chat) || /handleComposerSend/.test(chat), 'send passes the composer draft + image (B195 isolated Composer)');
 ok(!/onSend\([^)]*,\s*[^)]*,\s*[^)]*,\s*mode\)/.test(chat), 'send no longer passes a mode argument (the B117 freeze bug)');
 const home = fs.readFileSync('../src/components/HomeView.jsx', 'utf-8');
 ok(!/toggleMode/.test(home) && !/jexi_mode/.test(home), 'HomeView has no mode pill/toggle');

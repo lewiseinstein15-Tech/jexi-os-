@@ -1183,3 +1183,13 @@ form.surface-float { flex-shrink: 0; }
 @supports (height: 100dvh) {
   .jx-app { padding-bottom: env(safe-area-inset-bottom, 0px); }
 }
+
+/* ═══ B195 — composer wrap: keyboard-aware + queued chip ═══ */
+.jx-composerwrap { flex-shrink: 0; padding-bottom: var(--kb, 0px); transition: padding-bottom .12s ease-out; }
+.jx-queued {
+  display: flex; align-items: center; gap: 7px; margin: 0 2px 8px;
+  font-family: var(--mono); font-size: 10px; color: var(--amber);
+  background: rgba(255,157,46,.07); border: 1px solid rgba(255,157,46,.3);
+  border-radius: 99px; padding: 6px 12px;
+}
+.jx-queued .qdot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); animation: jxblink 1.2s infinite; flex-shrink: 0; }
