@@ -4,6 +4,7 @@ import { Send, Square, ImagePlus, X, Camera, Stethoscope, Plus, Copy, Check, Ref
 import TypedMessage from './TypedMessage';
 import ThinkRow from './ThinkRow'; // B173 — dsh ReasoningRow
 import ActionFeed from './ActionFeed'; // B184 — arena-style action timeline
+import OrbCore from './OrbCore'; // B192 — the presence orb (empty state)
 import MarkdownRenderer from './MarkdownRenderer';
 import VisionPanel from './VisionPanel';
 import AgentPipeline from './AgentPipeline';
@@ -108,6 +109,7 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
   const [image, setImage] = useState(null);
   const [visionOpen, setVisionOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [plusOpen, setPlusOpen] = useState(false); // B193 — + toggle for EYES/PHOTO/CHECK
   const fileRef = useRef(null);
   const scrollRef = useRef(null);
   const qaRef = useRef(null);
@@ -181,13 +183,19 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {messages.length === 0 && !isProcessing ? (
-          /* Empty state — minimal welcome, vertically centered */
-          <div className="min-h-[55vh] flex flex-col items-center justify-center py-16">
-            <div className="w-12 h-12 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center mb-4">
-              <Sparkles className="w-5 h-5 text-brand" />
+          /* B192 — ORB HERO: her presence center-stage (the ZOEY_OS look) */
+          <div className="jx-orb-wrap">
+            <OrbCore size={Math.min(300, 260)} state="idle" label="JEXI CORE" />
+            <p className="jx-orb-hello">
+              <b>I'm listening.</b> Build something, research anything, watch a video,
+              or just talk — I stream every step as I work.
+            </p>
+            <div className="jx-suggest">
+              <button type="button" onClick={() => onSend('build me a quiz app as a web app')}>build an app</button>
+              <button type="button" onClick={() => onSend('what is 2/3 + 1/4? show working')}>solve math</button>
+              <button type="button" onClick={() => onSend('research the latest AI news')}>research</button>
+              <button type="button" onClick={() => onSend('show me a picture of a lion')}>show a picture</button>
             </div>
-            <p className="text-[13px] text-text-secondary font-medium mb-1">What can I help with?</p>
-            <p className="text-[11px] text-text-tertiary">Ask me anything — code, research, math, creative work, and more.</p>
           </div>
         ) : (
           /* Message list */
@@ -282,15 +290,28 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
         </div>
       )}
 
-      {/* Quick actions */}
-      <div ref={qaRef} className="flex gap-1.5 mb-2 flex-shrink-0 min-w-0">
-        {narrowQA ? (
-          <QuickAction icon={Plus} label="MORE" title="Quick actions" onClick={() => setQuickOpen(true)} />
-        ) : (
-          QUICK_ACTIONS.map((qa) => (
-            <QuickAction key={qa.label} icon={qa.icon} label={qa.label} title={qa.title} onClick={() => runQuickAction(qa.action)} />
-          ))
-        )}
+      {/* B193 — ONE + toggle instead of the EYES/PHOTO/CHECK row */}
+      {plusOpen && (
+        <div className="jx-plusmenu" role="menu">
+          {QUICK_ACTIONS.map((qa) => (
+            <button key={qa.label} type="button" role="menuitem" onClick={() => { setPlusOpen(false); runQuickAction(qa.action); }}>
+              <qa.icon size={15} strokeWidth={1.8} />
+              <span>{qa.label}</span>
+              <small>{qa.title}</small>
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="flex justify-end mb-2 flex-shrink-0">
+        <button
+          type="button"
+          className={`jx-plusbtn${plusOpen ? ' open' : ''}`}
+          aria-label="Camera, photo and self-check"
+          aria-expanded={plusOpen}
+          onClick={() => setPlusOpen((o) => !o)}
+        >
+          <Plus size={17} strokeWidth={2.2} style={{ transform: plusOpen ? 'rotate(45deg)' : 'none', transition: 'transform .2s' }} />
+        </button>
       </div>
 
       {/* Input bar */}
@@ -334,48 +355,6 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
         )}
       </form>
 
-      {/* Quick-actions bottom sheet */}
-      <AnimatePresence>
-        {quickOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end"
-            onClick={() => setQuickOpen(false)}
-          >
-            <motion.div
-              initial={{ y: 80, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 80, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full bg-surface-1 border-t border-hairline rounded-t-xl p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.4)]"
-            >
-              <div className="w-8 h-1 bg-white/15 rounded-full mx-auto mb-4" />
-              <p className="eyebrow mb-2">Quick actions</p>
-              <div className="space-y-2">
-                {QUICK_ACTIONS.map((qa) => (
-                  <button
-                    key={qa.label}
-                    type="button"
-                    onClick={() => runQuickAction(qa.action)}
-                    className="w-full flex items-center gap-3 bg-surface-2 border border-hairline hover:border-brand-line rounded-lg px-3 py-3 text-left transition-colors"
-                  >
-                    <span className="w-10 h-10 flex items-center justify-center bg-surface-1 border border-hairline rounded-md text-text-secondary">
-                      <qa.icon className="w-4 h-4" />
-                    </span>
-                    <span>
-                      <span className="block text-[12px] font-semibold text-text-primary">{qa.label}</span>
-                      <span className="block text-[10px] text-text-tertiary">{qa.title}</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <VisionPanel
         open={visionOpen}

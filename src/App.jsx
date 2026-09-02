@@ -11,6 +11,8 @@ import UpdateBanner from './components/UpdateBanner';
 import { discoverBrainUrl, setBrainUrl } from './utils/updateCenter'; // B179 — brain discovery self-heal
 import BootSplash from './components/BootSplash'; // B79 — branded loading screen on open (never a blank screen)
 import { SidebarBrandMark, SidebarBrandName } from './brand/official'; // B160 — dsh ui-brand-official
+import OrbCore from './components/OrbCore'; // B192 — the presence orb
+import { StatusCard, CalendarCard } from './components/WidgetCards'; // B192 — glass widgets
 import ErrorBoundary from './components/ErrorBoundary';
 
 const VIEWS = {
@@ -36,6 +38,8 @@ function MenuIcon({ name }) {
 
 export default function App() {
   const [view, setView] = useState('chat');
+  const [clock, setClock] = useState(() => new Date());
+  useEffect(() => { const t = setInterval(() => setClock(new Date()), 1000); return () => clearInterval(t); }, []);
   const [menuOpen, setMenuOpen] = useState(false);
   const [booted, setBooted] = useState(false);
   const [bootStatus, setBootStatus] = useState('Connecting to JEXI\u2019s brain…');
@@ -146,18 +150,17 @@ export default function App() {
           >
             <i /><i /><i />
           </button>
-          <div className="jx-word">JEXI</div>
+          <div className="jx-word">JEXI<em>_OS</em><span style={{ opacity: .5 }}>™</span></div>
           <div className="jx-dotsep" />
           <div className="jx-ctx">{VIEWS[view]?.label || 'Chat'}</div>
           <div className="jx-right">
-            <div className={`jx-stat${engine.isProcessing ? ' working' : ''}`}>
-              <span className="dot" />
-              {engine.isProcessing
-                ? (engine.logs.length
-                    ? `${engine.logs[engine.logs.length - 1]?.agent || 'JEXI'} — ${(engine.logs[engine.logs.length - 1]?.message || 'working…').slice(0, 46)}`
-                    : 'Working…')
-                : 'Online'}
-            </div>
+            <span className={`jx-pill${engine.isProcessing ? ' violet' : ''}`}>
+              <span className="pdot" />
+              {engine.isProcessing ? 'THINKING' : 'ONLINE'}
+            </span>
+            <span className="jx-clock">
+              {clock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
           </div>
         </header>
 
@@ -183,6 +186,21 @@ export default function App() {
             </button>
           ))}
         </nav>
+
+        {/* B192 — workbench: glass widgets beside the chat on desktop */}
+        <div className="jx-workbench">
+        <aside className="jx-widgets" aria-hidden="true">
+          <StatusCard active={engine.isProcessing ? 1 : 0} done={engine.messages.filter((m) => m.role === 'jexi' && !m.streaming).length} idle={!engine.isProcessing} />
+          <CalendarCard date={clock} />
+          <div className="jx2-card">
+            <div className="jx2-card-title">PRESENCE</div>
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0' }}>
+              <OrbCore size={170} state={engine.isProcessing ? 'thinking' : 'idle'} label="" />
+            </div>
+            <div className="jx2-card-foot" style={{ textAlign: 'center' }}>{engine.isProcessing ? 'WORKING' : 'STANDBY'}</div>
+          </div>
+        </aside>
+        <div className="jx-stage">
 
         {/* chat */}
         <section className={`jx-view${view === 'chat' ? ' show' : ''}`}>
@@ -226,6 +244,9 @@ export default function App() {
             <SettingsView />
           </div>
         </section>
+
+        </div>{/* /jx-stage */}
+        </div>{/* /jx-workbench */}
 
         <UpdateBanner />
       </div>
