@@ -178,6 +178,14 @@ ok('boot self-heal purge wired in index.js', idx.includes('purgeNonAnswerKnowled
   ok('content-as-files build routes to content_creation, never the coding loop', swahili.intent === 'content_creation');
   const stillCode = await planner._classifyRegex('build me a web app that tracks my water intake with a dashboard');
   ok('real app builds still route to code_task', stillCode.intent === 'code_task');
+  // the LIVE-KEY path: a classifier that says code_task must defer too
+  const savedClassify = planner._classifyLLM.bind(planner);
+  planner._classifyLLM = async () => ({ intent: 'code_task', tasks: ['coder'], reasoning: 'LLM said code', confidence: 0.9 });
+  const deferred = await planner.analyzeIntent('build me a complete swahili learning guide for beginners as files: 10 lessons, one file per lesson');
+  const keptCode = await planner.analyzeIntent('build me a web app that tracks water intake');
+  planner._classifyLLM = savedClassify;
+  ok('LLM code_task DEFERS to content_creation for content-as-files (Test B round 4)', deferred.intent === 'content_creation');
+  ok('LLM code_task stays code_task for real apps', keptCode.intent === 'code_task');
 
   const { runCodingLoop } = await import('./src/services/CodingLoop.js');
   const loop = await runCodingLoop({

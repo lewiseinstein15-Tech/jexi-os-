@@ -220,6 +220,7 @@ const CLASSIFIER_FEW_SHOTS = [
   { q: 'build an app that tracks my water intake', intent: 'code_task', reason: 'An app deliverable even without an explicit build verb.' },
   { q: 'write a readme for my project', intent: 'docs', reason: 'Documentation for existing work.' },
   { q: 'make my website load faster', intent: 'perf', reason: 'A performance task, not a build.' },
+  { q: 'build me a complete spanish learning guide as files, one lesson per markdown file', intent: 'content_creation', reason: 'A WRITING deliverable as files — the content team writes it; markdown is not runnable code (B199e).' },
 ];
 
 const CLASSIFIER_SYSTEM = `You are JEXI OS's intent classifier. You read a user request and decide which single specialist pipeline should handle it.
@@ -430,6 +431,18 @@ export class Planner {
             }
           }
         }
+        // B199e — same defer for CONTENT-AS-FILES deliverables: a live-key
+        // classifier labels "build me a Swahili guide, one file per lesson"
+        // as code_task (Test B rounds 3 & 4); the deterministic rule knows
+        // better — markdown lessons are a writing deliverable.
+        if (llm.intent === 'code_task' && this.isContentFileDeliverable(q)) {
+          return {
+            intent: 'content_creation',
+            tasks: ['content-strategist', 'blog-writer', 'editor', 'technical-editor'],
+            reasoning: `${llm.reasoning} — but this is a writing deliverable as files, so the content team writes it and the files land in the workspace.`,
+            confidence: llm.confidence,
+          };
+        }
         return llm;
       }
     } catch (e) {
@@ -580,16 +593,13 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
       return { intent: 'perf', tasks: ['perf'], reasoning: 'Performance request — the Performance Engineer measures the real files, fixes the top bottlenecks and proves the improvement.' };
     }
 
-    // 5.95 CONTENT-AS-FILES DELIVERABLE (B199e — Test B round 3): "build me a
-    //     complete Swahili learning guide, one file per lesson (.md)" is a
-    //     WRITING deliverable, not a program. Sent to the coding team it can
+    // 5.95 CONTENT-AS-FILES DELIVERABLE (B199e — Test B rounds 3 & 4): "build
+    //     me a complete Swahili learning guide, one file per lesson (.md)" is
+    //     a WRITING deliverable, not a program. Sent to the coding team it can
     //     never "run clean" — the Runner executes markdown, fails, and the
-    //     Debugger churns rewrites forever. A content noun + file cues routes
-    //     to the content team instead; the FileBlockWriter persists the files.
-    const contentNoun = /\b(guide|lessons?|textbook|workbook|curriculum|syllabus|manual|handbook|notes?|study materials?|cheat ?sheet|flashcards?)\b/i;
-    const fileCue = /\b(files?|one file per|\.md\b|markdown files?|as (a )?markdown)\b/i;
-    const buildVerb = /\b(build|create|make|write|generate|produce|draft|prepare|put together|compile)\b/i;
-    if (buildVerb.test(q) && contentNoun.test(q) && fileCue.test(q)) {
+    //     Debugger churns rewrites forever. Routes to the content team; the
+    //     FileBlockWriter persists the files.
+    if (this.isContentFileDeliverable(q)) {
       return { intent: 'content_creation', tasks: ['content-strategist', 'blog-writer', 'editor', 'technical-editor'], reasoning: 'A writing deliverable requested as files — the content team writes it and the files are saved to the workspace (never the coding loop: markdown is not runnable code).' };
     }
 
@@ -782,6 +792,21 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
    * Build phrasings still flow to the coding team via isCoding() (checked
    * earlier) — these rules catch the domain requests around them.
    */
+  /**
+   * B199e — CONTENT-AS-FILES DELIVERABLE detection: "build me a complete
+   * Swahili learning guide, one file per lesson (.md)" is a WRITING
+   * deliverable, not a program. Shared by the regex cascade AND the LLM-path
+   * defer (a live-key classifier says code_task for these — the coding team
+   * then can never "run clean" and the Debugger churns forever).
+   */
+  isContentFileDeliverable(q) {
+    const s = String(q || '').toLowerCase();
+    const contentNoun = /\b(guide|lessons?|textbook|workbook|curriculum|syllabus|manual|handbook|notes?|study materials?|cheat ?sheet|flashcards?)\b/i;
+    const fileCue = /\b(files?|one file per|\.md\b|markdown files?|as (a )?markdown)\b/i;
+    const buildVerb = /\b(build|create|make|write|generate|produce|draft|prepare|put together|compile)\b/i;
+    return buildVerb.test(s) && contentNoun.test(s) && fileCue.test(s);
+  }
+
   _domainIntent(q) {
     const rules = [
       [/write (me |a |an )?(story|novel|book|short story)|write (a |an )?(screenplay|poem|song|lyrics)|story (idea|plot|outline)|novel (idea|outline)|poetry|creative writing|book (idea|outline|plot)/i, { intent: 'creative_writing', tasks: ['novelist', 'screenwriter', 'editor', 'critic'], reasoning: 'Creative writing request — the writing team drafts, edits and critiques.' }],
