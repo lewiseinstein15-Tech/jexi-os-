@@ -94,4 +94,5 @@ queries, one task record per conversation, and cost/context-length routing
 signals.
 
 > **B209 update: ALL of the above are closed** — see `FIXLOG-B209.md`.
-> (COMMAND_*/TEST_* remain honestly unemitted: no employee shell exists yet.)
+> **B210 update: COMMAND_*/TEST_* are now real too** — employees execute
+> allowlisted commands in their task workspace (`FIXLOG-B210.md`).

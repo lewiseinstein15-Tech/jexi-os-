@@ -57,6 +57,9 @@ function reduceTeam(prev, evt) {
     // B209 — live supervision: the boss stopped a bad approach mid-stream
     case 'SUPERVISION_REDIRECT': touch({ status: 'correcting', currentTask: safe(evt.summary, 110) }); break;
     case 'TASK_BLOCKED': t.state = 'blocked'; break;
+    // B210 — real command execution by employees
+    case 'COMMAND_STARTED': case 'TEST_STARTED': touch({ status: 'executing', currentTask: safe(evt.summary, 110) }); break;
+    case 'COMMAND_COMPLETED': case 'COMMAND_FAILED': case 'TEST_COMPLETED': case 'TEST_FAILED': touch({ status: 'working', currentTask: safe(evt.summary, 110) }); break;
     case 'VERIFICATION_STARTED': touch({ status: 'verifying' }); break;
     case 'VERIFICATION_PASSED': touch({ status: 'verified' }); break;
     case 'VERIFICATION_FAILED': touch({ status: 'verifying' }); break;

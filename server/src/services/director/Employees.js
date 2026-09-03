@@ -91,7 +91,7 @@ const DEFAULT_EMPLOYEES = [
     description: 'Designs, implements, and repairs code. Owns engineering deliverables.',
     personality: 'pragmatic, thorough, no-nonsense',
     capabilities: ['code', 'reasoning', 'planning'],
-    supportedTools: ['web-search', 'memory-recall', 'knowledge-save', 'file-write'],
+    supportedTools: ['web-search', 'memory-recall', 'knowledge-save', 'file-write', 'run-command'],
     permissions: ['READ', 'WRITE', 'EXECUTE', 'NETWORK'],
   },
   {

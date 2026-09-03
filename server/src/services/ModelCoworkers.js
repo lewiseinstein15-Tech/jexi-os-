@@ -121,6 +121,39 @@ export function sanitizeStreamText(text) {
   return out;
 }
 
+/**
+ * B210 — WORK-PRODUCT MASKING: the same leak protection, but FENCED CODE
+ * BLOCKS are exempt from the aggressive unknown-id pass. Rationale: code is
+ * full of dotted tokens (console.log, Math.round, process.exit) that the
+ * "vendor.model" heuristic cannot distinguish from model ids — masking them
+ * corrupts executable artifacts. Known model ids are STILL masked inside
+ * code (a literal 'gemini-2.5-flash' string is never legitimate work
+ * product); only the heuristic skips the fences.
+ */
+function maskKnownIdsOnly(text) {
+  let out = String(text || '');
+  if (!out) return out;
+  const urls = [];
+  out = out.replace(/https?:\/\/[^\s)]+/gi, (u) => { urls.push(u); return `\u0000U${urls.length - 1}\u0000`; });
+  for (const id of ALL_IDS) {
+    if (out.toLowerCase().includes(id)) {
+      const re = new RegExp(id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      out = out.replace(re, KEYLESS.get(id));
+    }
+  }
+  for (const [re, name] of COMPOSITE_LABELS) out = out.replace(re, name);
+  out = out.replace(/\u0000U(\d+)\u0000/g, (_, i) => urls[Number(i)] ?? '');
+  return out;
+}
+
+/** B210 — employee output masking: prose gets the full pass, code fences the known-id pass. */
+export function sanitizeWorkProduct(text) {
+  const src = String(text || '');
+  if (!src) return src;
+  const parts = src.split(/(```[\s\S]*?```)/g); // fence segments captured
+  return parts.map((seg) => (seg.startsWith('```') ? maskKnownIdsOnly(seg) : sanitizeStreamText(seg))).join('');
+}
+
 /** The named roster for the Models screen: [{ name, hint, models }] */
 export function teamRoster() {
   return ROSTER.map(({ name, hint, models }) => ({ name, hint, models }));

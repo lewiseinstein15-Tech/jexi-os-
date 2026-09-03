@@ -15,6 +15,7 @@ const TOOL_REQUIREMENTS = {
   'semantic-search': ['READ'],
   'knowledge-save': ['READ', 'WRITE'],
   'file-write': ['READ', 'WRITE'],
+  'run-command': ['READ', 'EXECUTE'], // B210 — the employee command runner (allowlisted, sandboxed)
   'file-read': ['READ'],
   'git-commit': ['READ', 'WRITE', 'GIT'],
   'shell-run': ['READ', 'EXECUTE'],

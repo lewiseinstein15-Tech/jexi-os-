@@ -22,13 +22,17 @@ import { message, normalizeArtifact } from './AgentMail.js';
 import { runWithModel } from './ModelRouter.js';
 import { Supervisor } from './Supervisor.js'; // B209 — live mid-work supervision
 import { checkToolPermission } from './Permissions.js'; // B209 — enforced tool gates
-import { sanitizeStreamText } from '../ModelCoworkers.js'; // B209 — model ids never enter work product
+import { runEmployeeCommand, isTestCommand, validateCommand } from './CommandRunner.js'; // B210 — real command execution for employees
+import { sanitizeWorkProduct } from '../ModelCoworkers.js'; // B209/B210 — model ids never enter work product, but CODE FENCES are never corrupted
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ARTIFACT_DIR = path.join(HERE, '..', '..', '..', 'jexi-workspace', 'director');
+
+/** B210 — command rounds per assignment (request → run → react; bounded). */
+const MAX_COMMAND_ROUNDS = 2;
 
 const SECTION_RE = (name) => new RegExp(`^##\\s+${name}\\s*$`, 'im');
 
@@ -98,7 +102,7 @@ high | medium | low — one short line why.
 
 ## CLAIMS
 - Each factual claim you make, each with its source or (unverified).
-${brief.searchQueries?.length || employee.supportedTools.includes('web-search') ? '\nYou have the web-search tool available; search results will be provided to you.' : ''}`;
+${brief.searchQueries?.length || employee.supportedTools.includes('web-search') ? '\nYou have the web-search tool available; search results will be provided to you.' : ''}${employee.supportedTools.includes('run-command') ? '\n\nYou can EXECUTE COMMANDS in your task workspace: write files as fenced artifact blocks (they land in the workspace), then put each command alone in a fenced block with `run` as the info string:\n\n```run\nnode analysis.js\n```\n\nAllowed binaries: node, node --test, python3, ls, cat, head, tail, wc, grep, echo, diff. Scripts run as CommonJS (use require, not import). NO shell features (no pipes, no &&, no redirects) — one plain command per block. The REAL output (exit code + stdout/stderr) comes back to you, and you then deliver the final structured answer grounded in the actual results.' : ''}`;
 }
 
 /** Parse the structured employee output into a machine-readable result. */
@@ -188,23 +192,87 @@ export async function runEmployeeSession(p) {
   // redirect instruction (bounded: one redirect per assignment).
   const userPrompt = buildUserPrompt(brief, toolContext);
   let parsed;
+  const persistedArtifactNames = new Set(); // B210 — artifacts persisted in-loop aren't re-persisted later
+  const persistParsedArtifacts = (p) => {
+    for (const artifact of (p && p.artifacts) || []) {
+      if (persistedArtifactNames.has(artifact.name)) continue;
+      const gate = checkToolPermission(employee, 'file-write');
+      if (!gate.allowed) {
+        emit('PERMISSION_DENIED', { agentId: employee.agentId, agentName: employee.displayName, summary: `File write skipped: ${gate.reason}.`, severity: 'warn' });
+        continue;
+      }
+      try {
+        const written = persistArtifact(task.id, artifact);
+        persistedArtifactNames.add(artifact.name);
+        emit('FILE_CREATED', { agentId: employee.agentId, agentName: employee.displayName, summary: `${employee.displayName} wrote ${written.name} (${written.bytes} bytes).`, data: { file: written.name, bytes: written.bytes } });
+      } catch (e) {
+        emit('TOOL_FAILED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Artifact write failed (${String(e.message || e).slice(0, 80)}) — it stays in the task record.`, severity: 'warn' });
+      }
+    }
+  };
   try {
-    const raw = await withTimeout(
-      generateWithSupervision({
-        employee, subtask, brief, task, mailbox, hooks, emit, llm, userPrompt,
-        review: hooks.review || null,
-        liveReview: hooks.liveReview !== false,
-      }),
-      brief.timeBudgetMs,
-    );
-    // B209 — model/provider identifiers NEVER enter work product (masked to
-    // coworker names by the same B162 masking the whole app uses)
-    const clean = sanitizeStreamText(String(raw || ''));
-    parsed = parseEmployeeOutput(clean);
-    if (parsed.bad) {
-      const err = new Error('employee output unparseable or empty');
-      err.code = 'BAD_OUTPUT';
-      throw err;
+    let commandContext = '';
+    let commandRounds = 0;
+    // B210 — the COMMAND LOOP: an employee with EXECUTE permission may put
+    // ```run blocks in her output. Each round: her artifacts land in the task
+    // workspace FIRST (so the scripts exist), the commands REALLY execute
+    // there (allowlisted, no shell, scrubbed env, bounded), and the actual
+    // output comes back to her for the next round. Bounded: 2 rounds.
+    for (let round = 0; round <= MAX_COMMAND_ROUNDS; round++) {
+      const raw = await withTimeout(
+        generateWithSupervision({
+          employee, subtask, brief, task, mailbox, hooks, emit, llm,
+          userPrompt: commandContext ? `${userPrompt}\n\n${commandContext}` : userPrompt,
+          review: hooks.review || null,
+          liveReview: hooks.liveReview !== false,
+        }),
+        brief.timeBudgetMs,
+      );
+      // B209 — model/provider identifiers NEVER enter work product (masked to
+      // coworker names by the same B162 masking the whole app uses)
+      const clean = sanitizeWorkProduct(String(raw || ''));
+      parsed = parseEmployeeOutput(clean);
+      if (parsed.bad) {
+        const err = new Error('employee output unparseable or empty');
+        err.code = 'BAD_OUTPUT';
+        throw err;
+      }
+      const requests = extractCommandRequests(clean);
+      if (!requests.length) break; // done — no command requests
+      const gate = checkToolPermission(employee, 'run-command');
+      if (!gate.allowed) {
+        emit('PERMISSION_DENIED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Command skipped: ${gate.reason}.`, severity: 'warn' });
+        break;
+      }
+      if (round === MAX_COMMAND_ROUNDS) break; // bounded — no infinite tool loops
+      commandRounds++;
+      // scripts land BEFORE commands run (the employee's files must exist)
+      persistParsedArtifacts(parsed);
+      const results = [];
+      for (const cmd of requests.slice(0, 4)) {
+        const asTest = isTestCommand(cmd);
+        const cmdLabel = cmd.length > 70 ? `${cmd.slice(0, 67)}…` : cmd;
+        emit(asTest ? 'TEST_STARTED' : 'COMMAND_STARTED', {
+          agentId: employee.agentId, agentName: employee.displayName,
+          summary: `${employee.displayName} runs \`${cmdLabel}\`${asTest ? ' (tests)' : ''}.`,
+          data: { command: cmd, round: commandRounds },
+        });
+        const r = await runEmployeeCommand({ taskId: task.id, command: cmd });
+        const evtType = asTest
+          ? (r.ok ? 'TEST_COMPLETED' : 'TEST_FAILED')
+          : (r.ok ? 'COMMAND_COMPLETED' : 'COMMAND_FAILED');
+        const verdict = r.blocked ? `blocked (${r.reason})`
+          : r.timedOut ? `timed out after ${r.ms}ms`
+          : r.ok ? `exit 0 in ${r.ms}ms` : `exit ${r.exitCode} in ${r.ms}ms`;
+        emit(evtType, {
+          agentId: employee.agentId, agentName: employee.displayName,
+          summary: `\`${cmdLabel}\` → ${verdict}.${asTest ? (r.ok ? ' Tests passed.' : ' Tests FAILED.') : ''}`,
+          severity: r.ok ? 'info' : 'warn',
+          data: { command: cmd, exitCode: r.exitCode, ms: r.ms, bytes: r.output.length, round: commandRounds },
+        });
+        results.push(`$ ${cmd}\n[exit ${r.exitCode}${r.timedOut ? ' · timed out' : ''}${r.blocked ? ` · ${r.reason}` : ''}]\n${r.output || '(no output)'}`);
+      }
+      commandContext += `\n\n# COMMAND RESULTS (real execution in your task workspace — round ${commandRounds})\n${results.join('\n\n')}\n\nDeliver your final structured output now (REPORT / DELIVERABLE / CONFIDENCE), using the real results above. You may run one more round of commands if genuinely needed.`;
     }
   } catch (e) {
     if (e?.code === 'REDIRECT') {
@@ -237,8 +305,9 @@ export async function runEmployeeSession(p) {
   }
 
   // B209 — artifacts actually land on disk (permission-gated, path-safe),
-  // each one a FILE_CREATED canonical event.
-  for (const artifact of parsed.artifacts || []) {
+  // each one a FILE_CREATED canonical event. (B210: ones already persisted
+  // during a command round are skipped here.)
+  for (const artifact of (parsed.artifacts || []).filter((a) => !persistedArtifactNames.has(a.name))) {
     const gate = checkToolPermission(employee, 'file-write');
     if (!gate.allowed) {
       emit('PERMISSION_DENIED', { agentId: employee.agentId, agentName: employee.displayName, summary: `File write skipped: ${gate.reason}.`, severity: 'warn' });
@@ -334,6 +403,25 @@ async function generateWithSupervision({ employee, subtask, brief, task, mailbox
     }
   }
   throw Object.assign(new Error('supervision exhausted'), { code: 'BAD_OUTPUT' });
+}
+
+/**
+ * B210 — extract command requests: fenced blocks whose info string is `run`.
+ *   ```run
+ *   node analysis.js
+ *   ```
+ * Each block is ONE command (single line, no shell semantics).
+ */
+export function extractCommandRequests(text) {
+  const out = String(text || '');
+  const re = new RegExp('```' + 'run' + '[ \\t]*\\n([\\s\\S]*?)```', 'g');
+  const requests = [];
+  let m;
+  while ((m = re.exec(out))) {
+    const cmd = m[1].split('\n').map((l) => l.trim()).filter(Boolean).join(' ');
+    if (cmd) requests.push(cmd);
+  }
+  return requests;
 }
 
 /** B209 — persist an artifact to the per-task directory (path-safe, bounded). */

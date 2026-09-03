@@ -57,7 +57,7 @@ Every task is its own record (`data/director-tasks/<taskId>.json`) plus a bounde
 
 ### 7. Event vocabulary (real subset, honestly)
 
-Added: `TASK_CREATED` (per subtask), `MODEL_PROVIDER_FAILED` (per failed lane, with provider id), `SEARCH_STARTED`/`SEARCH_COMPLETED` (aliases alongside TOOL_*), `FILE_CREATED`, `PERMISSION_DENIED`, `TASK_BLOCKED`, `SUPERVISION_*`. Envelope: every event now carries `parentEventId` (chains to the previous event) and `providerId` where a lane is involved. Still honestly **not** emitted: `COMMAND_*`/`TEST_*` — no employee shell exists yet.
+Added: `TASK_CREATED` (per subtask), `MODEL_PROVIDER_FAILED` (per failed lane, with provider id), `SEARCH_STARTED`/`SEARCH_COMPLETED` (aliases alongside TOOL_*), `FILE_CREATED`, `PERMISSION_DENIED`, `TASK_BLOCKED`, `SUPERVISION_*`. Envelope: every event now carries `parentEventId` (chains to the previous event) and `providerId` where a lane is involved. `COMMAND_*`/`TEST_*` were not emitted at B209 (no employee shell yet) — **closed by B210** (`FIXLOG-B210.md`): a real allowlisted command runner with the full event set.
 
 ### 8. Routing signals
 
