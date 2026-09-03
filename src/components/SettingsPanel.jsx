@@ -456,7 +456,7 @@ export default function SettingsPanel() {
                 type="text"
                 value={backendInput}
                 onChange={(e) => setBackendInput(e.target.value)}
-                placeholder="https://jexi-os-brain.onrender.com"
+                placeholder="https://jexi-brain-image.onrender.com"
                 className="w-full bg-surface-2 text-text-primary border border-hairline rounded-md px-3 py-2.5 text-xs focus:outline-none focus:border-brand-line font-mono"
               />
               <button

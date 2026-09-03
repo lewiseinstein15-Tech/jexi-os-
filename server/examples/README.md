@@ -65,4 +65,4 @@ curl -s -X POST http://localhost:3002/api/chat -H 'x-jexi-persona: concise' -d '
 ```
 
 > Note: the live backend is key-locked — add `-H 'x-jexi-key: <your key>'` when
-> talking to `https://jexi-os-brain.onrender.com`.
+> talking to `https://jexi-brain-image.onrender.com`.

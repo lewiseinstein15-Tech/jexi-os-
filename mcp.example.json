@@ -2,7 +2,7 @@
   "mcpServers": {
     "jexi-os": {
       "type": "http",
-      "url": "https://jexi-os-brain.onrender.com/mcp",
+      "url": "https://jexi-brain-image.onrender.com/mcp",
       "headers": {
         "Authorization": "Bearer YOUR_JEXI_MCP_KEY_IF_SET"
       }

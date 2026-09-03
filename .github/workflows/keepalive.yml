@@ -6,7 +6,7 @@
 # awake and every chat feels instant. GitHub Actions free tier runs it for $0.
 #
 # If you prefer an external uptime monitor (UptimeRobot free: 50 checks / 5 min),
-# point one at https://jexi-os-brain.onrender.com/api/health instead — both work.
+# point one at https://jexi-brain-image.onrender.com/api/health instead — both work.
 
 name: Keep JEXI Brain awake
 
@@ -35,4 +35,4 @@ jobs:
         if: vars.KEEPALIVE_URL != ''
         run: |
           curl -s -m 30 -o /dev/null -w 'Render:   HTTP %{http_code} in %{time_total}s\n' \
-            https://jexi-os-brain.onrender.com/api/health || echo 'render ping failed (may be asleep)'
+            https://jexi-brain-image.onrender.com/api/health || echo 'render ping failed (may be asleep)'

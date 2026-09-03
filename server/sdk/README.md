@@ -17,5 +17,5 @@ console.log(answer);
   returns the final answer text (NDJSON stream consumed internally).
 - The access key is read from the constructor, `JEXI_API_KEY`, or passed per
   call — same key the app uses in Settings → System.
-- Point `baseUrl` at `https://jexi-os-brain.onrender.com` for the hosted
+- Point `baseUrl` at `https://jexi-brain-image.onrender.com` for the hosted
   brain (send your key) or at a local dev server.

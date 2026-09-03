@@ -873,7 +873,7 @@ async function runEngine(slug, args, opts = {}) {
     case 'preview-server': {
       // B127 — REAL preview engine: returns the tappable public URL for the
       // workspace's index.html (or the named file). On Render, PUBLIC_URL is
-      // https://jexi-os-brain.onrender.com → https://…/preview/<file>.
+      // https://jexi-brain-image.onrender.com → https://…/preview/<file>.
       const { runFile } = await import('./Runner.js');
       const name = String(args.name || 'index.html');
       const file = name.endsWith('.html') ? name : `${name}.html`;

@@ -97,7 +97,7 @@ export const backendErrorMessage = (error, backendUrl = '') => {
   const looksBlocked = /fetch failed|failed to fetch|networkerror|network error|load failed/i.test(m);
   if (looksBlocked) {
     const origin = (typeof window !== 'undefined' && window.location) ? window.location.origin : '';
-    return `⚠️ The backend refused this browser's request (CORS) or is unreachable.\n\nFix (Render dashboard → jexi-os-brain → Environment):\n1. Add ${origin || 'your frontend origin'} to CORS_ORIGINS (for GitHub Pages: https://lewiseinstein15-tech.github.io), or clear CORS_ORIGINS to allow all browsers.\n2. Confirm the backend URL in Settings → Server is ${backendUrl || 'https://jexi-os-brain.onrender.com'}.\n3. If the server is locked, also set the access key in Settings → System.`;
+    return `⚠️ The backend refused this browser's request (CORS) or is unreachable.\n\nFix (Render dashboard → jexi-brain-image → Environment):\n1. Add ${origin || 'your frontend origin'} to CORS_ORIGINS (for GitHub Pages: https://lewiseinstein15-tech.github.io), or clear CORS_ORIGINS to allow all browsers.\n2. Confirm the backend URL in Settings → Server is ${backendUrl || 'https://jexi-brain-image.onrender.com'}.\n3. If the server is locked, also set the access key in Settings → System.`;
   }
   return `⚠ The connection to the backend dropped (${m || 'network error'}). The work may still be running on the server — wait a moment, then ask me to continue from where it stopped.`;
 };

@@ -23,7 +23,7 @@
 // automatically. Both instances share JEXI's memory via Upstash Redis
 // (REDIS_URL), so they behave like one brain.
 const ORIGINS = [
-  { name: 'render-primary', url: 'https://jexi-os-brain.onrender.com' },
+  { name: 'render-primary', url: 'https://jexi-brain-image.onrender.com' },
   // { name: 'host-two', url: 'https://your-second-backend.example.com' },
 ];
 

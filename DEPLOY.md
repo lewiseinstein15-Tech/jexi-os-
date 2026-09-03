@@ -40,7 +40,7 @@ Dashboard → **New → Web Service** → connect the repo, then set:
 - **Env vars:** `GROQ_API_KEY`, `GEMINI_API_KEY` (secrets)
 
 ### Verify it works
-Open your service URL, e.g. `https://jexi-os-brain.onrender.com/api/health` — you should see:
+Open your service URL, e.g. `https://jexi-brain-image.onrender.com/api/health` — you should see:
 ```json
 {"ok":true,"name":"JEXI OS Brain","version":"1.0.0","port":10000}
 ```
@@ -86,7 +86,7 @@ The frontend finds the backend in this order:
 
 ### On GitHub Pages (free, auto-deploys on every push)
 1. The repo ships `.github/workflows/deploy.yml` — every push to `main` builds the UI with
-   `VITE_JEXI_BACKEND_URL=https://jexi-os-brain.onrender.com` baked in and publishes to GitHub Pages.
+   `VITE_JEXI_BACKEND_URL=https://jexi-brain-image.onrender.com` baked in and publishes to GitHub Pages.
 2. Enable it once: **Repo → Settings → Pages → Source: GitHub Actions**.
 3. Your app is live at `https://lewiseinstein15-Tech.github.io/jexi-os-/`.
 4. Change the URL in the workflow if your Render service URL differs.
@@ -94,7 +94,7 @@ The frontend finds the backend in this order:
 ### On Vercel (alternative)
 1. Import the same repo into Vercel (framework preset: **Vite**; build `npm run build`, output `dist/`).
 2. **Project → Settings → Environment Variables**, add:
-   - `VITE_JEXI_BACKEND_URL` = `https://jexi-os-brain.onrender.com`
+   - `VITE_JEXI_BACKEND_URL` = `https://jexi-brain-image.onrender.com`
 3. Redeploy. The chat, memory, knowledge and virtual desktop will now talk to Render.
 
 > No key goes on the frontend host — `GROQ_API_KEY`/`GEMINI_API_KEY` stay server-side on Render.

@@ -3,7 +3,9 @@
 # Requires ONE repo secret (never commit the hook key — the repo is public):
 #   GitHub → Settings → Secrets and variables → Actions → New repository secret
 #   Name:  RENDER_DEPLOY_HOOK
-#   Value: https://api.render.com/deploy/srv-d9r5u4id0e5s73ahtvhg?key=<your-key>
+#   Value: https://api.render.com/deploy/srv-daa3bie7bikc73fal0kg?key=<your-key>
+#          (the CURRENT brain home — jexi-brain-image; RENDER_IMAGE_DEPLOY_HOOK
+#           in docker-publish.yml/self-deploy.yml points here too)
 #
 # Until the secret exists, the step warns and exits 0 (safe no-op).
 
