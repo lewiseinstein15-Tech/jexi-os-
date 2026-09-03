@@ -82,6 +82,7 @@ import { mountMcp } from './mcp-server.js';
 import { taskManager } from './src/services/TaskManager.js';
 import { taskScheduler } from './src/services/TaskScheduler.js';
 import { PORT, WORKSPACE_DIR, DATA_DIR, SERVER_ROOT } from './src/config.js';
+import { persistFileBlocks } from './src/services/FileBlockWriter.js';
 import { resolveInside } from './src/services/PathSafety.js';
 import { mountSurface } from './src/routes/surface.js';
 import { goalEngine } from './src/services/GoalEngine.js';
@@ -1293,6 +1294,19 @@ app.post('/api/chat', async (req, res) => {
     try { appendConversationEvent(convId, { role, text: t, kind: 'chat' }); } catch { /* same */ }
   };
   const done = (payload) => {
+    // B199c — a deliverable that was written as FILE BLOCKS in the answer
+    // ("**swahili-lessons/lesson-01.md**" + fenced content) must actually
+    // exist on disk: persist the blocks to the workspace before the answer
+    // leaves. Never blocks the answer on failure.
+    if (payload && typeof payload === 'object' && typeof payload.summary === 'string' && payload.summary.includes('```')) {
+      try {
+        persistFileBlocks(payload.summary, WORKSPACE_DIR, { log: (m) => sendEvent('log', { agent: 'Workspace', message: m }) }).then((saved) => {
+          if (saved && saved.length) {
+            sendEvent('log', { agent: 'Workspace', message: `📁 ${saved.length} file${saved.length > 1 ? 's' : ''} written to the workspace: ${saved.slice(0, 8).join(', ')}${saved.length > 8 ? ` +${saved.length - 8} more` : ''}` });
+          }
+        }).catch(() => {});
+      } catch { /* never block the answer */ }
+    }
     // B187 — sanitize links BEFORE anything leaves the server
     if (payload && typeof payload === 'object' && typeof payload.summary === 'string') {
       try {

@@ -137,5 +137,37 @@ ok('boot self-heal purge wired in index.js', idx.includes('purgeNonAnswerKnowled
     detectPluginIntent('write a program that tracks crypto prices in a file') === null);
 }
 
+// B199c (Test B) — file-block deliverables are persisted to the workspace.
+{
+  const { extractFileBlocks, persistFileBlocks } = await import('./src/services/FileBlockWriter.js');
+  const answer = [
+    'Here is your guide:',
+    '',
+    '**swahili-lessons/lesson-01.md**',
+    '```markdown',
+    '# Swahili Lesson 1: Greetings',
+    'Habari – How are you?',
+    '```',
+    '',
+    '**swahili-lessons/lesson-02.md**',
+    '```markdown',
+    '# Swahili Lesson 2: Family',
+    'Mama – Mother',
+    '```',
+    '',
+    'Enjoy!',
+  ].join('\n');
+  const blocks = extractFileBlocks(answer);
+  ok('file blocks extracted from a deliverable answer (2 lessons)', blocks.length === 2 && blocks[0].name === 'swahili-lessons/lesson-01.md' && blocks[0].content.includes('Habari'));
+  ok('answers without file blocks extract nothing', extractFileBlocks('plain answer with `code` but no fences') .length === 0 && extractFileBlocks('```js\nconsole.log(1)\n```').length === 0);
+  ok('path traversal is refused', extractFileBlocks('**../evil.md**\n```\nbad\n```').length === 0);
+  const tmp = fs.mkdtempSync('./.b199-ws-');
+  const saved = await persistFileBlocks(answer, tmp);
+  const f1 = path.join(tmp, 'swahili-lessons/lesson-01.md');
+  ok('files written to the workspace with subdirectories', saved.length === 2 && fs.existsSync(f1) && fs.readFileSync(f1, 'utf-8').includes('Habari'));
+  ok('done() wires the file-block writer (index.js)', fs.readFileSync('./index.js', 'utf-8').includes('persistFileBlocks(payload.summary, WORKSPACE_DIR'));
+  fs.rmSync(tmp, { recursive: true, force: true });
+}
+
 console.log(failures === 0 ? '\n🎉 B199 CHECKS PASSED' : `\n💥 ${failures} FAILURES`);
 process.exit(failures ? 1 : 0);
