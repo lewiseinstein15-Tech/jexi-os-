@@ -1020,8 +1020,9 @@ html, body {
 .jx-caret { box-shadow: 0 0 10px rgba(0,255,157,.55); }
 
 /* word-level fade-in: streaming words appear softly instead of popping */
-.jx-streaming-text .markdown-body { animation: jx-fadein .18s ease-out; }
-@keyframes jx-fadein { from { opacity: .55; } to { opacity: 1; } }
+/* B196 — the per-delta fade REPLAYED on every stream chunk (constant
+   blinking, worst on images) — removed. Streaming text renders plainly. */
+.jx-streaming-text .markdown-body { }
 
 /* writer badge pulse while a coworker types */
 .jx-writer { display: inline-flex; align-items: center; gap: 5px; }
@@ -1193,3 +1194,11 @@ form.surface-float { flex-shrink: 0; }
   border-radius: 99px; padding: 6px 12px;
 }
 .jx-queued .qdot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); animation: jxblink 1.2s infinite; flex-shrink: 0; }
+
+
+/* B196 — glitch-free images */
+.jx-imgfig { margin: 10px 0; }
+.jx-imgbox { position: relative; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--bg3); max-width: min(100%, 420px); }
+.jx-imgloading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.jx-img { display: block; width: 100%; max-height: 400px; object-fit: contain; opacity: 0; transition: opacity .28s ease; }
+.jx-img.shown { opacity: 1; }

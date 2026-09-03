@@ -18,6 +18,9 @@ export function useTypewriter(text, { baseSpeed = 16 } = {}) {
   useEffect(() => {
     if (text == null) { shownRef.current = ''; setOut(''); return; }
     if (text.length > 5000) { shownRef.current = text; setOut(text); return; } // monster answers: instant
+    // B196 — messages with images render INSTANTLY: revealing `![alt](u…`
+    // line-by-line makes the half-typed markdown flicker text→image→text.
+    if (/!\[[^\]]*\]\(/.test(text)) { shownRef.current = text; setOut(text); return; }
 
     const shown = shownRef.current;
     // Streaming append: new text extends what's already on screen → adopt it

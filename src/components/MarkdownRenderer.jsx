@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -348,7 +348,13 @@ function MermaidBlock({ code }) {
 /* ------------------------------------------------------------------ */
 /* Image Component                                                      */
 /* ------------------------------------------------------------------ */
-function MarkdownImage({ src, alt }) {
+/* B196 — image glitch/blink/zoom fix:
+   1. memo: streaming deltas re-render the markdown constantly — a memoized
+      image component keeps its DOM node (and its loaded state) alive, so the
+      browser does NOT reload/repaint the image on every delta (the blinking).
+   2. no placeholder swap: the shimmer sits UNDER the image in a reserved
+      box; the img fades in over it — zero layout jump (the 'zooming in'). */
+const MarkdownImage = memo(function MarkdownImage({ src, alt }) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
 
@@ -362,20 +368,17 @@ function MarkdownImage({ src, alt }) {
   }
 
   return (
-    <figure className="my-3">
-      {!loaded && (
-        <div className="w-full h-32 rounded-lg bg-surface-2 border border-hairline flex items-center justify-center">
-          <div className="shimmer-bar w-1/2" />
-        </div>
-      )}
-      <img
-        src={src}
-        alt={alt || ''}
-        className={`max-w-full rounded-lg border border-hairline ${loaded ? '' : 'hidden'}`}
-        style={{ maxHeight: '400px', objectFit: 'contain' }}
-        onLoad={() => setLoaded(true)}
-        onError={() => setError(true)}
-      />
+    <figure className="my-3 jx-imgfig">
+      <div className="jx-imgbox" style={{ minHeight: loaded ? 0 : 128 }}>
+        {!loaded && <div className="jx-imgloading"><div className="shimmer-bar w-1/2" /></div>}
+        <img
+          src={src}
+          alt={alt || ''}
+          className={`jx-img${loaded ? ' shown' : ''}`}
+          onLoad={() => setLoaded(true)}
+          onError={() => setError(true)}
+        />
+      </div>
       {alt && loaded && (
         <figcaption className="text-[10px] text-text-tertiary text-center mt-1.5 italic">
           {alt}
@@ -383,7 +386,7 @@ function MarkdownImage({ src, alt }) {
       )}
     </figure>
   );
-}
+});
 
 /* ------------------------------------------------------------------ */
 /* Horizontal Divider                                                   */

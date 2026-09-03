@@ -62,7 +62,8 @@ console.log('\n== 4. streaming upgrade ==');
   const css = fs.readFileSync(path.join(ROOT, 'src/index.css'), 'utf-8');
   ok('think row breathes while working', css.includes('jx-breathe'));
   ok('caret glows', css.includes('box-shadow: 0 0 10px'));
-  ok('streaming text fades in softly', css.includes('jx-fadein'));
+  // B196: per-delta fade removed (replayed every chunk — blinked images)
+  ok('streaming renders plainly (per-delta fade removed B196)', !css.includes('.jx-streaming-text .markdown-body { animation'));
   const chat = fs.readFileSync(path.join(ROOT, 'src/components/ChatWindow.jsx'), 'utf-8');
   ok('writer badge pulses while a coworker types', chat.includes('jx-writer') && chat.includes('className="dot"'));
 }
