@@ -43,14 +43,28 @@ async function searchOne(query) {
 const COMPLEX_MARKERS =
   /\b(compare|comparison|vs\.?|versus|difference|differences|pros and cons|relationship|impact of|history of|overview of|how do|explain both|and also|in detail|thoroughly|everything about)\b/i;
 
+// B204 — measure the QUESTION, not its packaging. Leading brevity/format
+// instructions ("In one short paragraph:", "briefly:") inflated the char
+// count and pushed simple questions into LLM decomposition — which cost
+// 34s on the slow live provider in production before any search started.
+const INSTRUCTION_PREFIX =
+  /^(?:please\s+)?(?:in\s+(?:one|a|two|three)?\s*(?:short\s+|brief\s+|single\s+|quick\s+)?(?:paragraph|sentence|word)s?|briefly|in\s+short|quickly|shortly|in\s+your\s+own\s+words|in\s+plain\s+(?:english|terms))[:,]?\s*/i;
+
+/** Strip leading answer-format instructions — the search core of the query. */
+export function coreQuery(q) {
+  return String(q || '').replace(INSTRUCTION_PREFIX, '').trim();
+}
+
 export function isComplexQuery(query) {
-  return String(query || '').length > 70 || COMPLEX_MARKERS.test(query);
+  const core = coreQuery(query);
+  return core.length > 70 || COMPLEX_MARKERS.test(core);
 }
 
 /** Return 1–3 independent sub-queries that together cover the question. */
 export async function analyzeQuery(query, context = '') {
+  const core = coreQuery(query);
   if (!isComplexQuery(query)) {
-    return { complex: false, subQueries: [query], reason: 'simple question — single focused search' };
+    return { complex: false, subQueries: [core], reason: 'simple question — single focused search' };
   }
   const thread = context && String(context).trim()
     ? `\n\nYou are continuing a conversation. What was just discussed (most recent last):\n${String(context).slice(0, 1200)}\n\nUse it ONLY to resolve references in the question — do not change the topic, and never announce that this continues a conversation (no "continuing our conversation", no recap of what was said before) — just answer.`
@@ -58,7 +72,7 @@ export async function analyzeQuery(query, context = '') {
   try {
     const prompt =
       `Break this research question into 1 to 3 independent sub-queries that together fully cover it. ` +
-      `Return ONLY a JSON array of strings — no markdown, no explanation.\nQuestion: "${query}"${thread}`;
+      `Return ONLY a JSON array of strings — no markdown, no explanation.\nQuestion: "${core}"${thread}`;
     const raw = await generateContent(
       prompt,
       'You decompose research questions into focused search sub-queries.',
@@ -75,15 +89,16 @@ export async function analyzeQuery(query, context = '') {
       return { complex: true, subQueries: subs, reason: `decomposed into ${subs.length} focused sub-searches` };
     }
   } catch (e) { /* fall through to single query */ }
-  return { complex: true, subQueries: [query], reason: 'decomposition unavailable — using the full question' };
+  return { complex: true, subQueries: [core], reason: 'decomposition unavailable — using the full question' };
 }
 
 // ---------------------------------------------------------------------------
 // Stage 2 — SEARCHER: run every sub-query across all engines, in parallel
 // ---------------------------------------------------------------------------
-export async function parallelSearch(subQueries) {
-  const settled = await Promise.allSettled((subQueries || []).map((q) => searchOne(q)));
-  const pools = settled.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+/** Merge settled searchOne pools into one deduped source list (B204: split
+ *  out of parallelSearch so the overlapped analyzer path can reuse it). */
+export function mergePools(settled) {
+  const pools = settled.filter((r) => r.status === 'fulfilled').map((r) => r.value).filter(Boolean);
   const seen = new Set();
   const merged = [];
   for (const pool of pools) {
@@ -100,6 +115,10 @@ export async function parallelSearch(subQueries) {
     }
   }
   return { pools, merged };
+}
+
+export async function parallelSearch(subQueries) {
+  return mergePools(await Promise.allSettled((subQueries || []).map((q) => searchOne(q))));
 }
 
 // ---------------------------------------------------------------------------
@@ -159,11 +178,17 @@ function withTimeout(promise, ms, label) {
 }
 
 const SOURCE_READ_TIMEOUT_MS = 25000;
-// B203 — 2 → 1: the idle brain sits at ~240MB RSS and the Render free tier
-// caps the container at 512MB; two concurrent JSDOM+Readability parses of
-// fat pages OOM-killed the process mid-request (live incident). Serialized
-// reads keep the peak flat; 10 sources × a few seconds each is fast enough.
-const MAX_CONCURRENT_READS = 1;
+// B203 — serialized reads: the idle brain sits at ~240MB RSS and the Render
+// free tier caps the container at 512MB; two concurrent JSDOM+Readability
+// parses of fat pages OOM-killed the process mid-request (live incident).
+// B204 — adaptive: with B203's caps in place (768KB download cap, 300KB
+// JSDOM threshold, RSS guard that skips JSDOM entirely above 330MB), TWO
+// readers are safe while the heap has headroom — halving deep-read wall
+// time (~31s → ~16s for 10 sources) on healthy hosts, and falling back to
+// the serialized 1 on small/full ones.
+export function readConcurrency() {
+  try { return process.memoryUsage().rss < 300 * 1024 * 1024 ? 2 : 1; } catch { return 1; }
+}
 
 async function readOne(src) {
   const content = await extractContent(src.link);
@@ -197,7 +222,7 @@ export async function deepRead(sources, query, sendEvent) {
   const settled = await mapPool(
     sources || [],
     (src) => withTimeout(readOne(src), SOURCE_READ_TIMEOUT_MS, src.link),
-    MAX_CONCURRENT_READS
+    readConcurrency()
   );
   const deep = [];
   settled.forEach((res, i) => {
@@ -322,8 +347,14 @@ export async function runSearchTeam(query, sendEvent, opts = {}) {
   // coworker status lines; narration is her voice telling the story).
   const narrate = (text) => { try { sendEvent?.('narration', { text }); } catch (e) {} };
   narrate(`I'm on it — let me break this question down first.`);
-  // 1. Query Analyzer
+  // 1. Query Analyzer — B204 OVERLAP: the raw-question search starts the
+  //    instant research begins, so the analyzer's LLM call (34s on the slow
+  //    live provider in production) is overlapped with real work instead of
+  //    being dead time before the first fetch. The raw-query pool almost
+  //    always contributes the bulk of the sources anyway.
   sendEvent?.('log', { agent: 'Query Analyzer', message: `🔎 Analyzing the best way to search: "${query}"` });
+  const core = coreQuery(query);
+  const rawPoolP = searchOne(core).catch(() => null); // starts NOW
   const plan = await analyzeQuery(query, context);
   sendEvent?.('log', {
     agent: 'Query Analyzer',
@@ -333,8 +364,16 @@ export async function runSearchTeam(query, sendEvent, opts = {}) {
   });
   if (plan.complex && plan.subQueries?.length) narrate(`I've split it into ${plan.subQueries.length} focused searches — scanning the web now.`);
 
-  // 2. Searcher (parallel across engines + sub-queries, with cache)
-  const { merged } = await parallelSearch(plan.subQueries);
+  // 2. Searcher (parallel across engines + sub-queries, with cache) —
+  //    the raw-query pool runs alongside the analyzer; only the extra
+  //    sub-queries are awaited here.
+  const extras = [...new Set(
+    (plan.subQueries || []).map((s) => String(s).trim()).filter((s) => s && s.toLowerCase() !== core.toLowerCase())
+  )];
+  const { merged } = mergePools(await Promise.allSettled([
+    rawPoolP,
+    ...extras.map((q) => searchOne(q)),
+  ]));
   const engineNames = [...new Set(merged.flatMap((m) => m.engines || [m.source]))];
   sendEvent?.('log', { agent: 'Searcher', message: `🔍 Whole-internet scan done — ${merged.length} sources from ${engineNames.length} engines (${engineNames.slice(0, 4).join(' · ')}${engineNames.length > 4 ? '…' : ''}).` });
   if (merged.length === 0) return { summary: '', sources: [] };
