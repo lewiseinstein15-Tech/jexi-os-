@@ -348,14 +348,55 @@ function MermaidBlock({ code }) {
 /* ------------------------------------------------------------------ */
 /* Image Component                                                      */
 /* ------------------------------------------------------------------ */
-/* B196 — image glitch/blink/zoom fix:
-   1. memo: streaming deltas re-render the markdown constantly — a memoized
-      image component keeps its DOM node (and its loaded state) alive, so the
-      browser does NOT reload/repaint the image on every delta (the blinking).
-   2. no placeholder swap: the shimmer sits UNDER the image in a reserved
-      box; the img fades in over it — zero layout jump (the 'zooming in'). */
+/* B197 — the REAL image glitch/blink/zoom fix. B196 memoized the image
+   component, but the blink survived because the true causes were elsewhere:
+
+   1. REMOUNT, NOT RE-RENDER: the components map handed to ReactMarkdown was
+      built INLINE in the render body — new function identities on every
+      streaming delta. React treats a changed element type as a different
+      component and UNMOUNTS/REMOUNTS the whole subtree, so the <img> DOM
+      node was destroyed and recreated on EVERY delta → the browser reloaded
+      it (opacity 0 → shimmer → fade-in) hundreds of times mid-stream. That
+      is the blinking. The map now lives at module scope (MARKDOWN_COMPONENTS)
+      so deltas RECONCILE and the img node — and its loaded state — survive.
+   2. THE ZOOM: the loading box reserved a flat 128px and then collapsed to
+      the image's real height (up to 400px) when it loaded — a size pulse on
+      every remount. Now the EXACT aspect ratio is reserved before load,
+      parsed from the image URL itself (every generated image carries
+      ?width=&height=) or from the dimension cache filled on first load, so
+      the box NEVER changes size. Zero layout shift, ever.
+   3. THE GLITCH TEXT: while an image URL streams in, the unterminated
+      `![alt](https://…` tail rendered as literal text — a URL flashing as
+      text before the image completes. stripTrailingImageFragment holds it
+      back until the markdown closes.
+   4. THE GHOST SHIMMER: the shimmer-bar class had no CSS definition at all,
+      so the loading state was an empty gray box. Now a real animated sweep.
+*/
+
+/** src → {w,h} for every image this session has ever loaded. Survives
+    re-renders, the stream→finished tree swap and history re-mounts, so an
+    image never reserves the wrong size twice. */
+const IMG_DIM_CACHE = new Map();
+
+/** Generated images (Pollinations) always carry ?width=&height= — reserve
+    the exact box before the first byte of the image ever arrives. */
+function imgDimsFromUrl(src) {
+  try {
+    const u = new URL(String(src), 'https://jexi.invalid');
+    const w = Number(u.searchParams.get('width'));
+    const h = Number(u.searchParams.get('height'));
+    if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) return { w, h };
+  } catch { /* not a parseable URL — fine */ }
+  return null;
+}
+
 const MarkdownImage = memo(function MarkdownImage({ src, alt }) {
-  const [loaded, setLoaded] = useState(false);
+  const cached = IMG_DIM_CACHE.get(src);
+  const known = cached || imgDimsFromUrl(src);
+  // A src we have already shown starts life loaded: re-mounts (the
+  // stream→finished swap, history view, tab switch) show no shimmer and
+  // replay no fade — the image is in the browser cache anyway.
+  const [loaded, setLoaded] = useState(Boolean(cached));
   const [error, setError] = useState(false);
 
   if (error) {
@@ -369,13 +410,27 @@ const MarkdownImage = memo(function MarkdownImage({ src, alt }) {
 
   return (
     <figure className="my-3 jx-imgfig">
-      <div className="jx-imgbox" style={{ minHeight: loaded ? 0 : 128 }}>
+      {/* Exact-size reservation when the aspect is known (URL params or a
+          previous load); flat 128px box only for a first-ever unknown image. */}
+      <div
+        className="jx-imgbox"
+        style={known ? { aspectRatio: `${known.w} / ${known.h}` } : { minHeight: loaded ? undefined : 128 }}
+      >
         {!loaded && <div className="jx-imgloading"><div className="shimmer-bar w-1/2" /></div>}
         <img
           src={src}
           alt={alt || ''}
           className={`jx-img${loaded ? ' shown' : ''}`}
-          onLoad={() => setLoaded(true)}
+          style={known ? { height: '100%' } : undefined}
+          onLoad={(e) => {
+            // Record the true dimensions so every future render of this src
+            // (any message, any remount) reserves the exact box.
+            const el = e && e.currentTarget;
+            if (el && el.naturalWidth && el.naturalHeight) {
+              IMG_DIM_CACHE.set(src, { w: el.naturalWidth, h: el.naturalHeight });
+            }
+            setLoaded(true);
+          }}
           onError={() => setError(true)}
         />
       </div>
@@ -388,6 +443,20 @@ const MarkdownImage = memo(function MarkdownImage({ src, alt }) {
   );
 });
 
+/**
+ * B197 — hold back an unterminated image token at the END of the content.
+ * While an image streams in (`![cat](https://image.pollinations…` with no
+ * closing paren yet) react-markdown renders that tail as LITERAL TEXT — the
+ * raw URL flashing on screen before the image completes. Such a tail is
+ * never valid markdown, so stripping it is safe for finished answers too.
+ * Never crosses a newline: only the streaming-edge fragment is affected.
+ */
+export function stripTrailingImageFragment(s) {
+  return String(s || '')
+    .replace(/!\[[^\]\n]*\]\([^)\n]*$/, '')
+    .replace(/!\[[^\]\n]*$/, '');
+}
+
 /* ------------------------------------------------------------------ */
 /* Horizontal Divider                                                   */
 /* ------------------------------------------------------------------ */
@@ -396,25 +465,15 @@ function HorizontalDivider() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Main Renderer                                                        */
+/* Component map — MODULE SCOPE (B197)                                  */
 /* ------------------------------------------------------------------ */
-export default function MarkdownRenderer({ content, size = 'text-[11px]' }) {
-  /* --- Pre-processing ------------------------------------------------ */
-  // B176 — THE math root fix: every dialect ($, \( \), \[ \], bare LaTeX)
-  // normalizes to $-dialect HERE, before the parser — covers streaming,
-  // finished answers AND old history. Code blocks/inline code are protected
-  // inside preprocessMath and restored untouched.
-  let cleanContent = useMemo(() => preprocessMath(content || ''), [content]);
-
-  // Clean up empty math blocks left after normalization
-  cleanContent = cleanContent.replace(/\$\$\s*\$\$/g, '').replace(/\$\s+\$/g, '');
-
-  return (
-    <div className={`markdown-body ${size} leading-relaxed`}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: 'ignore', errorColor: '#ffb020' }]]}
-        components={{
+/* This object MUST stay module-scope: react-markdown uses these functions
+   as React element TYPES. A fresh object per render means fresh function
+   identities, and React remounts (instead of reconciling) every custom-
+   rendered node — images reload, code re-highlights, the whole message
+   tree tears down on every streaming delta. One frozen identity keeps the
+   <img> DOM node (and its loaded state) alive across all deltas. */
+export const MARKDOWN_COMPONENTS = {
           /* --- Headings -------------------------------------------- */
           h1: ({ node, children, ...props }) => {
             if (SECTION_META[flattenText(children).trim().toUpperCase()]) {
@@ -596,7 +655,32 @@ export default function MarkdownRenderer({ content, size = 'text-[11px]' }) {
               {children}
             </summary>
           ),
-        }}
+};
+
+/* ------------------------------------------------------------------ */
+/* Main Renderer                                                        */
+/* ------------------------------------------------------------------ */
+export default function MarkdownRenderer({ content, size = 'text-[11px]' }) {
+  /* --- Pre-processing ------------------------------------------------ */
+  // B176 — THE math root fix: every dialect ($, \( \), \[ \], bare LaTeX)
+  // normalizes to $-dialect HERE, before the parser — covers streaming,
+  // finished answers AND old history. Code blocks/inline code are protected
+  // inside preprocessMath and restored untouched.
+  let cleanContent = useMemo(() => preprocessMath(content || ''), [content]);
+
+  // Clean up empty math blocks left after normalization
+  cleanContent = cleanContent.replace(/\$\$\s*\$\$/g, '').replace(/\$\s+\$/g, '');
+
+  // B197 — never show a half-streamed image URL as literal text: hold the
+  // unterminated trailing `![alt](https://…` fragment back until it closes.
+  cleanContent = stripTrailingImageFragment(cleanContent);
+
+  return (
+    <div className={`markdown-body ${size} leading-relaxed`}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: 'ignore', errorColor: '#ffb020' }]]}
+        components={MARKDOWN_COMPONENTS}
       >
         {cleanContent}
       </ReactMarkdown>

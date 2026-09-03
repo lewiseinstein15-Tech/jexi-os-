@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -137,7 +137,12 @@ function TaskLi({ checked, children }) {
 
 /* ── main component ── */
 export default function RichAnswer({ text, size = 'default' }) {
-  const components = {
+  // B197 — STABLE component identities: react-markdown uses these functions
+  // as React element types. A fresh object per render made React REMOUNT
+  // every custom-rendered node on each re-render — images visibly reloaded.
+  // All renderers below are pure functions of their props, so one frozen
+  // object (empty deps) is exactly equivalent — minus the remount storm.
+  const components = useMemo(() => ({
     h1: ({ children }) => <h1 className="jx-h1">{children}</h1>,
     h2: ({ children }) => <h2 className="jx-h2">{children}</h2>,
     h3: ({ children }) => <h3 className="jx-h3">{children}</h3>,
@@ -176,7 +181,7 @@ export default function RichAnswer({ text, size = 'default' }) {
     ),
     img: ({ src, alt }) => <img className="jx-img-inline" src={src} alt={alt || ''} loading="lazy" />,
     hr: () => <hr className="jx-hr" />,
-  };
+  }), []);
 
   return (
     <div className={`jx-rich${size === 'large' ? ' jx-rich-lg' : ''}`}>

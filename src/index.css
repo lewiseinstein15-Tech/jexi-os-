@@ -1199,6 +1199,17 @@ form.surface-float { flex-shrink: 0; }
 /* B196 — glitch-free images */
 .jx-imgfig { margin: 10px 0; }
 .jx-imgbox { position: relative; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--bg3); max-width: min(100%, 420px); }
+/* B197 — a reserved aspect-ratio box must never exceed the image cap, so a
+   portrait image reserves 400px-tall exactly once and never resizes again. */
+.jx-imgbox { max-height: 400px; }
 .jx-imgloading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .jx-img { display: block; width: 100%; max-height: 400px; object-fit: contain; opacity: 0; transition: opacity .28s ease; }
 .jx-img.shown { opacity: 1; }
+
+/* B197 — the shimmer-bar class was referenced by four components
+   (MarkdownRenderer image loading, BootSplash, CommandCenter, HomeView) but
+   had NO definition anywhere: every loading surface rendered as an EMPTY
+   box — the image "loading" state looked broken/glitchy. One real shimmer. */
+.shimmer-bar { position: relative; overflow: hidden; border-radius: 6px; height: 10px; background: rgba(255,255,255,.06); }
+.shimmer-bar::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.13), transparent); animation: jxshimmer 1.5s ease-in-out infinite; }
+@keyframes jxshimmer { 100% { transform: translateX(100%); } }
