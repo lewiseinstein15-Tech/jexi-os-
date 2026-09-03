@@ -1255,3 +1255,6 @@ form.surface-float { flex-shrink: 0; }
 .jx-agent-row-who { flex-shrink: 0; max-width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: .02em; color: var(--mag2, #a78bfa); opacity: .85; }
 .jx-agent-row-what { color: var(--faint, #6b7280); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .jx-agent-reason { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line); font-family: var(--mono); font-size: 11px; line-height: 1.55; color: var(--faint, #6b7280); white-space: pre-wrap; word-break: break-word; max-height: 96px; overflow-y: auto; }
+
+/* B206 — "+N earlier steps/notes" marker above the capped tail */
+.jx-agent-more { font-family: var(--mono); font-size: 9px; color: var(--faint, #6b7280); padding: 2px 0 4px 13px; letter-spacing: .04em; opacity: .8; }

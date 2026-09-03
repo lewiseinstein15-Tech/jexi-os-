@@ -103,7 +103,7 @@ console.log('\n[6] wiring contracts');
 
   const panel = read('../src/components/AgentThinking.jsx');
   check('panel auto-collapses when the turn finishes', /if \(!live\) setExpanded\(false\)/.test(panel));
-  check('panel live header ticks the timer', /Thinking\$\{by \? ` · \$\{by\}` : ''\} · \$\{elapsed\.toFixed\(1\)\}s/.test(panel));
+  check('panel live header ticks the timer', /Thinking\$\{safeBy \? ` · \$\{safeBy\}` : ''\} · \$\{elapsed\.toFixed\(1\)\}s/.test(panel));
   check('panel done header shows duration + chips', /Thought\$\{doneMs \? ` for \$\{formatDuration\(doneMs\)\}` : ''\}/.test(panel) && chipsBooleans(panel));
   check('panel renders no empty block for direct answers', /if \(!hasTrace\(\{ narrations, activity, thinking \}\)\) return null;/.test(panel));
 

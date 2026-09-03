@@ -70,3 +70,55 @@ export function hasTrace(msg) {
     || (thinking && String(thinking).trim())
   );
 }
+
+/* ------------------------------------------------------------------------
+ * B206 — THINKING-PANEL HARDENING.
+ * The panel renders LIVE, UNTRUSTED server data. One malformed event must
+ * never blank the chat: objects as React children throw ("Objects are not
+ * valid as a React child"), control characters/ANSI codes render as junk,
+ * and a marathon task can emit hundreds of rows. Everything below is
+ * defensive: coerce, strip, cap.
+ * ------------------------------------------------------------------------ */
+
+const CTRL_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g; // C0 except \n \t
+const ANSI_RE = /\u001B\[[0-9;?]*[A-Za-z]/g;
+
+/** Coerce anything into safe display text: string, controls + ANSI stripped,
+ *  length capped. Objects become a harmless "[object Object]"-style string
+ *  instead of crashing React. */
+export function sanitizeText(v, maxChars = 4000) {
+  let s = v === null || v === undefined ? '' : String(v);
+  s = s.replace(ANSI_RE, '').replace(CTRL_RE, '');
+  if (s.length > maxChars) s = `…${s.slice(-(maxChars - 1))}`;
+  return s;
+}
+
+/** Coerce raw activity rows into a safe shape; invalid entries are dropped. */
+export function safeRows(rows) {
+  if (!Array.isArray(rows)) return [];
+  const out = [];
+  for (const r of rows) {
+    if (r === null || r === undefined) continue;
+    const agent = sanitizeText(r.agent, 40).trim() || 'JEXI';
+    const message = sanitizeText(r.message, 240);
+    if (message) out.push({ agent, message });
+  }
+  return out;
+}
+
+/** Keep the TAIL of a long list for rendering: { shown, hidden }.
+ *  A 500-step marathon task renders the last 40 rows + "+460 earlier steps",
+ *  never a 500-node DOM subtree that re-renders 10×/s. */
+export function capTail(arr, limit = 40) {
+  const list = Array.isArray(arr) ? arr : [];
+  if (list.length <= limit) return { shown: list, hidden: 0 };
+  return { shown: list.slice(-limit), hidden: list.length - limit };
+}
+
+/** Cap a huge text blob for display, keeping the newest TAIL (live streams
+ *  care about what just happened). */
+export function capText(text, maxChars = 6000) {
+  const s = sanitizeText(text, maxChars + 1000);
+  if (s.length <= maxChars) return s;
+  return `…${s.slice(-(maxChars - 1))}`;
+}

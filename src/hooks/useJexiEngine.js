@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { getBackendUrl, jexiFetch, backendErrorMessage, delay, getSessionId, setSessionId } from '../utils/helpers';
+import { sanitizeText } from '../utils/agentStream.js'; // B206 — hardened log ingestion
 
 // A live agent loop streams events continuously. If the stream stays silent
 // this long (app backgrounded / proxy drop / host restart) the read is stuck
@@ -56,13 +57,20 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
     // story per-message (not just in the global side feed). The first log
     // creates the streaming message — the panel appears instantly.
     if (data.type === 'log' || data.type === 'agent.log') {
-      const entry = { agent: data.agent || 'JEXI', message: data.message };
-      setLogs(prev => [...prev, entry]);
+      // B206 — HARDENED INGESTION: server log payloads are live data; a
+      // structured/odd message must be coerced to a string HERE (objects as
+      // React children throw), control chars/ANSI stripped, and the stored
+      // array capped so a marathon task cannot grow state unbounded.
+      const entry = {
+        agent: sanitizeText(data.agent, 40).trim() || 'JEXI',
+        message: sanitizeText(data.message, 240),
+      };
+      setLogs(prev => [...prev, entry].slice(-400));
       setMessages(prev => {
         const next = [...prev];
         const last = next[next.length - 1];
         if (last && last.role === 'jexi' && last.streaming) {
-          next[next.length - 1] = { ...last, activity: [...(last.activity || []), entry] };
+          next[next.length - 1] = { ...last, activity: [...(last.activity || []), entry].slice(-400) };
         } else {
           next.push({ role: 'jexi', text: '', streaming: true, t0: Date.now(), activity: [entry] });
         }
