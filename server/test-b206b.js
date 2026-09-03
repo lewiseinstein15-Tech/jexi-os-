@@ -47,9 +47,13 @@ const check = (name, cond, extra = '') => {
 const dom = new JSDOM('<!doctype html><html><body><div id="host"></div></body></html>', { pretendToBeVisual: true });
 globalThis.window = dom.window;
 globalThis.document = dom.window.document;
-globalThis.navigator = dom.window.navigator;
 globalThis.HTMLElement = dom.window.HTMLElement;
 globalThis.IS_REACT_ACT_ENVIRONMENT = false;
+// Node 21+ ships a getter-only global navigator (CI runs Node 22, local 20):
+// defineProperty where possible, otherwise React reads jsdom's via window.
+try {
+  Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator, configurable: true, writable: true });
+} catch (e) { /* Node's built-in navigator is fine for rendering */ }
 
 const tick = (ms = 60) => new Promise((r) => setTimeout(r, ms));
 
