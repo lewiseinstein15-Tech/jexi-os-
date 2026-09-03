@@ -406,7 +406,7 @@ async function tryOpenAICompat({ key, baseUrl, models, label, providerKey = '' }
               { role: 'user', content: prompt },
             ],
             temperature: opts.temperature ?? 0.4,
-            max_tokens: 1600,
+            max_tokens: opts.maxTokens || 4000,
           }),
           signal: controller.signal,
         });
@@ -488,7 +488,7 @@ async function tryVllm(prompt, system, imageBase64, opts, errors) {
             { role: 'user', content: prompt },
           ],
           temperature: opts.temperature ?? 0.4,
-          max_tokens: 1600,
+          max_tokens: opts.maxTokens || 4000,
         }),
         signal: controller.signal,
       });
