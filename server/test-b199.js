@@ -121,5 +121,21 @@ ok('small source packs pass through untouched', budgetSources(small)[0].content 
 const idx = fs.readFileSync('./index.js', 'utf-8');
 ok('boot self-heal purge wired in index.js', idx.includes('purgeNonAnswerKnowledge();'));
 
+// B199 (Test B) — plugin fast-path must not hijack BUILD deliverables that
+// merely mention a plugin topic ("Swahili guide ... weather & seasons").
+{
+  const { detectPluginIntent } = await import('./src/services/Planner.js');
+  ok('pure weather query still fast-paths to the plugin',
+    detectPluginIntent('what is the weather in Nairobi')?.intent === 'weather');
+  ok('pure crypto query still fast-paths to the plugin',
+    detectPluginIntent('what is the price of bitcoin')?.intent === 'crypto_price');
+  ok('build-a-weather-app is NOT hijacked by the weather plugin',
+    detectPluginIntent('build me a weather app with forecasts') === null);
+  ok('Swahili guide mentioning weather & seasons is NOT hijacked (Test B)',
+    detectPluginIntent('build me a complete swahili learning guide: greetings, family, weather & seasons, work & school') === null);
+  ok('crypto tracker build request is NOT hijacked by the crypto plugin',
+    detectPluginIntent('write a program that tracks crypto prices in a file') === null);
+}
+
 console.log(failures === 0 ? '\n🎉 B199 CHECKS PASSED' : `\n💥 ${failures} FAILURES`);
 process.exit(failures ? 1 : 0);

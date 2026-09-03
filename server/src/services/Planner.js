@@ -169,6 +169,15 @@ export function isDirectIntent(intent) {
  *  Returns null when the query is not plugin-answerable. */
 export function detectPluginIntent(q) {
   const s = String(q || '').toLowerCase();
+  // B199 — a BUILD/CREATE deliverable that mentions a plugin topic must NOT
+  // be hijacked by the fast-path: "build a weather app", "write a crypto
+  // price tracker", "Swahili guide ... weather & seasons (lesson 8)" are
+  // build/code requests, not plugin queries. Deliverable verb + produced
+  // noun → let the full pipeline classify it (the tool router can still use
+  // the plugin there). Pure queries ("weather in Nairobi") never match.
+  const deliverable = /\b(build|create|make|write|develop|code|design|generate|draft|compile|produce)\b[^.!?]{0,60}\b(app|application|website|web ?page|site|guide|file|files|document|doc|report|program|script|game|tool|tracker|dashboard|quiz|planner|list|notes?|lessons?|book|story|presentation|slides|markdown|table|curriculum)\b/i.test(s)
+    || /\b(app|application|website|web ?page|site|guide|file|files|document|doc|report|program|script|game|tool|dashboard|quiz|planner|lessons?|curriculum)\b[^.!?]{0,40}\b(build|create|make|write|develop|generate)\b/i.test(s);
+  if (deliverable) return null;
   if (/\b(weather|forecast|temperature|humidity|rain|wind speed|sunny|cloudy|current conditions)\b/.test(s)) {
     return { intent: 'weather', tool: 'weather-now', reasoning: 'Weather query — the weather plugin answers it directly, no web search.' };
   }

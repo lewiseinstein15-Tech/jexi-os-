@@ -4,7 +4,9 @@
 
 The test: *"List every one of the 54 countries in Africa — table with capital,
 population, year of independence."* A long, verifiable, hallucination-checkable
-task. It found **five real bugs** — all fixed with regression tests.
+task. It found **six real bugs** — all fixed with regression tests. A second
+long test (Test B: *"build a 10-lesson Swahili guide, one file per lesson"*)
+found the sixth.
 
 ---
 
@@ -75,10 +77,37 @@ dropped, never the top.
 
 ---
 
+## Bug 6 — the weather hijack (Test B: a 13.5-second "build")
+
+Test B asked for a long BUILD: *"Build me a complete Swahili learning guide —
+10 lessons, one file per lesson … greetings (1) … weather & seasons (8) …"*
+It came back in **13.5 seconds** with zero files: the plugin fast-path matched
+the word "weather" in the lesson-topic list and hijacked the entire build
+request into the weather plugin. The same trap existed for "build a crypto
+price tracker app" (→ crypto plugin) and any build request that mentions a
+plugin-answerable topic.
+
+**Fix:** the plugin fast-path now stands down when the query carries a
+deliverable cue (build/create/write/develop + app/guide/file/lesson/report/
+table/…). Pure queries ("what's the weather in Nairobi") still fast-path;
+deliverables flow to the full pipeline, where the tool router can still use
+the plugin. Five regression checks added to `test-b199.js`.
+
 ## Result (live, third run)
 
 The pipeline now runs the full marathon — question breakdown, multi-engine
 scan, parallel deep-read, grounded synthesis, fact-check, targeted re-entry —
 without hijacks, without clobbering, without memorizing failures, and without
-dead-model round-trips. `generateContent` warm in 0.6s. 25 regression checks
+dead-model round-trips. `generateContent` warm in 0.6s. 30 regression checks
 in `server/test-b199.js`.
+
+**Run 5 (all fixes in):** 16m07s end-to-end — decompose → 2 sub-searches →
+20 sources/6 engines → deep-read 10 → synthesis → thin-coverage detection →
+second pass → knowledge fallback (honestly flagged) → fact-check → 2 flagged
+claims re-researched. The 15-minute connection deadline closed the stream,
+the mission finished server-side 63s later, and the full answer persisted:
+**all 54 countries, correct capitals and independence years (Ethiopia:
+"never colonized", Eritrea 1993, Egypt 1922), and ZERO fabricated numbers —
+every population cell says "Data not verifiable" rather than a guess.**
+That is the anti-hallucination discipline working under a "no guessing"
+instruction.
