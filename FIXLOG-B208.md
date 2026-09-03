@@ -62,3 +62,33 @@ swappable infrastructure. No scripted fake conversations.
 - The interpreter is one LLM call — its quality bounds the refinement quality.
 - Telemetry biases selection/routing; no actual model training happens and
   none is claimed.
+
+## B208b — gap closure (post-audit)
+
+Audited against the original 39-section spec and closed:
+
+- **REPLAN is real now** — a failed lead (after the recovery ladder) triggers
+  ONE bounded replan: the interpreter is re-invoked WITH the failure record
+  (failed subtasks + recovery attempts) and must produce a genuinely
+  different decomposition. REPLANNING state is actually used; the state
+  machine learned REPLANNING→PLANNING.
+- **Dependency results actually flow** — bug found by the new parallel/conflict
+  test: results were keyed `st1` but looked up by raw index (`0`), so the
+  lead's brief never received supporter findings. Fixed + tested.
+- **Employee context injection** — every brief now carries the user's learned
+  preferences (bounded slice; never the whole history).
+- **Attempts counter** — assignments record real retry counts.
+- **Events**: OBJECTIVE_REFINED, MODEL_REQUEST_STARTED/COMPLETED,
+  RECOVERY_COMPLETED added to the canonical stream.
+- **Latency-aware routing** — provider ranking tiebreaks on observed avgMs.
+- **CORRECTION threads to the RESULT it corrects** (parentId).
+- **Tests 74→89**: replan loop, provider-timeout recovery + attempts,
+  malformed refinement coercion, parallel waves with conflicting supporter
+  findings consolidated by the lead, dependency-wave unit, event vocabulary.
+
+Remaining known gaps (documented, not hidden): mid-work interruption/
+redirection, runtime team management API/UI, permission enforcement for
+WRITE/EXECUTE/GIT (vacuous today — employees only search+reason), the full
+§27 event vocabulary (FILE_*, COMMAND_*, TEST_*), per-employee task-history
+queries, one task record per conversation, and cost/context-length routing
+signals.

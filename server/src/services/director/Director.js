@@ -28,6 +28,7 @@ import { rankEmployees, selectEmployee, getEmployee } from './Employees.js';
 import { telemetry } from './Telemetry.js';
 import { runEmployeeSession, assembleBrief } from './EmployeeSession.js';
 import { verifyDeliverable, acceptanceGates } from './Verifier.js';
+import { preferencesBlock } from '../PreferenceLearner.js'; // B208b — employees receive relevant user context
 import { isProviderError } from './ModelRouter.js';
 
 const MAX_SUBTASKS = 5;
@@ -123,6 +124,7 @@ export class Director {
       summary: `Objective refined: ${String(refinement.refinedObjective).slice(0, 200)}`,
       data: { ambiguity: refinement.ambiguity, taskType: refinement.taskType, complexity: refinement.complexity },
     });
+    emit({ type: 'OBJECTIVE_REFINED', title: 'Constraints & success criteria set', summary: `${(task.constraints || []).length} constraints and ${task.successCriteria.length} success criteria extracted.`, data: { constraints: task.constraints, successCriteria: task.successCriteria } });
     narrate(refinement.userLine);
 
     // Genuinely unresolvable AND risky → ask instead of guessing.
@@ -137,8 +139,11 @@ export class Director {
     }
 
     // ── 2) PLAN ─────────────────────────────────────────────────────────────
+    // B208b — a ROUND = plan → staff → execute. If the lead fails after the
+    // recovery ladder, the Director REPLANS once with the failure context.
+    const runPlanRound = async (activeRefinement) => {
     task.setState('PLANNING');
-    const plan = normalizePlan(refinement, task);
+    const plan = normalizePlan(activeRefinement, task);
     task.plan = plan;
     task.leadEmployeeId = null;
     emit({
@@ -204,6 +209,41 @@ export class Director {
 
     const failed = plan.subtasks.filter((s) => !results.get(s.id));
     const leadResult = results.get(plan.leadSubtaskId) || [...results.values()][results.size - 1] || null;
+    return { plan, staffed, leadStaff, results, failed, leadResult };
+    };
+
+    let round = 0;
+    let plan, staffed, leadStaff, results, failed, leadResult;
+    ({ plan, staffed, leadStaff, results, failed, leadResult } = await runPlanRound(refinement));
+
+    // B208b — REPLAN (bounded: once): rebuild the plan with the failure
+    // context instead of retrying a dead approach.
+    while (!leadResult && failed.length && round < 1) {
+      round += 1;
+      task.setState('REPLANNING', 'lead assignment failed — rebuilding the plan');
+      emit({ type: 'REPLAN_STARTED', summary: 'That approach did not work — rebuilding the plan rather than retrying the same thing.', severity: 'warn' });
+      let replanned;
+      try {
+        replanned = await this.llm.interpret({
+          raw, effectiveQuery, contextBlock, memoryContext, activeTaskId, image,
+          failureContext: [
+            '# WHAT FAILED (real execution record)',
+            `Objective: ${task.objective}`,
+            `Failed subtasks: ${failed.map((f) => `- ${f.title}`).join('\n')}`,
+            `Recovery attempts that did not save it: ${task.recoveries.slice(-4).map((r) => `${r.action} (${r.reason})`).join('; ') || 'model lanes unavailable'}`,
+            'Produce a DIFFERENT decomposition — different subtasks, capabilities, or order. Do not repeat the failed approach.',
+          ].join('\n\n'),
+        });
+      } catch (e) { break; }
+      if (!validateRefinement(replanned).valid) break;
+      refinement = replanned;
+      task.objective = refinement.refinedObjective || task.objective;
+      task.successCriteria = refinement.successCriteria || task.successCriteria;
+      task._persist();
+      emit({ type: 'REPLAN_COMPLETED', summary: 'New plan ready — different approach, same objective.' });
+      narrate('The first approach failed, so I changed the plan rather than wasting the run.');
+      ({ plan, staffed, leadStaff, results, failed, leadResult } = await runPlanRound(refinement));
+    }
 
     if (!leadResult && failed.length) {
       task.setState('FAILED', 'lead assignment failed');
@@ -211,7 +251,7 @@ export class Director {
       return {
         success: false,
         summary: `I couldn't get this one done. ${failed.map((f) => `**${f.title}**`).join(' and ')} failed after recovery attempts — here's what happened and what I'd try next:\n\n- ${task.recoveries.slice(-3).map((r) => `${r.action} after ${r.reason}`).join('\n- ') || 'the model lanes were unavailable'}\n\nWant me to retry the whole thing, or approach it differently?`,
-        statistics: { directed: true, success: false, taskId: task.id, recoveries: task.recoveries.length },
+        statistics: { directed: true, success: false, taskId: task.id, recoveries: task.recoveries.length, replans: round },
       };
     }
 
@@ -236,6 +276,7 @@ export class Director {
         mailbox.post(message({
           from: 'jexi', to: leadStaff.employee.agentId, taskId: task.id, subtaskId: plan.leadSubtaskId,
           type: 'CORRECTION', content: verification.problems.join('\n'), title: 'Verification problems to fix',
+          parentId: leadResult?.id || null,
         }));
         const corrected = await this.runEmployeeWork({ task, subtask: plan.subtasks.find((s) => s.id === plan.leadSubtaskId), employee: leadStaff.employee, mailbox, emit, extraInstructions: `Your previous attempt failed verification. Fix these specific problems:\n${verification.problems.map((p) => `- ${p}`).join('\n')}\n\nPrevious deliverable:\n${deliverable.slice(0, 6000)}` });
         if (corrected) deliverable = String(corrected.content || deliverable);
@@ -281,6 +322,7 @@ export class Director {
         lead: nameFor(task.leadEmployeeId),
         verification: task.verification ? task.verification.verdict : 'skipped',
         recoveries: task.recoveries.length,
+        replans: round,
         subtasks: plan.subtasks.length,
       },
     };
@@ -291,11 +333,19 @@ export class Director {
     let attempt = 0;
     let current = staffing;
     while (attempt < 3) {
+      const assignmentRec = task.assignments.find((a) => a.subtaskId === subtask.id);
+      if (assignmentRec) { assignmentRec.attempts = attempt + 1; assignmentRec.status = attempt === 0 ? 'running' : `retry-${attempt}`; assignmentRec.employeeId = current.employee.agentId; }
+      const hadFailedBefore = attempt > 0;
       const t0 = Date.now();
       try {
-        const deps = (subtask.dependsOn || []).map((id) => results.get(id)).filter(Boolean).map((r) => ({ ...r, fromName: nameFor(r.from) }));
+        // dependsOn stores INDICES; results is keyed by subtask id (st1, st2, …)
+        const deps = (subtask.dependsOn || []).map((idx) => results.get(`st${idx + 1}`)).filter(Boolean).map((r) => ({ ...r, fromName: nameFor(r.from) }));
         const result = await this.runEmployeeWork({ task, subtask, employee: current.employee, mailbox, emit, deps });
         telemetry.record('employee', current.employee.agentId, { ok: true, ms: Date.now() - t0 });
+        if (hadFailedBefore) {
+          emit({ type: 'RECOVERY_COMPLETED', agentId: current.employee.agentId, agentName: current.employee.displayName, summary: `${current.employee.displayName} recovered — "${subtask.title}" is done after the retry.` });
+          task.recordRecovery({ subtaskId: subtask.id, employeeId: current.employee.agentId, action: 'RECOVERED', reason: 'assignment completed after recovery', ok: true });
+        }
         return result;
       } catch (err) {
         const action = recoveryAction(err, attempt, { noReassign: staffed.length === 1 });
@@ -335,9 +385,13 @@ export class Director {
       }));
       return msg;
     }
+    // B208b — employees receive RELEVANT context (never the whole history):
+    // the user's learned preferences + anything the plan attached.
+    let contextSlice = subtask.memorySlice || '';
+    try { const prefs = preferencesBlock(3); if (prefs) contextSlice = `${contextSlice ? contextSlice + '\n\n' : ''}${prefs}`.slice(0, 2000); } catch { /* context is best-effort */ }
     const brief = assembleBrief({
       task, subtask, employee, dependencies: deps,
-      memorySlice: subtask.memorySlice || '',
+      memorySlice: contextSlice,
       planContext: task.plan?.subtasks?.length > 1 ? `part ${subtask.id} of ${task.plan.subtasks.length}` : '',
     });
     if (extraInstructions) brief.taskDetails = `${brief.taskDetails || ''}\n\n${extraInstructions}`.trim();
@@ -411,7 +465,7 @@ function normalizePlan(refinement, task) {
 }
 
 /** Group subtasks into executable waves (topological order by dependency index). */
-function dependencyWaves(subtasks) {
+export function dependencyWaves(subtasks) {
   const done = new Set();
   const waves = [];
   let remaining = [...subtasks];

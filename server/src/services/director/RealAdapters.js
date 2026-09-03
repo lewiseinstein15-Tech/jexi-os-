@@ -43,12 +43,13 @@ Output ONLY JSON:
 
 export function realLlmAdapter() {
   return {
-    interpret: async ({ raw, effectiveQuery, contextBlock, memoryContext, activeTaskId, image }) => {
+    interpret: async ({ raw, effectiveQuery, contextBlock, memoryContext, activeTaskId, image, failureContext }) => {
       const user = [
         `# USER MESSAGE (verbatim)\n"${String(raw || '').slice(0, 2000)}"`,
         contextBlock ? `# CONVERSATION/TASK CONTEXT\n${String(contextBlock).slice(0, 2500)}` : '',
         memoryContext ? `# WHAT WE ALREADY KNOW (memory)\n${String(memoryContext).slice(0, 1500)}` : '',
         activeTaskId ? `# NOTE: there is an active product task in progress — "fix/change/add" language usually means modifying THAT, not starting new research.` : '',
+        failureContext ? `# REPLAN — the previous attempt failed; produce a genuinely different plan\n${String(failureContext).slice(0, 2000)}` : '',
       ].filter(Boolean).join('\n\n');
       const text = await generateContent(user, INTERPRET_SYSTEM, image || null, {});
       return extractJson(text);

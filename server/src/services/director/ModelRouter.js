@@ -113,10 +113,13 @@ export async function runWithModel(employee, taskType, work, hooks = {}) {
   let lastErr = null;
   while (true) {
     const t0 = Date.now();
+    emit('MODEL_REQUEST_STARTED', { agentId: employee.agentId, agentName: employee.displayName, summary: `${employee.displayName} is working (lane: ${session.providerLabel}).` });
     try {
       const result = await work({ session, prefer: session.prefer, attempt: session.attempt });
-      telemetry.record('provider', session.prefer || 'auto', { ok: true, ms: Date.now() - t0 });
+      const ms = Date.now() - t0;
+      telemetry.record('provider', session.prefer || 'auto', { ok: true, ms });
       session.providerUsed = session.prefer || 'auto';
+      emit('MODEL_REQUEST_COMPLETED', { agentId: employee.agentId, agentName: employee.displayName, summary: `${employee.displayName} finished a model pass in ${(ms / 1000).toFixed(1)}s.` });
       return result;
     } catch (err) {
       lastErr = err;

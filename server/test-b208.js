@@ -18,7 +18,7 @@
  */
 
 import assert from 'node:assert';
-import { Director } from './src/services/director/Director.js';
+import { Director, dependencyWaves } from './src/services/director/Director.js';
 import { TaskMailbox, message, mailToActivityLine, MESSAGE_TYPES } from './src/services/director/AgentMail.js';
 import { rankEmployees, selectEmployee, loadEmployees, getEmployee, normalizeCap } from './src/services/director/Employees.js';
 import { ModelSession, preferenceOrder, runWithModel, isProviderError } from './src/services/director/ModelRouter.js';
@@ -384,5 +384,99 @@ console.log('\n[16] Employee performance observation');
   telemetry.reset();
 }
 
+
+/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 17. B208b: replan \u2014 real, bounded \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */
+console.log('\n[17] Replan: a failed lead rebuilds the plan (once, with failure context)');
+{
+  const h = harness({
+    refinement: REFINEMENT({ subtasks: [{ title: 'Investigate', capability: 'research', requirements: ['research'], dependsOn: [] }] }),
+    employeeScript: () => Promise.reject(new Error('503 all providers down')),
+  });
+  const r = await runTurn(h, { convId: 'replan-test' });
+  check('turn fails honestly after the replan too', r.success === false && r.statistics.replans === 1);
+  check('interpreter re-invoked WITH failure context (2 calls)', h.llm.calls.interpret === 2);
+  check('REPLAN_STARTED fired before the honest failure', h.events.some((e) => e.type === 'REPLAN_STARTED'));
+  check('replanned round produced a fresh plan event', h.events.filter((e) => e.type === 'PLAN_CREATED').length === 2);
+  const persisted = loadTask('replan-test');
+  check('task persisted FAILED with recorded recoveries', persisted?.state === 'FAILED' && (persisted?.recoveries?.length || 0) >= 1);
+}
+
+/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 18. B208b: timeout recovery \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */
+console.log('\n[18] Provider timeout \u2192 typed recovery, then success');
+{
+  let n = 0;
+  const h = harness({
+    refinement: REFINEMENT({ subtasks: [{ title: 'Investigate', capability: 'research', requirements: ['research'], dependsOn: [] }] }),
+    employeeScript: () => { n++; return n === 1 ? Promise.reject(new Error('assignment exceeded its 60s time budget')) : GOOD_EMPLOYEE_OUTPUT; },
+  });
+  const r = await runTurn(h, { convId: 'timeout-test' });
+  check('timeout typed \u2192 retry \u2192 delivered', r.success === true && n === 2);
+  check('RECOVERY_COMPLETED fired after the save', h.events.some((e) => e.type === 'RECOVERY_COMPLETED'));
+  const persisted = loadTask('timeout-test');
+  const rec = (persisted?.assignments || [])[0];
+  check('attempts counter actually counted (2)', rec?.attempts === 2);
+}
+
+/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 19. malformed refinement input \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */
+console.log('\n[19] Malformed interpreter output is coerced, never crashes the boss');
+{
+  const h = harness({
+    refinement: REFINEMENT({
+      subtasks: [{ title: 42, details: null, capability: undefined, requirements: 'research', dependsOn: '0', searchQueries: 'not-an-array' }],
+      assumptions: 'oops', successCriteria: [null, 7, 'valid criterion'],
+    }),
+  });
+  const r = await runTurn(h, { raw: 'asdf qwerty zzz' });
+  check('garbage user input + malformed refinement still completes safely', r.success === true);
+  check('plan normalized (title stringified, deps sane)', r.statistics.subtasks === 1);
+}
+
+/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 20. parallel supporters + conflicting findings \u2550\u2550\u2550\u2550\u2550\u2550 */
+console.log('\n[20] Parallel waves, conflicting supporter results, lead consolidates');
+{
+  const outs = [
+    '## REPORT\nsource A says 30km\n\n## DELIVERABLE\nFinding: the tunnel is 30km long.\n\n## CONFIDENCE\nhigh\n\n## CLAIMS\n- source A',
+    '## REPORT\nsource B says 45km\n\n## DELIVERABLE\nFinding: the tunnel is 45km long.\n\n## CONFIDENCE\nmedium\n\n## CLAIMS\n- source B',
+    '## REPORT\ncompared both sources\n\n## DELIVERABLE\nSources conflict (30km vs 45km); the authoritative survey says 45km.\n\n## CONFIDENCE\nhigh\n\n## CLAIMS\n- survey of 2024',
+  ];
+  let call = 0;
+  const h = harness({
+    refinement: REFINEMENT({
+      subtasks: [
+        { title: 'Measure via source A', capability: 'research', requirements: ['research'], dependsOn: [] },
+        { title: 'Measure via source B', capability: 'research', requirements: ['research'], dependsOn: [] },
+        { title: 'Reconcile the measurements', capability: 'synthesis', requirements: ['synthesis'], dependsOn: [0, 1] },
+      ],
+    }),
+    employeeScript: () => outs[Math.min(call++, 2)],
+  });
+  const r = await runTurn(h, { convId: 'parallel-test' });
+  check('all three subtasks completed', r.statistics.subtasks === 3 && r.success === true);
+  const leadCall = h.llm.employeeCalls[h.llm.employeeCalls.length - 1];
+  check('lead received BOTH conflicting findings in its brief', /30km/.test(leadCall.user) && /45km/.test(leadCall.user));
+  check('two different employees ran the parallel wave', new Set(h.events.filter((e) => e.type === 'TASK_STARTED').map((e) => e.agentId)).size >= 2);
+}
+
+/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 21. dependency waves unit \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */
+console.log('\n[21] Dependency wave computation');
+{
+  const st = [
+    { id: 'st1', dependsOn: [] },
+    { id: 'st2', dependsOn: [] },
+    { id: 'st3', dependsOn: [0, 1] },
+    { id: 'st4', dependsOn: [2] },
+  ];
+  const waves = dependencyWaves(st);
+  check('independent subtasks share a wave, dependents wait', waves.length === 3 && waves[0].length === 2 && waves[1][0].id === 'st3' && waves[2][0].id === 'st4');
+}
+
+/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 22. B208b event vocabulary \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */
+console.log('\n[22] Expanded canonical events');
+{
+  const h = harness({ refinement: REFINEMENT() });
+  const types = new Set((await runTurn(h, { convId: 'events-test' })) && h.events.map((e) => e.type));
+  check('OBJECTIVE_REFINED emitted', types.has('OBJECTIVE_REFINED'));
+  check('MODEL_REQUEST_STARTED/COMPLETED emitted', types.has('MODEL_REQUEST_STARTED') && types.has('MODEL_REQUEST_COMPLETED'));
+}
 console.log(`\nB208: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

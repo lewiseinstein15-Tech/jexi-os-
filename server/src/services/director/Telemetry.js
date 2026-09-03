@@ -87,10 +87,11 @@ class Telemetry {
 
   /** Reliability-adjusted preference order for a set of providers (data-driven failover bias). */
   rankProviders(providers) {
+    // reliability first, then observed latency (B208b: latency-aware routing)
     return [...(providers || [])].sort((a, b) => {
-      const sa = this.providerStats(a).successRate;
-      const sb = this.providerStats(b).successRate;
-      return sb - sa;
+      const sa = this.providerStats(a);
+      const sb = this.providerStats(b);
+      return (sb.successRate - sa.successRate) || ((sa.avgMs || 0) - (sb.avgMs || 0));
     });
   }
 
