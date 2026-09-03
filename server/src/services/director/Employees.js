@@ -161,7 +161,6 @@ const DEFAULT_EMPLOYEES = [
     description: 'Shapes how things look, read, and feel. Support role for user-facing work.',
     support: true,
     personality: 'thoughtful, taste-driven, concise',
-    support: true,
     capabilities: ['design', 'synthesis'],
     supportedTools: ['memory-recall'],
     permissions: ['READ'],

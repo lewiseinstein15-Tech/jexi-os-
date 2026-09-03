@@ -1588,6 +1588,21 @@ app.post('/api/chat', async (req, res) => {
     let executionQuery = effectiveQuery; // may gain resume context
     let intelClassification = null;
 
+    // B208 — THE ONE DISPATCH: the complexity→fast-path/graph decision as a
+    // single shared closure — used by BOTH the Director's build department
+    // and the standard planner lane below (one call site, one contract).
+    const runLegacyPipeline = async (plan, q) => plan.complexity === 'SIMPLE'
+      ? await runSimpleTask(plan, q, sendEvent, { image })
+      : await orchestrator.executePlan(plan, q, sendEvent, {
+          image,
+          taskId: activeTaskId || null,
+          isContinuation: hasPending || ['continue', 'switch'].includes(intelClassification),
+          onPause: async (pausedState) => {
+            saveRun(convId, { plan, query: q, state: pausedState });
+            saveOffer(convId, q);
+          },
+        });
+
     // BUILD 47 — INTELLIGENCE PIPELINE (Conversation Manager).
     // Before anything runs, decide what this message MEANS: continuation of the
     // active task, a switch back to an older one, a genuinely new objective, or
@@ -1681,21 +1696,6 @@ app.post('/api/chat', async (req, res) => {
       // JEXI already knows (preferences, facts, prior research) when deciding
       // the intent. Compact slice — never the full transcript.
       const plannerMemory = await buildPlannerMemory(effectiveQuery);
-
-      // B208 — THE ONE DISPATCH: the complexity→fast-path/graph decision as a
-      // single shared closure — used by BOTH the Director's build department
-      // and the standard planner lane below (one call site, one contract).
-      const runLegacyPipeline = async (plan, q) => plan.complexity === 'SIMPLE'
-        ? await runSimpleTask(plan, q, sendEvent, { image })
-        : await orchestrator.executePlan(plan, q, sendEvent, {
-            image,
-            taskId: activeTaskId || null,
-            isContinuation: hasPending || ['continue', 'switch'].includes(intelClassification),
-            onPause: async (pausedState) => {
-              saveRun(convId, { plan, query: q, state: pausedState });
-              saveOffer(convId, q);
-            },
-          });
 
       // B208 — THE DIRECTOR LANE: JEXI runs this turn as the BOSS. She
       // interprets the request (however vague), refines it into a proper
