@@ -130,9 +130,10 @@ export class Supervisor {
       .then((r) => {
         this.reviewDone = true;
         if (r && r.redirect) {
+          const terse = String(r.reason || '').trim();
           this.decide({
             action: 'REDIRECT',
-            reason: r.reason || 'the approach is off-track for the objective',
+            reason: terse.length >= 12 ? terse : 'the approach is off-track for the objective',
             instruction: r.instruction || 'Stop the current approach and address the objective directly.',
           });
         } else if (r) {

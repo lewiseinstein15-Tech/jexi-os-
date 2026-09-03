@@ -292,7 +292,7 @@ async function generateWithSupervision({ employee, subtask, brief, task, mailbox
       employeeName: employee.displayName,
       review,
       liveReview: attempt === 0 && liveReview, // after a redirect: watchers only, no second review
-      onEvent: (e) => emit(e.type || 'SUPERVISION_FLAG', { agentId: employee.agentId, agentName: employee.displayName, summary: e.summary, severity: e.severity, instruction: e.instruction }),
+      onEvent: (e) => emit(e.type || 'SUPERVISION_FLAG', { agentId: employee.agentId, agentName: employee.displayName, summary: e.summary, severity: e.severity, data: e.instruction ? { instruction: e.instruction } : undefined }),
     });
     let redirectReject;
     const gate = new Promise((_, rej) => { redirectReject = rej; });
