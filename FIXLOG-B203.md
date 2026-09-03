@@ -59,11 +59,24 @@ path, small-page Readability path, memory gauges present.
 
 - `test-b203.js`: **17/17 passed**
 - Full `npm test`: **SUITE_EXIT=0** (B197→B203 all green)
-- Production research pipeline survives the 512MB ceiling and completes with
-  a `done` event (verified post-deploy).
+- CI on `a256180`: 4/4 workflows green
+- **Production verified post-deploy** (the exact question that killed it):
+  - 260.4s, `intent: research`, **`done: true`** — no process death
+  - 20 sources → deep-read (7 extracted) → synthesis → fact-check flagged 5
+    claims → re-research (30 sources, 8 extracted) → re-synthesis →
+    verify→revise→verify → honest best-effort ship
+  - Memory: **269MB RSS** after the full run (512MB ceiling, was ~240 idle
+    before) — the caps hold
+  - Fast path intact: "What is the capital of Kenya?" → 7.3s direct answer
 
 ## Effect in production
 
-The lakes question now runs the full research pipeline — sources found,
-pages deep-read within memory bounds, synthesized, fact-checked — and returns
-a cited answer instead of killing the server.
+The lakes question now runs the full research pipeline and returns:
+
+> 3. **Lake Malawi** – The third-largest lake in Africa by surface area, with
+> an area of approximately **29,600 km²**, bordered by **Malawi, Mozambique,
+> and Tanzania** [4][7].
+
+— cited (Wikipedia, WorldAtlas, Lakepedia, ACARE…), fact-checked, and the
+server survives. The original hallucination ("Lake Superior", 27,300 km²) is
+gone end-to-end: routing (B202) + grounding (sources) + memory (B203).
