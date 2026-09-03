@@ -93,6 +93,34 @@ table/…). Pure queries ("what's the weather in Nairobi") still fast-path;
 deliverables flow to the full pipeline, where the tool router can still use
 the plugin. Five regression checks added to `test-b199.js`.
 
+## Test B's own five-bug arc (rounds 2–6, all fixed)
+
+1. **Round 2 — content but no files:** correct classification, all 10 lessons
+   inline — but nothing on disk. → **FileBlockWriter**: the terminal `done()`
+   extracts `**path/file.md**` + fenced-code blocks and persists them
+   (sanitized, subdirs, caps) for every pipeline.
+2. **Round 3 — the coding loop on markdown:** routed to the coding team;
+   the Runner executed .md files (exit 1), the Debugger churned rewrites
+   forever, an Editor retried a malformed tool call 5×, and a one-line echo
+   overwrite was declared "all passed". → content-as-files routes to
+   content_creation; the coding loop **skips run/fix for non-runnable entry
+   points** (writing the files IS the success); the editor error now teaches
+   the valid commands.
+3. **Round 4 — the live-key classifier override:** with API keys present the
+   LLM classifier runs BEFORE the regex cascade and said `code_task` again —
+   15 minutes of churn, zero files. → an LLM `code_task` **defers** to the
+   deterministic content-as-files rule; classifier few-shot added.
+4. **Round 5 — the 1600-token ceiling:** routing fixed (content_creation in
+   2.0s, 20s total, files persisted, correct Swahili) but the answer stopped
+   mid-lesson-4: every non-streaming provider call was hard-capped at
+   `max_tokens: 1600`. → `opts.maxTokens || 4000`.
+5. **Round 6 — residual (model compliance):** with every primary provider
+   quota-dead, the weak fallback model wrote one lesson well (greeting words
+   4/4 correct — round 3's hallucinated translations gone) and offered
+   "want another?" instead of doing all 10. The architecture is right; a
+   **completeness-continuation pass** (count delivered vs. requested files,
+   continue when short) is the natural next build.
+
 ## Result (live, third run)
 
 The pipeline now runs the full marathon — question breakdown, multi-engine
