@@ -27,9 +27,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # B198b — two fixes for the run-failing-since-Aug-9 load balancer:
+      #   1. wrangler-action's internal `npx wrangler` prompt-cancels on
+      #      missing-package confirmation → run wrangler ourselves with --yes.
+      #   2. No CLOUDFLARE_* secrets are configured in this repo, so a real
+      #      deploy can only fail on auth. Match the render-deploy pattern:
+      #      warn and exit 0 (safe no-op) until the secrets exist.
       - name: Deploy worker with wrangler
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy deploy/lb-worker.js --name jexi-lb
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CF_TOKEN" ] || [ -z "$CF_ACCOUNT" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets are not set — add them in repo Settings → Secrets to enable the optional load balancer. Skipping (the app talks to the brain directly)."
+            exit 0
+          fi
+          npx --yes wrangler@4 deploy deploy/lb-worker.js --name jexi-lb
