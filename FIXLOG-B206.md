@@ -61,6 +61,30 @@ processing, caps, markers, styles).
   Docker, APK) → deployed Pages bundle verified to contain the hardened
   panel (`jx-agent-more`, capped-trace markers present)
 
+## Empirical proof (B206b/B206c — "make sure", verified by rendering)
+
+Asked again to *make sure* — so the guarantee is now proven by execution,
+not by reading source:
+
+- **`test-b206b.js` (25/25) — real DOM:** the actual AgentThinking component
+  (esbuild-bundled, react external) mounted with react-dom/client into jsdom:
+  - hostile props (objects/nulls/numbers as narrations, agents, `by`;
+    ANSI + control chars; 600 activity rows; 200 narrations; 100KB
+    reasoning) → renders, everything capped, page alive
+  - a **live render-crash bomb** (throwing `toString` on thinking + activity)
+    → the local boundary swallows it, panel hides, page intact
+  - 40 rapid live re-renders (the streaming pattern) → no throw, caps hold
+  - done-mode collapse + tap-to-expand still work after all of it
+  - bonus finding: non-string narrations are dropped BEFORE coercion —
+    objects in narrations can't even reach `String()`
+- **`test-b206c.js` (14/14) — real browser:** headless Chromium against the
+  live dev stack (UI :3000 → brain :3002): panel appears live with ticking
+  header, composer stays in the DOM while thinking, answer lands, panel
+  collapses, trace reopens on tap, **zero uncaught page errors, zero
+  render-crash console lines, no UI CRASH card** — across two exchanges.
+  Self-skips in CI (no browser/stack there; b206b covers React-level safety).
+- Full suite with all three layers: **SUITE_EXIT=0**
+
 ## Guarantee
 
 Whatever the brain streams while thinking — malformed events, objects,
