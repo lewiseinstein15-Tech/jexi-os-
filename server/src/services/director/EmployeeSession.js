@@ -338,7 +338,7 @@ async function generateWithSupervision({ employee, subtask, brief, task, mailbox
 
 /** B209 — persist an artifact to the per-task directory (path-safe, bounded). */
 function persistArtifact(taskId, artifact) {
-  const safeName = String(artifact?.name || 'artifact.md')
+  let safeName = String(artifact?.name || 'artifact.md')
     .replace(/\\/g, '/')
     .split('/')
     .pop() // no path components survive
