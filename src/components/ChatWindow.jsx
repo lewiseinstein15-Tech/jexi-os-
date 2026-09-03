@@ -2,14 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Square, ImagePlus, X, Camera, Stethoscope, Plus, Copy, Check, RefreshCw, Sparkles } from 'lucide-react';
 import TypedMessage from './TypedMessage';
-import ThinkRow from './ThinkRow'; // B173 — dsh ReasoningRow
-import ActionFeed from './ActionFeed'; // B184 — arena-style action timeline
-import NarrationFeed from './NarrationFeed'; // B200 — her live first-person commentary
+import AgentThinking from './AgentThinking'; // B205 — unified arena-style thinking panel
 import OrbCore from './OrbCore'; // B192 — the presence orb (empty state)
 import Composer from './Composer'; // B195 — isolated, real-app input
 import MarkdownRenderer from './MarkdownRenderer';
 import VisionPanel from './VisionPanel';
-import AgentPipeline from './AgentPipeline';
 
 const SELF_CHECK_QUERY =
   'JEXI, run a full system self-check now. Check your health, memory, eyes and recent errors. If anything is wrong, tell me the exact source file and the fix.';
@@ -233,17 +230,22 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
                       them directly (no typewriter) so the content never
                       re-flows mid-scroll. The typewriter reveal runs once,
                       on the completed answer. */}
-                  {(msg.thinking || msg.thinkMs !== undefined) && (
-                    <ThinkRow
-                      text={msg.thinking || ''}
-                      active={Boolean(msg.streaming && !msg.text)}
-                      ms={msg.thinkMs}
-                      by={msg.by}
-                    />
-                  )}
-                  {/* B200 — her first-person running commentary, live while she
-                      works; collapses to "HOW I WORKED" once the answer lands. */}
-                  <NarrationFeed lines={msg.narrations} live={Boolean(msg.streaming)} />
+                  {/* B205 — UNIFIED ARENA-STYLE THINKING PANEL: narrations +
+                      agent/tool activity + reasoning tokens in ONE collapsible
+                      block above the answer. Live: "Thinking · 12.3s" open and
+                      pulsing; done: "Thought for 43s · 8 agents · 10 sources",
+                      collapsed, one tap to review the whole trace. Replaces
+                      the old ThinkRow + NarrationFeed + inline ActionFeed. */}
+                  <AgentThinking
+                    narrations={msg.narrations}
+                    activity={msg.activity}
+                    thinking={msg.thinking}
+                    live={Boolean(msg.streaming)}
+                    thinkMs={msg.thinkMs}
+                    totalMs={msg.totalMs}
+                    by={msg.by}
+                    sourceCount={msg.sourceCount}
+                  />
                   {msg.streaming ? (
                     <div className="jx-streaming-text">
                       <MarkdownRenderer content={msg.text} size="text-[13px]" />
@@ -258,21 +260,6 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
           ))
         )}
 
-        {/* B184 — ACTION FEED: her own words on what she did, live */}
-        {(isProcessing || (logs.length > 0 && !messages.some((m) => m.role === 'jexi' && !m.streaming))) && (
-          <ActionFeed logs={logs} isProcessing={isProcessing} />
-        )}
-
-        {/* Inline processing indicator — no card, just a streaming line */}
-        {isProcessing && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="pl-1"
-          >
-            <AgentPipeline logs={logs} isProcessing />
-          </motion.div>
-        )}
       </div>
 
       {/* Image attachment preview */}

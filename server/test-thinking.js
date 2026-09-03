@@ -99,7 +99,10 @@ console.log('\n== 3. engine + UI wiring ==');
   ok('ThinkRow: tap to expand/collapse after the turn', tr.includes('tap to') && tr.includes('setExpanded((e) => !e)'));
 
   const chat = fs.readFileSync(path.join(ROOT, 'src/components/ChatWindow.jsx'), 'utf-8');
-  ok('ChatWindow renders the ThinkRow above the answer', chat.includes('<ThinkRow') && chat.includes('active={Boolean(msg.streaming && !msg.text)}'));
+  // B205 — ThinkRow + NarrationFeed were unified into AgentThinking (the
+  // arena-style panel): reasoning still renders above the answer, now with
+  // narrations + agent activity in the same collapsible block.
+  ok('ChatWindow renders the thinking panel above the answer', chat.includes('<AgentThinking') && chat.includes('thinking={msg.thinking}'));
 
   const pipe = fs.readFileSync(path.join(ROOT, 'src/components/AgentPipeline.jsx'), 'utf-8');
   ok('dead-air narration replaces flat "thinking…"', pipe.includes('reading your message…') && pipe.includes('planning the best approach') && !pipe.includes('"detail">thinking…'));

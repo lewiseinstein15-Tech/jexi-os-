@@ -51,8 +51,23 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
     // B162b — 'agent.log' events (the named coworker join/writing lines)
     // were silently DROPPED by the UI: only 'log' was consumed. Both feed
     // the live step feed now.
+    // B205 — ARENA-STYLE TRACE: the row is ALSO attached to the streaming
+    // assistant message, so the unified thinking panel carries the whole
+    // story per-message (not just in the global side feed). The first log
+    // creates the streaming message — the panel appears instantly.
     if (data.type === 'log' || data.type === 'agent.log') {
-      setLogs(prev => [...prev, { agent: data.agent || 'JEXI', message: data.message }]);
+      const entry = { agent: data.agent || 'JEXI', message: data.message };
+      setLogs(prev => [...prev, entry]);
+      setMessages(prev => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last && last.role === 'jexi' && last.streaming) {
+          next[next.length - 1] = { ...last, activity: [...(last.activity || []), entry] };
+        } else {
+          next.push({ role: 'jexi', text: '', streaming: true, t0: Date.now(), activity: [entry] });
+        }
+        return next;
+      });
     }
     // B200 — ARENA-STYLE NARRATION: JEXI's own first-person words about what
     // she is doing, live. They attach to the streaming assistant message and
@@ -67,7 +82,7 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
           if (last && last.role === 'jexi' && last.streaming) {
             next[next.length - 1] = { ...last, narrations: [...(last.narrations || []), text] };
           } else {
-            next.push({ role: 'jexi', text: '', streaming: true, narrations: [text] });
+            next.push({ role: 'jexi', text: '', streaming: true, t0: Date.now(), narrations: [text] });
           }
           return next;
         });
@@ -84,7 +99,7 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
           if (last && last.role === 'jexi' && last.streaming) {
             next[next.length - 1] = { ...last, thinking: (last.thinking || '') + delta, by: last.by || data.by };
           } else {
-            next.push({ role: 'jexi', text: '', thinking: delta, streaming: true, thinkT0: Date.now(), ...(data.by ? { by: data.by } : {}) });
+            next.push({ role: 'jexi', text: '', thinking: delta, streaming: true, t0: Date.now(), thinkT0: Date.now(), ...(data.by ? { by: data.by } : {}) });
           }
           return next;
         });
@@ -109,7 +124,18 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
         });
       }
     }
-    else if (data.type === 'website') setWebsites(prev => [...prev, data.site]);
+    else if (data.type === 'website') {
+      setWebsites(prev => [...prev, data.site]);
+      // B205 — per-message source count for the thinking panel's chips
+      setMessages(prev => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last && last.role === 'jexi' && last.streaming) {
+          next[next.length - 1] = { ...last, sourceCount: (last.sourceCount || 0) + 1 };
+        }
+        return next;
+      });
+    }
     else if (data.type === 'plan') setPlan(prev => ({ ...prev, ...data }));
     // Build 47 — intelligence metadata (classification, task id, confidence).
     else if (data.type === 'intel') setPlan(prev => ({ ...prev, intel: data }));
@@ -148,6 +174,16 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
             // B173 — the Think row survives the turn (tap to review reasoning)
             ...(cur && cur.thinking ? { thinking: cur.thinking } : {}),
             ...(cur && cur.thinkMs !== undefined ? { thinkMs: cur.thinkMs } : (thinkMs !== null ? { thinkMs } : {})),
+            // B205 — the whole ARENA-STYLE TRACE survives the turn: the
+            // collapsed "Thought for Xs · N agents · N sources" header must
+            // still open into the narrations + activity of the run. (Before
+            // B205 the final message dropped narrations entirely — the
+            // "HOW I WORKED" view could never render after done.)
+            ...(cur && cur.narrations?.length ? { narrations: cur.narrations } : {}),
+            ...(cur && cur.activity?.length ? { activity: cur.activity } : {}),
+            ...(cur && cur.sourceCount ? { sourceCount: cur.sourceCount } : {}),
+            ...(cur && cur.by ? { by: cur.by } : {}),
+            ...(cur && cur.t0 ? { totalMs: Date.now() - cur.t0 } : {}),
           };
           if (idx >= 0) next[idx] = finalMsg; else next.push(finalMsg);
           return next;
