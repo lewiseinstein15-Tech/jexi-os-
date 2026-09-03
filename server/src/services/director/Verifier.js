@@ -12,6 +12,7 @@
  */
 
 import { message } from './AgentMail.js';
+import { parseModelJson } from './JsonRepair.js'; // B209
 
 /** Model-free acceptance gates — cheap, deterministic, always on. */
 export function acceptanceGates(deliverable, task) {
@@ -87,10 +88,9 @@ Answer ONLY with JSON: {"pass": boolean, "score": 0.0-1.0, "problems": ["..."], 
 }
 
 function extractJson(text) {
-  const t = String(text || '');
-  const direct = t.match(/\{[\s\S]*\}/);
-  if (!direct) return null;
-  try { return JSON.parse(direct[0]); } catch { return null; }
+  // B209 — same repair parser as the interpreter: a sloppy-but-complete
+  // rubric must not read as "no verdict"
+  return parseModelJson(text);
 }
 
 function clamp01(n) {

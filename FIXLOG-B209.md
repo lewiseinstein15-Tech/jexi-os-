@@ -78,3 +78,20 @@ Added: `TASK_CREATED` (per subtask), `MODEL_PROVIDER_FAILED` (per failed lane, w
 
 - The redirect E2E in prod depends on an employee actually going off-track; the deterministic watchers + bounded review are verified by 85 unit/integration tests and the live UI wiring by the browser audit. Production traffic will exercise them as it happens.
 - The hire form persists to `data/employees.json` (hot-reloaded); deletion is modeled as benching — identities are stable by design.
+
+---
+
+## Addendum (found during the live production E2E)
+
+**The Director lane was silently declining on the live brain** — "invalid interpretation: not an object" — while the legacy graph answered fine. Root cause, reproduced against real lanes: free-tier models return *structurally complete but syntactically sloppy* JSON:
+
+1. markdown `**bold**` inside string values (`"refinedObjective": **"Conduct…"** with rigor`) → strict `JSON.parse` fails
+2. raw newlines inside string literals ("Bad control character in string literal")
+
+The strict `extractJson` returned null → the Director declined the turn → the legacy pipeline took over. It looked like "working fallback" while quietly disabling the boss on exactly the lanes free tiers serve.
+
+**Fix (both directions):**
+- **`JsonRepair.js`** — a conservative repair parser: strict first, then markdown-emphasis strip, string-literal control-char escaping, trailing-comma removal, stray-value-tail merging, and truncated-tail balancing/dropping (a truncated last element is dropped, never half-invented). Non-JSON garbage still returns null — the honesty path is intact. Used by both the interpreter (`RealAdapters`) and the Verifier (a sloppy-but-complete rubric no longer reads as "no verdict").
+- **Interpret lane-retry** — a lane that answers *without any* JSON is retried on alternates before the Director declines.
+
+Tests: section 14 (7 checks, both real production failure shapes verbatim). **92/92.**

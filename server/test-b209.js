@@ -29,6 +29,7 @@ import { telemetry } from './src/services/director/Telemetry.js';
 import { runEmployeeSession, parseEmployeeOutput, assembleBrief } from './src/services/director/EmployeeSession.js';
 import { TaskMailbox, message } from './src/services/director/AgentMail.js';
 import { runWithModel } from './src/services/director/ModelRouter.js';
+import { parseModelJson } from './src/services/director/JsonRepair.js';
 import { sanitizeStreamText } from './src/services/ModelCoworkers.js';
 import { fileURLToPath } from 'node:url';
 
@@ -461,6 +462,23 @@ console.log('\n[13] Mail: QUESTION + RECOVERY from supervision');
   await runTurn(h);
   check('supervision redirect happened (event)', h.events.some((e) => e.type === 'SUPERVISION_REDIRECT'));
   check('the redirected employee\'s second prompt contains the recovery instruction', /REDIRECTION FROM JEXI/.test(h.llm.employeeCalls[1]?.user || ''));
+}
+
+/* ═══════════════ 14. JSON repair (the production Director killer) ════════ */
+console.log('\n[14] JSON repair — sloppy-but-complete model output is salvaged');
+{
+  // the two REAL production failure shapes (observed live on the brain)
+  const mdBold = '```json\n{\n  "understood": "test",\n  "refinedObjective": **"Conduct the comparison"** with rigor,\n  "subtasks": [{ "title": "a", "priority": "normal" }]\n}\n```';
+  const rawNewline = '{\n  "understood": "line one\nline two continues here",\n  "risky": false\n}';
+  check('markdown-bold inside values is repaired (prod failure #1)', parseModelJson(mdBold)?.understood === 'test' && /Conduct the comparison with rigor/.test(parseModelJson(mdBold).refinedObjective));
+  check('raw newlines inside string literals are repaired (prod failure #2)', parseModelJson(rawNewline)?.understood?.includes('line two'));
+  check('trailing commas are dropped', parseModelJson('{"a": [1, 2, 3,], "b": "x",}')?.a?.length === 3);
+  const truncated = '{"understood": "good", "subtasks": [{"title": "one"}, {"title": "tw';
+  const salvaged = parseModelJson(truncated);
+  check('truncated JSON is balanced (complete data survives)', salvaged?.understood === 'good' && salvaged?.subtasks?.[0]?.title === 'one');
+  check('clean JSON still parses strictly', parseModelJson('{"ok":true}')?.ok === true);
+  check('non-JSON garbage returns null (honesty intact)', parseModelJson('no json at all, sorry!') === null);
+  check('empty input returns null', parseModelJson('') === null);
 }
 
 /* ─────────────────────────────── verdict ──────────────────────────────── */

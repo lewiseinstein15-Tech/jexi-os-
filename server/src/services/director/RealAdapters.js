@@ -12,17 +12,14 @@
  */
 
 import { generateContent } from '../LLMClient.js';
+import { parseModelJson } from './JsonRepair.js'; // B209 — salvage sloppy-but-complete model JSON
 import { executeTool } from '../ToolRuntime.js';
 
-/** Extract the first JSON object from model text (models wrap JSON in prose). */
+/** Extract the first JSON object from model text — B209: through the
+ * repair parser (models wrap JSON in prose AND pollute values with markdown
+ * bold / raw newlines; the strict parser declined whole Director turns). */
 function extractJson(text) {
-  const t = String(text || '');
-  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const body = fence ? fence[1] : t;
-  const start = body.indexOf('{');
-  const end = body.lastIndexOf('}');
-  if (start === -1 || end <= start) return null;
-  try { return JSON.parse(body.slice(start, end + 1)); } catch { return null; }
+  return parseModelJson(text);
 }
 
 const INTERPRET_SYSTEM = `You are JEXI — the boss of a team of AI employees (research, engineering, verification, security, planning, memory, data, design). A message from your user (Lewis) arrives. Your job is to interpret it like a strong chief of staff would and output the internal work order.
@@ -51,8 +48,21 @@ export function realLlmAdapter() {
         activeTaskId ? `# NOTE: there is an active product task in progress — "fix/change/add" language usually means modifying THAT, not starting new research.` : '',
         failureContext ? `# REPLAN — the previous attempt failed; produce a genuinely different plan\n${String(failureContext).slice(0, 2000)}` : '',
       ].filter(Boolean).join('\n\n');
-      const text = await generateContent(user, INTERPRET_SYSTEM, image || null, {});
-      return extractJson(text);
+      let parsed = extractJson(await generateContent(user, INTERPRET_SYSTEM, image || null, {}));
+      // B209 — a lane that answers WITHOUT JSON is as bad as a failed lane
+      // (refusals, empty bodies, degraded free-tier responses): retry on
+      // other lanes before declining the turn. The Director's honesty
+      // backstop stays, but it should only fire when the lanes truly have
+      // nothing usable.
+      if (!parsed) {
+        for (const alt of ['openrouter', 'groq', 'deepinfra', 'cerebras']) {
+          try {
+            parsed = extractJson(await generateContent(user, INTERPRET_SYSTEM, image || null, { prefer: alt }));
+            if (parsed) break;
+          } catch { /* next lane */ }
+        }
+      }
+      return parsed;
     },
 
     employee: async ({ system, user, prefer, onToken }) =>
