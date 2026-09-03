@@ -215,7 +215,7 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
                 </div>
               ) : (
                 /* ---- AI MESSAGE ---- */
-                <div className="w-full group">
+                <div className="w-full min-w-0 group">
                   <div className="flex items-center gap-1.5 mb-2">
                     <div className="w-5 h-5 rounded-full bg-gradient-to-br from-brand/30 to-brand/10 border border-brand/20 flex items-center justify-center flex-shrink-0">
                       <Sparkles className="w-2.5 h-2.5 text-brand" />

@@ -1090,7 +1090,7 @@ html, body {
    workbench/stage must be bounded flex containers always, not only ≥1140px.
    Without this, the chat column's height followed its CONTENT — sending a
    message shrank the orb hero and the whole composer jumped 131px. */
-.jx-workbench { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.jx-workbench { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 .jx-stage { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 @media (min-width: 1140px) {
   .jx-workbench { flex-direction: row; }
@@ -1238,7 +1238,7 @@ form.surface-float { flex-shrink: 0; }
    "Thinking · 12.3s". Done: collapsed "Thought for 43s · 8 agents · 10
    sources", one tap to review the whole trace.
    ========================================================================== */
-.jx-agent { margin: 0 0 10px; border: 1px solid var(--line); border-radius: 10px; background: rgba(124,77,255,.04); overflow: hidden; }
+.jx-agent { margin: 0 0 10px; border: 1px solid var(--line); border-radius: 10px; background: rgba(124,77,255,.04); overflow: hidden; max-width: 100%; min-width: 0; }  /* B207 */
 .jx-agent.live { border-color: rgba(124,77,255,.35); animation: jx-breathe 2.4s ease-in-out infinite; }
 .jx-agent-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; background: none; border: none; cursor: pointer; text-align: left; }
 .jx-agent-ic { font-size: 12px; line-height: 1; color: var(--mag2, #a78bfa); }
@@ -1251,10 +1251,10 @@ form.surface-float { flex-shrink: 0; }
 .jx-agent-narr { display: flex; align-items: baseline; gap: 8px; padding: 2.5px 0; font-size: 12.5px; font-style: italic; color: var(--muted, #9ca3af); line-height: 1.5; overflow-wrap: anywhere; }
 .jx-agent-narr.now { color: var(--ink, #e5e7eb); }
 .jx-agent-narr.now .jx-narration-dot { animation: jx-pingdot 1.1s ease-in-out infinite; }
-.jx-agent-row { display: flex; align-items: baseline; gap: 8px; padding: 1.5px 0; font-size: 11px; line-height: 1.45; min-width: 0; }
-.jx-agent-row-who { flex-shrink: 0; max-width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: .02em; color: var(--mag2, #a78bfa); opacity: .85; }
-.jx-agent-row-what { color: var(--faint, #6b7280); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.jx-agent-reason { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line); font-family: var(--mono); font-size: 11px; line-height: 1.55; color: var(--faint, #6b7280); white-space: pre-wrap; word-break: break-word; max-height: 96px; overflow-y: auto; }
+.jx-agent-row { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); align-items: baseline; gap: 8px; padding: 1.5px 0; font-size: 11px; line-height: 1.45; min-width: 0; max-width: 100%; }
+.jx-agent-row-who { flex-shrink: 0; min-width: 0; max-width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: .02em; color: var(--mag2, #a78bfa); opacity: .85; }
+.jx-agent-row-what { color: var(--faint, #6b7280); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }  /* B207: ellipsis only works if the cell may shrink */
+.jx-agent-reason { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line); font-family: var(--mono); font-size: 11px; line-height: 1.55; color: var(--faint, #6b7280); white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; max-height: 96px; overflow-y: auto; }  /* B207 */
 
 /* B206 — "+N earlier steps/notes" marker above the capped tail */
 .jx-agent-more { font-family: var(--mono); font-size: 9px; color: var(--faint, #6b7280); padding: 2px 0 4px 13px; letter-spacing: .04em; opacity: .8; }
