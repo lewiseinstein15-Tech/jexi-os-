@@ -243,6 +243,54 @@ console.log('\n[6] Regression — supervised generation still covers command rou
   check('post-redirect rerun can still use commands', r.success === true);
 }
 
+/* ═══════════════ 7. execution honesty (found in the live E2E) ════════════ */
+console.log('\n[7] Execution honesty — no fabricated results');
+{
+  // the exact production failure shape: a non-executor "verified" with
+  // invented timings. The gate must flag claims without real command events.
+  const { verifyDeliverable } = await import('./src/services/director/Verifier.js');
+  const task = new DirectorTask({ conversationId: 'honesty-1', rawQuery: 'q', objective: 'compute primes and run it', successCriteria: ['correct primes'] });
+  task.events.push({ id: 'e1', type: 'OBJECTIVE_RECEIVED' }); // events exist, but no COMMAND_*
+  const fabricated = 'The script executed successfully. Execution Time: 0.04ms. Node.js v20.12.2. Tests passed. Output: [2,3,5,7,11,13,17,19,23,29]';
+  const v = await verifyDeliverable({
+    task, deliverable: fabricated, criteria: ['correct primes'],
+    verifierEmployee: getEmployee('vera'),
+    llm: async () => JSON.stringify({ pass: true, score: 1.0, problems: [], rationale: 'looks fine' }),
+    mailbox: new TaskMailbox('honesty-1'), hooks: {},
+  });
+  check('fabricated execution claims FAIL verification', v.verdict === 'fail' && v.problems.some((p2) => /no command actually ran/i.test(p2)));
+
+  // same deliverable WITH a real command event → the claim is corroborated
+  const task2 = new DirectorTask({ conversationId: 'honesty-2', rawQuery: 'q', objective: 'compute primes and run it', successCriteria: ['correct primes'] });
+  task2.events.push({ id: 'e1', type: 'COMMAND_COMPLETED', data: { command: 'node primes.js', exitCode: 0 } });
+  const v2 = await verifyDeliverable({
+    task: task2, deliverable: fabricated, criteria: ['correct primes'],
+    verifierEmployee: getEmployee('vera'),
+    llm: async () => JSON.stringify({ pass: true, score: 1.0, problems: [], rationale: 'ok' }),
+    mailbox: new TaskMailbox('honesty-2'), hooks: {},
+  });
+  check('corroborated execution claims pass (real command event present)', v2.verdict !== 'fail' || !v2.problems.some((p2) => /no command actually ran/i.test(p2)));
+
+  // clean code with no execution claims → gate silent
+  const task3 = new DirectorTask({ conversationId: 'honesty-3', rawQuery: 'q', objective: 'write a primes function', successCriteria: ['function works'] });
+  const v3 = await verifyDeliverable({
+    task: task3, deliverable: 'function generatePrimes(count) { return [2, 3, 5]; }', criteria: ['function works'],
+    verifierEmployee: getEmployee('vera'),
+    llm: async () => JSON.stringify({ pass: true, score: 0.9, problems: [], rationale: 'ok' }),
+    mailbox: new TaskMailbox('honesty-3'), hooks: {},
+  });
+  check('no execution claims → honesty gate stays silent', !v3.problems.some((p2) => /no command actually ran/i.test(p2)));
+
+  // the interpreter prompt carries the no-split rule
+  const { realLlmAdapter } = await import('./src/services/director/RealAdapters.js');
+  const fsx = await import('fs');
+  const sys = fsx.readFileSync('src/services/director/RealAdapters.js', 'utf-8');
+  check('interpreter forbids splitting execution into a non-code subtask', /NEVER split.*run\/execute\/test/s.test(sys));
+  // and the employee prompt carries the honesty rule
+  const es = fsx.readFileSync('src/services/director/EmployeeSession.js', 'utf-8');
+  check('employee prompt: never fabricate execution results', /NEVER claim a command ran/.test(es));
+}
+
 /* ─────────────────────────────── verdict ──────────────────────────────── */
 console.log(`\nB210: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

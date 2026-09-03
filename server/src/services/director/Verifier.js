@@ -45,6 +45,18 @@ export async function verifyDeliverable(p) {
   // Gate 1 — deterministic acceptance problems (no model needed)
   const gateProblems = acceptanceGates(deliverable, task);
 
+  // Gate 1.5 (B210) — EXECUTION HONESTY: a deliverable that claims commands
+  // ran (timings, exit codes, "tests passed") without ANY real COMMAND_*/
+  // TEST_* event in the task record is fabricating results. The event record
+  // is the only source of truth for what actually executed.
+  {
+    const claimsExecution = /executed?\b|execution time|ran in \d|exit code? \d|tests? (all )?passed|\b\d+(\.\d+)?\s?ms\b/i.test(String(deliverable || ''));
+    const hasRealExecution = (task?.events || []).some((e) => e.type === 'COMMAND_COMPLETED' || e.type === 'COMMAND_FAILED' || e.type === 'TEST_COMPLETED' || e.type === 'TEST_FAILED');
+    if (claimsExecution && !hasRealExecution) {
+      gateProblems.push('the deliverable claims execution results (timings/exit codes/test results) but NO command actually ran in this task — report only what really executed');
+    }
+  }
+
   // Gate 2 — rubric evaluation (model; verifier identity, routed preference)
   let rubric = { pass: gateProblems.length === 0, score: gateProblems.length ? 0.2 : 0.75, problems: gateProblems, rationale: 'deterministic gates only' };
   if (criteria.length) {
