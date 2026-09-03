@@ -108,7 +108,7 @@ Key modules: `AgentProfiles` · `AgentGateway` · `SkillLoop` · `TeamRouter` ·
 
 ## 🧪 Quality
 
-- **~3,930 automated checks**, 0 failures (`cd server && npm test`)
+- **~3,947 automated checks**, 0 failures (`cd server && npm test`)
 - CI on every push; live smoke tests for math/search/pictures/video/builds
 - Every fix traced from real chat logs → regression test
 

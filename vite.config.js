@@ -42,6 +42,11 @@ export default defineConfig({
   server: {
     host: true,
     port: 3000,
+    // B197 — the dev server is often reached through a tunnelled/proxied
+    // preview host (e.g. sandboxed preview domains, Codespaces). Vite's host
+    // check 403s those by default; allow any host in DEV (production deploys
+    // are static files — this setting never ships).
+    allowedHosts: true,
     proxy: {
       '/api': 'http://localhost:3002',
       '/desktop-api': {
