@@ -25,8 +25,8 @@ import { orchestrator } from './src/services/Orchestrator.js';
 import { runSimpleTask } from './src/services/SimpleTask.js'; // B66 — Orchestrator-Workers SIMPLE fast path
 import { Director } from './src/services/director/Director.js'; // B208 — JEXI the boss: interpret→plan→staff→delegate→supervise→verify→report
 import { realLlmAdapter, realTools } from './src/services/director/RealAdapters.js';
-import { loadTask as loadDirectorTask } from './src/services/director/TaskState.js';
-import { rosterSummary as employeeRoster } from './src/services/director/Employees.js';
+import { loadTask as loadDirectorTask, loadTaskById, listDirectorTasks } from './src/services/director/TaskState.js'; // B209 — multi-task records
+import { rosterSummary as employeeRoster, rosterDetail, setEmployeeDisabled, upsertEmployee, employeeHistory } from './src/services/director/Employees.js'; // B209 — runtime team management
 import { normalizeFinalAnswer } from './src/services/Formatting.js'; // B66 — normalize every final answer
 import { generateContent, resolveKeys, testAllProviders } from './src/services/LLMClient.js';
 import { learnFromExchange } from './src/services/PreferenceLearner.js';
@@ -1219,10 +1219,36 @@ app.get('/api/team/status', (req, res) => {
 app.get('/api/team/events', (req, res) => {
   const convId = String(req.query.conversationId || req.headers['x-jexi-conv'] || 'default');
   const since = String(req.query.sinceEventId || '');
-  const task = loadDirectorTask(convId);
+  // B209 — events are addressable by taskId (multiple tasks per conversation)
+  const task = req.query.taskId ? loadTaskById(req.query.taskId) : loadDirectorTask(convId);
   let events = task?.events || [];
   if (since) { const i = events.findIndex((e) => e.id === since); if (i >= 0) events = events.slice(i + 1); }
   res.json({ ok: true, taskId: task?.id || null, state: task?.state || null, events });
+});
+
+// B209 — the conversation's recent task records (newest first)
+app.get('/api/team/tasks', (req, res) => {
+  const convId = String(req.query.conversationId || req.headers['x-jexi-conv'] || 'default');
+  res.json({ ok: true, tasks: listDirectorTasks(convId) });
+});
+
+// B209 — RUNTIME TEAM MANAGEMENT: the boss can re-staff her own team live.
+app.get('/api/team/roster', (req, res) => {
+  res.json({ ok: true, employees: rosterDetail() });
+});
+app.post('/api/team/employees/:agentId', (req, res) => {
+  const { disabled } = req.body || {};
+  const r = setEmployeeDisabled(req.params.agentId, Boolean(disabled));
+  if (!r.ok) return res.status(404).json({ ok: false, error: r.error });
+  res.json({ ok: true, employee: { agentId: r.employee.agentId, displayName: r.employee.displayName, disabled: Boolean(r.employee.disabled) } });
+});
+app.post('/api/team/employees', (req, res) => {
+  const r = upsertEmployee(req.body || {});
+  if (!r.ok) return res.status(400).json({ ok: false, error: r.error });
+  res.json({ ok: true, employee: { agentId: r.employee.agentId, displayName: r.employee.displayName, role: r.employee.role, disabled: Boolean(r.employee.disabled) } });
+});
+app.get('/api/team/employees/:agentId/history', (req, res) => {
+  res.json({ ok: true, history: employeeHistory(req.params.agentId, 50) });
 });
 
 app.get('/api/chat/result', (req, res) => {

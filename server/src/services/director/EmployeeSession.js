@@ -20,6 +20,15 @@
 
 import { message, normalizeArtifact } from './AgentMail.js';
 import { runWithModel } from './ModelRouter.js';
+import { Supervisor } from './Supervisor.js'; // B209 — live mid-work supervision
+import { checkToolPermission } from './Permissions.js'; // B209 — enforced tool gates
+import { sanitizeStreamText } from '../ModelCoworkers.js'; // B209 — model ids never enter work product
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'node:url';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ARTIFACT_DIR = path.join(HERE, '..', '..', '..', 'jexi-workspace', 'director');
 
 const SECTION_RE = (name) => new RegExp(`^##\\s+${name}\\s*$`, 'im');
 
@@ -115,8 +124,16 @@ export function parseEmployeeOutput(text) {
       artifacts.push(normalizeArtifact({ kind: 'file', name, content: m[2] }));
     }
   }
+  // B209 — the NEEDS channel (optional): "## NEEDS\nblocking: true\nquestion: ..."
+  const needsBlock = split('NEEDS');
+  let needs = null;
+  if (needsBlock) {
+    const blocking = /blocking:\s*true/i.test(needsBlock);
+    const q = (needsBlock.match(/question:\s*([\s\S]*)/i) || [])[1] || needsBlock;
+    needs = { blocking, question: q.trim().slice(0, 500) };
+  }
   const bad = !deliverable && !report;
-  return { report, deliverable, confidence: confidenceLine, claims, artifacts, raw: out.slice(0, 60000), bad };
+  return { report, deliverable, confidence: confidenceLine, claims, artifacts, needs, raw: out.slice(0, 60000), bad };
 }
 
 /**
@@ -139,13 +156,20 @@ export async function runEmployeeSession(p) {
   // 1) REAL TOOL PHASE — searches the employee was staffed to run.
   let toolContext = '';
   const wantsSearch = (brief.searchQueries || []).length > 0 && employee.supportedTools.includes('web-search');
-  if (wantsSearch) {
+  if (wantsSearch && !checkToolPermission(employee, 'web-search').allowed) {
+    // B209 — the permission gate is enforced BEFORE the tool runs
+    const gate = checkToolPermission(employee, 'web-search');
+    emit('PERMISSION_DENIED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Search blocked: ${gate.reason}.`, severity: 'warn' });
+  }
+  if (wantsSearch && checkToolPermission(employee, 'web-search').allowed) {
     for (const q of brief.searchQueries.slice(0, 3)) {
       emit('TOOL_STARTED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Searching: ${q}` });
+      emit('SEARCH_STARTED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Search: ${q}` });
       try {
         const resultText = await tools.search(q);
         toolContext += `\n\n[web-search results for "${q}"]\n${String(resultText || '').slice(0, 12000)}`;
         emit('TOOL_COMPLETED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Search returned sources for "${q}".` });
+        emit('SEARCH_COMPLETED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Search finished: ${q}.` });
         mailbox.post(message({
           from: employee.agentId, to: 'jexi', taskId: task.id, subtaskId: subtask.id,
           type: 'FINDING', content: `Ran a search for "${q}" — ${countSources(resultText)} sources to work through.`, title: q,
@@ -157,32 +181,75 @@ export async function runEmployeeSession(p) {
     }
   }
 
-  // 2) MODEL PHASE — the actual work, on the router ladder (identity preserved).
+  // 2) MODEL PHASE — the actual work, SUPERVISED LIVE (B209): JEXI watches
+  // the token stream; if a deterministic watcher or the checkpoint review
+  // decides the approach is off-track, the generation is abandoned, the
+  // employee gets a RECOVERY message, and the assignment restarts with the
+  // redirect instruction (bounded: one redirect per assignment).
   const userPrompt = buildUserPrompt(brief, toolContext);
   let parsed;
   try {
     const raw = await withTimeout(
-      runWithModel(
-        employee,
-        subtask.capability || 'reasoning',
-        ({ prefer }) => llm({ system: employeeSystemPrompt(employee, brief), user: userPrompt, prefer, onToken: hooks.onToken }),
-        { onEvent: emit },
-      ),
+      generateWithSupervision({
+        employee, subtask, brief, task, mailbox, hooks, emit, llm, userPrompt,
+        review: hooks.review || null,
+        liveReview: hooks.liveReview !== false,
+      }),
       brief.timeBudgetMs,
     );
-    parsed = parseEmployeeOutput(raw);
+    // B209 — model/provider identifiers NEVER enter work product (masked to
+    // coworker names by the same B162 masking the whole app uses)
+    const clean = sanitizeStreamText(String(raw || ''));
+    parsed = parseEmployeeOutput(clean);
     if (parsed.bad) {
       const err = new Error('employee output unparseable or empty');
       err.code = 'BAD_OUTPUT';
       throw err;
     }
   } catch (e) {
+    if (e?.code === 'REDIRECT') {
+      // a redirect that could not be honored (budget exhausted mid-redirect)
+      const err = new Error('assignment redirected but the retry did not complete');
+      err.code = 'BAD_OUTPUT';
+      mailbox.post(message({
+        from: employee.agentId, to: 'jexi', taskId: task.id, subtaskId: subtask.id,
+        type: 'FAILURE', content: `${employee.displayName} was redirected mid-work but the retry did not complete: ${String(e.message || e).slice(0, 160)}`,
+      }));
+      throw err;
+    }
     if (!e.code) { e.code = /timeout/i.test(String(e.message || '')) ? 'TIMEOUT' : isProviderErr(e) ? 'PROVIDER_FAILED' : 'BAD_OUTPUT'; }
     mailbox.post(message({
       from: employee.agentId, to: 'jexi', taskId: task.id, subtaskId: subtask.id,
       type: 'FAILURE', content: `${employee.displayName} could not complete "${subtask.title}": ${String(e.message || e).slice(0, 200)}`,
     }));
     throw e;
+  }
+
+  // B209 — the NEEDS channel: an employee may flag what she's missing.
+  //   blocking: true  → the work cannot proceed without an answer
+  //   blocking: false → an assumption she made that the boss should know
+  if (parsed.needs && parsed.needs.question) {
+    mailbox.post(message({
+      from: employee.agentId, to: 'jexi', taskId: task.id, subtaskId: subtask.id,
+      type: 'QUESTION', content: parsed.needs.question, blocking: Boolean(parsed.needs.blocking),
+      title: parsed.needs.blocking ? 'Blocking question' : 'Flagged assumption',
+    }));
+  }
+
+  // B209 — artifacts actually land on disk (permission-gated, path-safe),
+  // each one a FILE_CREATED canonical event.
+  for (const artifact of parsed.artifacts || []) {
+    const gate = checkToolPermission(employee, 'file-write');
+    if (!gate.allowed) {
+      emit('PERMISSION_DENIED', { agentId: employee.agentId, agentName: employee.displayName, summary: `File write skipped: ${gate.reason}.`, severity: 'warn' });
+      continue;
+    }
+    try {
+      const written = persistArtifact(task.id, artifact);
+      if (written) emit('FILE_CREATED', { agentId: employee.agentId, agentName: employee.displayName, summary: `${employee.displayName} wrote ${written.name} (${written.bytes} bytes).`, data: { file: written.name, bytes: written.bytes } });
+    } catch (e) {
+      emit('TOOL_FAILED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Artifact write failed (${String(e.message || e).slice(0, 80)}) — it stays in the task record.`, severity: 'warn' });
+    }
   }
 
   const ms = Date.now() - t0;
@@ -197,6 +264,7 @@ export async function runEmployeeSession(p) {
     confidence: parsed.confidence,
     claims: parsed.claims,
     artifacts: parsed.artifacts,
+    needs: parsed.needs || null, // B209 — the NEEDS channel rides the result
     ms,
   }));
   emit('TASK_COMPLETED', {
@@ -205,6 +273,85 @@ export async function runEmployeeSession(p) {
     data: { subtaskId: subtask.id, ms, confidence: parsed.confidence, artifacts: parsed.artifacts.length },
   });
   return { message: resultMessage, parsed, ms };
+}
+
+/**
+ * B209 — SUPERVISED GENERATION: the employee's model call runs against a
+ * live Supervisor. A redirect decision aborts the output, tells the
+ * employee over AgentMail, and restarts ONCE with the instruction.
+ */
+async function generateWithSupervision({ employee, subtask, brief, task, mailbox, hooks, emit, llm, userPrompt, review, liveReview }) {
+  let redirectInstruction = null;
+  for (let attempt = 0; attempt <= 1; attempt++) {
+    const finalPrompt = redirectInstruction
+      ? `${userPrompt}\n\n# REDIRECTION FROM JEXI (your boss)\nPrevious approach stopped because it was off-track. ${redirectInstruction}\n\nStart the assignment fresh with this correction applied.`
+      : userPrompt;
+    const supervisor = new Supervisor({
+      objective: brief.objective,
+      criteria: brief.successCriteria,
+      employeeName: employee.displayName,
+      review,
+      liveReview: attempt === 0 && liveReview, // after a redirect: watchers only, no second review
+      onEvent: (e) => emit(e.type || 'SUPERVISION_FLAG', { agentId: employee.agentId, agentName: employee.displayName, summary: e.summary, severity: e.severity, instruction: e.instruction }),
+    });
+    let redirectReject;
+    const gate = new Promise((_, rej) => { redirectReject = rej; });
+    supervisor.onDecision = (d) => {
+      try {
+        mailbox.post(message({
+          from: 'jexi', to: employee.agentId, taskId: task.id, subtaskId: subtask.id,
+          type: 'RECOVERY', content: `Stop the current approach — ${d.reason}. ${d.instruction}`,
+        }));
+      } catch { /* mail never breaks supervision */ }
+      const err = new Error(`redirected: ${d.reason}`);
+      err.code = 'REDIRECT';
+      err.instruction = d.instruction;
+      redirectReject(err);
+    };
+    const work = runWithModel(
+      employee,
+      subtask.capability || 'reasoning',
+      ({ prefer }) => llm({
+        system: employeeSystemPrompt(employee, brief),
+        user: finalPrompt,
+        prefer,
+        onToken: (t) => { supervisor.observe(t); if (hooks.onToken) { try { hooks.onToken(t); } catch { /* never break */ } } },
+      }),
+      { onEvent: emit },
+    );
+    work.catch(() => {}); // the race loser must never surface as unhandled
+    try {
+      const raw = await Promise.race([work, gate]);
+      supervisor.finish();
+      return raw;
+    } catch (e) {
+      supervisor.finish();
+      if (e?.code === 'REDIRECT' && attempt === 0) {
+        redirectInstruction = e.instruction || e.message;
+        continue; // the ONE bounded redirect-retry
+      }
+      throw e;
+    }
+  }
+  throw Object.assign(new Error('supervision exhausted'), { code: 'BAD_OUTPUT' });
+}
+
+/** B209 — persist an artifact to the per-task directory (path-safe, bounded). */
+function persistArtifact(taskId, artifact) {
+  const safeName = String(artifact?.name || 'artifact.md')
+    .replace(/\\/g, '/')
+    .split('/')
+    .pop() // no path components survive
+    .replace(/[^\w.-]+/g, '_')
+    .replace(/^\.+/, '_')
+    .slice(0, 80) || 'artifact.md';
+  if (!/^\w[\w.-]*$/.test(safeName)) safeName = `artifact_${Date.now()}.md`;
+  const dir = path.join(ARTIFACT_DIR, String(taskId || 'task').replace(/[^\w-]/g, '_'));
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, safeName);
+  const content = String(artifact?.content || '');
+  fs.writeFileSync(file, content);
+  return { name: safeName, bytes: Buffer.byteLength(content) };
 }
 
 function buildUserPrompt(brief, toolContext) {

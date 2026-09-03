@@ -54,6 +54,9 @@ function reduceTeam(prev, evt) {
     case 'TASK_COMPLETED': touch({ status: evt.agentId === 'jexi' ? t.employees.length ? 'done' : 'done' : 'delivered' }); break;
     case 'MODEL_SELECTED': case 'MODEL_SWITCHED': touch({ provider: safe(evt.data?.providerLabel, 18) }); break;
     case 'RECOVERY_STARTED': case 'ERROR_DETECTED': touch({ status: 'recovering' }); break;
+    // B209 — live supervision: the boss stopped a bad approach mid-stream
+    case 'SUPERVISION_REDIRECT': touch({ status: 'correcting', currentTask: safe(evt.summary, 110) }); break;
+    case 'TASK_BLOCKED': t.state = 'blocked'; break;
     case 'VERIFICATION_STARTED': touch({ status: 'verifying' }); break;
     case 'VERIFICATION_PASSED': touch({ status: 'verified' }); break;
     case 'VERIFICATION_FAILED': touch({ status: 'verifying' }); break;

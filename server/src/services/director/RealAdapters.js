@@ -63,6 +63,25 @@ export function realLlmAdapter() {
 
     report: async ({ system, user, onToken }) =>
       generateContent(user, system, null, { ...(onToken ? { onToken } : {}) }),
+
+    // B209 — the SUPERVISION CHECKPOINT REVIEW: a cheap, focused look at the
+    // employee's draft ~600 chars in. JSON verdict only; no prose.
+    review: async ({ objective, criteria, draft, employeeName }) => {
+      const system = `You are a supervisor reviewing an employee's in-progress draft about 600 characters into their work. Decide ONLY if the approach is clearly off-track for the objective (wrong deliverable, misunderstanding the task, refusing, or drifting). Normal drafts pass. Respond with JSON only: {"redirect": true|false, "reason": "short", "instruction": "if redirect, what to do instead"}`;
+      const user = `# OBJECTIVE\n${String(objective || '').slice(0, 400)}\n\n# SUCCESS CRITERIA\n${(criteria || []).slice(0, 4).map((c) => `- ${c}`).join('\n') || '- not specified'}\n\n# EMPLOYEE\n${employeeName || 'employee'}\n\n# DRAFT SO FAR\n${String(draft || '').slice(0, 1200)}`;
+      const raw = await generateContent(user, system, null, { prefer: 'flash' });
+      try {
+        const m = String(raw).match(/\{[\s\S]*\}/);
+        const parsed = m ? JSON.parse(m[0]) : {};
+        return {
+          redirect: parsed.redirect === true,
+          reason: String(parsed.reason || 'off-track approach').slice(0, 160),
+          instruction: String(parsed.instruction || 'restart with a correct approach for the objective').slice(0, 400),
+        };
+      } catch {
+        return { redirect: false, reason: '', instruction: '' }; // a bad review never breaks the run
+      }
+    },
   };
 }
 

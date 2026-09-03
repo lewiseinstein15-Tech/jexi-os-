@@ -122,8 +122,17 @@ export async function runWithModel(employee, taskType, work, hooks = {}) {
       emit('MODEL_REQUEST_COMPLETED', { agentId: employee.agentId, agentName: employee.displayName, summary: `${employee.displayName} finished a model pass in ${(ms / 1000).toFixed(1)}s.` });
       return result;
     } catch (err) {
+      // B209 — a SUPERVISION redirect is not a provider failure: it passes
+      // through untouched so the EmployeeSession can honor it
+      if (err?.code === 'REDIRECT') throw err;
       lastErr = err;
       telemetry.record('provider', session.prefer || 'auto', { ok: false, ms: Date.now() - t0 });
+      emit('MODEL_PROVIDER_FAILED', {
+        agentId: employee.agentId, agentName: employee.displayName,
+        summary: `${employee.displayName}'s ${session.providerLabel} lane failed (${String(err.message || err).slice(0, 90)}).`,
+        severity: 'warn',
+        data: { provider: session.prefer || 'auto', attempt: session.attempt },
+      });
       const retryable = isProviderError(err);
       if (!retryable || !session.switchModel()) break;
       // THE IDENTITY RULE: the employee continues — only the lane changes.

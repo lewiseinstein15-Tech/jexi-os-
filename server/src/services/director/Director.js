@@ -24,7 +24,7 @@
 
 import { DirectorTask, teamEvent } from './TaskState.js';
 import { TaskMailbox, message, mailToActivityLine } from './AgentMail.js';
-import { rankEmployees, selectEmployee, getEmployee } from './Employees.js';
+import { rankEmployees, selectEmployee, getEmployee, appendEmployeeHistory } from './Employees.js'; // B209 — history rides results
 import { telemetry } from './Telemetry.js';
 import { runEmployeeSession, assembleBrief } from './EmployeeSession.js';
 import { verifyDeliverable, acceptanceGates } from './Verifier.js';
@@ -92,6 +92,8 @@ export class Director {
       return evt;
     };
     const narrate = (text) => { if (text) { try { sendEvent('narration', { text }); } catch { /* same */ } } };
+    // B209 — employee tokens stream to the user as think events (live work)
+    const forwardThink = (name, t) => { try { sendEvent('think', { text: t, by: name }); } catch { /* same */ } };
     // B208 — the final report types out live, like every JEXI answer
     const hooks_report_onToken = (t) => { try { sendEvent('stream', { text: t, by: 'JEXI' }); } catch { /* same */ } };
 
@@ -189,6 +191,7 @@ export class Director {
         type: 'TASK_ASSIGNMENT', title: subtask.title, content: subtask.details || subtask.title, priority: subtask.priority || 'normal',
       }));
       emit({ type: 'TASK_ASSIGNED', agentId: employee.agentId, agentName: employee.displayName, summary: `Assignment delivered: ${subtask.title}.`, data: { subtaskId: subtask.id } });
+      emit({ type: 'TASK_CREATED', agentId: employee.agentId, agentName: employee.displayName, summary: `Task opened: ${subtask.title}.`, data: { subtaskId: subtask.id, title: subtask.title, capability: subtask.capability } });
     }
     narrate(composeAssignmentLine(refinement, staffed, plan));
 
@@ -200,7 +203,7 @@ export class Director {
       const running = wave.slice(0, MAX_PARALLEL).map(async (subtask) => {
         const staffing = staffed.find((s) => s.subtask.id === subtask.id);
         const resultMsg = await this.runAssignmentWithRecovery({
-          task, subtask, staffing, staffed, results, mailbox, emit, narrate, nameFor,
+          task, subtask, staffing, staffed, results, mailbox, emit, narrate, nameFor, forwardThink,
         });
         if (resultMsg) results.set(subtask.id, resultMsg);
       });
@@ -243,6 +246,20 @@ export class Director {
       emit({ type: 'REPLAN_COMPLETED', summary: 'New plan ready — different approach, same objective.' });
       narrate('The first approach failed, so I changed the plan rather than wasting the run.');
       ({ plan, staffed, leadStaff, results, failed, leadResult } = await runPlanRound(refinement));
+    }
+
+    // B209 — the NEEDS channel: a BLOCKING question from the lead employee
+    // means the work genuinely cannot finish without one more fact. Ask the
+    // user honestly instead of guessing; the task record keeps everything.
+    const blockingNeed = leadResult?.needs?.blocking && leadResult.needs.question ? leadResult.needs : null;
+    if (blockingNeed) {
+      task.setState('BLOCKED', 'waiting on the user for one answer');
+      emit({ type: 'TASK_BLOCKED', agentId: leadResult.from, summary: `The work paused — ${blockingNeed.question.slice(0, 160)}`, severity: 'warn', data: { question: blockingNeed.question } });
+      return {
+        success: true,
+        summary: `${nameFor ? nameFor(leadResult.from) : 'My lead'} flagged one thing she needs before this can be finished:\n\n> ${blockingNeed.question}\n\nEverything so far is saved on the task — answer that and I'll have her finish it.`,
+        statistics: { directed: true, success: true, taskId: task.id, blocked: true, askedBy: leadResult.from },
+      };
     }
 
     if (!leadResult && failed.length) {
@@ -329,7 +346,7 @@ export class Director {
   }
 
   /** One assignment with the full recovery ladder around the session. */
-  async runAssignmentWithRecovery({ task, subtask, staffing, staffed, results, mailbox, emit, narrate, nameFor }) {
+  async runAssignmentWithRecovery({ task, subtask, staffing, staffed, results, mailbox, emit, narrate, nameFor, forwardThink = null }) {
     let attempt = 0;
     let current = staffing;
     while (attempt < 3) {
@@ -340,7 +357,7 @@ export class Director {
       try {
         // dependsOn stores INDICES; results is keyed by subtask id (st1, st2, …)
         const deps = (subtask.dependsOn || []).map((idx) => results.get(`st${idx + 1}`)).filter(Boolean).map((r) => ({ ...r, fromName: nameFor(r.from) }));
-        const result = await this.runEmployeeWork({ task, subtask, employee: current.employee, mailbox, emit, deps });
+        const result = await this.runEmployeeWork({ task, subtask, employee: current.employee, mailbox, emit, deps, forwardThink });
         telemetry.record('employee', current.employee.agentId, { ok: true, ms: Date.now() - t0 });
         if (hadFailedBefore) {
           emit({ type: 'RECOVERY_COMPLETED', agentId: current.employee.agentId, agentName: current.employee.displayName, summary: `${current.employee.displayName} recovered — "${subtask.title}" is done after the retry.` });
@@ -348,6 +365,9 @@ export class Director {
         }
         return result;
       } catch (err) {
+        try {
+          appendEmployeeHistory(current.employee.agentId, { taskId: task.id, subtask: subtask.title, title: subtask.title, ok: false, ms: Date.now() - t0, confidence: null, error: String(err.message || err).slice(0, 120) });
+        } catch { /* best-effort */ }
         const action = recoveryAction(err, attempt, { noReassign: staffed.length === 1 });
         task.recordRecovery({ subtaskId: subtask.id, employeeId: current.employee.agentId, action, reason: String(err.message || err).slice(0, 160), ok: false });
         emit({ type: 'RECOVERY_STARTED', agentId: current.employee.agentId, agentName: current.employee.displayName, summary: recoveryLine(current.employee, action, err), severity: 'warn' });
@@ -373,7 +393,7 @@ export class Director {
   }
 
   /** The actual employee session (shared by first runs and correction rounds). */
-  async runEmployeeWork({ task, subtask, employee, mailbox, emit, deps = [], extraInstructions = '' }) {
+  async runEmployeeWork({ task, subtask, employee, mailbox, emit, deps = [], extraInstructions = '', forwardThink = null }) {
     // DEPARTMENT delegation: heavy industrial pipelines run under an employee's responsibility.
     if (subtask.department && this.departments[subtask.department]) {
       emit({ type: 'TASK_STARTED', agentId: employee.agentId, agentName: employee.displayName, summary: `${employee.displayName} is running the ${subtask.department} department for this.` });
@@ -396,8 +416,30 @@ export class Director {
     });
     if (extraInstructions) brief.taskDetails = `${brief.taskDetails || ''}\n\n${extraInstructions}`.trim();
     emit({ type: 'TASK_STARTED', agentId: employee.agentId, agentName: employee.displayName, summary: `${employee.displayName} started: ${subtask.title}.` });
-    const { message: msg } = await runEmployeeSession({ task, subtask, employee, brief, mailbox, hooks: { onEvent: emit, onToken: null }, llm: (a) => this.llm.employee(a), tools: this.tools });
+    // B209 — SUPERVISION + LIVE THINKING: her tokens stream to the user as
+    // think events (watching work is visibly alive), and the Supervisor gets
+    // a checkpoint review hook. The LEAD gets the LLM checkpoint; support
+    // employees run under deterministic watchers only (cheap and enough).
+    const isLead = task.plan?.leadSubtaskId === subtask.id;
+    const { message: msg } = await runEmployeeSession({
+      task, subtask, employee, brief, mailbox, tools: this.tools,
+      llm: (a) => this.llm.employee(a),
+      hooks: {
+        onEvent: emit,
+        onToken: forwardThink ? (t) => forwardThink(employee.displayName, t) : null,
+        review: isLead && this.llm.review ? (input) => this.llm.review(input) : null,
+        liveReview: isLead,
+      },
+    });
     for (const artifact of msg.artifacts || []) task.addArtifact(artifact);
+    // B209 — per-employee history (both wins and losses, real record)
+    try {
+      appendEmployeeHistory(employee.agentId, {
+        taskId: task.id, subtask: subtask.title, title: subtask.title,
+        ok: msg.type === 'RESULT', ms: msg.ms || null,
+        confidence: msg.confidence || null, needs: msg.needs?.question || null,
+      });
+    } catch { /* history is best-effort */ }
     return msg;
   }
 

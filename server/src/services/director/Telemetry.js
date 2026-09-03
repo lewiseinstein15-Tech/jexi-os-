@@ -86,12 +86,34 @@ class Telemetry {
   }
 
   /** Reliability-adjusted preference order for a set of providers (data-driven failover bias). */
+  /**
+   * B209 — provider metadata: routing signals beyond raw reliability.
+   * costClass orders cheap lanes first when quality is equal; contextK
+   * records the lane's window size for capability-aware placement.
+   */
+  providerMeta(provider) {
+    const p = String(provider || '').toLowerCase();
+    if (p === 'groq' || p === 'cerebras') return { costClass: 'free', contextK: 128 };
+    if (p === 'gemini') return { costClass: 'free-tier', contextK: 1000 };
+    if (p === 'openrouter') return { costClass: 'freemium', contextK: 256 };
+    if (p === 'deepinfra' || p === 'huggingface') return { costClass: 'free-tier', contextK: 64 };
+    if (p === 'mistral') return { costClass: 'free-tier', contextK: 128 };
+    if (p === 'xai') return { costClass: 'paid', contextK: 128 };
+    return { costClass: 'unknown', contextK: 128 };
+  }
+
   rankProviders(providers) {
-    // reliability first, then observed latency (B208b: latency-aware routing)
+    // reliability first, then observed latency (B208b), then cost class
+    // (B209: equal-reliability ties break toward cheaper lanes)
+    const costRank = { free: 0, 'free-tier': 1, freemium: 2, paid: 3, unknown: 4 };
     return [...(providers || [])].sort((a, b) => {
       const sa = this.providerStats(a);
       const sb = this.providerStats(b);
-      return (sb.successRate - sa.successRate) || ((sa.avgMs || 0) - (sb.avgMs || 0));
+      const ma = this.providerMeta(a);
+      const mb = this.providerMeta(b);
+      return (sb.successRate - sa.successRate)
+        || ((sa.avgMs || 0) - (sb.avgMs || 0))
+        || ((costRank[ma.costClass] ?? 9) - (costRank[mb.costClass] ?? 9));
     });
   }
 

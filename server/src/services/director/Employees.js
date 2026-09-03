@@ -26,6 +26,7 @@ import { telemetry } from './Telemetry.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = path.join(HERE, '..', '..', '..', 'data', 'employees.json');
+const HISTORY_DIR = path.join(HERE, '..', '..', '..', 'data', 'director-history');
 
 /**
  * Capability vocabulary — synonyms collapse to canonical tokens so the
@@ -90,7 +91,7 @@ const DEFAULT_EMPLOYEES = [
     description: 'Designs, implements, and repairs code. Owns engineering deliverables.',
     personality: 'pragmatic, thorough, no-nonsense',
     capabilities: ['code', 'reasoning', 'planning'],
-    supportedTools: ['web-search', 'memory-recall', 'knowledge-save'],
+    supportedTools: ['web-search', 'memory-recall', 'knowledge-save', 'file-write'],
     permissions: ['READ', 'WRITE', 'EXECUTE', 'NETWORK'],
   },
   {
@@ -130,7 +131,7 @@ const DEFAULT_EMPLOYEES = [
     description: 'Remembers everything the team has learned and retrieves it on demand.',
     personality: 'organized, quiet, reliable',
     capabilities: ['synthesis', 'memory', 'research'],
-    supportedTools: ['memory-recall', 'rolling-summary', 'episode-recall', 'semantic-search', 'knowledge-save'],
+    supportedTools: ['memory-recall', 'rolling-summary', 'episode-recall', 'semantic-search', 'knowledge-save', 'file-write'],
     permissions: ['READ', 'WRITE'],
   },
   {
@@ -270,4 +271,65 @@ export function rosterSummary() {
     capabilities: e.capabilities,
     status: 'available',
   }));
+}
+
+
+/* ── B209: per-employee task history (bounded JSONL, replayable) ── */
+export function appendEmployeeHistory(agentId, entry) {
+  try {
+    fs.mkdirSync(HISTORY_DIR, { recursive: true });
+    const file = path.join(HISTORY_DIR, `${String(agentId).replace(/[^a-z0-9-]/gi, '_')}.jsonl`);
+    const lines = [JSON.stringify({ ts: new Date().toISOString(), ...entry })];
+    fs.appendFileSync(file, lines.join('\n') + '\n');
+  } catch { /* history is best-effort */ }
+}
+
+export function employeeHistory(agentId, limit = 30) {
+  try {
+    const file = path.join(HISTORY_DIR, `${String(agentId).replace(/[^a-z0-9-]/gi, '_')}.jsonl`);
+    const raw = fs.readFileSync(file, 'utf-8').trim();
+    if (!raw) return [];
+    return raw.split('\n').filter(Boolean).slice(-limit).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean).reverse();
+  } catch { return []; }
+}
+
+/** Full roster detail for management: profile + live stats + history depth. */
+export function rosterDetail() {
+  return loadEmployees().map((e) => {
+    const stats = telemetry.employeeStats(e.agentId);
+    return {
+      agentId: e.agentId, displayName: e.displayName, role: e.role, description: e.description,
+      personality: e.personality, capabilities: e.capabilities, permissions: e.permissions,
+      supportedTools: e.supportedTools, support: Boolean(e.support), disabled: Boolean(e.disabled),
+      stats, historyCount: employeeHistory(e.agentId, 200).length,
+    };
+  });
+}
+
+/** B209 — runtime roster management: persist changes to data/employees.json
+ * (hot-reloaded). Deletion is modeled as disable — identities are stable. */
+export function saveRosterOverride(employees) {
+  fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify({ employees }, null, 2));
+  _cache = null; // force reload
+}
+
+export function setEmployeeDisabled(agentId, disabled) {
+  const roster = loadEmployees();
+  const target = roster.find((e) => e.agentId === String(agentId).toLowerCase());
+  if (!target) return { ok: false, error: `no employee "${agentId}"` };
+  target.disabled = Boolean(disabled);
+  saveRosterOverride(roster);
+  return { ok: true, employee: target };
+}
+
+export function upsertEmployee(profile) {
+  const roster = loadEmployees();
+  const normalized = normalizeEmployee(profile || {});
+  if (!normalized.agentId || normalized.agentId === 'employee') return { ok: false, error: 'agentId or displayName required' };
+  const i = roster.findIndex((e) => e.agentId === normalized.agentId);
+  if (i >= 0) roster[i] = { ...roster[i], ...normalized };
+  else roster.push(normalized);
+  saveRosterOverride(roster);
+  return { ok: true, employee: normalized };
 }

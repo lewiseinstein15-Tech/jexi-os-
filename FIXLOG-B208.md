@@ -86,9 +86,12 @@ Audited against the original 39-section spec and closed:
   malformed refinement coercion, parallel waves with conflicting supporter
   findings consolidated by the lead, dependency-wave unit, event vocabulary.
 
-Remaining known gaps (documented, not hidden): mid-work interruption/
+Remaining known gaps after B208b (documented, not hidden): mid-work interruption/
 redirection, runtime team management API/UI, permission enforcement for
 WRITE/EXECUTE/GIT (vacuous today — employees only search+reason), the full
 §27 event vocabulary (FILE_*, COMMAND_*, TEST_*), per-employee task-history
 queries, one task record per conversation, and cost/context-length routing
 signals.
+
+> **B209 update: ALL of the above are closed** — see `FIXLOG-B209.md`.
+> (COMMAND_*/TEST_* remain honestly unemitted: no employee shell exists yet.)

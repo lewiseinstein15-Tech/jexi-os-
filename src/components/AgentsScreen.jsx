@@ -4,6 +4,7 @@ import { Terminal, Globe, Loader2, CheckCircle2, XCircle, Radio, Activity } from
 import JexiCore, { coreColor } from './JexiCore';
 import RosterPanel from './RosterPanel';
 import ActiveAgents from './ActiveAgents';
+import TeamManager from './TeamManager'; // B209 — runtime team management
 
 function Tab({ active, onClick, children }) {
   return (
@@ -188,6 +189,7 @@ export default function AgentsScreen({ logs, websites, isProcessing, plan }) {
         <Tab active={tab === 'active'} onClick={() => setTab('active')}>ACTIVE</Tab>
         <Tab active={tab === 'pipeline'} onClick={() => setTab('pipeline')}>PIPELINE</Tab>
         <Tab active={tab === 'roster'} onClick={() => setTab('roster')}>ROSTER</Tab>
+        <Tab active={tab === 'team'} onClick={() => setTab('team')}>TEAM</Tab>
         {tab === 'active' && isProcessing && (
           <span className="ml-auto flex items-center gap-1.5 text-[8px] text-brand font-bold">
             <Activity className="w-3 h-3" />
@@ -207,6 +209,8 @@ export default function AgentsScreen({ logs, websites, isProcessing, plan }) {
             <ActiveAgents logs={logs} isProcessing={isProcessing} plan={plan} />
           ) : tab === 'pipeline' ? (
             <PipelineTab logs={logs} websites={websites} isProcessing={isProcessing} plan={plan} />
+          ) : tab === 'team' ? (
+            <TeamManager />
           ) : (
             <RosterPanel />
           )}
