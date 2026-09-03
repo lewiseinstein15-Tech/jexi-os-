@@ -169,5 +169,41 @@ ok('boot self-heal purge wired in index.js', idx.includes('purgeNonAnswerKnowled
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 
+// B199e (Test B round 3) — content-as-files goes to the CONTENT team, the
+// coding loop never tries to execute markdown, and the editor error teaches
+// the model the valid commands.
+{
+  const { planner } = await import('./src/services/Planner.js');
+  const swahili = await planner._classifyRegex('build me a complete swahili learning guide for beginners as files: 10 lessons, one file per lesson (lesson-01.md through lesson-10.md)');
+  ok('content-as-files build routes to content_creation, never the coding loop', swahili.intent === 'content_creation');
+  const stillCode = await planner._classifyRegex('build me a web app that tracks my water intake with a dashboard');
+  ok('real app builds still route to code_task', stillCode.intent === 'code_task');
+
+  const { runCodingLoop } = await import('./src/services/CodingLoop.js');
+  const loop = await runCodingLoop({
+    goal: 'swahili guide', entryPoint: 'swahili-lessons/lesson-01.md',
+    files: [{ name: 'swahili-lessons/lesson-01.md', code: '# Lesson 1\nHabari' }],
+    writeFiles: () => {}, maxAttempts: 4, successCriterion: 'exit 0',
+  });
+  ok('the coding loop SKIPS run/fix for a .md entry point', loop.contentOnly === true && loop.attempts === 0);
+  const escapeHatch = await runCodingLoop({
+    goal: 'lint the guide', entryPoint: 'swahili-lessons/lesson-01.md',
+    files: [{ name: 'swahili-lessons/lesson-01.md', code: '# ok' }],
+    writeFiles: () => {}, maxAttempts: 2, successCriterion: 'exit 0',
+    runCommand: async () => ({ exitCode: 0, output: 'lint clean' }),
+  });
+  ok('an explicit runCommand still runs (escape hatch)', escapeHatch.success === true && escapeHatch.attempts === 1);
+  const codeLoop = await runCodingLoop({
+    goal: 'hello app', entryPoint: 'index.js',
+    files: [{ name: 'index.js', code: 'console.log(1)' }],
+    writeFiles: () => {}, maxAttempts: 2, successCriterion: 'exit 0',
+    runCommand: async () => ({ exitCode: 0, output: 'ok' }),
+  });
+  ok('the coding loop still runs real code entry points', codeLoop.success === true && codeLoop.attempts >= 1);
+
+  const dsh = fs.readFileSync('./src/services/DshCoding.js', 'utf-8');
+  ok('editor error lists the valid commands (no blind retries)', dsh.includes('valid commands: view, create, str_replace, insert'));
+}
+
 console.log(failures === 0 ? '\n🎉 B199 CHECKS PASSED' : `\n💥 ${failures} FAILURES`);
 process.exit(failures ? 1 : 0);

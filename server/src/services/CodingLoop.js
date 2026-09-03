@@ -125,6 +125,18 @@ export async function runCodingLoop(opts) {
   let attempts = 0;
   const attemptsLog = [];
 
+  // B199e — CONTENT DELIVERABLE GUARD (Test B round 3): a non-runnable entry
+  // point (.md/.txt/.csv/.pdf lessons, guides, notes) can never "run clean" —
+  // the Runner fails, the Debugger rewrites it forever, and a one-line echo
+  // overwrite gets declared a pass. Content files skip the run/fix loop
+  // entirely: writing them IS the success. (An explicit runCommand still
+  // runs — the caller knows what to execute.)
+  const NON_RUNNABLE = /\.(md|txt|csv|pdf|docx?|pptx?|xlsx?|json|ya?ml|svg)$/i;
+  if (!opts.runCommand && entryPoint && NON_RUNNABLE.test(String(entryPoint).trim())) {
+    emit('log', { agent: 'Runner', message: `📖 ${entryPoint} is a content file — nothing to execute. Skipping the run/fix loop; the written files are the deliverable.` });
+    return { attempts: 0, success: true, lastOutput: `content deliverable — ${entryPoint} written, nothing to execute`, lastExitCode: 0, files, entryPoint, attemptsLog, contentOnly: true };
+  }
+
   // B51 P5 — repeated-failure guard: the SAME error text seen IDENTICAL_STREAK
   // times means blind re-fixing is wasting attempts → escalate (change strategy)
   // instead of re-running the exact same step again.

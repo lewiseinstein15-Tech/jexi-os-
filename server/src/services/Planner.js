@@ -580,6 +580,19 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
       return { intent: 'perf', tasks: ['perf'], reasoning: 'Performance request — the Performance Engineer measures the real files, fixes the top bottlenecks and proves the improvement.' };
     }
 
+    // 5.95 CONTENT-AS-FILES DELIVERABLE (B199e — Test B round 3): "build me a
+    //     complete Swahili learning guide, one file per lesson (.md)" is a
+    //     WRITING deliverable, not a program. Sent to the coding team it can
+    //     never "run clean" — the Runner executes markdown, fails, and the
+    //     Debugger churns rewrites forever. A content noun + file cues routes
+    //     to the content team instead; the FileBlockWriter persists the files.
+    const contentNoun = /\b(guide|lessons?|textbook|workbook|curriculum|syllabus|manual|handbook|notes?|study materials?|cheat ?sheet|flashcards?)\b/i;
+    const fileCue = /\b(files?|one file per|\.md\b|markdown files?|as (a )?markdown)\b/i;
+    const buildVerb = /\b(build|create|make|write|generate|produce|draft|prepare|put together|compile)\b/i;
+    if (buildVerb.test(q) && contentNoun.test(q) && fileCue.test(q)) {
+      return { intent: 'content_creation', tasks: ['content-strategist', 'blog-writer', 'editor', 'technical-editor'], reasoning: 'A writing deliverable requested as files — the content team writes it and the files are saved to the workspace (never the coding loop: markdown is not runnable code).' };
+    }
+
     // 6. Coding / programming — the FULL AGENT TEAM plans, builds, QA-tests and ships.
     //    Checked BEFORE study/research so "build me a study planner", "an app to
     //    track habits", "/team build…" and "/careful check my code" all land here

@@ -90,6 +90,8 @@ const TOOL_DEFS = [
 
 async function executeEditorTool(args) {
   const c = String(args.command || '');
+  // B199e — a malformed call (missing/unknown command) must teach the model
+  // the valid commands, or it retries the same broken call forever.
   if (c === 'view') return view(args.path);
   if (c === 'create') return create(args.path, args.file_text ?? '');
   if (c === 'str_replace') {
@@ -97,7 +99,7 @@ async function executeEditorTool(args) {
     return strReplace(args.path, String(args.old_str), String(args.new_str ?? ''));
   }
   if (c === 'insert') return insert(args.path, Number(args.insert_line) || 0, String(args.text ?? ''));
-  return { ok: false, error: `unknown command ${c}` };
+  return { ok: false, error: `unknown command ${c || '(missing)'} — valid commands: view, create, str_replace, insert. Example: {"command":"create","path":"file.md","file_text":"..."}` };
 }
 
 async function executeBash(args, owner) {
