@@ -38,8 +38,19 @@ jobs:
           exit 1
 
       - name: Verify the new build went live (version marker)
-        if: ${{ secrets.RENDER_IMAGE_DEPLOY_HOOK != '' }}
+        # B198c — a step-level `if: ${{ secrets.… }}` is INVALID in GitHub
+        # Actions (the secrets context is not allowed in if-conditionals —
+        # "Unrecognized named-value: 'secrets'"), which made this whole
+        # workflow fail validation on every push since B181 and the monthly
+        # refill cron never fire. Guard inside the script instead, exactly
+        # like the deploy step above.
+        env:
+          HOOK: ${{ secrets.RENDER_IMAGE_DEPLOY_HOOK }}
         run: |
+          if [ -z "$HOOK" ]; then
+            echo "::warning::RENDER_IMAGE_DEPLOY_HOOK secret is empty — skipping verification."
+            exit 0
+          fi
           sleep 240
           for i in 1 2 3 4 5 6; do
             V=$(curl -s -m 20 https://jexi-brain-image.onrender.com/api/health | grep -oE '"version":"[^"]+"' | head -1 || true)
