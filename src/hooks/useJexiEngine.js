@@ -19,7 +19,52 @@ const STREAM_STALE_MS = 60000;
  * exactly why JEXI finished a task in the logs while the chat showed no answer.
  * Buffer partial lines until the newline arrives.
  */
-async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable, setQuestions, setPlanReview } = {}) {
+/**
+ * B208 — TEAM STATE REDUCER: canonical Director events → the live team strip.
+ * JEXI is the boss (first card); employees appear as they are staffed and
+ * their status follows REAL events only (assigned → working → delivered /
+ * verifying → verified / recovering). Nothing is animated for show: every
+ * state change here corresponds to something that actually executed.
+ */
+const TEAM_STATUS = {
+  selected: 'standby', assigned: 'ready', working: 'working', delivered: 'done',
+  verifying: 'verifying', verified: 'verified', recovering: 'recovering',
+};
+
+function reduceTeam(prev, evt) {
+  const safe = (v, n) => { try { return sanitizeText(v, n); } catch { return String(v || '').slice(0, n); } };
+  // a brand-new objective resets the strip (fresh turn)
+  if (String(evt.type) === 'OBJECTIVE_RECEIVED') {
+    return { active: true, taskId: evt.taskId || null, state: evt.state || '', objective: '', employees: [], byId: {} };
+  }
+  const t = prev ? { ...prev, byId: { ...prev.byId } } : { active: true, taskId: null, state: '', objective: '', employees: [], byId: {} };
+  if (evt.taskId) t.taskId = evt.taskId;
+  if (evt.state) t.state = evt.state;
+  const touch = (patch) => {
+    const id = evt.agentId;
+    if (!id || id === 'jexi') return; // the boss is rendered separately
+    const cur = t.byId[id] || { agentId: id, name: safe(evt.agentName, 24) || id, status: 'standby', currentTask: '', provider: '' };
+    t.byId[id] = { ...cur, ...patch };
+  };
+  switch (String(evt.type)) {
+    case 'OBJECTIVE_INTERPRETED': t.objective = safe(evt.title || evt.summary, 120); break;
+    case 'EMPLOYEE_SELECTED': touch({ status: 'selected', name: safe(evt.agentName, 24) }); break;
+    case 'TASK_ASSIGNED': touch({ status: 'assigned' }); break;
+    case 'TASK_STARTED': touch({ status: 'working', currentTask: safe(evt.summary, 110) }); break;
+    case 'TASK_COMPLETED': touch({ status: evt.agentId === 'jexi' ? t.employees.length ? 'done' : 'done' : 'delivered' }); break;
+    case 'MODEL_SELECTED': case 'MODEL_SWITCHED': touch({ provider: safe(evt.data?.providerLabel, 18) }); break;
+    case 'RECOVERY_STARTED': case 'ERROR_DETECTED': touch({ status: 'recovering' }); break;
+    case 'VERIFICATION_STARTED': touch({ status: 'verifying' }); break;
+    case 'VERIFICATION_PASSED': touch({ status: 'verified' }); break;
+    case 'VERIFICATION_FAILED': touch({ status: 'verifying' }); break;
+    case 'TASK_FAILED': t.active = false; break;
+    default: break;
+  }
+  t.employees = Object.values(t.byId);
+  return t;
+}
+
+async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable, setQuestions, setPlanReview, setTeam } = {}) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -145,12 +190,17 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
       });
     }
     else if (data.type === 'plan') setPlan(prev => ({ ...prev, ...data }));
+    // B208 — canonical team events drive the live team strip
+    else if (data.type === 'team' && setTeam && data.event) {
+      try { setTeam(prev => reduceTeam(prev, data.event)); } catch (e) { /* team strip never breaks the stream */ }
+    }
     // Build 47 — intelligence metadata (classification, task id, confidence).
     else if (data.type === 'intel') setPlan(prev => ({ ...prev, intel: data }));
     else if (data.type === 'ask.user') setQuestions?.(data);
     else if (data.type === 'plan.review') setPlanReview?.(data);
     else if (data.type === 'done') {
       sawDone = true;
+      if (setTeam) { try { setTeam(prev => (prev ? { ...prev, active: false } : prev)); } catch (e) { /* never break */ } }
       if (data.success) {
         // ALWAYS show an answer on success — never a silent drop. Even if
         // the backend returns no summary, the user must see the outcome
@@ -265,6 +315,7 @@ export const useJexiEngine = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [questions, setQuestions] = useState(null); // { conv, questions: [...] }
   const [planReview, setPlanReview] = useState(null); // { conv, plan }
+  const [team, setTeam] = useState(null); // B208 — live team strip state (from 'team' events)
   const abortRef = useRef(null);
   const watchdogFiredRef = useRef(false);
   const recoverRef = useRef(null); // AbortController for the auto-recovery poll
@@ -386,6 +437,7 @@ export const useJexiEngine = () => {
     setLogs([]);
     setWebsites([]);
     setPlan(null);
+    setTeam(null); // B208 — fresh turn, fresh team strip
     const userMsg = { role: 'user', text: query, image };
     setMessages(prev => [...prev, userMsg]);
     const onEvent = () => { watchdogFiredRef.current = false; };
@@ -437,7 +489,7 @@ export const useJexiEngine = () => {
         return;
       }
       if (!res.ok) throw new Error(`Backend replied HTTP ${res.status}`);
-      await consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable, setQuestions, setPlanReview });
+      await consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable, setQuestions, setPlanReview, setTeam });
     } catch (error) {
       // Aborted by the user (STOP) — don't show a scary network error.
       if (error?.name === 'AbortError') {
@@ -501,5 +553,5 @@ export const useJexiEngine = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { messages, logs, websites, plan, isProcessing, runSearch, stopGeneration, pushMessage, questions, setQuestions, planReview, setPlanReview, openConversation };
+  return { messages, logs, websites, plan, team, isProcessing, runSearch, stopGeneration, pushMessage, questions, setQuestions, planReview, setPlanReview, openConversation };
 };

@@ -23,6 +23,10 @@ import { imageSearch, detectPictureIntent, detectCorrectionToPicture, verifyImag
 import { setGoalEngine } from './src/services/PromptAssembly.js'; // B158 — goals reach every assembled prompt
 import { orchestrator } from './src/services/Orchestrator.js';
 import { runSimpleTask } from './src/services/SimpleTask.js'; // B66 — Orchestrator-Workers SIMPLE fast path
+import { Director } from './src/services/director/Director.js'; // B208 — JEXI the boss: interpret→plan→staff→delegate→supervise→verify→report
+import { realLlmAdapter, realTools } from './src/services/director/RealAdapters.js';
+import { loadTask as loadDirectorTask } from './src/services/director/TaskState.js';
+import { rosterSummary as employeeRoster } from './src/services/director/Employees.js';
 import { normalizeFinalAnswer } from './src/services/Formatting.js'; // B66 — normalize every final answer
 import { generateContent, resolveKeys, testAllProviders } from './src/services/LLMClient.js';
 import { learnFromExchange } from './src/services/PreferenceLearner.js';
@@ -1204,6 +1208,23 @@ const DECLINE_RE = /^(no|nope|never ?mind|cancel|stop|forget it|skip|don'?t|no t
 // host restart), the server-side mission keeps running. The frontend polls this
 // endpoint to AUTO-RECOVER the finished result instead of asking the user to
 // manually say "continue".
+// B208 — DIRECTOR/TASK REPLAY: a reconnecting browser restores the team's
+// current state and the event history (ordered, event-id'd — the client
+// filters with sinceEventId for duplicate protection).
+app.get('/api/team/status', (req, res) => {
+  const convId = String(req.query.conversationId || req.headers['x-jexi-conv'] || 'default');
+  const task = loadDirectorTask(convId);
+  res.json({ ok: true, task: task ? { id: task.id, state: task.state, objective: task.objective, lead: task.leadEmployeeId, assignments: task.assignments, verification: task.verification, updatedAt: task.updatedAt } : null, employees: employeeRoster() });
+});
+app.get('/api/team/events', (req, res) => {
+  const convId = String(req.query.conversationId || req.headers['x-jexi-conv'] || 'default');
+  const since = String(req.query.sinceEventId || '');
+  const task = loadDirectorTask(convId);
+  let events = task?.events || [];
+  if (since) { const i = events.findIndex((e) => e.id === since); if (i >= 0) events = events.slice(i + 1); }
+  res.json({ ok: true, taskId: task?.id || null, state: task?.state || null, events });
+});
+
 app.get('/api/chat/result', (req, res) => {
   // B48 P7.2 — every recovery poll is observable: did the stream actually drop
   // (poll with no fresh task running) and did the result exist to be recovered?
@@ -1660,6 +1681,114 @@ app.post('/api/chat', async (req, res) => {
       // JEXI already knows (preferences, facts, prior research) when deciding
       // the intent. Compact slice — never the full transcript.
       const plannerMemory = await buildPlannerMemory(effectiveQuery);
+
+      // B208 — THE ONE DISPATCH: the complexity→fast-path/graph decision as a
+      // single shared closure — used by BOTH the Director's build department
+      // and the standard planner lane below (one call site, one contract).
+      const runLegacyPipeline = async (plan, q) => plan.complexity === 'SIMPLE'
+        ? await runSimpleTask(plan, q, sendEvent, { image })
+        : await orchestrator.executePlan(plan, q, sendEvent, {
+            image,
+            taskId: activeTaskId || null,
+            isContinuation: hasPending || ['continue', 'switch'].includes(intelClassification),
+            onPause: async (pausedState) => {
+              saveRun(convId, { plan, query: q, state: pausedState });
+              saveOffer(convId, q);
+            },
+          });
+
+      // B208 — THE DIRECTOR LANE: JEXI runs this turn as the BOSS. She
+      // interprets the request (however vague), refines it into a proper
+      // objective, plans, staffs employees by capability, delegates real
+      // work with structured briefs, supervises, verifies, recovers, and
+      // reports back in her own voice. She declines honestly (no keys /
+      // vision requests) and the battle-tested planner pipeline below takes
+      // the turn unchanged — the app never breaks because the boss is out.
+      {
+        // GUARDRAIL FIRST — the safety scan must cover the Director lane
+        // exactly as it covers the planner lane below.
+        const preSafety = scanPromptSafety(effectiveQuery || raw);
+        if (!preSafety.safe) {
+          sendEvent('log', { agent: 'Guardrail', message: `🛡 ${preSafety.reason}` });
+          done({ success: false, blocked: true, query, summary: blockExplanation(preSafety), statistics: { executionTime: 0, agentsUsed: 0, confidence: 0 } });
+          finish(); return;
+        }
+        let directorTurn = null;
+        if (!image) {
+          try {
+            const director = new Director({
+              llm: realLlmAdapter(),
+              tools: realTools(),
+              departments: {
+                // the heavy engineering department: the full legacy build
+                // pipeline (planner graph, workspace isolation, QA gates,
+                // publishing) runs under Forge's responsibility.
+                build: async ({ task }) => {
+                  const buildPlan = await planner.analyzeIntent(task.effectiveQuery, { image, memoryContext: plannerMemory, activeTaskId: currentTaskId || null });
+                  if (activeTaskId && getTask(activeTaskId)) { try { activateTaskWorkspace(activeTaskId); } catch (e) {} }
+                  const results = await runLegacyPipeline(buildPlan, task.effectiveQuery);
+                  if (activeTaskId && getTask(activeTaskId) && results.files?.length) { try { archiveTaskWorkspace(activeTaskId); } catch (e) {} }
+                  return { summary: results.summary || '', ok: results.success !== false, paused: Boolean(results.needsConfirmation), files: results.files || [] };
+                },
+              },
+            });
+            // one 'plan' event for the UI (orb/plan view) from the real
+            // staffing decisions as they happen
+            const teamSeen = [];
+            const directorSendEvent = (type, data) => {
+              sendEvent(type, data);
+              if (type === 'team' && data && data.event && data.event.type === 'TASK_ASSIGNED') {
+                teamSeen.push(data.event);
+                try {
+                  sendEvent('plan', {
+                    intent: 'directed',
+                    complexity: 'boss-directed',
+                    complexityReason: 'JEXI (the Director) planned and staffed this run herself',
+                    steps: teamSeen.map((t) => `${t.agentName}: ${String(t.summary || '').replace(/^(.*?) — /, '$1 · ')}`.slice(0, 90)),
+                    roster: [...new Set(teamSeen.map((t) => t.agentName))],
+                    skillsLine: '',
+                    tools: [], toolsLine: '', toolCount: 0,
+                    rosterCatalogSize: ROSTER_COUNT, skillCatalogSize: SKILL_COUNT,
+                    execution: { independent: [...new Set(teamSeen.map((t) => t.agentName))], bundled: [] },
+                  });
+                } catch (e) { /* the plan event is a nicety, never critical */ }
+              }
+            };
+            directorTurn = await director.runTurn({
+              raw, effectiveQuery,
+              contextBlock: decision && decision.contextBlock ? decision.contextBlock : '',
+              convId, sendEvent: directorSendEvent, memoryContext: plannerMemory,
+              activeTaskId: currentTaskId || null,
+            });
+          } catch (e) {
+            sendEvent('log', { agent: 'Director', message: `⚠ Director lane failed (${String(e && e.message || e).slice(0, 100)}) — the standard pipeline takes this one.` });
+          }
+        }
+        if (directorTurn && !directorTurn.decline) {
+          const finalSummary = directorTurn.summary && String(directorTurn.summary).trim()
+            ? normalizeFinalAnswer(directorTurn.summary)
+            : 'Done — but no readable summary came back. The activity log above shows what ran.';
+          if (activeTaskId && getTask(activeTaskId)) {
+            updateTask(activeTaskId, {
+              status: directorTurn.success === false ? 'failed' : 'completed',
+              query: effectiveQuery,
+              result: finalSummary.slice(0, 2000),
+              verified: directorTurn.statistics?.verification === 'pass',
+            });
+          }
+          if (!image && intelClassification && ['continue', 'switch'].includes(intelClassification) && raw.length > 25 && !DECLINE_RE.test(raw) && !CONFIRM_RE.test(raw)) {
+            try { recordDecision({ type: 'requirement', content: raw.slice(0, 300), source: 'user', taskId: activeTaskId || '', confidence: 'direct' }); } catch (e) {}
+          }
+          learnFromExchange(effectiveQuery).catch(() => {});
+          rollingConversationSummary().catch(() => {});
+          done({ success: directorTurn.success !== false, query, summary: finalSummary, sources: [], statistics: directorTurn.statistics || {}, files: directorTurn.files || [] });
+          finish(); return;
+        }
+        if (directorTurn && directorTurn.decline) {
+          sendEvent('log', { agent: 'Director', message: `↩ ${directorTurn.decline} — standard pipeline.` });
+        }
+      }
+
       // B53 P3 — the planner sees whether an active product task exists so
       // add/change/update/fix language routes to code modify, never research.
       plan = await planner.analyzeIntent(effectiveQuery, { image, memoryContext: plannerMemory, activeTaskId: currentTaskId || null });
@@ -1754,26 +1883,9 @@ app.post('/api/chat', async (req, res) => {
     // B66 — Orchestrator-Workers: SIMPLE tasks (single-shot intent) take the
     // single-coworker fast path — no graph construction at all. COMPLEX tasks
     // run the full typed-state graph as before. Both return the same contract.
-    const results = plan.complexity === 'SIMPLE'
-      ? await runSimpleTask(plan, executionQuery || effectiveQuery, sendEvent, { image })
-      : await orchestrator.executePlan(plan, executionQuery || effectiveQuery, sendEvent, {
-          image,
-          // B53 P2 — task scope for the run: the orchestrator gates memory reuse
-      // and writes durable checkpoints keyed to this taskId.
-      taskId: activeTaskId || null,
-      // B53 P2 — continuation turns (continue/switch/resume) may reuse the
-      // task's saved coding memory; brand-new product tasks must not.
-      isContinuation: hasPending || ['continue', 'switch'].includes(intelClassification),
-      // P5 — when a node pauses for approval, persist the FULL RunState so a
-      // later "yes" resumes at the exact paused node, prior results intact.
-      onPause: async (pausedState) => {
-        saveRun(convId, { plan, query: executionQuery || effectiveQuery, state: pausedState });
-        // B54 P1 — the pending offer is created HERE (only for real pauses),
-        // so "yes" resumes the actual paused action and nothing else can
-        // re-trigger a previous task.
-        saveOffer(convId, executionQuery || effectiveQuery);
-      },
-    });
+    // B208 — the dispatch itself lives in runLegacyPipeline above (shared
+    // with the Director's build department — exactly ONE call site).
+    const results = await runLegacyPipeline(plan, executionQuery || effectiveQuery);
 
     // B53 P2 — snapshot the finished task's workspace so a later "go back to
     // the calculator" restores the exact artifacts, and the NEXT product task

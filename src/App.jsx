@@ -214,6 +214,7 @@ export default function App() {
               questions={engine.questions}
               onDismissQuestions={() => engine.setQuestions(null)}
               planReview={engine.planReview}
+              team={engine.team}
               onDismissPlan={() => engine.setPlanReview(null)}
             />
           </div>

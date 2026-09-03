@@ -139,6 +139,7 @@ export default function CommandCenter({ engine, isDesktop }) {
           questions={engine.questions}
           onDismissQuestions={engine.setQuestions}
           planReview={engine.planReview}
+              team={engine.team}
           onDismissPlan={engine.setPlanReview}
         />
       </div>

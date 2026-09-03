@@ -7,6 +7,7 @@ import OrbCore from './OrbCore'; // B192 — the presence orb (empty state)
 import Composer from './Composer'; // B195 — isolated, real-app input
 import MarkdownRenderer from './MarkdownRenderer';
 import VisionPanel from './VisionPanel';
+import TeamLive from './TeamLive'; // B208 — the boss + employees strip (real Director events)
 
 const SELF_CHECK_QUERY =
   'JEXI, run a full system self-check now. Check your health, memory, eyes and recent errors. If anything is wrong, tell me the exact source file and the fix.';
@@ -103,7 +104,7 @@ function MessageActions({ text, onRegenerate }) {
 /* ------------------------------------------------------------------ */
 /* Main ChatWindow                                                      */
 /* ------------------------------------------------------------------ */
-export default function ChatWindow({ messages, logs, isProcessing, onSend, onStop, onVisionResult }) {
+export default function ChatWindow({ messages, logs, isProcessing, onSend, onStop, onVisionResult, team }) {
   const [image, setImage] = useState(null);
   const [visionOpen, setVisionOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -176,6 +177,9 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
         className="space-y-4 mb-3 flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
+        {/* B208 — TEAM LIVE: the boss + her employees, statuses driven by real
+            Director events (assigned → working → delivered → verified). */}
+        <TeamLive team={team} live={isProcessing} />
         {messages.length === 0 && !isProcessing ? (
           /* B192 — ORB HERO: her presence center-stage (the ZOEY_OS look) */
           <div className="jx-orb-wrap">
