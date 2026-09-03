@@ -2009,11 +2009,17 @@ app.get('/api/health', (req, res) => {
 app.get('/api/metrics', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const m = metricsSummary();
+  const mu = process.memoryUsage(); // B203 — memory gauges: OOM incidents become diagnosable
   res.json({
     ok: true,
     instanceId: INSTANCE_ID,
     uptime: Math.round(process.uptime()),
     providerHealth: scoreProviderHealth(providerHealthSnapshot()),
+    memory: {
+      rssMb: Math.round(mu.rss / 1048576),
+      heapUsedMb: Math.round(mu.heapUsed / 1048576),
+      heapTotalMb: Math.round(mu.heapTotal / 1048576),
+    },
     ...m,
   });
 });

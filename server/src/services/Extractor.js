@@ -36,13 +36,52 @@ async function fetchBuffer(url) {
     // safeFetchUrl re-validates every redirect hop (SSRF guard).
     const res = await safeFetchUrl(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, timeout: 20000 }, fetch);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.arrayBuffer();
+    return await capArrayBuffer(res, MAX_PDF_BYTES); // B203 — bounded PDF download
   } catch (e) {
     const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
     const proxyRes = await fetch(proxyUrl, { timeout: 30000 });
-    if (proxyRes.ok) return await proxyRes.arrayBuffer();
+    if (proxyRes.ok) return await capArrayBuffer(proxyRes, MAX_PDF_BYTES);
     throw new Error(`Download failed: ${e.message}`);
   }
+}
+
+/** B203 — read a response body as ArrayBuffer but never more than maxBytes. */
+export async function capArrayBuffer(res, maxBytes) {
+  const buf = await res.arrayBuffer();
+  if (buf.byteLength <= maxBytes) return buf;
+  return buf.slice(0, maxBytes);
+}
+
+// B203 — small-host memory hardening constants. The Render free tier gives
+// the container 512MB; the idle brain alone sits at ~240MB RSS, so one
+// unbounded page download (or one fat JSDOM parse) can OOM-kill the process
+// mid-request (observed live: stream froze, metrics timed out, container
+// restarted). Everything below keeps the extraction peak under control.
+export const MAX_HTML_BYTES = 768 * 1024;   // never read more than 768KB of a page
+export const JSDOM_MAX_HTML = 300 * 1024;   // >300KB pages take the light regex path
+export const RSS_JSDOM_GUARD = 330 * 1024 * 1024; // skip JSDOM entirely above this RSS
+export const MAX_PDF_BYTES = 8 * 1024 * 1024;     // cap PDF downloads at 8MB
+
+/** Read a response body as text but NEVER more than maxBytes (B203). */
+export async function readCapped(res, maxBytes = MAX_HTML_BYTES) {
+  if (!res.body || typeof res.body.getReader !== 'function') {
+    const raw = typeof res.text === 'function' ? await res.text() : String(res);
+    return raw.length > maxBytes ? raw.slice(0, maxBytes) : raw;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder('utf-8', { fatal: false });
+  let out = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    out += decoder.decode(value, { stream: true });
+    if (out.length > maxBytes) {
+      try { await reader.cancel(); } catch (e) {}
+      return out.slice(0, maxBytes);
+    }
+  }
+  out += decoder.decode();
+  return out.length > maxBytes ? out.slice(0, maxBytes) : out;
 }
 
 async function fetchHTML(url, opts = {}) {
@@ -50,7 +89,10 @@ async function fetchHTML(url, opts = {}) {
     // safeFetchUrl re-validates every redirect hop (SSRF guard).
     const res = await safeFetchUrl(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' }, timeout: 12000 }, fetch);
     if (res.status === 403 || res.status === 503) throw new Error('Blocked by host');
-    return await res.text();
+    // B203 — NEVER read an unbounded body: a 20MB page fully materialized in
+    // memory froze and OOM-killed the whole brain on the 512MB Render free
+    // tier (idle brain alone sits at ~240MB RSS). Read at most MAX_HTML_BYTES.
+    return await readCapped(res);
   } catch (e) {
     // JS rendering launches a full Chromium browser — only for explicit link
     // analysis, NEVER during bulk search extraction (memory-heavy, and a crash
@@ -61,7 +103,7 @@ async function fetchHTML(url, opts = {}) {
     }
     const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
     const proxyRes = await fetch(proxyUrl, { timeout: 20000 });
-    if (proxyRes.ok) return await proxyRes.text();
+    if (proxyRes.ok) return await readCapped(proxyRes); // B203 — capped here too
     throw new Error(`All fetch methods failed: ${e.message}`);
   }
 }
@@ -223,13 +265,24 @@ export async function extractContent(url) {
 
   // HTML PAGES
   const html = await fetchHTML(url); // js rendering off — search extraction stays lightweight
+  return extractFromHTML(html, url);
+}
+
+/**
+ * B203 — the HTML→content core, split out of extractContent so the
+ * JSDOM-vs-light-path decision is unit-testable without network.
+ */
+export function extractFromHTML(html, url) {
   if (html.includes('cf-challenge') || html.includes('Cloudflare Ray ID')) {
     throw new Error('Cloudflare bot protection triggered.');
   }
 
   // Oversized pages skip JSDOM+Readability (memory spike on small hosts) — the
   // regex-based html-to-text path is far lighter and good enough for extraction.
-  if (html.length > 2_500_000) {
+  // B203: threshold 2.5MB → 300KB, plus an RSS guard — two concurrent fat JSDOM
+  // parses OOM-killed the 512MB Render free-tier container mid-request.
+  const rss = process.memoryUsage().rss;
+  if (html.length > JSDOM_MAX_HTML || rss > RSS_JSDOM_GUARD) {
     const text = convert(html, { wordwrap: 130 });
     if (text && text.length > 300) {
       return { title: docTitleSafe(html, url), content: text, length: text.length, method: 'html-to-text' };

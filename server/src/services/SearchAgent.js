@@ -159,7 +159,11 @@ function withTimeout(promise, ms, label) {
 }
 
 const SOURCE_READ_TIMEOUT_MS = 25000;
-const MAX_CONCURRENT_READS = 2; // JSDOM is memory-hungry — keep peak RSS safe on small hosts
+// B203 — 2 → 1: the idle brain sits at ~240MB RSS and the Render free tier
+// caps the container at 512MB; two concurrent JSDOM+Readability parses of
+// fat pages OOM-killed the process mid-request (live incident). Serialized
+// reads keep the peak flat; 10 sources × a few seconds each is fast enough.
+const MAX_CONCURRENT_READS = 1;
 
 async function readOne(src) {
   const content = await extractContent(src.link);
