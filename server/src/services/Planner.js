@@ -431,6 +431,17 @@ export class Planner {
             }
           }
         }
+        // B202 — ranked-list questions ("three largest lakes in Africa") must
+        // not ship as direct_answer recall: the production smoke test
+        // hallucinated "Lake Superior" as an African lake. Defer to research.
+        if (llm.intent === 'direct_answer' && this.isRankedListQuestion(q)) {
+          return {
+            intent: 'research',
+            tasks: ['search', 'browser', 'extractor', 'reasoner', 'memory'],
+            reasoning: `${llm.reasoning} — but a ranked list needs verified sources, so the research pipeline takes it.`,
+            confidence: llm.confidence,
+          };
+        }
         // B199e — same defer for CONTENT-AS-FILES deliverables: a live-key
         // classifier labels "build me a Swahili guide, one file per lesson"
         // as code_task (Test B rounds 3 & 4); the deterministic rule knows
@@ -716,6 +727,16 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
       return { intent: 'news_latest', tasks: ['news', 'twitter', 'reasoner', 'memory'], reasoning: 'User wants the latest news / social updates.' };
     }
 
+    // 8.75 RANKED-LIST QUESTIONS (B202) — "the three largest lakes in Africa"
+    //      must NOT take the direct-recall fast path, and must not be swallowed
+    //      by domain/field keyword matches either: raw model recall
+    //      hallucinated "Lake Superior" as an African lake in the production
+    //      smoke test. Ranked lists with quantities are research-shaped —
+    //      sources + fact-check beat recall.
+    if (this.isRankedListQuestion(q)) {
+      return { intent: 'research', tasks: ['search', 'browser', 'extractor', 'reasoner', 'memory'], reasoning: 'A ranked list with quantities — verified sources beat raw model recall (B202).' };
+    }
+
     // 8.8 DEEP-DOMAIN ROUTING — the round-4 roster: domain keywords route to
     //     their own specialist team instead of the generic research fallback,
     //     so the 200+ catalog is actually deployed per task (supervisor pattern:
@@ -805,6 +826,20 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
     const fileCue = /\b(files?|one file per|\.md\b|markdown files?|as (a )?markdown)\b/i;
     const buildVerb = /\b(build|create|make|write|generate|produce|draft|prepare|put together|compile)\b/i;
     return buildVerb.test(s) && contentNoun.test(s) && fileCue.test(s);
+  }
+
+  /**
+   * B202 — RANKED-LIST QUESTIONS: "the three largest lakes in Africa",
+   * "5 longest rivers", "top 10 tallest mountains". Raw model recall
+   * hallucinates list members and numbers (the production smoke test got
+   * "Lake Superior" as an AFRICAN lake) — these are research-shaped and
+   * need the sourced + fact-checked pipeline.
+   */
+  isRankedListQuestion(q) {
+    const s = String(q || '').toLowerCase();
+    const rankCue = /\b(largest|longest|biggest|highest|deepest|tallest|fastest|richest|poorest|smallest|busiest|oldest|newest|most populated|most spoken|top \d+|first \d+|\d+ (largest|longest|biggest|highest|deepest|tallest|smallest|most))\b/i;
+    const listNoun = /\b(lakes|rivers|mountains|peaks|cities|countries|buildings|towers|companies|universities|islands|deserts|forests|airports|bridges|roads|railways|economies|industries|languages|currencies|exporters|producers|teams|players|artists|songs|albums|films|movies|books|novels|rivers)\b/i;
+    return rankCue.test(s) && listNoun.test(s);
   }
 
   _domainIntent(q) {
