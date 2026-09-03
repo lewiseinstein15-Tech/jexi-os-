@@ -392,7 +392,37 @@ export class Planner {
     // so a remembered preference/project state can decide the intent.
     try {
       const llm = await this._classifyLLM(query, { ...opts, scope, scopedQuery });
-      if (llm) return llm;
+      if (llm) {
+        // B199 — the classifier enum has no domain:* intents, so a live-key
+        // run squashed specialist-domain topics ("help me understand quantum
+        // entanglement") into generic study_topic and the specialist teams
+        // never fired. A generic learning/research classification defers to
+        // the deterministic domain routing: round-4 keywords first, then the
+        // DomainRegistry fields (same research-cue guard as the cascade).
+        // BUT an explicit study/learn deliverable ("study calculus") keeps
+        // study_topic — the cascade orders study (6.5) before domains (8.8+).
+        const studyDeliverable = /study|learn everything about|fill knowledge base|master topic|teach me/i.test(q);
+        const genericLearning = llm.intent === 'study_topic' || llm.intent === 'learning_research' || llm.intent === 'research';
+        if (genericLearning && !studyDeliverable) {
+          const domain = this._domainIntent(q);
+          if (domain) return { ...domain, confidence: llm.confidence, reasoning: `${llm.reasoning} — routed to the specialist team: ${domain.reasoning}` };
+          const strongResearchCue = /research|search|latest|breaking|news|sources|compare|deep dive|investigate|report on|current/i.test(q);
+          if (!strongResearchCue) {
+            const fields = matchDomains(q);
+            if (fields.length) {
+              const primary = fields[0];
+              return {
+                intent: `domain:${primary.id}`,
+                tasks: [...primary.team],
+                reasoning: `${llm.reasoning} — routed to the ${primary.name} specialist team.`,
+                confidence: llm.confidence,
+                domains: fields.map((f) => f.id),
+              };
+            }
+          }
+        }
+        return llm;
+      }
     } catch (e) {
       // Provider failure must never kill classification — fall through to the
       // deterministic cascade (fail closed, never crash).

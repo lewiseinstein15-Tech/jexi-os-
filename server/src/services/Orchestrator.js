@@ -37,6 +37,7 @@ import {
   saveInternetKnowledge, saveCodingKnowledge, saveKnowledgeFile,
   getRollingSummary, getRecentEpisodes, rememberEpisode,
   semanticRecall, memoryForAgent, conversationTranscript,
+  isNonAnswerText, // B199 — a search sentinel must never become the final answer
 } from './MemoryManager.js';
 import { WORKSPACE_DIR, MANAGER_URL, PUBLIC_URL, MAX_DEBUG_ATTEMPTS } from '../config.js';
 import { resolveInside } from './PathSafety.js'; // security: real path-resolution for /guard writes
@@ -203,6 +204,17 @@ function normalizeAgentResult(results) {
  * every specialist is a node, edges route by intent/outcome, and the coding
  * debug loop is a real cycle (debugger → debugger) instead of a special case.
  */
+/** B199 — detect a "the source can't answer this" reply from
+ *  answerFromKnowledge. The books path used to ship these as the FINAL
+ *  answer ("mission complete", 95% confidence, no real content) — now the
+ *  caller bails out to real research instead. The prompt already tells the
+ *  model to answer honestly when the passages don't cover the question;
+ *  this turns that honesty into a route change instead of a dead end. */
+export function looksLikeSourceRefusal(text) {
+  const head = String(text || '').slice(0, 400).toLowerCase().replace(/[’‘]/g, "'");
+  return /\b(does not contain|do not contain|doesn't contain|don't contain|no information (?:about|on|regarding|in)|cannot compile|can't compile|cannot answer|can't answer|cannot provide|can't provide|not covered|doesn't cover|does not cover|no relevant (?:information|content|passage|details?|material)|not addressed|not mentioned|not included|unable to (?:answer|provide|compile))\b/.test(head);
+}
+
 export class Orchestrator {
   constructor() { this.executionHistory = []; }
 
@@ -695,6 +707,15 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
     });
 
     N.research = this.wrapCase('research', async ({ results, sendEvent, query, plan, state }) => {
+      // B200 — ARENA-STYLE LIVE UPDATES: her answer types itself into the
+      // chat as it is written, and she narrates the big moves in first
+      // person while she works. The client renders 'stream' deltas on the
+      // streaming message (B150 handler) and 'narration' lines above it.
+      let streamedChars = 0;
+      const onToken = (piece) => {
+        streamedChars += String(piece || '').length;
+        try { sendEvent('stream', { text: piece, by: 'JEXI' }); } catch (e) {}
+      };
       // B54 P3 — the two independent knowledge probes (books/library recall and
       // the semantic-memory check) run CONCURRENTLY, not one-after-the-other:
       // both are read-only lookups and either one can short-circuit the search.
@@ -704,14 +725,21 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
       ]);
 
       // 1. The user's own books/library come FIRST — grounded answers from their materials
+      //    B199 — but ONLY when the book can actually answer: an explicit
+      //    "this source has nothing on that" reply bails out to real research
+      //    instead of shipping a non-answer as the final result.
       if (fromBooks) {
-        sendEvent('log', { agent: 'Books', message: '📚 Found it in your books / knowledge library — answering from there.' });
+        try { sendEvent('narration', { text: 'Let me check my books and notes first — you might already have this.' }); } catch (e) {}
         const summary = await this.answerFromKnowledge(fromBooks, query);
-        try { addChat('jexi', summary); } catch (e) {}
-        results.summary = summary;
-        results.sources = fromBooks.map(k => ({ title: k.title, link: '' }));
-        results.statistics.confidence = 95;
-        return results;
+        if (summary && !looksLikeSourceRefusal(summary)) {
+          sendEvent('log', { agent: 'Books', message: '📚 Found it in your books / knowledge library — answering from there.' });
+          try { addChat('jexi', summary); } catch (e) {}
+          results.summary = summary;
+          results.sources = fromBooks.map(k => ({ title: k.title, link: '' }));
+          results.statistics.confidence = 95;
+          return results;
+        }
+        sendEvent('log', { agent: 'Books', message: '📚 My library has nothing on this — researching it properly.' });
       }
 
       // 2. Check memory — did we already learn this?
@@ -734,7 +762,7 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
       const effectiveQuery = retryClaims && retryClaims.length
         ? `${query}\n\n[Verification follow-up — these specific claims were flagged as unsupported, verify each with a real source: ${retryClaims.join(' | ')}]`
         : query;
-      const team = await runSearchTeam(effectiveQuery, sendEvent, { context: conversationTranscript(6) });
+      const team = await runSearchTeam(effectiveQuery, sendEvent, { context: conversationTranscript(6), onToken });
       results.sources = team.sources.slice(0, 5).map(s => ({ title: s.title, link: s.link }));
 
       if (team.sources.length === 0) {
@@ -749,11 +777,25 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
         }
       }
 
-      try { addChat('jexi', team.summary); } catch (e) {}
-      results.summary = team.summary;
+      // B199 — when the search team honestly cannot synthesize from its
+      // sources (the "could not find enough information…" sentinel — common
+      // for encyclopedic list questions the sources only partially cover),
+      // that sentinel must NEVER become the final answer. Fall back to
+      // answering from her own knowledge with the team's sources as
+      // reference; the verify graph then checks it like any other draft.
+      let researchDraft = team.summary;
+      if (isNonAnswerText(researchDraft)) {
+        sendEvent('log', { agent: 'Synthesizer', message: '⚠ The sources only partially cover this — answering from my own knowledge and verifying it.' });
+        try { sendEvent('narration', { text: 'My sources only partially cover this — I\u2019ll answer from my own knowledge and verify that.' }); } catch (e) {}
+        const rw = await reasonAndWrite(query, (team.sources || []).slice(0, 5), { onToken: streamedChars === 0 ? onToken : undefined }).catch(() => null);
+        if (rw && rw.summary && !isNonAnswerText(rw.summary)) {
+          researchDraft = rw.summary;
+          team.confidence = Math.min(team.confidence || 92, 80);
+        }
+      }
+      try { addChat('jexi', researchDraft); } catch (e) {}
+      results.summary = researchDraft;
       results.statistics.confidence = team.confidence;
-
-      // B52 P2 — the verification + correction path is a REAL GraphRunner run:
       // draft → verifier → (revise WITH the specific missing claims → verifier,
       // bounded) → final. Durable failure history flows back into state so the
       // next iteration reads the last error + reasons (P7).
@@ -808,19 +850,24 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
 
     N.knowledgeRecall = this.wrapCase('knowledgeRecall', async ({ results, sendEvent, query, plan }) => {
       const kb = plan.payload || (await recallKnowledge(query, sendEvent));
+      // B199 — a book that can't answer the question must not become the
+      // final answer; fall through to the writer below.
       if (kb) {
         let summary = await this.answerFromKnowledge(kb, query);
-        const sources = (Array.isArray(kb) ? kb : [kb]).map(k => ({ title: k.title, link: '' }));
-        // B52 P5 — single completion gate (verify against the book passages +
-        // sanitize) before the answer reaches the user.
-        sendEvent('log', { agent: 'Critic', message: '🔎 Checking the answer stays true to your book...' });
-        const finalized = await finalizeAnswer({ query, draft: summary, sources, domain: 'knowledge_recall', sendEvent });
-        try { addChat('jexi', finalized.summary); } catch (e) {}
-        results.summary = finalized.summary;
-        results.sources = sources;
-        results.statistics.confidence = 95;
-        if (finalized.verification) results.statistics.verification = finalized.verification;
-        return results;
+        if (summary && !looksLikeSourceRefusal(summary)) {
+          const sources = (Array.isArray(kb) ? kb : [kb]).map(k => ({ title: k.title, link: '' }));
+          // B52 P5 — single completion gate (verify against the book passages +
+          // sanitize) before the answer reaches the user.
+          sendEvent('log', { agent: 'Critic', message: '🔎 Checking the answer stays true to your book...' });
+          const finalized = await finalizeAnswer({ query, draft: summary, sources, domain: 'knowledge_recall', sendEvent });
+          try { addChat('jexi', finalized.summary); } catch (e) {}
+          results.summary = finalized.summary;
+          results.sources = sources;
+          results.statistics.confidence = 95;
+          if (finalized.verification) results.statistics.verification = finalized.verification;
+          return results;
+        }
+        sendEvent('log', { agent: 'Books', message: '📚 My library has nothing on this — answering from what I know.' });
       }
       // Fall through to research if the library has nothing
       const { summary } = await reasonAndWrite(query, []);
@@ -1003,14 +1050,18 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
 
     N.generic = this.wrapCase('generic', async ({ results, sendEvent, query, plan }) => {
       // Check the user's own books/library before generic research
+      // B199 — bail out when the book can't answer; never ship the refusal.
       try {
         const fromBooks = await recallKnowledge(query, sendEvent, 1);
         if (fromBooks) {
           const summary = await this.answerFromKnowledge(fromBooks, query);
-          try { addChat('jexi', summary); } catch (e) {}
-          results.summary = summary;
-          results.statistics.confidence = 90;
-          return results;
+          if (summary && !looksLikeSourceRefusal(summary)) {
+            try { addChat('jexi', summary); } catch (e) {}
+            results.summary = summary;
+            results.statistics.confidence = 90;
+            return results;
+          }
+          sendEvent('log', { agent: 'Books', message: '📚 My library has nothing on this — thinking it through properly.' });
         }
       } catch (e) {}
       const ctx = await conversationContext();

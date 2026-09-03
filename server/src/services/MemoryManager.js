@@ -1016,7 +1016,42 @@ export function getMemoryStats() {
 /* Learned internet knowledge (JEXI's "mind" for research topics)      */
 /* ------------------------------------------------------------------ */
 
+/* B199 — failure notices must never become "learned knowledge". A failed
+   retrieval sentinel ("I could not find enough information…"), a degraded
+   no-key synthesis notice, or an explicit source refusal is NOT knowledge —
+   but it WAS being saved to internetKnowledge and then served instantly
+   from memory on the next identical ask ("she remembers failing and refuses
+   to retry"). One shared detector protects every save + recall path. */
+const NON_ANSWER_PATTERNS = [
+  /could not find enough information in my retrieved sources/i,
+  /was unavailable \(no api key/i,
+  /no readable summary/i,
+  /\b(does not contain|do not contain|doesn't contain|don't contain|no information (?:about|on|regarding)|cannot compile|can't compile|cannot answer|can't answer|not covered|doesn't cover|does not cover|no relevant (?:information|content|passage|details?|material)|unable to (?:answer|provide|compile))\b/i,
+];
+export function isNonAnswerText(text) {
+  const t = String(text || '').trim();
+  if (!t) return true;
+  const head = t.slice(0, 400).replace(/[’‘]/g, "'");
+  return NON_ANSWER_PATTERNS.some((re) => re.test(head));
+}
+
+/** B199 — remove previously-poisoned entries (self-heal at boot). */
+export function purgeNonAnswerKnowledge() {
+  const mem = loadMemory();
+  const before = (mem.internetKnowledge || []).length + (mem.learnedAnswers || []).length;
+  mem.internetKnowledge = (mem.internetKnowledge || []).filter((e) => !isNonAnswerText(e.answer));
+  mem.learnedAnswers = (mem.learnedAnswers || []).filter((e) => !isNonAnswerText(e.answer));
+  const removed = before - (mem.internetKnowledge.length + mem.learnedAnswers.length);
+  if (removed > 0) {
+    saveMemory();
+    console.log(`[Memory] purged ${removed} non-answer entr${removed === 1 ? 'y' : 'ies'} (failed retrievals must never pose as knowledge)`);
+  }
+  return removed;
+}
+
 export function saveInternetKnowledge(topic, answer, sources = []) {
+  // B199 — a failure notice is not knowledge: refuse to store it.
+  if (isNonAnswerText(answer)) return null;
   const mem = loadMemory();
   const entry = {
     topic: String(topic).slice(0, 300),
@@ -1040,7 +1075,7 @@ export function saveInternetKnowledge(topic, answer, sources = []) {
 
 export async function searchInternetKnowledge(query) {
   const mem = loadMemory();
-  const list = mem.internetKnowledge;
+  const list = (mem.internetKnowledge || []).filter((e) => !isNonAnswerText(e.answer)); // B199 — never recall a failure notice
   if (!list.length) return null;
   const hits = await hybridSearch(list, query, { relevanceFloor: 0.12, limit: 1 });
   return hits.length ? hits[0].entry : null;
@@ -1054,7 +1089,7 @@ export async function searchInternetKnowledge(query) {
  */
 export async function searchFreshInternetKnowledge(query, maxAgeMs = 30 * 60 * 1000) {
   const mem = loadMemory();
-  const list = mem.internetKnowledge;
+  const list = (mem.internetKnowledge || []).filter((e) => !isNonAnswerText(e.answer)); // B199
   if (!list.length) return null;
   const hits = await hybridSearch(list, query, { relevanceFloor: 0.12, limit: 1 });
   if (!hits.length) return null;
@@ -1258,17 +1293,43 @@ function indexKnowledgeFiles() {
  * they survive redeploys via Redis) plus studied-topic files on disk.
  * Returns excerpts centered on the best match, not whole files.
  */
+/* B199 — stop-words for knowledge-library matching. Generic English and
+   programming words must NEVER score a library "match" on their own. Before
+   this, a question about African countries matched a JavaScript tips book
+   because ordinary words like "list", "table", "with", "columns", "year"
+   appear in every text — the books path then HIJACKED the answer and shipped
+   the model's "this book has nothing about that" reply as the FINAL answer
+   ("mission complete", 95% confidence, zero real content). */
+const KNOWLEDGE_STOPWORDS = new Set(('about,above,after,again,against,all,also,although,always,among,another,any,anyone,'
+  + 'are,around,back,been,before,being,below,best,better,between,both,bring,build,built,came,can,cannot,come,could,'
+  + 'create,does,doing,done,down,during,each,early,either,else,enough,even,every,exactly,example,explain,find,'
+  + 'first,for,from,give,given,going,good,got,had,has,have,having,help,here,how,information,into,just,keep,kind,know,'
+  + 'last,late,later,least,less,let,like,list,little,long,look,make,making,many,matter,more,most,much,must,'
+  + 'need,never,next,nice,none,not,note,nothing,now,off,often,once,one,only,open,other,others,out,over,own,'
+  + 'part,people,please,point,pretty,put,question,quite,read,really,right,same,search,see,seem,show,some,'
+  + 'something,soon,still,stop,such,take,tell,than,that,their,them,then,there,these,they,thing,things,think,'
+  + 'this,those,through,time,today,together,told,too,took,toward,turn,under,until,use,used,using,want,was,'
+  + 'way,well,went,were,what,when,where,which,while,who,why,will,with,within,without,would,write,yes,yet,you,your,'
+  // generic technical words that appear in almost every programming note
+  + 'code,data,file,files,page,pages,table,tables,year,years,number,numbers,value,values,item,items,name,names,text,content').split(','));
+
 export function searchKnowledge(query, minScore = 2) {
   const results = [];
-  const q = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-  if (q.length === 0) return results;
+  // B199 — score on DISTINCTIVE terms only: stop-words are removed before any
+  // counting, and a match must hit at least one distinctive term. When the
+  // question carries several distinctive terms (a real topical question), a
+  // single stray hit is not enough — require two.
+  const qAll = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+  const q = qAll.filter(w => !KNOWLEDGE_STOPWORDS.has(w));
+  if (q.length === 0) return results; // nothing distinctive to match on — no library hit
   const count = (hay) => q.reduce((acc, w) => acc + (hay.includes(w) ? 1 : 0), 0);
+  const minDistinctive = q.length >= 4 ? 2 : 1;
 
   // 1) The user's own books (memory-first: survives restarts via Redis mirror)
   for (const book of loadMemory().bookLibrary || []) {
     const text = book.text || '';
     const score = count(text.toLowerCase());
-    if (score >= 1) {
+    if (score >= minDistinctive) {
       const excerpt = bestExcerpt(text, q);
       if (excerpt) results.push({ title: book.name, category: 'USER_BOOKS', content: excerpt, score, source: 'book' });
     }
@@ -1276,7 +1337,7 @@ export function searchKnowledge(query, minScore = 2) {
 
   // 2) Studied topic files on disk (indexed — read once per change, not per query)
   const skipBooks = loadMemory().bookLibrary.length > 0;
-  const threshold = Math.min(minScore, q.length);
+  const threshold = Math.max(Math.min(minScore, q.length), minDistinctive);
   for (const f of indexKnowledgeFiles()) {
     if (f.cat === 'USER_BOOKS' && skipBooks) continue;
     const score = count(f.content.toLowerCase());

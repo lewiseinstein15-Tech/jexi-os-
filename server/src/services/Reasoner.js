@@ -25,7 +25,10 @@ export async function reasonAndWrite(query, sources, opts = {}) {
     prompt = `Answer the user's question clearly and completely: "${query}"\n\n${memoryContext ? `Context from previous conversation (use it only to resolve references — never announce that this continues a conversation, just answer):\n${memoryContext}` : ''}\nFollow JEXI OS formatting rules.`;
   }
 
-  const summary = await generateContent(prompt, JEXI_SYSTEM_PROMPT + preferencesBlock());
+  // B200 — live answer streaming (same seam as the search synthesizer).
+  const summary = await generateContent(prompt, JEXI_SYSTEM_PROMPT + preferencesBlock(), null, {
+    ...(typeof opts.onToken === 'function' ? { onToken: opts.onToken } : {}),
+  });
 
   // Store what we learned so next time JEXI answers from memory
   try {

@@ -31,8 +31,13 @@ export function resolveKeys() {
 
 // --- Current, valid model names (verified against Google's docs, Aug 2026).
 // gemini-1.5-flash-latest was REMOVED from the API (404) — never use it as primary.
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'; // multimodal, best price-performance
-const GEMINI_FALLBACK_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-1.5-flash'];
+// B199 — model catalog refreshed against the live API (Sept 2026):
+// gemini-2.5-flash 404s ("no longer available to new users — use
+// gemini-3.6-flash") and gemini-1.5-flash is hard-gone. Lead with the
+// current generation; keep 2.5-flash as a late fallback for grandfathered
+// keys that still have it.
+const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash'; // multimodal, current generation
+const GEMINI_FALLBACK_MODELS = ['gemini-3.5-flash', 'gemini-2.5-flash'];
 
 // Groq vision-capable models, tried in order when an image is attached.
 const GROQ_VISION_MODELS = [
@@ -213,7 +218,12 @@ async function tryGroq(prompt, system, imageBase64, opts, errors) {
   const { groqKey } = resolveKeys();
   if (!groqKey) return null;
   const groq = new Groq({ apiKey: groqKey });
-  const models = imageBase64 ? GROQ_VISION_MODELS : (opts.model ? [opts.model] : [GROQ_TEXT_MODEL]);
+  // B199 — start from the DISCOVERED model when we have one. The B177 self-heal
+  // discovered a live model on the first 404 but only the tool-calling path
+  // consulted it — every plain call still opened with the retired
+  // llama-3.3-70b-versatile, ate a deterministic 404, and only then retried:
+  // one wasted round-trip (and one error log) on EVERY completion.
+  const models = imageBase64 ? GROQ_VISION_MODELS : (opts.model ? [opts.model] : [groqModelCache || GROQ_TEXT_MODEL]);
   for (const model of models) {
     const messages = [ // hoisted: the B177 model-not-found retry reuses it
       { role: 'system', content: system },

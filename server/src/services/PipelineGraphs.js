@@ -26,6 +26,7 @@ import { qaWebApp, qaScripted, gateVerdict, runReviewerPass, runSecurityPass, fi
 import { runFile } from './Runner.js';
 import { verifyAnswer } from './VerificationLoop.js';
 import { runSearchTeam } from './SearchAgent.js';
+import { isNonAnswerText } from './MemoryManager.js'; // B199 — a re-run's failure sentinel must never clobber the real draft
 import { WORKSPACE_DIR } from '../config.js';
 
 /** Append a durable failure entry (P7): reason + node + timestamp, capped. */
@@ -144,6 +145,7 @@ export async function runResearchVerifyGraph(seed) {
       run: async (state) => {
         const c = state.context;
         emit('log', { agent: 'Critic', message: '🔎 Verifying the answer against its sources (fact-check pass)...' });
+        try { emit('narration', { text: 'Let me fact-check my draft against those sources.' }); } catch (e) {}
         const verified = await verify({ query: c.query, draft: c.draft, sources: c.sources }).catch(() => null)
           || { verdict: 'verified', changed: false, text: c.draft, issues: [] };
         state.context.verification = { rounds: verified.rounds || 1, verdict: verified.verdict };
@@ -153,6 +155,7 @@ export async function runResearchVerifyGraph(seed) {
           recordFailure(state, 'research-verify', `unsupported claims: ${verified.issues.slice(0, 5).join(' | ')}`, { issues: verified.issues.slice(0, 5) });
           state.context.missingClaims = verified.issues.slice(0, 5);
           emit('log', { agent: 'Fact Checker', message: `↻ Re-entering research with ${verified.issues.length} specific missing claim(s) to fix.` });
+          try { emit('narration', { text: `The fact-check flagged ${verified.issues.length} claims — I'm re-verifying those specifically.` }); } catch (e) {}
           state.outcome = 'revise';
         } else {
           if (hasIssues) emit('log', { agent: 'Fact Checker', message: '⚠ Verification still flagged issues after retry — shipping the best-effort honest answer.' });
@@ -172,9 +175,17 @@ export async function runResearchVerifyGraph(seed) {
         const claims = (c.missingClaims || []).join(' | ');
         const effQuery = claims ? `${c.query}\n\n[Verification follow-up — verify each flagged claim with a real source: ${claims}]` : c.query;
         const team = await search(effQuery, emit, { context: c.thread || '' }).catch(() => null);
-        if (team && team.summary) {
+        // B199 — adopt the re-run ONLY when it produced a real answer. The
+        // re-entry synthesizer can honestly return "I could not find enough
+        // information…" — that sentinel used to REPLACE the existing real
+        // draft, throwing away minutes of verified work and shipping the
+        // failure to the user as the final answer. Keep the draft instead.
+        if (team && team.summary && !isNonAnswerText(team.summary)) {
           c.draft = team.summary;
           if (team.sources && team.sources.length) c.sources = team.sources.slice(0, 5);
+        } else if (team && team.summary) {
+          emit('log', { agent: 'Fact Checker', message: '⚠ The extra pass came back empty — shipping the best-effort draft with its caveats.' });
+          try { emit('narration', { text: 'The extra pass came back empty — I\u2019ll give you the best-effort answer with honest caveats.' }); } catch (e) {}
         }
         state.outcome = 'verify'; // loop back through the verifier (bounded by revisions < 1)
         return state;

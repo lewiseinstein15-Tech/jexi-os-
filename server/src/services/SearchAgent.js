@@ -236,8 +236,29 @@ function fallbackSummary(query, deep) {
   );
 }
 
-export async function synthesizeGrounded(query, deep, context = '') {
-  const sourceText = (deep || [])
+/**
+ * B199 — context budget for grounded synthesis. synthesizeGrounded used to
+ * pack the FULL deep-read text of every source into one prompt: a 10-source
+ * query hit 14,871 tokens while Groq's free/on-demand tier caps a request at
+ * 8,000 TPM → 413 "Request too large" → provider roulette → the model that
+ * finally answered got a truncated view and honestly replied "I could not
+ * find enough information". Sources are re-ranked before this point, so the
+ * BEST sources keep the most content and the tail is dropped, never the top.
+ */
+export function budgetSources(deep, { totalBudget = 18000, perSource = 3000 } = {}) {
+  const out = [];
+  let used = 0;
+  for (const s of deep || []) {
+    if (used >= totalBudget) break;
+    const content = String(s.content || '').slice(0, perSource);
+    used += content.length;
+    out.push({ ...s, content });
+  }
+  return out;
+}
+
+export async function synthesizeGrounded(query, deep, context = '', opts = {}) {
+  const sourceText = budgetSources(deep)
     .map((s, i) => `SOURCE [${i + 1}]: ${s.title}\nLink: ${s.link}\n${s.content}`)
     .join('\n\n---\n\n');
   const thread = context && String(context).trim()
@@ -258,7 +279,12 @@ export async function synthesizeGrounded(query, deep, context = '') {
 
   let summary;
   try {
-    summary = await generateContent(prompt, JEXI_SYSTEM_PROMPT, null, { temperature: 0.3 });
+    // B200 — live answer streaming: tokens flow to the chat as they are
+    // written (the client's B150 stream handler renders them live).
+    summary = await generateContent(prompt, JEXI_SYSTEM_PROMPT, null, {
+      temperature: 0.3,
+      ...(typeof opts.onToken === 'function' ? { onToken: opts.onToken } : {}),
+    });
   } catch (e) {
     summary = fallbackSummary(query, deep);
   }
@@ -287,6 +313,11 @@ export async function runSearchTeam(query, sendEvent, opts = {}) {
   // Conversation thread from earlier turns — lets the team resolve references
   // like "this course" / "the app" / "continue" (continuity pattern).
   const context = opts?.context || '';
+  // B200 — ARENA-STYLE NARRATION: JEXI's own first-person words about what
+  // she is doing, streamed live to the chat (the ActionFeed still shows the
+  // coworker status lines; narration is her voice telling the story).
+  const narrate = (text) => { try { sendEvent?.('narration', { text }); } catch (e) {} };
+  narrate(`I'm on it — let me break this question down first.`);
   // 1. Query Analyzer
   sendEvent?.('log', { agent: 'Query Analyzer', message: `🔎 Analyzing the best way to search: "${query}"` });
   const plan = await analyzeQuery(query, context);
@@ -296,12 +327,14 @@ export async function runSearchTeam(query, sendEvent, opts = {}) {
       ? `↗ ${plan.reason}: ${plan.subQueries.join('  |  ')}`
       : `→ ${plan.reason}.`,
   });
+  if (plan.complex && plan.subQueries?.length) narrate(`I've split it into ${plan.subQueries.length} focused searches — scanning the web now.`);
 
   // 2. Searcher (parallel across engines + sub-queries, with cache)
   const { merged } = await parallelSearch(plan.subQueries);
   const engineNames = [...new Set(merged.flatMap((m) => m.engines || [m.source]))];
   sendEvent?.('log', { agent: 'Searcher', message: `🔍 Whole-internet scan done — ${merged.length} sources from ${engineNames.length} engines (${engineNames.slice(0, 4).join(' · ')}${engineNames.length > 4 ? '…' : ''}).` });
   if (merged.length === 0) return { summary: '', sources: [] };
+  narrate(`I found ${merged.length} sources across ${engineNames.length} search engines.`);
 
   // 3. Re-ranker (relevance to the actual question, not just domain trust)
   const ranked = rankSources(query, merged);
@@ -313,6 +346,7 @@ export async function runSearchTeam(query, sendEvent, opts = {}) {
   sendEvent?.('log', { agent: 'Extractor', message: `✅ Extracted full text from ${deep.length} sources.` });
 
   if (deep.length === 0) return { summary: '', sources: [] };
+  narrate(`I finished reading — ${deep.length} pages gave me real content. Writing the answer now, with citations.`);
 
   // Quality gate: for a NON-academic question, only academic papers/PDFs means
   // the general engines failed (flaky/blocked) — let the orchestrator fall back
@@ -328,11 +362,15 @@ export async function runSearchTeam(query, sendEvent, opts = {}) {
 
   // 5. Synthesizer (grounded, cited)
   sendEvent?.('log', { agent: 'Synthesizer', message: '🧠 Synthesizing a cited answer from the sources...' });
-  let summary = await synthesizeGrounded(query, deep, context);
+  // B200 — the FIRST synthesis streams its tokens live (opts.onToken). The
+  // gap-filler re-synthesis below intentionally does NOT stream: appending a
+  // second answer to the same message would concatenate two texts.
+  let summary = await synthesizeGrounded(query, deep, context, { onToken: opts.onToken });
 
   // 5.5 Gap-filler — one bounded extra pass if the answer is thin
   if (await needsMore(deep, summary)) {
     sendEvent?.('log', { agent: 'Searcher', message: '↻ Coverage is thin — one more in-depth pass...' });
+    narrate(`My first draft looked thin — I'm doing one more in-depth pass.`);
     try {
       const extra = await searchOne(`${query} in-depth overview`);
       const extraRanked = rankSources(query, extra.results).slice(0, 2);

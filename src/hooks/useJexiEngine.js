@@ -54,6 +54,25 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
     if (data.type === 'log' || data.type === 'agent.log') {
       setLogs(prev => [...prev, { agent: data.agent || 'JEXI', message: data.message }]);
     }
+    // B200 — ARENA-STYLE NARRATION: JEXI's own first-person words about what
+    // she is doing, live. They attach to the streaming assistant message and
+    // render above the answer (NarrationFeed) — the running commentary the
+    // whole task long, not just a final dump.
+    else if (data.type === 'narration') {
+      const text = String(data.text || '');
+      if (text) {
+        setMessages(prev => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last && last.role === 'jexi' && last.streaming) {
+            next[next.length - 1] = { ...last, narrations: [...(last.narrations || []), text] };
+          } else {
+            next.push({ role: 'jexi', text: '', streaming: true, narrations: [text] });
+          }
+          return next;
+        });
+      }
+    }
     else if (data.type === 'think') {
       // B173 — reasoning deltas build the Think row on the streaming message
       const delta = String(data.text || '');

@@ -4,6 +4,7 @@ import { Send, Square, ImagePlus, X, Camera, Stethoscope, Plus, Copy, Check, Ref
 import TypedMessage from './TypedMessage';
 import ThinkRow from './ThinkRow'; // B173 — dsh ReasoningRow
 import ActionFeed from './ActionFeed'; // B184 — arena-style action timeline
+import NarrationFeed from './NarrationFeed'; // B200 — her live first-person commentary
 import OrbCore from './OrbCore'; // B192 — the presence orb (empty state)
 import Composer from './Composer'; // B195 — isolated, real-app input
 import MarkdownRenderer from './MarkdownRenderer';
@@ -240,6 +241,9 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
                       by={msg.by}
                     />
                   )}
+                  {/* B200 — her first-person running commentary, live while she
+                      works; collapses to "HOW I WORKED" once the answer lands. */}
+                  <NarrationFeed lines={msg.narrations} live={Boolean(msg.streaming)} />
                   {msg.streaming ? (
                     <div className="jx-streaming-text">
                       <MarkdownRenderer content={msg.text} size="text-[13px]" />

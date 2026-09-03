@@ -1213,3 +1213,20 @@ form.surface-float { flex-shrink: 0; }
 .shimmer-bar { position: relative; overflow: hidden; border-radius: 6px; height: 10px; background: rgba(255,255,255,.06); }
 .shimmer-bar::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.13), transparent); animation: jxshimmer 1.5s ease-in-out infinite; }
 @keyframes jxshimmer { 100% { transform: translateX(100%); } }
+
+/* ═══ B200 — ARENA-STYLE NARRATION (her first-person running commentary) ═══ */
+.jx-narration { margin: 0 0 10px; border: 1px solid var(--line); border-radius: 10px; background: rgba(124,77,255,.045); overflow: hidden; }
+.jx-narration-head { display: flex; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.jx-narration-badge { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: .14em; color: var(--amber, #ffb020); animation: jx-breathe 2.4s ease-in-out infinite; }
+.jx-narration-badge.done { color: var(--faint, #6b7280); animation: none; }
+.jx-narration-body { max-height: 190px; overflow-y: auto; padding: 8px 10px; }
+.jx-narration-line { display: flex; align-items: baseline; gap: 8px; padding: 2.5px 0; font-size: 12.5px; color: var(--muted, #9ca3af); }
+.jx-narration-line.now .jx-narration-text { color: var(--ink, #e5e7eb); }
+.jx-narration-dot { flex-shrink: 0; width: 5px; height: 5px; border-radius: 50%; background: var(--amber, #ffb020); opacity: .7; transform: translateY(-2px); }
+.jx-narration-line.now .jx-narration-dot { animation: jx-pingdot 1.1s ease-in-out infinite; }
+.jx-narration-text { font-style: italic; line-height: 1.5; overflow-wrap: anywhere; }
+.jx-narration-working { color: var(--faint, #6b7280); }
+.jx-narration-collapsed { display: flex; align-items: center; gap: 8px; padding: 7px 10px; cursor: pointer; list-style: none; user-select: none; }
+.jx-narration-collapsed::-webkit-details-marker { display: none; }
+.jx-narration-count { font-family: var(--mono); font-size: 10px; color: var(--faint, #6b7280); }
+.jx-narration[open] .jx-think-chev { transform: rotate(90deg); }

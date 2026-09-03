@@ -38,7 +38,7 @@ import { executionModel } from './src/services/Reachability.js';
 import { DesktopManager, ensureBrowser, browserStatus, restartBrowser } from './src/services/DesktopManager.js';
 import {
   addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory, saveMemory,
-  saveInternetKnowledge, saveCodingKnowledge, searchInternetKnowledge, searchCodingKnowledge,
+  saveInternetKnowledge, saveCodingKnowledge, searchInternetKnowledge, searchCodingKnowledge, purgeNonAnswerKnowledge,
   saveKnowledgeFile, searchKnowledge, getKnowledgeStructure, getKnowledgeStatus,
   hydrateFromRedis, isRedisActive, semanticRecall, backfillEmbeddings,
   resolveConversationalQuery,
@@ -126,6 +126,11 @@ try { writeBootProfile({ phase: 'B156', commit: process.env.RENDER_GIT_COMMIT ||
 globalThis.__jexiSessionConversations = SessionConversations;
 openSessionPersistence(path.join(DATA_DIR, 'sessions.sqlite')).catch((e) => recordError('boot', e.message));
 try { startGateway(); console.log('[Gateway] agent gateway started (jobs resume + 60s tick)'); } catch (e) { console.error('[Gateway] failed:', e.message); }
+
+// B199 — self-heal poisoned memory: failed-retrieval notices that were saved
+// as "learned knowledge" (and then instantly served as answers on repeat
+// asks) are purged once at boot.
+try { purgeNonAnswerKnowledge(); } catch (e) { console.error('[Memory] purge failed:', e.message); }
 
 // B188 — workspace TTL sweep on boot: finished projects clean themselves
 sweepWorkspace().then((r) => { if (r.cleared.length) console.log('[Workspace] swept:', r.cleared.join(', ')); }).catch(() => {});

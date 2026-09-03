@@ -97,11 +97,24 @@ const probes = [
   ['hello, how are you?', 'conversation'],
 ];
 let planMisses = 0;
+// B199: probe the deterministic cascade (_classifyRegex) directly — with API
+// keys loaded this process would otherwise take the live LLM path and the
+// section would flake on whichever provider answers.
 for (const [query, expected] of probes) {
-  const plan = await planner.analyzeIntent(query);
+  const plan = await planner._classifyRegex(query);
   if (plan.intent !== expected) { planMisses++; console.log(`    ✗ "${query}" → ${plan.intent}, expected ${expected}`); }
 }
 ok(planMisses === 0, `${probes.length} intent classifications correct (${planMisses} misses)`);
+
+// B199: a live-key LLM classification of study/research must DEFER to the
+// deterministic domain routing when a specialist team matches.
+{
+  const saved = planner._classifyLLM.bind(planner);
+  planner._classifyLLM = async () => ({ intent: 'study_topic', tasks: ['scholar'], reasoning: 'LLM said study', confidence: 0.9 });
+  const p = await planner.analyzeIntent('help me understand quantum entanglement');
+  planner._classifyLLM = saved;
+  ok(p.intent === 'domain:quantum-computing', `LLM study_topic defers to domain routing (${p.intent})`);
+}
 
 /* ------------------------------------------------------------------ */
 console.log('\n== Domain verification engine ==');
