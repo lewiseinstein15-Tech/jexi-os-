@@ -117,5 +117,15 @@ console.log('\n== 4. Live behavior ==');
   ok(`meta → “${coworkerName(meta.provider, meta.model)}” (Nemo expected)`, coworkerName(meta.provider, meta.model) === 'Nemo');
 }
 
+// B201 — fractions/scores/ratios in log lines are never model IDs: the
+// completeness log printed "pass: Tessa files" because 5/10 was masked.
+{
+  const { sanitizeStreamText: sst } = await import('./src/services/ModelCoworkers.js');
+  ok('5/10 survives masking', sst('completeness pass: 5/10 files') === 'completeness pass: 5/10 files');
+  ok('16/9 survives masking', sst('aspect 16/9 ok') === 'aspect 16/9 ok');
+  ok('unknown model ids are still masked', sst('vendorx/mystery-model wrote it') !== 'vendorx/mystery-model wrote it');
+  ok('unit numbers still survive', sst('took 26.8s at 12.5%') === 'took 26.8s at 12.5%');
+}
+
 console.log(`\n${failures === 0 ? '🎉 ALL B162 COWORKER-NAME CHECKS PASSED' : `💥 ${failures} FAILURES`}`);
 process.exit(failures === 0 ? 0 : 1);

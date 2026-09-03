@@ -83,6 +83,7 @@ import { taskManager } from './src/services/TaskManager.js';
 import { taskScheduler } from './src/services/TaskScheduler.js';
 import { PORT, WORKSPACE_DIR, DATA_DIR, SERVER_ROOT } from './src/config.js';
 import { persistFileBlocks } from './src/services/FileBlockWriter.js';
+import { continueDeliverable } from './src/services/DeliverableContinuation.js';
 import { resolveInside } from './src/services/PathSafety.js';
 import { mountSurface } from './src/routes/surface.js';
 import { goalEngine } from './src/services/GoalEngine.js';
@@ -1786,6 +1787,21 @@ app.post('/api/chat', async (req, res) => {
     emitMetric('chat.latencyMs', Date.now() - taskStart, { intent: plan.intent, ok: results.success });
     emitMetric('chat.agents', plan.steps?.length || 0, { intent: plan.intent });
     emitMetric('chat.gate.result', results.success ? 1 : 0, { intent: plan.intent });
+
+    // B201 — DELIVERABLE COMPLETENESS: a counted file deliverable that came
+    // up short (weak model stopped early / output cap) gets continuation
+    // passes BEFORE the answer ships — the summary grows to include the
+    // missing files and the FileBlockWriter persists them all. Never blocks
+    // the answer on failure.
+    if (results.success !== false && results.summary && String(results.summary).includes('```')) {
+      try {
+        const cont = await continueDeliverable({ query, summary: results.summary, sendEvent });
+        if (cont && cont.added && cont.added.length && cont.summary && cont.summary.length > String(results.summary).length) {
+          sendEvent('log', { agent: 'JEXI', message: `📚 completeness pass: ${cont.delivered}/${cont.requested} files (${cont.rounds} continuation round${cont.rounds === 1 ? '' : 's'}).` });
+          results.summary = cont.summary;
+        }
+      } catch { /* never block the answer */ }
+    }
 
     sendEvent('log', { agent: 'JEXI', message: '🎯 Mission complete — here is the result.' });
     // Contract: a successful done ALWAYS carries a readable summary — the

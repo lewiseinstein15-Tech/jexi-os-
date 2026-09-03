@@ -106,7 +106,7 @@ export function sanitizeStreamText(text) {
   // (a trailing sentence period is NOT part of a token), filenames and URLs
   // are kept, everything else gets a stable reserve name.
   out = out.replace(/[A-Za-z0-9][A-Za-z0-9_-]*(?:[.\/][A-Za-z0-9_-]+)+/g, (tok) => {
-    if (/^[0-9][0-9.,:%_-]*[a-zA-Z]{0,2}$/.test(tok)) return tok; // numbers with units (26.8s, 12.5%, 1.5mb) are NEVER model ids
+    if (/^[0-9][0-9.,:%_/-]*[a-zA-Z]{0,2}$/.test(tok)) return tok; // numbers with units/scores/fractions (26.8s, 12.5%, 5/10, 16/9) are NEVER model ids
     if (/\.(js|jsx|ts|tsx|mjs|cjs|json|md|markdown|css|scss|html|htm|py|rb|go|rs|java|kt|swift|c|cpp|h|sh|bash|yml|yaml|toml|xml|txt|csv|pdf|jpg|jpeg|png|gif|svg|webp|ico|env|lock|apk)\b/i.test(tok)) return tok; // filenames/configs stay
     const known = ALL_IDS.some((id) => tok.toLowerCase().includes(id));
     if (known) return tok; // already replaced above (names contain no / or .)
