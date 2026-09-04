@@ -199,9 +199,33 @@ export async function runEmployeeSession(p) {
   let totalBrowserActions = 0;
   const MAX_BROWSER_ROUNDS = 3;
   const persistedArtifactNames = new Set(); // B210 — artifacts persisted in-loop aren't re-persisted later
+  const persistedArtifactBytes = new Map(); // B212 — name → bytes: a later same-name artifact with DIFFERENT content is a fix-in-place
   const persistParsedArtifacts = (p) => {
     for (const artifact of (p && p.artifacts) || []) {
-      if (persistedArtifactNames.has(artifact.name)) continue;
+      const bytes = Buffer.byteLength(String(artifact?.content || ''));
+      if (persistedArtifactNames.has(artifact.name)) {
+        // B212 — fix-in-place: the employee rewrote a file she wrote in an
+        // earlier round of THIS session (e.g. after a real failing test run).
+        // The file MUST land on disk; identical content is a no-op.
+        if (persistedArtifactBytes.get(artifact.name) === bytes) continue;
+        const gate = checkToolPermission(employee, 'file-write');
+        if (!gate.allowed) {
+          emit('PERMISSION_DENIED', { agentId: employee.agentId, agentName: employee.displayName, summary: `File update skipped: ${gate.reason}.`, severity: 'warn' });
+          continue;
+        }
+        try {
+          const written = persistArtifact(task.workspaceId || task.id, artifact);
+          persistedArtifactBytes.set(artifact.name, written.bytes);
+          emit('FILE_UPDATED', {
+            agentId: employee.agentId, agentName: employee.displayName,
+            summary: `${employee.displayName} updated ${written.name} (${written.bytes} bytes) — fix-in-place.`,
+            data: { file: written.name, bytes: written.bytes },
+          });
+        } catch (e) {
+          emit('TOOL_FAILED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Artifact update failed (${String(e.message || e).slice(0, 80)}) — the earlier version stays.`, severity: 'warn' });
+        }
+        continue;
+      }
       const gate = checkToolPermission(employee, 'file-write');
       if (!gate.allowed) {
         emit('PERMISSION_DENIED', { agentId: employee.agentId, agentName: employee.displayName, summary: `File write skipped: ${gate.reason}.`, severity: 'warn' });
@@ -210,6 +234,7 @@ export async function runEmployeeSession(p) {
       try {
         const written = persistArtifact(task.workspaceId || task.id, artifact);
         persistedArtifactNames.add(artifact.name);
+        persistedArtifactBytes.set(artifact.name, written.bytes);
         emit('FILE_CREATED', { agentId: employee.agentId, agentName: employee.displayName, summary: `${employee.displayName} wrote ${written.name} (${written.bytes} bytes).`, data: { file: written.name, bytes: written.bytes } });
       } catch (e) {
         emit('TOOL_FAILED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Artifact write failed (${String(e.message || e).slice(0, 80)}) — it stays in the task record.`, severity: 'warn' });

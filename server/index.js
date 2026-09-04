@@ -1264,8 +1264,8 @@ app.get('/api/missions/:id/events', (req, res) => {
   res.json({ ok: true, missionId: m.id, state: m.state, events });
 });
 app.post('/api/missions/:id/control', (req, res) => {
-  const { action, itemId, reason } = req.body || {};
-  const r = missionRunner.control(req.params.id, action, { itemId, reason });
+  const { action, itemId, reason, text } = req.body || {};
+  const r = missionRunner.control(req.params.id, action, { itemId, reason, text });
   if (!r.ok) return res.status(400).json(r);
   res.json(r);
 });

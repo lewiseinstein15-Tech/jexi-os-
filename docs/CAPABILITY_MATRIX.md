@@ -44,20 +44,15 @@
 
 ## Honest limitations (not hidden, not converted to PASS)
 
-1. **Same-session file rewrite**: an artifact with the same name written in a
-   LATER round of the SAME session is skipped (B210 dedupe). Cross-item fixes
-   in the shared mission workspace work (proven in the long-horizon test);
-   a fix of a file written in the same session's earlier round would be
-   dropped. B212 candidate.
-2. **Production browser**: Atlas's remote-provider path routes through the
+1. ~~Same-session file rewrite~~ **CLOSED in B212**: a same-name artifact in a later round of the same session is a fix-in-place — rewritten on disk with a FILE_UPDATED event (proven by the employee's own `cat` reading the fixed content back); identical rewrites are no-ops. `test-b212.js`.
+2. ~~Mission UI~~ **CLOSED in B212**: `MissionsScreen` — mission control over the real API (list, snapshot, work graph, live event record, pause/resume/cancel/retry, steering, answers for gated missions). Real API only; the frontend invents nothing.
+3. **Production browser**: Atlas's remote-provider path routes through the
    same Playwright stack the coder routes use; if the Render container cannot
    launch Chromium, computer use is honestly COMPUTER_BLOCKED (never faked).
    The remote path is exercised by the existing browser suites; live
-   site-driving on production was not part of this build's E2E.
-3. **Worker pool**: parallel batches per mission loop (3), not a
+   site-driving on production is verified per-deploy (B212 live E2E).
+4. **Worker pool**: parallel batches per mission loop (3), not a
    cross-mission persistent pool; leases exist in the WorkGraph but one
-   runner process per deployment is the current model.
-4. **Mission UI**: chat + ComputerPanel + `/api/missions` JSON + snapshot
-   API; no dedicated graph-visualization screen yet.
+   runner process per deployment is the current model. Deferred by design.
 5. **Imagination lessons** are deterministic (real numbers, templated
-   wording) — no LLM narrative polish.
+   wording) — no LLM narrative polish. Deferred by design.

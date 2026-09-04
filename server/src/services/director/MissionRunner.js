@@ -456,10 +456,11 @@ Output ONLY JSON:
   answer(missionId, text) {
     const mission = loadMission(missionId);
     if (!mission || mission.state !== 'AWAITING_INPUT') return { ok: false, error: `mission is ${mission ? mission.state : 'missing'}` };
+    const answerText = String(text || '').trim();
+    if (!answerText) return { ok: false, error: 'empty answer — the mission stays blocked until a real answer arrives' };
     const graph = loadWorkGraph(mission.id);
     const itemId = mission.awaitingAnswerFor || mission.needsQuestion?.itemId || null;
     const planned = Boolean(graph && graph.items.length);
-    const answerText = String(text || '');
     if (graph && itemId) {
       const item = graph.get(itemId);
       if (item) {
@@ -882,11 +883,15 @@ Output ONLY JSON: {"affectedItemIds":["wi-..."],"newItems":[{"title":"...","deta
 
   /* ── user controls (API) ──────────────────────────────────────────── */
 
-  control(missionId, action, { itemId, reason } = {}) {
+  control(missionId, action, { itemId, reason, text } = {}) {
     const mission = loadMission(missionId);
     if (!mission) return { ok: false, error: 'mission not found' };
     const graph = loadWorkGraph(mission.id);
     switch (action) {
+      case 'answer':
+        // B212 — the API path for answering an AWAITING_INPUT mission
+        // (risk gate or a blocking NEEDS) without going through chat.
+        return this.answer(missionId, String(text || ''));
       case 'pause':
         if (mission.isTerminal) return { ok: false, error: `mission is ${mission.state}` };
         this._publish(mission, { type: 'MISSION_PAUSED', severity: 'warn', summary: `Paused — ${reason || 'by user'}. Completed work stays saved.` });
