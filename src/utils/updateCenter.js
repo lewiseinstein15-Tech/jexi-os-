@@ -30,7 +30,7 @@ const RELEASE_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 const PAGES_BASE = 'https://lewiseinstein15-Tech.github.io/jexi-os-';
 
 /** The installed build (baked at CI time), e.g. 'apk-build-216'. '' = web. */
-const INSTALLED_TAG = (import.meta.env.VITE_APP_VERSION || '').trim();
+export const INSTALLED_TAG = (import.meta.env.VITE_APP_VERSION || '').trim();
 
 const buildNumber = (tag) => {
   const m = String(tag || '').match(/(\d+)/);

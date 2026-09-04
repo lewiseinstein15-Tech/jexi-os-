@@ -122,7 +122,7 @@ export default function MemoryPanel({ memory }) {
   const statTiles = [
     { label: 'USER', value: userCount, color: '#A78BFA' },
     { label: 'INTERNET', value: internetCount, color: '#22D3EE' },
-    { label: 'CODING', value: codingCount, color: '#00FF9D' },
+    { label: 'CODING', value: codingCount, color: '#00D26A' },
     { label: 'CHAT', value: chatCount, color: '#FBBF24' },
   ];
 
@@ -235,10 +235,10 @@ export default function MemoryPanel({ memory }) {
           </Accordion>
 
           {/* Coding knowledge */}
-          <Accordion icon={Code} title="CODING KNOWLEDGE" count={codingCount} color="#00FF9D">
+          <Accordion icon={Code} title="CODING KNOWLEDGE" count={codingCount} color="#00D26A">
             <div className="space-y-1 max-h-40 overflow-y-auto">
               {(mem.codingKnowledge || []).slice(-5).reverse().map((item, i) => (
-                <EntryRow key={`c-${i}`} text={item.topic} color="#00FF9D" index={(mem.codingKnowledge || []).length - 1 - i} kind="codingKnowledge" onDelete={deleteEntry} meta={`${item.language} • ${timeAgo(item.date)}`} />
+                <EntryRow key={`c-${i}`} text={item.topic} color="#00D26A" index={(mem.codingKnowledge || []).length - 1 - i} kind="codingKnowledge" onDelete={deleteEntry} meta={`${item.language} • ${timeAgo(item.date)}`} />
               ))}
               {codingCount === 0 && <p className="text-[9px] text-text-tertiary italic">No coding solutions saved yet.</p>}
             </div>

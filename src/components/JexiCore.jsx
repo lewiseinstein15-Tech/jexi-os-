@@ -20,7 +20,7 @@ const AGENT_COLOR = {
   Product: '#FBBF24',
   Designer: '#F472B6',
   Engineer: '#A78BFA',
-  Coder: '#00FF9D',
+  Coder: '#00D26A',
   'QA Lead': '#FBBF24',
   Reviewer: '#A1A1AA',
   'Security Officer': '#FB7185',
@@ -55,7 +55,7 @@ const AGENT_COLOR = {
   SelfDiagnose: '#FB7185',
   Books: '#FBBF24',
   'Computer Use Agent': '#34D399',
-  JEXI: '#00FF9D',
+  JEXI: '#00D26A',
 };
 const FALLBACK_COLOR = '#A1A1AA';
 
@@ -174,7 +174,7 @@ export default function JexiCore({ size = 32, roster = [], activeAgent = null, r
         ) : (
           <span
             className="rounded-full"
-            style={{ width: Math.max(3, size * 0.1), height: Math.max(3, size * 0.1), background: '#00FF9D', boxShadow: '0 0 6px rgba(0,255,157,0.6)' }}
+            style={{ width: Math.max(3, size * 0.1), height: Math.max(3, size * 0.1), background: '#00D26A', boxShadow: '0 0 6px rgba(0,210,106,0.5)' }}
           />
         )}
       </div>

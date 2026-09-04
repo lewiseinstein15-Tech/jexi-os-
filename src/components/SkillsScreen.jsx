@@ -5,21 +5,21 @@ import { getBackendUrl, jexiFetch } from '../utils/helpers';
 
 // Same category accent system as the roster panel (live categories, stable hash).
 const CATEGORY_ACCENTS = {
-  Core: '#00FF9D', Math: '#A78BFA', Science: '#22D3EE', Research: '#22D3EE',
+  Core: '#00D26A', Math: '#A78BFA', Science: '#22D3EE', Research: '#22D3EE',
   Coding: '#A78BFA', Data: '#22D3EE', Memory: '#F472B6', Writing: '#FBBF24',
   Teaching: '#FBBF24', Life: '#FB7185', Agent: '#A1A1AA', Product: '#FBBF24',
   Design: '#F472B6', Medicine: '#FB7185', Quant: '#FBBF24', Engineering: '#A78BFA',
-  AI: '#00FF9D', Knowledge: '#34D399', Quality: '#FB7185', Safety: '#FBBF24',
+  AI: '#00D26A', Knowledge: '#34D399', Quality: '#FB7185', Safety: '#FBBF24',
   Security: '#A78BFA', Creative: '#F472B6', Media: '#FBBF24', Business: '#34D399',
-  Education: '#22D3EE', Marketing: '#FBBF24', Productivity: '#00FF9D',
+  Education: '#22D3EE', Marketing: '#FBBF24', Productivity: '#00D26A',
   Platform: '#A1A1AA', News: '#34D399', Perception: '#F472B6', DevOps: '#22D3EE',
 };
-const ACCENT_PALETTE = ['#00FF9D', '#22D3EE', '#34D399', '#F472B6', '#A78BFA', '#FBBF24', '#FB7185', '#A1A1AA'];
+const ACCENT_PALETTE = ['#00D26A', '#22D3EE', '#34D399', '#F472B6', '#A78BFA', '#FBBF24', '#FB7185', '#A1A1AA'];
 const catAccent = (c) => CATEGORY_ACCENTS[c] || ACCENT_PALETTE[(c || '').length % ACCENT_PALETTE.length];
 
 // B98 — DSH-style source labels + rank colors for auto-discovered skills.
 const SOURCE_META = {
-  'project-dsh': { label: 'PROJECT', color: '#00FF9D', rank: 100 },
+  'project-dsh': { label: 'PROJECT', color: '#00D26A', rank: 100 },
   'project-agents': { label: 'AGENTS', color: '#22D3EE', rank: 200 },
   custom: { label: 'PLUGIN', color: '#A78BFA', rank: 300 },
   'user-dsh': { label: 'USER', color: '#FBBF24', rank: 400 },
@@ -369,7 +369,7 @@ export default function SkillsScreen({ onUseSkill }) {
           {/* discovery explainer */}
           <div className="rounded-lg border border-hairline bg-surface-2/60 px-3 py-2">
             <p className="text-[9px] text-text-tertiary leading-snug">
-              <span className="font-bold text-text-secondary">AUTO-DISCOVERED SKILLS</span> — scanned from ranked roots exactly like DeepSeek Harness: <span style={{ color: '#00FF9D' }}>project .jexi/skills (100)</span> · <span style={{ color: '#22D3EE' }}>.agents/skills (200)</span> · <span style={{ color: '#A78BFA' }}>plugins (300)</span> · <span style={{ color: '#FBBF24' }}>user (400)</span> · <span style={{ color: '#A1A1AA' }}>bundled (600)</span>. Catalog is metadata-only — the full body loads only when used (progressive disclosure). Watchers pick up new skills instantly.
+              <span className="font-bold text-text-secondary">AUTO-DISCOVERED SKILLS</span> — scanned from ranked roots exactly like DeepSeek Harness: <span style={{ color: '#00D26A' }}>project .jexi/skills (100)</span> · <span style={{ color: '#22D3EE' }}>.agents/skills (200)</span> · <span style={{ color: '#A78BFA' }}>plugins (300)</span> · <span style={{ color: '#FBBF24' }}>user (400)</span> · <span style={{ color: '#A1A1AA' }}>bundled (600)</span>. Catalog is metadata-only — the full body loads only when used (progressive disclosure). Watchers pick up new skills instantly.
             </p>
             {disc?.warnings?.length > 0 && (
               <p className="mt-1 text-[8px] text-status-warn leading-snug line-clamp-2">

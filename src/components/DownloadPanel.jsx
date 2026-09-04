@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import {
   Smartphone, Download, ShieldCheck, Zap, CheckCircle2, PlayCircle, Github, Sparkles, Wifi, Star, RefreshCw, Loader2, AlertTriangle
 } from 'lucide-react';
-import { checkForUpdate, downloadAndInstall, APK_URL } from '../utils/updateCenter';
+import { checkForUpdate, downloadAndInstall, APK_URL, isNativeAndroid, INSTALLED_TAG } from '../utils/updateCenter';
 
 const RELEASES_URL = 'https://github.com/lewiseinstein15-Tech/jexi-os-/releases';
 
@@ -11,11 +11,59 @@ const fadeUp = {
   animate: { opacity: 1, y: 0 },
 };
 
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
+/**
+ * B221 — repair: this panel was orphaned mid-refactor and referenced
+ * `installer`/`updater` objects that no longer existed. Rebuilt from the
+ * real updateCenter primitives (the same lanes UpdateBanner uses).
+ */
 export default function DownloadPanel() {
-  const [phase, setPhase] = useState('idle');
-  const [progress, setProgress] = useState(0);
+  const [phase, setPhase] = useState('idle'); // idle | downloading | installing | done | error
+  const [progress, setProgress] = useState(-1);
+  const [instErr, setInstErr] = useState('');
+  const [latest, setLatest] = useState(null);
+  const [checking, setChecking] = useState(false);
+  const [updErr, setUpdErr] = useState('');
+
+  const checkNow = useCallback(async () => {
+    setChecking(true); setUpdErr('');
+    try {
+      const r = await checkForUpdate();
+      const num = r ? Number(String(r.tag).match(/(\d+)(?!.*\d)/)?.[1] || 0) : 0;
+      setLatest(r ? { ...r, number: num, date: '' } : null);
+    } catch (e) { setUpdErr(String(e?.message || e)); }
+    setChecking(false);
+  }, []);
+
+  useEffect(() => { checkNow(); }, [checkNow]);
+
+  const start = useCallback(async () => {
+    setInstErr(''); setProgress(-1);
+    if (!isNativeAndroid()) { window.open(APK_URL, '_blank', 'noopener'); return; }
+    setPhase('downloading');
+    const r = await downloadAndInstall((p) => {
+      if (p >= 100) { setProgress(-1); setPhase('installing'); }
+      else setProgress(p);
+    });
+    if (r && r.ok) setPhase('done');
+    else {
+      setPhase('error');
+      setInstErr((r && r.error) || 'download failed');
+      if (r && r.fallbackUrl) window.open(r.fallbackUrl, '_blank', 'noopener');
+    }
+  }, []);
+
+  const installer = {
+    isAndroid: isNativeAndroid(), phase, progress,
+    busy: phase === 'downloading' || phase === 'installing',
+    error: instErr, start,
+  };
+  const updater = {
+    updateAvailable: !!(latest && latest.available), latest,
+    checkNow, checking, error: updErr,
+    enabled: !!INSTALLED_TAG, installedTag: INSTALLED_TAG || null,
+  };
 
   const buttonLabel = () => {
     const base = updater.updateAvailable ? `UPDATE TO BUILD #${updater.latest.number}` : 'DOWNLOAD JEXI OS APK';
@@ -64,7 +112,7 @@ export default function DownloadPanel() {
         >
           <div className="absolute inset-2 rounded-full border-2 border-transparent"
             style={{ borderTopColor: '#22d3ee', borderRightColor: '#a78bfa', borderBottomColor: '#f472b6' }} />
-          <Smartphone className="w-7 h-7 text-[#00FF9D]" />
+          <Smartphone className="w-7 h-7 text-brand" />
         </motion.div>
 
         <h2 className="text-lg font-bold text-text-primary tracking-tight">
@@ -184,7 +232,7 @@ export default function DownloadPanel() {
           <button
             onClick={updater.checkNow}
             disabled={updater.checking}
-            className="ml-auto text-gray-500 hover:text-[#00FF9D] transition-colors p-1 disabled:opacity-50"
+            className="ml-auto text-gray-500 hover:text-brand transition-colors p-1 disabled:opacity-50"
             title="Check for updates now"
           >
             <RefreshCw className={`w-3 h-3 ${updater.checking ? 'animate-spin' : ''}`} />
@@ -240,8 +288,8 @@ export default function DownloadPanel() {
       {/* Install steps */}
       <motion.div {...fadeUp} transition={{ delay: 0.08 }} className="space-y-2.5">
         <div className="flex items-center gap-2 px-1">
-          <Zap className="w-3.5 h-3.5 text-[#00FF9D]" />
-          <h3 className="text-[11px] font-bold text-[#00FF9D] tracking-wider">INSTALL IN 3 TAPS</h3>
+          <Zap className="w-3.5 h-3.5 text-brand" />
+          <h3 className="text-[11px] font-bold text-brand tracking-wider">INSTALL IN 3 TAPS</h3>
         </div>
         {steps.map(({ icon: Icon, title, text }, i) => (
           <motion.div
@@ -252,10 +300,10 @@ export default function DownloadPanel() {
             className="glass rounded-xl p-3.5 flex gap-3 items-start"
           >
             <div className="relative flex-shrink-0">
-              <div className="w-9 h-9 rounded-xl bg-[#00FF9D]/10 border border-[#00FF9D]/20 flex items-center justify-center">
-                <Icon className="w-4 h-4 text-[#00FF9D]" />
+              <div className="w-9 h-9 rounded-xl bg-brand-dim/50 border border-brand-line/60 flex items-center justify-center">
+                <Icon className="w-4 h-4 text-brand" />
               </div>
-              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#00FF9D] text-black text-[8px] font-black flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#00D26A] text-black text-[8px] font-black flex items-center justify-center">
                 {i + 1}
               </span>
             </div>
@@ -283,13 +331,13 @@ export default function DownloadPanel() {
           href={RELEASES_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 glass rounded-xl p-3 flex items-center justify-center gap-2 hover:border-[#00FF9D]/40 transition-colors"
+          className="flex-1 glass rounded-xl p-3 flex items-center justify-center gap-2 hover:border-brand-line transition-colors"
         >
           <Github className="w-3.5 h-3.5 text-gray-300" />
           <span className="text-[9px] font-bold text-gray-300">ALL BUILD VERSIONS</span>
         </a>
         <div className="flex-1 glass rounded-xl p-3 flex items-center justify-center gap-2">
-          <CheckCircle2 className="w-3.5 h-3.5 text-[#00FF9D]" />
+          <CheckCircle2 className="w-3.5 h-3.5 text-brand" />
           <span className="text-[9px] font-bold text-gray-300">BUILT BY GITHUB ACTIONS</span>
         </div>
       </motion.div>

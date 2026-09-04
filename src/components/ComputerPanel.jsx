@@ -48,7 +48,7 @@ export default function ComputerPanel({ computer, live = false }) {
       }}>
         <span style={{ fontSize: 13 }}>🖥️</span>
         <span style={{
-          fontSize: 11, fontWeight: 600, letterSpacing: '.04em', color: '#00FF9D',
+          fontSize: 11, fontWeight: 600, letterSpacing: '.04em', color: '#00D26A',
           minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           COMPUTER USE — {last?.agentName || 'Atlas'}

@@ -7,6 +7,9 @@ import ChatWindow from './components/ChatWindow';
 import HistoryView from './components/HistoryView';
 import AgentsScreen from './components/AgentsScreen'; // B209 — the Team view is reachable again (orphaned since the Orbit redesign)
 import WorkshopView from './components/WorkshopView';
+import MemoryView from './components/MemoryView'; // B221 — spec screen C: memory bank
+import KnowledgePanel from './components/KnowledgePanel'; // B221 — spec screen D: books library
+import DownloadPanel from './components/DownloadPanel'; // B221 — spec screen F: app installer
 import MissionsScreen from './components/MissionsScreen'; // B212 — mission control over the real API
 import SettingsView from './components/SettingsView';
 import UpdateBanner from './components/UpdateBanner';
@@ -23,6 +26,9 @@ const VIEWS = {
   agents: { label: 'Team', icon: 'agents' },
   missions: { label: 'Missions', icon: 'missions' },
   workshop: { label: 'Workshop', icon: 'workshop' },
+  memory: { label: 'Memory', icon: 'memory' }, // B221 — spec C
+  books: { label: 'Books', icon: 'books' }, // B221 — spec D
+  app: { label: 'Get the app', icon: 'app' }, // B221 — spec F
   settings: { label: 'Settings', icon: 'settings' },
 };
 
@@ -46,6 +52,12 @@ function MenuIcon({ name }) {
       );
     case 'workshop':
       return <svg {...common} strokeWidth="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>;
+    case 'memory':
+      return <svg {...common} strokeWidth="1.8"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" /><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3" /></svg>;
+    case 'books':
+      return <svg {...common} strokeWidth="1.8"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg>;
+    case 'app':
+      return <svg {...common} strokeWidth="1.8"><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M12 18h.01" /></svg>;
     default:
       return <svg {...common} strokeWidth="1.8"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>;
   }
@@ -266,6 +278,33 @@ export default function App() {
         <section className={`jx-view${view === 'workshop' ? ' show' : ''}`}>
           <div className="jx-main">
             <WorkshopView />
+          </div>
+        </section>
+
+        {/* B221 — spec screen C: the memory bank, alive from the brain */}
+        <section className={`jx-view${view === 'memory' ? ' show' : ''}`}>
+          <div className="jx-main">
+            <MemoryView />
+          </div>
+        </section>
+
+        {/* B221 — spec screen D: the books JEXI answers from */}
+        <section className={`jx-view${view === 'books' ? ' show' : ''}`}>
+          <div className="jx-main">
+            <div className="jx-scroll">
+              <div className="jx-view-inner">
+                <div className="jx-vtitle">Books</div>
+                <div className="jx-vsub">The library JEXI answers from — add PDFs, TXT and MD, she learns them.</div>
+                <KnowledgePanel />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* B221 — spec screen F: install on the phone */}
+        <section className={`jx-view${view === 'app' ? ' show' : ''}`}>
+          <div className="jx-main">
+            <DownloadPanel />
           </div>
         </section>
 

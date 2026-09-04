@@ -178,7 +178,7 @@ export default function ConnectorsScreen() {
                     className="flex-1 min-w-[90px] bg-surface-2 text-text-primary border border-hairline rounded-md px-2 py-1.5 text-[8px] font-mono focus:outline-none focus:border-brand-line"
                   />
                 ))}
-                <button onClick={() => sendTest(c.name)} disabled={isBusy} className="bg-[#00FF9D]/15 border border-[#00FF9D]/30 text-[#00FF9D] rounded-md px-2.5 py-1.5 text-[8px] font-black tracking-wide disabled:opacity-50 flex items-center gap-1">
+                <button onClick={() => sendTest(c.name)} disabled={isBusy} className="bg-brand-dim border border-brand-line text-brand rounded-md px-2.5 py-1.5 text-[8px] font-black tracking-wide disabled:opacity-50 flex items-center gap-1">
                   <Send className="w-2.5 h-2.5" /> SEND
                 </button>
               </div>

@@ -8,16 +8,16 @@ import { coreColor } from './JexiCore';
 // category (categories come from the live backend skill registry, never a
 // hardcoded list, so new catalog categories always render).
 const CATEGORY_ACCENTS = {
-  Core: '#00FF9D', Research: '#22D3EE', News: '#34D399', Memory: '#F472B6',
+  Core: '#00D26A', Research: '#22D3EE', News: '#34D399', Memory: '#F472B6',
   Perception: '#F472B6', Coding: '#A78BFA', DevOps: '#22D3EE', Data: '#22D3EE',
   Writing: '#FBBF24', Teaching: '#FBBF24', Life: '#FB7185', Agent: '#A1A1AA',
   Product: '#FBBF24', Design: '#F472B6', Math: '#A78BFA', Science: '#22D3EE',
-  Medicine: '#FB7185', Quant: '#FBBF24', Engineering: '#A78BFA', AI: '#00FF9D',
+  Medicine: '#FB7185', Quant: '#FBBF24', Engineering: '#A78BFA', AI: '#00D26A',
   Knowledge: '#34D399', Quality: '#FB7185', Safety: '#FBBF24', Security: '#A78BFA',
   Creative: '#F472B6', Media: '#FBBF24', Business: '#34D399', Education: '#22D3EE',
-  Marketing: '#FBBF24', Productivity: '#00FF9D', Platform: '#A1A1AA',
+  Marketing: '#FBBF24', Productivity: '#00D26A', Platform: '#A1A1AA',
 };
-const ACCENT_PALETTE = ['#00FF9D', '#22D3EE', '#34D399', '#F472B6', '#A78BFA', '#FBBF24', '#FB7185', '#A1A1AA'];
+const ACCENT_PALETTE = ['#00D26A', '#22D3EE', '#34D399', '#F472B6', '#A78BFA', '#FBBF24', '#FB7185', '#A1A1AA'];
 const catAccent = (c) => CATEGORY_ACCENTS[c] || ACCENT_PALETTE[(c || '').length % ACCENT_PALETTE.length];
 
 export default function RosterPanel() {
