@@ -221,20 +221,23 @@ fixes came out of this test: mission-scoped workspaces (items share
 **Test totals (all green, all real execution):** B208 89 · B209 92 · B210 64
 · B211 spine 111 · B2 intelligence 74 · B3 computer 57 · B4 autonomy 53
 (long-horizon 14, failure-injection 17, backend-restart 11,
-browser-disconnect 11). Director lane total: **540**; B211 alone: **295**.
+browser-disconnect 11). Director lane total at B211 close: **540** (B211 alone: **295**; now 588 after B212+B213 — see `docs/CAPABILITY_MATRIX.md`, the living truth table).
 CI: 5/5 workflows green on every B211 commit. Render: deploys live and
 verified via API after B2 (03:14Z) and B3 (03:55Z).
 
 **Known limitations (BLOCKED/deferred — never converted to PASS):**
-1. Same-session same-name artifact rewrites are skipped (B210 dedupe);
-   cross-item fixes work, in-session rewrites are a B212 candidate.
-2. Atlas on production depends on the Render container's Chromium; if it
-   cannot launch, computer use is honestly COMPUTER_BLOCKED. Live
-   production site-driving was not E2E'd in this build (local/remote/mock
-   paths covered by suites).
+1. ~~Same-session same-name artifact rewrites~~ CLOSED in B212 (FILE_UPDATED
+   fix-in-place, zero-trust `cat` proof).
+2. ~~Live production site-driving~~ CLOSED in B212 (live E2E, twice; the
+   prod slim image ships no Chromium by design — 512MB hosts — and computer
+   use now blocks immediately with the true reason instead of burning dead
+   actions). Real browser driving on prod needs a bigger plan / full image.
 3. Worker pool is per-mission batches (3 parallel), not a cross-mission
-   persistent pool; single runner process per deployment.
-4. No dedicated graph-visualization screen (chat + ComputerPanel +
-   `/api/missions` JSON today).
+   persistent pool; single runner process per deployment. Deferred by design.
+4. ~~No dedicated graph-visualization screen~~ CLOSED in B212 (MissionsScreen:
+   list, work graph, live events, controls, answers, steering — real API only).
 5. Imagination deviation lessons are deterministic templates from real
-   numbers (no LLM narrative).
+   numbers (no LLM narrative). Deferred by design.
+6. Employee method-fabrication (found live in the B212 E2E) CLOSED in B213:
+   deterministic browser-provenance gate + evidence-grounded verification.
+   Residual: non-browser method claims rely on the grounded rubric.
