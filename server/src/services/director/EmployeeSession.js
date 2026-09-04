@@ -192,6 +192,8 @@ export async function runEmployeeSession(p) {
   // redirect instruction (bounded: one redirect per assignment).
   const userPrompt = buildUserPrompt(brief, toolContext);
   let parsed;
+  let commandRounds = 0; // B210 — command-loop state (visible to the RESULT message)
+  let totalCommandsExecuted = 0;
   const persistedArtifactNames = new Set(); // B210 — artifacts persisted in-loop aren't re-persisted later
   const persistParsedArtifacts = (p) => {
     for (const artifact of (p && p.artifacts) || []) {
@@ -212,7 +214,6 @@ export async function runEmployeeSession(p) {
   };
   try {
     let commandContext = '';
-    let commandRounds = 0;
     // B210 — the COMMAND LOOP: an employee with EXECUTE permission may put
     // ```run blocks in her output. Each round: her artifacts land in the task
     // workspace FIRST (so the scripts exist), the commands REALLY execute
@@ -257,6 +258,7 @@ export async function runEmployeeSession(p) {
           summary: `${employee.displayName} runs \`${cmdLabel}\`${asTest ? ' (tests)' : ''}.`,
           data: { command: cmd, round: commandRounds },
         });
+        totalCommandsExecuted++;
         const r = await runEmployeeCommand({ taskId: task.id, command: cmd });
         const evtType = asTest
           ? (r.ok ? 'TEST_COMPLETED' : 'TEST_FAILED')
@@ -339,7 +341,7 @@ export async function runEmployeeSession(p) {
   emit('TASK_COMPLETED', {
     agentId: employee.agentId, agentName: employee.displayName,
     summary: `${employee.displayName} delivered: ${subtask.title}`,
-    data: { subtaskId: subtask.id, ms, confidence: parsed.confidence, artifacts: parsed.artifacts.length },
+    data: { subtaskId: subtask.id, ms, confidence: parsed.confidence, artifacts: parsed.artifacts.length, commandsExecuted: commandRounds > 0 ? totalCommandsExecuted : 0 },
   });
   return { message: resultMessage, parsed, ms };
 }

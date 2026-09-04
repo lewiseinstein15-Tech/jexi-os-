@@ -25,6 +25,8 @@
 import { DirectorTask, teamEvent } from './TaskState.js';
 import { TaskMailbox, message, mailToActivityLine } from './AgentMail.js';
 import { rankEmployees, selectEmployee, getEmployee, appendEmployeeHistory } from './Employees.js'; // B209 — history rides results
+import { runEmployeeCommand } from './CommandRunner.js'; // B210 — the execution backstop
+import { checkToolPermission } from './Permissions.js'; // B210 — executor check
 import { telemetry } from './Telemetry.js';
 import { runEmployeeSession, assembleBrief } from './EmployeeSession.js';
 import { verifyDeliverable, acceptanceGates } from './Verifier.js';
@@ -444,6 +446,30 @@ export class Director {
       },
     });
     for (const artifact of msg.artifacts || []) task.addArtifact(artifact);
+    // B210 — EXECUTION BACKSTOP (deterministic): the assignment wanted real
+    // execution, the employee is an executor, a runnable artifact exists —
+    // but she never ran it (free lanes often describe "expected output"
+    // instead of running). JEXI runs it herself, transparently, and the
+    // real output is appended to the result. Never a fabricated "executed".
+    try {
+      const stText = `${subtask.title} ${subtask.details} ${subtask.expectedOutput || ''}`;
+      const wantsExecution = /\b(run|runs|ran|execute|executes|executed|execution|test|tests|testing)\b/i.test(stText) && /\b(script|scripts|code|program|node|python|javascript|js)\b/i.test(stText);
+      const runnable = (msg.artifacts || []).find((a) => /\.(js|mjs|cjs|py)$/i.test(String(a.name || '')));
+      const alreadyRan = (msg.data?.commandsExecuted || 0) > 0;
+      if (wantsExecution && runnable && !alreadyRan && checkToolPermission(employee, 'run-command').allowed) {
+        const cmd = String(runnable.name || '').toLowerCase().endsWith('.py') ? `python3 ${runnable.name}` : `node ${runnable.name}`;
+        emit({ type: 'COMMAND_STARTED', agentId: employee.agentId, agentName: employee.displayName, summary: `${employee.displayName} didn't run her script — I'm running it myself to get the real output.`, data: { command: cmd, initiator: 'supervisor' } });
+        const r = await runEmployeeCommand({ taskId: task.id, command: cmd });
+        emit({
+          type: r.ok ? 'COMMAND_COMPLETED' : 'COMMAND_FAILED',
+          agentId: employee.agentId, agentName: employee.displayName,
+          summary: `I ran ${cmd} → exit ${r.exitCode} in ${r.ms}ms${r.ok ? '' : ' — the script failed; the report says so plainly'}.`,
+          severity: r.ok ? 'info' : 'warn',
+          data: { command: cmd, exitCode: r.exitCode, ms: r.ms, bytes: r.output.length, initiator: 'supervisor' },
+        });
+        msg.content = `${String(msg.content || '')}\n\n---\n**Real execution (run by JEXI, not simulated):** \`${cmd}\` → exit ${r.exitCode}${r.timedOut ? ' (timed out)' : ''}\n\n\`\`\`\n${String(r.output || '(no output)').slice(0, 2000)}\n\`\`\``;
+      }
+    } catch { /* the backstop never breaks the assignment */ }
     // B209 — per-employee history (both wins and losses, real record)
     try {
       appendEmployeeHistory(employee.agentId, {

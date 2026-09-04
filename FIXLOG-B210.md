@@ -49,3 +49,19 @@ Forge's system prompt now includes the command briefing (CommonJS, allowed binar
 - `python3` may not exist on every deploy target (the Render image is Node-based). When it's absent the command fails honestly with a COMMAND_FAILED the employee can see and adapt to (deliver JS instead) — availability is probed by reality, not assumed.
 - The allowlist is deliberately tiny. Growing it is a decision, not an accident: every addition widens what employee-generated code can touch.
 - `npm test`/`npm install` stay blocked on purpose: `npm run <script>` executes arbitrary script strings — that's a shell by another name.
+
+---
+
+## Addendum: the honesty war (three live E2E iterations)
+
+Getting Forge to *actually execute* took three production rounds — each found a real gap:
+
+**Round 1** — the interpreter split "Execute and Capture Output" into a separate subtask for **Atlas** (who cannot execute). Nobody ran anything, yet the final answer claimed "Execution Time: 0.04ms, Node.js v20.12.2, tests passed" — **fabricated**. Fixes: interpreter rule (execution stays inside the code subtask), employee honesty rule (never claim a command ran), and **Verifier Gate 1.5** — a deliverable that claims execution (timings/exit codes/test results) with no real `COMMAND_*`/`TEST_*` event in the task record FAILS verification.
+
+**Round 2** — the interpreter still handed "Code and Test Script" to Atlas (code-capable *on paper*). Prompt compliance isn't a control. Fixes (deterministic): `rankEmployees` gained a `requireTool` constraint — exec-mention subtasks can only be staffed by an employee who actually has `run-command`; the executor is never excluded by prior use (a design subtask must not steal Forge from the build-and-run subtask); `composeReport` now states the REAL commands that ran (or an explicit "NONE — do not present output as executed").
+
+**Round 3** — Forge got the whole assignment, wrote `primes.js`… and described *expected* output instead of running it (free-lane models skip tool steps). Fix: the **execution backstop** — if the assignment wanted execution, a runnable artifact exists, the employee is an executor, and nothing ran, JEXI runs it herself (`COMMAND_STARTED` with `initiator: 'supervisor'`, transparent summary "I'm running it myself") and appends the real exit code + output to the result. Never a fabricated "executed" — and never a silent skip either.
+
+Also fixed en route: a scope bug (`commandRounds` referenced outside its `try`) caught by the B209 regression suite before it ever shipped.
+
+**Tests now: 64** (sections 7–9 cover the fabrication gate, the deterministic executor routing with the exact live failure shape, and the backstop's three paths). Full suite SUITE_EXIT=0; B209 92/92; B208 89/89.

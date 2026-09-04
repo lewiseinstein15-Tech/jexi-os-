@@ -46,7 +46,7 @@ class FakeLlm {
     return r;
   }
   async verify() { this.calls.verify++; return this.verifyScript; }
-  async report() { this.calls.report++; return this.reportScript; }
+  async report(a) { this.calls.report++; this.reportCalls = this.reportCalls || []; this.reportCalls.push({ user: a?.user || '' }); return this.reportScript; }
   async review() { return { redirect: false, reason: '', instruction: '' }; }
 }
 
@@ -321,6 +321,43 @@ console.log('\n[8] Exec-mention subtasks are CODE subtasks — no prompt-hoping'
   check('Atlas no longer receives the code-and-execute subtask', selected.every((e) => e.agentId === 'forge'));
   // composeReport got the real command facts (the report prompt includes them)
   check('report context includes the real command list or the NONE warning', h.llm.employeeCalls.length >= 0);
+}
+
+/* ═══════════════ 9. the execution backstop (deterministic) ══════════════ */
+console.log('\n[9] The backstop — JEXI runs it herself when nobody did');
+{
+  // the exact live failure: Forge writes primes.js, describes "expected
+  // output", never emits a run block. The boss runs it — transparently.
+  const h = harness({
+    employeeScript: () => ['## REPORT', 'Wrote the script.', '', '## DELIVERABLE', 'primes.js below; expected output [2,3,5,7,11,13,17,19,23,29].', '', '```js primes.js', 'console.log([2,3,5,7,11,13,17,19,23,29].join(","));', '```', '', '## CONFIDENCE', 'medium'].join(NL),
+  });
+  const r = await runTurn(h);
+  const started = h.events.find((e) => e.type === 'COMMAND_STARTED');
+  const completedEv = h.events.find((e) => e.type === 'COMMAND_COMPLETED');
+  check('the backstop fired (COMMAND_STARTED, initiator: supervisor)', started?.data?.initiator === 'supervisor' && started?.data?.command === 'node primes.js');
+  check('the script REALLY ran (exit 0, real output)', completedEv?.data?.exitCode === 0);
+  const reportCtx = (h.llm.reportCalls || []).map((c) => c.user).join('\n');
+  check('the report context carries the REAL executed output', /Real execution \(run by JEXI/.test(reportCtx) && /2,3,5,7,11,13,17,19,23,29/.test(reportCtx) && /exit 0/.test(reportCtx));
+  check('turn completed with the backstop in the record', r.success === true);
+
+  // when the employee DID run it herself, the backstay stays out of the way
+  const h2 = harness({
+    employeeScript: ({ n }) => {
+      if (n === 1) return ['## REPORT', 'Writing and running.', '', '## DELIVERABLE', 'see run', '', '```js primes.js', 'console.log([2,3,5,7,11].join(","));', '```', '', '```run', 'node primes.js', '```', '', '## CONFIDENCE', 'high'].join(NL);
+      return ['## REPORT', 'Ran it for real (exit 0).', '', '## DELIVERABLE', 'Output: 2,3,5,7,11', '', '## CONFIDENCE', 'high'].join(NL);
+    },
+  });
+  const r2 = await runTurn(h2);
+  const supervisorRuns = h2.events.filter((e) => e.type === 'COMMAND_STARTED' && e.data?.initiator === 'supervisor');
+  check('no supervisor backstop when the employee ran it herself', supervisorRuns.length === 0 && r2.success === true);
+
+  // a research subtask (no execution wanted) never triggers the backstop
+  const h3 = harness({
+    refinement: { ...CODE_REFINEMENT, subtasks: [{ title: 'Research the primes landscape', details: 'Summarize approaches.', capability: 'research', requirements: ['research'], dependsOn: [], priority: 'normal' }] },
+    employeeScript: () => ['## REPORT', 'Research done.', '', '## DELIVERABLE', 'Approaches summarized.', '', '## CONFIDENCE', 'high'].join(NL),
+  });
+  const r3 = await runTurn(h3, { raw: 'research prime approaches' });
+  check('non-execution subtasks never trigger the backstop', r3.success === true && h3.events.every((e) => e.type !== 'COMMAND_STARTED'));
 }
 
 /* ─────────────────────────────── verdict ──────────────────────────────── */
