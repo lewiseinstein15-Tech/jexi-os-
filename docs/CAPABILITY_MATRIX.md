@@ -46,13 +46,26 @@
 
 1. ~~Same-session file rewrite~~ **CLOSED in B212**: a same-name artifact in a later round of the same session is a fix-in-place — rewritten on disk with a FILE_UPDATED event (proven by the employee's own `cat` reading the fixed content back); identical rewrites are no-ops. `test-b212.js`.
 2. ~~Mission UI~~ **CLOSED in B212**: `MissionsScreen` — mission control over the real API (list, snapshot, work graph, live event record, pause/resume/cancel/retry, steering, answers for gated missions). Real API only; the frontend invents nothing.
-3. **Production browser**: Atlas's remote-provider path routes through the
-   same Playwright stack the coder routes use; if the Render container cannot
-   launch Chromium, computer use is honestly COMPUTER_BLOCKED (never faked).
-   The remote path is exercised by the existing browser suites; live
-   site-driving on production is verified per-deploy (B212 live E2E).
+3. ~~Production browser~~ **CLOSED in B212 (live-verified, twice)**: the
+   production brain runs the slim deploy image — no Chromium, by design
+   (512MB hosts OOM with a browser), `JEXI_NO_BROWSER=1`. Two live missions
+   against prod proved the honest chain end-to-end: the first browser
+   attempt now emits ONE COMPUTER_BLOCKED with the true reason (before B212
+   it burned a round of dead actions and an empty observation — the E2E
+   also caught and fixed an always-empty observed title), the employees
+   pivot to server-side fetch, and the mission only passes if the
+   deliverable is real. Real browser-driven computer use on production
+   requires a bigger plan / the full image — an infrastructure decision,
+   not a code gap.
 4. **Worker pool**: parallel batches per mission loop (3), not a
    cross-mission persistent pool; leases exist in the WorkGraph but one
    runner process per deployment is the current model. Deferred by design.
 5. **Imagination lessons** are deterministic (real numbers, templated
    wording) — no LLM narrative polish. Deferred by design.
+6. **Employee provenance discipline (NEW, found by the live prod E2E)**:
+   real-LLM employees on replan/verification items sometimes describe
+   methods they did not run ("headless_browser", "real_browser") — the
+   fabrications were caught by verification every time (missions ended in
+   honest FAILED, never fake success), but a verifier can in principle be
+   misled by internally-consistent fabricated evidence. Next frontier:
+   require tool-event provenance for method claims. B213 candidate.

@@ -1,11 +1,12 @@
 import { motion } from 'framer-motion';
-import { Home, Bot, LayoutGrid, ListTodo, Settings } from 'lucide-react';
+import { Home, Bot, LayoutGrid, ListTodo, Target, Settings } from 'lucide-react';
 
 export default function BottomNavigation({ activeNav, setActiveNav }) {
   const items = [
     { id: 'home', icon: Home, label: 'HOME' },
     { id: 'agents', icon: Bot, label: 'AGENTS' },
     { id: 'command', icon: LayoutGrid, label: 'COMMAND' },
+    { id: 'missions', icon: Target, label: 'MISSIONS' },
     { id: 'tasks', icon: ListTodo, label: 'TASKS' },
     { id: 'settings', icon: Settings, label: 'SETTINGS' },
   ];

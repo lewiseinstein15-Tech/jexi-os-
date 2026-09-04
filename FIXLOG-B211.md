@@ -49,9 +49,48 @@
 5. The `data/employees.json` stale-shadow trap killed at the root (roster
    under DATA_DIR; the test that wrote it now deletes it).
 
+## The live production E2E (limitation #2) — what running it for real found
+
+Two live missions were fired at the production brain
+(`ms-mtmir1dp-001`, `ms-mtmkdn6b-001`) with one objective: open
+example.com in the real browser and report the exact title + link text.
+
+**Run 1 (pre-fix):** the full autonomy loop ran live (analyze → plan →
+execute → verify-fail → REPLAN → recovery → lesson → real browser attempt →
+verify-fail → honest MISSION_FAILED) — and exposed two real bugs:
+
+6. `observeViaDesktop()` fetched the page text a second time and discarded
+   it with `&& ''` — the observed title was ALWAYS empty, even on a loaded
+   page. Fixed: the title now comes from the interactive map's
+   `document.title`. Proven by a real-browser round-trip in `test-b212.js` §3b.
+7. `runBrowserRound()` trusted the advertised provider capabilities
+   (`browser: true`) without probing the host — on the slim deploy image
+   (`JEXI_NO_BROWSER=1`, no Chromium by design for 512MB hosts) that meant a
+   whole round of dead actions and an empty observation instead of the
+   documented COMPUTER_BLOCKED. Fixed: the desktop path probes
+   `ensureBrowser()` first — one honest COMPUTER_BLOCKED with the true
+   reason, zero dead actions. `test-b212.js` §3a replays the exact prod case.
+
+**Run 2 (post-fix, verified live):** COMPUTER_BLOCKED fired at the first
+browser attempt with the true reason; the browser item reported
+`browserAvailable: false` with empty values (no hallucination); the
+fallback server-side fetch produced the REAL title and link text
+("Example Domain" / "More information...") with provenance; the mission
+still ended in an honest FAILED because replan items fabricated methods
+("headless_browser", "real_browser") and one link text — and Vera refused
+to pass the incoherent deliverable. No success was ever faked.
+
+Also fixed on the way: the CI-only failure the first B212 push hit —
+MissionsScreen built its events URL with an inline conditional query, which
+the frontend↔server API-surface contract test couldn't normalize. The
+endpoint literal is now whole (`MISSION_EVENTS_URL`), 101 endpoints checked,
+0 missing. Process lesson recorded: run the FULL `npm test` chain locally,
+not a curated suite list.
+
 ## Honest state at close
 
-Director lane: **553 checks** (B208 89 · B209 92 · B210 64 · B211 295 ·
-B212 13), all green; CI 5/5; Render live. Remaining known limitations are
+Director lane: **560 checks** (B208 89 · B209 92 · B210 64 · B211 295 ·
+B212 20), all green; CI 5/5; Render live. Remaining known limitations are
 listed in `docs/CAPABILITY_MATRIX.md` (cross-mission worker pool, LLM
-narrative lessons) — deferred by design, never converted to PASS.
+narrative lessons, employee provenance discipline) — deferred by design,
+never converted to PASS.
