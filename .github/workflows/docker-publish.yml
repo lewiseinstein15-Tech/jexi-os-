@@ -74,3 +74,17 @@ jobs:
           ${{ steps.name.outputs.image }}:latest
           ```' >> $GITHUB_STEP_SUMMARY
           echo "Point Render (Deploy an existing image) at this URL — free plan, zero build minutes." >> $GITHUB_STEP_SUMMARY
+
+      # B214 — ping the Render deploy hook ONLY after :latest is actually
+      # pushed (the old separate render-deploy workflow raced this one and
+      # could deploy a stale image).
+      - name: Ping Render deploy hook (image is live on ghcr now)
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::warning::RENDER_DEPLOY_HOOK secret is not set — add it in repo Settings → Secrets to enable auto-deploy to Render."
+            exit 0
+          fi
+          echo "Pinging Render deploy hook..."
+          curl -sS -m 60 -X POST "$HOOK" -H "Accept: application/json" -w "\nHTTP %{http_code}\n"

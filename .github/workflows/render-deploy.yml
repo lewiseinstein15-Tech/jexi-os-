@@ -11,13 +11,9 @@
 
 name: Deploy Backend to Render
 
+# B214 — the hook ping moved INTO docker-publish.yml (after the image push)
+# so it can never race the registry. This workflow is now manual-only.
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'server/**'
-      - 'package.json'
-      - 'render.yaml'
   workflow_dispatch:
 
 jobs:

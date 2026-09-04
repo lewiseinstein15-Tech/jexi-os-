@@ -62,3 +62,43 @@ link over.
 - The TTL sweep only runs on boot/publish/manual (`/api/workspace-admin/
   sweep`), so links can outlive the TTL until the next sweep — the
   opposite of breaking.
+
+## INCIDENT (same session, full disclosure): Render env set wiped — twice
+
+While raising the TTL I PUT a single env var to the Render API. **The
+PUT replaces the entire set** (it is not an upsert) — the service's 24
+env vars collapsed to 1, and every deploy from that moment failed
+(`Refusing to start: JEXI_API_KEY is required in production`) while the
+old container kept serving, masking it. I then repeated the same mistake
+once during recovery before burning the rule in.
+
+**Recovery (verified live):** 22 vars restored — 8 read back from the
+earlier session dump, 12 from the local `server/.env` (the user's own
+keys; the GITHUB_TOKEN had to be the classic PAT — the fine-grained
+local one cannot write `jexi-workspace`), and the Render env-vars API
+**paginates at 20** (the first dump was page 1 of 2; `HF_TOKEN`,
+`MISTRAL_API_KEY`, `NVIDIA_API_KEY`, `JEXI_API_KEY` were on page 2 —
+caught via `/api/settings/status` on the still-running old process).
+Post-restore verification: deploy live, health ok, key enforcement
+identical (401/200), all 12 model lanes env-configured exactly as
+before, and a real publish through the prod API returned `live: true`
+after waiting out the Pages rebuild (22.8s).
+
+**Still missing (user must re-paste in the Render dashboard):**
+- `FIREBASE_SERVICE_ACCOUNT_B64` (push notifications; a hand-transcribed
+  copy was corrupt and was discarded rather than shipped)
+- `WHATSAPP_ACCESS_TOKEN` + `VERIFY_TOKEN` (WhatsApp messaging)
+- `RESEND_API_KEY` (outbound email)
+Everything else is verified at functional parity.
+
+**Rules burned in:** Render env-vars PUT = whole-set replace (GET with
+`limit=100` → merge → PUT everything, always); the env API paginates at
+20; a "running fine" old container hides a broken deploy config.
+
+## Deploy-hook race fixed for good
+
+`render-deploy.yml` pinged the Render hook the moment code pushed —
+racing the Docker publish, so Render could re-deploy a stale image (bit
+us in B212, B213 and today). The hook ping now lives INSIDE
+`docker-publish.yml` as the step AFTER the image push; the standalone
+workflow is manual-only.
