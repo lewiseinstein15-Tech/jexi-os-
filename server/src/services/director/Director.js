@@ -31,6 +31,7 @@ import { telemetry } from './Telemetry.js';
 import { runEmployeeSession, assembleBrief } from './EmployeeSession.js';
 import { verifyDeliverable, acceptanceGates } from './Verifier.js';
 import { structureObjective } from './ObjectiveInterpreter.js'; // B215 — provenance-tagged objective state
+import { discoverTools } from '../ToolDiscovery.js'; // B223 — Part 20: objective → capability → tool discovery
 import { preferencesBlock } from '../PreferenceLearner.js'; // B208b — employees receive relevant user context
 import { isProviderError } from './ModelRouter.js';
 
@@ -125,6 +126,29 @@ export class Director {
     // B215 — structured objective state: every requirement provenance-tagged
     // (USER_STATED / INFERRED / ASSUMED / UNKNOWN), derived deterministically
     task.structuredObjective = structureObjective(refinement, raw);
+    // B223 — Part 20 tool discovery: match the objective's required
+    // capabilities against the tool registry (risk/verification metadata,
+    // honest capability gaps). ADDITIVE metadata — team injection, the B52
+    // allowlist and the B209 permission gate are unchanged.
+    try {
+      task.structuredObjective.toolDiscovery = discoverTools({
+        objective: task.objective,
+        intent: refinement.intent || null,
+        interpreted: task.structuredObjective,
+      });
+      const d = task.structuredObjective.toolDiscovery;
+      emit({
+        type: 'TOOLS_DISCOVERED', title: 'Tool discovery',
+        summary: `${d.meta.toolCount} tools match ${d.meta.capabilityCount} required capabilities${d.meta.gapCount ? ` · ${d.meta.gapCount} capabilit${d.meta.gapCount === 1 ? 'y' : 'ies'} uncovered` : ''}`,
+        data: {
+          requiredCapabilities: d.requiredCapabilities,
+          tools: d.tools.map((t) => t.slug),
+          addedForObjective: d.addedForObjective,
+          gaps: d.gaps,
+          blockedByAllowlist: d.blockedByAllowlist,
+        },
+      });
+    } catch (e) { /* discovery is metadata — never blocks the mission */ }
     task._persist();
 
     emit({

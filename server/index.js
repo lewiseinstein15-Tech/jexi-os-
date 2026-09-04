@@ -53,6 +53,7 @@ import {
   setActiveSession, clearActiveSession, memoryPersistenceProbe, probeRedis,
 } from './src/services/MemoryManager.js';
 import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
+import { discoverTools } from './src/services/ToolDiscovery.js'; // B223 — Part 20 discovery
 import {
   setRedisClientGetter, startMirrorLoop, mirrorStatus, hydrateMirrorWithRetries,
 } from './src/services/RedisMirror.js';
@@ -752,6 +753,21 @@ app.post('/api/notifications/clear', (req, res) => res.json(clearNotifications()
 
 // === MODEL ROUTING (roadmap stage 24 — per-domain provider preference) ===
 // Exposes the intent → provider map; AgentLoop honors it via opts.prefer.
+// B223 — Part 20: objective → capability → tool discovery (pure computation,
+// no LLM calls). Read-only, deterministic, additive metadata.
+app.get('/api/tools/discover', (req, res) => {
+  const objective = String(req.query.objective || '').slice(0, 800);
+  if (!objective) return res.status(400).json({ ok: false, error: 'objective query parameter required' });
+  const intent = req.query.intent ? String(req.query.intent).slice(0, 64) : null;
+  const caps = String(req.query.capabilities || '').split(',').map((c) => c.trim()).filter(Boolean).slice(0, 16);
+  try {
+    const discovery = discoverTools({ objective, intent, interpreted: caps.length ? { requiredCapabilities: caps } : null });
+    res.json({ ok: true, discovery });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e && e.message || e).slice(0, 200) });
+  }
+});
+
 app.get('/api/models', (req, res) => {
   const routing = modelRoutingTable();
   const workers = [
