@@ -65,3 +65,15 @@ Getting Forge to *actually execute* took three production rounds — each found 
 Also fixed en route: a scope bug (`commandRounds` referenced outside its `try`) caught by the B209 regression suite before it ever shipped.
 
 **Tests now: 64** (sections 7–9 cover the fabrication gate, the deterministic executor routing with the exact live failure shape, and the backstop's three paths). Full suite SUITE_EXIT=0; B209 92/92; B208 89/89.
+
+## Final E2E (all layers live on the brain)
+
+```
+0012 FILE_CREATED      Forge wrote primes.js (376 bytes)
+0013 COMMAND_STARTED   Forge runs `node primes.js`.
+0014 COMMAND_COMPLETED `node primes.js` → exit 0 in 211ms.   ← real execution
+0015-0017 round 2 with the real output
+0022 VERIFICATION_PASSED score 1.00
+```
+
+The report's "executed" claim is corroborated by a real `COMMAND_COMPLETED` — the fabrication path is closed end-to-end. (One last bug fixed getting here: `commandsExecuted` was riding the TASK_COMPLETED *event* instead of the RESULT *message*, so the backstop double-ran; and note the "Deploy Backend to Render" workflow only PINGS the deploy hook — "success" means triggered, not live. Verify via the Render deploys API before E2E.)
