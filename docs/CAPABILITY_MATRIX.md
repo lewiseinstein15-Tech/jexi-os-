@@ -62,10 +62,13 @@
    runner process per deployment is the current model. Deferred by design.
 5. **Imagination lessons** are deterministic (real numbers, templated
    wording) — no LLM narrative polish. Deferred by design.
-6. **Employee provenance discipline (NEW, found by the live prod E2E)**:
-   real-LLM employees on replan/verification items sometimes describe
-   methods they did not run ("headless_browser", "real_browser") — the
-   fabrications were caught by verification every time (missions ended in
-   honest FAILED, never fake success), but a verifier can in principle be
-   misled by internally-consistent fabricated evidence. Next frontier:
-   require tool-event provenance for method claims. B213 candidate.
+6. ~~Employee provenance discipline~~ **CLOSED in B213 (live-verified)**:
+   browser-method claims now require real COMPUTER_ACT/OBSERVE events
+   (deterministic gate — the model cannot override it), Vera's rubric is
+   grounded in WHAT ACTUALLY EXECUTED from the task event record, and the
+   employee brief demands methods-actually-run reporting. Live proof: a
+   production mission whose employees produced correct-looking values with
+   zero tools executed failed twice with evidence-grounded verdicts
+   ("zero commands were executed ... indicating the data was fabricated").
+   Residual: non-browser method claims rely on the grounded rubric
+   (model-based, evidence-armed) rather than a deterministic gate.

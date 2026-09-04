@@ -124,7 +124,7 @@ Key modules: `Director` · `EmployeeSession` · `Supervisor` · `CommandRunner` 
 
 ## 🧪 Quality
 
-- **4,000+ automated checks**, 0 failures (`cd server && npm test`) — including 560 that test the Director's boss behavior specifically (staffing, supervision, redirection bounds, permissions, real execution, the fabrication gate) and 315 for the B211+ autonomy layer (persistent missions + work graphs, imagination, operational lessons, real computer use, restart/disconnect/failure-injection proofs, plus B212's fix-in-place rewrites, API answers and live-prod browser honesty)
+- **4,000+ automated checks**, 0 failures (`cd server && npm test`) — including 588 that test the Director's boss behavior specifically (staffing, supervision, redirection bounds, permissions, real execution, the fabrication and method-provenance gates) and 343 for the B211+ autonomy layer (persistent missions + work graphs, imagination, operational lessons, real computer use, restart/disconnect/failure-injection proofs, plus B212's fix-in-place rewrites, API answers, live-prod browser honesty and B213's evidence-grounded verification)
 - CI on every push; live smoke tests for math/search/pictures/video/builds
 - Every fix traced from real chat logs → regression test
 
