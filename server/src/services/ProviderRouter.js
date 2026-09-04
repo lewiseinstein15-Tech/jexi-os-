@@ -61,13 +61,26 @@ export function providerLatency(key) {
   return LATENCY_PRIORS_MS[key] ?? 6000;
 }
 
-/** Record a failure — starts/extends a cooldown after CONSECUTIVE_COOLDOWN. */
-export function recordProviderFailure(key) {
+/**
+ * Record a failure — starts/extends a cooldown after CONSECUTIVE_COOLDOWN.
+ *
+ * B220 — RETRY-AFTER AWARENESS: when the provider SAID when to come back
+ * (429 "Please retry in 47s" from Gemini, "try again in Xs" from Groq), park
+ * it for exactly that window (+3s slack, capped at 15 min) IMMEDIATELY —
+ * not after 3 consecutive failures. The old fixed 30s cooldown re-poked a
+ * quota-blocked provider every 30s and burned a wasted 429 round-trip each
+ * time, which the user felt as "taking a lot of time on understanding".
+ */
+export function recordProviderFailure(key, retryAfterMs = null) {
   const s = h(key);
   s.calls++;
   s.fails++;
   s.lastFail = Date.now();
-  if (s.fails >= CONSECUTIVE_COOLDOWN) {
+  if (Number.isFinite(retryAfterMs) && retryAfterMs > 0) {
+    const until = Date.now() + Math.min(Math.max(retryAfterMs, 1000), 15 * 60 * 1000) + 3000;
+    s.cooldownUntil = Math.max(s.cooldownUntil, until);
+    s.fails = Math.max(s.fails, CONSECUTIVE_COOLDOWN);
+  } else if (s.fails >= CONSECUTIVE_COOLDOWN) {
     s.cooldownUntil = Date.now() + COOLDOWN_MS;
   }
 }

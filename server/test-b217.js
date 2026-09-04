@@ -86,8 +86,13 @@ test('sync pushes changed files with TTL; unchanged files are skipped', async ()
   const pushed2 = await syncMirror();
   assert.equal(pushed2, 0, 'unchanged files must be skipped');
 
-  // mutate one file → only that file is re-pushed
+  // mutate one file → only that file is re-pushed. The mtime bump is EXPLICIT:
+  // container filesystems can have coarse mtime resolution, and when the rewrite
+  // lands in the same tick as the previous sync the file looked unchanged
+  // (flaked once in a full-chain run). utimesSync makes it deterministic.
   fs.writeFileSync(m, JSON.stringify({ id: 'ms-a', phase: 'verify' }));
+  const bump = new Date(Date.now() + 10_000);
+  fs.utimesSync(m, bump, bump);
   const pushed3 = await syncMirror();
   assert.equal(pushed3, 1);
   assert.equal(JSON.parse(r.store.get('jexi:mirror:missions/ms-a/mission.json').v).phase, 'verify');

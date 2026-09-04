@@ -68,6 +68,42 @@ export function __groqModelHealth() {
   return { deadModels: [...deadGroqModels], cached: groqModelCache, default: GROQ_TEXT_MODEL };
 }
 
+/**
+ * B220 — parse a provider's "come back later" hint from an error message.
+ * Matches Gemini's "Please retry in 46.8s" and Groq/OpenRouter's
+ * "Please try again in 3.2s" (also minutes). Returns ms (bounded
+ * [1s, 15min]) or null when the message carries no hint.
+ */
+export function __parseRetryAfterMs(msg) {
+  const m = /(?:re)?try (?:again )?in ([\d.]+)\s*(ms|s|secs?|seconds?|m|mins?|minutes?)\b/i.exec(String(msg || ''));
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  if (!Number.isFinite(n)) return null;
+  const unit = m[2].toLowerCase();
+  const ms = unit.startsWith('ms') ? n : unit.startsWith('m') ? n * 60000 : n * 1000;
+  return Math.min(Math.max(Math.round(ms), 1000), 15 * 60 * 1000);
+}
+
+/* B220 — side channel: the freshest retry-after hint per provider, set by the
+ * try* catch blocks, consumed by noteProviderFailure at the cascade level.
+ * Hints older than 60s are ignored (a stale hint must never over-cooldown). */
+const retryAfterHints = new Map(); // provider → { ms, at }
+
+function noteRetryAfter(provider, message) {
+  const ms = __parseRetryAfterMs(message);
+  if (ms == null) return;
+  const prev = retryAfterHints.get(provider);
+  if (!prev || prev.ms < ms) retryAfterHints.set(provider, { ms, at: Date.now() });
+}
+
+/** B220 — record a provider failure, honoring its retry-after hint if fresh. */
+function noteProviderFailure(provider) {
+  const hint = retryAfterHints.get(provider);
+  retryAfterHints.delete(provider);
+  const ms = hint && Date.now() - hint.at <= 60_000 ? hint.ms : null;
+  recordProviderFailure(provider, ms);
+}
+
 /** Pure picker (test-exported): choose the best model id from a list. */
 export function __pickGroqModel(ids) {
   const list = (ids || []).filter((id) => !/whisper|tts|guard|embed|vision/i.test(id));
@@ -281,6 +317,7 @@ async function tryGroq(prompt, system, imageBase64, opts, errors) {
       }
       errors.push(`Groq(${model}): ${e.message}`);
       console.error('[LLMClient] Groq failed:', e.message);
+      noteRetryAfter('groq', e.message); // B220 — honor "try again in Xs"
     }
   }
   return null;
@@ -330,6 +367,7 @@ async function tryGemini(prompt, system, imageBase64, opts, errors) {
     } catch (e) {
       errors.push(`Gemini(${modelName}): ${e.message}`);
       console.error('[LLMClient] Gemini failed:', e.message);
+      noteRetryAfter('gemini', e.message); // B220 — honor "retry in Xs"
       // B219 — quota hits are PROVIDER-wide (same free-tier RPM bucket):
       // trying the sibling models just burns 2-3 round-trips before the
       // cascade moves on. Break to the next provider immediately.
@@ -385,6 +423,7 @@ async function tryOpenRouter(prompt, system, imageBase64, opts, errors) {
       }
     } catch (e) {
       errors.push(`OpenRouter(${model}): ${e.message}`);
+      noteRetryAfter('openrouter', e.message); // B220
       console.error('[LLMClient] OpenRouter failed:', e.message);
     }
   }
@@ -592,7 +631,7 @@ async function streamPlainText(prompt, system, opts, onDelta) {
         return out.text;
       }
     } catch (e) { errors.push(`${provider}: ${e.message}`); }
-    recordProviderFailure(provider);
+    noteProviderFailure(provider); // B220 — retry-after aware
     releaseSlot();
   }
   return null;
@@ -644,7 +683,7 @@ export async function generateContent(prompt, systemInstruction = '', imageBase6
     } catch (e) {
       errors.push(`${provider}: ${e.message}`);
     }
-    recordProviderFailure(provider);
+    noteProviderFailure(provider); // B220 — retry-after aware
     releaseSlot();
   }
 
@@ -1030,7 +1069,7 @@ export async function generateWithToolsLoop(prompt, systemInstruction = '', tool
     } catch (e) {
       errors.push(`${provider}: ${e.message}`);
     }
-    recordProviderFailure(provider);
+    noteProviderFailure(provider); // B220 — retry-after aware
     releaseSlot();
   }
 
@@ -1055,7 +1094,7 @@ export async function generateWithToolsLoop(prompt, systemInstruction = '', tool
       } catch (e) {
         fallbackErrors.push(`${provider}: ${e.message}`);
       }
-      recordProviderFailure(provider);
+      noteProviderFailure(provider); // B220 — retry-after aware
       releaseSlot();
     }
   }
