@@ -160,12 +160,17 @@
   (graph + events + lessons + imagination record persisted per mission), compaction engine
   for long contexts. "Continue." reconstructs mission state without re-asking
   (test-b211.js J).
-- **Known limit:** chat TRANSCRIPTS live on the ephemeral container disk
-  (`DATA_DIR/conversations/*.jsonl`) — they do not survive deploys/restarts (Render free
-  tier has no persistent disk). This is the one honest PARTIAL in the memory family;
-  documented in FIXLOG-B214 addendum. Mission state itself survives (it is rebuilt from
-  atomic files at boot) — transcripts are the gap.
-- **Status: WORKING (missions) / PARTIAL (transcripts: ephemeral by environment).**
+- **Known limit (B216 correction — proven live, not theorized):** chat TRANSCRIPTS *and
+  mission records* live on the ephemeral container disk (`DATA_DIR/conversations/`,
+  `DATA_DIR/missions/`). They survive PROCESS restarts (atomic files + boot recovery,
+  tested by SIGKILL→resume) but NOT container replacement: on 2026-09-04 a Render
+  free-tier hibernation + cold wake wiped a live mission record mid-verification
+  (instance `…-hibernate-…`, uptime ~17 min at check). The keepalive cron was starved
+  for 3h by GitHub Actions queue pressure, so the brain slept. Redis-backed state
+  (memory, identity) survived. **Honest fix (future build): persist missions/world to
+  the external store.**
+- **Status: WORKING (in-process persistence + recovery) / PARTIAL (container-level
+  ephemerality on Render free — transcripts AND missions until externalized).**
 
 ### World state (spec Part 9)
 - **Status: MISSING.** Nothing tracks files/processes/browser/repos/tools/network as an

@@ -80,3 +80,22 @@ at the real backend:
 - Still adaptive polling (spec permits the existing fabric).
 - The failed fibonacci mission is REAL and stays in the record (honest
   failure; retryable from the UI).
+
+
+## Post-ship incidents (same day, disclosed — neither caused by B216)
+
+1. **GitHub Pages for jexi-os- was found DISABLED** (~16:10 — site 404, Pages API 404,
+   while the deploy workflow had succeeded minutes earlier; the `github-pages`
+   environment still existed). Cause UNKNOWN — nothing in the repo's workflows or this
+   build touches the Pages config, and no API call from this session disabled it.
+   Fix applied: re-enabled Pages via the API (`build_type: workflow`) + re-ran the
+   deploy — live again (200, B216 build verified in the HTML). If the site was disabled
+   from the GitHub settings UI, that happened outside this session.
+2. **Render free-tier hibernation wiped mission data mid-verification**: the brain
+   hibernated (keepalive cron last ran 13:33 — GitHub Actions queue pressure starved
+   the schedule for 3h+) and woke with a fresh ephemeral disk — the fibonacci mission
+   record used for the live UI drive vanished. All B216 verification evidence was
+   captured BEFORE the wipe (drive logs + `b216-mission-detail.png` + this fixlog).
+   The B215 audit's mission-persistence row has been corrected (process restarts:
+   yes; container replacement: no — externalize missions/world to Redis, future
+   build).
