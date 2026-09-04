@@ -23,10 +23,13 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'node:url';
 import { telemetry } from './Telemetry.js';
+import { DATA_DIR } from '../../config.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = path.join(HERE, '..', '..', '..', 'data', 'employees.json');
-const HISTORY_DIR = path.join(HERE, '..', '..', '..', 'data', 'director-history');
+// B211 B3: the roster override lives under DATA_DIR — test isolation
+// (DATA_DIR override) no longer leaks a stale shadow over the defaults.
+const CONFIG_PATH = path.join(DATA_DIR, 'employees.json');
+const HISTORY_DIR = path.join(DATA_DIR, 'director-history');
 
 /**
  * Capability vocabulary — synonyms collapse to canonical tokens so the
@@ -56,12 +59,15 @@ const CAP_SYNONYMS = {
   'product-design': 'design', 'ui-design': 'design',
   reasoning: 'reasoning', 'critical-thinking': 'reasoning', logic: 'reasoning',
   math: 'reasoning', 'mathematics': 'reasoning', calculation: 'reasoning',
+  computer: 'computer', 'computer-use': 'computer', 'computer-operations': 'computer',
+  browser: 'computer', 'browser-use': 'computer', desktop: 'computer',
+  'web-browsing': 'computer', 'ui-driving': 'computer', 'web-interaction': 'computer',
 };
 
 /** Canonical capability tokens an employee profile may declare. */
 const KNOWN_CAPS = new Set([
   'code', 'research', 'search', 'synthesis', 'verification', 'security',
-  'planning', 'memory', 'data', 'design', 'reasoning',
+  'planning', 'memory', 'data', 'design', 'reasoning', 'computer',
 ]);
 
 export function normalizeCap(token) {
@@ -117,12 +123,12 @@ const DEFAULT_EMPLOYEES = [
   {
     agentId: 'atlas',
     displayName: 'Atlas',
-    role: 'Architect',
-    description: 'Decomposes large objectives, structures plans, sequences work.',
-    personality: 'structured, calm, far-sighted',
-    capabilities: ['planning', 'reasoning', 'synthesis'],
-    supportedTools: ['memory-recall'],
-    permissions: ['READ'],
+    role: 'Computer Operations',
+    description: 'Drives the real virtual desktop — opens pages, clicks, types, reads what is actually on screen, and reports only what he truly observed.',
+    personality: 'methodical, visual, scrupulously honest about what he saw',
+    capabilities: ['computer', 'planning', 'reasoning'],
+    supportedTools: ['browser-act', 'memory-recall', 'file-write', 'web-search'],
+    permissions: ['READ', 'WRITE', 'NETWORK', 'COMPUTER'],
   },
   {
     agentId: 'echo',

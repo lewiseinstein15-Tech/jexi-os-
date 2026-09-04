@@ -312,8 +312,9 @@ export class MissionRunner {
 Plan rules:
 - Decompose into 2-${PLAN_MAX_ITEMS} WORK ITEMS. Each item is independently executable by ONE employee and independently checkable.
 - Order matters: give each item "dependsOn" (1-based indices of items that must finish first). No cycles.
-- Capabilities vocabulary ONLY: code, research, search, synthesis, verification, security, planning, memory, data, design, reasoning.
+- Capabilities vocabulary ONLY: code, research, search, synthesis, verification, security, planning, memory, data, design, reasoning, computer.
 - Writing, running and testing code is ONE item for the code engineer (she can execute allowlisted commands herself). Never split "then run it" into a separate item.
+- Browsing a real site, filling a form, or reading a live page is ONE computer item for the computer-ops employee (he can drive the real browser himself, honestly blocked if the environment has none).
 - Items needing fresh web facts get searchQueries (1-3 precise queries).
 - Include a final verification item ONLY when the criteria need cross-item checking (the Director verifies the whole mission at the end regardless).
 - successCriteria are measurable statements the FINAL mission deliverable must satisfy.

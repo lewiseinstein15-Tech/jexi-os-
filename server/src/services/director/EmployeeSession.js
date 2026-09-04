@@ -23,6 +23,7 @@ import { runWithModel } from './ModelRouter.js';
 import { Supervisor } from './Supervisor.js'; // B209 — live mid-work supervision
 import { checkToolPermission } from './Permissions.js'; // B209 — enforced tool gates
 import { runEmployeeCommand, isTestCommand, validateCommand } from './CommandRunner.js'; // B210 — real command execution for employees
+import { runBrowserRound, browserToolInstructions } from './ComputerOps.js'; // B211 B3 — real browser driving for computer-ops employees
 import { sanitizeWorkProduct } from '../ModelCoworkers.js'; // B209/B210 — model ids never enter work product, but CODE FENCES are never corrupted
 import fs from 'fs';
 import path from 'path';
@@ -102,7 +103,7 @@ high | medium | low — one short line why.
 
 ## CLAIMS
 - Each factual claim you make, each with its source or (unverified).
-${brief.searchQueries?.length || employee.supportedTools.includes('web-search') ? '\nYou have the web-search tool available; search results will be provided to you.' : ''}${employee.supportedTools.includes('run-command') ? '\n\nYou can EXECUTE COMMANDS in your task workspace: write files as fenced artifact blocks (they land in the workspace), then put each command alone in a fenced block with `run` as the info string:\n\n```run\nnode analysis.js\n```\n\nAllowed binaries: node, node --test, python3, ls, cat, head, tail, wc, grep, echo, diff. Scripts run as CommonJS (use require, not import). NO shell features (no pipes, no &&, no redirects) — one plain command per block. The REAL output (exit code + stdout/stderr) comes back to you, and you then deliver the final structured answer grounded in the actual results.\nCRITICAL HONESTY RULE: if the assignment needs executed output, you MUST run it with a run block. NEVER claim a command ran, invent its output, timings, or environment details — if you did not receive it in COMMAND RESULTS, it did not happen: say so instead.' : ''}`;
+${brief.searchQueries?.length || employee.supportedTools.includes('web-search') ? '\nYou have the web-search tool available; search results will be provided to you.' : ''}${employee.supportedTools.includes('run-command') ? '\n\nYou can EXECUTE COMMANDS in your task workspace: write files as fenced artifact blocks (they land in the workspace), then put each command alone in a fenced block with `run` as the info string:\n\n```run\nnode analysis.js\n```\n\nAllowed binaries: node, node --test, python3, ls, cat, head, tail, wc, grep, echo, diff. Scripts run as CommonJS (use require, not import). NO shell features (no pipes, no &&, no redirects) — one plain command per block. The REAL output (exit code + stdout/stderr) comes back to you, and you then deliver the final structured answer grounded in the actual results.\nCRITICAL HONESTY RULE: if the assignment needs executed output, you MUST run it with a run block. NEVER claim a command ran, invent its output, timings, or environment details — if you did not receive it in COMMAND RESULTS, it did not happen: say so instead.' : ''}${employee.supportedTools.includes('browser-act') ? browserToolInstructions() : ''}`;
 }
 
 /** Parse the structured employee output into a machine-readable result. */
@@ -194,6 +195,9 @@ export async function runEmployeeSession(p) {
   let parsed;
   let commandRounds = 0; // B210 — command-loop state (visible to the RESULT message)
   let totalCommandsExecuted = 0;
+  let browserRounds = 0; // B211 B3 — browser-loop state (observe→act→observe→verify)
+  let totalBrowserActions = 0;
+  const MAX_BROWSER_ROUNDS = 3;
   const persistedArtifactNames = new Set(); // B210 — artifacts persisted in-loop aren't re-persisted later
   const persistParsedArtifacts = (p) => {
     for (const artifact of (p && p.artifacts) || []) {
@@ -214,16 +218,21 @@ export async function runEmployeeSession(p) {
   };
   try {
     let commandContext = '';
+    let browserContext = ''; // B211 B3 — real page state fed back to computer-ops employees
     // B210 — the COMMAND LOOP: an employee with EXECUTE permission may put
     // ```run blocks in her output. Each round: her artifacts land in the task
     // workspace FIRST (so the scripts exist), the commands REALLY execute
     // there (allowlisted, no shell, scrubbed env, bounded), and the actual
     // output comes back to her for the next round. Bounded: 2 rounds.
-    for (let round = 0; round <= MAX_COMMAND_ROUNDS; round++) {
+    // B211 B3 — the BROWSER LOOP rides the same rounds: ```browser blocks
+    // from a computer-ops employee (browser-act tool + COMPUTER permission)
+    // really execute against the virtual desktop and the REAL observed page
+    // state comes back. Bounded: 3 rounds, 4 actions per round.
+    for (let round = 0; round <= MAX_COMMAND_ROUNDS + MAX_BROWSER_ROUNDS; round++) {
       const raw = await withTimeout(
         generateWithSupervision({
           employee, subtask, brief, task, mailbox, hooks, emit, llm,
-          userPrompt: commandContext ? `${userPrompt}\n\n${commandContext}` : userPrompt,
+          userPrompt: [userPrompt, commandContext, browserContext].filter(Boolean).join('\n\n'),
           review: hooks.review || null,
           liveReview: hooks.liveReview !== false,
         }),
@@ -239,16 +248,25 @@ export async function runEmployeeSession(p) {
         throw err;
       }
       const requests = extractCommandRequests(clean);
-      if (!requests.length) break; // done — no command requests
-      const gate = checkToolPermission(employee, 'run-command');
-      if (!gate.allowed) {
-        emit('PERMISSION_DENIED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Command skipped: ${gate.reason}.`, severity: 'warn' });
-        break;
-      }
-      if (round === MAX_COMMAND_ROUNDS) break; // bounded — no infinite tool loops
-      commandRounds++;
-      // scripts land BEFORE commands run (the employee's files must exist)
-      persistParsedArtifacts(parsed);
+      const browserLines = extractBrowserRequests(clean); // B211 B3
+      if (!requests.length && !browserLines.length) break; // done — no tool requests
+      // ---- B210 command phase (unchanged semantics, budget per-tool) ----
+      if (requests.length) {
+        const gate = checkToolPermission(employee, 'run-command');
+        if (!gate.allowed) {
+          emit('PERMISSION_DENIED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Command skipped: ${gate.reason}.`, severity: 'warn' });
+          break;
+        }
+        if (commandRounds >= MAX_COMMAND_ROUNDS) {
+          // B210 semantics preserved: a command-requesting employee with no
+          // browser work pending stops here (bounded tool loop). Browser
+          // requests may still continue below (their own budget).
+          if (!browserLines.length) break;
+          commandContext += `\n\n# COMMAND BUDGET USED\nNo more command rounds (${MAX_COMMAND_ROUNDS} max) — deliver from the results you already have.`;
+        } else {
+        commandRounds++;
+        // scripts land BEFORE commands run (the employee's files must exist)
+        persistParsedArtifacts(parsed);
       const results = [];
       for (const cmd of requests.slice(0, 4)) {
         const asTest = isTestCommand(cmd);
@@ -275,6 +293,36 @@ export async function runEmployeeSession(p) {
         results.push(`$ ${cmd}\n[exit ${r.exitCode}${r.timedOut ? ' · timed out' : ''}${r.blocked ? ` · ${r.reason}` : ''}]\n${r.output || '(no output)'}`);
       }
       commandContext += `\n\n# COMMAND RESULTS (real execution in your task workspace — round ${commandRounds})\n${results.join('\n\n')}\n\nDeliver your final structured output now (REPORT / DELIVERABLE / CONFIDENCE), using the real results above. You may run one more round of commands if genuinely needed.`;
+        }
+      }
+
+      // ---- B211 B3 browser phase: real computer use, honest when unavailable ----
+      if (browserLines.length) {
+        const bgate = checkToolPermission(employee, 'browser-act');
+        if (!bgate.allowed) {
+          emit('PERMISSION_DENIED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Browser action skipped: ${bgate.reason}.`, severity: 'warn' });
+          break;
+        }
+        if (browserRounds >= MAX_BROWSER_ROUNDS) {
+          if (!requests.length) break; // nothing else pending — the tool loop is done
+          browserContext += `\n\n# BROWSER BUDGET USED\nNo more browser rounds (${MAX_BROWSER_ROUNDS} max) — deliver from what you actually observed.`;
+        } else {
+          browserRounds++;
+          totalBrowserActions += browserLines.length;
+          const br = await runBrowserRound({
+            lines: browserLines, emit,
+            identity: { agentId: employee.agentId, agentName: employee.displayName },
+          });
+          if (br.blocked) {
+            browserContext += `\n\n# BROWSER UNAVAILABLE (real capability check)\n${br.reason}\nNever claim you browsed, opened, or read anything — report honestly that the browser is unavailable in this environment.`;
+          } else {
+            const acts = br.results.map((r) => `- ${r.summary}${r.ok ? '' : ` — FAILED: ${r.detail || ''}`}`).join('\n');
+            const obs = br.observation || {};
+            const elList = (obs.elements || []).map((e) => `  #${e.id} <${e.tag}${e.type ? ` type=${e.type}` : ''}> ${String(e.text || e.placeholder || '').slice(0, 60)}`).join('\n');
+            browserContext += `\n\n# BROWSER RESULTS (real virtual-desktop state — round ${browserRounds})\nActions:\n${acts}\n\nObserved page:${obs.title ? ` title "${obs.title}"` : ''} ${obs.elementCount ?? '?'} interactive element(s), ${obs.textChars ?? '?'} chars of text.\nElements:\n${elList || '  (none listed)'}\nPage text (first part):\n${obs.textSnippet || '(empty)'}\n\nDecide your next step from what the page ACTUALLY shows. You may act again (browser block) or deliver your final structured output (REPORT / DELIVERABLE / CONFIDENCE) grounded in the real state above.`;
+          }
+        }
+      }
     }
   } catch (e) {
     if (e?.code === 'REDIRECT') {
@@ -337,12 +385,12 @@ export async function runEmployeeSession(p) {
     artifacts: parsed.artifacts,
     needs: parsed.needs || null, // B209 — the NEEDS channel rides the result
     ms,
-    data: { commandsExecuted: totalCommandsExecuted }, // B210 — the execution backstop reads this
+    data: { commandsExecuted: totalCommandsExecuted, browserActions: totalBrowserActions }, // B210 backstop reads commandsExecuted; B211 B3 adds browserActions
   }));
   emit('TASK_COMPLETED', {
     agentId: employee.agentId, agentName: employee.displayName,
     summary: `${employee.displayName} delivered: ${subtask.title}`,
-    data: { subtaskId: subtask.id, ms, confidence: parsed.confidence, artifacts: parsed.artifacts.length, commandsExecuted: commandRounds > 0 ? totalCommandsExecuted : 0 },
+    data: { subtaskId: subtask.id, ms, confidence: parsed.confidence, artifacts: parsed.artifacts.length, commandsExecuted: commandRounds > 0 ? totalCommandsExecuted : 0, browserActions: browserRounds > 0 ? totalBrowserActions : 0 },
   });
   return { message: resultMessage, parsed, ms };
 }
@@ -425,6 +473,21 @@ export function extractCommandRequests(text) {
     if (cmd) requests.push(cmd);
   }
   return requests;
+}
+
+/** B211 B3 — extract ```browser action lines from employee output (one per block). */
+export function extractBrowserRequests(text) {
+  const out = String(text || '');
+  const re = new RegExp('```' + 'browser' + '[ \\t]*\\n([\\s\\S]*?)```', 'g');
+  const lines = [];
+  let m;
+  while ((m = re.exec(out))) {
+    for (const l of m[1].split('\n')) {
+      const t = l.trim();
+      if (t) lines.push(t);
+    }
+  }
+  return lines;
 }
 
 /** B209 — persist an artifact to the per-task directory (path-safe, bounded). */

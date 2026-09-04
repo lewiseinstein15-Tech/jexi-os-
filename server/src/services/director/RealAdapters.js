@@ -29,7 +29,7 @@ Rules:
 - Reconstruct a proper professional objective (what "better"/"good"/"this" most plausibly means here), with measurable success criteria.
 - Ask a clarifying question ONLY if the request is genuinely unresolvable AND acting on a wrong guess would be destructive/risky. Otherwise proceed with assumptions.
 - Decide the minimal team: simple requests get ONE subtask; only genuinely multi-part work gets up to 5. NEVER pad the plan.
-- Each subtask gets capability requirements from this vocabulary ONLY: code, research, search, synthesis, verification, security, planning, memory, data, design, reasoning.
+- Each subtask gets capability requirements from this vocabulary ONLY: code, research, search, synthesis, verification, security, planning, memory, data, design, reasoning, computer. Use the computer capability only when the work needs a REAL browser (opening a page, clicking, reading live content).
 - Subtasks that need fresh facts from the web get searchQueries (1-3 precise queries). Pure reasoning/knowledge work gets none.
 - If the objective is a full application/website BUILD, set taskType "build" and give exactly ONE subtask with "department": "build" (the engineering department handles it end-to-end).
 - Writing, running, and testing code is ONE code-capability subtask (the engineer can execute allowlisted commands inside her own assignment). NEVER split "then run/execute/test it" into a separate subtask for another employee — only the code engineer can actually execute, and a non-executor claiming results is fabrication.

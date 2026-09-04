@@ -60,6 +60,10 @@ function reduceTeam(prev, evt) {
     // B210 — real command execution by employees
     case 'COMMAND_STARTED': case 'TEST_STARTED': touch({ status: 'executing', currentTask: safe(evt.summary, 110) }); break;
     case 'COMMAND_COMPLETED': case 'COMMAND_FAILED': case 'TEST_COMPLETED': case 'TEST_FAILED': touch({ status: 'working', currentTask: safe(evt.summary, 110) }); break;
+    // B211 B3 — real computer use (Atlas driving the virtual desktop)
+    case 'COMPUTER_ACT': touch({ status: 'executing', currentTask: safe(evt.summary, 110) }); break;
+    case 'COMPUTER_OBSERVE': touch({ status: 'working', currentTask: safe(evt.summary, 110) }); break;
+    case 'COMPUTER_BLOCKED': touch({ status: 'correcting', currentTask: safe(evt.summary, 110) }); break;
     case 'VERIFICATION_STARTED': touch({ status: 'verifying' }); break;
     case 'VERIFICATION_PASSED': touch({ status: 'verified' }); break;
     case 'VERIFICATION_FAILED': touch({ status: 'verifying' }); break;
@@ -70,7 +74,7 @@ function reduceTeam(prev, evt) {
   return t;
 }
 
-async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable, setQuestions, setPlanReview, setTeam } = {}) {
+async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable, setQuestions, setPlanReview, setTeam, setComputer } = {}) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -197,8 +201,13 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
     }
     else if (data.type === 'plan') setPlan(prev => ({ ...prev, ...data }));
     // B208 — canonical team events drive the live team strip
-    else if (data.type === 'team' && setTeam && data.event) {
+    else if (data.type === 'team' && data.event) {
       try { setTeam(prev => reduceTeam(prev, data.event)); } catch (e) { /* team strip never breaks the stream */ }
+      // B211 B3 — live computer-use telemetry (real COMPUTER_* events only,
+      // never frontend-invented state; capped so a marathon cannot grow state)
+      if (setComputer && String(data.event.type || '').startsWith('COMPUTER_')) {
+        try { setComputer(prev => [...(prev || []), { ...data.event, at: Date.now() }].slice(-60)); } catch (e) { /* never break */ }
+      }
     }
     // Build 47 — intelligence metadata (classification, task id, confidence).
     else if (data.type === 'intel') setPlan(prev => ({ ...prev, intel: data }));
@@ -322,6 +331,7 @@ export const useJexiEngine = () => {
   const [questions, setQuestions] = useState(null); // { conv, questions: [...] }
   const [planReview, setPlanReview] = useState(null); // { conv, plan }
   const [team, setTeam] = useState(null); // B208 — live team strip state (from 'team' events)
+  const [computer, setComputer] = useState(null); // B211 B3 — live computer-use telemetry (real events only)
   const abortRef = useRef(null);
   const watchdogFiredRef = useRef(false);
   const recoverRef = useRef(null); // AbortController for the auto-recovery poll
@@ -444,6 +454,7 @@ export const useJexiEngine = () => {
     setWebsites([]);
     setPlan(null);
     setTeam(null); // B208 — fresh turn, fresh team strip
+    setComputer(null); // B211 B3 — fresh turn, fresh computer telemetry
     const userMsg = { role: 'user', text: query, image };
     setMessages(prev => [...prev, userMsg]);
     const onEvent = () => { watchdogFiredRef.current = false; };
@@ -495,7 +506,7 @@ export const useJexiEngine = () => {
         return;
       }
       if (!res.ok) throw new Error(`Backend replied HTTP ${res.status}`);
-      await consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable, setQuestions, setPlanReview, setTeam });
+      await consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable, setQuestions, setPlanReview, setTeam, setComputer });
     } catch (error) {
       // Aborted by the user (STOP) — don't show a scary network error.
       if (error?.name === 'AbortError') {
@@ -559,5 +570,5 @@ export const useJexiEngine = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { messages, logs, websites, plan, team, isProcessing, runSearch, stopGeneration, pushMessage, questions, setQuestions, planReview, setPlanReview, openConversation };
+  return { messages, logs, websites, plan, team, computer, isProcessing, runSearch, stopGeneration, pushMessage, questions, setQuestions, planReview, setPlanReview, openConversation };
 };

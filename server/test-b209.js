@@ -419,11 +419,12 @@ console.log('\n[10] Runtime team management — bench, hire, staffing obeys');
   check('per-employee history records real assignments', hist.length >= 2);
   check('history is newest-first with outcomes', hist[0].title === 'cohort breakdown' && hist[0].ok === false && hist[1].ok === true);
 
-  // cleanup the hire so later suites stay deterministic
+  // cleanup the hire so later suites stay deterministic: remove the override
+  // file entirely — the next load falls back to the shipped DEFAULT roster.
+  // (B211 B3: a stale written roster used to shadow default changes like
+  // Atlas's move to Computer Operations.)
   setEmployeeDisabled('nadia', true);
-  const roster = loadEmployees();
-  const kept = roster.filter((e) => e.agentId !== 'nadia');
-  fs.writeFileSync(path.join(here_, 'data', 'employees.json'), JSON.stringify({ employees: kept }, null, 2));
+  fs.rmSync(path.join(here_, 'data', 'employees.json'), { force: true });
 }
 /* ═════════════════ 11. think-forwarding + report ═════════════════════════ */
 console.log('\n[11] Live thinking — employee tokens reach the user');

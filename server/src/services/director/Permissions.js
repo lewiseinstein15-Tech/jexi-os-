@@ -16,6 +16,7 @@ const TOOL_REQUIREMENTS = {
   'knowledge-save': ['READ', 'WRITE'],
   'file-write': ['READ', 'WRITE'],
   'run-command': ['READ', 'EXECUTE'], // B210 — the employee command runner (allowlisted, sandboxed)
+  'browser-act': ['READ', 'COMPUTER'], // B211 B3 — real virtual-desktop browser driving
   'file-read': ['READ'],
   'git-commit': ['READ', 'WRITE', 'GIT'],
   'shell-run': ['READ', 'EXECUTE'],
