@@ -337,6 +337,7 @@ export async function runEmployeeSession(p) {
     artifacts: parsed.artifacts,
     needs: parsed.needs || null, // B209 — the NEEDS channel rides the result
     ms,
+    data: { commandsExecuted: totalCommandsExecuted }, // B210 — the execution backstop reads this
   }));
   emit('TASK_COMPLETED', {
     agentId: employee.agentId, agentName: employee.displayName,
