@@ -25,6 +25,9 @@ import { verifyDeliverable } from './Verifier.js';
 import { parseModelJson } from './JsonRepair.js';
 import { Mission, loadMission, listMissions, activeMissionFor, loadMissionEvents } from './Mission.js';
 import { WorkGraph, loadWorkGraph } from './WorkGraph.js';
+import { analyzeObjective } from './ComplexityAnalyzer.js';
+import { imagine, comparePredictedVsActual } from './ImaginationEngine.js';
+import { recordLesson, retrieveLessons, formatLessonsBlock, lessonCount } from './Lessons.js';
 
 const MAX_PARALLEL = 3;
 const PLAN_MAX_ITEMS = 8;
@@ -181,6 +184,51 @@ export class MissionRunner {
 
     if (mission.state === 'CREATED' || mission.state === 'PLANNING') {
       if (mission.state === 'CREATED') mission.setState('PLANNING');
+
+      // B2: classify once — complexity/risk → execution depth (who decided is recorded)
+      if (!mission.analysis) {
+        const analysis = await analyzeObjective(mission.objective, { llm: (a) => this.llm.employee(a) });
+        mission.analysis = analysis;
+        mission._persist();
+        this._publish(mission, {
+          type: 'MISSION_ANALYZED',
+          summary: `Mission classified ${analysis.complexity} / risk ${analysis.risk} (decided by ${analysis.decidedBy}) — depth: imagination ${analysis.executionDepth.imagination ? 'ON' : 'off'}, checkpoints ${analysis.executionDepth.checkpointMode}${analysis.executionDepth.requiresApproval ? ', APPROVAL GATE' : ''}.`,
+          data: { complexity: analysis.complexity, risk: analysis.risk, decidedBy: analysis.decidedBy, reasons: analysis.reasons, executionDepth: analysis.executionDepth },
+        });
+        if (analysis.executionDepth.requiresApproval) {
+          mission.needsQuestion = {
+            question: `This mission reads as ${analysis.risk.toLowerCase()} risk (${(analysis.reasons || []).slice(0, 2).join('; ')}). Reply "approve" to run it as stated, or tell me what to change — nothing has run yet.`,
+          };
+          mission.awaitingAnswerFor = null;
+          mission._persist();
+          this._publish(mission, { type: 'MISSION_AWAITING_INPUT', severity: 'warn', summary: `Risk gate: ${mission.needsQuestion.question.slice(0, 200)}` });
+          try { mission.setState('AWAITING_INPUT', 'risk approval gate'); } catch { /* racing a control; the record is already honest */ }
+          return;
+        }
+      }
+
+      // B2: bounded imagination pass for deep missions (honest skip when unavailable)
+      if (mission.analysis?.executionDepth?.imagination && !mission.imagination) {
+        const lessonsBlock = formatLessonsBlock(retrieveLessons(mission.objective, 3));
+        const pass = await imagine({ objective: mission.objective, analysis: mission.analysis, lessonsBlock, llm: (a) => this.llm.employee(a) });
+        mission.imagination = pass;
+        mission._persist();
+        if (pass.status === 'COMPLETED') {
+          const sel = pass.branches.find((b) => b.id === pass.selectedId);
+          this._publish(mission, {
+            type: 'IMAGINATION_PASS',
+            summary: `Imagined ${pass.branches.length} strategies (simulated, ${pass.cost.llmCalls} call(s)) — selected "${sel?.name}" (${pass.judgedBy}). A plan input, not a result.`,
+            data: { branches: pass.branches.map((b) => ({ name: b.name, status: b.status, because: b.verdict || b.rejectedBecause })), selected: sel?.name || null, simulated: true },
+          });
+        } else {
+          this._publish(mission, {
+            type: 'IMAGINATION_PASS', severity: 'warn',
+            summary: `Strategy simulation unavailable (${pass.reason}) — planning proceeds without it. Never faked.`,
+            data: { status: pass.status, reason: pass.reason },
+          });
+        }
+      }
+
       if (!graph.items.length) { // a crash after planning but before EXECUTING persisted leaves items → never re-plan (no duplicates)
         const planned = await this._plan(mission, graph);
         if (!planned) return; // _plan already failed the mission honestly
@@ -276,6 +324,13 @@ Output ONLY JSON:
       `# MISSION (the user's request, verbatim)\n"${mission.rawRequest || mission.objective}"`,
       mission.contextBlock ? `# CONVERSATION/TASK CONTEXT\n${mission.contextBlock.slice(0, 2000)}` : '',
       mission.memoryContext ? `# WHAT WE ALREADY KNOW (memory)\n${mission.memoryContext.slice(0, 1200)}` : '',
+      (mission.preplanSteering || []).length
+        ? `# USER STEERING (said on the approval gate — obey it in this plan)\n${mission.preplanSteering.map((s) => `- "${s}"`).join('\n')}`
+        : '',
+      mission.imagination?.status === 'COMPLETED'
+        ? `# SIMULATED STRATEGY (imagined in the imagination pass — a PLAN INPUT, nothing has run)\nSelected approach "${(mission.imagination.branches.find((b) => b.id === mission.imagination.selectedId) || {}).name}": ${(mission.imagination.branches.find((b) => b.id === mission.imagination.selectedId) || {}).approach}\nPredicted outcome (to be checked against reality at the end): ${(mission.imagination.branches.find((b) => b.id === mission.imagination.selectedId) || {}).predictedOutcome}`
+        : '',
+      formatLessonsBlock(retrieveLessons(`${mission.objective} ${(mission.preplanSteering || []).join(' ')}`, 3)),
     ].filter(Boolean).join('\n\n');
 
     let parsed = null;
@@ -353,7 +408,8 @@ Output ONLY JSON:
       ...blocked.map((i) => `- "${i.title}" (waiting on failed work)`),
       `# WORK ALREADY DONE (do not redo)`,
       ...graph.items.filter((i) => i.status === 'DONE').map((i) => `- ${i.title}`),
-    ].join('\n');
+      formatLessonsBlock(retrieveLessons(`${mission.objective} ${reason} ${failedItems.map((i) => i.failureReason || '').join(' ')}`, 3)),
+    ].filter(Boolean).join('\n');
     let parsed = null;
     try { parsed = parseModelJson(await this.llm.employee({ system, user })); } catch { parsed = null; }
     if (!parsed || !Array.isArray(parsed.items) || !parsed.items.length) return false;
@@ -401,18 +457,26 @@ Output ONLY JSON:
     if (!mission || mission.state !== 'AWAITING_INPUT') return { ok: false, error: `mission is ${mission ? mission.state : 'missing'}` };
     const graph = loadWorkGraph(mission.id);
     const itemId = mission.awaitingAnswerFor || mission.needsQuestion?.itemId || null;
+    const planned = Boolean(graph && graph.items.length);
+    const answerText = String(text || '');
     if (graph && itemId) {
       const item = graph.get(itemId);
       if (item) {
-        item.details = `${item.details}\n\n# USER ANSWER (this unblocks the work)\n"${String(text).slice(0, 800)}"`;
+        item.details = `${item.details}\n\n# USER ANSWER (this unblocks the work)\n"${answerText.slice(0, 800)}"`;
         item.updatedAt = new Date().toISOString();
         graph._persist();
       }
     }
+    // B2: an answer on the MISSION-level gate (risk gate, before any plan) that
+    // is not a plain approval is a CHANGE — keep it and feed it to the planner.
+    const APPROVAL_RE = /^(yes|y|approve[d]?|ok|okay|go( ahead)?|confirmed?|proceed|run it|do it|lgfm?)\b/i;
+    if (!itemId && !planned && answerText.trim() && !APPROVAL_RE.test(answerText.trim())) {
+      mission.preplanSteering = [...(mission.preplanSteering || []), answerText.slice(0, 800)];
+    }
     mission.needsQuestion = null;
     mission.awaitingAnswerFor = null;
-    mission.setState('EXECUTING', 'answer received');
-    this._publish(mission, { type: 'MISSION_RESUMED', summary: 'Answer received — the blocked item continues with it.' });
+    mission.setState(planned ? 'EXECUTING' : 'PLANNING', 'answer received');
+    this._publish(mission, { type: 'MISSION_RESUMED', summary: planned ? 'Answer received — the blocked item continues with it.' : 'Answer received — planning proceeds with it.' });
     this.kick(mission.id);
     return { ok: true };
   }
@@ -627,6 +691,18 @@ Output ONLY JSON: {"affectedItemIds":["wi-..."],"newItems":[{"title":"...","deta
         summary: `${nameFor(resultMsg.from)} delivered: ${item.title}${(resultMsg.artifacts || []).length ? ` (${resultMsg.artifacts.length} artifact(s), hashed)` : ''}.`,
         data: { itemId: item.id, ms: Date.now() - t0, confidence: resultMsg.confidence, artifacts: (resultMsg.artifacts || []).map((a) => a.name) },
       });
+      // B2: an item that needed the recovery ladder but STILL delivered = a working strategy worth remembering
+      const recoveries = task.recoveries || [];
+      if (recoveries.length) {
+        const lastAction = recoveries[recoveries.length - 1];
+        recordLesson({
+          kind: 'recovery', missionId: mission.id, objective: [mission.rawRequest, mission.objective].filter(Boolean).join(' | ').slice(0, 300), itemTitle: item.title,
+          cause: `${lastAction.action}: ${String(lastAction.reason || '').slice(0, 160)}`,
+          strategy: `recovery ladder round ${recoveries.length}`,
+          lesson: `"${item.title}" (capability: ${item.capability}) hit "${String(lastAction.reason || '').slice(0, 120)}" but recovered via ${lastAction.action} and delivered — for similar work, expect this failure mode and keep one recovery round.`,
+        });
+        this._publish(mission, { type: 'LESSON_RECORDED', summary: `Operational lesson recorded: ${item.title} recovered via ${lastAction.action} — future plans will see it.` });
+      }
       const found = extractDiscovered(resultMsg.content);
       if (found.length) this._ingestDiscovered(mission, graph, item, found);
     } else {
@@ -637,6 +713,14 @@ Output ONLY JSON: {"affectedItemIds":["wi-..."],"newItems":[{"title":"...","deta
       mission.usage.failures += 1;
       mission._persist();
       this._publish(mission, { type: 'WORK_FAILED', severity: 'error', title: item.title, summary: `"${item.title}" failed after the full recovery ladder — ${reason.slice(0, 140)} — recorded honestly, never faked.`, data: { itemId: item.id } });
+      // B2: a real failure is operational knowledge — record it for future planning
+      recordLesson({
+        kind: 'failure', missionId: mission.id, objective: [mission.rawRequest, mission.objective].filter(Boolean).join(' | ').slice(0, 300), itemTitle: item.title,
+        failure: reason, cause: String(lastRec?.reason || reason).slice(0, 200),
+        strategy: `recovery ladder exhausted after ${((task.recoveries || []).length)} round(s)`,
+        lesson: `"${item.title}" (capability: ${item.capability}) failed for: ${reason.slice(0, 160)} — plan a different approach for this kind of item, do not retry the same way.`,
+      });
+      this._publish(mission, { type: 'LESSON_RECORDED', severity: 'warn', summary: `Operational lesson recorded: how "${item.title}" failed — future plans will avoid repeating it.` });
     }
   }
 
@@ -722,6 +806,32 @@ Output ONLY JSON: {"affectedItemIds":["wi-..."],"newItems":[{"title":"...","deta
       summary: `Verification: ${verification.verdict} (${verification.score}) — ${verification.rationale || ''}`.slice(0, 400),
       data: { verdict: verification.verdict, score: verification.score, problems: verification.problems },
     });
+
+    // B2: close the imagination loop — PREDICTED vs ACTUAL, deviation + lesson (real numbers only)
+    if (mission.imagination?.status === 'COMPLETED' && !mission.imagination.review) {
+      const stats = graph.stats();
+      const review = comparePredictedVsActual(mission.imagination, {
+        verdict: verification.verdict, score: verification.score,
+        itemsTotal: graph.items.length, itemsDone: doneItems.length,
+        itemsFailed: stats.byStatus.FAILED || 0, replans: mission.usage.replans,
+      });
+      if (review) {
+        mission.imagination.review = review;
+        mission._persist();
+        this._publish(mission, {
+          type: 'IMAGINATION_REVIEW',
+          severity: review.outcomeMatched ? 'info' : 'warn',
+          summary: `Predicted vs actual — ${review.outcomeMatched ? 'prediction held' : 'prediction deviated'}: ${review.lesson.slice(0, 260)}`,
+          data: { predicted: review.predicted, actual: review.actual, itemsDelta: review.itemsDelta },
+        });
+        recordLesson({
+          kind: 'deviation', missionId: mission.id, objective: [mission.rawRequest, mission.objective].filter(Boolean).join(' | ').slice(0, 300),
+          cause: `strategy "${review.strategy}" — itemsDelta ${review.itemsDelta ?? 'n/a'}, outcomeMatched ${review.outcomeMatched}`,
+          strategy: review.strategy,
+          lesson: review.lesson,
+        });
+      }
+    }
 
     if (verification.verdict === 'fail' && mission.usage.replans < 1) {
       mission.usage.replans += 1;
@@ -830,6 +940,15 @@ Output ONLY JSON: {"affectedItemIds":["wi-..."],"newItems":[{"title":"...","deta
         objective: mission.objective, successCriteria: mission.successCriteria,
         createdAt: mission.createdAt, updatedAt: mission.updatedAt,
         needsQuestion: mission.needsQuestion, pausedReason: mission.pausedReason,
+        analysis: mission.analysis ? { complexity: mission.analysis.complexity, risk: mission.analysis.risk, decidedBy: mission.analysis.decidedBy, executionDepth: mission.analysis.executionDepth } : null,
+        imagination: mission.imagination ? {
+          status: mission.imagination.status, simulated: mission.imagination.simulated === true,
+          reason: mission.imagination.reason || null,
+          selected: (mission.imagination.branches || []).find((b) => b.id === mission.imagination.selectedId)?.name || null,
+          branches: (mission.imagination.branches || []).map((b) => ({ name: b.name, status: b.status })),
+          review: mission.imagination.review ? { outcomeMatched: mission.imagination.review.outcomeMatched, itemsDelta: mission.imagination.review.itemsDelta, lesson: mission.imagination.review.lesson } : null,
+        } : null,
+        lessonsKnown: lessonCount(),
         verification: mission.verification, result: mission.result ? { summary: mission.result.summary } : null,
         budgets: mission.budgets, usage: mission.usage,
       },

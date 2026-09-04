@@ -57,6 +57,11 @@ class FakeLlm {
   }
   async employee({ system } = {}) {
     const sys = String(system || '');
+    // B2 intelligence call sites (analyzer / imagination / judge): no lane in
+    // this harness → the honest fallbacks kick in (heuristics classification,
+    // SIMULATION_UNAVAILABLE) WITHOUT consuming session-queue entries.
+    if (/MISSION COMPLEXITY/.test(sys)) throw new Error('no analysis lane');
+    if (/COUNTERFACTUAL STRATEGY/.test(sys) || /STRATEGY JUDGE/.test(sys)) throw new Error('no imagination lane');
     if (/PERSISTENT MISSION/.test(sys)) return JSON.stringify(this.planJson);
     if (/Mid-mission steering/.test(sys)) return JSON.stringify(this.impactJson);
     this.sessionCalls += 1;

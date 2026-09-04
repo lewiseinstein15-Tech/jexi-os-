@@ -122,7 +122,7 @@ for Lane A use cases without deleting them.
 5. Discovered work classification + ingestion.
 6. Tests: graph/ready-engine unit, state machine, restart-recovery, steering, discovery.
 
-**Phase B2 — intelligence:** complexity/risk analyzer → depth; Imagination Engine (bounded, honest); lessons store.
+**Phase B2 — intelligence:** complexity/risk analyzer → depth; Imagination Engine (bounded, honest); lessons store. **SHIPPED** — `ComplexityAnalyzer.js` (LLM-first with deterministic heuristic floor, `decidedBy` always recorded; CRITICAL risk gates the mission behind user approval, non-approval answers steer the plan), `ImaginationEngine.js` (≤3 branches, ≤2 LLM calls, CREATED→SELECTED/REJECTED with reasons, SIMULATION_UNAVAILABLE never faked, PREDICTED vs ACTUAL review at mission end), `Lessons.js` (failure/recovery/deviation lessons, deduped, persisted, retrieved into plan + replan prompts). 74 tests (`test-b211b2.js`), 185 B211 total.
 
 **Phase B3 — computer:** Atlas employee + computer tool gates + observe/act/verify loop; `COMPUTER_*` events; live computer panel (real screenshots via existing DesktopManager routes).
 
