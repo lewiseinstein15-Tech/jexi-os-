@@ -104,6 +104,15 @@ const tierOf = (items) => {
   return tiers.filter(Boolean);
 };
 
+/** B224 — duplicate-safe event append: SSE push and the REST fallback can
+ *  both deliver an event; ids are unique so the union stays clean. */
+const appendEvents = (prev, incoming, incremental) => {
+  if (!incremental) return (incoming || []).slice(-300);
+  const seen = new Set(prev.map((e) => e.id));
+  const fresh = (incoming || []).filter((e) => e && e.id && !seen.has(e.id));
+  return fresh.length ? [...prev, ...fresh].slice(-300) : prev;
+};
+
 export default function MissionsScreen() {
   const [missions, setMissions] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
@@ -116,6 +125,7 @@ export default function MissionsScreen() {
   const [note, setNote] = useState('');
   const lastEventId = useRef(null);
   const selectedRef = useRef(null);
+  const [esLive, setEsLive] = useState(false); // B224 — SSE push live (stretches the poll)
   const seenItemIds = useRef(null); // B216: animate only nodes that join AFTER first render
   selectedRef.current = selectedId;
 
@@ -141,7 +151,7 @@ export default function MissionsScreen() {
       const w = rWorld && rWorld.ok ? await rWorld.json().catch(() => null) : null;
       if (w && w.ok) setWorld(w.world || null);
       if (e.ok && Array.isArray(e.events)) {
-        setEvents((prev) => (incremental ? [...prev, ...e.events].slice(-300) : e.events.slice(-300)));
+        setEvents((prev) => appendEvents(prev, e.events, incremental));
         const last = e.events[e.events.length - 1];
         if (last?.id) lastEventId.current = last.id;
       }
@@ -158,16 +168,42 @@ export default function MissionsScreen() {
 
   useEffect(() => {
     if (!selectedId) return;
-    setSnap(null); setEvents([]); setWorld(null); lastEventId.current = null; seenItemIds.current = null;
+    setSnap(null); setEvents([]); setWorld(null); lastEventId.current = null; seenItemIds.current = null; setEsLive(false);
     loadDetail(selectedId, false);
   }, [selectedId, loadDetail]);
 
+  // B224 — Part 29: SSE PUSH while a mission is open. Events arrive within a
+  // second of landing; native reconnect replays the missed tail. On any error
+  // the stream closes and the REST poll (below) keeps the screen alive — the
+  // polling fabric is the fallback, not the primary.
+  useEffect(() => {
+    if (!selectedId || typeof EventSource === 'undefined') return;
+    const key = getAccessKey();
+    const streamUrl = `${getBackendUrl()}/api/missions/${selectedId}/events/stream`;
+    const url = key ? `${streamUrl}?key=${encodeURIComponent(key)}` : streamUrl;
+    let es;
+    try { es = new EventSource(url); } catch { return; }
+    es.addEventListener('ready', () => setEsLive(true));
+    es.addEventListener('mission-event', (ev) => {
+      try {
+        const e = JSON.parse(ev.data);
+        setEvents((prev) => appendEvents(prev, [e], true));
+        if (e.id) lastEventId.current = e.id;
+      } catch { /* malformed frame — the poll will backstop */ }
+    });
+    es.onerror = () => { setEsLive(false); try { es.close(); } catch { /* already closed */ } };
+    return () => { try { es.close(); } catch { /* already closed */ } setEsLive(false); };
+  }, [selectedId]);
+
+  // the REST poll: still the state source (progress/items), but stretched
+  // while SSE is live — events already arrive by push (§8 performance contract).
   useEffect(() => {
     if (!selectedId) return;
     const active = snap && ACTIVE_STATES.concat('PAUSED').includes(snap.mission?.state);
-    const t = setInterval(() => loadDetail(selectedId, true), active ? 2500 : 8000);
+    const interval = esLive ? (active ? 8000 : 20000) : (active ? 2500 : 8000);
+    const t = setInterval(() => loadDetail(selectedId, true), interval);
     return () => clearInterval(t);
-  }, [selectedId, snap && snap.mission && snap.mission.state, loadDetail]);
+  }, [selectedId, snap && snap.mission && snap.mission.state, esLive, loadDetail]);
 
   const control = async (action, extra = {}) => {
     if (!selectedId) return;
@@ -438,6 +474,44 @@ export default function MissionsScreen() {
               </div>
             </div>
           )}
+
+          {/* ══ TOOL DISCOVERY — B223 Part 20, surfaced (real event data only) ══ */}
+          {(() => {
+            const td = [...events].reverse().find((e) => e.type === 'TOOLS_DISCOVERED' && e.data);
+            if (!td) return null;
+            const d = td.data;
+            const tools = Array.isArray(d.tools) ? d.tools : [];
+            const caps = Array.isArray(d.requiredCapabilities) ? d.requiredCapabilities : [];
+            const gaps = [...(Array.isArray(d.gaps) ? d.gaps : []), ...(Array.isArray(d.blockedByAllowlist) ? d.blockedByAllowlist : [])];
+            return (
+              <div className="space-y-1 min-w-0">
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="text-[9px] font-mono font-bold tracking-[0.14em] text-text-tertiary">TOOL DISCOVERY</span>
+                  <span className="text-[9px] font-mono text-text-tertiary">{tools.length} tools · {caps.length} capabilities</span>
+                  {esLive && <span className="text-[8px] font-mono text-brand">· push</span>}
+                </div>
+                <div className="rounded-lg border border-hairline bg-surface-1/40 px-2.5 py-2 space-y-1.5 min-w-0">
+                  {caps.length > 0 && (
+                    <div className="flex flex-wrap gap-1 min-w-0">
+                      {caps.map((c) => (
+                        <span key={c} className="text-[9px] font-mono text-text-secondary border border-hairline rounded-full px-1.5 py-0.5">{c}</span>
+                      ))}
+                    </div>
+                  )}
+                  {tools.length > 0 && (
+                    <div className="text-[9px] font-mono text-text-tertiary break-words leading-relaxed">{tools.slice(0, 10).join(' · ')}{tools.length > 10 ? ` · +${tools.length - 10} more` : ''}</div>
+                  )}
+                  {gaps.length > 0 && (
+                    <div className="space-y-0.5">
+                      {gaps.map((g) => (
+                        <div key={g.capability} className="text-[9px] font-mono text-status-warn leading-snug">⚠ {g.capability} — {g.reason}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ══ ACTIVITY STREAM — the append-only log (§5.5) ══ */}
           <div className="space-y-1 min-w-0">

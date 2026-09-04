@@ -7,7 +7,8 @@
 >
 > Verification snapshot: local suites green (B208 89, B209 92, B210 64,
 > B211 spine 111, B2 74, B3 57, B4 autonomy 53 = 540 director-lane checks;
-> 295 of them B211), CI 5/5, Render live.
+> 295 of them B211), CI 5/5, Render live. B223 adds tool discovery (17),
+> B224 adds SSE push (10) — full chain 0 ❌.
 
 | # | Spec capability | Status | Evidence (real passing tests) | Notes / honest limits |
 |---|---|---|---|---|
@@ -41,6 +42,8 @@
 | 28 | Failure-injection suite | SHIPPED | `tests/autonomy/failure-injection.js` (429s, BAD_OUTPUT, lane death, verify-fail correction, tool failure, imagination-down, lessons) | — |
 | 29 | Secrets never in prompts/logs/telemetry/UI/artifacts | SHIPPED (standing) | B209/B210 gate tests; command env scrubbing (shellEnv); sanitizeWorkProduct | No new secret surface introduced by B211 |
 | 30 | Event-sourcing rule: the frontend never invents operational events | SHIPPED (standing) | B208 89 checks + all B211 events originate server-side | ComputerPanel/TeamLive render only |
+| 31 | Tool discovery: objective → capability → tool, risk + verification metadata, honest gaps (Part 20) | SHIPPED | `test-b223.js` (17: registry coverage, B209 risk truth, verification kinds, provenance, allowlist respect, gap honesty, determinism, wiring contracts) | ADDITIVE metadata — team injection unchanged; discovery does not yet compose teams |
+| 32 | SSE push for mission events: native replay, bounded 300, heartbeat, ?key auth; polling as fallback (Part 29) | SHIPPED | `test-b224.js` (10: wire format on a real HTTP server, LIVE push without client poll, Last-Event-ID tail-only replay, 404, heartbeat, cleanup, auth + frontend contracts) | Server tails events.jsonl at 1s per open stream; client stretches polls while push is live |
 
 ## Honest limitations (not hidden, not converted to PASS)
 
@@ -72,3 +75,19 @@
    ("zero commands were executed ... indicating the data was fabricated").
    Residual: non-browser method claims rely on the grounded rubric
    (model-based, evidence-armed) rather than a deterministic gate.
+
+7. ~~Tool discovery (spec Part 20)~~ **CLOSED in B223**: the registry is now
+   matched per-objective — interpreter + documented keyword capabilities →
+   tools with B209 risk, verification kinds, honest gaps; additive wiring,
+   never bypassing the B52 allowlist or B209 gate. `test-b223.js` (17).
+8. ~~SSE/WebSocket push (spec Part 29)~~ **CLOSED in B224**: mission events
+   push over SSE with native Last-Event-ID replay; the polling fabric
+   remains as fallback (and stretches while push is live — §8 contract).
+   `test-b224.js` (10), wire-tested against the real handler.
+9. ~~Mission UI design system (Parts 32–51)~~ **CLOSED in B216/B221/B222**:
+   DESIGN_SYSTEM.md + the mission instrument, then the all-screen migration
+   (one green, three voices, 21 views verified at 390×844, 0 console
+   errors). Vocabulary aligned with this matrix: capability names in
+   `ToolDiscovery.js` (author-code / research / vision / data-analysis /
+   git / outbound-send / scheduling / verification / …) are the canonical
+   terms; docs and code use the same words for the same things.

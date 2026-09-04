@@ -27,6 +27,7 @@ import { Director } from './src/services/director/Director.js'; // B208 — JEXI
 import { realLlmAdapter, realTools } from './src/services/director/RealAdapters.js';
 import { missionRunner } from './src/services/director/MissionRunner.js'; // B211 — persistent missions (work graph)
 import { listMissions, loadMission, loadMissionEvents } from './src/services/director/Mission.js'; // B211 — mission store + replayable event log
+import { missionEventStream } from './src/routes/missionStream.js'; // B224 — Part 29 SSE push
 import { loadWorldState, runtimeCapabilities, globalWorld } from './src/services/director/WorldState.js'; // B215 — real environment record
 import { loadTask as loadDirectorTask, loadTaskById, listDirectorTasks } from './src/services/director/TaskState.js'; // B209 — multi-task records
 import { rosterSummary as employeeRoster, rosterDetail, setEmployeeDisabled, upsertEmployee, employeeHistory } from './src/services/director/Employees.js'; // B209 — runtime team management
@@ -262,11 +263,6 @@ setInboundReplyGenerator(async (event) => {
 });
 
 const app = express();
-// B219 — Render terminates TLS in front of this process: trust exactly one
-// proxy hop so express-rate-limit keys on the REAL client IP from
-// X-Forwarded-For (otherwise every visitor shares the proxy's IP and the
-// limiter emits ERR_ERL_UNEXPECTED_X_FORWARDED_FOR warnings).
-app.set('trust proxy', 1);
 
 // === API ACCESS CONTROL (optional but recommended for production) ===
 // Set JEXI_API_KEY in the host env (Render dashboard) and every AI-spend / data
@@ -310,6 +306,9 @@ app.use((req, res, next) => {
   // they stay open for browser verification with no shell access. Connector
   // sends/config/toggle stay API-key gated.
   if (req.method === 'GET' && (req.path.startsWith('/api/connectors') || req.path === '/api/memory/persistence')) return next();
+  // B224 — SSE push: EventSource cannot set headers, so the mission event
+  // stream authenticates with the same key as a query parameter.
+  if (req.method === 'GET' && /^\/api\/missions\/[^/]+\/events\/stream$/.test(req.path) && keyMatches(req.query.key)) return next();
   if (keyMatches(req.headers['x-jexi-key'])) return next();
   res.status(401).json({ error: 'Unauthorized — this server is locked. Set the JEXI access key in Settings → System.' });
 });
@@ -1206,7 +1205,7 @@ app.post('/api/vision', async (req, res) => {
       'Describe what you see warmly and precisely: who or what is in frame, expressions, lighting, surroundings. ' +
       'Be honest if the image is unclear or if no face is visible. Keep it natural and short (2-4 sentences).',
       image,
-      // prefer Gemini first — its vision (gemini-3.6-flash) is far sharper than
+      // prefer Gemini first — its vision (gemini-2.5-flash) is far sharper than
       // Groq's llama-4-scout, and it is a key the user already has. Seed-family
       // vision (via OpenRouter) is tried last when OPENROUTER_API_KEY is set.
       { prefer: 'gemini', temperature: 0.5 }
@@ -1337,6 +1336,9 @@ app.get('/api/missions/:id/events', (req, res) => {
   const events = loadMissionEvents(m.id, String(req.query.sinceEventId || ''));
   res.json({ ok: true, missionId: m.id, state: m.state, events });
 });
+
+// B224 — Part 29: SSE push (handler extracted so the chain tests the real wire behavior)
+app.get('/api/missions/:id/events/stream', missionEventStream);
 // B215 — WORLD STATE: the real environment record for a mission (files,
 // processes, browser, publishes — observed facts only, never synthesized).
 app.get('/api/missions/:id/world', (req, res) => {

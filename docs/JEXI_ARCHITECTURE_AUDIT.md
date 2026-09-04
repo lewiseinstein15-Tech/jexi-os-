@@ -186,7 +186,7 @@
 - **Spec delta:** no SSE/WebSocket push (spec says "use existing infrastructure where
   appropriate" — the polling fabric IS the existing infrastructure; push would be a new
   subsystem). Poll intervals are adaptive (2.5s only while active).
-- **Status: WORKING (polling fabric, reconnect-safe) / PARTIAL vs spec's SSE preference.**
+- **Status: WORKING — SSE push since B224** (native replay, heartbeat, ?key auth) **+ the polling fabric as fallback** (reconnect-safe; intervals stretch while push is live). .
 
 ### Telemetry (`Telemetry.js`, `ChatEventLogger.js`)
 - Real observed performance only (success, duration, verdicts, provider failures) feeding
@@ -233,8 +233,8 @@
 | 3 | Part 9 | WorldState — explicit persisted environment state, updated by real actions, read at planning | **B215 — DONE** (`WorldState.js`, EmployeeSession/MissionRunner/publish seams, `/api/missions/:id/world`, `test-b215.js` §3–4) |
 | 4 | Parts 32–51 | Human-first UI evolution: design system doc, work-graph visual experience, semantic motion, employee UI, error UI, mobile-first pass, performance | **DONE — B216 (MissionsScreen, DESIGN_SYSTEM.md) + B221 (all-screen migration: one-green color authority purge of legacy magenta, mono/display/prose voice sweep across 29 components, spec screens C/D/F wired back in — Memory bank, Books library, App installer — B207 layout verified 9/9 views at 390px, 0 console errors)** |
 | 5 | Part 20 | Objective→capability→tool discovery registry (current: per-employee tool injection — safe but not discovery) | **DONE — B223** (`ToolDiscovery.js`: interpreter+keyword → capabilities, registry-matched tools with B209 risk + verification metadata, honest capability gaps, B52-aware; Director attaches + emits TOOLS_DISCOVERED as ADDITIVE metadata; `/api/tools/discover`; `test-b223.js` 17/17) |
-| 6 | Part 29 | SSE/WebSocket push (current: adaptive polling, reconnect-safe) | Later phase (explicit spec permission to use existing fabric) |
-| 7 | Part 56/60 | Docs: DESIGN_SYSTEM, HUMAN_UI_AUDIT, GENERAL_INTELLIGENCE_AUDIT, IMPLEMENTATION_REPORT + matrix vocabulary alignment | With their phases (never before the work is real) |
+| 6 | Part 29 | SSE/WebSocket push (current: adaptive polling, reconnect-safe) | **DONE — B224** (`/api/missions/:id/events/stream`: SSE push, native Last-Event-ID replay, bounded 300, heartbeat, ?key auth for EventSource; REST polling stays as fallback and stretches while push is live; `test-b224.js` 10/10 wire-tested) |
+| 7 | Part 56/60 | Docs: DESIGN_SYSTEM, HUMAN_UI_AUDIT, GENERAL_INTELLIGENCE_AUDIT, IMPLEMENTATION_REPORT + matrix vocabulary alignment | **DONE — B216/B221 (design + audit) + B224**: GENERAL_INTELLIGENCE_AUDIT.md + IMPLEMENTATION_REPORT.md written against the shipped system; CAPABILITY_MATRIX rows 31–32 + closed-limitations 7–9; ToolDiscovery capability names are the canonical vocabulary |
 | 8 | Part 13 | "AndroidRuntime" adapter does not exist — not claimed, not faked; computer use reports real adapters only | Not scheduled (would need real Android infra; honest BLOCKED by environment) |
 | 9 | Memory | Chat transcripts ephemeral across deploys (env limitation, documented) | **DONE in B217** — Redis mirror (`jexi:mirror:*` keys, 30s sync, boot rehydrate) |
 
