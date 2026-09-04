@@ -25,6 +25,8 @@ import { orchestrator } from './src/services/Orchestrator.js';
 import { runSimpleTask } from './src/services/SimpleTask.js'; // B66 — Orchestrator-Workers SIMPLE fast path
 import { Director } from './src/services/director/Director.js'; // B208 — JEXI the boss: interpret→plan→staff→delegate→supervise→verify→report
 import { realLlmAdapter, realTools } from './src/services/director/RealAdapters.js';
+import { missionRunner } from './src/services/director/MissionRunner.js'; // B211 — persistent missions (work graph)
+import { listMissions, loadMission, loadMissionEvents } from './src/services/director/Mission.js'; // B211 — mission store + replayable event log
 import { loadTask as loadDirectorTask, loadTaskById, listDirectorTasks } from './src/services/director/TaskState.js'; // B209 — multi-task records
 import { rosterSummary as employeeRoster, rosterDetail, setEmployeeDisabled, upsertEmployee, employeeHistory } from './src/services/director/Employees.js'; // B209 — runtime team management
 import { normalizeFinalAnswer } from './src/services/Formatting.js'; // B66 — normalize every final answer
@@ -1232,6 +1234,49 @@ app.get('/api/team/tasks', (req, res) => {
   res.json({ ok: true, tasks: listDirectorTasks(convId) });
 });
 
+// B211 — MISSIONS: persistent work graphs. The chat layer STREAMS these
+// events (it never invents them); these endpoints inspect and control the
+// missions that keep running server-side across refresh, disconnect, restart.
+app.get('/api/missions', (req, res) => {
+  const convId = String(req.query.conversationId || req.headers['x-jexi-conv'] || '');
+  const missions = listMissions(convId || null, 50).map((m) => ({
+    id: m.id, state: m.state, objective: m.objective, createdAt: m.createdAt, updatedAt: m.updatedAt,
+    awaitingAnswer: Boolean(m.needsQuestion), verification: m.verification ? m.verification.verdict : null,
+  }));
+  res.json({ ok: true, missions });
+});
+app.post('/api/missions', (req, res) => {
+  if (!missionRunner.llm) return res.status(503).json({ ok: false, error: 'mission runner not configured' });
+  const { conversationId, objective, contextBlock, memoryContext } = req.body || {};
+  if (!objective) return res.status(400).json({ ok: false, error: 'objective required' });
+  const m = missionRunner.create({ conversationId: conversationId || 'default', objective, rawRequest: objective, contextBlock: contextBlock || '', memoryContext: memoryContext || '', budgets: {} });
+  res.json({ ok: true, missionId: m.id, state: m.state });
+});
+app.get('/api/missions/:id', (req, res) => {
+  const snap = missionRunner.snapshot(req.params.id);
+  if (!snap) return res.status(404).json({ ok: false, error: 'mission not found' });
+  res.json({ ok: true, ...snap });
+});
+app.get('/api/missions/:id/events', (req, res) => {
+  const m = loadMission(req.params.id);
+  if (!m) return res.status(404).json({ ok: false, error: 'mission not found' });
+  const events = loadMissionEvents(m.id, String(req.query.sinceEventId || ''));
+  res.json({ ok: true, missionId: m.id, state: m.state, events });
+});
+app.post('/api/missions/:id/control', (req, res) => {
+  const { action, itemId, reason } = req.body || {};
+  const r = missionRunner.control(req.params.id, action, { itemId, reason });
+  if (!r.ok) return res.status(400).json(r);
+  res.json(r);
+});
+app.post('/api/missions/:id/steer', (req, res) => {
+  const { message } = req.body || {};
+  if (!message) return res.status(400).json({ ok: false, error: 'message required' });
+  const r = missionRunner.steer(req.params.id, message);
+  if (!r.ok) return res.status(400).json(r);
+  res.json(r);
+});
+
 // B209 — RUNTIME TEAM MANAGEMENT: the boss can re-staff her own team live.
 app.get('/api/team/roster', (req, res) => {
   res.json({ ok: true, employees: rosterDetail() });
@@ -1741,6 +1786,18 @@ app.post('/api/chat', async (req, res) => {
         }
         let directorTurn = null;
         if (!image) {
+          // B211 — MISSION LANE FIRST: a persistent mission claims this turn
+          // when the message continues/steers/answers one, or explicitly
+          // starts a new mission. Chat is a VIEW onto the mission: it streams
+          // real mission events while the mission keeps running server-side
+          // across disconnects and restarts. On any error the normal lanes
+          // take the turn unchanged.
+          try {
+            const missionHandled = await missionRunner.handleChat({ raw, effectiveQuery, convId, sendEvent, done, decision });
+            if (missionHandled) { finish(); return; }
+          } catch (e) {
+            sendEvent('log', { agent: 'Missions', message: `⚠ Mission lane error (${String(e && e.message || e).slice(0, 100)}) — the normal lanes take this turn.` });
+          }
           try {
             const director = new Director({
               llm: realLlmAdapter(),
@@ -2226,6 +2283,14 @@ if (process.env.NODE_ENV === 'production' && !API_KEY && process.env.JEXI_ALLOW_
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🧠 JEXI OS BRAIN running on port ${PORT}`);
+  // B211 — MISSION BOOT RECOVERY: missions that were mid-flight when the
+  // process died resume now — in-flight items requeued honestly (leases
+  // cleared, DONE work and artifacts never redone).
+  try {
+    missionRunner.configure({ llm: realLlmAdapter(), tools: realTools() });
+    const resumed = missionRunner.resumeOnBoot();
+    if (resumed) console.log(`🛰️ B211 missions: ${resumed} mid-flight mission(s) resumed after restart`);
+  } catch (e) { console.warn('mission boot recovery:', e.message); }
   // Chromium is launched LAZILY on first desktop/QA use, never held resident at
   // boot: on small hosts (512MB) a permanently-open browser + concurrent page
   // parsing during search was OOM-killing the process mid-request.
