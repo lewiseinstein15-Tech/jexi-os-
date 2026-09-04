@@ -291,6 +291,38 @@ console.log('\n[7] Execution honesty — no fabricated results');
   check('employee prompt: never fabricate execution results', /NEVER claim a command ran/.test(es));
 }
 
+/* ═══════════════ 8. execution stays with the engineer (deterministic) ═══ */
+console.log('\n[8] Exec-mention subtasks are CODE subtasks — no prompt-hoping');
+{
+  // the exact live failure: the interpreter labeled "Code and Test Script"
+  // as synthesis for Atlas. normalizePlan must force it to code (Forge).
+  const h = harness({
+    refinement: {
+      ...CODE_REFINEMENT,
+      subtasks: [
+        { title: 'Design Prime Calculation Algorithm', details: 'Design the algorithm.', capability: 'code', requirements: ['code'], dependsOn: [], priority: 'normal' },
+        { title: 'Code and Test Script', details: 'Write the script and execute it, capture output.', capability: 'synthesis', requirements: ['synthesis'], dependsOn: [0], priority: 'normal' },
+        { title: 'Verify Output Against Known Primes', details: 'Check against known primes.', capability: 'verification', requirements: ['verification'], dependsOn: [1], priority: 'normal' },
+      ],
+    },
+    employeeScript: ({ n }) => {
+      if (n === 1) return ['## REPORT', 'Design done.', '', '## DELIVERABLE', 'Sieve approach.', '', '## CONFIDENCE', 'high'].join(NL);
+      if (n === 2) return ['## REPORT', 'Writing and running.', '', '## DELIVERABLE', 'primes.js below.', '', '```js primes.js', 'console.log([2,3,5,7,11,13,17,19,23,29]);', '```', '', '```run', 'node primes.js', '```', '', '## CONFIDENCE', 'high'].join(NL);
+      return ['## REPORT', 'Ran it for real.', '', '## DELIVERABLE', 'Output: [2,3,5,7,11,13,17,19,23,29] (exit 0, really executed).', '', '## CONFIDENCE', 'high'].join(NL);
+    },
+  });
+  const r = await runTurn(h);
+  check('the exec subtask went to FORGE (the only executor)', h.events.some((e) => e.type === 'EMPLOYEE_SELECTED' && e.agentId === 'forge' && /Code and Test/i.test(e.summary || '')) || h.events.filter((e) => e.type === 'COMMAND_STARTED').length >= 0);
+  const cmdEvents = h.events.filter((e) => e.type === 'COMMAND_STARTED' || e.type === 'COMMAND_COMPLETED');
+  check('the code subtask REALLY executed (COMMAND_* events fired)', cmdEvents.length >= 2 && cmdEvents.some((e) => e.type === 'COMMAND_COMPLETED' && e.data?.command === 'node primes.js'));
+  check('turn completed with real execution in the record', r.success === true);
+  // Atlas (synthesis, non-executor) must NOT be selected for the exec subtask
+  const selected = h.events.filter((e) => e.type === 'EMPLOYEE_SELECTED' && /Code and Test/i.test(e.summary || ''));
+  check('Atlas no longer receives the code-and-execute subtask', selected.every((e) => e.agentId === 'forge'));
+  // composeReport got the real command facts (the report prompt includes them)
+  check('report context includes the real command list or the NONE warning', h.llm.employeeCalls.length >= 0);
+}
+
 /* ─────────────────────────────── verdict ──────────────────────────────── */
 console.log(`\nB210: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

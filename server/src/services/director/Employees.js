@@ -225,6 +225,9 @@ export function rankEmployees(requirements, opts = {}) {
   for (const employee of loadEmployees()) {
     if (employee.disabled) continue;
     if (opts.exclude?.has(employee.agentId)) continue;
+    // B210 — some subtasks NEED a real tool (execution): only employees
+    // staffed for it may be selected, whoever else ranks higher on paper
+    if (opts.requireTool && !(employee.supportedTools || []).includes(opts.requireTool)) continue;
     let score = 0;
     const matched = [];
     const missing = [];

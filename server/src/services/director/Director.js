@@ -168,7 +168,19 @@ export class Director {
         emit({ type: 'EMPLOYEE_SELECTED', agentId: lead.agentId, agentName: lead.displayName, summary: `${lead.displayName} takes the build — she's the responsible engineer for this one.`, data: { subtaskId: subtask.id, department: subtask.department } });
         continue;
       }
-      const employee = selectEmployee(subtask.requirements?.length ? subtask.requirements : [subtask.capability], { exclude: usedEmployees, fallback: 'echo' });
+      // B210 — a subtask that wants execution goes to an employee who can
+      // actually EXECUTE (Forge staffs run-command). The executor is never
+      // excluded by prior use — a design subtask must not steal her from
+      // the build-and-run subtask that needs her hands.
+      const stText = `${subtask.title} ${subtask.details} ${subtask.expectedOutput || ''}`;
+      const wantsExecution = /\b(run|runs|ran|execute|executes|executed|execution|test|tests|testing)\b/i.test(stText) && /\b(script|scripts|code|program|node|python|javascript|js)\b/i.test(stText);
+      const excludeFor = wantsExecution
+        ? new Set([...usedEmployees].filter((id) => { const e = getEmployee(id); return !e?.supportedTools?.includes('run-command'); }))
+        : usedEmployees;
+      const employee = selectEmployee(
+        subtask.requirements?.length ? subtask.requirements : [subtask.capability],
+        { exclude: excludeFor, fallback: 'echo', ...(wantsExecution ? { requireTool: 'run-command' } : {}) },
+      );
       usedEmployees.add(employee.agentId);
       const role = subtask.id === plan.leadSubtaskId ? 'lead' : 'support';
       staffed.push({ subtask, employee, role });
@@ -457,6 +469,7 @@ Your answer IS the final user-facing message. Deliverable content should be pres
         task.assumptions.length ? `# ASSUMPTIONS MADE\n${task.assumptions.map((a) => `- ${a}`).join('\n')}` : '',
         task.successCriteria.length ? `# SUCCESS CRITERIA\n${task.successCriteria.map((c) => `- ${c}`).join('\n')}` : '',
         `# EXECUTION RECORD (what actually ran)`,
+        `Real commands executed this task: ${(task.events || []).filter((e) => e.type === 'COMMAND_COMPLETED' || e.type === 'TEST_COMPLETED').map((e) => e.data?.command).filter(Boolean).join(' · ') || 'NONE — no command was executed; do NOT present any output as "executed" — label code as provided-but-not-run'}`,
         teamRecap.map((t) => `- ${t.name} (${t.role}) — ${t.work}${t.confidence ? ` [confidence: ${t.confidence}]` : ''}`).join('\n'),
         task.recoveries.length ? `# RECOVERY EVENTS (real)\n${task.recoveries.map((r) => `- ${r.action}: ${r.reason}`).join('\n')}` : '',
         verification ? `# VERIFICATION\nverdict: ${verification.verdict} · score ${verification.score}${verification.problems?.length ? `\nproblems: ${verification.problems.join('; ')}` : ''}` : '# VERIFICATION\nskipped (not needed for this task type)',
@@ -498,6 +511,20 @@ function normalizePlan(refinement, task) {
     verify: s.verify !== false,
     department: typeof s.department === 'string' ? s.department : null,
   }));
+  // B210 — EXECUTION STAYS WITH THE ENGINEER (deterministic, not
+  // prompt-hoped): a subtask that asks to run/execute/test a script or
+  // program is a CODE subtask whatever the interpreter labeled it — only
+  // code engineers can actually execute, and a non-executor "delivering"
+  // execution results is fabrication (observed live).
+  for (const st of subtasks) {
+    const text = `${st.title} ${st.details} ${st.expectedOutput}`;
+    const wantsExecution = /\b(run|runs|ran|execute|executes|executed|execution|test|tests|testing)\b/i.test(text);
+    const isAboutCode = /\b(script|scripts|code|program|node|python|javascript|js)\b/i.test(text);
+    if (wantsExecution && isAboutCode && st.capability !== 'code' && !st.department) {
+      st.capability = 'code';
+      if (!st.requirements.includes('code')) st.requirements = ['code', ...st.requirements].slice(0, 6);
+    }
+  }
   // single-subtask tasks are trivially consistent
   if (subtasks.length === 1) subtasks[0].dependsOn = [];
   // dependency indices must point backwards (no cycles, no self-reference)
