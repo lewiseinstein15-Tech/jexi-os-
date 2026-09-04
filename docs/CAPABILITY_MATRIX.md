@@ -1,0 +1,63 @@
+# B211 — CAPABILITY MATRIX (Autonomy Engineering Upgrade)
+
+> Status vocabulary: **SHIPPED** = implemented, wired end-to-end, covered by
+> real passing tests. **PARTIAL** = working core with documented limits.
+> **NOT BUILT** = honestly absent. Nothing is marked SHIPPED on code
+> existence alone; every SHIPPED row cites the tests that prove it.
+>
+> Verification snapshot: local suites green (B208 89, B209 92, B210 64,
+> B211 spine 111, B2 74, B3 57, B4 autonomy 53 = 540 director-lane checks;
+> 295 of them B211), CI 5/5, Render live.
+
+| # | Spec capability | Status | Evidence (real passing tests) | Notes / honest limits |
+|---|---|---|---|---|
+| 1 | Persistent Work Graph: items + typed relations (BLOCKS / DISCOVERED_FROM / SUPERSEDES / PRODUCES), survives restart | SHIPPED | `test-b211.js` A (relations, deterministic ready-work, leases, atomic persistence, restart recovery) | Deterministic order: priority desc → createdAt asc; leases TTL 10 min |
+| 2 | Mission state machine (CREATED…CANCELLED, validated transitions) | SHIPPED | `test-b211.js` B (illegal transitions throw) | PLANNING↔AWAITING_INPUT added for the risk gate (B2) |
+| 3 | Mission persistence + budgets (items/failures/wall-clock/replans/discovery) | SHIPPED | `test-b211.js` B + budget tests | maxItems 24, maxFailures 8, 30-min window, 1 replan, 6 discovery rounds (per mission, overridable) |
+| 4 | Ready-work engine (deterministic dependency resolution) | SHIPPED | `test-b211.js` A + dependency-order in `tests/autonomy/long-horizon-mission.js` | Parallel batches (MAX_PARALLEL=3), deadlock fails honestly |
+| 5 | "Continue." reconstructs + resumes without re-asking | SHIPPED | `test-b211.js` J; `tests/autonomy/browser-disconnect.js` 1 | No re-planning on resume; in-flight results kept |
+| 6 | Discovered work (EXECUTE_NOW / QUEUE / DELEGATE / DEFER / IGNORE_WITH_REASON, lineage) | SHIPPED | `test-b211.js` D (### DISCOVERED ingestion, dupe-merge, budget deferral) | Classification by the discovering employee, bounded by budget |
+| 7 | Mid-mission steering (impact → invalidate affected only → replan) | SHIPPED | `test-b211.js` F (done work never invalidated; SUPERSEDES lineage) | Impact analysis is LLM-driven; unavailable lane defers the steering honestly |
+| 8 | Mission checkpoints (every mutation persisted atomically) | SHIPPED | `tests/autonomy/backend-restart.js` (SIGKILL → fresh process → resume, DONE never redone) | tmp+rename writes; events append-only with chained ids |
+| 9 | User controls: pause / resume / cancel / retry / skip / approve | SHIPPED | `test-b211.js` H (controls incl. retry re-opening FAILED), B2 risk-gate approval | Exposed via `/api/missions/:id/control` + chat |
+| 10 | Complexity/risk analyzer → execution depth (SIMPLE→LONG_HORIZON) | SHIPPED | `test-b211b2.js` A/B (heuristics floor, LLM refinement, decidedBy honesty) | Heuristics never inflate (uncertainty maps down) |
+| 11 | CRITICAL-risk approval gate (nothing runs before approval) | SHIPPED | `test-b211b2.js` I/J (gate → approve; gate → change steers the plan) | Gate reasons cite the objective's actual words |
+| 12 | Imagination Engine: bounded counterfactual strategy search | SHIPPED | `test-b211b2.js` C (≤3 branches, ≤2 LLM calls, CREATED→SELECTED/REJECTED with reasons) | Hard budgets; single deterministic fallback judge when the judge lane is down |
+| 13 | SIMULATION_UNAVAILABLE honesty (never fake a simulation) | SHIPPED | `test-b211b2.js` C/H; `tests/autonomy/failure-injection.js` 5 | Unavailable pass is recorded with the real reason and skipped, not retried |
+| 14 | PREDICTED vs ACTUAL (deviation + lesson at mission end) | SHIPPED | `test-b211b2.js` D/F (review event + persisted lesson from real numbers) | Deterministic comparison; lesson feeds the store |
+| 15 | Operational learning (failure → cause → strategy → lesson, retrievable) | SHIPPED | `test-b211b2.js` E/K; `tests/autonomy/failure-injection.js` 1b/2/6 (lessons reach the NEXT plan prompt) | Token-relevance retrieval, dedupe, 300-entry cap, cross-process persistence |
+| 16 | ModelRouter fallback; employee identity ≠ model identity | SHIPPED (B209, reused) | B209 92 checks; `tests/autonomy/failure-injection.js` 1a (injected 429s → MODEL_SWITCHED → delivered) | 9-rung ladder, telemetry-informed |
+| 17 | Recovery engine, layered (model-lane → assignment ladder RETRY/REASSIGN/ESCALATE → replan) | SHIPPED | `tests/autonomy/failure-injection.js` 1a/1b/2 | Single-employee staffing cannot REASSIGN (honest: RETRY→ESCALATE) |
+| 18 | Verification: ACTION COMPLETED vs OBJECTIVE VERIFIED | SHIPPED | `test-b211.js` (mission verify); B210 64 checks (anti-fabrication gate); `tests/autonomy/long-horizon-mission.js` (verdict grounded in real TEST_* events) | Deterministic acceptance gates (empty/short/refusal/fabricated-execution) run without any model |
+| 19 | Artifacts: real files, hashes, relationships; never claim non-existent | SHIPPED | `test-b211.js` artifact tests; `tests/autonomy/long-horizon-mission.js` (files on disk verified independently) | Content-hashed records; subpaths ≤3 levels sanitized; workspace is MISSION-scoped (B4 fix) |
+| 20 | ComputerRuntime adapters with capability honesty (local/remote/docker/mock) | SHIPPED (pre-B211 core, reused) | `test-computer-runtime.js` 15 checks; `test-b211b3.js` D (local → COMPUTER_BLOCKED, never faked) | docker honestly "not configured"; env-detected at execution time |
+| 21 | Atlas: computer-ops employee (identity, tools, COMPUTER permission) | SHIPPED | `test-b211b3.js` C (identity, staffing, synonyms, permission refusal for others) | Roster override under DATA_DIR; defaults ship Atlas |
+| 22 | Browser loop: observe → act → observe → verify (```browser blocks) | SHIPPED | `test-b211b3.js` F (real round-trip: actions execute, observed state feeds the next prompt, bounded 3 rounds/4 actions) | Mirrors the proven B210 ```run loop; per-tool budgets |
+| 23 | COMPUTER_* telemetry events (real execution only) | SHIPPED | `test-b211b3.js` F/I (events from session + mission levels) | Frontend renders them; it never invents them |
+| 24 | Live computer-use UI panel (real telemetry + real screenshots) | SHIPPED | `test-b211b3.js` (screenshot events carry real saved files); frontend build green | Renders nothing without real computer events; screenshot is a real capture or absent |
+| 25 | Chat is a view (browser disconnect changes nothing server-side) | SHIPPED | `tests/autonomy/browser-disconnect.js` (viewer dies mid-stream + dead-on-arrival; replay on reconnect) | Every sendEvent/done is isolated; the persisted record is the source of truth |
+| 26 | Backend restart safety (boot recovery, DONE never redone) | SHIPPED | `tests/autonomy/backend-restart.js` (REAL SIGKILL of a child process; fresh process resumes; exactly-one-session proofs) | In-flight items requeue with recorded reason |
+| 27 | Long-horizon mission: build + test + fix + verify a full-stack app, unguided | SHIPPED | `tests/autonomy/long-horizon-mission.js` (real fail→fix→pass via real `node --test`; the TEST re-runs the suite independently, trusting nothing) | Model scripted, machinery real — the established harness pattern |
+| 28 | Failure-injection suite | SHIPPED | `tests/autonomy/failure-injection.js` (429s, BAD_OUTPUT, lane death, verify-fail correction, tool failure, imagination-down, lessons) | — |
+| 29 | Secrets never in prompts/logs/telemetry/UI/artifacts | SHIPPED (standing) | B209/B210 gate tests; command env scrubbing (shellEnv); sanitizeWorkProduct | No new secret surface introduced by B211 |
+| 30 | Event-sourcing rule: the frontend never invents operational events | SHIPPED (standing) | B208 89 checks + all B211 events originate server-side | ComputerPanel/TeamLive render only |
+
+## Honest limitations (not hidden, not converted to PASS)
+
+1. **Same-session file rewrite**: an artifact with the same name written in a
+   LATER round of the SAME session is skipped (B210 dedupe). Cross-item fixes
+   in the shared mission workspace work (proven in the long-horizon test);
+   a fix of a file written in the same session's earlier round would be
+   dropped. B212 candidate.
+2. **Production browser**: Atlas's remote-provider path routes through the
+   same Playwright stack the coder routes use; if the Render container cannot
+   launch Chromium, computer use is honestly COMPUTER_BLOCKED (never faked).
+   The remote path is exercised by the existing browser suites; live
+   site-driving on production was not part of this build's E2E.
+3. **Worker pool**: parallel batches per mission loop (3), not a
+   cross-mission persistent pool; leases exist in the WorkGraph but one
+   runner process per deployment is the current model.
+4. **Mission UI**: chat + ComputerPanel + `/api/missions` JSON + snapshot
+   API; no dedicated graph-visualization screen yet.
+5. **Imagination lessons** are deterministic (real numbers, templated
+   wording) — no LLM narrative polish.

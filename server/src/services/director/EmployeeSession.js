@@ -208,7 +208,7 @@ export async function runEmployeeSession(p) {
         continue;
       }
       try {
-        const written = persistArtifact(task.id, artifact);
+        const written = persistArtifact(task.workspaceId || task.id, artifact);
         persistedArtifactNames.add(artifact.name);
         emit('FILE_CREATED', { agentId: employee.agentId, agentName: employee.displayName, summary: `${employee.displayName} wrote ${written.name} (${written.bytes} bytes).`, data: { file: written.name, bytes: written.bytes } });
       } catch (e) {
@@ -277,7 +277,7 @@ export async function runEmployeeSession(p) {
           data: { command: cmd, round: commandRounds },
         });
         totalCommandsExecuted++;
-        const r = await runEmployeeCommand({ taskId: task.id, command: cmd });
+        const r = await runEmployeeCommand({ taskId: task.id, workspaceId: task.workspaceId || null, command: cmd });
         const evtType = asTest
           ? (r.ok ? 'TEST_COMPLETED' : 'TEST_FAILED')
           : (r.ok ? 'COMMAND_COMPLETED' : 'COMMAND_FAILED');
@@ -364,7 +364,7 @@ export async function runEmployeeSession(p) {
       continue;
     }
     try {
-      const written = persistArtifact(task.id, artifact);
+      const written = persistArtifact(task.workspaceId || task.id, artifact);
       if (written) emit('FILE_CREATED', { agentId: employee.agentId, agentName: employee.displayName, summary: `${employee.displayName} wrote ${written.name} (${written.bytes} bytes).`, data: { file: written.name, bytes: written.bytes } });
     } catch (e) {
       emit('TOOL_FAILED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Artifact write failed (${String(e.message || e).slice(0, 80)}) — it stays in the task record.`, severity: 'warn' });
@@ -492,16 +492,19 @@ export function extractBrowserRequests(text) {
 
 /** B209 — persist an artifact to the per-task directory (path-safe, bounded). */
 function persistArtifact(taskId, artifact) {
-  let safeName = String(artifact?.name || 'artifact.md')
-    .replace(/\\/g, '/')
-    .split('/')
-    .pop() // no path components survive
-    .replace(/[^\w.-]+/g, '_')
-    .replace(/^\.+/, '_')
-    .slice(0, 80) || 'artifact.md';
-  if (!/^\w[\w.-]*$/.test(safeName)) safeName = `artifact_${Date.now()}.md`;
+  // B211 B4 — SAFE relative subpaths survive (a full-stack build writes
+  // public/index.html next to server.js). Each component is sanitized, no
+  // traversal, depth <= 3; anything dubious flattens to one sanitized name.
+  let safeName = String(artifact?.name || 'artifact.md').replace(/\\/g, '/').trim();
+  const parts = safeName.split('/').filter(Boolean)
+    .map((seg) => seg.replace(/[^\w.-]+/g, '_').replace(/^\.+/, '_').slice(0, 60))
+    .filter(Boolean);
+  safeName = (parts.length > 1 && parts.length <= 3)
+    ? parts.join('/')
+    : (parts[parts.length - 1] || 'artifact.md').slice(0, 80);
+  if (!/^[\w][\w.-]*(\/[\w][\w.-]*)*$/.test(safeName)) safeName = `artifact_${Date.now()}.md`;
   const dir = path.join(ARTIFACT_DIR, String(taskId || 'task').replace(/[^\w-]/g, '_'));
-  fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(path.dirname(path.join(dir, safeName)), { recursive: true });
   const file = path.join(dir, safeName);
   const content = String(artifact?.content || '');
   fs.writeFileSync(file, content);

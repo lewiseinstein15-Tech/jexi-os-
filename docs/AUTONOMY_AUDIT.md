@@ -126,7 +126,7 @@ for Lane A use cases without deleting them.
 
 **Phase B3 — computer: SHIPPED** — Atlas is now Computer Operations (computer capability, `browser-act` tool, enforced `COMPUTER` permission); `ComputerOps.js` executes real browser rounds through the existing DesktopManager/ComputerRuntime stack (observe→act→observe→verify, honest `COMPUTER_BLOCKED` when the environment has no browser — never faked); EmployeeSession's ```browser loop mirrors the proven B210 ```run loop (≤3 rounds, ≤4 actions, real page state fed back); `browserActions` rides the RESULT; live `ComputerPanel.jsx` renders real `COMPUTER_*` telemetry + real screenshots only; roster override now lives under DATA_DIR (kills the stale-shadow trap, test isolation). 57 tests (`test-b211b3.js`), 242 B211 total.
 
-**Phase B4 — proof:** failure-injection suite, backend-restart test, browser-disconnect test, long-horizon mission test (build+test+fix+verify a small full-stack app, unguided); `docs/CAPABILITY_MATRIX.md` + `docs/AUTONOMY_IMPLEMENTATION_REPORT.md` with evidence.
+**Phase B4 — proof: SHIPPED** — `tests/autonomy/`: long-horizon-mission (14 — unguided build+test+fix+verify, real node --test fail→fix→pass, independent zero-trust re-run; drove two production fixes: mission-scoped workspaces + subpath artifacts), failure-injection (17 — 429s→lane fallback, BAD_OUTPUT→ladder, lane death→replan+supersede, verify-fail→correction, tool failure, imagination-down, lessons propagation), backend-restart (11 — REAL SIGKILL across process boundaries, DONE never redone), browser-disconnect (11 — viewer dies mid-stream/dead-on-arrival, replay on reconnect). Deliverables: docs/CAPABILITY_MATRIX.md + docs/AUTONOMY_IMPLEMENTATION_REPORT.md (23 sections, evidence-based). B211 total: 295 checks.
 
 ---
 

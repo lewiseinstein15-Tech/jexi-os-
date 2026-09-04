@@ -47,6 +47,7 @@ export class DirectorTask {
     this.effectiveQuery = String(effectiveQuery || rawQuery || '').slice(0, 8000);
     this.contextBlock = String(contextBlock || '').slice(0, 4000);
     this.state = 'QUEUED';
+    this.workspaceId = null;       // B211 B4 — shared mission workspace (defaults to this task's own id)
     this.createdAt = new Date().toISOString();
     this.updatedAt = this.createdAt;
     this.objective = null;          // refined objective (interpreter output)

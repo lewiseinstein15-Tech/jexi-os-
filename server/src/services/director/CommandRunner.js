@@ -102,13 +102,13 @@ function ensureCommonJs(cwd) {
  * Run one allowlisted command inside the task workspace.
  * @returns {Promise<{ok:boolean, exitCode:number, output:string, ms:number, timedOut?:boolean, blocked?:boolean, reason?:string}>}
  */
-export function runEmployeeCommand({ taskId, command, timeoutMs, env }) {
+export function runEmployeeCommand({ taskId, workspaceId = null, command, timeoutMs, env }) {
   const gate = validateCommand(command);
   if (!gate.ok) {
     return Promise.resolve({ ok: false, exitCode: null, output: '', ms: 0, blocked: true, reason: gate.reason });
   }
   const [bin, ...args] = gate.parts;
-  const cwd = taskCommandDir(taskId);
+  const cwd = taskCommandDir(workspaceId || taskId); // B211 B4 — mission-shared workspace when given
   try { fs.mkdirSync(cwd, { recursive: true }); } catch { /* exists */ }
   ensureCommonJs(cwd);
   const t0 = Date.now();

@@ -598,6 +598,9 @@ Output ONLY JSON: {"affectedItemIds":["wi-..."],"newItems":[{"title":"...","deta
       effectiveQuery: `${item.title}\n${item.details}`.slice(0, 8000),
       contextBlock: `Mission: ${mission.objective}`.slice(0, 2000),
     });
+    // B211 B4 — one workspace per MISSION: later items build on earlier
+    // items' files (the long-horizon contract). Records stay per-item.
+    task.workspaceId = mission.id;
     task.objective = item.title;
     task.successCriteria = [item.expectedOutput || mission.successCriteria[0] || mission.objective].filter(Boolean).slice(0, 4);
     task.setState('INTERPRETING'); // instant: the mission already interpreted; the record keeps the legal path
