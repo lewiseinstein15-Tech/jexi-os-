@@ -27,6 +27,7 @@ import { Director } from './src/services/director/Director.js'; // B208 — JEXI
 import { realLlmAdapter, realTools } from './src/services/director/RealAdapters.js';
 import { missionRunner } from './src/services/director/MissionRunner.js'; // B211 — persistent missions (work graph)
 import { listMissions, loadMission, loadMissionEvents } from './src/services/director/Mission.js'; // B211 — mission store + replayable event log
+import { loadWorldState, runtimeCapabilities, globalWorld } from './src/services/director/WorldState.js'; // B215 — real environment record
 import { loadTask as loadDirectorTask, loadTaskById, listDirectorTasks } from './src/services/director/TaskState.js'; // B209 — multi-task records
 import { rosterSummary as employeeRoster, rosterDetail, setEmployeeDisabled, upsertEmployee, employeeHistory } from './src/services/director/Employees.js'; // B209 — runtime team management
 import { normalizeFinalAnswer } from './src/services/Formatting.js'; // B66 — normalize every final answer
@@ -860,7 +861,12 @@ app.post('/api/gateway/dispatch', (req, res) => {
 });
 app.delete('/api/gateway/jobs/:id', (req, res) => res.json({ ok: cancelJob(req.params.id) }));
 app.get('/api/workspace-admin/list', async (req, res) => res.json({ ok: true, home: workspaceHome(), projects: await listPublished() }));
-app.post('/api/workspace-admin/publish', async (req, res) => res.json(await publishProject(req.body || {})));
+app.post('/api/workspace-admin/publish', async (req, res) => {
+  const r = await publishProject(req.body || {});
+  // B215 — real publish lands in the global world record (best-effort)
+  try { if (r && r.ok) globalWorld().recordPublish({ repo: process.env.JEXI_WORKSPACE_REPO || 'lewiseinstein15-Tech/jexi-workspace', slug: r.slug, url: r.url, live: r.live }); } catch { /* never fail the publish */ }
+  res.json(r);
+});
 app.post('/api/workspace-admin/clear', async (req, res) => res.json(await clearProject(String(req.body?.project || ''))));
 app.post('/api/workspace-admin/sweep', async (req, res) => res.json(await sweepWorkspace({ force: Boolean(req.body?.force) })));
 app.get('/api/skills/:agent', (req, res) => res.json({ agent: req.params.agent, skills: recallSkills(req.params.agent, String(req.query.q || ''), { limit: 10, includeForeign: false }) }));
@@ -1262,6 +1268,14 @@ app.get('/api/missions/:id/events', (req, res) => {
   if (!m) return res.status(404).json({ ok: false, error: 'mission not found' });
   const events = loadMissionEvents(m.id, String(req.query.sinceEventId || ''));
   res.json({ ok: true, missionId: m.id, state: m.state, events });
+});
+// B215 — WORLD STATE: the real environment record for a mission (files,
+// processes, browser, publishes — observed facts only, never synthesized).
+app.get('/api/missions/:id/world', (req, res) => {
+  const m = loadMission(req.params.id);
+  if (!m) return res.status(404).json({ ok: false, error: 'mission not found' });
+  const world = loadWorldState(req.params.id);
+  res.json({ ok: true, missionId: m.id, runtime: runtimeCapabilities(), world: world.snapshot() });
 });
 app.post('/api/missions/:id/control', (req, res) => {
   const { action, itemId, reason, text } = req.body || {};

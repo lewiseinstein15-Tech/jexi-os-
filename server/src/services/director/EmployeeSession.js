@@ -22,8 +22,19 @@ import { message, normalizeArtifact } from './AgentMail.js';
 import { runWithModel } from './ModelRouter.js';
 import { Supervisor } from './Supervisor.js'; // B209 — live mid-work supervision
 import { checkToolPermission } from './Permissions.js'; // B209 — enforced tool gates
-import { runEmployeeCommand, isTestCommand, validateCommand } from './CommandRunner.js'; // B210 — real command execution for employees
+import { runEmployeeCommand, isTestCommand, validateCommand, taskCommandDir } from './CommandRunner.js'; // B210 — real command execution for employees
 import { runBrowserRound, browserToolInstructions } from './ComputerOps.js'; // B211 B3 — real browser driving for computer-ops employees
+import { WorldState } from './WorldState.js'; // B215 — real environment record (files/processes/browser)
+
+/** B215 — REAL observation: what files exist in the task/mission workspace right now. */
+function listWorkspaceFiles(ownerId) {
+  const dir = taskCommandDir(ownerId);
+  const entries = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile() && e.name !== 'package.json');
+  return entries.map((e) => {
+    const st = fs.statSync(path.join(dir, e.name));
+    return { path: e.name, bytes: st.size, mtime: new Date(st.mtimeMs).toISOString() };
+  }).slice(0, 60);
+}
 import { sanitizeWorkProduct } from '../ModelCoworkers.js'; // B209/B210 — model ids never enter work product, but CODE FENCES are never corrupted
 import fs from 'fs';
 import path from 'path';
@@ -158,6 +169,12 @@ export async function runEmployeeSession(p) {
   };
 
   const t0 = Date.now();
+
+  // B215 — WORLD STATE: this session's real actions (commands, browser) land
+  // in the mission's (or task's) world record. Best-effort only: world state
+  // must never fail execution.
+  const world = new WorldState(task.workspaceId || task.id);
+  const worldSafe = (fn) => { try { fn(); } catch { /* never break the session */ } };
 
   // 1) REAL TOOL PHASE — searches the employee was staffed to run.
   let toolContext = '';
@@ -304,6 +321,11 @@ export async function runEmployeeSession(p) {
         });
         totalCommandsExecuted++;
         const r = await runEmployeeCommand({ taskId: task.id, workspaceId: task.workspaceId || null, command: cmd });
+        worldSafe(() => world.recordCommand({
+          command: cmd, ok: r.ok, exitCode: r.exitCode, ms: r.ms,
+          timedOut: r.timedOut, blocked: r.blocked, reason: r.reason,
+          workspaceFiles: listWorkspaceFiles(task.workspaceId || task.id),
+        }));
         const evtType = asTest
           ? (r.ok ? 'TEST_COMPLETED' : 'TEST_FAILED')
           : (r.ok ? 'COMMAND_COMPLETED' : 'COMMAND_FAILED');
@@ -339,6 +361,9 @@ export async function runEmployeeSession(p) {
             lines: browserLines, emit,
             identity: { agentId: employee.agentId, agentName: employee.displayName },
           });
+          worldSafe(() => world.recordBrowser(br.blocked
+            ? { available: false, ok: false, blockedReason: br.reason }
+            : { available: true, ok: br.results.every((x) => x.ok), title: (br.observation || {}).title }));
           if (br.blocked) {
             browserContext += `\n\n# BROWSER UNAVAILABLE (real capability check)\n${br.reason}\nNever claim you browsed, opened, or read anything — report honestly that the browser is unavailable in this environment.`;
           } else {

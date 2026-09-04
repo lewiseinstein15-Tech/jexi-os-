@@ -55,6 +55,7 @@ export class DirectorTask {
     this.assumptions = [];
     this.constraints = [];
     this.successCriteria = [];
+    this.structuredObjective = null; // B215 — provenance-tagged objective state (ObjectiveInterpreter)
     this.plan = null;               // { subtasks: [...], leadEmployeeId, parallel }
     this.assignments = [];          // { subtaskId, employeeId, role, status, attempts }
     this.leadEmployeeId = null;

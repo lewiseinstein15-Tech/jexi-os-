@@ -28,6 +28,7 @@ import { WorkGraph, loadWorkGraph } from './WorkGraph.js';
 import { analyzeObjective } from './ComplexityAnalyzer.js';
 import { imagine, comparePredictedVsActual } from './ImaginationEngine.js';
 import { recordLesson, retrieveLessons, formatLessonsBlock, lessonCount } from './Lessons.js';
+import { loadWorldState, runtimeCapabilities } from './WorldState.js'; // B215 — real environment record
 
 const MAX_PARALLEL = 3;
 const PLAN_MAX_ITEMS = 8;
@@ -328,6 +329,9 @@ Output ONLY JSON:
       (mission.preplanSteering || []).length
         ? `# USER STEERING (said on the approval gate — obey it in this plan)\n${mission.preplanSteering.map((s) => `- "${s}"`).join('\n')}`
         : '',
+      // B215 — real environment record: plan from what EXISTS, not assumptions.
+      // An empty world says so honestly (no fabricated state).
+      (() => { try { return loadWorldState(mission.id).summaryBlock(); } catch { return ''; } })(),
       mission.imagination?.status === 'COMPLETED'
         ? `# SIMULATED STRATEGY (imagined in the imagination pass — a PLAN INPUT, nothing has run)\nSelected approach "${(mission.imagination.branches.find((b) => b.id === mission.imagination.selectedId) || {}).name}": ${(mission.imagination.branches.find((b) => b.id === mission.imagination.selectedId) || {}).approach}\nPredicted outcome (to be checked against reality at the end): ${(mission.imagination.branches.find((b) => b.id === mission.imagination.selectedId) || {}).predictedOutcome}`
         : '',

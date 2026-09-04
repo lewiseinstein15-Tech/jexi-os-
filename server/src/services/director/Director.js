@@ -30,6 +30,7 @@ import { checkToolPermission } from './Permissions.js'; // B210 — executor che
 import { telemetry } from './Telemetry.js';
 import { runEmployeeSession, assembleBrief } from './EmployeeSession.js';
 import { verifyDeliverable, acceptanceGates } from './Verifier.js';
+import { structureObjective } from './ObjectiveInterpreter.js'; // B215 — provenance-tagged objective state
 import { preferencesBlock } from '../PreferenceLearner.js'; // B208b — employees receive relevant user context
 import { isProviderError } from './ModelRouter.js';
 
@@ -121,12 +122,15 @@ export class Director {
     task.assumptions = refinement.assumptions || [];
     task.constraints = refinement.constraints || [];
     task.successCriteria = refinement.successCriteria || [];
+    // B215 — structured objective state: every requirement provenance-tagged
+    // (USER_STATED / INFERRED / ASSUMED / UNKNOWN), derived deterministically
+    task.structuredObjective = structureObjective(refinement, raw);
     task._persist();
 
     emit({
       type: 'OBJECTIVE_INTERPRETED', title: refinement.understood,
       summary: `Objective refined: ${String(refinement.refinedObjective).slice(0, 200)}`,
-      data: { ambiguity: refinement.ambiguity, taskType: refinement.taskType, complexity: refinement.complexity },
+      data: { ambiguity: refinement.ambiguity, taskType: refinement.taskType, complexity: refinement.complexity, provenance: task.structuredObjective.provenanceCounts },
     });
     emit({ type: 'OBJECTIVE_REFINED', title: 'Constraints & success criteria set', summary: `${(task.constraints || []).length} constraints and ${task.successCriteria.length} success criteria extracted.`, data: { constraints: task.constraints, successCriteria: task.successCriteria } });
     narrate(refinement.userLine);
