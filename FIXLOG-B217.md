@@ -57,10 +57,15 @@ scope isolation (nothing outside mirrored dirs).
 
 ## Verification
 - `node test-b217.js`: 6/6 PASS (fake-redis seam, no network).
-- Full `npm test` chain: run before push (see commit CI).
-- Post-deploy prod checks: `/api/mirror/status` shows `active:true` + keys
-  climbing; `/api/health` uptime climbing past 15 min (self-ping working);
-  Pages 200.
+- Full `npm test` chain: PASS before push (commit 74dabcd).
+- **PROD END-TO-END PROOF (2026-09-04 ~16:33 UTC):**
+  1. deploy live → `/api/mirror/status` = `{active:true, lastSyncAt set}` (loop running);
+  2. created mission `ms-mtn69b1z-001` → 30s later mirror shows `keys:3` (mission+graph+events in Redis);
+  3. **service restarted via Render API → brand-new instance (`…-d76cd46b-52z8q`)**;
+  4. new boot: `lastHydrateFiles:3` and `GET /api/missions` still lists `ms-mtn69b1z-001` (PLANNING, boot recovery resumed it).
+  → The exact incident scenario (container replacement) replayed on production: **zero mission loss.** Before B217 this was a wipe.
+- Keepalive guard exercised live: dispatched run 33895232884 → "App site: HTTP 200" → no heal needed (correct pass-through behavior).
+- Self-ping: enabled via Render env (`JEXI_SELF_PING=1`, all 22 existing vars preserved); uptime verification below.
 
 ## Honest limits
 - Self-ping cannot resurrect a STOPPED instance; if she's down, only external
