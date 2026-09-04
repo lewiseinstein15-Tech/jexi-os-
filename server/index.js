@@ -54,7 +54,7 @@ import {
 } from './src/services/MemoryManager.js';
 import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
 import {
-  setRedisClientGetter, startMirrorLoop, mirrorStatus, hydrateMirroredDirs,
+  setRedisClientGetter, startMirrorLoop, mirrorStatus, hydrateMirrorWithRetries,
 } from './src/services/RedisMirror.js';
 setRedisClientGetter(() => import('./src/services/MemoryManager.js').then((m) => m.getRedis()).catch(() => null));
 
@@ -146,7 +146,13 @@ if (String(process.env.JEXI_SELF_PING || '') === '1') {
 // replacement (Render free hibernation/deploy = fresh ephemeral disk), this
 // writes the mirrored files back BEFORE the mission boot recovery runs, so
 // she wakes up with her own record intact.
-hydrateMirroredDirs().catch((e) => { recordError('mirror', (e && e.message) || String(e)); });
+// B218 — hydrate WITH RETRIES (one Upstash blip at boot used to leave the
+// disk unrestored while boot recovery had already run) and expose the
+// settled promise so mission recovery can wait for it below.
+const mirrorHydrateSettled = hydrateMirrorWithRetries().catch((e) => {
+  recordError('mirror', (e && e.message) || String(e));
+  return false;
+});
 // …and keep the mirror fresh while she runs (every 30s, changed files only).
 startMirrorLoop();
 
@@ -2341,11 +2347,17 @@ app.listen(PORT, '0.0.0.0', () => {
   // B211 — MISSION BOOT RECOVERY: missions that were mid-flight when the
   // process died resume now — in-flight items requeued honestly (leases
   // cleared, DONE work and artifacts never redone).
-  try {
-    missionRunner.configure({ llm: realLlmAdapter(), tools: realTools() });
-    const resumed = missionRunner.resumeOnBoot();
-    if (resumed) console.log(`🛰️ B211 missions: ${resumed} mid-flight mission(s) resumed after restart`);
-  } catch (e) { console.warn('mission boot recovery:', e.message); }
+  // B218 — recovery WAITS for the mirror hydrate to settle (fresh container
+  // disks need the Redis-mirrored mission files back BEFORE resuming; on a
+  // Redis blip this can take up to ~55s of retries — listening is never
+  // blocked, only the resume is delayed).
+  mirrorHydrateSettled.finally(() => {
+    try {
+      missionRunner.configure({ llm: realLlmAdapter(), tools: realTools() });
+      const resumed = missionRunner.resumeOnBoot();
+      if (resumed) console.log(`🛰️ B211 missions: ${resumed} mid-flight mission(s) resumed after restart`);
+    } catch (e) { console.warn('mission boot recovery:', e.message); }
+  });
   // Chromium is launched LAZILY on first desktop/QA use, never held resident at
   // boot: on small hosts (512MB) a permanently-open browser + concurrent page
   // parsing during search was OOM-killing the process mid-request.

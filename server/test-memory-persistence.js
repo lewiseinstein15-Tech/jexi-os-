@@ -51,7 +51,14 @@ function runBoot(env) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['tests/memoryProbeChild.js'], {
       cwd: SERVER_ROOT,
-      env: { ...process.env, DATA_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'jexi-b68-boot-')), ...env },
+      env: {
+        ...process.env,
+        DATA_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'jexi-b68-boot-')),
+        // B218 — probe children are DIAGNOSTICS, not boots: skip the new
+        // hydrate retry backoff so broken-Redis scenarios stay fast.
+        JEXI_HYDRATE_RETRY_DELAYS_MS: '0',
+        ...env,
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';

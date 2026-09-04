@@ -256,31 +256,60 @@ export async function getRedis() {
   }
 }
 
-/** Load memory from Redis into the local cache (called once at boot). */
+/**
+ * Load memory from Redis into the local cache (called once at boot).
+ *
+ * B218 — RETRY WITH BACKOFF: on 2026-09-04 a single ~3s Upstash latency
+ * spike at boot permanently disabled the Redis layer for the whole process
+ * (memory stopped persisting, the B217 mirror silently no-opped, health
+ * showed redis:false until a manual restart). One slow moment must not cost
+ * a boot its durable layer: each retry builds a FRESH client (the old one
+ * may be wedged mid-command), and the layer is only disabled (B158
+ * semantics: health must stay honest) after ALL attempts fail — ~55s of
+ * proven-unreachable Redis, not one timeout.
+ * Delays are overridable via JEXI_HYDRATE_RETRY_DELAYS_MS for tests.
+ */
+function hydrateRetryDelays() {
+  return String(process.env.JEXI_HYDRATE_RETRY_DELAYS_MS || '10000,45000')
+    .split(',').map((s) => parseInt(s, 10)).filter((n) => Number.isFinite(n) && n >= 0);
+}
+
 export async function hydrateFromRedis() {
   if (!redisEnabled) return false;
-  const r = await getRedis();
-  if (!r) return false;
-  try {
-    const raw = await r.get(MEMORY_REDIS_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      cache = { ...structuredClone(DEFAULT_MEMORY), ...parsed };
-      migrate(cache);
-      ensureDirs();
-      fs.writeFileSync(MEMORY_FILE, JSON.stringify(cache, null, 2), 'utf-8');
-      console.log('[Memory] ✓ Hydrated memory core from Redis.');
-      consolidateMemory();
-      return true;
+  const delays = hydrateRetryDelays();
+  const maxAttempts = 1 + delays.length;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const r = await getRedis();
+    if (!r) return false; // client init failed — already logged, layer off
+    try {
+      const raw = await r.get(MEMORY_REDIS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        cache = { ...structuredClone(DEFAULT_MEMORY), ...parsed };
+        migrate(cache);
+        ensureDirs();
+        fs.writeFileSync(MEMORY_FILE, JSON.stringify(cache, null, 2), 'utf-8');
+        console.log('[Memory] ✓ Hydrated memory core from Redis.');
+        consolidateMemory();
+        return true;
+      }
+      return false; // reachable but empty — settled, nothing to hydrate
+    } catch (e) {
+      // B218 — kill THIS client so the next attempt reconnects cleanly.
+      try { if (redisClient === r) { r.disconnect(); redisClient = null; } } catch { /* best-effort */ }
+      if (attempt < maxAttempts) {
+        console.error(`[Memory] Redis hydrate failed (attempt ${attempt}/${maxAttempts}), retrying in ${delays[attempt - 1]}ms: ${e.message}`);
+        await new Promise((res) => setTimeout(res, delays[attempt - 1]));
+        continue;
+      }
+      console.error(`[Memory] Redis hydrate failed after ${maxAttempts} attempts, using local file: ${e.message}`);
+      // B158 — a proven-dead Redis must not keep reporting "active" in health
+      // checks: close the client and disable the layer (process is honest, and
+      // disk/JSON remains the source of truth).
+      try { if (redisClient) redisClient.disconnect(); } catch { /* best-effort */ }
+      redisClient = null;
+      redisEnabled = false;
     }
-  } catch (e) {
-    console.error('[Memory] Redis hydrate failed, using local file:', e.message);
-    // B158 — a proven-dead Redis must not keep reporting "active" in health
-    // checks: close the client and disable the layer (process is honest, and
-    // disk/JSON remains the source of truth).
-    try { if (redisClient) redisClient.disconnect(); } catch { /* best-effort */ }
-    redisClient = null;
-    redisEnabled = false;
   }
   return false;
 }
@@ -296,6 +325,15 @@ async function redisPush(memory) {
 /** True when a Redis layer is configured (used by the load-balancer health check). */
 export function isRedisActive() {
   return redisEnabled && !!redisClient;
+}
+
+/**
+ * B218 — cleanly close the shared Redis client (tests + graceful shutdown:
+ * Render sends SIGTERM on deploys; an open client keeps the event loop alive).
+ */
+export function closeRedis() {
+  try { if (redisClient) redisClient.disconnect(); } catch { /* best-effort */ }
+  redisClient = null;
 }
 
 /**

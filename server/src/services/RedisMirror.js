@@ -39,7 +39,7 @@ let __timer = null;
 let __clientGetter = null;  // test seam: async () => redisClient|null
 const status = {
   active: false, reason: null, keys: 0, lastSyncAt: null, lastSyncFiles: 0,
-  lastHydrateAt: null, lastHydrateFiles: 0, errors: 0,
+  lastHydrateAt: null, lastHydrateFiles: 0, errors: 0, hydrateSettled: false,
 };
 
 /** Test seam + production wiring: inject the redis client getter. */
@@ -103,6 +103,7 @@ export async function syncMirror({ force = false } = {}) {
 export async function hydrateMirroredDirs() {
   const client = await getClient();
   if (!client) { status.reason = status.reason || 'redis unavailable (no REDIS_URL or connection failed)'; return 0; }
+  const errorsBefore = status.errors;
   let restored = 0;
   let cursor = '0';
   do {
@@ -133,16 +134,47 @@ export async function hydrateMirroredDirs() {
       }
     }
   } while (cursor !== '0' && cursor !== 0);
+  // B218 — hydrate "settles" only when a full scan ran with a live client and
+  // no new errors: callers (mission boot recovery) wait on this before
+  // resuming mid-flight missions on a fresh container disk.
+  status.hydrateSettled = (status.errors === errorsBefore);
   status.active = true;
   status.lastHydrateAt = new Date().toISOString();
   status.lastHydrateFiles = restored;
   return restored;
 }
 
+/**
+ * B218 — boot hydrate with the same retry/backoff contract as the memory
+ * hydrate (JEXI_HYDRATE_RETRY_DELAYS_MS, default 10s/45s): one Upstash blip
+ * at boot must not leave the mission disk unrestored while boot recovery
+ * already ran. Returns true when the hydrate settled.
+ */
+export async function hydrateMirrorWithRetries() {
+  const delays = String(process.env.JEXI_HYDRATE_RETRY_DELAYS_MS || '10000,45000')
+    .split(',').map((s) => parseInt(s, 10)).filter((n) => Number.isFinite(n) && n >= 0);
+  for (let attempt = 1; !status.hydrateSettled && attempt <= 1 + delays.length; attempt++) {
+    try { await hydrateMirroredDirs(); } catch (e) {
+      status.errors += 1;
+      status.reason = `hydrate error: ${String(e.message || e).slice(0, 120)}`;
+    }
+    if (status.hydrateSettled) break;
+    if (attempt <= delays.length) await new Promise((res) => setTimeout(res, delays[attempt - 1]));
+  }
+  return status.hydrateSettled;
+}
+
 /** Start the periodic sync (idempotent). */
 export function startMirrorLoop(intervalMs = SYNC_INTERVAL_DEFAULT) {
   if (__timer) return;
-  const tick = async () => { try { await syncMirror(); } catch { /* recorded in status */ } };
+  const tick = async () => {
+    try { await syncMirror(); } catch { /* recorded in status */ }
+    // B218 — self-heal: if the boot hydrate never settled (Redis was blipping
+    // at boot), keep retrying it on ticks until ONE clean pass lands, so a
+    // fresh container eventually gets its mission files even when the outage
+    // outlived the boot retries.
+    if (!status.hydrateSettled) { try { await hydrateMirroredDirs(); } catch { /* recorded */ } }
+  };
   __timer = setInterval(tick, intervalMs);
   __timer.unref?.(); // never hold the process open on its own
   tick(); // immediate first sync
@@ -157,5 +189,5 @@ export function __resetForTests() {
   __synced = new Map();
   if (__timer) { clearInterval(__timer); __timer = null; }
   __clientGetter = null;
-  Object.assign(status, { active: false, reason: null, keys: 0, lastSyncAt: null, lastSyncFiles: 0, lastHydrateAt: null, lastHydrateFiles: 0, errors: 0 });
+  Object.assign(status, { active: false, reason: null, keys: 0, lastSyncAt: null, lastSyncFiles: 0, lastHydrateAt: null, lastHydrateFiles: 0, errors: 0, hydrateSettled: false });
 }
