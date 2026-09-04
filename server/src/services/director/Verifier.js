@@ -26,6 +26,63 @@ export function acceptanceGates(deliverable, task) {
   return problems;
 }
 
+/* ── B213: METHOD PROVENANCE ────────────────────────────────────────────
+ * Found by the first live production missions: real-LLM employees on
+ * replan/verification items described methods they never ran ("headless
+ * browser", "real browser") — caught by Vera's coherence check, but a
+ * verifier that only sees the deliverable can in principle be misled by
+ * internally-consistent fabricated evidence. Two fixes:
+ *   1. a deterministic gate: browser-method claims require real
+ *      COMPUTER_ACT/COMPUTER_OBSERVE events in the task record;
+ *   2. the rubric prompt now carries WHAT ACTUALLY EXECUTED, so the model
+ *      verifies claims against evidence, not just coherence.
+ */
+
+const BROWSER_CLAIM_RE = /headless[ _/-]?browser|real[ _/-]?browser|browser[ _/-]?(session|execution|screenshot|automation|rendering)|(?:opened|browsed|saw|observed|viewed|captured|screenshot(?:ted)?|loaded)\s+(?:it\s+|the\s+page\s+)?(?:in|with|using)\s+(?:a\s+|the\s+)?(?:real\s+|headless\s+)?browser|puppeteer|playwright|selenium|chrome[ _/-]?headless/gi;
+// A claim only counts when it is not negated in its sentence context
+// ("no real browser", "without a browser", "browser unavailable" must NOT
+// trigger — reporting honestly that the browser was absent is the behavior
+// we want).
+const NEGATION_BEFORE_RE = /\b(no|not|never|without|cannot|can't|couldn't|unable|unavailable|disabled|blocked|failed|absent|lacking?)\b[^.!?]{0,60}$/i;
+const NEGATION_AFTER_RE = /^\s*(was|is|were)?\s*(unavailable|disabled|blocked|not[ _-]?(available|accessible|possible)|absent)/i;
+
+/** True when the text affirmatively claims browser-driven work. */
+export function claimsBrowserMethod(text) {
+  const s = String(text || '');
+  BROWSER_CLAIM_RE.lastIndex = 0;
+  let m;
+  while ((m = BROWSER_CLAIM_RE.exec(s))) {
+    const before = s.slice(Math.max(0, m.index - 70), m.index);
+    const after = s.slice(m.index + m[0].length, m.index + m[0].length + 40);
+    if (!NEGATION_BEFORE_RE.test(before) && !NEGATION_AFTER_RE.test(after)) return true;
+  }
+  return false;
+}
+
+/** Compact, honest summary of what ACTUALLY executed in a task — the only
+ *  source of truth for HOW work was done. Fed to the rubric prompt. */
+export function executionEvidence(events = []) {
+  const list = Array.isArray(events) ? events : [];
+  const of = (t) => list.filter((e) => e && e.type === t);
+  const lines = [];
+  const acts = [...of('COMPUTER_ACT'), ...of('COMPUTER_OBSERVE')];
+  const blocked = of('COMPUTER_BLOCKED')[0];
+  if (acts.length) {
+    lines.push(`browser actions executed: ${acts.length} (${acts.slice(0, 3).map((e) => String(e.summary || e.data?.action || '').slice(0, 60)).join(' · ')})`);
+  } else if (blocked) {
+    lines.push(`browser: BLOCKED — ${String(blocked.summary || blocked.data?.reason || '').slice(0, 130)}`);
+  } else {
+    lines.push('browser: never invoked');
+  }
+  const cmds = [...of('COMMAND_COMPLETED'), ...of('COMMAND_FAILED'), ...of('TEST_COMPLETED'), ...of('TEST_FAILED')];
+  lines.push(`commands/tests executed: ${cmds.length}${cmds.length ? ` (last: ${String(cmds[cmds.length - 1].summary || '').slice(0, 90)})` : ' — NONE'}`);
+  const files = [...of('FILE_CREATED'), ...of('FILE_UPDATED')];
+  if (files.length) lines.push(`files written: ${files.length} (${files.slice(0, 4).map((e) => String(e.summary || '').slice(0, 50)).join(' · ')})`);
+  lines.push(`searches: ${of('SEARCH_COMPLETED').length}`);
+  lines.push(`model calls: ${of('MODEL_REQUEST_COMPLETED').length}`);
+  return lines.join('\n').slice(0, 1200);
+}
+
 /**
  * Verify a deliverable against the task's success criteria.
  *
@@ -57,6 +114,20 @@ export async function verifyDeliverable(p) {
     }
   }
 
+  // Gate 1.6 (B213) — METHOD PROVENANCE: claims of browser-driven work are
+  // honest only if browser events exist in the task record. A COMPUTER_BLOCKED
+  // means the browser was tried and honestly unavailable — claiming browser
+  // work on top of that is a fabricated method. Deterministic on purpose:
+  // the model cannot override it (rubric pass is ANDed with the gates).
+  {
+    if (claimsBrowserMethod(deliverable)) {
+      const hasBrowserEvidence = (task?.events || []).some((e) => e.type === 'COMPUTER_ACT' || e.type === 'COMPUTER_OBSERVE');
+      if (!hasBrowserEvidence) {
+        gateProblems.push('the deliverable claims browser-driven work (headless/real browser) but NO browser action ever executed in this task — fabricated method; report only what really ran');
+      }
+    }
+  }
+
   // Gate 2 — rubric evaluation (model; verifier identity, routed preference)
   let rubric = { pass: gateProblems.length === 0, score: gateProblems.length ? 0.2 : 0.75, problems: gateProblems, rationale: 'deterministic gates only' };
   if (criteria.length) {
@@ -65,7 +136,11 @@ export async function verifyDeliverable(p) {
 You verify coworkers' work against explicit success criteria. You are strict but fair: a criterion is met only if the deliverable actually satisfies it. Never accept empty, evasive, or off-topic work.
 
 Answer ONLY with JSON: {"pass": boolean, "score": 0.0-1.0, "problems": ["..."], "rationale": "one short operational line"}`;
-      const user = `# OBJECTIVE\n${task.objective}\n\n# SUCCESS CRITERIA\n${criteria.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n\n# DELIVERABLE TO VERIFY\n${String(deliverable || '').slice(0, 30000)}\n\nIs this deliverable acceptable? JSON only.`;
+      // B213 — GROUNDED VERIFICATION: the rubric sees WHAT ACTUALLY EXECUTED
+      // (from the task's event record), so method claims are checked against
+      // evidence, not just the deliverable's internal coherence.
+      const evidence = executionEvidence(task?.events || []);
+      const user = `# OBJECTIVE\n${task.objective}\n\n# SUCCESS CRITERIA\n${criteria.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n\n# WHAT ACTUALLY EXECUTED (the only source of truth for HOW the work was done)\n${evidence}\n\n# DELIVERABLE TO VERIFY\n${String(deliverable || '').slice(0, 30000)}\n\nA claim about how the work was done (browser, commands, files, searches) that contradicts the execution evidence is fabrication — fail the deliverable and name the contradiction.\n\nIs this deliverable acceptable? JSON only.`;
       const raw = await llm({ system, user, prefer: 'gemini' });
       const parsed = extractJson(raw);
       if (parsed && typeof parsed.pass === 'boolean') {

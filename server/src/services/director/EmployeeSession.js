@@ -58,6 +58,7 @@ export function assembleBrief({ task, subtask, employee, dependencies = [], memo
       ...(subtask.constraints || []),
       'Operational summaries only in updates — never expose private chain-of-thought.',
       'Never fabricate: if you did not verify something, mark it unverified.',
+      'Report only methods you actually executed this session. If a tool was blocked or unavailable, say exactly that — never name a method you did not run.',
     ],
     availableResources: employee.supportedTools,
     expectedOutput: subtask.expectedOutput || 'A complete, self-contained deliverable for this subtask.',
