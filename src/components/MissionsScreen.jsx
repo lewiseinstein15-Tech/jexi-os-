@@ -2,28 +2,33 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Rocket, Loader2, Pause, Play, XCircle, Send, ChevronLeft, RefreshCw,
   CircleDot, CheckCircle2, XSquare, SkipForward, AlertTriangle, Eye, MousePointerClick, Ban,
+  FolderTree, TerminalSquare, Globe, UserRound,
 } from 'lucide-react';
 import { jexiFetch, getBackendUrl } from '../utils/helpers';
 
 /**
- * B212 — MISSIONS SCREEN: mission control over the REAL API only.
+ * B216 — MISSIONS SCREEN: the mission instrument (docs/DESIGN_SYSTEM.md §5).
  *
- * Everything rendered here comes from /api/missions (list, snapshot, events,
- * control, steer) — the persisted record is the single source of truth and
- * the frontend never invents operational state (the event-sourcing rule).
- * A mission listed here is exactly what the server knows; controls map 1:1
- * to the runner's controls; the event feed is the same append-only log the
- * chat replays.
+ * Everything rendered here comes from the REAL API only (list, snapshot,
+ * events, world, control, steer) — the persisted record is the single source
+ * of truth and the frontend never invents operational state. The screen is
+ * structured the way execution actually flows:
  *
- * Layout rules (B207 lessons): min-width 0 everywhere, truncation instead of
- * overflow, capped feed heights — phone-safe by construction.
+ *   OBJECTIVE → WORK GRAPH (tiered by dependencies) → EMPLOYEES →
+ *   ACTIVITY STREAM (the append-only log) → ENVIRONMENT (B215 world state) →
+ *   VERIFICATION / RESULT
+ *
+ * B207 lessons stay baked in: min-width 0 down the chain, truncation before
+ * overflow, capped feeds. B216 adds semantic motion (node-in / breath /
+ * settle) with a prefers-reduced-motion kill-switch in index.css.
  */
 
 const ACTIVE_STATES = ['PLANNING', 'EXECUTING', 'VERIFYING', 'AWAITING_INPUT'];
 
-// endpoint literal kept whole so the frontend↔server API-surface contract
-// test can see it (it normalizes ${...} to :id, but only on closed braces)
+// endpoint literals kept whole so the frontend↔server API-surface contract
+// test can see them (it normalizes ${...} to :id, but only on closed braces)
 const MISSION_EVENTS_URL = (id) => `/api/missions/${id}/events`;
+const MISSION_WORLD_URL = (id) => `/api/missions/${id}/world`;
 
 const STATE_META = {
   CREATED:    { label: 'CREATED',    cls: 'text-text-tertiary border-hairline' },
@@ -39,11 +44,15 @@ const STATE_META = {
 
 const ITEM_ICON = {
   PENDING: <CircleDot size={12} className="text-text-tertiary shrink-0" />,
-  RUNNING: <Loader2 size={12} className="text-brand animate-spin shrink-0" />,
+  RUNNING: <Loader2 size={12} className="text-brand jx-breath shrink-0" />,
   DONE: <CheckCircle2 size={12} className="text-brand shrink-0" />,
   FAILED: <XSquare size={12} className="text-status-error shrink-0" />,
   SKIPPED: <SkipForward size={12} className="text-text-tertiary shrink-0" />,
   SUPERSEDED: <RefreshCw size={12} className="text-status-warn shrink-0" />,
+};
+
+const DOT_CLS = {
+  RUNNING: 'jx-dot-running', DONE: 'jx-dot-done', FAILED: 'jx-dot-failed',
 };
 
 const EVT_ICON = (t) => {
@@ -65,17 +74,49 @@ const timeAgo = (iso) => {
   return `${Math.floor(m / 60)}h ${m % 60}m ago`;
 };
 
+const clockOf = (iso) => {
+  if (!iso) return '--:--:--';
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+};
+
+/** Dependency tiers: level = longest chain of dependsOn (planIndex refs). Cycle-safe. */
+const tierOf = (items) => {
+  const byIdx = new Map(items.map((i) => [i.planIndex, i]));
+  const level = new Map();
+  const visiting = new Set();
+  const depth = (idx, guard = 0) => {
+    if (level.has(idx)) return level.get(idx);
+    if (visiting.has(idx) || guard > 64) return 0; // cycle/absent guard — honest flat placement
+    visiting.add(idx);
+    const it = byIdx.get(idx);
+    const ds = (it?.dependsOn || []).filter((d) => byIdx.has(d));
+    const v = ds.length ? Math.max(...ds.map((d) => depth(d, guard + 1))) + 1 : 0;
+    visiting.delete(idx);
+    level.set(idx, v);
+    return v;
+  };
+  const tiers = [];
+  for (const i of items) {
+    const t = depth(i.planIndex);
+    (tiers[t] = tiers[t] || []).push(i);
+  }
+  return tiers.filter(Boolean);
+};
+
 export default function MissionsScreen() {
   const [missions, setMissions] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [snap, setSnap] = useState(null);
   const [events, setEvents] = useState([]);
+  const [world, setWorld] = useState(null);
   const [busy, setBusy] = useState(null);
   const [steerText, setSteerText] = useState('');
   const [answerText, setAnswerText] = useState('');
   const [note, setNote] = useState('');
   const lastEventId = useRef(null);
   const selectedRef = useRef(null);
+  const seenItemIds = useRef(null); // B216: animate only nodes that join AFTER first render
   selectedRef.current = selectedId;
 
   const loadList = useCallback(async () => {
@@ -88,14 +129,17 @@ export default function MissionsScreen() {
 
   const loadDetail = useCallback(async (id, incremental = false) => {
     try {
-      const [rSnap, rEvts] = await Promise.all([
+      const [rSnap, rEvts, rWorld] = await Promise.all([
         jexiFetch(`${getBackendUrl()}/api/missions/${id}`),
         jexiFetch(`${getBackendUrl()}${MISSION_EVENTS_URL(id)}${incremental && lastEventId.current ? `?sinceEventId=${encodeURIComponent(lastEventId.current)}` : ''}`),
+        jexiFetch(`${getBackendUrl()}${MISSION_WORLD_URL(id)}`).catch(() => null), // B215 world (best-effort, never blocks)
       ]);
       const s = await rSnap.json();
       const e = await rEvts.json();
       if (selectedRef.current !== id) return;
       setSnap(s.ok ? s : null);
+      const w = rWorld && rWorld.ok ? await rWorld.json().catch(() => null) : null;
+      if (w && w.ok) setWorld(w.world || null);
       if (e.ok && Array.isArray(e.events)) {
         setEvents((prev) => (incremental ? [...prev, ...e.events].slice(-300) : e.events.slice(-300)));
         const last = e.events[e.events.length - 1];
@@ -114,7 +158,7 @@ export default function MissionsScreen() {
 
   useEffect(() => {
     if (!selectedId) return;
-    setSnap(null); setEvents([]); lastEventId.current = null;
+    setSnap(null); setEvents([]); setWorld(null); lastEventId.current = null; seenItemIds.current = null;
     loadDetail(selectedId, false);
   }, [selectedId, loadDetail]);
 
@@ -165,11 +209,57 @@ export default function MissionsScreen() {
   /* ── list (phone-first: detail replaces the list) ─────────────────── */
   if (selectedId && m) {
     const usage = m.usage || {};
-    const budgets = m.budgets || {};
     const analysis = m.analysis;
     const imagination = m.imagination;
+    const items = snap.graph?.items || [];
+    const stats = snap.graph?.stats || null;
+    const tiers = tierOf(items);
+
+    // B216 motion contract: the first render of a graph settles every node;
+    // only nodes that JOIN later animate in (a reconnect is not a replay).
+    if (seenItemIds.current === null && items.length) {
+      seenItemIds.current = new Set(items.map((i) => i.id));
+    }
+    const isNewNode = (it) => {
+      if (!seenItemIds.current) return false;
+      if (seenItemIds.current.has(it.id)) return false;
+      seenItemIds.current.add(it.id);
+      return true;
+    };
+
+    // the live phase line — derived from the LATEST REAL EVENT, never invented
+    const lastEvt = events[events.length - 1] || null;
+    const phaseLine = lastEvt
+      ? `${clockOf(lastEvt.ts || lastEvt.at)} · ${String(lastEvt.summary || lastEvt.type).slice(0, 96)}`
+      : m.state === 'PLANNING' ? 'planning — no events yet' : 'waiting for the first event…';
+
+    // progress rail — REAL counts, no percentage fiction
+    const rail = stats ? [
+      { k: 'done', n: stats.byStatus.DONE || 0, cls: 'bg-brand' },
+      { k: 'run', n: stats.byStatus.RUNNING || 0, cls: 'bg-brand/60' },
+      { k: 'ready', n: stats.ready || 0, cls: 'bg-text-secondary/50' },
+      { k: 'pend', n: Math.max(0, (stats.open || 0) - (stats.ready || 0)), cls: 'bg-text-tertiary/40' },
+      { k: 'fail', n: (stats.byStatus.FAILED || 0) + (stats.blockedByFailures || 0), cls: 'bg-status-error/70' },
+    ] : [];
+    const railTotal = rail.reduce((n, s) => n + s.n, 0) || 1;
+
+    // employee lane — real workers only (from item results); absent when unstaffed
+    const workers = new Map();
+    for (const it of items) {
+      const name = it.result?.employeeName;
+      if (name && !workers.has(name)) workers.set(name, { name, last: it.title, status: it.status, ms: it.result?.ms });
+    }
+    const inFlight = stats?.byStatus.RUNNING || 0;
+
+    const worldFiles = world?.files || [];
+    const worldProcs = world?.processes || [];
+    const worldLastCmd = worldProcs[worldProcs.length - 1] || null;
+    const worldBrowser = world?.browser || {};
+    const worldHasContent = worldFiles.length || worldProcs.length || worldBrowser.updatedAt || (world?.repos || []).length;
+
     return (
       <div className="h-full flex flex-col min-w-0">
+        {/* header */}
         <div className="flex items-center gap-2 px-3 py-2 border-b border-hairline shrink-0">
           <button type="button" onClick={() => setSelectedId(null)} className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-2 transition-colors" aria-label="back to missions">
             <ChevronLeft size={16} />
@@ -179,7 +269,26 @@ export default function MissionsScreen() {
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 min-w-0">
-          <div className="text-[13px] text-text-primary leading-snug break-words">{m.objective}</div>
+          {/* objective — the display voice: what she understood */}
+          <div className="min-w-0">
+            <div className="text-[9px] font-bold tracking-[0.14em] text-text-tertiary mb-1">OBJECTIVE</div>
+            <div className="font-display text-[15px] leading-snug text-text-primary break-words">{m.objective}</div>
+          </div>
+
+          {/* live phase line — real telemetry, never a spinner */}
+          <div className="jx-phase flex items-center gap-2 min-w-0" aria-live="polite">
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${active ? 'bg-brand jx-breath' : m.state === 'FAILED' ? 'bg-status-error' : 'bg-text-tertiary'}`} />
+            <span className="text-[10px] font-mono text-text-secondary truncate min-w-0">{phaseLine}</span>
+          </div>
+
+          {/* progress rail — real item counts */}
+          {stats && stats.total > 0 && (
+            <div className="flex h-[3px] rounded-full overflow-hidden gap-px min-w-0 jx-rail-in" role="img" aria-label={`work graph: ${stats.byStatus.DONE || 0} done, ${stats.byStatus.RUNNING || 0} running, ${stats.ready} ready, ${stats.byStatus.FAILED || 0} failed of ${stats.total}`}>
+              {rail.map((s) => s.n > 0 && (
+                <div key={s.k} className={s.cls} style={{ width: `${(s.n / railTotal) * 100}%` }} />
+              ))}
+            </div>
+          )}
 
           {m.state === 'AWAITING_INPUT' && m.needsQuestion && (
             <div className="rounded-xl border border-status-warn/40 bg-status-warn/5 p-3 space-y-2 min-w-0">
@@ -263,52 +372,142 @@ export default function MissionsScreen() {
             </div>
           )}
 
-          {/* work items */}
+          {/* ══ WORK GRAPH — the tier ladder (signature element, §5.3) ══ */}
           {snap.graph && (
-            <div className="space-y-1.5 min-w-0">
-              <div className="text-[9px] font-bold tracking-[0.14em] text-text-tertiary pt-1">WORK GRAPH</div>
-              {(snap.graph.items || []).map((it) => (
-                <div key={it.id} className="rounded-lg border border-hairline bg-surface-1/60 px-2.5 py-2 min-w-0">
-                  <div className="flex items-start gap-2 min-w-0">
-                    <span className="mt-0.5">{ITEM_ICON[it.status] || ITEM_ICON.PENDING}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[12px] text-text-primary leading-snug break-words">
-                        {it.title}
-                        {it.result?.employeeName && <span className="text-text-tertiary"> — {it.result.employeeName}</span>}
-                      </div>
-                      {it.failureReason && <div className="text-[10px] text-status-warn break-words mt-0.5">{it.failureReason}</div>}
-                      {it.result?.artifacts?.length > 0 && (
-                        <div className="text-[10px] text-text-tertiary mt-0.5 truncate">{it.result.artifacts.length} artifact(s): {it.result.artifacts.map((a) => a.name || a).join(', ')}</div>
-                      )}
-                      {it.status === 'FAILED' && (
-                        <button type="button" onClick={() => control('retry', { itemId: it.id })} className="mt-1.5 text-[10px] font-semibold text-brand disabled:opacity-40" disabled={busy === 'retry'}>
-                          {busy === 'retry' ? 'retrying…' : 'retry this item'}
-                        </button>
-                      )}
-                    </div>
+            <div className="space-y-2 min-w-0">
+              <div className="text-[9px] font-bold tracking-[0.14em] text-text-tertiary pt-1">WORK GRAPH — DEPENDENCY TIERS</div>
+              {items.length === 0 && <div className="text-[11px] text-text-tertiary">graph not built yet — planning in progress</div>}
+              <div className="space-y-2">
+                {tiers.map((tier, ti) => (
+                  <div key={ti} className="jx-tier space-y-1.5 min-w-0">
+                    <div className="text-[9px] font-mono text-text-tertiary pl-1">{ti === 0 ? 'TIER 0 · INDEPENDENT' : `TIER ${ti} · NEEDS TIER ${ti - 1}`}</div>
+                    {tier.map((it) => {
+                      const dot = DOT_CLS[it.status] || (it.deferred ? 'jx-dot-warn' : '');
+                      const joined = isNewNode(it);
+                      return (
+                        <div key={it.id} className={`jx-tier-node jx-settle ${dot} rounded-lg border bg-surface-1/60 px-2.5 py-2 min-w-0 ${it.status === 'FAILED' ? 'border-status-error/30' : 'border-hairline'} ${joined ? 'jx-node-in' : ''}`}>
+                          <div className="flex items-start gap-2 min-w-0">
+                            <span className="mt-0.5">{ITEM_ICON[it.status] || ITEM_ICON.PENDING}</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[12px] text-text-primary leading-snug break-words">
+                                {it.title}
+                                {it.result?.employeeName && <span className="text-text-tertiary"> — {it.result.employeeName}</span>}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                                <span className="text-[9px] font-mono text-text-tertiary">{it.status}{it.deferred ? ' · deferred' : ''}{(it.attempts || 0) > 1 ? ` · ${it.attempts} attempts` : ''}</span>
+                                {it.origin === 'discovered' && <span className="text-[9px] font-mono text-status-warn/80 border border-status-warn/25 rounded-full px-1.5">discovered</span>}
+                                {it.result?.artifacts?.length > 0 && (
+                                  <span className="text-[9px] font-mono text-text-tertiary truncate">{it.result.artifacts.length} artifact{it.result.artifacts.length > 1 ? 's' : ''}</span>
+                                )}
+                              </div>
+                              {it.failureReason && <div className="text-[10px] text-status-warn break-words mt-0.5">{it.failureReason}</div>}
+                              {it.status === 'FAILED' && (
+                                <button type="button" onClick={() => control('retry', { itemId: it.id })} className="mt-1.5 text-[10px] font-semibold text-brand disabled:opacity-40" disabled={busy === 'retry'}>
+                                  {busy === 'retry' ? 'retrying…' : 'retry this item'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
 
-          {/* event feed — the same append-only log the chat replays */}
+          {/* ══ EMPLOYEE LANE — real workers only (§5.4) ══ */}
+          {(workers.size > 0 || inFlight > 0) && (
+            <div className="space-y-1.5 min-w-0">
+              <div className="text-[9px] font-bold tracking-[0.14em] text-text-tertiary pt-1">WORKFORCE</div>
+              <div className="flex flex-wrap gap-1.5">
+                {[...workers.values()].map((w) => (
+                  <span key={w.name} className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface-1/60 px-2 py-1 min-w-0 max-w-full">
+                    <UserRound size={10} className="text-text-tertiary shrink-0" />
+                    <span className="text-[10px] text-text-secondary truncate">{w.name}</span>
+                    <span className="text-[9px] font-mono text-text-tertiary truncate">{w.status === 'DONE' ? 'delivered' : w.status.toLowerCase()}</span>
+                  </span>
+                ))}
+                {inFlight > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-brand-line bg-brand/5 px-2 py-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand jx-breath" />
+                    <span className="text-[10px] font-mono text-brand">{inFlight} in flight</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ══ ACTIVITY STREAM — the append-only log (§5.5) ══ */}
           <div className="space-y-1 min-w-0">
-            <div className="text-[9px] font-bold tracking-[0.14em] text-text-tertiary pt-1">EVENT RECORD ({events.length})</div>
-            <div className="rounded-lg border border-hairline bg-surface-1/40 max-h-64 overflow-y-auto px-2.5 py-2 space-y-1">
-              {events.length === 0 && <div className="text-[11px] text-text-tertiary">no events yet</div>}
+            <div className="text-[9px] font-bold tracking-[0.14em] text-text-tertiary pt-1">ACTIVITY STREAM ({events.length})</div>
+            <div className="rounded-lg border border-hairline bg-surface-1/40 max-h-64 overflow-y-auto px-2.5 py-2 space-y-1.5">
+              {events.length === 0 && <div className="text-[11px] text-text-tertiary">no events yet — the record starts when the mission does</div>}
               {events.slice(-80).reverse().map((e) => (
-                <div key={e.id || e.at} className="flex items-start gap-1.5 min-w-0">
-                  <span className="mt-[3px]">{EVT_ICON(e.type)}</span>
+                <div key={e.id || e.at} className="flex items-start gap-2 min-w-0">
+                  <span className="text-[9px] font-mono text-text-tertiary shrink-0 mt-[2px] tabular-nums">{clockOf(e.ts || e.at)}</span>
+                  <span className="mt-[3px] shrink-0">{EVT_ICON(e.type)}</span>
                   <div className="min-w-0">
                     <div className="text-[11px] text-text-secondary leading-snug break-words">{String(e.summary || e.type)}</div>
-                    <div className="text-[9px] font-mono text-text-tertiary">{e.type}{e.at ? ` · ${timeAgo(e.at)}` : ''}</div>
+                    <div className="text-[9px] font-mono text-text-tertiary">{e.type}</div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
+          {/* ══ ENVIRONMENT — B215 world state, real entries only (§5.6) ══ */}
+          {worldHasContent ? (
+            <div className="space-y-1.5 min-w-0">
+              <div className="text-[9px] font-bold tracking-[0.14em] text-text-tertiary pt-1">ENVIRONMENT — OBSERVED</div>
+              <div className="rounded-lg border border-hairline bg-surface-1/40 px-2.5 py-2 space-y-1 min-w-0">
+                {worldLastCmd && (
+                  <div className="flex items-center gap-2 min-w-0">
+                    <TerminalSquare size={11} className="text-text-tertiary shrink-0" />
+                    <span className="text-[10px] font-mono text-text-secondary truncate min-w-0">{worldLastCmd.command} → exit {worldLastCmd.exitCode ?? '?'}{worldLastCmd.ms != null ? ` · ${worldLastCmd.ms}ms` : ''}</span>
+                  </div>
+                )}
+                {worldFiles.length > 0 && (
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FolderTree size={11} className="text-text-tertiary shrink-0" />
+                    <span className="text-[10px] font-mono text-text-secondary truncate min-w-0">{worldFiles.length} file{worldFiles.length > 1 ? 's' : ''}: {worldFiles.slice(-8).map((f) => f.path).join(', ')}</span>
+                  </div>
+                )}
+                {worldBrowser.updatedAt && (
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Globe size={11} className="text-text-tertiary shrink-0" />
+                    <span className={`text-[10px] font-mono truncate min-w-0 ${worldBrowser.available ? 'text-text-secondary' : 'text-status-warn'}`}>
+                      browser {worldBrowser.available ? `available${worldBrowser.lastTitle ? ` · “${worldBrowser.lastTitle}”` : ''}` : `unavailable — ${worldBrowser.blockedReason || 'not configured'}`}
+                    </span>
+                  </div>
+                )}
+                {(world?.repos || []).length > 0 && (
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Rocket size={11} className="text-text-tertiary shrink-0" />
+                    <span className="text-[10px] font-mono text-text-secondary truncate min-w-0">published: {(world.repos || []).slice(-3).map((r) => r.slug).join(', ')}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {/* ══ ERROR SURFACE — what happened / what you can do (§5.7) ══ */}
+          {m.state === 'FAILED' && (
+            <div className="rounded-xl border border-status-error/40 bg-status-error/5 p-3 space-y-2 min-w-0">
+              <div className="text-[9px] font-bold tracking-[0.14em] text-status-error">MISSION FAILED — HONESTLY RECORDED</div>
+              {m.verification?.verdict === 'fail' && m.verification.problems?.length > 0 && (
+                <div className="text-[11px] text-text-primary break-words border-l-2 border-status-error/40 pl-2">{String(m.verification.problems[0]).slice(0, 400)}</div>
+              )}
+              <div className="text-[11px] text-text-secondary break-words">
+                Every item's state is preserved above — failed items show their real failure reason and can be retried individually.
+                {usage.failures ? ` ${usage.failures} failure${usage.failures > 1 ? 's' : ''} recorded.` : ''}
+                {usage.replans ? ` A replan was attempted.` : ''}
+              </div>
+            </div>
+          )}
+
+          {/* final report */}
           {m.result?.summary && (
             <div className="rounded-xl border border-hairline bg-surface-1/60 p-3 min-w-0">
               <div className="text-[9px] font-bold tracking-[0.14em] text-text-tertiary mb-1">FINAL REPORT</div>
@@ -335,7 +534,7 @@ export default function MissionsScreen() {
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 min-w-0">
         {missions === null && (
-          <div className="flex items-center gap-2 text-[12px] text-text-tertiary px-1"><Loader2 size={13} className="animate-spin" /> loading the mission record…</div>
+          <div className="flex items-center gap-2 text-[12px] text-text-tertiary px-1"><Loader2 size={13} className="animate-spin" /> retrieving mission state…</div>
         )}
         {missions !== null && missions.length === 0 && (
           <div className="text-[12px] text-text-tertiary leading-relaxed px-1">
@@ -355,7 +554,7 @@ export default function MissionsScreen() {
                 <span className={`text-[9px] font-bold tracking-[0.12em] border rounded-full px-2 py-0.5 shrink-0 ${meta.cls}`}>{meta.label}</span>
                 <span className="text-[10px] text-text-tertiary ml-auto shrink-0">{timeAgo(mi.updatedAt)}</span>
               </div>
-              <div className="text-[12px] text-text-primary leading-snug mt-1.5 break-words line-clamp-2">{mi.objective}</div>
+              <div className="font-display text-[13px] text-text-primary leading-snug mt-1.5 break-words line-clamp-2">{mi.objective}</div>
               <div className="text-[10px] font-mono text-text-tertiary mt-1 truncate">{mi.id}</div>
             </button>
           );

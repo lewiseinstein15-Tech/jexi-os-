@@ -1287,3 +1287,61 @@ form.surface-float { flex-shrink: 0; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .jx-team-model { font-size: 8.5px; color: var(--muted, #4b5563); font-family: var(--mono); min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ════════════════════════════════════════════════════════════════
+   B216 — MISSION INSTRUMENT: semantic motion + work-graph primitives
+   (docs/DESIGN_SYSTEM.md §5–§6. Motion means state change, nothing else.)
+   ════════════════════════════════════════════════════════════════ */
+
+/* a node JOINS the graph (once — reconnects render settled) */
+@keyframes jxNodeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.jx-node-in { animation: jxNodeIn 240ms cubic-bezier(.2,.8,.3,1) both; }
+
+/* RUNNING work is alive — a slow breath on the status glyph ONLY */
+@keyframes jxBreath {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+.jx-breath { animation: jxBreath 2.4s ease-in-out infinite; }
+
+/* work LANDED — a quiet tint settle, no celebration theater */
+.jx-settle { transition: border-color 300ms ease, color 300ms ease; }
+
+/* progress rail segments grow once when the graph changes shape */
+@keyframes jxRailIn {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.jx-rail-in { transform-origin: left; animation: jxRailIn 360ms cubic-bezier(.2,.8,.3,1) both; }
+
+/* the live phase line swaps content without layout jumps */
+.jx-phase { transition: opacity 160ms ease; }
+
+/* ── B216 Part 41: reduced motion — one kill-switch, everything calms ── */
+@media (prefers-reduced-motion: reduce) {
+  .jx-node-in, .jx-rail-in { animation: none; }
+  .jx-breath { animation: none; opacity: 1; }
+  .jx-settle { transition: none; }
+  .jx-phase { transition: none; }
+}
+
+/* ── work-graph tier ladder (mobile-first: vertical levels) ── */
+.jx-tier { position: relative; padding-left: 18px; }
+.jx-tier::before {           /* the level's spine on the left rail */
+  content: ''; position: absolute; left: 5px; top: 4px; bottom: 4px;
+  width: 1px; background: var(--line2, #2a2a3e);
+}
+.jx-tier:last-child::before { bottom: auto; height: 14px; }
+.jx-tier-node { position: relative; }
+.jx-tier-node::before {      /* the node's anchor dot on the rail */
+  content: ''; position: absolute; left: -18px; top: 13px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #07070b; border: 1.5px solid var(--faint, #5d6270);
+}
+.jx-tier-node.jx-dot-running::before { border-color: #00D26A; }
+.jx-tier-node.jx-dot-done::before    { border-color: #00D26A; background: #00D26A; }
+.jx-tier-node.jx-dot-failed::before  { border-color: #FB7185; background: #FB7185; }
+.jx-tier-node.jx-dot-warn::before    { border-color: #D8A83E; }
