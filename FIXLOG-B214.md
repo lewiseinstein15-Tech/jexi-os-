@@ -113,3 +113,25 @@ brain boots, serves, and degrades honestly without them (verified live —
 health, key enforcement, 12 model lanes, missions, publishing all green).
 Next-build scope: WhatsApp messaging, push notifications, outbound email —
 each already designed to no-op cleanly when unconfigured.
+
+## Addendum — binary publish support (same day)
+
+**Found live:** demo-post images (banner.jpg, app-login.png, app-dashboard.png) published as 9-byte
+files — literal text "undefined". Cause: the b64 binary format was edited locally but PROD still ran
+the old publisher, which read the nonexistent `code` field on `{name,b64}` files. Lesson recorded:
+**a local edit does nothing for prod — deploy before exercising new code paths on prod.**
+
+**Fix (commit `62b7f6a`):** `putFile` accepts `content = {b64}` passed through as-is (text stays
+utf-8→base64); E2E §3 added to test-b214.js — publishes a real 1×1 PNG and byte-compares it back.
+CI green (CI/Pages/APK/docker-publish); docker-publish pushed image + hook deployed it (the race
+fix held: deploy `dep-dadc529tb6fs73a99ma0` started after the image push). Env intact (22 vars).
+
+**Verified on prod:** `jexi-demo` republished — banner.jpg 84,246 B, app-login.png 47,127 B,
+app-dashboard.png 89,969 B — all three byte-identical (sha256) to the source files. B207 phone-width
+drive: 3/3 images render (naturalWidth > 0), no horizontal overflow, both links resolve, zero
+console errors. Future builds with images/assets publish natively.
+
+**Known (pre-existing, not a regression):** chat transcripts live at DATA_DIR/conversations/*.jsonl
+on the ephemeral container disk — every deploy starts a fresh container, so chat history does not
+survive restarts. App code, workspace projects and long-term memory ride external stores (GitHub
+repo / Redis). Persistent transcript storage is a future-build candidate.
