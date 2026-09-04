@@ -420,6 +420,8 @@ html, body {
 
 /* headings — clear hierarchy, never noisy */
 .jx-h1 { font-size: 19px; font-weight: 800; letter-spacing: -.3px; margin: 22px 0 8px; color: #fff; line-height: 1.35; }
+.jx-mgroup { font-family: var(--mono); font-size: 9px; font-weight: 500; letter-spacing: .14em; color: var(--faint); padding: 12px 8px 4px; }
+nav.jx-menu { overflow-y: auto; } /* B222 — 21 items: the drawer scrolls, truncation before overflow */
 .jx-kick { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .jx-h2 { font-family: var(--sg, 'Space Grotesk'); font-size: 16.5px; font-weight: 700; letter-spacing: -.01em; margin: 20px 0 7px; color: #fff; line-height: 1.35; }
 .jx-h3 { font-size: 14.5px; font-weight: 700; margin: 16px 0 6px; color: #fff; }

@@ -41,10 +41,13 @@ export default function McpScreen() {
       <div>
         <p className="eyebrow mb-1.5">ALLOWLISTED TOOLS · READ-ONLY</p>
         <div className="surface-card divide-y divide-hairline/50">
-          {(status?.tools || []).map((t) => (
-            <div key={t} className="flex items-center gap-2 px-3 py-2">
+          {(status?.tools || []).map((t, i) => (
+            /* B222 repair: /api/mcp/status tools evolved from strings to
+               {name, tier, builtin} objects while this screen sat unwired. */
+            <div key={typeof t === 'string' ? t : (t?.name || i)} className="flex items-center gap-2 px-3 py-2">
               <Wrench className="w-3 h-3 text-text-tertiary flex-shrink-0" />
-              <code className="text-[10px] font-mono text-text-primary flex-1">{t}</code>
+              <code className="text-[10px] font-mono text-text-primary flex-1">{typeof t === 'string' ? t : t?.name}</code>
+              {t?.tier && <span className="text-[7px] font-mono text-text-tertiary border border-hairline rounded-full px-1.5 py-0.5 flex-shrink-0">{t.tier}</span>}
               <ShieldCheck className="w-3 h-3 text-brand flex-shrink-0" />
             </div>
           ))}

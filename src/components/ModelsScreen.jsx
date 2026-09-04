@@ -31,15 +31,24 @@ export default function ModelsScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const [r, p] = await Promise.all([
-          jexiFetch(`${getBackendUrl()}/api/models`).then((x) => x.json()),
-          jexiFetch(`${getBackendUrl()}/api/health/providers`).then((x) => x.json()).catch(() => ({ providers: [] })),
-        ]);
+        const r = await jexiFetch(`${getBackendUrl()}/api/models`).then((x) => x.json());
         setWorkers(r.workers || []);
-        setProviders(p.providers || []);
       } catch (e) { console.error('Models fetch failed', e); }
       setLoading(false);
     })();
+  }, []);
+
+  // B222: provider health LIVE-TESTS every configured provider (about a
+  // minute) — it must never block the screen. It streams in when it lands.
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      try {
+        const p = await jexiFetch(`${getBackendUrl()}/api/health/providers`).then((x) => x.json());
+        if (!dead) setProviders(p.providers || []);
+      } catch (e) { if (!dead) setProviders([]); }
+    })();
+    return () => { dead = true; };
   }, []);
 
   if (loading) return <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="skeleton h-14 rounded-lg" />)}</div>;
@@ -105,7 +114,7 @@ export default function ModelsScreen() {
             </div>
           ))}
         </div>
-        {providers.length === 0 && <p className="text-[10px] text-text-tertiary">Provider health is unavailable right now.</p>}
+        {providers.length === 0 && <p className="text-[10px] text-text-tertiary font-mono">live-testing providers… (takes about a minute)</p>}
       </div>
     </div>
   );
