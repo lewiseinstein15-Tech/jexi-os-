@@ -21,6 +21,10 @@ import { jexiFetch, getBackendUrl } from '../utils/helpers';
 
 const ACTIVE_STATES = ['PLANNING', 'EXECUTING', 'VERIFYING', 'AWAITING_INPUT'];
 
+// endpoint literal kept whole so the frontend↔server API-surface contract
+// test can see it (it normalizes ${...} to :id, but only on closed braces)
+const MISSION_EVENTS_URL = (id) => `/api/missions/${id}/events`;
+
 const STATE_META = {
   CREATED:    { label: 'CREATED',    cls: 'text-text-tertiary border-hairline' },
   PLANNING:   { label: 'PLANNING',   cls: 'text-brand border-brand-line' },
@@ -86,7 +90,7 @@ export default function MissionsScreen() {
     try {
       const [rSnap, rEvts] = await Promise.all([
         jexiFetch(`${getBackendUrl()}/api/missions/${id}`),
-        jexiFetch(`${getBackendUrl()}/api/missions/${id}/events${incremental && lastEventId.current ? `?sinceEventId=${encodeURIComponent(lastEventId.current)}` : ''}`),
+        jexiFetch(`${getBackendUrl()}${MISSION_EVENTS_URL(id)}${incremental && lastEventId.current ? `?sinceEventId=${encodeURIComponent(lastEventId.current)}` : ''}`),
       ]);
       const s = await rSnap.json();
       const e = await rEvts.json();
