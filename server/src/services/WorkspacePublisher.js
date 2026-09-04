@@ -53,7 +53,11 @@ async function getJson(pathname) {
 async function putFile(path, content, message, sha = null, branch = 'main') {
   const body = {
     message: String(message).slice(0, 200),
-    content: Buffer.from(String(content), 'utf-8').toString('base64'),
+    // B214: binary support — files may arrive as { name, b64 } (images and
+    // other assets). Passing raw base64 through; text stays utf-8 encoded.
+    content: typeof content === 'object' && content !== null && content.b64
+      ? String(content.b64)
+      : Buffer.from(String(content), 'utf-8').toString('base64'),
     branch,
     ...(sha ? { sha } : {}),
   };
@@ -193,7 +197,7 @@ export async function publishProject({ name, title, brief = '', icon = '', files
   for (const f of files.slice(0, 40)) {
     const path = `${slug}/${String(f.name).replace(/^\/+/, '')}`;
     const existing = await getJson(`/contents/${path}`);
-    const r = await putFile(path, f.code, `workspace: ${slug} — ${f.name}`, existing?.sha || null);
+    const r = await putFile(path, f.b64 ? { b64: f.b64 } : f.code, `workspace: ${slug} — ${f.name}`, existing?.sha || null);
     if (!r.ok) return { ok: false, error: `could not publish ${f.name}: ${r.error}` };
   }
 

@@ -98,6 +98,34 @@ console.log('\n== 2. REAL publish E2E on the live workspace (opt-in) ==');
   }
 }
 
+console.log('\n== 3. Binary (b64) files publish byte-identical (opt-in, same flag) ==');
+{
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
+  if (process.env.JEXI_WORKSPACE_E2E !== '1' || !token) {
+    console.log('  ⏭ SKIP — set JEXI_WORKSPACE_E2E=1 + GITHUB_TOKEN to run the binary publish proof');
+  } else {
+    // a real 1x1 red PNG
+    const PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const pub = await publishProject({
+      name: 'b214-binary-check',
+      title: 'binary publish proof',
+      brief: 'images must survive the publish round-trip byte-identical',
+      files: [
+        { name: 'index.html', code: '<!doctype html><img src="dot.png">' },
+        { name: 'dot.png', b64: PNG_B64 },
+      ],
+      entry: 'index.html',
+    });
+    check('binary publish ok + live', pub.ok === true && pub.live === true, JSON.stringify(pub).slice(0, 150));
+    const res = await fetch('https://lewiseinstein15-tech.github.io/jexi-workspace/b214-binary-check/dot.png', { headers: { 'Cache-Control': 'no-cache' } });
+    const buf = Buffer.from(await res.arrayBuffer());
+    check('published PNG serves with the image content-type', res.status === 200 && /^image\/png/.test(res.headers.get('content-type') || ''), res.headers.get('content-type'));
+    check('published PNG is BYTE-IDENTICAL to the original', buf.toString('base64') === PNG_B64, `got ${buf.length} bytes: ${buf.toString('utf-8').slice(0, 30)}`);
+    const cleared = await clearProject('b214-binary-check');
+    check('cleanup clears the binary proof project', cleared.ok === true);
+  }
+}
+
 console.log('\n============================================================');
 console.log(`B214: ${pass} passed, ${fail} failed`);
 console.log('============================================================');
