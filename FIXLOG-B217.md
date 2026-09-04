@@ -90,3 +90,63 @@ scope isolation (nothing outside mirrored dirs).
 3. **Review github.com/settings/installations** — revoke `freebuff-web`
    (CodebuffAI) if you don't use it; it's the actor on every keepalive run
    and had repo workflow access.
+
+---
+
+## ADDENDUM (same day, evening) — aftermath, verification, and closure
+
+### Both incidents: CLOSED
+- **Pages root cause FOUND (it was us, not an attacker):** the user flipped the
+  repo to private for a few minutes (~16:02–16:09 UTC). GitHub Free cannot
+  serve Pages from private repos, so the site was killed instantly — and
+  flipping back to public does NOT auto-re-enable Pages (that's why it stayed
+  a 404 until the API re-enable). The Security Log correctly showed the user
+  as actor. Lesson recorded: going private on Free = site down until re-enabled.
+- **"Mystery repos" explained:** `repo.create` entries with the user as actor
+  are JEXI infrastructure (jexi-workspace, jexi-os-test-, .github.io site,
+  cinejexi) created via the API with the user's token. Full repo audit found
+  nothing attacker-shaped.
+
+### Security actions completed by the user (2026-09-04 evening)
+- Old full-scope PAT **revoked (verified 401)**; new PAT stored in
+  `GH_PAGES_GUARD_TOKEN` (updated 17:29:30Z) + git remote; guard permissions
+  re-verified live: Pages write probe 409-as-expected, workflow rerun 201,
+  keepalive rerun completed success. NOTE: user chose to keep the new token
+  full-scope intentionally ("I will not notice some things you will") — swap
+  to a minimal repo+workflow token planned for next week.
+- CodebuffAI (`freebuff-web`) **revoked** (plus other app authorizations).
+  Keepalive scheduled runs now attribute to `lewiseinstein15-Tech`
+  (verified via triggering_actor on the 17:02 run) — revocation broke nothing.
+- **UptimeRobot monitor live** — see verification below.
+- Render workspace ownerId (for the logs API): `tea-d9r5odf10e5c73anqs50`.
+
+### UptimeRobot verification (controlled experiment, 17:59–18:17 UTC)
+Render free tier doesn't expose request logs (only `type=app`), so UptimeRobot
+pings can't be read from logs. Instead: JEXI_SELF_PING was set to 0 (env value
+changes do NOT auto-trigger a deploy — an env-var ADD does; a value change
+needs a manual deploy trigger), a fresh instance booted 17:59:52, then 17.5
+minutes of total silence from us. Result: **uptime 1104s (18.4 min), no cold
+start** — she crossed the 15-min hibernation threshold with self-ping OFF.
+Contamination ruled out: no keepalive cron run fired in the window (last was
+17:02). ⇒ the only possible keep-awake source was the external monitor.
+**UptimeRobot: PROVEN working.** Self-ping restored after (boot-log marker
+verified via Render logs API).
+
+### Transient incident during the test (honest record)
+The rapid double-boot (18:17/18:19) hit an Upstash latency spike: one boot
+logged `[Memory] Redis hydrate failed, using local file: Command timed out`
+and ran with `redis:false` until a clean restart. Upstash itself was healthy
+(external PING → PONG in ~1.3s; mirror keys intact). The clean restart
+recovered everything: memory hydrate ✓, 56 goal jobs ✓, mirror hydrated the
+3 mission files onto the fresh disk ✓. **Known residual weakness:** the boot
+memory hydrate has no retry — if Upstash is slow at boot, she falls back to
+the local file for that process lifetime. Future hardening candidate (add
+hydrate retry with backoff); not fixed in this build.
+
+### Final state (2026-09-04 ~18:25 UTC)
+- keep-warm: self-ping ON (primary) + UptimeRobot 5-min external (proven) +
+  starved GitHub cron (best-effort backup)
+- persistence: Redis mirror active (missions/world/conversations, 45d TTL)
+- Pages: 200, self-heal guard armed with the rotated token
+- brain: healthy, memory + goals hydrated, mission restored across 3
+  container replacements today with zero data loss
