@@ -102,3 +102,14 @@ racing the Docker publish, so Render could re-deploy a stale image (bit
 us in B212, B213 and today). The hook ping now lives INSIDE
 `docker-publish.yml` as the step AFTER the image push; the standalone
 workflow is manual-only.
+
+## User decision (2026-09-04): the 4 unconfigured integrations stay off
+
+The four env values that were not recoverable (`FIREBASE_SERVICE_ACCOUNT_B64`,
+`WHATSAPP_ACCESS_TOKEN`, `VERIFY_TOKEN`, `RESEND_API_KEY`) are **unused by
+choice** — the owner will rebuild those integrations properly as a future
+build ("build them well as intended"). Until then they stay unset: the
+brain boots, serves, and degrades honestly without them (verified live —
+health, key enforcement, 12 model lanes, missions, publishing all green).
+Next-build scope: WhatsApp messaging, push notifications, outbound email —
+each already designed to no-op cleanly when unconfigured.
