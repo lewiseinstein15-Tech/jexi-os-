@@ -43,7 +43,7 @@
 
 ### 🚀 Her workspace (separate build home)
 - Finished web builds **auto-publish** to a dedicated free site with a **public link that works on any phone**
-- Portfolio-style index of every project; **auto-cleans 24h after publish** or on demand ("done with X", "clear my workspace")
+- Portfolio-style index of every project; **links are verified live before handover** (she waits out the GitHub Pages rebuild — never a fresh 404), Jekyll disabled (`.nojekyll`) so underscore assets always serve, and auto-cleans after the TTL (24h default, **7 days in production**) or on demand ("done with X", "clear my workspace")
 - Zero localhost links, ever — enforced in every summary AND every live stream token
 
 ### 💾 Project memory

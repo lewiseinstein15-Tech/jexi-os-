@@ -140,14 +140,54 @@ async function refreshIndex(projects) {
 /* ─────────── public API ─────────── */
 
 /**
+ * B214 — a preview link must WORK when the user opens it. GitHub Pages
+ * rebuilds asynchronously after our commits (typically 10-60s), so a URL
+ * handed over immediately 404s in the user's browser. Poll the public URL
+ * (cache-busted — the CDN caches 404s briefly) until it serves 200.
+ */
+export async function waitForLive(url, timeoutMs = 45000, intervalMs = 2500) {
+  const t0 = Date.now();
+  for (;;) {
+    try {
+      const bust = url.includes('?') ? '&' : '?';
+      const res = await fetch(`${url}${bust}_live=${t0}-${Date.now()}`, {
+        redirect: 'follow',
+        headers: { 'User-Agent': UA, 'Cache-Control': 'no-cache' },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (res.ok) return { live: true, waitedMs: Date.now() - t0, status: res.status };
+    } catch { /* not up yet — keep polling */ }
+    if (Date.now() - t0 >= timeoutMs) return { live: false, waitedMs: Date.now() - t0, status: 0 };
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+}
+
+/**
+ * B214 — Jekyll processing on GitHub Pages silently DROPS directories that
+ * start with an underscore (e.g. Next.js `_next/`) and dotfiles, which
+ * breaks published apps in the browser. One `.nojekyll` at the repo root
+ * disables it. Ensured once per publish (cheap GET, PUT only when missing).
+ */
+async function ensureNoJekyll() {
+  const existing = await getJson('/contents/.nojekyll');
+  if (existing) return { ok: true, ensured: false };
+  const r = await putFile('.nojekyll', '', 'workspace: disable Jekyll (underscore assets must serve)');
+  return { ok: r.ok, ensured: r.ok };
+}
+
+/**
  * Publish a finished build. files = [{ name, code }] (paths may include /).
  * Returns { ok, url, filesUrl } where url is the LIVE app (entry file) or
- * the project folder on the workspace Pages site.
+ * the project folder on the workspace Pages site. B214: also waits for the
+ * URL to actually serve (GitHub Pages rebuild lag) and reports `live` —
+ * the caller must never present a dead link as ready.
  */
 export async function publishProject({ name, title, brief = '', icon = '', files = [], entry = null }) {
   if (!files.length) return { ok: false, error: 'no files to publish' };
   const slug = String(name || 'project').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'project';
   const entryName = entry || files.find((f) => /^index\.html$/i.test(f.name))?.name || files.find((f) => /\.html$/i.test(f.name))?.name || null;
+
+  await ensureNoJekyll();
 
   // 1) commit each file under <slug>/…
   for (const f of files.slice(0, 40)) {
@@ -173,7 +213,18 @@ export async function publishProject({ name, title, brief = '', icon = '', files
   const url = entryName
     ? `${BASE}/${slug}/${entryName}`
     : `${BASE}/${slug}/`;
-  return { ok: true, slug, url, indexUrl: `${BASE}/`, expiresAt: new Date(Date.now() + TTL_MS).toISOString() };
+  // B214 — index.html entry: the clean directory URL serves the same page
+  // and keeps working even if the entry file is renamed later.
+  const publicUrl = /^index\.html$/i.test(String(entryName)) ? `${BASE}/${slug}/` : url;
+  // B214 — wait until the URL actually serves before calling it a link.
+  const live = await waitForLive(publicUrl);
+  return {
+    ok: true, slug, url: publicUrl, rawUrl: url, indexUrl: `${BASE}/`,
+    live: live.live, waitedMs: live.waitedMs,
+    expiresAt: new Date(Date.now() + TTL_MS).toISOString(),
+    ttlHours: Math.round(TTL_MS / 3600000),
+    ...(live.live ? {} : { note: 'GitHub Pages is still rebuilding — the link goes live within ~a minute' }),
+  };
 }
 
 /** Delete one project (the "done with it" clear). */
@@ -214,7 +265,7 @@ export async function listPublished() {
   return Object.entries(m.projects).map(([slug, p]) => ({
     slug, title: p.title, brief: p.brief, entry: p.entry, files: p.files,
     publishedAt: p.publishedAt,
-    url: p.entry ? `${BASE}/${slug}/${p.entry}` : `${BASE}/${slug}/`,
+    url: p.entry && !/^index\.html$/i.test(String(p.entry)) ? `${BASE}/${slug}/${p.entry}` : `${BASE}/${slug}/`,
     expiresAt: new Date(new Date(p.publishedAt).getTime() + TTL_MS).toISOString(),
   }));
 }

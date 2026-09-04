@@ -103,7 +103,9 @@ export async function runTeam(team, query, { sendEvent = () => {}, convId = null
             entry: entry.name,
           });
           preview = pub.ok
-            ? `\n\n**🔗 Open it live (works on any device):** ${pub.url}\n*Also on my workspace home: ${pub.indexUrl} — auto-cleans when the project is done.*`
+            ? (pub.live
+                ? `\n\n**🔗 Open it live (works on any device):** ${pub.url}\n*Verified serving just now. Also on my workspace home: ${pub.indexUrl} — live for ~${pub.ttlHours || 24}h, auto-cleaned after.*`
+                : `\n\n**🔗 Publishing now:** ${pub.url}\n*GitHub Pages rebuilds take up to a minute — the link goes live on its own; refresh if it's not ready yet. (Workspace home: ${pub.indexUrl})*`)
             : `\n\n**🔗 Live preview:** [Open ${entry.name}](/preview/${encodeURIComponent(entry.name)})`;
         } catch (e) {
           preview = `\n\n**🔗 Live preview:** [Open ${entry.name}](/preview/${encodeURIComponent(entry.name)})`;
