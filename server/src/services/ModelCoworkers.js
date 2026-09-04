@@ -14,11 +14,16 @@
  */
 
 const ROSTER = [
-  { name: 'Leonardo', models: ['llama-3.3-70b-versatile', 'llama-3.3-70b', 'Meta-Llama-3.3-70B-Instruct', 'Meta-Llama-3.3-70B'], hint: 'the big veteran thinker — research lead' },
-  { name: 'Luna', models: ['llama-3.1-8b-instant', 'llama-3.1-8b', 'Meta-Llama-3.1-8B'], hint: 'quick & light — fast replies' },
-  { name: 'Maya', models: ['gemini-2.5-flash'], hint: "JEXI's main chat voice — memory & continuity" },
-  { name: 'Mira', models: ['gemini-3.6-flash'], hint: 'Maya’s faster sibling' },
-  { name: 'Mila', models: ['gemini-3.5-flash'], hint: 'Maya’s sibling' },
+  // B219 — Groq retired the llama line: Leonardo (research lead) takes the
+  // live gpt-oss flagship but KEEPS his legacy llama fragments so grandfathered
+  // keys still map to the same person; Luna takes the lighter 20B sibling.
+  { name: 'Leonardo', models: ['openai/gpt-oss-120b', 'gpt-oss-120b', 'llama-3.3-70b-versatile', 'llama-3.3-70b', 'Meta-Llama-3.3-70B-Instruct', 'Meta-Llama-3.3-70B'], hint: 'the big veteran thinker — research lead' },
+  { name: 'Luna', models: ['openai/gpt-oss-20b', 'gpt-oss-20b', 'llama-3.1-8b-instant', 'llama-3.1-8b', 'Meta-Llama-3.1-8B'], hint: 'quick & light — fast replies' },
+  // B219 — the Gemini sisters rotate to the current generation: Maya (the
+  // main chat voice) follows the default model, the others trail as fallbacks.
+  { name: 'Maya', models: ['gemini-3.6-flash'], hint: "JEXI's main chat voice — memory & continuity" },
+  { name: 'Mira', models: ['gemini-3.5-flash'], hint: 'Maya’s faster sibling' },
+  { name: 'Mila', models: ['gemini-2.5-flash'], hint: 'Maya’s sibling' },
   { name: 'Gigi', models: ['gemini-1.5-flash'], hint: 'the experienced elder — last fallback' },
   { name: 'Rex', models: ['grok-4.6'], hint: 'bold & blunt' },
   { name: 'Rocco', models: ['grok-4'], hint: '' },
@@ -35,7 +40,6 @@ const ROSTER = [
   { name: 'Nemo', models: ['nemotron-3-super-120b'], hint: '120B general brain' },
   { name: 'Cody', models: ['north-mini-code'], hint: 'the coder' },
   { name: 'Gemma', models: ['gemma-4-26b'], hint: 'already had a people name' },
-  { name: 'Oscar', models: ['gpt-oss-120b'], hint: 'open-weight star' },
   { name: 'Georgia', models: ['gemma-4-31b'], hint: "Gemma's cousin" },
   { name: 'Milo', models: ['open-mistral-7b'], hint: 'the French house' },
   { name: 'Marcel', models: ['open-mixtral-8x7b'], hint: 'the French house' },

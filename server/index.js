@@ -261,6 +261,11 @@ setInboundReplyGenerator(async (event) => {
 });
 
 const app = express();
+// B219 — Render terminates TLS in front of this process: trust exactly one
+// proxy hop so express-rate-limit keys on the REAL client IP from
+// X-Forwarded-For (otherwise every visitor shares the proxy's IP and the
+// limiter emits ERR_ERL_UNEXPECTED_X_FORWARDED_FOR warnings).
+app.set('trust proxy', 1);
 
 // === API ACCESS CONTROL (optional but recommended for production) ===
 // Set JEXI_API_KEY in the host env (Render dashboard) and every AI-spend / data
@@ -1185,7 +1190,7 @@ app.post('/api/vision', async (req, res) => {
       'Describe what you see warmly and precisely: who or what is in frame, expressions, lighting, surroundings. ' +
       'Be honest if the image is unclear or if no face is visible. Keep it natural and short (2-4 sentences).',
       image,
-      // prefer Gemini first — its vision (gemini-2.5-flash) is far sharper than
+      // prefer Gemini first — its vision (gemini-3.6-flash) is far sharper than
       // Groq's llama-4-scout, and it is a key the user already has. Seed-family
       // vision (via OpenRouter) is tried last when OPENROUTER_API_KEY is set.
       { prefer: 'gemini', temperature: 0.5 }

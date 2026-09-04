@@ -34,7 +34,9 @@ console.log('\n== 1. Registry: every worker-chain model has a people name ==');
     }
   }
   // spot-check the user-verified assignments
-  ok('gemini-2.5-flash → Maya', coworkerName('gemini', 'gemini-2.5-flash') === 'Maya');
+  ok('gemini-3.6-flash → Maya (B219: chat voice follows the live default)', coworkerName('gemini', 'gemini-3.6-flash') === 'Maya');
+ok('gemini-2.5-flash → Mila (demoted to late fallback)', coworkerName('gemini', 'gemini-2.5-flash') === 'Mila');
+ok('openai/gpt-oss-120b → Leonardo (B219: live Groq flagship)', coworkerName('groq', 'openai/gpt-oss-120b') === 'Leonardo');
   ok('llama-3.3-70b-versatile → Leonardo', coworkerName('groq', 'llama-3.3-70b-versatile') === 'Leonardo');
   ok('deepseek-v4-flash → Wei', coworkerName('nvidia', 'deepseek-ai/deepseek-v4-flash-0731') === 'Wei');
   ok('seed-2.0-mini → Sasha', coworkerName('openrouter', 'bytedance-seed/seed-2.0-mini') === 'Sasha');

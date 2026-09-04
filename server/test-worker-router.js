@@ -64,8 +64,8 @@ ok(
 //    the FREE 120B OpenRouter model, then the near-free workhorse.
 const memoryChain = coworkerChain('memory');
 ok(
-  memoryChain[0] && memoryChain[0].key === 'gemini' && memoryChain[0].model === 'gemini-2.5-flash',
-  `memory worker primary = gemini(gemini-2.5-flash) — free tier, 1,500 RPD, got ${JSON.stringify(memoryChain[0])}`
+  memoryChain[0] && memoryChain[0].key === 'gemini' && memoryChain[0].model === 'gemini-3.6-flash',
+  `memory worker primary = gemini(gemini-3.6-flash) — current generation (B219), got ${JSON.stringify(memoryChain[0])}`
 );
 ok(
   memoryChain[1] && memoryChain[1].key === 'openrouter' && memoryChain[1].model === 'nvidia/nemotron-3-super-120b-a12b:free',
@@ -80,8 +80,8 @@ ok(
 //     (403, payment-gated) removed from the chain entirely.
 const researcherChain = coworkerChain('researcher');
 ok(
-  researcherChain[0] && researcherChain[0].key === 'groq' && researcherChain[0].model === 'llama-3.3-70b-versatile',
-  `researcher primary = groq(llama-3.3-70b-versatile) — free tier, got ${JSON.stringify(researcherChain[0])}`
+  researcherChain[0] && researcherChain[0].key === 'groq' && researcherChain[0].model === 'openai/gpt-oss-120b',
+  `researcher primary = groq(openai/gpt-oss-120b) — live flagship after the llama retirement (B219), got ${JSON.stringify(researcherChain[0])}`
 );
 ok(!researcherChain.some((p) => p.key === 'xai'), 'payment-gated grok removed from the research chain');
 
@@ -155,7 +155,7 @@ ok(COWORKERS.fallback.providers[0].key === 'vllm', 'vLLM leads the last-resort f
 const roster = workerRoster();
 const memoryRoster = roster.find((w) => w.slug === 'memory');
 ok(
-  memoryRoster && memoryRoster.providers[0] === 'gemini:gemini-2.5-flash',
+  memoryRoster && memoryRoster.providers[0] === 'gemini:gemini-3.6-flash',
   `Models screen roster shows the live-tested memory primary, got ${memoryRoster && memoryRoster.providers[0]}`
 );
 

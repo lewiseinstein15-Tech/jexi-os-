@@ -48,13 +48,25 @@ const GROQ_VISION_MODELS = [
 // calls). Default to a long-lived tier and self-heal at runtime: on a
 // model_not_found the client asks /models which names still exist, picks the
 // best match and caches it for the process lifetime.
-const GROQ_TEXT_MODEL = process.env.GROQ_TEXT_MODEL || 'llama-3.3-70b-versatile';
+// B219 — Groq RETIRED the entire llama line (llama-3.3-70b-versatile and
+// llama-3.1-8b-instant both 404 model_not_found; live catalog on this key,
+// verified 2026-09-04: openai/gpt-oss-120b, openai/gpt-oss-20b, qwen3.8-27b,
+// qwen3.6-27b, groq/compound, allam-2-7b). Default to the live flagship;
+// discovery still self-heals future retirements.
+const GROQ_TEXT_MODEL = process.env.GROQ_TEXT_MODEL || 'openai/gpt-oss-120b';
 let groqModelCache = null; // discovered fallback model id
+const deadGroqModels = new Set(); // B219 — 404'd ids this process: never retried
 
 const GROQ_MODEL_PREFERENCE = [
-  /llama-3\.3-70b/i, /llama-3\.1-8b-instruct/i, /gpt-oss-120b/i, /gpt-oss-20b/i,
-  /llama-3\.1/i, /llama-3/i, /qwen/i, /deepseek/i, /moonshot/i, /openai/i,
+  /gpt-oss-120b/i, /gpt-oss-20b/i, /qwen3\.8/i, /qwen3\.6/i, /qwen/i, /compound/i,
+  /llama-3\.3-70b/i, /llama-3\.1-8b-instruct/i, /llama-3\.1/i, /llama-3/i,
+  /deepseek/i, /moonshot/i, /openai/i,
 ];
+
+/** B219 — observability + tests: current Groq model health (dead ids, cache). */
+export function __groqModelHealth() {
+  return { deadModels: [...deadGroqModels], cached: groqModelCache, default: GROQ_TEXT_MODEL };
+}
 
 /** Pure picker (test-exported): choose the best model id from a list. */
 export function __pickGroqModel(ids) {
@@ -223,7 +235,12 @@ async function tryGroq(prompt, system, imageBase64, opts, errors) {
   // consulted it — every plain call still opened with the retired
   // llama-3.3-70b-versatile, ate a deterministic 404, and only then retried:
   // one wasted round-trip (and one error log) on EVERY completion.
-  const models = imageBase64 ? GROQ_VISION_MODELS : (opts.model ? [opts.model] : [groqModelCache || GROQ_TEXT_MODEL]);
+  let models = imageBase64 ? GROQ_VISION_MODELS : (opts.model ? [opts.model] : [groqModelCache || GROQ_TEXT_MODEL]);
+  // B219 — skip ids that already 404'd this process (retired models never
+  // come back mid-process; this makes hard-coded stale ids cost ONE
+  // round-trip total, not one per call).
+  models = models.filter((m) => !deadGroqModels.has(m));
+  if (models.length === 0) return null;
   for (const model of models) {
     const messages = [ // hoisted: the B177 model-not-found retry reuses it
       { role: 'system', content: system },
@@ -249,6 +266,7 @@ async function tryGroq(prompt, system, imageBase64, opts, errors) {
     } catch (e) {
       // B177 — model retired? discover a live one and retry ONCE
       if (/model_not_found|does not exist/i.test(String(e.message))) {
+        deadGroqModels.add(model); // B219 — never try this id again this process
         const discovered = await discoverGroqModel(groqKey);
         if (discovered && discovered !== model) {
           try {
@@ -312,6 +330,10 @@ async function tryGemini(prompt, system, imageBase64, opts, errors) {
     } catch (e) {
       errors.push(`Gemini(${modelName}): ${e.message}`);
       console.error('[LLMClient] Gemini failed:', e.message);
+      // B219 — quota hits are PROVIDER-wide (same free-tier RPM bucket):
+      // trying the sibling models just burns 2-3 round-trips before the
+      // cascade moves on. Break to the next provider immediately.
+      if (/quota|RESOURCE_EXHAUSTED|429|rate.?limit/i.test(String(e.message))) break;
     }
   }
   return null;

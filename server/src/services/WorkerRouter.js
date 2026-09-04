@@ -58,7 +58,8 @@ export const COWORKERS = {
       // Tested ✅ against the real key, and its free tier (1,500 RPD) has 30x
       // the daily volume of OpenRouter :free models (50 RPD) — chat is the
       // highest-frequency path and can't live on a 50/day cap.
-      { key: 'gemini', model: 'gemini-2.5-flash' },
+      // B219 — gemini-2.5-flash 404s for current keys ("use gemini-3.6-flash").
+      { key: 'gemini', model: 'gemini-3.6-flash' },
       // B73 — FREE 120B general model (tool calling, 262k ctx, live $0).
       { key: 'openrouter', model: 'nvidia/nemotron-3-super-120b-a12b:free' },
       // B72 — was qwen/qwen3-8b:free (deleted from OpenRouter). seed-2.0-mini
@@ -69,10 +70,11 @@ export const COWORKERS = {
   researcher: {
     role: 'Research / realtime information',
     providers: [
-      // B75b — Groq 70B leads research: live-verified ✅, on Groq's free tier
-      // (1,000 RPD), and far better research quality than the 8B.
-      { key: 'groq', model: 'llama-3.3-70b-versatile' },
-      { key: 'groq', model: 'llama-3.1-8b-instant' },                // proven free fallback
+      // B219 — the whole llama line is RETIRED on Groq (404 model_not_found,
+      // live-verified): the 120B gpt-oss flagship now leads research, with
+      // its 20B sibling as the in-family fallback.
+      { key: 'groq', model: 'openai/gpt-oss-120b' },
+      { key: 'groq', model: 'openai/gpt-oss-20b' },
       { key: 'openrouter', model: 'bytedance-seed/seed-2.0-mini' },  // near-free fallback
       { key: 'openrouter', model: 'google/gemma-4-26b-a4b-it:free' }, // B73 — FREE fallback
     ],
