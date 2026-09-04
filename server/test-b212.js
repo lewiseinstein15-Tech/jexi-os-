@@ -120,7 +120,68 @@ console.log('\n== 2. control(answer): answer an AWAITING_INPUT mission via the A
   check('the answer is on the event record (MISSION_RESUMED)', loadMissionEvents(mission.id).some((e) => e.type === 'MISSION_RESUMED'));
 }
 
+console.log('\n== 3. Live-prod truth: browser honesty (found by the first production mission) ==');
+{
+  const { runBrowserRound } = await import('./src/services/director/ComputerOps.js');
+  const IDENTITY = { agentId: 'atlas', agentName: 'Atlas' };
+
+  // 3a — the slim prod image sets JEXI_NO_BROWSER=1: the round must block ONCE
+  // with the true reason instead of burning a round of dead actions (that is
+  // exactly what the first live mission on production ran into).
+  const savedRuntime = process.env.COMPUTER_RUNTIME;
+  process.env.COMPUTER_RUNTIME = 'auto'; // provider 'remote' — the prod default
+  process.env.JEXI_NO_BROWSER = '1';
+  const eventsA = [];
+  const blocked = await runBrowserRound({
+    lines: ['goto https://example.com'],
+    emit: (type, fields) => eventsA.push({ type, ...fields }),
+    identity: IDENTITY,
+  });
+  check('disabled browser → blocked with the true reason', blocked.blocked === true && /disabled on this host/.test(String(blocked.reason)), JSON.stringify(blocked).slice(0, 200));
+  check('one COMPUTER_BLOCKED event, zero COMPUTER_ACT events', eventsA.some((e) => e.type === 'COMPUTER_BLOCKED' && /disabled on this host/.test(e.summary)) && !eventsA.some((e) => e.type === 'COMPUTER_ACT'));
+  delete process.env.JEXI_NO_BROWSER;
+  if (savedRuntime === undefined) delete process.env.COMPUTER_RUNTIME;
+  else process.env.COMPUTER_RUNTIME = savedRuntime;
+
+  // 3b — real browser round (self-skips without chromium, like the b207 live
+  // audits): the observed title must be the REAL page title. The old
+  // observeViaDesktop discarded it (`&& ''`), so title was always empty even
+  // on a loaded page — the production mission's empty COMPUTER_OBSERVE title.
+  let chromiumThere = true;
+  try {
+    const { chromium } = await import('playwright');
+    const probe = await chromium.launch({ args: ['--no-sandbox'] });
+    await probe.close();
+  } catch { chromiumThere = false; }
+  if (!chromiumThere) {
+    console.log('  ⏭ SKIP — chromium unavailable (this section runs live wherever a browser exists)');
+  } else {
+    const http = await import('node:http');
+    const server = http.createServer((req, res) => {
+      res.writeHead(200, { 'content-type': 'text/html' });
+      res.end('<!doctype html><html><head><title>B212 Probe Page</title></head><body><h1>Round trip</h1><a href="/x">Probe Link</a><button>Probe Button</button></body></html>');
+    });
+    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    const port = server.address().port;
+    const eventsB = [];
+    const round = await runBrowserRound({
+      lines: [`goto http://127.0.0.1:${port}/`],
+      emit: (type, fields) => eventsB.push({ type, ...fields }),
+      identity: IDENTITY,
+    });
+    check('real round: goto action succeeded', round.blocked === false && round.results[0] && round.results[0].ok === true, JSON.stringify(round.results).slice(0, 200));
+    check('real round: goto detail reports the true title', /B212 Probe Page/.test(String(round.results[0] && round.results[0].detail)));
+    check("real round: observation.title is the REAL page title (the `&& ''` bug is dead)", round.observation && round.observation.title === 'B212 Probe Page', JSON.stringify(round.observation || {}).slice(0, 200));
+    check('real round: observation carries real text and elements', Boolean(round.observation && round.observation.textChars > 0 && round.observation.elementCount >= 2));
+    check('real round: COMPUTER_OBSERVE event shows the true title', eventsB.some((e) => e.type === 'COMPUTER_OBSERVE' && e.data && e.data.title === 'B212 Probe Page'));
+    server.close();
+  }
+}
+
 console.log('\n============================================================');
 console.log(`B212: ${pass} passed, ${fail} failed`);
 console.log('============================================================');
-if (fail > 0) process.exit(1);
+// §3b launches the shared DesktopManager Chromium, which has no public
+// close API — its transport keeps the event loop alive. Everything has
+// already been printed and counted, so exit explicitly.
+process.exit(fail > 0 ? 1 : 0);

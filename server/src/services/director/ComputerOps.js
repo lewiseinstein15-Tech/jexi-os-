@@ -23,7 +23,7 @@
  */
 
 import { activeProvider, providerCapabilities, runtimeCall } from '../ComputerRuntime.js';
-import { DesktopManager } from '../DesktopManager.js';
+import { DesktopManager, ensureBrowser } from '../DesktopManager.js';
 
 const dm = new DesktopManager('playwright');
 
@@ -83,9 +83,17 @@ async function observeViaRuntime() {
 async function observeViaDesktop() {
   const text = await dm.pageText('atlas').catch(() => '');
   let elements = [];
-  try { elements = (await dm.interactiveMap('atlas')).elements || []; } catch { /* page may have no interactive nodes */ }
   let title = '';
-  try { title = (await dm.pageText('atlas').catch(() => '')) && ''; } catch { /* never */ }
+  try {
+    // B212: the interactive map already carries document.title. The old code
+    // fetched the page text a SECOND time and discarded it (`&& ''`), so the
+    // observed title was always empty — even on a fully loaded page. Found by
+    // the first live production mission (its COMPUTER_OBSERVE title was ''
+    // while the page had loaded for the goto call).
+    const m = await dm.interactiveMap('atlas');
+    elements = m.elements || [];
+    if (typeof m.title === 'string') title = m.title;
+  } catch { /* page may have no interactive nodes */ }
   let screenshot = null;
   try {
     const shot = await dm.saveScreenshot('atlas');
@@ -120,6 +128,25 @@ export async function runBrowserRound({ lines, emit, identity }) {
   }
 
   const viaDesktop = caps.provider !== 'mock';
+
+  // B212 (found by the live production mission): the advertised provider may
+  // claim a browser this host cannot actually launch — e.g. the slim deploy
+  // image sets JEXI_NO_BROWSER=1, so every DesktopManager call honestly
+  // fails while caps.browser still says true. Probe the REAL thing before
+  // acting: one COMPUTER_BLOCKED with the true reason beats a whole round of
+  // dead actions and an empty observation.
+  if (viaDesktop) {
+    const ready = await ensureBrowser();
+    if (!ready.ok) {
+      const reason = `${ready.error} — computer use is honestly unavailable, never faked`;
+      emit('COMPUTER_BLOCKED', {
+        agentId: id.agentId, agentName: id.agentName, severity: 'warn',
+        summary: `Browser action blocked: ${reason}.`,
+        data: { provider: caps.provider, capabilities: caps },
+      });
+      return { blocked: true, reason, results: [] };
+    }
+  }
   const results = [];
   for (const req of requests) {
     const label = describeAction(req);
