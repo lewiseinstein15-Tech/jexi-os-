@@ -53,6 +53,11 @@ import {
   setActiveSession, clearActiveSession, memoryPersistenceProbe, probeRedis,
 } from './src/services/MemoryManager.js';
 import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
+import {
+  setRedisClientGetter, startMirrorLoop, mirrorStatus, hydrateMirroredDirs,
+} from './src/services/RedisMirror.js';
+setRedisClientGetter(() => import('./src/services/MemoryManager.js').then((m) => m.getRedis()).catch(() => null));
+
 import { skillFolder, SKILL_META } from './src/services/SkillChain.js'; // B50 P1 — progressive skill folders
 import { knowledgeStatus, loadProjectKnowledge, knowledgeLoad } from './src/services/KnowledgeBase.js'; // B50 P2 — project knowledge
 import { getToolCatalog, TOOL_PROFILES, activeToolProfile, setToolProfile, executeTool } from './src/services/ToolRuntime.js';
@@ -112,6 +117,38 @@ import { startSkillWatcher } from './src/services/SkillDiscovery.js';
 // If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
 // everything across restarts/redeploys (non-blocking).
 hydrateFromRedis().catch((e) => { recordError('memory', (e && e.message) || String(e)); });
+
+// B217 — SELF-PING KEEP-WARM: Render's free tier spins the instance down
+// after ~15 min without INBOUND traffic. The GitHub keepalive cron proved
+// unreliable (starved to ~every 4h, so she slept and the ephemeral disk was
+// wiped on wake — 2026-09-04 incident). While the process is RUNNING, she
+// now pings her own public health endpoint every ~9 min so a RUNNING brain
+// never idles out. (This cannot wake a stopped instance — that still needs
+// external traffic: the cron, a monitor, or a user request.)
+if (String(process.env.JEXI_SELF_PING || '') === '1') {
+  const selfUrl = process.env.RENDER_EXTERNAL_URL || process.env.JEXI_PUBLIC_URL || '';
+  if (selfUrl) {
+    const ping = () => fetch(`${selfUrl}/api/health`, { headers: { 'x-jexi-self-ping': '1' } })
+      .then((r) => { if (!r.ok) recordError('selfping', `self-ping HTTP ${r.status}`); })
+      .catch((e) => recordError('selfping', e.message));
+    const everyMs = 9 * 60 * 1000;
+    const jitter = () => Math.floor(Math.random() * 60 * 1000); // never align with the clock
+    const loop = () => { ping(); setTimeout(loop, everyMs + jitter()); };
+    setTimeout(loop, 60 * 1000); // first ping after boot settles
+    console.log(`[B217] self-ping keep-warm ON → ${selfUrl}/api/health every ~9 min`);
+  } else {
+    recordError('selfping', 'JEXI_SELF_PING=1 but no RENDER_EXTERNAL_URL/JEXI_PUBLIC_URL set');
+  }
+}
+
+// B217 — REDIS MIRROR HYDRATION: missions/world/lessons/transcripts are
+// mirrored to Redis on every write (see RedisMirror.js). After a container
+// replacement (Render free hibernation/deploy = fresh ephemeral disk), this
+// writes the mirrored files back BEFORE the mission boot recovery runs, so
+// she wakes up with her own record intact.
+hydrateMirroredDirs().catch((e) => { recordError('mirror', (e && e.message) || String(e)); });
+// …and keep the mirror fresh while she runs (every 30s, changed files only).
+startMirrorLoop();
 
 // Vector layer (TencentDB-Agent-Memory pattern): embed memories saved before
 // the vector layer existed. Non-blocking; no-op without a Groq key.
@@ -869,6 +906,10 @@ app.post('/api/workspace-admin/publish', async (req, res) => {
 });
 app.post('/api/workspace-admin/clear', async (req, res) => res.json(await clearProject(String(req.body?.project || ''))));
 app.post('/api/workspace-admin/sweep', async (req, res) => res.json(await sweepWorkspace({ force: Boolean(req.body?.force) })));
+
+// B217 — persistence-mirror telemetry (counts only; never file contents).
+// Proves the Redis mirror is actually landing keys after a deploy.
+app.get('/api/mirror/status', (req, res) => res.json({ ok: true, ...mirrorStatus() }));
 app.get('/api/skills/:agent', (req, res) => res.json({ agent: req.params.agent, skills: recallSkills(req.params.agent, String(req.query.q || ''), { limit: 10, includeForeign: false }) }));
 app.post('/api/plugins/:id/toggle', (req, res) => {
   try { res.json({ success: true, ...togglePlugin(req.params.id) }); }

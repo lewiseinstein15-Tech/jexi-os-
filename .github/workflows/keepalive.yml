@@ -5,6 +5,17 @@
 # This cron pings the health endpoint every 10 minutes so the instance stays
 # awake and every chat feels instant. GitHub Actions free tier runs it for $0.
 #
+# ⚠ B216-1 incident follow-up (2026-09-04): GitHub's scheduler STARVES this
+# workflow — observed cadence ~every 2.5–4.5h instead of */10 (account-wide
+# cron deprioritization under load), so the brain slept and the free-tier
+# ephemeral disk was wiped on wake. Two hardenings shipped the same day:
+#   1. the brain now ALSO self-pings (JEXI_SELF_PING=1, index.js) — the
+#      reliable always-on keep-warm while she's running;
+#   2. this workflow now ALSO GUARDS THE APP SITE: if GitHub Pages for
+#      jexi-os- goes 404 (it was found disabled once, cause never identified
+#      — see FIXLOG-B216), this guard re-enables Pages via the API and
+#      re-runs the frontend deploy automatically.
+#
 # If you prefer an external uptime monitor (UptimeRobot free: 50 checks / 5 min),
 # point one at https://jexi-brain-image.onrender.com/api/health instead — both work.
 
@@ -12,8 +23,8 @@ name: Keep JEXI Brain awake
 
 on:
   schedule:
-    # every 10 minutes (GitHub cron can be delayed a couple of minutes —
-    # still well inside Render's 15-minute sleep window)
+    # every 10 minutes (GitHub cron can be delayed or SKIPPED for hours —
+    # see the warning above; the brain's self-ping is the primary keep-warm)
     - cron: '*/10 * * * *'
   workflow_dispatch:
 
@@ -36,3 +47,37 @@ jobs:
         run: |
           curl -s -m 30 -o /dev/null -w 'Render:   HTTP %{http_code} in %{time_total}s\n' \
             https://jexi-brain-image.onrender.com/api/health || echo 'render ping failed (may be asleep)'
+
+      # ── B216-1: PAGES SELF-HEAL GUARD ─────────────────────────────────
+      # The app site was found disabled once (cause unknown, likely manual or
+      # token misuse — never identified). If it 404s again, re-enable Pages
+      # and redeploy automatically, then say so LOUDLY in the run log.
+      - name: Guard the app site (self-heal on 404)
+        env:
+          SITE: ${{ vars.APP_SITE_URL || 'https://lewiseinstein15-tech.github.io/jexi-os-/' }}
+          GH_TOKEN: ${{ secrets.GH_PAGES_GUARD_TOKEN }}
+          REPO: lewiseinstein15-Tech/jexi-os-
+        run: |
+          CODE=$(curl -s -m 30 -o /dev/null -w '%{http_code}' "$SITE")
+          echo "App site: HTTP $CODE"
+          if [ "$CODE" != "200" ]; then
+            echo "::warning::App site is $CODE (expected 200) — attempting self-heal"
+            echo "1/2 re-enabling Pages (build_type: workflow)…"
+            curl -s -X POST \
+              -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$REPO/pages" \
+              -d '{"build_type":"workflow"}' | head -c 300; echo
+            echo "2/2 re-running the latest successful frontend deploy…"
+            RUN_ID=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO/actions/workflows/deploy.yml/runs?status=success&per_page=1" \
+              | python3 -c 'import json,sys; r=json.load(sys.stdin)["workflow_runs"]; print(r[0]["id"] if r else "")')
+            if [ -n "$RUN_ID" ]; then
+              curl -s -X POST -H "Authorization: token $GH_TOKEN" \
+                "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/rerun" \
+                -o /dev/null -w "rerun HTTP %{http_code}\n"
+              echo "::warning::PAGES SELF-HEAL DONE — site was $CODE; Pages re-enabled + deploy rerun ($RUN_ID). CHECK GITHUB SETTINGS → SECURITY LOG for who disabled it."
+            else
+              echo "::warning::No successful deploy run found to rerun — manual fix needed"
+            fi
+          fi

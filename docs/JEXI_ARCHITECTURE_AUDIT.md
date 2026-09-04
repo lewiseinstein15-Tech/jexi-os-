@@ -167,10 +167,12 @@
   free-tier hibernation + cold wake wiped a live mission record mid-verification
   (instance `…-hibernate-…`, uptime ~17 min at check). The keepalive cron was starved
   for 3h by GitHub Actions queue pressure, so the brain slept. Redis-backed state
-  (memory, identity) survived. **Honest fix (future build): persist missions/world to
-  the external store.**
-- **Status: WORKING (in-process persistence + recovery) / PARTIAL (container-level
-  ephemerality on Render free — transcripts AND missions until externalized).**
+  (memory, identity) survived. **Fixed in B217: `RedisMirror.js` syncs
+  `missions/world/conversations` to Redis every 30s and rehydrates missing files on
+  boot (`hydrateMirroredDirs()`, disk-wins rule, `test-b217.js` incident replay). A
+  cold wake now costs ~60s, not the mission. Residual gap: the last ≤30s of writes.**
+- **Status: WORKING (in-process persistence + recovery + Redis mirror rehydration,
+  B217) / PARTIAL (≤30s write window on hard container kill).**
 
 ### World state (spec Part 9)
 - **Status: MISSING.** Nothing tracks files/processes/browser/repos/tools/network as an
@@ -234,7 +236,7 @@
 | 6 | Part 29 | SSE/WebSocket push (current: adaptive polling, reconnect-safe) | Later phase (explicit spec permission to use existing fabric) |
 | 7 | Part 56/60 | Docs: DESIGN_SYSTEM, HUMAN_UI_AUDIT, GENERAL_INTELLIGENCE_AUDIT, IMPLEMENTATION_REPORT + matrix vocabulary alignment | With their phases (never before the work is real) |
 | 8 | Part 13 | "AndroidRuntime" adapter does not exist — not claimed, not faked; computer use reports real adapters only | Not scheduled (would need real Android infra; honest BLOCKED by environment) |
-| 9 | Memory | Chat transcripts ephemeral across deploys (env limitation, documented) | Candidate future build (persistent transcript store) |
+| 9 | Memory | Chat transcripts ephemeral across deploys (env limitation, documented) | **DONE in B217** — Redis mirror (`jexi:mirror:*` keys, 30s sync, boot rehydrate) |
 
 ## 4. What B215 delivers (this build)
 
