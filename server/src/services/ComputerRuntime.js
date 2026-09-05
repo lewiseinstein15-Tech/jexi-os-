@@ -11,21 +11,29 @@
  *             browser, numbered elements, screenshots and input
  *   docker  — declared but not wired (no docker socket in production);
  *             returns honest "provider not configured"
+ *   android — REAL device use via adb (B225, Part 13): shell, browser
+ *             (am start + uiautomator dump), input, screencap, push.
+ *             The device IS the computer — no Chromium on this host.
+ *             Honest "unavailable" when adb or a device is absent.
  *   mock    — deterministic in-process provider for tests
  *
- * Selection: COMPUTER_RUNTIME env (local | remote | docker | auto).
+ * Selection: COMPUTER_RUNTIME env (local | remote | docker | android | auto).
  * auto = remote if VIRTUAL_API responds, else local.
  */
 
 import { runCommand } from './Runner.js';
+import { AndroidRuntime, androidAdbPath } from './AndroidRuntime.js'; // B225 — Part 13
 import { MANAGER_URL } from '../config.js';
 
-export const RUNTIME_PROVIDERS = ['local', 'remote', 'docker', 'mock'];
+export const RUNTIME_PROVIDERS = ['local', 'remote', 'docker', 'android', 'mock'];
 
 const CAPABILITIES = {
   local: { terminal: true, browser: false, screenshot: false, input: false, files: true },
   remote: { terminal: true, browser: true, screenshot: true, input: true, files: true },
   docker: { terminal: false, browser: false, screenshot: false, input: false, files: false },
+  // android capabilities are all REAL — but only when a device is actually
+  // attached; every call re-checks and returns honest "unavailable" otherwise.
+  android: { terminal: true, browser: true, screenshot: true, input: true, files: true },
   mock: { terminal: true, browser: true, screenshot: true, input: true, files: true },
 };
 
@@ -50,7 +58,7 @@ export function computerStatus() {
     providers: RUNTIME_PROVIDERS.map((p) => ({
       name: p,
       capabilities: providerCapabilities(p),
-      configured: p === 'remote' ? true : p === 'local' || p === 'mock', // remote = in-process bridge (always available)
+      configured: p === 'remote' ? true : p === 'android' ? !!androidAdbPath() : p === 'local' || p === 'mock', // android = adb binary present (device presence is per-call, honestly checked)
     })),
     endpoint: process.env.VIRTUAL_API || '(in-process desktop bridge)',
   };
@@ -129,6 +137,8 @@ export async function runtimeCall(endpoint, payload = {}, provider) {
       return new RemoteRuntime().call(endpoint, payload);
     case 'docker':
       return { unavailable: true, reason: 'docker provider is not wired in this build (declared for roadmap completeness)' };
+    case 'android':
+      return new AndroidRuntime().call(endpoint, payload);
     default:
       return { unavailable: true, reason: `unknown provider: ${p}` };
   }

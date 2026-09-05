@@ -1184,6 +1184,23 @@ a:hover { color: #d9b3ff; }
 .jx-sendbtn:not(:disabled):hover { box-shadow: 0 0 18px rgba(0,210,106,.35); }
 .jx-sendbtn:disabled { background: var(--bg3); color: var(--faint); cursor: default; }
 .jx-sendbtn.stop { background: transparent; color: #ff6b6b; border: 1px solid rgba(255,107,107,.45); }
+
+/* B225 — voice input: the browser is the microphone (Web Speech API). */
+.jx-sendbtn.mic { color: var(--jx-muted, #7c8496); }
+.jx-sendbtn.mic.live {
+  color: #e5484d;
+  animation: jx-mic-pulse 1.2s ease-in-out infinite;
+}
+@keyframes jx-mic-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.jx-micnote {
+  font-size: 11px;
+  color: #e5484d;
+  padding: 2px 14px 6px;
+  text-align: center;
+}
 .jx-sendbtn.stop:active { transform: scale(.9); background: rgba(255,107,107,.1); }
 /* form row stays tight */
 form.surface-float { flex-shrink: 0; }

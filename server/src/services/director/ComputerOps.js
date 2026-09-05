@@ -71,13 +71,18 @@ export function parseBrowserLine(line) {
 /* ── observation helpers (one per provider) ─────────────────────────────── */
 
 async function observeViaRuntime() {
-  const [textR, elR] = await Promise.all([
+  const [textR, elR, titleR] = await Promise.all([
     runtimeCall('page-text', {}).catch(() => null),
     runtimeCall('elements', {}).catch(() => null),
+    runtimeCall('page-title', {}).catch(() => null),
   ]);
   const text = String((textR && textR.text) || '');
   const elements = Array.isArray(elR && elR.elements) ? elR.elements : [];
-  return { title: 'Mock page', text, elements, screenshot: null };
+  // B225: the observed title is whatever the runtime REALLY reports. Runtimes
+  // without a DOM title (android: a11y dump only) report unavailable → ''
+  // honestly — never a fabricated 'Mock page'.
+  const title = titleR && typeof titleR.title === 'string' && titleR.title ? titleR.title : '';
+  return { title, text, elements, screenshot: null };
 }
 
 async function observeViaDesktop() {
@@ -127,7 +132,10 @@ export async function runBrowserRound({ lines, emit, identity }) {
     return { blocked: true, reason, results: [] };
   }
 
-  const viaDesktop = caps.provider !== 'mock';
+  // B225: mock AND android act through the runtime adapter. android needs no
+  // host browser — the DEVICE is the computer (am start + uiautomator + input).
+  const viaRuntime = caps.provider === 'mock' || caps.provider === 'android';
+  const viaDesktop = !viaRuntime;
 
   // B212 (found by the live production mission): the advertised provider may
   // claim a browser this host cannot actually launch — e.g. the slim deploy
@@ -135,6 +143,20 @@ export async function runBrowserRound({ lines, emit, identity }) {
   // fails while caps.browser still says true. Probe the REAL thing before
   // acting: one COMPUTER_BLOCKED with the true reason beats a whole round of
   // dead actions and an empty observation.
+  // B225: android gets the same probe — the REAL device must be attached
+  // (adb + USB debugging) before any action is attempted.
+  if (caps.provider === 'android') {
+    const probe = await runtimeCall('status', {}).catch(() => null);
+    if (!probe || probe.unavailable) {
+      const reason = `${(probe && probe.reason) || 'android device not reachable'} — computer use is honestly unavailable, never faked`;
+      emit('COMPUTER_BLOCKED', {
+        agentId: id.agentId, agentName: id.agentName, severity: 'warn',
+        summary: `Browser action blocked: ${reason}.`,
+        data: { provider: caps.provider, capabilities: caps },
+      });
+      return { blocked: true, reason, results: [] };
+    }
+  }
   if (viaDesktop) {
     const ready = await ensureBrowser();
     if (!ready.ok) {
@@ -228,9 +250,11 @@ async function actViaRuntime(req) {
     case 'click-index': { await runtimeCall('click-index', { index: req.index }); return { ok: true, summary: `clicked #${req.index}` }; }
     case 'type-index': { await runtimeCall('type-index', { index: req.index, text: req.text }); return { ok: true, summary: `typed into #${req.index}` }; }
     case 'click-text': { const r = await runtimeCall('click-text', { text: req.text }); return { ok: r !== false, summary: `clicked "${req.text}"` }; }
-    case 'scroll': return { ok: true, summary: `scrolled ${req.direction}` };
-    case 'press': return { ok: true, summary: `pressed ${req.key}` };
-    case 'back': case 'forward': return { ok: true, summary: req.action };
+    // B225: these pass through to the runtime for real (android executes
+    // swipe/keyevent; mock answers ok as before; local honestly declines).
+    case 'scroll': { const r = await runtimeCall('scroll', { direction: req.direction }).catch(() => null); return { ok: !!r && r.ok !== false && !r.unavailable, summary: `scrolled ${req.direction}` }; }
+    case 'press': { const r = await runtimeCall('press', { key: req.key }).catch(() => null); return { ok: !!r && r.ok !== false && !r.unavailable, summary: `pressed ${req.key}` }; }
+    case 'back': case 'forward': { const r = await runtimeCall(req.action, {}).catch(() => null); return { ok: !!r && r.ok !== false && !r.unavailable, summary: req.action }; }
     default: return { ok: false, summary: `unknown action ${req.action}` };
   }
 }

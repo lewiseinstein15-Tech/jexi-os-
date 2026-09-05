@@ -16,11 +16,20 @@ ok(providerCapabilities('local').browser === false, 'local has no browser');
 ok(providerCapabilities('remote').browser === true, 'remote has browser');
 ok(providerCapabilities('remote').screenshot === true, 'remote has screenshot');
 ok(providerCapabilities('docker').browser === false, 'docker not wired (honest)');
+// B225 — android is a REAL provider (adb-backed): full capabilities when a
+// device is attached, honest per-call "unavailable" when not.
+ok(providerCapabilities('android').terminal === true && providerCapabilities('android').browser === true
+  && providerCapabilities('android').screenshot === true && providerCapabilities('android').input === true
+  && providerCapabilities('android').files === true, 'android capabilities are all real (device-attached)');
 
 console.log('\n== Status ==');
 const st = computerStatus();
-ok(['local', 'remote', 'docker', 'mock'].includes(st.provider), 'active provider is a known provider');
-ok(st.providers.length === 4, 'all four providers reported');
+ok(['local', 'remote', 'docker', 'android', 'mock'].includes(st.provider), 'active provider is a known provider');
+ok(st.providers.length === 5, 'all five providers reported');
+const androidRow = st.providers.find((p) => p.name === 'android');
+ok(!!androidRow, 'android is listed in the provider status');
+ok(androidRow.configured === !!process.env.ANDROID_ADB, 'android configured flag mirrors real adb presence (honest)');
+
 
 console.log('\n== Mock runtime (deterministic) ==');
 const mockStatus = await runtimeCall('status', {}, 'mock');

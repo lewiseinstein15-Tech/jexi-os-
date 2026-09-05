@@ -53,6 +53,22 @@ function recoveryAction(err, attempt, opts = {}) {
   return 'ESCALATE';
 }
 
+/**
+ * B225 — discovery composes assignments: the tools discovery matched to the
+ * objective, intersected with THIS subtask's required capabilities, become a
+ * recommendation attached to the assignment. Recommendation only — the B52
+ * allowlist and the B209 permission gate still run at execution time; this
+ * never injects a tool, it tells the employee what discovery found. Null
+ * when nothing matches (absence is honest — no padded recommendations).
+ */
+export function recommendedToolsForSubtask(discovery, subtask) {
+  if (!discovery || !Array.isArray(discovery.tools) || !discovery.tools.length) return null;
+  const want = new Set([...(Array.isArray(subtask && subtask.requirements) ? subtask.requirements : []), subtask && subtask.capability].filter(Boolean));
+  if (!want.size) return null;
+  const matched = discovery.tools.filter((t) => Array.isArray(t.matchedCapabilities) && t.matchedCapabilities.some((c) => want.has(c)));
+  return matched.length ? matched.map((t) => t.slug) : null;
+}
+
 export class Director {
   /**
    * @param {object} adapters — injectable seams (tests pass fakes):
@@ -214,12 +230,15 @@ export class Director {
       usedEmployees.add(employee.agentId);
       const role = subtask.id === plan.leadSubtaskId ? 'lead' : 'support';
       staffed.push({ subtask, employee, role });
+      // B225 — discovery composes: tools matched to this subtask's capability
+      // ride along with the assignment (recommendation, not injection).
+      const recommended = recommendedToolsForSubtask(task.structuredObjective?.toolDiscovery, subtask);
       emit({
         type: 'EMPLOYEE_SELECTED', agentId: employee.agentId, agentName: employee.displayName,
         summary: subtask.id === plan.leadSubtaskId
           ? `${employee.displayName} leads this — ${subtask.title}.`
           : `Assigning ${employee.displayName} to ${subtask.title}.`,
-        data: { subtaskId: subtask.id, role, matched: subtask.requirements },
+        data: { subtaskId: subtask.id, role, matched: subtask.requirements, ...(recommended ? { recommendedTools: recommended } : {}) },
       });
     }
     task.assignments = staffed.map(({ subtask, employee, role }) => ({ subtaskId: subtask.id, employeeId: employee.agentId, role, status: 'assigned', attempts: 0 }));
@@ -228,9 +247,16 @@ export class Director {
     task._persist();
 
     for (const { subtask, employee } of staffed) {
+      // B225 — the brief the employee receives includes discovery's matched
+      // tools for their subtask (only when discovery found a real match).
+      const recommended = recommendedToolsForSubtask(task.structuredObjective?.toolDiscovery, subtask);
+      const brief = subtask.details || subtask.title;
+      const content = recommended
+        ? `${brief}\n\nRecommended tools for this assignment (matched to the objective by discovery): ${recommended.join(', ')} — use them if the work needs them.`
+        : brief;
       mailbox.post(message({
         from: 'jexi', to: employee.agentId, taskId: task.id, subtaskId: subtask.id,
-        type: 'TASK_ASSIGNMENT', title: subtask.title, content: subtask.details || subtask.title, priority: subtask.priority || 'normal',
+        type: 'TASK_ASSIGNMENT', title: subtask.title, content, priority: subtask.priority || 'normal',
       }));
       emit({ type: 'TASK_ASSIGNED', agentId: employee.agentId, agentName: employee.displayName, summary: `Assignment delivered: ${subtask.title}.`, data: { subtaskId: subtask.id } });
       emit({ type: 'TASK_CREATED', agentId: employee.agentId, agentName: employee.displayName, summary: `Task opened: ${subtask.title}.`, data: { subtaskId: subtask.id, title: subtask.title, capability: subtask.capability } });

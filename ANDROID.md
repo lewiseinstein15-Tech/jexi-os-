@@ -112,3 +112,44 @@ cd android && ./gradlew assembleDebug   # compile the APK
 - The APK is **debug-signed** — fine for personal use. When you ever want to
   publish to the Play Store, we'll set up a release keystore (still free
   locally; Play charges $25 once).
+
+
+---
+
+## 🤖 AndroidRuntime — driving a real Android device (B225, Part 13)
+
+The computer-use runtime now speaks **adb**. A phone or emulator with USB
+debugging IS a full computer-use target — real terminal, real browser, real
+input, real screenshots — with **zero extra infrastructure** (no host
+Chromium, no daemon, no paid service; the 512MB server stays slim).
+
+### Activate
+
+```bash
+COMPUTER_RUNTIME=android          # select the provider
+JEXI_ANDROID_SERIAL=emulator-5554 # optional: pick a specific device
+# adb itself: ANDROID_ADB=/path/to/adb or ANDROID_HOME=... or on PATH
+```
+
+Attach a device (USB debugging on, or `adb connect <ip>:<port>`) and the
+employees' ```browser blocks run on it: `goto` opens the real device browser
+(`am start`), observation reads the real accessibility tree
+(`uiautomator dump` — numbered elements with bounds), clicks tap element
+centers (`input tap`), typing uses adb's real escaping (spaces → `%s`),
+screenshots are real PNG bytes (`screencap`), and `execute` is a real
+device shell.
+
+### The honesty contract (unchanged, tested by `test-b225.js`)
+
+- No adb binary → `adb not found …` — one honest `COMPUTER_BLOCKED`, never a
+  round of dead actions.
+- adb present but no device → `no Android device ready …` (with the
+  unauthorized/offline states named if that's what `adb devices` shows).
+- `screencap` returning junk → `unavailable`, never a fake image.
+- The a11y tree has no DOM title → honest empty title, never a guess.
+- Unknown endpoints → honest `does not implement`.
+
+**Testing:** `test-b225.js` drives the adapter through a stub adb BINARY
+(argv-precise recorder) — proving exact argv, real XML parsing, center-of-
+bounds taps, PNG validation, and every honest-absence path. Production uses
+the real adb only; nothing device-shaped is emulated in production code.

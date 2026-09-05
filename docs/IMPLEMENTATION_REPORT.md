@@ -70,21 +70,29 @@ transcripts, persistent missions with work graphs, and free-tier LLM lanes
 
 ## Honest remaining (the §3 ledger, final state)
 
-- **Part 13 — AndroidRuntime adapter: NOT BUILT, honestly blocked.** Would
-  require real Android infrastructure; the system reports only real adapters
-  and claims nothing here (ANDROID.md documents the packaging path that DOES
-  exist: Capacitor APK, FCM push).
+- ~~**Part 13 — AndroidRuntime adapter: honestly blocked**~~ **CLOSED in
+  B225 — the alternative was the device itself**: a REAL adb-backed adapter
+  (shell, device browser via `am start` + `uiautomator dump`, input,
+  `screencap`, push). A phone/emulator with USB debugging is a full
+  computer-use target with zero extra infrastructure; no adb / no device →
+  one honest `COMPUTER_BLOCKED`, never faked. `test-b225.js` (31 checks).
 - **Parity utils without consumers**: the dsh port modules are tested but
   not yet used by the current shell (kept deliberately — they are the
   B134–B150 parity work).
 - **Dead UI fixtures**: 7 superseded components remain as regression-test
   fixtures (six suites read their source); removing them means rewriting
   those suites.
+- **Voice input (B225)**: the browser is the microphone (Web Speech API —
+  no keys, no server cost); honestly absent in browsers/WebViews without a
+  speech engine, including the APK shell.
 - **Free-tier physics**: Groq TPD / Gemini RPM are the latency ceiling when
   exhausted; the system degrades honestly (cooldowns, fallback lanes) and
   never pretends otherwise.
-- **Discovery feeds nothing yet by design**: B223's discovery is metadata;
-  letting it compose teams is an evidence-first future change.
+- ~~**Discovery feeds nothing yet by design**~~ **CLOSED in B225 (the
+  evidence-first step taken)**: discovery's tools, intersected with each
+  subtask's capabilities, now ride the assignment brief and the
+  EMPLOYEE_SELECTED event — recommendation only; the B52 allowlist and B209
+  gate still run at execution.
 
 ## How to verify any claim in this report
 

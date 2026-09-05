@@ -89,6 +89,13 @@ live) — `test-b224.js` 10/10, wire-tested on a real HTTP server.
 Vision (describe/OCR/solve, model-lane), audio transcription, real browser
 observation loops (observe → act → observe → verify, `test-b211b3.js` F),
 desktop screenshots that are real captures or absent.
+**B225 (the alternative path):** an Android device with USB debugging IS a
+full computer-use target — the `AndroidRuntime` adapter drives it over adb
+(real shell, real device browser via `am start` + `uiautomator dump`, real
+taps/keys/swipes, real `screencap` PNGs) with no host Chromium at all; and
+the microphone is the user's own browser (Web Speech API, zero keys),
+feature-detected so it is honestly absent where no engine exists.
+
 **Limit:** no local microphone/camera daemon; production browser runs only in
 the deploy image that has Chromium.
 
