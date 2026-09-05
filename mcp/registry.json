@@ -1,6 +1,6 @@
 {
-  "_comment": "JEXI MCP server registry (AGI Phase 2). Every server is DISABLED by default — Lewis enables what he trusts. permissions are the server's granted boundary: READ_ONLY, LOCAL_WRITE, NETWORK, EXECUTION, GIT, DEPLOYMENT, DESTRUCTIVE. trustLevel: curated (reviewed for JEXI) | community (reviewed upstream only).",
-  "version": 1,
+  "_comment": "JEXI MCP server registry (AGI Phase 2, expanded Sept 2026). permissions are the server's granted boundary: READ_ONLY, LOCAL_WRITE, NETWORK, EXECUTION, GIT, DEPLOYMENT, DESTRUCTIVE. trustLevel: curated (reviewed for JEXI) | community (reviewed upstream only). enabled=true means Lewis switched it on — the gateway connects lazily/on-demand so idle servers cost no memory. Servers needing uvx (Python) or a Chromium download stay disabled with an honest note.",
+  "version": 2,
   "servers": [
     {
       "name": "filesystem",
@@ -8,43 +8,10 @@
       "transport": "stdio",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "${JEXI_WORKSPACE}"],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "curated",
       "permissions": ["READ_ONLY", "LOCAL_WRITE"],
-      "notes": "Roots must be set to the JEXI workspace, never the home directory."
-    },
-    {
-      "name": "git",
-      "description": "Official MCP reference server — repository operations (status, diff, log, commit) through a standard, audited interface.",
-      "transport": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-git"],
-      "enabled": false,
-      "trustLevel": "curated",
-      "permissions": ["READ_ONLY", "GIT"],
-      "notes": "No push/force-push: destructive git operations stay with JEXI's own authorized GitHub path."
-    },
-    {
-      "name": "fetch",
-      "description": "Official MCP reference server — URL to markdown fetching with size and timeout limits.",
-      "transport": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-fetch"],
-      "enabled": false,
-      "trustLevel": "curated",
-      "permissions": ["READ_ONLY", "NETWORK"],
-      "notes": "Complements JEXI's native deep-read; useful for simple structured fetches."
-    },
-    {
-      "name": "sqlite",
-      "description": "Official MCP reference server — read-mostly SQL queries over SQLite databases.",
-      "transport": "stdio",
-      "command": "uvx",
-      "args": ["mcp-server-sqlite", "--db-path", "${JEXI_SQLITE_DB}"],
-      "enabled": false,
-      "trustLevel": "curated",
-      "permissions": ["READ_ONLY"],
-      "notes": "JEXI data lives in JSON; SQL analysis is a genuine capability gap this fills safely."
+      "notes": "Roots must be set to the JEXI workspace, never the home directory. ${JEXI_WORKSPACE} is interpolated at connect time."
     },
     {
       "name": "memory",
@@ -52,21 +19,98 @@
       "transport": "stdio",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-memory"],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "curated",
       "permissions": ["READ_ONLY", "LOCAL_WRITE"],
       "notes": "Optional; JEXI's own WorldModel + memory layers remain the primary memory."
     },
     {
+      "name": "everything",
+      "description": "Official MCP test server — exercises the full MCP protocol (tools, resources, prompts, sampling, roots). Used to verify JEXI's client implementation against the reference implementation.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-everything"],
+      "enabled": true,
+      "trustLevel": "curated",
+      "permissions": ["READ_ONLY", "LOCAL_WRITE"],
+      "notes": "Test/diagnostic server from the official SDK team; its echo tools prove real round-trips."
+    },
+    {
+      "name": "sequentialthinking",
+      "description": "Official MCP reference server — structured step-by-step thinking with branching and revision history.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "enabled": true,
+      "trustLevel": "curated",
+      "permissions": ["READ_ONLY"],
+      "notes": "Pure computation, no I/O. A thinking scratchpad JEXI can call like any other tool. (npm name has the hyphen: server-sequential-thinking.)"
+    },
+    {
+      "name": "fetch",
+      "description": "Official MCP reference server (Python) — URL to markdown fetching with size and timeout limits.",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "enabled": false,
+      "trustLevel": "curated",
+      "permissions": ["READ_ONLY", "NETWORK"],
+      "notes": "NEEDS uvx (Python). Not installed on the current host — will not connect until Python/uv is available. JEXI's native deep-read covers this meanwhile."
+    },
+    {
+      "name": "sqlite",
+      "description": "Official MCP reference server (Python) — read-mostly SQL queries over SQLite databases.",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": ["mcp-server-sqlite", "--db-path", "${JEXI_SQLITE_DB}"],
+      "enabled": false,
+      "trustLevel": "curated",
+      "permissions": ["READ_ONLY"],
+      "notes": "NEEDS uvx (Python). Not installed on the current host. JEXI data lives in JSON; SQL analysis is the genuine gap this would fill. ${JEXI_SQLITE_DB} is interpolated at connect time."
+    },
+    {
+      "name": "time",
+      "description": "Official MCP reference server (Python) — current time and timezone conversion.",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": ["mcp-server-time"],
+      "enabled": false,
+      "trustLevel": "curated",
+      "permissions": ["READ_ONLY"],
+      "notes": "NEEDS uvx (Python). Not installed on the current host. JEXI's own clock covers basic needs meanwhile."
+    },
+    {
       "name": "playwright",
-      "description": "Community Playwright MCP server — browser automation through the MCP standard. Only enable if it adds beyond JEXI's native browser control.",
+      "description": "Microsoft's Playwright MCP server — browser automation through the MCP standard.",
       "transport": "stdio",
       "command": "npx",
       "args": ["-y", "@playwright/mcp@latest"],
       "enabled": false,
       "trustLevel": "community",
       "permissions": ["READ_ONLY", "NETWORK", "EXECUTION"],
-      "notes": "Evaluated, not defaulted on — JEXI's native browser path is already proven."
+      "notes": "Disabled: needs browser binaries, and JEXI's native browser path is already proven. Flip on only for cross-checks."
+    },
+    {
+      "name": "puppeteer",
+      "description": "Official MCP reference server — browser automation via Puppeteer.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"],
+      "enabled": false,
+      "trustLevel": "curated",
+      "permissions": ["READ_ONLY", "NETWORK", "EXECUTION"],
+      "notes": "DISABLED on purpose: installs/downloads a full Chromium (heavy). Redundant with JEXI's native browser control. Flip on only if specifically wanted."
+    },
+    {
+      "name": "brave-search",
+      "description": "Community MCP server — web search via the Brave Search API.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "enabled": false,
+      "trustLevel": "community",
+      "permissions": ["READ_ONLY", "NETWORK"],
+      "notes": "DISABLED: requires a BRAVE_API_KEY (paid tier for real use). Registered so the slot exists; will not connect without a key."
     }
   ]
 }

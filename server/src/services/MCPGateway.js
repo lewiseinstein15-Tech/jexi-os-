@@ -13,9 +13,11 @@
  * Security posture (research/MCP.md, per the 2026-07-28 spec):
  *   - MCP tool annotations are UNTRUSTED input — they are hints, never the
  *     decision. The server's registry-granted permissions are the boundary.
- *   - Destructive-looking tools (annotation OR name heuristics) require BOTH
- *     the server holding the DESTRUCTIVE grant AND an explicit `authorized`
- *     flag on the call.
+ *   - Destructive-looking tools require BOTH the server holding the DESTRUCTIVE
+ *     grant AND an explicit `authorized` flag on the call. Detectors: tool name
+ *     heuristics (always), plus the UNTRUSTED destructiveHint annotation — which
+ *     yields to an explicitly granted LOCAL_WRITE boundary (overwrite-in-scope
+ *     is the write that was granted; delete-style names still stand).
  *   - Every invocation is audit-logged (bounded JSONL).
  *
  * The connector is injectable for keyless deterministic tests.
@@ -114,17 +116,69 @@ function audit(entry) {
 const connections = new Map(); // name → { tools: [{name, description, inputSchema}], connectedAt, lastError, lastSuccessAt, calls, failures }
 let connector = null; // injectable seam
 
-/** Inject a connection factory (tests). Real default: McpClient. */
+/** Inject a connection factory (tests). Real default: the official MCP SDK below. */
 export function __setConnector(fn) { connector = fn; }
 
+/** Interpolate registry placeholders at CONNECT time (never bake host paths into the registry). */
+function interpolateArg(a, wsDir) {
+  const dbPath = path.join(process.env.DATA_DIR || './data', 'mcp-sqlite.db');
+  return String(a)
+    .replace(/\$\{JEXI_WORKSPACE\}/g, wsDir)
+    .replace(/\$\{JEXI_SQLITE_DB\}/g, dbPath);
+}
+
+/**
+ * REAL connector (Sept 2026 — Lewis switched servers on): own SDK Client over
+ * StdioClientTransport / StreamableHTTPClientTransport. No plugin seam, no
+ * fake listTools. What this returns is what actually talks to the server.
+ */
 async function defaultConnector(entry) {
-  const { connectMcpServer } = await import('./McpClient.js');
-  const spec = entry.transport === 'streamable-http'
-    ? { serverName: entry.name, transport: 'streamable-http', url: entry.url }
-    : { serverName: entry.name, transport: 'stdio', command: entry.command, args: entry.args };
-  const res = await connectMcpServer(spec);
-  if (!res || res.ok === false) throw new Error(res && res.error ? res.error : 'connect failed');
-  return { listTools: async () => ({ tools: [] }) }; // McpClient registers on the plugin seam; the gateway records what it can
+  const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+  const { WORKSPACE_DIR } = await import('../config.js');
+
+  let client;
+  if (entry.transport === 'streamable-http') {
+    const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
+    const transport = new StreamableHTTPClientTransport(new URL(entry.url), {
+      requestInit: { headers: { ...(entry.headers || {}) } },
+    });
+    client = new Client({ name: 'jexi-mcp-gateway', version: '1.0.0' }, { capabilities: {} });
+    await withTimeout(client.connect(transport), 45_000, 'connect timed out');
+  } else {
+    const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
+    const args = (entry.args || []).map((a) => interpolateArg(a, WORKSPACE_DIR));
+    // sqlite path placeholder → make sure the parent dir exists (empty file = server opens/creates it)
+    const transport = new StdioClientTransport({
+      command: entry.command,
+      args,
+      env: { ...process.env, ...(entry.env || {}) }, // npx needs PATH/HOME; registry env overrides win
+      stderr: 'pipe',
+    });
+    client = new Client({ name: 'jexi-mcp-gateway', version: '1.0.0' }, { capabilities: {} });
+    await withTimeout(client.connect(transport), 45_000, 'connect timed out'); // npx cold download is slow
+  }
+
+  return {
+    listTools: async () => client.listTools(),
+    callTool: async (req) => {
+      const res = await client.callTool(req);
+      if (res && res.isError === true) {
+        const text = Array.isArray(res.content) ? res.content.map((c) => c.text || '').join(' ').slice(0, 200) : '';
+        throw new Error(text || 'tool reported an error');
+      }
+      return res;
+    },
+    close: async () => { try { await client.close(); } catch { /* already gone */ } },
+  };
+}
+
+function withTimeout(p, ms, label) {
+  let timer = null;
+  const timeoutP = new Promise((_, rej) => {
+    timer = setTimeout(() => rej(new Error(`${label} after ${ms}ms`)), ms);
+    if (typeof timer.unref === 'function') timer.unref();
+  });
+  return Promise.race([p, timeoutP]).finally(() => clearTimeout(timer));
 }
 
 export async function connectGatewayServer(name, { registryPath } = {}) {
@@ -151,11 +205,48 @@ export async function connectGatewayServer(name, { registryPath } = {}) {
   }
 }
 
-/** Does a tool look destructive? Annotations are hints; names are heuristics. BOTH are just detectors. */
-function looksDestructive(tool) {
+/**
+ * Boot wiring: connect every ENABLED server, one at a time, fail-soft.
+ * Called shortly after the brain is up so enabled servers' tools are offered
+ * to the model without anyone opening the UI. A server that cannot start
+ * (missing runtime, no network) just reports honestly in health.
+ */
+export async function connectEnabledMcpServers() {
+  const reg = effectiveRegistry();
+  const out = [];
+  for (const s of reg.servers) {
+    if (!s.enabled) continue;
+    const r = await connectGatewayServer(s.name);
+    out.push({ server: s.name, ok: r.ok === true, tools: r.tools || 0, ...(r.ok ? {} : { error: r.error }) });
+  }
+  return out;
+}
+
+/** Close a live connection (kills the stdio child process). Server stays enabled unless disabled too. */
+export async function disconnectGatewayServer(name) {
+  const conn = connections.get(name);
+  if (!conn) return { ok: true, already: true };
+  connections.delete(name);
+  try {
+    if (conn.__client && typeof conn.__client.close === 'function') await conn.__client.close();
+  } catch { /* closing a dead process is fine */ }
+  audit({ type: 'MCP_DISCONNECTED', server: name });
+  return { ok: true, disconnected: name };
+}
+
+/**
+ * Does a tool look destructive? Two detectors, both only detectors:
+ *  - the tool NAME matching delete/remove/drop/… → always treated as destructive
+ *  - an UNTRUSTED destructiveHint annotation → destructive UNLESS the server
+ *    holds LOCAL_WRITE: inside a granted local-write boundary an overwrite-style
+ *    tool (e.g. filesystem write_file within its roots) is exactly the write
+ *    that was granted. Delete-style names are still caught by the first rule.
+ */
+function looksDestructive(tool, grants = []) {
+  if (/delete|remove|drop|truncate|destroy|wipe|reset|purge|uninstall/i.test(tool.name || '')) return true;
   const ann = tool.annotations || {};
-  if (ann.destructiveHint === true) return true;
-  return /delete|remove|drop|truncate|destroy|wipe|reset|purge|uninstall/i.test(tool.name || '');
+  if (ann.destructiveHint === true) return !grants.includes('LOCAL_WRITE');
+  return false;
 }
 
 /** Unified tool shape (Phase 3 interface) for every discovered MCP tool. */
@@ -171,10 +262,10 @@ export function mcpToolsUnified() {
         source: 'mcp',
         server,
         permissions: grants,
-        risk: looksDestructive(t) ? 'risky' : (grants.includes('LOCAL_WRITE') ? 'medium' : 'safe'),
+        risk: looksDestructive(t, grants) ? 'risky' : (grants.includes('LOCAL_WRITE') ? 'medium' : 'safe'),
         timeoutMs: 30_000,
         cost: 0,
-        requiresAuthorization: looksDestructive(t),
+        requiresAuthorization: looksDestructive(t, grants),
       });
     }
   }
@@ -186,13 +277,23 @@ export function mcpToolsUnified() {
  * @param {object} p { server, tool, args, authorized, timeoutMs }
  */
 export async function invokeMcpTool({ server, tool, args = {}, authorized = false, timeoutMs = 30_000 } = {}) {
-  const conn = connections.get(server);
+  let conn = connections.get(server);
+  if (!conn) {
+    // Lazy connect: an enabled server spins up on first real use (idle servers cost no memory).
+    const reg = effectiveRegistry();
+    const entry = reg.servers.find((s) => s.name === server);
+    if (entry && entry.enabled) {
+      const r = await connectGatewayServer(server);
+      if (!r.ok) return { ok: false, error: `server '${server}' not connected (${r.error})` };
+      conn = connections.get(server);
+    }
+  }
   if (!conn) return { ok: false, error: `server '${server}' is not connected` };
   const grants = conn.grants || []; // the permission boundary the server was CONNECTED with
   const toolDef = conn.tools.find((t) => t.name === tool);
   if (!toolDef) return { ok: false, error: `unknown tool '${tool}' on '${server}'` };
 
-  const destructive = looksDestructive(toolDef);
+  const destructive = looksDestructive(toolDef, grants);
   if (destructive && !grants.includes('DESTRUCTIVE')) {
     audit({ type: 'MCP_DENIED', server, tool, reason: 'destructive tool on a server without the DESTRUCTIVE grant' });
     return { ok: false, error: `refused: '${tool}' looks destructive and server '${server}' does not hold the DESTRUCTIVE permission` };
@@ -241,7 +342,7 @@ export function mcpServerHealth() {
       enabled: s.enabled,
       trustLevel: s.trustLevel,
       permissions: s.permissions,
-      status: !s.enabled ? 'disabled' : c ? (c.failures > 0 && !c.lastSuccessAt ? 'error' : 'connected') : 'off',
+      status: !s.enabled ? 'disabled' : c ? (c.failures > 0 && !c.lastSuccessAt ? 'error' : 'connected') : 'ready',
       tools: c ? c.tools.length : 0,
       calls: c ? c.calls : 0,
       failures: c ? c.failures : 0,

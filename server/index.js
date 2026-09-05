@@ -74,6 +74,8 @@ import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications } from './src/services/NotificationCenter.js';
 import { modelRoutingTable, providerPreferenceForIntent } from './src/services/ModelRouting.js';
 import { MCP_PORT, MCP_TOOL_ALLOWLIST, listMcpTools } from './mcp-server.js';
+import { enableMcpServer, disableMcpServer, connectGatewayServer, disconnectGatewayServer, connectEnabledMcpServers, invokeMcpTool, mcpServerHealth, mcpToolsUnified } from './src/services/MCPGateway.js';
+import { unifiedToolCatalog, invokeUnifiedTool } from './src/services/UnifiedTools.js';
 import {
   registerConnectors, getConnectorStatus, saveConnectorConfig, callConnector, handleConnectorWebhook, getConnectorToolSchemas, setInboundReplyGenerator,
 } from './src/connectors/index.js'; // B56 — connector system (B66 — email reply loop; messaging connector removed)
@@ -610,6 +612,33 @@ app.post('/api/tools/execute', async (req, res) => {
   res.json(result);
 });
 
+// === UNIFIED TOOLS (AGI spec §21) — one catalog: native + MCP + computer ===
+// The MCP section is live: every CONNECTED external MCP server's tools appear
+// here (id form mcp:server:tool) and run through the same permission boundary.
+app.get('/api/tools/unified', (req, res) => {
+  try {
+    const cat = unifiedToolCatalog();
+    res.json({
+      ok: true,
+      counts: { native: cat.native.length, mcp: cat.mcp.length, computer: cat.computer.length },
+      mcp: cat.mcp.map((t) => ({ id: t.id, server: t.server, description: (t.description || '').slice(0, 140), risk: t.risk, requiresAuthorization: t.requiresAuthorization === true })),
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: (e && e.message) || String(e) });
+  }
+});
+
+app.post('/api/tools/unified/invoke', async (req, res) => {
+  try {
+    const { id, args, authorized } = req.body || {};
+    if (!id) return res.status(400).json({ ok: false, error: 'id is required (e.g. "mcp:everything:echo")' });
+    const r = await invokeUnifiedTool(id, args || {}, { authorized: authorized === true });
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: (e && e.message) || String(e) });
+  }
+});
+
 // === AGENT LOOP (roadmap stage 12 — tool-calling loop) ===
 // Orchestrator v2: plan → generate → call tools → feed results back → final
 // answer. Streams agent.plan / agent.log / tool.start / tool.result / agent.done.
@@ -829,6 +858,55 @@ app.get('/api/mcp/status', (req, res) => {
     allowlist: MCP_TOOL_ALLOWLIST || [],
     docs: 'Any MCP client can connect to /mcp and call the allowlisted tools. Generic MCP tools can be attached via registerMcpTool (EXTERNAL tier only — approval required).'
   });
+});
+
+// === MCP GATEWAY (AGI Phase 2, live Sept 2026) — external MCP servers ===
+// Lewis's switches. Enabled servers connect lazily/on demand; toggling from the
+// UI connects or disconnects immediately so the status shown is the real one.
+app.get('/api/mcp/servers', async (req, res) => {
+  try {
+    const rows = mcpServerHealth();
+    const withTools = await Promise.all(rows.map(async (r) => {
+      const unified = mcpToolsUnified().filter((t) => t.server === r.name).map((t) => t.id);
+      return { ...r, toolIds: unified };
+    }));
+    res.json({ ok: true, servers: withTools });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: (e && e.message) || String(e) });
+  }
+});
+
+app.post('/api/mcp/servers/:name/enable', async (req, res) => {
+  try {
+    // The flip itself is Lewis's decision — community-trust review is the UI's warning, not a silent block.
+    const r = enableMcpServer(req.params.name, { force: req.body && req.body.force === true ? true : false });
+    if (!r.ok) return res.status(400).json(r);
+    const c = await connectGatewayServer(req.params.name);
+    res.json({ ok: true, enabled: req.params.name, connect: c });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: (e && e.message) || String(e) });
+  }
+});
+
+app.post('/api/mcp/servers/:name/disable', async (req, res) => {
+  try {
+    const d = await disconnectGatewayServer(req.params.name);
+    const r = disableMcpServer(req.params.name);
+    res.json({ ok: true, disabled: req.params.name, disconnect: d, state: r });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: (e && e.message) || String(e) });
+  }
+});
+
+app.post('/api/mcp/tools/invoke', async (req, res) => {
+  try {
+    const { server, tool, args, authorized } = req.body || {};
+    if (!server || !tool) return res.status(400).json({ ok: false, error: 'server and tool are required' });
+    const r = await invokeMcpTool({ server, tool, args, authorized: authorized === true, timeoutMs: 60_000 });
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: (e && e.message) || String(e) });
+  }
 });
 
 // === CONNECTOR SYSTEM (B56 — github / email; messaging connector removed in B66) ===
@@ -2379,6 +2457,15 @@ if (process.env.NODE_ENV === 'production' && !API_KEY && process.env.JEXI_ALLOW_
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🧠 JEXI OS BRAIN running on port ${PORT}`);
+  // AGI Phase 2 (live) — MCP gateway boot: connect Lewis's enabled servers
+  // shortly after the brain is up, sequentially + fail-soft. npx cold starts
+  // are slow, so this never blocks listening; failures just show in health.
+  const mcpBoot = setTimeout(() => {
+    connectEnabledMcpServers()
+      .then((rows) => console.log(`[MCP] boot connect: ${rows.filter((r) => r.ok).length}/${rows.length} up (${rows.map((r) => `${r.server}:${r.ok ? r.tools + ' tools' : 'failed'}`).join(', ')})`))
+      .catch((e) => console.log(`[MCP] boot connect failed softly: ${e && e.message}`));
+  }, 8_000);
+  if (typeof mcpBoot.unref === 'function') mcpBoot.unref();
   // B211 — MISSION BOOT RECOVERY: missions that were mid-flight when the
   // process died resume now — in-flight items requeued honestly (leases
   // cleared, DONE work and artifacts never redone).

@@ -34,11 +34,14 @@ function fakeServer(tools, behavior = {}) {
 
 /* ═══ 1. the shipped registry ═══════════════════════════════════════════ */
 
-test('the shipped registry is valid and EVERY server starts disabled', () => {
+test('the shipped registry is valid; enabled defaults are curated-only (Lewis switched them on Sept 2026)', () => {
   const reg = loadRegistry(REGISTRY);
   assert.ok(reg.servers.length >= 5);
   for (const s of reg.servers) {
-    assert.equal(s.enabled, false, `${s.name} must ship disabled`);
+    // Policy update (Lewis, Sept 2026): curated servers MAY ship enabled.
+    // The invariants that still hold: community-trust ships disabled, and
+    // every entry carries an explicit permission boundary.
+    if (s.trustLevel === 'community') assert.equal(s.enabled, false, `${s.name} (community) must ship disabled`);
     assert.ok(s.permissions.length, `${s.name} needs an explicit permission boundary`);
     assert.ok(['curated', 'community'].includes(s.trustLevel));
   }
@@ -181,32 +184,32 @@ test('tool calls time out instead of hanging forever', async () => {
 test('server health reflects connection state, calls, and failures', async () => {
   __resetGateway();
   const reg = JSON.parse(fs.readFileSync(REGISTRY, 'utf8'));
-  const g = reg.servers.find((s) => s.name === 'git');
-  g.name = 'git-health-test';
+  const g = reg.servers.find((s) => s.name === 'filesystem');
+  g.name = 'fs-health-test';
   g.enabled = true;
-  const tmp = process.env.DATA_DIR + '/registry-git.json';
+  const tmp = process.env.DATA_DIR + '/registry-fs.json';
   fs.writeFileSync(tmp, JSON.stringify(reg));
   __setConnector(async () => fakeServer([
-    { name: 'git_status', description: 'status' },
-    { name: 'git_diff', description: 'diff' },
-  ], { failFor: 'git_diff', error: 'not a repo' }));
-  await connectGatewayServer('git-health-test', { registryPath: tmp });
-  await invokeMcpTool({ server: 'git-health-test', tool: 'git_status' });
-  await invokeMcpTool({ server: 'git-health-test', tool: 'git_diff' });
-  await invokeMcpTool({ server: 'git-health-test', tool: 'git_diff' });
+    { name: 'list_directory', description: 'list' },
+    { name: 'read_file', description: 'read' },
+  ], { failFor: 'read_file', error: 'not a file' }));
+  await connectGatewayServer('fs-health-test', { registryPath: tmp });
+  await invokeMcpTool({ server: 'fs-health-test', tool: 'list_directory' });
+  await invokeMcpTool({ server: 'fs-health-test', tool: 'read_file' });
+  await invokeMcpTool({ server: 'fs-health-test', tool: 'read_file' });
 
-  const h = mcpServerHealth().find((s) => s.name === 'git-health-test');
+  const h = mcpServerHealth().find((s) => s.name === 'fs-health-test');
   assert.equal(h.status, 'connected');
   assert.equal(h.enabled, true);
   assert.equal(h.tools, 2);
   assert.equal(h.calls, 3);
   assert.equal(h.failures, 2);
-  assert.match(h.lastError, /not a repo/);
+  assert.match(h.lastError, /not a file/);
   assert.ok(h.lastSuccessAt);
 
   // audit log recorded the invocations (bounded JSONL)
   const audit = fs.readFileSync(process.env.DATA_DIR + '/mcp-audit.jsonl', 'utf8').trim().split('\n').map((l) => JSON.parse(l));
-  assert.ok(audit.some((e) => e.type === 'MCP_CONNECTED' && e.server === 'git-health-test'));
-  assert.ok(audit.some((e) => e.type === 'MCP_INVOKE' && e.tool === 'git_status'));
-  assert.ok(audit.some((e) => e.type === 'MCP_INVOKE_FAILED' && e.tool === 'git_diff'));
+  assert.ok(audit.some((e) => e.type === 'MCP_CONNECTED' && e.server === 'fs-health-test'));
+  assert.ok(audit.some((e) => e.type === 'MCP_INVOKE' && e.tool === 'list_directory'));
+  assert.ok(audit.some((e) => e.type === 'MCP_INVOKE_FAILED' && e.tool === 'read_file'));
 });
