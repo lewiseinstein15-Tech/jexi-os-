@@ -2459,10 +2459,21 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🧠 JEXI OS BRAIN running on port ${PORT}`);
   // AGI Phase 2 (live) — MCP gateway boot: connect Lewis's enabled servers
   // shortly after the brain is up, sequentially + fail-soft. npx cold starts
-  // are slow, so this never blocks listening; failures just show in health.
+  // are slow (a fresh container downloads every package), so a second pass
+  // retries whatever missed — failures surface honestly in health either way.
   const mcpBoot = setTimeout(() => {
     connectEnabledMcpServers()
-      .then((rows) => console.log(`[MCP] boot connect: ${rows.filter((r) => r.ok).length}/${rows.length} up (${rows.map((r) => `${r.server}:${r.ok ? r.tools + ' tools' : 'failed'}`).join(', ')})`))
+      .then((rows) => {
+        console.log(`[MCP] boot connect pass 1: ${rows.filter((r) => r.ok).length}/${rows.length} up`);
+        const missed = rows.filter((r) => !r.ok);
+        if (missed.length) {
+          setTimeout(() => {
+            connectEnabledMcpServers()
+              .then((r2) => console.log(`[MCP] boot connect pass 2: ${r2.filter((r) => r.ok).length}/${r2.length} up (${missed.map((m) => m.server).join(', ')} retried)`))
+              .catch(() => {});
+          }, 30_000).unref?.();
+        }
+      })
       .catch((e) => console.log(`[MCP] boot connect failed softly: ${e && e.message}`));
   }, 8_000);
   if (typeof mcpBoot.unref === 'function') mcpBoot.unref();

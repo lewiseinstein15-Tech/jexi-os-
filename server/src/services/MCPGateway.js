@@ -114,6 +114,7 @@ function audit(entry) {
 /* ── connection + discovery + invocation ──────────────────────────────── */
 
 const connections = new Map(); // name → { tools: [{name, description, inputSchema}], connectedAt, lastError, lastSuccessAt, calls, failures }
+const connectState = new Map(); // name → { lastConnectAt, lastConnectError } — survives failed connects (a failed connect leaves NO connection entry, so without this the failure is invisible)
 let connector = null; // injectable seam
 
 /** Inject a connection factory (tests). Real default: the official MCP SDK below. */
@@ -143,7 +144,7 @@ async function defaultConnector(entry) {
       requestInit: { headers: { ...(entry.headers || {}) } },
     });
     client = new Client({ name: 'jexi-mcp-gateway', version: '1.0.0' }, { capabilities: {} });
-    await withTimeout(client.connect(transport), 45_000, 'connect timed out');
+    await withTimeout(client.connect(transport), 90_000, 'connect timed out');
   } else {
     const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
     const args = (entry.args || []).map((a) => interpolateArg(a, WORKSPACE_DIR));
@@ -155,7 +156,7 @@ async function defaultConnector(entry) {
       stderr: 'pipe',
     });
     client = new Client({ name: 'jexi-mcp-gateway', version: '1.0.0' }, { capabilities: {} });
-    await withTimeout(client.connect(transport), 45_000, 'connect timed out'); // npx cold download is slow
+    await withTimeout(client.connect(transport), 90_000, 'connect timed out'); // npx cold download is slow
   }
 
   return {
@@ -196,10 +197,12 @@ export async function connectGatewayServer(name, { registryPath } = {}) {
       inputSchema: t.inputSchema || null,
       annotations: t.annotations || null, // UNTRUSTED hints (spec guidance)
     }));
+    connectState.set(name, { lastConnectAt: new Date().toISOString(), lastConnectError: null });
     connections.set(name, { tools, __client: typeof conn.callTool === 'function' ? conn : null, grants: entry.permissions, serverName: name, connectedAt: new Date().toISOString(), lastError: null, lastSuccessAt: null, calls: 0, failures: 0 });
     audit({ type: 'MCP_CONNECTED', server: name, tools: tools.length });
     return { ok: true, server: name, tools: tools.length };
   } catch (e) {
+    connectState.set(name, { lastConnectAt: new Date().toISOString(), lastConnectError: String(e && e.message).slice(0, 200) });
     audit({ type: 'MCP_CONNECT_FAILED', server: name, error: String(e && e.message).slice(0, 200) });
     return { ok: false, error: String(e && e.message).slice(0, 300) };
   }
@@ -216,6 +219,7 @@ export async function connectEnabledMcpServers() {
   const out = [];
   for (const s of reg.servers) {
     if (!s.enabled) continue;
+    if (connections.has(s.name)) continue; // already up (e.g. retry pass)
     const r = await connectGatewayServer(s.name);
     out.push({ server: s.name, ok: r.ok === true, tools: r.tools || 0, ...(r.ok ? {} : { error: r.error }) });
   }
@@ -337,16 +341,20 @@ export function mcpServerHealth() {
   const reg = effectiveRegistry();
   const rows = reg.servers.map((s) => {
     const c = connections.get(s.name);
+    const cs = connectState.get(s.name);
+    // enabled + unconnected: 'ready' (never tried / healthy idle) vs 'error' (last connect attempt failed)
+    const idleStatus = cs && cs.lastConnectError ? 'error' : 'ready';
     return {
       name: s.name,
       enabled: s.enabled,
       trustLevel: s.trustLevel,
       permissions: s.permissions,
-      status: !s.enabled ? 'disabled' : c ? (c.failures > 0 && !c.lastSuccessAt ? 'error' : 'connected') : 'ready',
+      status: !s.enabled ? 'disabled' : c ? (c.failures > 0 && !c.lastSuccessAt ? 'error' : 'connected') : idleStatus,
       tools: c ? c.tools.length : 0,
       calls: c ? c.calls : 0,
       failures: c ? c.failures : 0,
-      lastError: c ? c.lastError : null,
+      lastError: c ? c.lastError : (cs ? cs.lastConnectError : null),
+      lastConnectAt: cs ? cs.lastConnectAt : null,
       lastSuccessAt: c ? c.lastSuccessAt : null,
       connectedAt: c ? c.connectedAt : null,
     };
@@ -366,4 +374,4 @@ export function mcpServerHealth() {
 }
 
 /** Test seam: wipe connections. */
-export function __resetGateway() { connections.clear(); connector = null; }
+export function __resetGateway() { connections.clear(); connectState.clear(); connector = null; }
