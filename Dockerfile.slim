@@ -23,6 +23,9 @@ RUN cd server && npm ci --no-audit --no-fund
 
 COPY server ./server
 
+# AGI Phase 2 — the MCP server registry ships with the brain (mcp/registry.json)
+COPY mcp ./mcp
+
 # Frontend build → served by Express from server/public
 COPY package*.json index.html vite.config.js tailwind.config.js postcss.config.js ./
 COPY public ./public
