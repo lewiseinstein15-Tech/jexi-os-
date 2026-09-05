@@ -28,7 +28,7 @@ const registry = JSON.parse(fs.readFileSync(path.join(SERVER_ROOT, '../mcp/regis
 
 // Test registry: only the JS/npx-runnable servers, isolated names not needed (own DATA_DIR).
 // (git server removed upstream: @modelcontextprotocol/server-git is archived off npm.)
-const runnable = ['filesystem', 'memory', 'everything', 'sequentialthinking'];
+const runnable = ['filesystem', 'memory', 'everything', 'sequentialthinking', 'context7'];
 const testReg = {
   version: registry.version,
   servers: registry.servers
@@ -107,6 +107,25 @@ await liveTest('sequentialthinking', async () => {
   return /thought/i.test(text)
     ? { ok: true, evidence: `thinking step processed: "${text.slice(0, 80)}…"` }
     : { ok: false, error: 'no thought processed' };
+});
+
+await liveTest('context7', async () => {
+  const res = await g.invokeMcpTool({ server: 'context7', tool: 'resolve-library-id', args: { libraryName: 'react', query: 'react' } });
+  if (!res.ok) return res;
+  const text = Array.isArray(res.result?.content) ? res.result.content.map((x) => x.text || '').join('') : '';
+  const ids = [...new Set((text.match(/\/[a-z0-9.-]+\/[a-z0-9.-]+/gi) || []))];
+  if (!ids.length) return { ok: false, error: `no library id resolved: ${text.slice(0, 120)}` };
+  let docsText = '';
+  let usedId = '';
+  for (const id of ids.slice(0, 3)) { // try the listed ids until real docs come back (a redirect notice means try the next)
+    const docs = await g.invokeMcpTool({ server: 'context7', tool: 'query-docs', args: { libraryId: id, query: 'how do hooks work' } });
+    if (!docs.ok) continue;
+    const t = Array.isArray(docs.result?.content) ? docs.result.content.map((x) => x.text || '').join('') : '';
+    if (t.length > 200) { docsText = t; usedId = id; break; }
+  }
+  return docsText
+    ? { ok: true, evidence: `resolved "${usedId}" and pulled ${docsText.length} chars of real current docs` }
+    : { ok: false, error: 'docs came back too thin to be real' };
 });
 
 /* ── report ─────────────────────────────────────────────────────────────── */

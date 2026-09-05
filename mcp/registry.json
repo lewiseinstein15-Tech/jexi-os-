@@ -47,6 +47,17 @@
       "notes": "Pure computation, no I/O. A thinking scratchpad JEXI can call like any other tool. (npm name has the hyphen: server-sequential-thinking.)"
     },
     {
+      "name": "context7",
+      "description": "Upstash's Context7 — current, version-specific library and framework docs on demand (resolve a library, pull its real docs instead of stale training-data memories).",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "enabled": true,
+      "trustLevel": "curated",
+      "permissions": ["READ_ONLY", "NETWORK"],
+      "notes": "MIT, maintained by Upstash (~15k stars). Free tier needs NO API key (key only raises rate limits). Read-only docs tools; a hosted streamable-http endpoint (mcp.context7.com/mcp) exists as fallback."
+    },
+    {
       "name": "fetch",
       "description": "Official MCP reference server (Python) — URL to markdown fetching with size and timeout limits.",
       "transport": "stdio",
