@@ -4,8 +4,13 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 
 process.env.DATA_DIR = './data/test-agi-provider-health';
+
+// start from a clean slate every run (the chain does not wipe test data)
+try { fs.rmSync(path.join(process.env.DATA_DIR, 'provider-health.json'), { force: true }); } catch { /* fine */ }
 
 const {
   classifyProviderError, PROVIDER_STATES,

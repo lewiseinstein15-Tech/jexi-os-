@@ -14,16 +14,16 @@
 |---|---|---|
 | 0 | Audits + research docs | **DONE** — this doc, `JEXI_CURRENT_ARCHITECTURE.md`, `research/{MCP,AWESOME_MCP_SERVERS,HERMES,ANTIDOOM,PURO_RESEARCH,OBLITERATUS}.md`; prior `AGI_ARCHITECTURE.md` |
 | A+B | Scored benchmark + epistemic vocabulary | **DONE** (commit e3edbc3, 8cd2ba6) — 6 axes @ 1.000; KNOWN/LIKELY/UNCERTAIN/UNKNOWN/CONTRADICTED claim algebra live |
-| 1 | API independence | **IN PROGRESS (1/6 done)** — ProviderHealthManager + error taxonomy + persistence + dashboard endpoint shipped; budgets, cache, dedup, dashboard UI remain |
+| 1 | API independence | **DONE (2026-09-05)** — health manager + taxonomy + persistence + dashboard endpoint (earlier); NOW ALSO: task budgets (RequestBudget, wired into both provider walks), opt-in response cache with TTL+invalidation+bounds, concurrent request deduplication with content-hash identity, deterministic-first audit (verifier gates already run before any model call; dead verifyWithLLM has zero callers), dashboard UI section in ModelsScreen |
 | 2 | MCP gateway + registry | **IN PROGRESS** — client+server exist; registry/trust/permissions wiring remain |
-| 3 | Tool unification | PARTIAL — ToolRegistry + ToolProfiles + ToolDiscovery exist; MCP/browser/computer/agent tools not yet one interface |
-| 4 | World model + memory layers | PARTIAL — WorldState (mission-scoped), MemoryManager, Lessons; global model + layers remain |
+| 3 | Tool unification | **DONE (2026-09-05)** — UnifiedTools: one Tool interface (id/description/schema/source/permissions/risk/timeout/cost/verification/execute) over native (real ToolRuntime.executeTool path), MCP (gateway), computer/browser (ComputerOps round). Catalog + capability index. Agent/API sources land with CognitiveCore |
+| 4 | World model + memory layers | **CORE DONE (2026-09-05)** — global WorldModel (typed entities, epistemic claim facts, typed relations, bounded events, uncertainty report, atomic persistence) + MemoryLayers (working/episodic/semantic/procedural/project/user over the EXISTING stores — nothing replaced; one relevance-based recall interface with layer labels + provenance). Mission WorldState remains the mission view (full merge with CognitiveCore) |
 | 5 | Work Graph + planning | **LARGELY DONE** — WorkGraph, budgets, resume, replan (tested) |
 | 6 | Browser / computer use | **LARGELY DONE** — observe→act→verify, honest degradation, CAPTCHA stop |
-| 7 | Verification + failure recovery | **LARGELY DONE** — Verifier gates, failure ladder, lessons; hypothesis engine is basic |
-| 8 | Skills + learning | PARTIAL — skills screen/roster skills exist; versioned skill artifacts + validation remain |
-| 9 | Imagination engine | PARTIAL — PREDICTED vs ACTUAL exists; multi-plan simulation + risk comparison remain |
-| 10 | Evaluation expansion | PARTIAL — 6-axis benchmark gates the chain; full task suites (10×6 categories) remain |
+| 7 | Verification + failure recovery | **DEEPENED (2026-09-05)** — LoopDetector (runtime doom-loop detection: repeated identical tool calls, repeated identical failures, near-identical consecutive reasoning, circular plans — Antidoom-inspired, zero training, zero dependencies) |
+| 8 | Skills + learning | **DONE (2026-09-05)** — skills/ artifacts (2 seeded, validated) + Skills module: real validation gate (shape, tools, concrete procedure, failure modes, verification), versioned promotion, lesson→draft→validate→promote learning loop (drafts are NEVER usable until validated — no uncontrolled self-modification) |
+| 9 | Imagination engine | **DONE (2026-09-05)** — PlanSimulator: deterministic multi-plan scoring (expectedSuccess, cost, risk, reversibility) with reversible-action preference ranking; every prediction is a PREDICTED epistemic claim that can never be stored as an observation (complements the existing LLM imagination pass) |
+| 10 | Evaluation expansion | **DONE (2026-09-05)** — server/evaluation/: 6 categories × 10 tasks (short/multi-step/unfamiliar/failure-recovery/tool-discovery/memory-transfer), each with task+expected+tools+constraints+executable success criteria; deterministic runner gates the chain at 0.90; results tracked in RESULTS.md. Current: 60/60. Known honest limit: transfer tasks need a lexical bridge — pure-synonym transfer requires embeddings (future) |
 
 ## Phase 1 — API independence (highest priority)
 
