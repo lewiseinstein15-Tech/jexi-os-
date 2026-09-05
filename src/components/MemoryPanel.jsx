@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Database, User, Globe, MessageSquare, HardDrive, Code, ChevronDown, Sparkles, Search, Trash2, Download, BookOpen, X } from 'lucide-react';
+import { Database, User, ChevronDown, Sparkles, Search, Trash2, Download, BookOpen, X } from 'lucide-react';
 import { getBackendUrl, jexiFetch } from '../utils/helpers';
 
 const timeAgo = (dateStr) => {
@@ -111,20 +111,11 @@ export default function MemoryPanel({ memory }) {
   }
 
   const userCount = Object.values(mem.userProfile || {}).filter(v => v && v.length > 0).length;
-  const internetCount = (mem.internetKnowledge || []).length;
-  const codingCount = (mem.codingKnowledge || []).length;
-  const chatCount = (mem.chatHistory || []).length;
   const facts = (mem.userFacts || []).filter(Boolean).slice(-12).reverse();
   const prefs = (mem.preferences || []).filter(Boolean).slice(-12).reverse();
   const learned = (mem.learnedAnswers || []).filter(Boolean).slice(-12).reverse();
   const episodes = (mem.episodes || []).filter(Boolean).slice(-8).reverse();
 
-  const statTiles = [
-    { label: 'USER', value: userCount, color: '#A78BFA' },
-    { label: 'INTERNET', value: internetCount, color: '#22D3EE' },
-    { label: 'CODING', value: codingCount, color: '#00D26A' },
-    { label: 'CHAT', value: chatCount, color: '#FBBF24' },
-  ];
 
   return (
     <div className="space-y-3">
@@ -179,15 +170,6 @@ export default function MemoryPanel({ memory }) {
         </div>
       ) : (
         <>
-          {/* 4-up stat tiles */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {statTiles.map((t) => (
-              <div key={t.label} className="surface-card p-3 text-center">
-                <p className="text-[20px] font-semibold leading-none" style={{ color: t.color }}>{t.value}</p>
-                <p className="text-[8px] font-bold tracking-wider text-text-tertiary mt-1.5">{t.label}</p>
-              </div>
-            ))}
-          </div>
 
           {/* User profile */}
           <Accordion icon={User} title="USER PROFILE" count={userCount} color="#A78BFA" defaultOpen>
@@ -224,25 +206,7 @@ export default function MemoryPanel({ memory }) {
             </div>
           </Accordion>
 
-          {/* Internet knowledge */}
-          <Accordion icon={Globe} title="INTERNET KNOWLEDGE" count={internetCount} color="#22D3EE">
-            <div className="space-y-1 max-h-40 overflow-y-auto">
-              {(mem.internetKnowledge || []).slice(-5).reverse().map((item, i) => (
-                <EntryRow key={`i-${i}`} text={item.topic} color="#22D3EE" index={(mem.internetKnowledge || []).length - 1 - i} kind="internetKnowledge" onDelete={deleteEntry} meta={timeAgo(item.date)} />
-              ))}
-              {internetCount === 0 && <p className="text-[9px] text-text-tertiary italic">No internet research saved yet.</p>}
-            </div>
-          </Accordion>
 
-          {/* Coding knowledge */}
-          <Accordion icon={Code} title="CODING KNOWLEDGE" count={codingCount} color="#00D26A">
-            <div className="space-y-1 max-h-40 overflow-y-auto">
-              {(mem.codingKnowledge || []).slice(-5).reverse().map((item, i) => (
-                <EntryRow key={`c-${i}`} text={item.topic} color="#00D26A" index={(mem.codingKnowledge || []).length - 1 - i} kind="codingKnowledge" onDelete={deleteEntry} meta={`${item.language} • ${timeAgo(item.date)}`} />
-              ))}
-              {codingCount === 0 && <p className="text-[9px] text-text-tertiary italic">No coding solutions saved yet.</p>}
-            </div>
-          </Accordion>
 
           {/* Learned answers */}
           {learned.length > 0 && (
@@ -265,43 +229,6 @@ export default function MemoryPanel({ memory }) {
               </div>
             </Accordion>
           )}
-
-          {/* Chat history */}
-          <Accordion icon={MessageSquare} title="CHAT HISTORY" count={chatCount} color="#FBBF24">
-            <div className="space-y-1 max-h-44 overflow-y-auto">
-              {(mem.chatHistory || []).slice(-8).reverse().map((item, i) => (
-                <div key={`ch-${i}`} className="flex items-start gap-2 text-[9px] bg-surface-2 p-2 rounded-md border-l-2" style={{ borderLeftColor: '#FBBF24' }}>
-                  <div className="min-w-0 flex-1">
-                    <span className={item.role === 'user' ? 'text-brand font-bold' : 'text-cyan-400 font-bold'}>
-                      {item.role === 'user' ? 'You: ' : 'JEXI: '}
-                    </span>
-                    <span className="text-text-secondary">{String(item.text || '').replace(/[#*`]/g, '').substring(0, 80)}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => deleteEntry('chatHistory', (mem.chatHistory || []).length - 1 - i)}
-                    className="flex-shrink-0 p-1 text-text-tertiary hover:text-status-error"
-                    title="Delete entry"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-              {chatCount === 0 && <p className="text-[9px] text-text-tertiary italic">No chat history yet.</p>}
-            </div>
-          </Accordion>
-
-          {/* Status footer */}
-          <div className="surface-card p-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <HardDrive className="w-3 h-3 text-brand" />
-              <h3 className="text-[10px] font-bold text-brand tracking-wider">MEMORY STATUS</h3>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-brand animate-pulse" />
-              <span className="text-[10px] text-brand font-bold">100% HEALTHY</span>
-            </div>
-          </div>
         </>
       )}
     </div>

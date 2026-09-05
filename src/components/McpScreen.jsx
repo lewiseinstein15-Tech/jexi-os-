@@ -16,7 +16,7 @@ const STATUS_STYLE = {
   disabled: { label: 'OFF', cls: 'text-text-tertiary border-hairline' },
 };
 
-export default function McpScreen() {
+export default function McpScreen({ embedded = false }) {
   const [servers, setServers] = useState(null);
   const [busy, setBusy] = useState(null); // server name being toggled
   const [open, setOpen] = useState(null); // expanded server (tool list)
@@ -55,17 +55,19 @@ export default function McpScreen() {
   const totalTools = connected.reduce((n, s) => n + (s.tools || 0), 0);
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Plug className="w-3.5 h-3.5 text-brand" />
-        <h2 className="text-[10px] font-bold text-brand tracking-wider flex-1">MCP SERVERS</h2>
-        <button onClick={load} className="text-text-tertiary hover:text-brand transition-colors" title="Refresh">
-          <RefreshCw className="w-3 h-3" />
-        </button>
-      </div>
+    <div className="space-y-3" style={embedded ? { paddingTop: 4 } : undefined}>
+      {!embedded && (
+        <div className="flex items-center gap-2">
+          <Plug className="w-3.5 h-3.5 text-brand" />
+          <h2 className="text-[10px] font-bold text-brand tracking-wider flex-1">MCP SERVERS</h2>
+          <button onClick={load} className="text-text-tertiary hover:text-brand transition-colors" title="Refresh">
+            <RefreshCw className="w-3 h-3" />
+          </button>
+        </div>
+      )}
 
       <p className="text-[8px] text-text-tertiary leading-relaxed">
-        External tools JEXI can plug into. ON means really connected — {connected.length} live · {totalTools} tools available to the brain. Enabled servers spin up when needed, so OFF switches cost nothing.
+        {connected.length} live · {totalTools} tools available to the brain. Enabled servers spin up when needed, so OFF switches cost nothing.
       </p>
 
       <div className="surface-card divide-y divide-hairline/50">

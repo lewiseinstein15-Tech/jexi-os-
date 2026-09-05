@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getBackendUrl, jexiFetch, getAccessKey, setAccessKey } from '../utils/helpers';
+import McpScreen from './McpScreen';
 
 export default function SettingsView() {
   const [key, setKey] = useState(getAccessKey());
@@ -111,6 +112,12 @@ export default function SettingsView() {
         <div className="jx-setline">
           <div className="lab"><b>Files &amp; preview</b><span>the project you're working on</span></div>
           <span className="jx-st on">open from ☰</span>
+        </div>
+
+        <div className="jx-grp">MCP servers</div>
+        <div className="jx-setline" style={{ alignItems: 'flex-start', flexDirection: 'column', gap: 6 }}>
+          <div className="lab"><b>External tools</b><span>switch servers on or off — they keep working in the background either way</span></div>
+          <McpScreen embedded />
         </div>
 
         <div className="jx-grp">Memory &amp; data</div>
