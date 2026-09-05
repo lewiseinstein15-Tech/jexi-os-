@@ -1650,8 +1650,12 @@ app.post('/api/chat', async (req, res) => {
       // picture answer → corrected subject, retried. Failures fall through
       // to normal planning — chat is never blocked.
       {
-        let pic = detectPictureIntent(raw);
-        if (!pic) {
+        // B227 — an ATTACHED image means the user wants their photo analyzed.
+        // The Presenter's picture-search must never fire then (the live bug:
+        // "what do you see in this image?" + a real photo was answered with a
+        // random Wikimedia picture-search result — the photo was ignored).
+        let pic = image ? null : detectPictureIntent(raw);
+        if (!pic && !image) {
           const corr = detectCorrectionToPicture(raw);
           if (corr) {
             try {

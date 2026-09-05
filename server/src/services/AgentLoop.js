@@ -149,8 +149,44 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   try { lifecycleTurnStart(convId, 1); } catch { /* noop */ }
 
   try {
+    // B227 — VISION: a turn with an image goes to a DIRECT vision call. The
+    // native-tools loop cannot carry images, and the old text-only note
+    // ("an image was provided — analyze it.") never showed the model the
+    // actual picture, so it guessed. The photo is attached for real now.
+    if (image) {
+      emit('log', { agent: 'JEXI', message: '📷 Reading your image…' });
+      finalText = await generateContent(
+        `The user asked: "${query}"\n\nAn image is attached. Answer from what you ACTUALLY see in the image — real objects, colors, people, text, setting. If something is unclear or not visible, say exactly that. Never invent content that is not in the picture.`,
+        await assemblePrompt({
+          convId: opts.spillOwner || null,
+          codeMode,
+          codeTools,
+          presetFlavor: opts.presetFlavor || '',
+          base: opts.systemPromptOverride || null,
+          userText: query, // B160 — @file mentions → file references
+        }) + (opts.subagentId ? `\n\n[You are a subagent. ${REPORT_GUIDANCE}]` : ''),
+        image,
+        {
+          temperature: 0.3,
+          prefer,
+          signal: opts.signal,
+          onThink: (t, meta) => {
+            const by = meta ? coworkerName(meta.provider, meta.model) : undefined;
+            emit('think', { text: t, ...(by ? { by } : {}) });
+          },
+          onToken: (t, meta) => {
+            const by = meta ? coworkerName(meta.provider, meta.model) : undefined;
+            if (!announcedWriter) {
+              announcedWriter = true;
+              emit('log', { agent: by || 'JEXI', message: '✍️ is writing your answer…' });
+            }
+            emit('stream', { text: t, ...(by ? { by } : {}) });
+          },
+        }
+      );
+    } else {
     const res = await generateWithToolsLoop(
-      `The user asked: "${query}"${image ? '\n(An image was provided — analyze it.)' : ''}`,
+      `The user asked: "${query}"`,
       await assemblePrompt({
         convId: opts.spillOwner || null,
         codeMode,
@@ -226,6 +262,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
       }
     );
     finalText = res.ok ? res.text : '';
+    }
   } catch (e) {
     emit('agent.log', { message: `⚠ Generation failed: ${(e && e.message) || e}. Finishing with what we have.` });
   }

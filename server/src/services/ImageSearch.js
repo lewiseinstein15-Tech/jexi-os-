@@ -96,7 +96,7 @@ export function generatedImageUrl(prompt, { width = 768, height = 512 } = {}) {
 
 const SHOW_RE = /\b(shows?|find|displays?|see|look\s+at)\b[^.?!]{0,40}\b(picture|photo|image|pic)\b|\b(picture|photo|image|pic)\s+of\b|\bwhat\s+(does|do)\b[^.?!]{0,30}\blook\s+like\b/i;
 const GEN_RE = /\b(generate|draw|create|make|paint|design)\b[^.?!]{0,40}\b(picture|photo|image|pic|art)\b|\b(draw|paint)\b\s+(me\s+)?(a|an|the)\b/i;
-const BLOCK_WORDS = /\b(build|code|app|website|logo\s+file|icon\s+file|diagram\s+of\s+the\s+system|architecture)\b/i;
+const BLOCK_WORDS = /\b(build|code|app|website|logo\s+file|icon\s+file|diagram\s+of\s+the\s+system|architecture|describe|describing|analy[sz]e|analy[sz]ing|identify|what\s+is\s+in\s+this|what\s+do\s+you\s+see|tell\s+me\s+about\s+this|read\s+this)\b/i; // B227 — vision-ANALYSIS phrasing never triggers picture SEARCH
 
 /**
  * B171 — one detector, two modes:

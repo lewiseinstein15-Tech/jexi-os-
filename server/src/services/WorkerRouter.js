@@ -163,10 +163,23 @@ export async function executeNativeToolCalls(calls, opts = {}) {
  * coworker executes them with full gating, results feed back, and the loop
  * repeats until the model answers directly. No JSON-in-prose anywhere.
  */
+// B227 — providers that can actually SEE an image (matched to LLMClient's
+// try* functions: groq switches to GROQ_VISION_MODELS, gemini sends
+// inline_data, openrouter switches to OPENROUTER_VISION_MODELS; every other
+// provider honestly returns null for images and can never serve a vision turn).
+const VISION_PROVIDERS = new Set(['groq', 'gemini', 'openrouter']);
+
 export async function runWorker(role, prompt, system = '', opts = {}) {
   const chain = coworkerChain(role);
   const attempts = [];
   const wantsTools = Array.isArray(opts.tools) && opts.tools.length > 0;
+  // B227 — VISION: the native-tools loop cannot carry images — a vision turn
+  // sent through it silently loses the photo (the model then guesses from
+  // text). When an image is attached, go straight to the text+image lane;
+  // LLMClient routes to vision-capable providers only (text-only providers
+  // honestly decline images by returning null).
+  const image = typeof opts.image === 'string' && opts.image.startsWith('data:image/') ? opts.image : null;
+  const toolLane = wantsTools && !image;
   // B99 — CODE MODE (PTC): when enabled and tools are offered, the model may
   // write ONE TypeScript program via run_code composing the same tools (dsh
   // `code` preset). The SDK section regenerates from THIS coworker's tool
@@ -207,7 +220,7 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
   // even attempted here — Gemini/HuggingFace are text-only and get skipped
   // by generateWithToolsLoop, so a tools-first task can fail even when those
   // providers are healthy.
-  if (wantsTools) {
+  if (toolLane) {
     for (const p of chain) {
       const label = p.model ? `${p.key}(${p.model})` : p.key;
       logCall(p, 'tool_calling');
@@ -246,10 +259,11 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
   // a bonus, never a hard requirement: a conversation answer must not die
   // because every tool-capable provider is down.
   for (const p of chain) {
+    if (image && !VISION_PROVIDERS.has(p.key)) continue; // B227 — cannot see; do not waste the attempt
     const label = p.model ? `${p.key}(${p.model})` : p.key;
-    logCall(p, 'text');
+    logCall(p, image ? 'vision' : 'text');
     try {
-      const res = await generateContentSafe(prompt, system, null, { provider: p.key, model: p.model, temperature: opts.temperature, onToken: (typeof opts.onToken === 'function') ? opts.onToken : undefined, onThink: (typeof opts.onThink === 'function') ? opts.onThink : undefined });
+      const res = await generateContentSafe(prompt, system, image, { provider: p.key, model: p.model, temperature: opts.temperature, onToken: (typeof opts.onToken === 'function') ? opts.onToken : undefined, onThink: (typeof opts.onThink === 'function') ? opts.onThink : undefined }); // B227 — the image rides (was hardcoded null: the photo never reached the model)
       if (res.ok && res.text) {
         logResult({ ok: true, mode: 'text', provider: res.provider || p.key, model: res.model || p.model || null, degraded: !!res.degraded, local: !!res.local });
         return { ok: true, text: res.text, degraded: !!res.degraded, local: !!res.local, worker: role, provider: res.provider || p.key, model: res.model || p.model || null, attempts };

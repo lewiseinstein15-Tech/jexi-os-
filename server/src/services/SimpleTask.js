@@ -104,7 +104,16 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
     });
   } catch (e) {}
 
-  const prompt = `The user asked: "${query}"\n\n${ctx ? `Conversation context:\n${ctx.slice(0, 4000)}\n\n` : ''}Answer directly and completely. ${FORMAT_RULES}`;
+  // B227 — VISION: the photo actually reaches the model. Before this, the
+  // image arrived in opts and was silently dropped — the model never saw the
+  // picture and guessed from the text alone (the "not describing what is
+  // actually in the photo" bug). Now it rides with the worker call, and the
+  // prompt demands grounding in what is truly visible.
+  const image = typeof opts.image === 'string' && opts.image.startsWith('data:image/') ? opts.image : null;
+  const visionNote = image
+    ? '\n\n[An image is attached to the user\'s message. Look at the ACTUAL image and ground your answer in what you truly see — real objects, colors, people, text, setting. If something is unclear or not visible, say exactly that. NEVER invent content that is not in the picture.]'
+    : '';
+  const prompt = `The user asked: "${query}"${visionNote}\n\n${ctx ? `Conversation context:\n${ctx.slice(0, 4000)}\n\n` : ''}Answer directly and completely. ${FORMAT_RULES}`;
 
   // B157 — LIVE STREAMING + ANSWER PRESERVATION. Every token the coworker
   // emits streams straight to the UI (the answer types itself live, like a
@@ -164,6 +173,7 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
     userText: prompt, // B160 — @file mentions → file references
   }) + orchestratorPromptFragment() + coworkerMandate;
   const res = await runWorker(role, prompt, system, {
+    image, // B227 — the real photo, so the model sees it
     temperature: 0.4,
     // B67 — the coworker can really call these tools via native function
     // calling; intent is passed so ToolRuntime enforces the allowlist.
