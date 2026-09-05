@@ -6,6 +6,7 @@ import { takeSlot, releaseSlot } from './ProviderRateLimiter.js'; // free-tier p
 import { queryLocalLLM } from './OfflineAgent.js';
 import { appendTimeContext } from './TimeContext.js'; // B104 — every LLM call knows the current date/time (dsh time-context)
 import { withRetry } from './RetryPolicy.js'; // B133 — dsh llm-retry: backoff on 429/5xx/network
+import { recordProviderCallSuccess, recordProviderCallFailure, skipForNow, providerState } from './ProviderHealth.js'; // AGI Phase 1 — structured, persistent provider health
 
 /**
  * Keys are resolved in this order:
@@ -610,6 +611,7 @@ async function streamPlainText(prompt, system, opts, onDelta) {
     if (!cfg || !cfg.key) continue;
     const base = cfg.baseUrl || (provider === 'groq' ? 'https://api.groq.com/openai/v1' : null);
     if (!base) continue;
+    if (skipForNow(provider)) { errors.push(`${provider}: skipped (health: ${providerState(provider).state})`); continue; } // Phase 1 — sticky auth/cooldown skip
     const slot = await takeSlot(provider);
     if (!slot.ok) { errors.push(`${provider}: ${slot.reason} (rate limiter)`); continue; }
     try {
@@ -627,10 +629,14 @@ async function streamPlainText(prompt, system, opts, onDelta) {
       out.tookMs = Date.now() - __st0;
       if (out.text) {
         recordProviderSuccess(provider, out.tookMs);
+        recordProviderCallSuccess(provider, { latencyMs: out.tookMs }); // Phase 1
         releaseSlot();
         return out.text;
       }
-    } catch (e) { errors.push(`${provider}: ${e.message}`); }
+    } catch (e) {
+      errors.push(`${provider}: ${e.message}`);
+      recordProviderCallFailure(provider, e); // Phase 1 — classified + persisted
+    }
     noteProviderFailure(provider); // B220 — retry-after aware
     releaseSlot();
   }
@@ -658,6 +664,7 @@ export async function generateContent(prompt, systemInstruction = '', imageBase6
   for (const provider of order) {
     const call = PROVIDER_CALLS[provider];
     if (!call) continue;
+    if (skipForNow(provider)) { errors.push(`${provider}: skipped (health: ${providerState(provider).state})`); continue; } // Phase 1 — sticky auth/cooldown skip
     // Free-tier pacing: wait for the provider's rate slot (bounded). When
     // throttled for too long, slide to the next healthy provider.
     const slot = await takeSlot(provider);
@@ -670,6 +677,7 @@ export async function generateContent(prompt, systemInstruction = '', imageBase6
       const text = await call(prompt, system, imageBase64, opts, errors);
       if (text) {
         recordProviderSuccess(provider, Date.now() - __t0);
+        recordProviderCallSuccess(provider, { latencyMs: Date.now() - __t0 }); // Phase 1
         releaseSlot();
         // B162b — if this provider answered WITHOUT streaming deltas (SDK
         // paths), emit the whole text once WITH provider+model meta: the UI
@@ -682,6 +690,7 @@ export async function generateContent(prompt, systemInstruction = '', imageBase6
       }
     } catch (e) {
       errors.push(`${provider}: ${e.message}`);
+      recordProviderCallFailure(provider, e); // Phase 1 — classified + persisted
     }
     noteProviderFailure(provider); // B220 — retry-after aware
     releaseSlot();

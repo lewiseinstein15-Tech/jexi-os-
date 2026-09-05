@@ -33,6 +33,7 @@ import { loadTask as loadDirectorTask, loadTaskById, listDirectorTasks } from '.
 import { rosterSummary as employeeRoster, rosterDetail, setEmployeeDisabled, upsertEmployee, employeeHistory } from './src/services/director/Employees.js'; // B209 — runtime team management
 import { normalizeFinalAnswer } from './src/services/Formatting.js'; // B66 — normalize every final answer
 import { generateContent, resolveKeys, testAllProviders } from './src/services/LLMClient.js';
+import { providerHealthSnapshot as providerHealthDetail } from './src/services/ProviderHealth.js'; // AGI Phase 1 — structured, persistent health (dashboard layer)
 import { learnFromExchange } from './src/services/PreferenceLearner.js';
 import { rollingConversationSummary } from './src/services/MemoryManager.js';
 import {
@@ -765,6 +766,13 @@ app.get('/api/tools/discover', (req, res) => {
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e && e.message || e).slice(0, 200) });
   }
+});
+
+// AGI Phase 1 — API-limit dashboard data: structured provider health
+// (states, counts, latency, cooldowns). Key-protected like /api/models,
+// because it names providers and error details (no secrets, but internal).
+app.get('/api/providers/health', (req, res) => {
+  res.json({ ok: true, providers: providerHealthDetail(), at: new Date().toISOString() });
 });
 
 app.get('/api/models', (req, res) => {

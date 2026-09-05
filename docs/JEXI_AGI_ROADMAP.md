@@ -14,7 +14,7 @@
 |---|---|---|
 | 0 | Audits + research docs | **DONE** — this doc, `JEXI_CURRENT_ARCHITECTURE.md`, `research/{MCP,AWESOME_MCP_SERVERS,HERMES,ANTIDOOM,PURO_RESEARCH,OBLITERATUS}.md`; prior `AGI_ARCHITECTURE.md` |
 | A+B | Scored benchmark + epistemic vocabulary | **DONE** (commit e3edbc3, 8cd2ba6) — 6 axes @ 1.000; KNOWN/LIKELY/UNCERTAIN/UNKNOWN/CONTRADICTED claim algebra live |
-| 1 | API independence | **IN PROGRESS** — see breakdown below |
+| 1 | API independence | **IN PROGRESS (1/6 done)** — ProviderHealthManager + error taxonomy + persistence + dashboard endpoint shipped; budgets, cache, dedup, dashboard UI remain |
 | 2 | MCP gateway + registry | **IN PROGRESS** — client+server exist; registry/trust/permissions wiring remain |
 | 3 | Tool unification | PARTIAL — ToolRegistry + ToolProfiles + ToolDiscovery exist; MCP/browser/computer/agent tools not yet one interface |
 | 4 | World model + memory layers | PARTIAL — WorldState (mission-scoped), MemoryManager, Lessons; global model + layers remain |
@@ -34,10 +34,16 @@ per-provider rate-limiter slots.
 
 Remaining, in order:
 
-1. **ProviderHealthManager** (`src/services/ProviderHealth.js`) — structured
-   states (healthy/degraded/rate_limited/unavailable/auth_error/disabled),
-   success-rate + latency EWMA per provider, cooldown expiry, persisted
-   across restarts, exposed via an admin endpoint (feeds the dashboard).
+1. ~~**ProviderHealthManager**~~ **DONE (2026-09-05)** —
+   `src/services/ProviderHealth.js`: structured states, error taxonomy
+   (RATE_LIMITED / QUOTA_EXHAUSTED / AUTH_ERROR / CONTEXT_TOO_LARGE /
+   MODEL_NOT_FOUND / TIMEOUT / OVERLOAD / SERVER_ERROR / NETWORK / UNKNOWN),
+   success-rate + latency EWMA, consecutive-failure cooldown scaling (capped,
+   retry-after overrides honored), STICKY auth errors, disk persistence,
+   `GET /api/providers/health` dashboard endpoint; wired into both LLMClient
+   provider walks (success/failure recording + skip-while-unhealthy).
+   Tests: `tests/agi/test-provider-health.js` (14); benchmark robustness
+   axis extended to 8 checks.
 2. **Request budgets** — per-task {model calls, tokens, time, retries};
    mission budgets extend to model consumption; budget-aware model choice
    (small/cheap for routine, strong for reasoning) via the capability matrix.

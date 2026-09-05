@@ -29,6 +29,9 @@ process.env.DATA_DIR = './data/test-agi-bench';
 import fs from 'node:fs';
 import path from 'node:path';
 
+// repetition-safety: provider health persists to disk; start each run clean
+try { fs.rmSync(path.join(process.env.DATA_DIR, 'provider-health.json'), { force: true }); } catch { /* fine */ }
+
 const { structureObjective } = await import('../../src/services/director/ObjectiveInterpreter.js');
 const { discoverTools } = await import('../../src/services/ToolDiscovery.js');
 const { TOOL_REGISTRY } = await import('../../src/services/ToolRegistry.js');
@@ -39,6 +42,7 @@ const { recordLesson, retrieveLessons, formatLessonsBlock } = await import('../.
 const { WorldState } = await import('../../src/services/director/WorldState.js');
 const { dependencyWaves } = await import('../../src/services/director/Director.js');
 const Epistemics = await import('../../src/services/director/Epistemics.js');
+const PH = await import('../../src/services/ProviderHealth.js');
 
 /* ── scoring ───────────────────────────────────────────────────────────── */
 const axes = {};
@@ -228,6 +232,16 @@ axis('robustness', (check) => {
   try { m2.setState('COMPLETED', 'illegal jump'); } catch { threw = true; }
   check('illegal state transitions are rejected (no fake completion)', threw);
   m2.cancel('benchmark done');
+
+  // ── Phase 1: provider health (API independence) ──
+  PH.__resetProviderHealth();
+  const now = Date.now();
+  PH.recordProviderCallFailure('bench-a', 'HTTP 429 rate limit exceeded', { at: now });
+  check('a rate-limited provider is skipped while cooling and recovers after', PH.skipForNow('bench-a', now + 1000) === true && PH.skipForNow('bench-a', now + 31_000) === false);
+  PH.recordProviderCallFailure('bench-b', '401 unauthorized: invalid api key');
+  check('a bad key is sticky — never retried forever', PH.providerState('bench-b').state === 'auth_error' && PH.skipForNow('bench-b', now + 48 * 3600_000) === true);
+  PH.recordProviderCallFailure('bench-c', 'daily quota exhausted', { at: now });
+  check('quota exhaustion and rate limiting are classified as different problems', PH.providerHealthSnapshot(now).find((p) => p.provider === 'bench-c').lastErrorKind === 'QUOTA_EXHAUSTED');
 });
 
 /* ── results ───────────────────────────────────────────────────────────── */
