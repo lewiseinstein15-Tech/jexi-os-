@@ -58,16 +58,23 @@ Remaining, in order:
 6. **API-limit dashboard** — admin view: provider, status, requests, success,
    failures, 429s, latency, cooldown, last success/failure.
 
-## Phase 2 — MCP gateway
+## Phase 2 — MCP gateway — **LIVE (Sept 2026)**
 
-Keep and harden what exists (official-SDK server; McpClient with stdio +
-streamable-http). Add: `mcp/registry.json` (name, description, transport,
-endpoint, enabled, trustLevel, permissions, health); permission boundaries
-READ_ONLY / LOCAL_WRITE / NETWORK / EXECUTION / GIT / DEPLOYMENT /
-DESTRUCTIVE; discovery results flow through ToolDiscovery so planning sees
-MCP tools with the same capability matching as native tools; per-server
-timeouts + health + lifecycle. Start with a SMALL trusted set (see
-`research/AWESOME_MCP_SERVERS.md`).
+DONE and live-tested end to end (Lewis switched the servers on):
+`mcp/registry.json` (10 servers; 4 curated ones enabled and really connected
+at boot, fail-soft); the gateway owns its real SDK Client + stdio/streamable-
+http transports with `${JEXI_WORKSPACE}` interpolation; enable/disable + lazy
+connect + disconnect (child processes die); per-server health, timeouts and a
+bounded audit log; `GET /api/mcp/servers` + per-server enable/disable +
+`/api/mcp/tools/invoke`; ON/OFF toggles in the MCP screen; the unified tool
+catalog exposes every connected server's tools (`mcp:server:tool`, 37 live at
+test time) through the same permission boundary.
+Honest limits: fetch/sqlite/time need uvx (Python — absent on current hosts);
+the official git MCP server was archived off npm (JEXI's own audited git path
+covers it); playwright/puppeteer stay off (browser binaries; redundant with
+the native browser); brave-search needs a paid key. Live proof:
+`server/scripts/mcp-live-test.js` — 4/4 servers connect, execute a real tool,
+and disconnect cleanly.
 
 ## Phase 3 — Tool unification
 
