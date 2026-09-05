@@ -84,11 +84,31 @@ test('AgentLoop: image turns attach the REAL photo; the text-only lie is gone', 
 
 /* ── the already-correct lanes, locked in ──────────────────────────────── */
 
-test('graph lane: image_recognition passes the real image to the vision node', () => {
+test('graph lane: the vision node gets the image with a fallback + honest absence', () => {
   const plan = read('./src/services/Planner.js');
   assert.match(plan, /if \(hasImage\) \{\s*return \{ intent: 'image_recognition'[\s\S]*?payload: opts\.image \}/, 'an attached image deterministically plans image_recognition with the real image as payload');
   const orch = read('./src/services/Orchestrator.js');
-  assert.match(orch, /JEXI_SYSTEM_PROMPT \+ preferencesBlock\(\),\s*plan\.payload/, 'the vision node shows the model the actual image');
+  assert.match(orch, /visionImage = \(typeof \(plan && plan\.payload\) === 'string' && plan\.payload\.startsWith\('data:image\/'\)/, 'the node reads plan.payload');
+  assert.match(orch, /: \(typeof \(opts && opts\.image\) === 'string' && opts\.image\.startsWith\('data:image\/'\)\) \? opts\.image : null/, 'opts.image is the fallback belt-and-suspenders');
+  assert.match(orch, /🔍 Analyzing image \(\$\{Math\.round\(visionImage\.length \/ 1024\)\}KB attached to the model\)/, 'the size of what actually reached the model is LOGGED (the observability the live debugging needed)');
+  assert.match(orch, /⚠ No image reached the vision node/, 'no image → one honest warning, never a blind guess');
+  assert.match(orch, /I did not receive the image on this turn/, 'the no-image answer is honest, not a hallucinated description');
+  assert.match(orch, /visionImage,\s*\{ prefer: 'gemini', temperature: 0\.4 \}/, 'the vision call uses the proven /api/vision lane');
+});
+
+test('graph lane (functional): the image reaches the vision node through the real graph', async () => {
+  const { Planner } = await import('./src/services/Planner.js');
+  const { orchestrator } = await import('./src/services/Orchestrator.js');
+  const p = new Planner();
+  const fake = 'data:image/jpeg;base64,' + 'A'.repeat(1000);
+  const plan = await p.analyzeIntent('What do you see in this image? Describe it.', { image: fake });
+  assert.equal(plan.intent, 'image_recognition');
+  const logs = [];
+  const sendEvent = (t, d) => { if (t === 'log') logs.push(String(d && d.message || '')); };
+  const out = await orchestrator.executePlan(plan, 'What do you see in this image? Describe it.', sendEvent, { image: fake });
+  assert.ok(logs.some((l) => l.includes('Analyzing image (1KB attached to the model)')), 'the node logged the attached image size');
+  // no keys in the test env → the node fails HONESTLY (no blind text answer)
+  assert.match(String(out.summary || ''), /problem while working on this|No API keys configured|did not receive the image/, 'no keys → honest failure, never a fabricated description');
 });
 
 test('provider layer: text-only providers honestly decline images; vision providers carry them', () => {

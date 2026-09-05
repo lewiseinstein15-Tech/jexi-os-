@@ -547,12 +547,25 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
       return results;
     });
 
-    N.imageRecognition = this.wrapCase('imageRecognition', async ({ results, sendEvent, query, plan }) => {
-      sendEvent('log', { agent: 'Vision', message: '🔍 Analyzing image...' });
+    N.imageRecognition = this.wrapCase('imageRecognition', async ({ results, sendEvent, query, plan, opts }) => {
+      // B227 — the image that actually reaches the model, with observability:
+      // plan.payload is the planner's copy; opts.image is what /api/chat handed
+      // executePlan. Either is the real photo. If BOTH are missing the node
+      // says so honestly instead of asking a blind model to describe a picture.
+      const visionImage = (typeof (plan && plan.payload) === 'string' && plan.payload.startsWith('data:image/'))
+        ? plan.payload
+        : (typeof (opts && opts.image) === 'string' && opts.image.startsWith('data:image/')) ? opts.image : null;
+      sendEvent('log', { agent: 'Vision', message: visionImage ? `🔍 Analyzing image (${Math.round(visionImage.length / 1024)}KB attached to the model)...` : '⚠ No image reached the vision node — the plan and the request both lack it.' });
+      if (!visionImage) {
+        results.summary = '### 👁️ JEXI VISION\n\nI did not receive the image on this turn — nothing was attached by the time it reached my vision step. Please send the photo again; this is now reported honestly instead of guessing.';
+        results.statistics.confidence = 0;
+        return results;
+      }
       const reply = await generateContent(
         `The user attached an image and asked: \"${query || 'What is this?'}\"\n\nAnalyze the image thoroughly: describe what it shows, read any text/numbers/symbols, and if it is a math problem, solve it with full LaTeX steps.`,
         JEXI_SYSTEM_PROMPT + preferencesBlock(),
-        plan.payload
+        visionImage,
+        { prefer: 'gemini', temperature: 0.4 } // same proven lane as /api/vision
       );
       try { addChat('jexi', reply); } catch (e) {}
       results.summary = `### 👁️ JEXI VISION\n\n${reply}`;
