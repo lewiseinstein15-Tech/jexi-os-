@@ -7,6 +7,8 @@ import { queryLocalLLM } from './OfflineAgent.js';
 import { appendTimeContext } from './TimeContext.js'; // B104 — every LLM call knows the current date/time (dsh time-context)
 import { withRetry } from './RetryPolicy.js'; // B133 — dsh llm-retry: backoff on 429/5xx/network
 import { recordProviderCallSuccess, recordProviderCallFailure, skipForNow, providerState } from './ProviderHealth.js'; // AGI Phase 1 — structured, persistent provider health
+import { cacheKey, cacheGet, cacheSet } from './ResponseCache.js'; // AGI Phase 1 — safe caching (opt-in per call)
+import { dedupeInflight, requestIdentity } from './RequestDedup.js'; // AGI Phase 1 — concurrent identical calls share one request
 
 /**
  * Keys are resolved in this order:
@@ -630,6 +632,7 @@ async function streamPlainText(prompt, system, opts, onDelta) {
       if (out.text) {
         recordProviderSuccess(provider, out.tookMs);
         recordProviderCallSuccess(provider, { latencyMs: out.tookMs }); // Phase 1
+        if (opts.budget && typeof opts.budget.consume === 'function') opts.budget.consume({ tokens: Math.ceil(String(out.text).length / 4) });
         releaseSlot();
         return out.text;
       }
@@ -645,6 +648,32 @@ async function streamPlainText(prompt, system, opts, onDelta) {
 
 export async function generateContent(prompt, systemInstruction = '', imageBase64 = null, opts = {}) {
   systemInstruction = appendTimeContext(systemInstruction); // B104 — time context on every call
+
+  // AGI Phase 1 — REQUEST ECONOMY (spec §13/§15/§16):
+  //   budget gate → opt-in response cache → in-flight deduplication.
+  //   Streaming calls skip cache+dedup (deltas cannot be fairly shared).
+  if (opts.budget && typeof opts.budget.canSpend === 'function') {
+    const gate = opts.budget.canSpend();
+    if (!gate.ok) throw new Error(`Budget exhausted (${opts.budget.label}): ${gate.why}`);
+  }
+  const streamable = typeof opts.onToken === 'function';
+  const identity = () => requestIdentity({ prompt, system: systemInstruction, imageBase64, provider: opts.provider || null, model: opts.model || null, temperature: opts.temperature ?? null });
+  if (opts.cache === true && !streamable) {
+    const key = cacheKey({ prompt, system: systemInstruction, provider: opts.provider || null, model: opts.model || null, temperature: opts.temperature ?? null });
+    const hit = cacheGet(key);
+    if (hit) return hit.value; // identical cacheable request — no model call spent
+    const text = await dedupeInflight(identity(), () => __generateWalk(prompt, systemInstruction, imageBase64, opts));
+    if (text) cacheSet(key, text, { ttlMs: opts.cacheTtlMs });
+    return text;
+  }
+  if (!streamable && !imageBase64) {
+    return dedupeInflight(identity(), () => __generateWalk(prompt, systemInstruction, imageBase64, opts));
+  }
+  return __generateWalk(prompt, systemInstruction, imageBase64, opts);
+}
+
+/** The actual provider walk (B220 health-aware, Phase 1 health-skips). */
+async function __generateWalk(prompt, systemInstruction, imageBase64, opts) {
   // B150 — live token streaming when requested (the UI shows the answer as
   // it is generated instead of a blank wait). Falls back on any failure.
   let streamedAny = false; // B162b — has any delta reached the consumer yet?
@@ -678,6 +707,7 @@ export async function generateContent(prompt, systemInstruction = '', imageBase6
       if (text) {
         recordProviderSuccess(provider, Date.now() - __t0);
         recordProviderCallSuccess(provider, { latencyMs: Date.now() - __t0 }); // Phase 1
+        if (opts.budget && typeof opts.budget.consume === 'function') opts.budget.consume({ tokens: Math.ceil(String(text).length / 4) }); // Phase 1 — model calls are a limited resource
         releaseSlot();
         // B162b — if this provider answered WITHOUT streaming deltas (SDK
         // paths), emit the whole text once WITH provider+model meta: the UI

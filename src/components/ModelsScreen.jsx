@@ -26,6 +26,7 @@ const COWORKER_HINT = {
 export default function ModelsScreen() {
   const [workers, setWorkers] = useState([]);
   const [providers, setProviders] = useState([]);
+  const [detail, setDetail] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,6 +48,20 @@ export default function ModelsScreen() {
         const p = await jexiFetch(`${getBackendUrl()}/api/health/providers`).then((x) => x.json());
         if (!dead) setProviders(p.providers || []);
       } catch (e) { if (!dead) setProviders([]); }
+    })();
+    return () => { dead = true; };
+  }, []);
+
+  // AGI Phase 1 — the API-limit dashboard data: structured, persistent
+  // provider health (states, 429 counts, latency, cooldowns) from
+  // /api/providers/health. Never blocks the screen.
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      try {
+        const d = await jexiFetch(`${getBackendUrl()}/api/providers/health`).then((x) => x.json());
+        if (!dead) setDetail(d.providers || []);
+      } catch (e) { if (!dead) setDetail([]); }
     })();
     return () => { dead = true; };
   }, []);
@@ -116,6 +131,42 @@ export default function ModelsScreen() {
         </div>
         {providers.length === 0 && <p className="text-[10px] text-text-tertiary font-mono">live-testing providers… (takes about a minute)</p>}
       </div>
+
+      {/* AGI Phase 1 — the API-limit dashboard (spec §44) */}
+      {detail.length > 0 && (
+        <div>
+          <p className="eyebrow mb-1.5">API LIMITS · DETAILED HEALTH</p>
+          <div className="space-y-1.5">
+            {detail.map((p) => (
+              <div key={p.provider} className="surface-card p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-semibold text-text-primary truncate">{p.provider}</span>
+                  <span className={`text-[8px] font-bold tracking-wider ${
+                    p.state === 'healthy' ? 'text-brand'
+                    : p.state === 'rate_limited' || p.state === 'unavailable' ? 'text-status-error'
+                    : p.state === 'auth_error' || p.state === 'disabled' ? 'text-status-error'
+                    : 'text-acc-automation'
+                  }`}>
+                    {String(p.state || '').toUpperCase()}
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-[8px] font-mono text-text-tertiary">
+                  <span className="flex items-center gap-0.5"><Activity className="w-2.5 h-2.5" /> {p.requests || 0}</span>
+                  <span>ok {p.successes || 0}</span>
+                  <span>fail {p.failures || 0}</span>
+                  <span className={p.rateLimited > 0 ? 'text-status-error' : ''}>429 {p.rateLimited || 0}</span>
+                  {p.latencyEwmaMs != null && <span>{p.latencyEwmaMs}ms</span>}
+                  {p.successRateEwma != null && <span>{Math.round((p.successRateEwma || 0) * 100)}%</span>}
+                  {p.cooldownRemainingMs > 0 && <span className="text-acc-automation">cooldown {Math.ceil(p.cooldownRemainingMs / 1000)}s</span>}
+                  {p.lastErrorKind && <span className="text-status-error/80">last: {p.lastErrorKind}</span>}
+                </div>
+                {p.note && <p className="text-[8px] text-text-tertiary mt-1 truncate">{p.note}</p>}
+              </div>
+            ))}
+          </div>
+          <p className="text-[8px] text-text-tertiary mt-1.5">Persistent health record: rate limits cool down exactly as long as the provider asked, broken keys are never retried blindly, and everything survives restarts.</p>
+        </div>
+      )}
     </div>
   );
 }
