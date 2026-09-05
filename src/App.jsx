@@ -298,6 +298,7 @@ export default function App() {
               team={engine.team}
               computer={engine.computer}
               onDismissPlan={() => engine.setPlanReview(null)}
+              onVisionResult={(img) => engine.runSearch('What do you see in this image? Describe it and tell me anything important.', img)}
             />
           </div>
         </section>

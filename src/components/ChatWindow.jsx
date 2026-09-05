@@ -268,6 +268,11 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
 
       </div>
 
+      {/* B226 FIX: the hidden image picker PHOTO clicks — fileRef existed
+          since B193 but the input element itself was never rendered, so the
+          PHOTO action clicked null and silently did nothing. */}
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+
       {/* Image attachment preview */}
       {image && (
         <div className="relative inline-block mb-2 flex-shrink-0">

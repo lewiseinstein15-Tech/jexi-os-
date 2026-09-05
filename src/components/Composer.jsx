@@ -39,6 +39,13 @@ function Composer({ isProcessing, onSendText, onStop }) {
   const recRef = useRef(null);
   const baseTextRef = useRef(''); // draft when listening started
 
+  const autosize = useCallback(() => {
+    const el = taRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(120, el.scrollHeight)}px`;
+  }, []);
+
   const stopMic = useCallback(() => {
     try { recRef.current && recRef.current.stop(); } catch { /* already stopped */ }
     setListening(false);
@@ -82,12 +89,6 @@ function Composer({ isProcessing, onSendText, onStop }) {
   // never leave a recognizer running after unmount
   useEffect(() => () => { try { recRef.current && recRef.current.stop(); } catch { /* gone */ } }, []);
 
-  const autosize = useCallback(() => {
-    const el = taRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(120, el.scrollHeight)}px`;
-  }, []);
 
   // fire the queued message the moment she finishes
   useEffect(() => {
