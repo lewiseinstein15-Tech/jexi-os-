@@ -2,6 +2,7 @@
  * JEXI OS — test suite for the computer runtime abstraction (roadmap stage 18).
  */
 import { computerStatus, providerCapabilities, runtimeCall } from './src/services/ComputerRuntime.js';
+import { androidAdbPath } from './src/services/AndroidRuntime.js'; // B225 — the honest configured-flag check
 
 let passed = 0;
 let failed = 0;
@@ -28,7 +29,7 @@ ok(['local', 'remote', 'docker', 'android', 'mock'].includes(st.provider), 'acti
 ok(st.providers.length === 5, 'all five providers reported');
 const androidRow = st.providers.find((p) => p.name === 'android');
 ok(!!androidRow, 'android is listed in the provider status');
-ok(androidRow.configured === !!process.env.ANDROID_ADB, 'android configured flag mirrors real adb presence (honest)');
+ok(androidRow.configured === (androidAdbPath() !== null), 'android configured flag mirrors real adb presence (honest — whatever the host actually has)');
 
 
 console.log('\n== Mock runtime (deterministic) ==');
