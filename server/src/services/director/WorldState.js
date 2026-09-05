@@ -78,6 +78,7 @@ export class WorldState {
       at: now(), command: String(command || '').slice(0, 200),
       ok: Boolean(ok), exitCode: exitCode ?? null, ms: ms ?? null,
       timedOut: Boolean(timedOut), blocked: Boolean(blocked), reason: reason ? String(reason).slice(0, 120) : undefined,
+      epistemic: 'KNOWN', how: 'observed', // Phase B: this is an execution observation, never an inference
     }, 60);
     if (Array.isArray(workspaceFiles)) {
       const seen = new Map((this.state.files || []).map((f) => [f.path, f]));
@@ -94,6 +95,7 @@ export class WorldState {
       ...(this.state.browser || {}),
       updatedAt: now(),
       available: Boolean(available),
+      epistemic: 'KNOWN', how: 'observed', // Phase B: even unavailability is OBSERVED, not guessed
       ...(url !== undefined ? { lastUrl: String(url || '').slice(0, 300) } : {}),
       ...(title !== undefined ? { lastTitle: String(title || '').slice(0, 200) } : {}),
       ...(action !== undefined ? { lastAction: String(action || '').slice(0, 120) } : {}),
@@ -109,6 +111,7 @@ export class WorldState {
     pushBounded(this.state.repos, {
       at: now(), repo: String(repo || ''), slug: String(slug || ''),
       url: String(url || '').slice(0, 300), live: Boolean(live),
+      epistemic: 'KNOWN', how: 'observed', // Phase B
     }, 40);
     this._persist();
     return this.state;
@@ -116,7 +119,7 @@ export class WorldState {
 
   /** The observed outcome of a real network operation (publish/search). */
   recordNetwork({ ok, detail }) {
-    this.state.network = { at: now(), ok: Boolean(ok), ...(detail ? { detail: String(detail).slice(0, 160) } : {}) };
+    this.state.network = { at: now(), ok: Boolean(ok), ...(detail ? { detail: String(detail).slice(0, 160) } : {}), epistemic: 'KNOWN', how: 'observed' };
     this._persist();
     return this.state;
   }

@@ -38,6 +38,7 @@ const { acceptanceGates, claimsBrowserMethod, executionEvidence } = await import
 const { recordLesson, retrieveLessons, formatLessonsBlock } = await import('../../src/services/director/Lessons.js');
 const { WorldState } = await import('../../src/services/director/WorldState.js');
 const { dependencyWaves } = await import('../../src/services/director/Director.js');
+const Epistemics = await import('../../src/services/director/Epistemics.js');
 
 /* ── scoring ───────────────────────────────────────────────────────────── */
 const axes = {};
@@ -173,6 +174,36 @@ axis('epistemic', (check) => {
 
   const so = structureObjective({ refinedObjective: 'do the thing', understood: 'unclear request', ambiguity: 'high' }, 'do the thing');
   check('an underdetermined objective is structured WITHOUT invented requirements', (so.provenanceCounts.USER_STATED ?? 0) <= 1);
+
+  // ── Phase B: the epistemic claim algebra (director/Epistemics.js) ──
+  const { makeClaim, mergeClaims, upgradeClaim } = Epistemics;
+
+  // Repetition is not evidence: an inference never becomes KNOWN.
+  let c = makeClaim({ key: 'deploy.status', value: 'live', source: 'INFERRED', confidence: 0.9 });
+  for (let i = 0; i < 10; i++) c = mergeClaims(c, makeClaim({ key: 'deploy.status', value: 'live', source: 'INFERRED', confidence: 0.99 }));
+  check('an inference stays LIKELY no matter how often it is re-inferred', c.epistemic === 'LIKELY');
+
+  // Only observation or verification promotes to KNOWN.
+  const observed = upgradeClaim(makeClaim({ key: 'build', value: 'pass', source: 'PREDICTED' }), { source: 'OBSERVED', evidence: 'exit 0 + dist present' });
+  check('observation promotes a prediction to KNOWN', observed.ok && observed.claim.epistemic === 'KNOWN');
+  const notObserved = upgradeClaim(makeClaim({ key: 'build', value: 'pass', source: 'PREDICTED' }), { source: 'INFERRED', evidence: 'feels right' });
+  check('a prediction WITHOUT observation stays a prediction', !notObserved.ok && notObserved.claim.prediction === true);
+
+  // Contradictions surface instead of silently overwriting.
+  const contradicted = mergeClaims(
+    makeClaim({ key: 'site.up', value: true, source: 'OBSERVED', evidence: 'curl 200' }),
+    makeClaim({ key: 'site.up', value: false, source: 'OBSERVED', evidence: 'curl 502' }),
+  );
+  check('conflicting observations become CONTRADICTED (both kept)', contradicted.epistemic === 'CONTRADICTED' && contradicted.conflict.length === 2);
+
+  // And weaker evidence never overwrites stronger evidence.
+  const kept = mergeClaims(makeClaim({ key: 'port', value: 3002, source: 'OBSERVED' }), makeClaim({ key: 'port', value: 8080, source: 'INFERRED' }));
+  check('an inference cannot overwrite an observation', kept.value === 3002 && kept.epistemic === 'KNOWN');
+
+  // Wiring: real records carry honest states.
+  check('WorldState observations are stamped KNOWN/observed', (ws.recordCommand({ command: 'ls', ok: true, exitCode: 0 }), ws.state.processes.at(-1).epistemic === 'KNOWN' && ws.state.processes.at(-1).how === 'observed'));
+  const soEp = structureObjective({ refinedObjective: 'build it', assumptions: ['db is up'] }, 'build it');
+  check('structured objectives report epistemic states (assumptions UNCERTAIN, reconstruction at best LIKELY)', soEp.epistemics.assumptions === 'UNCERTAIN' && soEp.epistemics.outcome === 'LIKELY');
 });
 
 /* ═══ 6. ROBUSTNESS — exact persistence, precise resume ═══════════════ */
@@ -226,7 +257,12 @@ if (process.argv.includes('--record')) {
   } catch {
     content = `# AGI Benchmark — results over time\n\nScores are 0–1 per axis; overall is the mean. Run \`node tests/agi/benchmark.js --record\` (from \`server/\`) after every phase.\n\n| Date | ${names.join(' | ')} | Overall |\n|---|${names.map(() => '---').join('|')}|---|\n`;
   }
-  fs.writeFileSync(file, content.trimEnd() + '\n' + row + '\n');
+  // one row per date: re-running the same day replaces that day's row
+  const lines = content.trimEnd().split('\n');
+  const dateIdx = lines.findIndex((l) => l.startsWith(`| ${date} |`));
+  if (dateIdx >= 0) lines[dateIdx] = row;
+  else lines.push(row);
+  fs.writeFileSync(file, lines.join('\n') + '\n');
   console.log(`\nrecorded → docs/AGI_BENCHMARK.md`);
 }
 

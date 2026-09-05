@@ -808,7 +808,7 @@ Output ONLY JSON: {"affectedItemIds":["wi-..."],"newItems":[{"title":"...","deta
       verifierEmployee: verifier, llm: (a) => this.llm.verify(a), mailbox: new TaskMailbox(mission.id),
       hooks: { onEvent: (e) => this._publish(mission, { type: e.type, summary: e.summary, severity: e.severity, data: { ...e.data, agentId: e.agentId, agentName: e.agentName } }) },
     });
-    mission.verification = { verdict: verification.verdict, score: verification.score, problems: verification.problems || [], rationale: verification.rationale || '' };
+    mission.verification = { verdict: verification.verdict, score: verification.score, problems: verification.problems || [], rationale: verification.rationale || '', epistemic: 'KNOWN', how: 'verified' };
     mission._persist();
     this._publish(mission, {
       type: 'MISSION_VERIFIED', severity: verification.verdict === 'fail' ? 'warn' : 'info',

@@ -88,7 +88,7 @@ unifies them; it does not rewrite them.
 | 20 | Safety/permissions/audit | **TESTED** — profiles auto/ask/full × safe/medium/risky; RiskGuard; outbound sends pause for ONE approval; every call/result in EventLog; rate limits | `test-b52.js`, `test-security-hardening.js` |
 | 21 | Human-in-the-loop (ask only when needed) | **TESTED** — the gate fires only on unresolvable-and-risky; CRITICAL objectives wait for approval; otherwise autonomous | `test-b211b2.js` I/J |
 | 22 | AGI evaluation system | **PARTIAL** — static 10-dimension audit (GENERAL_INTELLIGENCE_AUDIT.md) + pass/fail suites; **no scored, tracked benchmark** → built in this phase (§8) | this doc + `tests/agi/benchmark.js` |
-| 23 | UNKNOWN / epistemic states | **PARTIAL** — provenance tags USER_STATED/INFERRED/ASSUMED/UNKNOWN (B215); honest degradation everywhere; no CONTRADICTED state, no confidence scores | `test-b215.js` |
+| 23 | UNKNOWN / epistemic states | **DONE (Phase B)** — full vocabulary KNOWN/LIKELY/UNCERTAIN/UNKNOWN/CONTRADICTED with confidence, claim algebra with hard promotion rules (`director/Epistemics.js`); adopted by ObjectiveInterpreter, WorldState, MissionRunner | `tests/agi/test-epistemics.js` + benchmark epistemic axis |
 | 24 | Real-event streaming UI | **TESTED** — SSE push (B224) replays/pushes real server events; the frontend invents nothing (row 30 of the matrix) | `test-b224.js` |
 | 25 | Personality preserved | **TESTED** — identity prompt + warm/direct tone, honesty about limits | `test-identity.js` |
 
@@ -213,11 +213,18 @@ efficiency) as the phases land.
 
 ## 9. Implementation roadmap (phases, each ends chain-green + committed)
 
-- **PHASE A (this change)** — audit doc (this file) + the scored benchmark
-  harness + baseline results committed.
-- **PHASE B — Epistemic spine**: the KNOWN/LIKELY/UNCERTAIN/UNKNOWN/
-  CONTRADICTED vocabulary module + confidence scores, adopted by
-  ObjectiveInterpreter, Lessons, and discovery gaps. (Small, foundational.)
+- **PHASE A (done 2026-09-05)** — audit doc (this file) + the scored benchmark
+  harness + baseline results committed (all axes 1.00, overall 1.000).
+- **PHASE B (done 2026-09-05) — Epistemic spine**: `director/Epistemics.js` —
+  the KNOWN/LIKELY/UNCERTAIN/UNKNOWN/CONTRADICTED vocabulary + claim algebra
+  (repetition never promotes an inference; only observation/verification
+  reaches KNOWN; predictions stay predictions until reality is checked;
+  conflicting observations become CONTRADICTED, both sides kept; weaker
+  evidence never overwrites stronger). Adopted by ObjectiveInterpreter
+  (epistemics block on every structured objective), WorldState (every
+  observation stamped KNOWN/observed, including honest unavailability),
+  MissionRunner (verdicts stamped KNOWN/verified). Tests:
+  `tests/agi/test-epistemics.js` (14); benchmark epistemic axis now 12 checks.
 - **PHASE C — World Model v2**: global entity/relationship store (people,
   projects, files, APIs, tools, goals, events, uncertainty) with real-action
   updates and environment learning (X failed twice → represented as

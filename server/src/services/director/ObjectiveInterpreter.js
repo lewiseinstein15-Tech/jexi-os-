@@ -87,8 +87,8 @@ export function structureObjective(refinement, rawUserMessage) {
     ],
   };
 
-  const assumptions = asStrings(r.assumptions).map((text) => ({ text, provenance: 'ASSUMED' }));
-  const unknowns = asStrings(r.unknowns).map((text) => ({ text, provenance: 'UNKNOWN' }));
+  const assumptions = asStrings(r.assumptions).map((text) => ({ text, provenance: 'ASSUMED', epistemic: 'UNCERTAIN' }));
+  const unknowns = asStrings(r.unknowns).map((text) => ({ text, provenance: 'UNKNOWN', epistemic: 'UNKNOWN' }));
 
   // desiredOutcome: the lane's own words when provided; else the refined
   // objective IS the interpreted outcome (tagged INFERRED, never USER_STATED
@@ -136,6 +136,16 @@ export function structureObjective(refinement, rawUserMessage) {
       INFERRED: requirements.inferred.length,
       ASSUMED: assumptions.length,
       UNKNOWN: unknowns.length,
+    },
+    epistemics: {
+      // Phase B: the same objective, stated in terms of how well it is known.
+      // Inferences stay LIKELY until observed or verified — repetition of an
+      // inference NEVER promotes it (see director/Epistemics.js hard rules).
+      outcome: desiredOutcome.provenance === 'USER_STATED' || desiredOutcome.provenance === 'OBSERVED'
+        ? 'KNOWN'
+        : desiredOutcome.provenance === 'UNKNOWN' ? 'UNKNOWN' : 'LIKELY',
+      assumptions: assumptions.length ? 'UNCERTAIN' : null,
+      unknowns: unknowns.length ? 'UNKNOWN' : null,
     },
     laneProvided: provided, // honesty: which B215 fields the lane itself returned vs derived
   };
