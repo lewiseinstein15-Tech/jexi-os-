@@ -1,0 +1,22 @@
+{
+  "name": "deploy-then-verify",
+  "version": 1,
+  "status": "validated",
+  "description": "Deploy a service and PROVE it works by requesting the live health endpoint — exit code 0 is never accepted as success on its own.",
+  "requirements": ["a deployed HTTP service with a health endpoint", "network access to the live URL"],
+  "procedure": [
+    "run the deploy command and capture the real exit code",
+    "request the live health URL (curl -fsS) and record the HTTP status + body",
+    "if the request fails or returns a non-200, treat the deploy as FAILED even when the command exited 0",
+    "record the verified live URL and verification evidence in the world model"
+  ],
+  "tools": ["native:code-run", "native:deep-read"],
+  "examples": [
+    { "situation": "npm deploy exits 0 but site returns 502", "outcome": "skill reports FAILED with the 502 evidence" }
+  ],
+  "failureModes": [
+    "health endpoint exists but checks nothing real (false confidence)",
+    "verifying a staging URL instead of production"
+  ],
+  "verification": "a real HTTP request to the live URL returning the expected status — evidence recorded, never assumed"
+}

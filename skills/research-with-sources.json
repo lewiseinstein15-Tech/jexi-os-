@@ -1,0 +1,22 @@
+{
+  "name": "research-with-sources",
+  "version": 1,
+  "status": "validated",
+  "description": "Answer research questions with real sources: search, read the actual pages, and cite what was actually read — never synthesize from memory alone.",
+  "requirements": ["web search available", "ability to open URLs server-side"],
+  "procedure": [
+    "search multiple engines and keep the top trusted results",
+    "open the most promising 2-3 URLs and extract their real content",
+    "ground every claim in the extracted text; drop any claim no source supports",
+    "list the sources actually read in the answer"
+  ],
+  "tools": ["native:web-search", "native:deep-read"],
+  "examples": [
+    { "situation": "user asks for current best practices for SQLite backups", "outcome": "answer cites the pages actually opened" }
+  ],
+  "failureModes": [
+    "citing a URL that was never opened",
+    "summarizing the search snippet instead of the page"
+  ],
+  "verification": "every cited URL appears in the tool-call record as actually fetched"
+}
