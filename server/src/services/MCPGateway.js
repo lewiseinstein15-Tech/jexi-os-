@@ -25,6 +25,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 
 const DEFAULT_REGISTRY_PATH = () => new URL('../../../mcp/registry.json', import.meta.url).pathname;
 const STATE_FILE = () => path.join(process.env.DATA_DIR || './data', 'mcp-registry-state.json');
@@ -220,6 +221,16 @@ export async function connectEnabledMcpServers() {
   for (const s of reg.servers) {
     if (!s.enabled) continue;
     if (connections.has(s.name)) continue; // already up (e.g. retry pass)
+    // Memory guard: each connected MCP server is a child node process
+    // (~40-90MB). On a small host (Render free tier = 512MB total) connecting
+    // all of them starves the brain itself and the container gets recycled —
+    // observed live as servers climbing to 4/5 then the whole brain resetting.
+    // Stop before that: leave headroom, let the rest wake on first use.
+    const freeMb = Math.round(os.freemem() / 1048576);
+    if (out.length > 0 && freeMb < 200) {
+      out.push({ server: s.name, ok: true, skipped: true, note: `memory guard: ${freeMb}MB free — stays ready, wakes on first use` });
+      continue;
+    }
     const r = await connectGatewayServer(s.name);
     out.push({ server: s.name, ok: r.ok === true, tools: r.tools || 0, ...(r.ok ? {} : { error: r.error }) });
   }

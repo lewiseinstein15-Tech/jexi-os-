@@ -2464,7 +2464,9 @@ app.listen(PORT, '0.0.0.0', () => {
   const mcpBoot = setTimeout(() => {
     connectEnabledMcpServers()
       .then((rows) => {
-        console.log(`[MCP] boot connect pass 1: ${rows.filter((r) => r.ok).length}/${rows.length} up`);
+        const up = rows.filter((r) => r.ok && !r.skipped).length;
+        const guarded = rows.filter((r) => r.skipped).length;
+        console.log(`[MCP] boot connect pass 1: ${up}/${rows.length} up${guarded ? `, ${guarded} left ready (memory guard)` : ''}`);
         const missed = rows.filter((r) => !r.ok);
         if (missed.length) {
           setTimeout(() => {
