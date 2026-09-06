@@ -413,7 +413,7 @@
     "NETWORK",
     "EXECUTION"
    ],
-   "notes": "Same browser-binary requirement. Reviewed + live-tested Sept 2026. Needs a browser with system deps on the host. Connect+list verified here; navigation needs the host browser."
+   "notes": "Same browser-binary requirement. Reviewed + live-tested Sept 2026. Needs a browser with system deps on the host. Connect+list verified here; navigation needs the host browser. We WILL find a way to give these a browser — see docs/BROWSER-PLAN.md (free hosted browser / full image on a 2GB machine / plan upgrade / phone-browser idea)."
   },
   {
    "name": "mcpqueen",
@@ -489,7 +489,7 @@
     "NETWORK",
     "EXECUTION"
    ],
-   "notes": "Needs browser binaries on the host; wakes with an honest error where none exist (JEXI's native browser covers that). Needs a browser with system deps on the host. Connect+list verified here; full navigation needs the host browser. JEXI native browser control covers browsing where this cannot run."
+   "notes": "Needs browser binaries on the host; wakes with an honest error where none exist (JEXI's native browser covers that). Needs a browser with system deps on the host. Connect+list verified here; full navigation needs the host browser. JEXI native browser control covers browsing where this cannot run. We WILL find a way to give these a browser — see docs/BROWSER-PLAN.md (free hosted browser / full image on a 2GB machine / plan upgrade / phone-browser idea)."
   },
   {
    "name": "chrome-devtools",
@@ -508,7 +508,7 @@
     "NETWORK",
     "EXECUTION"
    ],
-   "notes": "Needs Chrome on the host; honest error where absent. Needs Chrome at the host default path. Connect+list verified here; page tools need Chrome on the host."
+   "notes": "Needs Chrome on the host; honest error where absent. Needs Chrome at the host default path. Connect+list verified here; page tools need Chrome on the host. We WILL find a way to give these a browser — see docs/BROWSER-PLAN.md (free hosted browser / full image on a 2GB machine / plan upgrade / phone-browser idea)."
   },
   {
    "name": "duckduckgo",
