@@ -246,6 +246,14 @@ export async function connectGatewayServer(name, { registryPath } = {}) {
 export async function connectEnabledMcpServers() {
   const reg = effectiveRegistry();
   const out = [];
+  // SMALL-HOST MODE (Render free tier, Sept 2026): with ~512MB total, the app
+  // itself + even 3 boot-connected stdio children leave <100MB free — the
+  // npx startup spike (~100-150MB) then OOM-kills the whole brain on the
+  // first lazy connect (observed live as 502 recycles). On such hosts connect
+  // NOTHING stdio at boot: every server wakes on first use (lazy, warm cache
+  // from the image prewarm) and sleeps again via the idle sweeper.
+  const totalMb = Math.round(os.totalmem() / 1048576);
+  const smallHost = totalMb < 768;
   for (const s of reg.servers) {
     if (!s.enabled) continue;
     if (connections.has(s.name)) continue; // already up (e.g. retry pass)
@@ -255,10 +263,12 @@ export async function connectEnabledMcpServers() {
       out.push({ server: s.name, ok: r.ok === true, tools: r.tools || 0, ...(r.ok ? {} : { error: r.error }) });
       continue;
     }
+    if (smallHost) {
+      out.push({ server: s.name, ok: true, skipped: true, note: `small host (${totalMb}MB) — lazy only, wakes on first use` });
+      continue;
+    }
     // Memory guard: each connected local MCP server is a child process
-    // (~40-90MB). On a small host (Render free tier = 512MB total) connecting
-    // all of them starves the brain itself — observed live as container
-    // recycling. Stop before that: leave headroom, the rest wake on first use.
+    // (~40-90MB). Stop before starving the brain; the rest wake on first use.
     const freeMb = Math.round(os.freemem() / 1048576);
     if (out.filter((o) => o.ok && !o.skipped && !o.hosted).length > 0 && freeMb < 300) {
       out.push({ server: s.name, ok: true, skipped: true, note: `memory guard: ${freeMb}MB free — sleeps, wakes on first use` });
@@ -291,7 +301,8 @@ export async function disconnectGatewayServer(name) {
  * servers hold no child and are never swept. JEXI_MCP_IDLE_MINUTES=0 disables.
  */
 export function startIdleSweeper() {
-  const minutes = Number(process.env.JEXI_MCP_IDLE_MINUTES ?? 10);
+  const smallHost = os.totalmem() < 768 * 1048576;
+  const minutes = Number(process.env.JEXI_MCP_IDLE_MINUTES ?? (smallHost ? 5 : 10));
   if (!(minutes > 0)) return { started: false, reason: `JEXI_MCP_IDLE_MINUTES=${minutes} — idle sweep disabled` };
   const interval = setInterval(() => { sweepIdleServers(minutes); }, 60_000);
   if (typeof interval.unref === 'function') interval.unref();
