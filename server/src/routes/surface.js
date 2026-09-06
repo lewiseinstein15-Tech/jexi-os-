@@ -20,6 +20,8 @@ import { hostStatus, gatewayStatus } from '../services/HostStatus.js';
 import { sessionPersistenceStatus } from '../services/SessionPersistenceSqlite.js';
 import { hookBridgeStatus } from '../services/HookBridges.js';
 import { mcpServerStatus } from '../services/McpClient.js';
+import { architectureSnapshot } from '../services/ArchitectureViews.js';
+import { listRuns, getRun } from '../services/TaskGraph.js';
 import { typertRegistryStatus } from '../services/TypingGenerator.js';
 import { localeStatus } from '../services/Locale.js';
 import { hmrStatus } from '../services/ClientHmr.js';
@@ -158,6 +160,15 @@ export function mountSurface(app, ctx = {}) {
   app.get('/api/session-persistence', (req, res) => jsonOk(res, { ok: true, ...sessionPersistenceStatus() }));
   app.get('/api/hooks/bridges', (req, res) => jsonOk(res, { ok: true, ...hookBridgeStatus() }));
   app.get('/api/mcp/servers', (req, res) => jsonOk(res, { ok: true, ...mcpServerStatus() }));
+  /* Ultimate Architecture Upgrade — observability (§20). Read-only views that
+     feed the existing chat/Workshop surfaces. No new UI buttons (Lewis's rule). */
+  app.get('/api/architecture', (req, res) => jsonOk(res, { ok: true, ...architectureSnapshot() }));
+  app.get('/api/architecture/runs', (req, res) => jsonOk(res, { ok: true, runs: listRuns() }));
+  app.get('/api/architecture/runs/:id', (req, res) => {
+    const run = getRun(req.params.id);
+    if (!run) return jsonErr(res, 404, `run '${req.params.id}' not found`);
+    jsonOk(res, { ok: true, run });
+  });
   app.get('/api/typert/registry', (req, res) => jsonOk(res, { ok: true, ...typertRegistryStatus() }));
   app.get('/api/remotes', (req, res) => jsonOk(res, { ok: true, ...remoteAgentsStatus(), remotes: listRemoteAgents() }));
   app.get('/api/tmux', (req, res) => jsonOk(res, { ok: true, ...tmuxStatus() }));

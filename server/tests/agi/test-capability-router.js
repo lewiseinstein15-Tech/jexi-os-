@@ -168,3 +168,11 @@ test('every intent capability exists in CAPABILITY_SERVERS or is intentionally n
     }
   }
 });
+
+/* ═══ cleanup: the live weather test leaves a stdio connection open — close
+   its transport so node --test can exit (a lingering child would hang the
+   whole `npm test` chain after the results print). ════════════════════════ */
+test('cleanup: gateway connections closed', async () => {
+  const { disconnectGatewayServer } = await import('../../src/services/MCPGateway.js');
+  await disconnectGatewayServer('weather');
+});

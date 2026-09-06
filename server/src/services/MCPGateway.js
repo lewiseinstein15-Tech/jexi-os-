@@ -188,9 +188,10 @@ async function defaultConnector(entry) {
   const { WORKSPACE_DIR } = await import('../config.js');
 
   let client;
+  let transport; // hoisted so the returned wrapper can expose it (tree-kill on disconnect)
   if (entry.transport === 'streamable-http') {
     const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
-    const transport = new StreamableHTTPClientTransport(new URL(entry.url), {
+    transport = new StreamableHTTPClientTransport(new URL(entry.url), {
       requestInit: { headers: { ...(entry.headers || {}) } },
     });
     client = new Client({ name: 'jexi-mcp-gateway', version: '1.0.0' }, { capabilities: {} });
@@ -224,7 +225,7 @@ async function defaultConnector(entry) {
       }
     } catch { /* best effort — server reports honestly if still broken */ }
     // sqlite path placeholder → make sure the parent dir exists (empty file = server opens/creates it)
-    const transport = new StdioClientTransport({
+    transport = new StdioClientTransport({
       command: entry.command,
       args,
       env: { ...process.env, ...(entry.env || {}) }, // npx needs PATH/HOME; registry env overrides win
@@ -260,6 +261,9 @@ async function defaultConnector(entry) {
       return res;
     },
     close: async () => { try { await client.close(); } catch { /* already gone */ } },
+    // expose the transport so disconnect can kill the process TREE (the SDK
+    // kills only its direct child; npx/uvx wrap the real server deeper)
+    __transport: transport,
   };
 }
 
@@ -307,7 +311,10 @@ async function connectGatewayServerInner(name, { registryPath } = {}) {
       annotations: t.annotations || null, // UNTRUSTED hints (spec guidance)
     }));
     connectState.set(name, { lastConnectAt: new Date().toISOString(), lastConnectError: null });
-    connections.set(name, { tools, __client: typeof conn.callTool === 'function' ? conn : null, grants: entry.permissions, serverName: name, connectedAt: new Date().toISOString(), lastError: null, lastSuccessAt: null, calls: 0, failures: 0 });
+    // keep the transport handle: disconnect must close the TRANSPORT or the
+    // stdio child survives client.close() and holds the event loop open.
+    const transport = (conn && (conn.transport || conn.__transport || conn._transport)) || null;
+    connections.set(name, { tools, __client: typeof conn.callTool === 'function' ? conn : null, __transport: transport, grants: entry.permissions, serverName: name, connectedAt: new Date().toISOString(), lastError: null, lastSuccessAt: null, calls: 0, failures: 0 });
     audit({ type: 'MCP_CONNECTED', server: name, tools: tools.length });
     return { ok: true, server: name, tools: tools.length };
   } catch (e) {
@@ -376,13 +383,72 @@ export async function connectEnabledMcpServers() {
 }
 
 /** Close a live connection (kills the stdio child process). Server stays enabled unless disabled too. */
+/**
+ * Kill an entire process TREE (Linux). `npx -y pkg` spawns npm → node as a
+ * GRANDCHILD: killing only the direct child orphans the real server, which
+ * keeps its pipe open — the parent's event loop then never drains (and on the
+ * 512MB brain the orphan eats memory). Walk /proc, collect descendants, kill
+ * leaves-first. Best-effort: missing /proc entries just drop out.
+ */
+export function killProcessTree(rootPid, signal = 'SIGKILL') {
+  if (!rootPid || typeof rootPid !== 'number') return { killed: 0 };
+  try {
+    const pids = fs.readdirSync('/proc').filter((d) => /^\d+$/.test(d)).map(Number);
+    const byPpid = new Map();
+    for (const pid of pids) {
+      try {
+        const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+        // comm may contain spaces/parens — ppid is the field after the last ')'
+        const after = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+        const ppid = Number(after[1]);
+        if (Number.isFinite(ppid)) {
+          if (!byPpid.has(ppid)) byPpid.set(ppid, []);
+          byPpid.get(ppid).push(pid);
+        }
+      } catch { /* process gone */ }
+    }
+    const toKill = [];
+    const stack = [rootPid];
+    while (stack.length) {
+      const cur = stack.pop();
+      for (const kid of byPpid.get(cur) || []) { toKill.push(kid); stack.push(kid); }
+    }
+    for (const pid of toKill.reverse()) {
+      try { process.kill(pid, signal); } catch { /* already gone */ }
+    }
+    try { process.kill(rootPid, signal); } catch { /* already gone */ }
+    return { killed: toKill.length + 1 };
+  } catch {
+    return { killed: 0, reason: 'process tree walk failed (non-Linux?)' };
+  }
+}
+
 export async function disconnectGatewayServer(name) {
   const conn = connections.get(name);
   if (!conn) return { ok: true, already: true };
   connections.delete(name);
+  // grab the child BEFORE closing: the SDK's close() nulls its _process ref,
+  // and it never destroys the parent-side stdin/stdout/stderr pipes — those
+  // lingering PipeWraps keep Node's event loop (and node --test) alive.
+  const child = conn.__transport && conn.__transport._process ? conn.__transport._process : null;
+  const childPid = child && typeof child.pid === 'number' ? child.pid : null;
+  // KILL THE TREE FIRST: once the SDK's close() kills the direct npx/uvx
+  // child, the REAL server (a grandchild) is re-parented to init and the
+  // /proc tree walk can no longer find it. Kill while the tree is intact.
+  if (childPid) killProcessTree(childPid);
   try {
     if (conn.__client && typeof conn.__client.close === 'function') await conn.__client.close();
   } catch { /* closing a dead process is fine */ }
+  // client.close() alone does NOT kill a stdio child — close the TRANSPORT
+  // too, or the orphaned child keeps this process's event loop alive.
+  try {
+    if (conn.__transport && typeof conn.__transport.close === 'function') await conn.__transport.close();
+  } catch { /* already gone */ }
+  if (child) {
+    for (const stream of [child.stdin, child.stdout, child.stderr]) {
+      try { if (stream && typeof stream.destroy === 'function') stream.destroy(); } catch { /* already gone */ }
+    }
+  }
   audit({ type: 'MCP_DISCONNECTED', server: name });
   return { ok: true, disconnected: name };
 }
