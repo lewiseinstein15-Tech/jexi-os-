@@ -23,6 +23,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+# Pre-warm the npx/uvx MCP package caches: the first connect on Render must
+# never pay the cold PyPI/npm download (it can exceed the 60s connect window).
+COPY mcp/registry.json ./mcp/registry.json
+COPY server/scripts/mcp-prewarm.mjs ./server/scripts/mcp-prewarm.mjs
+RUN cd server && node scripts/mcp-prewarm.mjs 90
+
 # Backend dependencies (NO playwright browser download in the slim image)
 COPY server/package*.json ./server/
 RUN cd server && npm ci --no-audit --no-fund
