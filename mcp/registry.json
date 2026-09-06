@@ -532,7 +532,7 @@
    "command": "npx",
    "args": [
     "-y",
-    "@dangahagan/weather-mcp@latest"
+    "@dangahagan/weather-mcp@1.28.0"
    ],
    "enabled": true,
    "trustLevel": "curated",
