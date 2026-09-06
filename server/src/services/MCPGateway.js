@@ -195,7 +195,7 @@ async function defaultConnector(entry) {
     });
     client = new Client({ name: 'jexi-mcp-gateway', version: '1.0.0' }, { capabilities: {} });
     try {
-      await withTimeout(client.connect(transport), 90_000, 'connect timed out');
+      await withTimeout(client.connect(transport, { timeout: 150_000 }), 160_000, 'connect timed out');
     } catch (e) {
       try { await transport.close(); } catch { /* already gone */ }
       try { await client.close(); } catch { /* already gone */ }
@@ -226,7 +226,10 @@ async function defaultConnector(entry) {
     });
     client = new Client({ name: 'jexi-mcp-gateway', version: '1.0.0' }, { capabilities: {} });
     try {
-      await withTimeout(client.connect(transport), 90_000, 'connect timed out'); // npx cold download is slow
+      // 150s initialize budget: heavy servers (weather-mcp's TS bundle) can
+      // take over a minute to boot on a throttled 0.1-CPU free instance —
+      // the SDK's default 60s request timeout cut them off mid-boot.
+      await withTimeout(client.connect(transport, { timeout: 150_000 }), 160_000, 'connect timed out');
     } catch (e) {
       // LEAK FIX (Render, Sept 2026): a failed/timed-out connect must KILL the
       // stdio child. Otherwise every npx/uvx attempt that dies mid-install
