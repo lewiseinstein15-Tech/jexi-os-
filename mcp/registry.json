@@ -525,7 +525,7 @@
    "permissions": [
     "READ_ONLY"
    ],
-   "notes": "No key, no signup (MIT, nickclyde/duckduckgo-mcp-server). Ships the curl-cffi browser-fingerprint backend (small lib, NOT a browser) so datacenter IPs like the brain's don't get bot-blocked — the server auto-falls back to it. Rate-limited ~30 searches/min."
+   "notes": "No key, no signup (MIT, nickclyde/duckduckgo-mcp-server). Ships the curl-cffi browser-fingerprint backend (small lib, NOT a browser). VERIFIED LIVE: works from normal IPs; hard-blocked from datacenter IPs like the brain's Render host even with the backend (auto mode returns empty, forced mode times out — tested Sept 2026). On the brain, live web search rides free-search (Wikipedia/StackExchange engines, proven) + wikipedia/arxiv/rss/hackernews instead."
   },
   {
    "name": "weather",
