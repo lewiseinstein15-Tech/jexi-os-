@@ -122,6 +122,42 @@ function audit(entry) {
   } catch { /* never fatal */ }
 }
 
+/* Cgroup-aware memory ceiling (Docker/Render): os.totalmem() reports the
+ * HOST's RAM inside a container, so a 512MB Render instance looks like the
+ * whole machine. Read the cgroup v2/v1 limit and take the smaller truth. */
+function hostMemoryLimitMb() {
+  let mb = os.totalmem() / 1048576;
+  try {
+    const v2 = Number(fs.readFileSync('/sys/fs/cgroup/memory.max', 'utf8').trim());
+    if (Number.isFinite(v2) && v2 > 0) mb = Math.min(mb, v2 / 1048576);
+  } catch { /* not cgroup v2 */ }
+  try {
+    const v1 = Number(fs.readFileSync('/sys/fs/cgroup/memory/memory.limit_in_bytes', 'utf8').trim());
+    if (Number.isFinite(v1) && v1 > 0 && v1 < 1e12) mb = Math.min(mb, v1 / 1048576);
+  } catch { /* not cgroup v1 */ }
+  return Math.round(mb);
+}
+
+/** Free memory, cgroup-aware: limit minus current usage when a cgroup limit
+ *  exists (os.freemem() reports host-wide free inside containers). */
+function hostFreeMemoryMb() {
+  try {
+    const cur = Number(fs.readFileSync('/sys/fs/cgroup/memory.current', 'utf8').trim());
+    const lim = Number(fs.readFileSync('/sys/fs/cgroup/memory.max', 'utf8').trim());
+    if (Number.isFinite(cur) && Number.isFinite(lim) && lim > 0 && lim < 1e12) return Math.round((lim - cur) / 1048576);
+  } catch { /* fall through */ }
+  try {
+    const lim = Number(fs.readFileSync('/sys/fs/cgroup/memory/memory.limit_in_bytes', 'utf8').trim());
+    if (Number.isFinite(lim) && lim > 0 && lim < 1e12) {
+      const usageFile = '/sys/fs/cgroup/memory/memory.usage_in_bytes';
+      let used = 0;
+      try { used = Number(fs.readFileSync(usageFile, 'utf8').trim()); } catch { used = 0; }
+      if (Number.isFinite(used)) return Math.round((lim - used) / 1048576);
+    }
+  } catch { /* fall through */ }
+  return Math.round(os.freemem() / 1048576);
+}
+
 /* ── connection + discovery + invocation ──────────────────────────────── */
 
 const connections = new Map(); // name → { tools: [{name, description, inputSchema}], connectedAt, lastError, lastSuccessAt, calls, failures }
@@ -252,7 +288,7 @@ export async function connectEnabledMcpServers() {
   // first lazy connect (observed live as 502 recycles). On such hosts connect
   // NOTHING stdio at boot: every server wakes on first use (lazy, warm cache
   // from the image prewarm) and sleeps again via the idle sweeper.
-  const totalMb = Math.round(os.totalmem() / 1048576);
+  const totalMb = hostMemoryLimitMb();
   const smallHost = totalMb < 768;
   for (const s of reg.servers) {
     if (!s.enabled) continue;
@@ -269,7 +305,7 @@ export async function connectEnabledMcpServers() {
     }
     // Memory guard: each connected local MCP server is a child process
     // (~40-90MB). Stop before starving the brain; the rest wake on first use.
-    const freeMb = Math.round(os.freemem() / 1048576);
+    const freeMb = hostFreeMemoryMb();
     if (out.filter((o) => o.ok && !o.skipped && !o.hosted).length > 0 && freeMb < 300) {
       out.push({ server: s.name, ok: true, skipped: true, note: `memory guard: ${freeMb}MB free — sleeps, wakes on first use` });
       continue;
@@ -301,7 +337,7 @@ export async function disconnectGatewayServer(name) {
  * servers hold no child and are never swept. JEXI_MCP_IDLE_MINUTES=0 disables.
  */
 export function startIdleSweeper() {
-  const smallHost = os.totalmem() < 768 * 1048576;
+  const smallHost = hostMemoryLimitMb() < 768;
   const minutes = Number(process.env.JEXI_MCP_IDLE_MINUTES ?? (smallHost ? 5 : 10));
   if (!(minutes > 0)) return { started: false, reason: `JEXI_MCP_IDLE_MINUTES=${minutes} — idle sweep disabled` };
   const interval = setInterval(() => { sweepIdleServers(minutes); }, 60_000);
