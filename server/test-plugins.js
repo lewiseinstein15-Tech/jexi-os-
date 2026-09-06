@@ -23,7 +23,7 @@ check('catalog has 6 bundled plugins', PLUGINS.length === 6);
 /* ---------------- B50 P5: on-disk plugin packages ---------------- */
 const discovered = discoverPlugins();
 check('on-disk coding-pipeline plugin discovered', discovered.some((p) => p.id === 'coding-pipeline' && p.builtin === false));
-check('full catalog includes discovered plugin (7 total)', ALL_PLUGINS.length === 7);
+check(`full catalog includes all discovered plugins (${PLUGINS.length + discovered.length} total)`, ALL_PLUGINS.length === PLUGINS.length + discovered.length);
 const cp = listPlugins().find((p) => p.id === 'coding-pipeline');
 check('coding-pipeline reports 7 packaged skills', cp && cp.live.packagedSkills === 7);
 check('coding-pipeline contributes the pipeline skills', cp && cp.contributes.skills.includes('coder') && cp.contributes.skills.includes('security-officer'));

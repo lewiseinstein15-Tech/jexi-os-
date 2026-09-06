@@ -16,6 +16,13 @@ import os from 'os';
 // Isolate stores FIRST (config reads env at import).
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'jexi-dshr-'));
 process.env.DATA_DIR = path.join(TMP, 'data');
+
+// DETERMINISTIC OFFLINE CLASSIFICATION: this is a routing/contract test.
+// A live key in the local sandbox .env would make _classifyLLM fire a REAL
+// model call inside analyzeIntent and the intent assertions would flake
+// (observed: "research how solar panels work" occasionally -> direct_answer).
+// Tests must never depend on a live provider — null every key BEFORE imports.
+for (const k of ['GROQ_API_KEY','GEMINI_API_KEY','OPENROUTER_API_KEY','XAI_API_KEY','OPENAI_API_KEY','MISTRAL_API_KEY','DEEPINFRA_API_KEY','DEEPSEEK_API_KEY','NVIDIA_API_KEY','SAMBANOVA_API_KEY','CEREBRAS_API_KEY','HF_TOKEN']) delete process.env[k];
 process.env.WORKSPACE_DIR = path.join(TMP, 'ws');
 
 let passed = 0, failedCount = 0;
