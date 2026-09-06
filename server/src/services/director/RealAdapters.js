@@ -57,7 +57,7 @@ export function realLlmAdapter() {
               .map(([k, v]) => `${k}${v.type === 'number' ? ':number' : ''}${Array.isArray(sc.function.parameters.required) && sc.function.parameters.required.includes(k) ? ' (required)' : ''}`)
               .join(', ');
             return `- ${name}${argSpec ? ` — args: ${argSpec}` : ''}`;
-          }).join('\n')}\nIf (and only if) a subtask needs this live data, give it "mcpCalls":[{"server":"<name>","tool":"<tool>","args":{...}}] (max 3). Only use services from the list above. Data from these services is REAL — prefer it over web search for its domain.`;
+          }).join('\n')}\nPrefer the SIMPLEST SINGLE call that answers the question (e.g. weather: get_weather_summary with city_name — NOT search_location plus a second call). If (and only if) a subtask needs this live data, give it "mcpCalls":[{"server":"<name>","tool":"<tool>","args":{...}}] (max 3). Only use services from the list above. Data from these services is REAL — prefer it over web search for its domain.`;
         }
       } catch { /* routing is additive — interpretation works without it */ }
       const user = [

@@ -221,11 +221,14 @@ export async function runEmployeeSession(p) {
       if (!server || !tool) continue;
       emit('TOOL_STARTED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Live data: ${server} · ${tool}` });
       try {
-        const r = await invokeMcpTool({ server, tool, args });
+        // 120s boot budget: the FIRST call on a cold server pays its startup
+        // (npx/uvx boot can exceed the default 30s on slow hosts) — the same
+        // discipline the gateway's connect budget uses.
+        const r = await invokeMcpTool({ server, tool, args, timeoutMs: 120_000 });
         if (r && r.ok) {
           const content = (r.result && Array.isArray(r.result.content)) ? r.result.content : [];
           const text = content.map((c) => c && c.text ? c.text : '').join('\n').trim() || JSON.stringify(r.result).slice(0, 12_000);
-          toolContext += `\n\n[live data from the "${server}" service — tool "${tool}", real result]\n${String(text).slice(0, 12_000)}`;
+          toolContext += `\n\n[live data from the "${server}" service — tool "${tool}", REAL result. Ground your deliverable in this data and cite the service. If the data you need is NOT in here, say exactly that — NEVER invent values, NEVER present "simulated" numbers, and NEVER promise that data will arrive later.]\n${String(text).slice(0, 12_000)}`;
           emit('TOOL_COMPLETED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Live data received from ${server} · ${tool}.` });
           mailbox.post(message({
             from: employee.agentId, to: 'jexi', taskId: task.id, subtaskId: subtask.id,

@@ -334,7 +334,7 @@ Output ONLY JSON:
             .map(([k, v]) => `${k}${v.type === 'number' ? ':number' : ''}${Array.isArray(sc.function.parameters.required) && sc.function.parameters.required.includes(k) ? ' (required)' : ''}`)
             .join(', ');
           return `- ${name}${argSpec ? ` \u2014 args: ${argSpec}` : ''}`;
-        }).join('\n')}\nData from these services is REAL \u2014 prefer it over web search for its domain.`;
+        }).join('\n')}\nPrefer the simplest single call that answers the need (e.g. weather: get_weather_summary with city_name).\nData from these services is REAL \u2014 prefer it over web search for its domain.`;
       }
     } catch { /* routing is additive */ }
 const user = [

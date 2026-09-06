@@ -45,7 +45,14 @@ test('assembleBrief carries the interpreter-routed mcpCalls (capped at 3)', () =
 
 /* ═══ live data phase — real weather call, grounded prompt ═════════════════ */
 
-test('a routed mcpCall runs for REAL and lands in the employee context', { timeout: 120_000 }, async () => {
+test('a routed mcpCall runs for REAL and lands in the employee context', { timeout: 240_000 }, async () => {
+  // pre-warm: on a cold CI runner the weather server's npx boot can take
+  // over a minute — connect it through the gateway's 150s boot budget first
+  // so the session's own call is warm (mirrors what the prewarm step does in
+  // production images).
+  const { connectGatewayServer } = await import('../../src/services/MCPGateway.js');
+  const warm = await connectGatewayServer('weather');
+  assert.ok(warm.ok, `weather pre-warm failed: ${warm.error}`);
   const task = new DirectorTask({ conversationId: 'c2', rawQuery: 'weather in Kericho', objective: 'weather in Kericho', successCriteria: [] });
   const subtask = {
     id: 'st1', title: 'Fetch current weather for Kericho', capability: 'research', searchQueries: [],
