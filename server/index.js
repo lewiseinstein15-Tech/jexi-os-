@@ -74,7 +74,7 @@ import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications } from './src/services/NotificationCenter.js';
 import { modelRoutingTable, providerPreferenceForIntent } from './src/services/ModelRouting.js';
 import { MCP_PORT, MCP_TOOL_ALLOWLIST, listMcpTools } from './mcp-server.js';
-import { enableMcpServer, disableMcpServer, connectGatewayServer, disconnectGatewayServer, connectEnabledMcpServers, invokeMcpTool, mcpServerHealth, mcpToolsUnified } from './src/services/MCPGateway.js';
+import { enableMcpServer, disableMcpServer, connectGatewayServer, disconnectGatewayServer, connectEnabledMcpServers, startIdleSweeper, invokeMcpTool, mcpServerHealth, mcpToolsUnified } from './src/services/MCPGateway.js';
 import { unifiedToolCatalog, invokeUnifiedTool } from './src/services/UnifiedTools.js';
 import {
   registerConnectors, getConnectorStatus, saveConnectorConfig, callConnector, handleConnectorWebhook, getConnectorToolSchemas, setInboundReplyGenerator,
@@ -2477,6 +2477,10 @@ app.listen(PORT, '0.0.0.0', () => {
         }
       })
       .catch((e) => console.log(`[MCP] boot connect failed softly: ${e && e.message}`));
+    // Idle sweep (small hosts): stdio servers nobody has used for a while go
+    // to sleep — the child process dies, memory returns; next use wakes them.
+    const sweep = startIdleSweeper();
+    if (sweep.started) console.log(`[MCP] idle sweeper: stdio servers sleep after ${sweep.idleMinutes}min unused`);
   }, 8_000);
   if (typeof mcpBoot.unref === 'function') mcpBoot.unref();
   // B211 — MISSION BOOT RECOVERY: missions that were mid-flight when the

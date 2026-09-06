@@ -155,7 +155,13 @@ async function defaultConnector(entry) {
       requestInit: { headers: { ...(entry.headers || {}) } },
     });
     client = new Client({ name: 'jexi-mcp-gateway', version: '1.0.0' }, { capabilities: {} });
-    await withTimeout(client.connect(transport), 90_000, 'connect timed out');
+    try {
+      await withTimeout(client.connect(transport), 90_000, 'connect timed out');
+    } catch (e) {
+      try { await transport.close(); } catch { /* already gone */ }
+      try { await client.close(); } catch { /* already gone */ }
+      throw e;
+    }
   } else {
     const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
     const args = (entry.args || []).map((a) => interpolateArg(a, WORKSPACE_DIR));
@@ -167,7 +173,19 @@ async function defaultConnector(entry) {
       stderr: 'pipe',
     });
     client = new Client({ name: 'jexi-mcp-gateway', version: '1.0.0' }, { capabilities: {} });
-    await withTimeout(client.connect(transport), 90_000, 'connect timed out'); // npx cold download is slow
+    try {
+      await withTimeout(client.connect(transport), 90_000, 'connect timed out'); // npx cold download is slow
+    } catch (e) {
+      // LEAK FIX (Render, Sept 2026): a failed/timed-out connect must KILL the
+      // stdio child. Otherwise every npx/uvx attempt that dies mid-install
+      // leaves an orphan (npm alone is ~100-200MB) — on a 512MB host three
+      // failures = dead brain. NOTE: close the TRANSPORT, not just the client —
+      // a client whose connect() never finished does not own the transport, so
+      // client.close() alone leaves the child alive (verified live).
+      try { await transport.close(); } catch { /* already gone */ }
+      try { await client.close(); } catch { /* already gone */ }
+      throw e;
+    }
   }
 
   return {
@@ -242,7 +260,7 @@ export async function connectEnabledMcpServers() {
     // all of them starves the brain itself — observed live as container
     // recycling. Stop before that: leave headroom, the rest wake on first use.
     const freeMb = Math.round(os.freemem() / 1048576);
-    if (out.filter((o) => o.ok && !o.skipped && !o.hosted).length > 0 && freeMb < 200) {
+    if (out.filter((o) => o.ok && !o.skipped && !o.hosted).length > 0 && freeMb < 300) {
       out.push({ server: s.name, ok: true, skipped: true, note: `memory guard: ${freeMb}MB free — sleeps, wakes on first use` });
       continue;
     }
@@ -262,6 +280,42 @@ export async function disconnectGatewayServer(name) {
   } catch { /* closing a dead process is fine */ }
   audit({ type: 'MCP_DISCONNECTED', server: name });
   return { ok: true, disconnected: name };
+}
+
+/**
+ * IDLE SWEEPER (Render, Sept 2026): on a 512MB host every connected stdio
+ * server is a live child process (~40-90MB each). Servers nobody has talked
+ * to for IDLE_MINUTES go to sleep — the connection closes, the child dies,
+ * memory comes back. The server stays enabled and WAKES ON NEXT USE (lazy
+ * connect), so this is invisible except in lower memory use. Hosted HTTP
+ * servers hold no child and are never swept. JEXI_MCP_IDLE_MINUTES=0 disables.
+ */
+export function startIdleSweeper() {
+  const minutes = Number(process.env.JEXI_MCP_IDLE_MINUTES ?? 10);
+  if (!(minutes > 0)) return { started: false, reason: `JEXI_MCP_IDLE_MINUTES=${minutes} — idle sweep disabled` };
+  const interval = setInterval(() => { sweepIdleServers(minutes); }, 60_000);
+  if (typeof interval.unref === 'function') interval.unref();
+  return { started: true, idleMinutes: minutes };
+}
+
+/** One idle-sweep pass (exported for tests): sleep stdio servers idle > minutes. */
+export async function sweepIdleServers(minutes = Number(process.env.JEXI_MCP_IDLE_MINUTES ?? 10)) {
+  if (!(minutes > 0)) return { swept: [] };
+  const cutoff = Date.now() - minutes * 60_000;
+  const swept = [];
+  for (const [name, conn] of [...connections.entries()]) {
+    // Only stdio servers hold a child process; only real clients can be closed.
+    if (!conn.__client) continue;
+    const entry = effectiveRegistry().servers.find((s) => s.name === name);
+    if (entry && entry.transport === 'streamable-http') continue;
+    const lastUsed = conn.lastSuccessAt || conn.connectedAt;
+    if (Date.parse(lastUsed) < cutoff) {
+      await disconnectGatewayServer(name);
+      audit({ type: 'MCP_IDLE_SLEEP', server: name, note: `idle > ${minutes}min — child stopped, wakes on next use` });
+      swept.push(name);
+    }
+  }
+  return { swept };
 }
 
 /**
