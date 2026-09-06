@@ -586,6 +586,14 @@ function normalizePlan(refinement, task) {
     requirements: Array.isArray(s.requirements) ? s.requirements.map(String).slice(0, 6) : [String(s.capability || 'reasoning')],
     dependsOn: Array.isArray(s.dependsOn) ? s.dependsOn.map((d) => Number(d)).filter(Number.isInteger) : [],
     searchQueries: Array.isArray(s.searchQueries) ? s.searchQueries.map(String).slice(0, 3) : [],
+    // Capability Router: interpreter-routed live MCP calls (validated shape;
+    // execution happens in the employee's tool phase, real results only)
+    mcpCalls: Array.isArray(s.mcpCalls)
+      ? s.mcpCalls
+          .filter((c) => c && typeof c === 'object' && typeof c.server === 'string' && typeof c.tool === 'string' && c.server && c.tool)
+          .slice(0, 3)
+          .map((c) => ({ server: c.server.slice(0, 60), tool: c.tool.slice(0, 80), args: c.args && typeof c.args === 'object' && !Array.isArray(c.args) ? c.args : {} }))
+      : [],
     expectedOutput: String(s.expectedOutput || '').slice(0, 500),
     priority: ['low', 'normal', 'high'].includes(s.priority) ? s.priority : 'normal',
     verify: s.verify !== false,

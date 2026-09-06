@@ -43,10 +43,28 @@ Output ONLY JSON:
 export function realLlmAdapter() {
   return {
     interpret: async ({ raw, effectiveQuery, contextBlock, memoryContext, activeTaskId, image, failureContext }) => {
+      // CAPABILITY ROUTER (§7/§11): the minimum useful live services for THIS
+      // message become an explicit menu — the interpreter may attach real
+      // mcpCalls to a subtask; the employee session executes them for real.
+      let mcpMenu = '';
+      try {
+        const { selectMcpToolset } = await import('../CapabilityRouter.js');
+        const sel = selectMcpToolset(String(effectiveQuery || raw || ''), { intent: null });
+        if (sel.schemas.length) {
+          mcpMenu = `# AVAILABLE LIVE SERVICES (capability-routed for this exact request)\n${sel.schemas.map((sc) => {
+            const name = sc.function.name.replace(/^mcp__/, '').replace('__', ' · ');
+            const argSpec = Object.entries(sc.function.parameters.properties || {})
+              .map(([k, v]) => `${k}${v.type === 'number' ? ':number' : ''}${Array.isArray(sc.function.parameters.required) && sc.function.parameters.required.includes(k) ? ' (required)' : ''}`)
+              .join(', ');
+            return `- ${name}${argSpec ? ` — args: ${argSpec}` : ''}`;
+          }).join('\n')}\nIf (and only if) a subtask needs this live data, give it "mcpCalls":[{"server":"<name>","tool":"<tool>","args":{...}}] (max 3). Only use services from the list above. Data from these services is REAL — prefer it over web search for its domain.`;
+        }
+      } catch { /* routing is additive — interpretation works without it */ }
       const user = [
         `# USER MESSAGE (verbatim)\n"${String(raw || '').slice(0, 2000)}"`,
         contextBlock ? `# CONVERSATION/TASK CONTEXT\n${String(contextBlock).slice(0, 2500)}` : '',
         memoryContext ? `# WHAT WE ALREADY KNOW (memory)\n${String(memoryContext).slice(0, 1500)}` : '',
+        mcpMenu || '',
         activeTaskId ? `# NOTE: there is an active product task in progress — "fix/change/add" language usually means modifying THAT, not starting new research.` : '',
         failureContext ? `# REPLAN — the previous attempt failed; produce a genuinely different plan\n${String(failureContext).slice(0, 2000)}` : '',
       ].filter(Boolean).join('\n\n');

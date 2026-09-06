@@ -80,6 +80,9 @@ export function assembleBrief({ task, subtask, employee, dependencies = [], memo
     timeBudgetMs: subtask.timeBudgetMs || 180000,
     relevantPreviousResults: dependencies.map((d) => ({ from: d.from, content: String(d.content || '').slice(0, 2000) })),
     searchQueries: subtask.searchQueries || [],
+    // CAPABILITY ROUTER (§7/§11): live MCP calls the interpreter routed to
+    // this assignment — executed for real in the tool phase below.
+    mcpCalls: Array.isArray(subtask.mcpCalls) ? subtask.mcpCalls.slice(0, 3) : [],
   };
 }
 
@@ -200,6 +203,39 @@ export async function runEmployeeSession(p) {
       } catch (e) {
         emit('TOOL_FAILED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Search failed for "${q}" — ${String(e.message || e).slice(0, 80)}`, severity: 'warn' });
         // tool failure is not fatal: the employee proceeds with less material
+      }
+    }
+  }
+
+  // 1b) LIVE MCP DATA PHASE (Capability Router §7/§11): the interpreter
+  // routed live services to this assignment (weather, math, papers, …).
+  // The call runs for real through the MCP gateway and the RESULT lands in
+  // the employee's context — the deliverable is grounded in actual data,
+  // never a guess. Failure is non-fatal, exactly like search.
+  if (Array.isArray(brief.mcpCalls) && brief.mcpCalls.length) {
+    const { invokeMcpTool } = await import('../MCPGateway.js');
+    for (const call of brief.mcpCalls.slice(0, 3)) {
+      const server = String((call && call.server) || '');
+      const tool = String((call && call.tool) || '');
+      const args = call && call.args && typeof call.args === 'object' && !Array.isArray(call.args) ? call.args : {};
+      if (!server || !tool) continue;
+      emit('TOOL_STARTED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Live data: ${server} · ${tool}` });
+      try {
+        const r = await invokeMcpTool({ server, tool, args });
+        if (r && r.ok) {
+          const content = (r.result && Array.isArray(r.result.content)) ? r.result.content : [];
+          const text = content.map((c) => c && c.text ? c.text : '').join('\n').trim() || JSON.stringify(r.result).slice(0, 12_000);
+          toolContext += `\n\n[live data from the "${server}" service — tool "${tool}", real result]\n${String(text).slice(0, 12_000)}`;
+          emit('TOOL_COMPLETED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Live data received from ${server} · ${tool}.` });
+          mailbox.post(message({
+            from: employee.agentId, to: 'jexi', taskId: task.id, subtaskId: subtask.id,
+            type: 'FINDING', content: `Pulled real data from the ${server} service (${tool}) for this assignment.`, title: `${server}:${tool}`,
+          }));
+        } else {
+          emit('TOOL_FAILED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Live data unavailable (${server} · ${tool}): ${String((r && r.error) || 'unknown error').slice(0, 90)}`, severity: 'warn' });
+        }
+      } catch (e) {
+        emit('TOOL_FAILED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Live data call failed (${server} · ${tool}) — proceeding without it.`, severity: 'warn' });
       }
     }
   }

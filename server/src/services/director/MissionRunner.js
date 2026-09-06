@@ -317,13 +317,29 @@ Plan rules:
 - Writing, running and testing code is ONE item for the code engineer (she can execute allowlisted commands herself). Never split "then run it" into a separate item.
 - Browsing a real site, filling a form, or reading a live page is ONE computer item for the computer-ops employee (he can drive the real browser himself, honestly blocked if the environment has none).
 - Items needing fresh web facts get searchQueries (1-3 precise queries).
+- Live services from the AVAILABLE LIVE SERVICES list (when present) are called for real: attach "mcpCalls":[{"server":"<name>","tool":"<tool>","args":{...}}] to the item that needs that data (max 3). Only use listed services.
 - Include a final verification item ONLY when the criteria need cross-item checking (the Director verifies the whole mission at the end regardless).
 - successCriteria are measurable statements the FINAL mission deliverable must satisfy.
 
 Output ONLY JSON:
 {"refinedObjective":"...","assumptions":["..."],"constraints":["..."],"successCriteria":["..."],"items":[{"title":"...","details":"precise professional instructions","capability":"code","requirements":["code"],"dependsOn":[],"searchQueries":[],"expectedOutput":"what done looks like","priority":"high|normal|low"}]}`;
-    const user = [
+        let mcpMenu = '';
+    try {
+      const { selectMcpToolset } = await import('../CapabilityRouter.js');
+      const sel = selectMcpToolset(String(mission.rawRequest || mission.objective || ''), { intent: null });
+      if (sel.schemas.length) {
+        mcpMenu = `# AVAILABLE LIVE SERVICES (capability-routed for this mission)\n${sel.schemas.map((sc) => {
+          const name = sc.function.name.replace(/^mcp__/, '').replace('__', ' \u00b7 ');
+          const argSpec = Object.entries(sc.function.parameters.properties || {})
+            .map(([k, v]) => `${k}${v.type === 'number' ? ':number' : ''}${Array.isArray(sc.function.parameters.required) && sc.function.parameters.required.includes(k) ? ' (required)' : ''}`)
+            .join(', ');
+          return `- ${name}${argSpec ? ` \u2014 args: ${argSpec}` : ''}`;
+        }).join('\n')}\nData from these services is REAL \u2014 prefer it over web search for its domain.`;
+      }
+    } catch { /* routing is additive */ }
+const user = [
       `# MISSION (the user's request, verbatim)\n"${mission.rawRequest || mission.objective}"`,
+      mcpMenu || '',
       mission.contextBlock ? `# CONVERSATION/TASK CONTEXT\n${mission.contextBlock.slice(0, 2000)}` : '',
       mission.memoryContext ? `# WHAT WE ALREADY KNOW (memory)\n${mission.memoryContext.slice(0, 1200)}` : '',
       (mission.preplanSteering || []).length
@@ -386,6 +402,12 @@ Output ONLY JSON:
       title: it.title, details: it.details, capability: it.capability, requirements: it.requirements,
       expectedOutput: it.expectedOutput, priority: it.priority, dependsOn: deps[idx],
       searchQueries: Array.isArray(it.searchQueries) ? it.searchQueries.slice(0, 3) : [],
+      mcpCalls: Array.isArray(it.mcpCalls)
+        ? it.mcpCalls
+            .filter((c) => c && typeof c === 'object' && typeof c.server === 'string' && typeof c.tool === 'string' && c.server && c.tool)
+            .slice(0, 3)
+            .map((c) => ({ server: c.server.slice(0, 60), tool: c.tool.slice(0, 80), args: c.args && typeof c.args === 'object' && !Array.isArray(c.args) ? c.args : {} }))
+        : [],
     }));
     for (let i = 0; i < created.length; i++) {
       for (const d of deps[i]) graph.addRelation('BLOCKS', created[d - 1].id, created[i].id, `plan dependency (st${d} → st${i + 1})`);

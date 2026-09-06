@@ -34,10 +34,18 @@ const AUDIT_FILE = () => path.join(process.env.DATA_DIR || './data', 'mcp-audit.
 
 /** Tool directory: every server's tool names as last verified live — lets the planner
  *  see all 35 servers' tools without holding 35 child processes. */
+let __dirCache = { mtimeMs: -1, at: 0, servers: {} };
 export function loadToolDirectory() {
   try {
-    const raw = JSON.parse(fs.readFileSync(DIRECTORY_PATH(), 'utf8'));
-    return raw.servers || {};
+    const p = DIRECTORY_PATH();
+    const st = fs.statSync(p);
+    // mtime-keyed cache: the directory is 42 servers / 515 tools of JSON —
+    // parsing it on every routed turn is waste; stat is ~free. Re-reads
+    // happen the moment the file changes (regeneration picks up instantly).
+    if (__dirCache.mtimeMs === st.mtimeMs && Date.now() - __dirCache.at < 60_000) return __dirCache.servers;
+    const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+    __dirCache = { mtimeMs: st.mtimeMs, at: Date.now(), servers: raw.servers || {} };
+    return __dirCache.servers;
   } catch { return {}; }
 }
 
