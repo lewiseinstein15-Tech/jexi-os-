@@ -263,7 +263,26 @@ function withTimeout(p, ms, label) {
   return Promise.race([p, timeoutP]).finally(() => clearTimeout(timer));
 }
 
-export async function connectGatewayServer(name, { registryPath } = {}) {
+/* Small-host connect discipline (Sept 2026, Render 512MB): two lazy connects
+ * arriving together stack two npx/uvx spawn spikes (~100-150MB each) and
+ * OOM-kill the brain (observed live). On small hosts stdio connects are
+ * SERIALIZED through this chain, and before each spawn we make room: if free
+ * memory is tight the least-recently-used stdio child is put to sleep first
+ * (it wakes on its own next use). */
+let connectChain = Promise.resolve();
+function smallHostMode() { return hostMemoryLimitMb() < 768; }
+async function makeRoomForSpawn() {
+  for (let i = 0; i < 3 && hostFreeMemoryMb() < 150; i++) {
+    const stdioConns = [...connections.entries()]
+      .filter(([, c]) => c.__client)
+      .map(([n, c]) => [n, Date.parse(c.lastSuccessAt || c.connectedAt)])
+      .sort((a, b) => a[1] - b[1]); // oldest use first
+    if (!stdioConns.length) return;
+    await disconnectGatewayServer(stdioConns[0][0]);
+  }
+}
+
+async function connectGatewayServerInner(name, { registryPath } = {}) {
   const reg = effectiveRegistry(registryPath);
   const entry = reg.servers.find((s) => s.name === name);
   if (!entry) return { ok: false, error: `unknown server '${name}'` };
@@ -287,6 +306,21 @@ export async function connectGatewayServer(name, { registryPath } = {}) {
     audit({ type: 'MCP_CONNECT_FAILED', server: name, error: String(e && e.message).slice(0, 200) });
     return { ok: false, error: String(e && e.message).slice(0, 300) };
   }
+}
+
+/** Public connect: on small hosts connects are serialized; stdio spawns make room first. */
+export function connectGatewayServer(name, opts = {}) {
+  if (!smallHostMode()) return connectGatewayServerInner(name, opts);
+  const run = async () => {
+    try {
+      const entry = effectiveRegistry(opts.registryPath).servers.find((s) => s.name === name);
+      if (entry && entry.transport !== 'streamable-http') await makeRoomForSpawn();
+    } catch { /* registry read issues fall through */ }
+    return connectGatewayServerInner(name, opts);
+  };
+  const p = connectChain.then(run, run);
+  connectChain = p.catch(() => {});
+  return p;
 }
 
 /**
