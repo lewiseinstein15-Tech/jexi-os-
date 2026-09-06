@@ -169,10 +169,13 @@ export function __setConnector(fn) { connector = fn; }
 
 /** Interpolate registry placeholders at CONNECT time (never bake host paths into the registry). */
 function interpolateArg(a, wsDir) {
-  const dbPath = path.join(process.env.DATA_DIR || './data', 'mcp-sqlite.db');
+  const dataDir = process.env.DATA_DIR || './data';
+  const dbPath = path.join(dataDir, 'mcp-sqlite.db');
+  const duckPath = path.join(dataDir, 'mcp-duckdb.duckdb');
   return String(a)
     .replace(/\$\{JEXI_WORKSPACE\}/g, wsDir)
-    .replace(/\$\{JEXI_SQLITE_DB\}/g, dbPath);
+    .replace(/\$\{JEXI_SQLITE_DB\}/g, dbPath)
+    .replace(/\$\{JEXI_DUCKDB_DB\}/g, duckPath);
 }
 
 /**
@@ -200,7 +203,20 @@ async function defaultConnector(entry) {
     }
   } else {
     const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
+    // the workspace root must exist before servers that take it as an argument
+    // (filesystem roots, git --repository) can start — create-on-connect.
+    try { fs.mkdirSync(WORKSPACE_DIR, { recursive: true }); } catch { /* best effort */ }
     const args = (entry.args || []).map((a) => interpolateArg(a, WORKSPACE_DIR));
+    // mcp-server-git crashes unless --repository points at an existing GIT REPO
+    // (NoSuchPathError otherwise). The JEXI workspace is versioned anyway —
+    // git-init it once if it is not a repo yet.
+    try {
+      const repoIdx = args.indexOf('--repository');
+      if (repoIdx >= 0 && args[repoIdx + 1] && !fs.existsSync(path.join(args[repoIdx + 1], '.git'))) {
+        const { spawnSync } = await import('node:child_process');
+        spawnSync('git', ['init', '-q', args[repoIdx + 1]], { timeout: 15_000 });
+      }
+    } catch { /* best effort — server reports honestly if still broken */ }
     // sqlite path placeholder → make sure the parent dir exists (empty file = server opens/creates it)
     const transport = new StdioClientTransport({
       command: entry.command,
@@ -501,6 +517,12 @@ export async function invokeMcpTool({ server, tool, args = {}, authorized = fals
     audit({ type: 'MCP_INVOKE_FAILED', server, tool, error: conn.lastError });
     return { ok: false, error: conn.lastError };
   }
+}
+
+/** Live tool list of a CONNECTED server (name + description each), or null. */
+export function gatewayServerTools(name) {
+  const c = connections.get(name);
+  return c ? c.tools.map((t) => ({ name: t.name, description: String(t.description || '').slice(0, 220) })) : null;
 }
 
 /** Server health snapshot (spec §17: server health + lifecycle). */

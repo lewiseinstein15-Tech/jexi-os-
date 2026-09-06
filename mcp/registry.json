@@ -1,514 +1,683 @@
 {
-  "_comment": "JEXI MCP server registry v3 (Sept 2026 — Lewis: connect them directly, no switches). Every server here was REALLY connected and tool-called by the live test (scripts/mcp-live-test.js, multiple rounds). No paid keys anywhere. uvx servers need Python+uv on the host; npx needs node; streamable-http needs only network. A memory-guarded few wake at boot; the rest connect lazily on first use — mcp/tool-directory.json lets the planner see every tool without holding 35 child processes.",
-  "version": 3,
-  "servers": [
-    {
-      "name": "filesystem",
-      "description": "Official MCP reference server — bounded read/write file access inside the workspace roots.",
-      "transport": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "${JEXI_WORKSPACE}"
-      ],
-      "enabled": true,
-      "trustLevel": "curated",
-      "permissions": [
-        "READ_ONLY",
-        "LOCAL_WRITE"
-      ],
-      "notes": "Roots = the JEXI workspace only."
-    },
-    {
-      "name": "memory",
-      "description": "Official MCP reference server — knowledge-graph memory (entities, relations, observations).",
-      "transport": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-memory"
-      ],
-      "enabled": true,
-      "trustLevel": "curated",
-      "permissions": [
-        "READ_ONLY",
-        "LOCAL_WRITE"
-      ],
-      "notes": "Cross-check on JEXI's own memory layers."
-    },
-    {
-      "name": "everything",
-      "description": "Official MCP test server from the SDK team — exercises the full protocol; used to prove real round-trips.",
-      "transport": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-everything"
-      ],
-      "enabled": true,
-      "trustLevel": "curated",
-      "permissions": [
-        "READ_ONLY",
-        "LOCAL_WRITE"
-      ],
-      "notes": "Diagnostic server."
-    },
-    {
-      "name": "sequentialthinking",
-      "description": "Official MCP reference server — structured step-by-step thinking with branching and revision history.",
-      "transport": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking"
-      ],
-      "enabled": true,
-      "trustLevel": "curated",
-      "permissions": [
-        "READ_ONLY"
-      ],
-      "notes": "Pure computation, no I/O."
-    },
-    {
-      "name": "context7",
-      "description": "Upstash Context7 (stdio) — current version-specific library docs on demand.",
-      "transport": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@upstash/context7-mcp"
-      ],
-      "enabled": true,
-      "trustLevel": "curated",
-      "permissions": [
-        "READ_ONLY",
-        "NETWORK"
-      ],
-      "notes": "Free tier, no key. MIT."
-    },
-    {
-      "name": "mate-tools",
-      "description": "mate.tools MCP — 35 utility tools: text metrics, case conversion, hashing, regex, JSON/CSV/XML parsing, JWT decode, DNS lookup, SSL inspection, password/CSRF generation, color, dates, SEO tags and more.",
-      "transport": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@mate-tools/mcp-server"
-      ],
-      "enabled": true,
-      "trustLevel": "community",
-      "permissions": [
-        "READ_ONLY",
-        "NETWORK"
-      ],
-      "notes": "MIT, zero deps, no key, no telemetry. Reviewed + live-tested by JEXI Sept 2026."
-    },
-    {
-      "name": "wikipedia-js",
-      "description": "Wikipedia MCP (JS) — search, summaries, sections.",
-      "transport": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "wikipedia-mcp-server"
-      ],
-      "enabled": true,
-      "trustLevel": "community",
-      "permissions": [
-        "READ_ONLY",
-        "NETWORK"
-      ],
-      "notes": "Free public API. Reviewed + live-tested Sept 2026."
-    },
-    {
-      "name": "qrcode",
-      "description": "QR code generator MCP — text/URL to QR image data, fully local.",
-      "transport": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-server-qrcode"
-      ],
-      "enabled": true,
-      "trustLevel": "community",
-      "permissions": [
-        "READ_ONLY"
-      ],
-      "notes": "No network, no key. Reviewed + live-tested Sept 2026. Needs the qrencode binary on the host (installed in the JEXI brain image; absent in some sandboxes — connect+list verified there, full generation verified on the brain)."
-    },
-    {
-      "name": "fetch",
-      "description": "Official MCP reference server (Python) — URL to clean markdown with size/timeout limits.",
-      "transport": "stdio",
-      "command": "uvx",
-      "args": [
-        "mcp-server-fetch"
-      ],
-      "enabled": true,
-      "trustLevel": "curated",
-      "permissions": [
-        "READ_ONLY",
-        "NETWORK"
-      ],
-      "notes": "Complements JEXI's native deep-read."
-    },
-    {
-      "name": "time",
-      "description": "Official MCP reference server (Python) — current time and timezone conversion.",
-      "transport": "stdio",
-      "command": "uvx",
-      "args": [
-        "mcp-server-time"
-      ],
-      "enabled": true,
-      "trustLevel": "curated",
-      "permissions": [
-        "READ_ONLY"
-      ],
-      "notes": "Timezone-aware clock tools."
-    },
-    {
-      "name": "git",
-      "description": "Official MCP reference server (Python) — repo status, diff, log, commit operations.",
-      "transport": "stdio",
-      "command": "uvx",
-      "args": [
-        "mcp-server-git",
-        "--repository",
-        "${JEXI_WORKSPACE}"
-      ],
-      "enabled": true,
-      "trustLevel": "curated",
-      "permissions": [
-        "READ_ONLY",
-        "GIT"
-      ],
-      "notes": "Repo = the JEXI workspace. Destructive git stays with JEXI's own audited path."
-    },
-    {
-      "name": "calculator",
-      "description": "Calculator MCP (Python) — precise numerical evaluation.",
-      "transport": "stdio",
-      "command": "uvx",
-      "args": [
-        "mcp-server-calculator"
-      ],
-      "enabled": true,
-      "trustLevel": "community",
-      "permissions": [
-        "READ_ONLY"
-      ],
-      "notes": "MIT. Reviewed + live-tested Sept 2026."
-    },
-    {
-      "name": "wikipedia-py",
-      "description": "Official-style Wikipedia MCP (Python) — search, summaries, translations, links (7 tools).",
-      "transport": "stdio",
-      "command": "uvx",
-      "args": [
-        "mcp-server-wikipedia"
-      ],
-      "enabled": true,
-      "trustLevel": "community",
-      "permissions": [
-        "READ_ONLY",
-        "NETWORK"
-      ],
-      "notes": "Runs via uvx. Reviewed + live-tested Sept 2026."
-    },
-    {
-      "name": "arxiv",
-      "description": "arXiv MCP server — search and read scientific preprints (19 tools).",
-      "transport": "stdio",
-      "command": "uvx",
-      "args": [
-        "arxiv-mcp-server"
-      ],
-      "enabled": true,
-      "trustLevel": "community",
-      "permissions": [
-        "READ_ONLY",
-        "NETWORK"
-      ],
-      "notes": "Free arXiv API. Reviewed + live-tested Sept 2026."
-    },
-    {
-      "name": "markitdown",
-      "description": "Microsoft MarkItDown MCP — converts many file formats (Office, PDF, images, audio) to Markdown.",
-      "transport": "stdio",
-      "command": "uvx",
-      "args": [
-        "markitdown-mcp"
-      ],
-      "enabled": true,
-      "trustLevel": "curated",
-      "permissions": [
-        "READ_ONLY",
-        "LOCAL_WRITE"
-      ],
-      "notes": "Microsoft OSS. Local conversion, no key."
-    },
-    {
-      "name": "sqlite",
-      "description": "Official MCP reference server (Python) — SQL over a SQLite database file.",
-      "transport": "stdio",
-      "command": "uvx",
-      "args": [
-        "--with",
-        "mcp<2",
-        "mcp-server-sqlite",
-        "--db-path",
-        "${JEXI_SQLITE_DB}"
-      ],
-      "enabled": true,
-      "trustLevel": "curated",
-      "permissions": [
-        "READ_ONLY",
-        "LOCAL_WRITE"
-      ],
-      "notes": "Needs mcp<2 pin (v1 FastMCP). DB file in JEXI data dir."
-    },
-    {
-      "name": "osm",
-      "description": "OpenStreetMap MCP — geocoding, places, routing data from the free OSM ecosystem (12 tools).",
-      "transport": "stdio",
-      "command": "uvx",
-      "args": [
-        "--with",
-        "mcp<2",
-        "osm-mcp-server"
-      ],
-      "enabled": true,
-      "trustLevel": "community",
-      "permissions": [
-        "READ_ONLY",
-        "NETWORK"
-      ],
-      "notes": "Free OSM/Nominatim APIs. Reviewed + live-tested Sept 2026."
-    },
-    {
-      "name": "rss",
-      "description": "RSS MCP server — read and parse RSS/Atom feeds.",
-      "transport": "stdio",
-      "command": "uvx",
-      "args": [
-        "--with",
-        "mcp<2",
-        "mcp-server-rss"
-      ],
-      "enabled": true,
-      "trustLevel": "community",
-      "permissions": [
-        "READ_ONLY",
-        "NETWORK"
-      ],
-      "notes": "Reviewed + live-tested Sept 2026."
-    },
-    {
-      "name": "context7-remote",
-      "description": "Upstash Context7 hosted endpoint — same live library docs, no local process.",
-      "transport": "streamable-http",
-      "url": "https://mcp.context7.com/mcp",
-      "enabled": true,
-      "trustLevel": "curated",
-      "permissions": [
-        "READ_ONLY",
-        "NETWORK"
-      ],
-      "notes": "Fallback transport for the same service; free, no key."
-    },
-    {
-      "name": "deepwiki",
-      "description": "DeepWiki MCP (hosted, by Cognition) — ask questions about any public GitHub repository, answered from its code and docs.",
-      "transport": "streamable-http",
-      "url": "https://mcp.deepwiki.com/mcp",
-      "enabled": true,
-      "trustLevel": "curated",
-      "permissions": [
-        "READ_ONLY",
-        "NETWORK"
-      ],
-      "notes": "Free hosted endpoint, no auth."
-    },
-    {
-      "name": "gitmcp",
-      "description": "GitMCP (hosted) — instant documentation/context server for GitHub repositories.",
-      "transport": "streamable-http",
-      "url": "https://gitmcp.io/docs",
-      "enabled": true,
-      "trustLevel": "community",
-      "permissions": [
-        "READ_ONLY",
-        "NETWORK"
-      ],
-      "notes": "Free hosted endpoint. Reviewed + live-tested Sept 2026."
-    },
-    {
-      "name": "chroma",
-      "description": "Chroma local vector database MCP — persistent collections, embeddings, similarity search (13 tools).",
-      "transport": "stdio",
-      "command": "uvx",
-      "args": [
-        "--with",
-        "mcp<2",
-        "chroma-mcp"
-      ],
-      "enabled": true,
-      "trustLevel": "community",
-      "permissions": [
-        "READ_ONLY",
-        "LOCAL_WRITE"
-      ],
-      "notes": "Local-only vector store, no key. Reviewed + live-tested Sept 2026."
-    },
-    {
-      "name": "mermaid",
-      "description": "Mermaid MCP — render diagrams (flowcharts, sequence, class…) from text definitions.",
-      "transport": "stdio",
-      "command": "uvx",
-      "args": [
-        "--with",
-        "mcp<2",
-        "mcp-mermaid"
-      ],
-      "enabled": true,
-      "trustLevel": "community",
-      "permissions": [
-        "READ_ONLY"
-      ],
-      "notes": "Local rendering. Reviewed + live-tested Sept 2026."
-    },
-    {
-      "name": "fs-alt",
-      "description": "Community filesystem server (mcp-server-fs) — a second, richer file toolbox (search, move, metadata).",
-      "transport": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-server-fs",
-        "${JEXI_WORKSPACE}"
-      ],
-      "enabled": true,
-      "trustLevel": "community",
-      "permissions": [
-        "READ_ONLY",
-        "LOCAL_WRITE"
-      ],
-      "notes": "Reviewed + live-tested by JEXI Sept 2026. Same workspace boundary as the official one."
-    },
-    {
-      "name": "playwright-ea",
-      "description": "Community Playwright MCP (executeautomation) — a richer browser automation surface (33 tools).",
-      "transport": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@executeautomation/playwright-mcp-server"
-      ],
-      "enabled": true,
-      "trustLevel": "community",
-      "permissions": [
-        "READ_ONLY",
-        "NETWORK",
-        "EXECUTION"
-      ],
-      "notes": "Same browser-binary requirement. Reviewed + live-tested Sept 2026. Needs a browser with system deps on the host. Connect+list verified here; navigation needs the host browser."
-    },
-    {
-      "name": "mcpqueen",
-      "description": "MCPQueen (hosted) — the graded MCP registry: live-probed grades for remote MCP servers, searchable.",
-      "transport": "streamable-http",
-      "url": "https://mcpqueen.com/mcp",
-      "enabled": true,
-      "trustLevel": "community",
-      "permissions": [
-        "READ_ONLY",
-        "NETWORK"
-      ],
-      "notes": "Free hosted endpoint. Reviewed + live-tested Sept 2026."
-    },
-    {
-      "name": "pandoc",
-      "description": "Pandoc MCP — convert documents between formats (markdown, HTML, docx, PDF…).",
-      "transport": "stdio",
-      "command": "uvx",
-      "args": [
-        "--with",
-        "mcp<2",
-        "mcp-pandoc"
-      ],
-      "enabled": true,
-      "trustLevel": "community",
-      "permissions": [
-        "READ_ONLY",
-        "LOCAL_WRITE"
-      ],
-      "notes": "Needs pandoc binary availability where it runs. Reviewed + live-tested Sept 2026. Needs the pandoc binary on the host (installed in the JEXI brain image). Connect+list verified everywhere; conversion verified on the brain."
-    },
-    {
-      "name": "mslearn",
-      "description": "Microsoft Learn MCP (hosted, official) — search and read Microsoft's entire documentation.",
-      "transport": "streamable-http",
-      "url": "https://learn.microsoft.com/api/mcp",
-      "enabled": true,
-      "trustLevel": "curated",
-      "permissions": [
-        "READ_ONLY",
-        "NETWORK"
-      ],
-      "notes": "Free hosted endpoint, no auth."
-    },
-    {
-      "name": "cloudflare-docs",
-      "description": "Cloudflare Docs MCP (hosted, official) — search Cloudflare's documentation.",
-      "transport": "streamable-http",
-      "url": "https://docs.mcp.cloudflare.com/mcp",
-      "enabled": true,
-      "trustLevel": "curated",
-      "permissions": [
-        "READ_ONLY",
-        "NETWORK"
-      ],
-      "notes": "Free hosted endpoint, no auth."
-    },
-    {
-      "name": "playwright",
-      "description": "Microsoft Playwright MCP (official) — drive a real browser: navigate, click, fill, screenshot (24 tools).",
-      "transport": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@playwright/mcp@latest",
-        "--headless"
-      ],
-      "enabled": true,
-      "trustLevel": "curated",
-      "permissions": [
-        "READ_ONLY",
-        "NETWORK",
-        "EXECUTION"
-      ],
-      "notes": "Needs browser binaries on the host; wakes with an honest error where none exist (JEXI's native browser covers that). Needs a browser with system deps on the host. Connect+list verified here; full navigation needs the host browser. JEXI native browser control covers browsing where this cannot run."
-    },
-    {
-      "name": "chrome-devtools",
-      "description": "Chrome DevTools MCP — inspect, debug and profile pages via the DevTools protocol (29 tools).",
-      "transport": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "chrome-devtools-mcp",
-        "--headless"
-      ],
-      "enabled": true,
-      "trustLevel": "curated",
-      "permissions": [
-        "READ_ONLY",
-        "NETWORK",
-        "EXECUTION"
-      ],
-      "notes": "Needs Chrome on the host; honest error where absent. Needs Chrome at the host default path. Connect+list verified here; page tools need Chrome on the host."
-    }
-  ]
+ "_comment": "JEXI MCP server registry v3 (Sept 2026 — Lewis: connect them directly, no switches). Every server here was REALLY connected and tool-called by the live test (scripts/mcp-live-test.js, multiple rounds). No paid keys anywhere. uvx servers need Python+uv on the host; npx needs node; streamable-http needs only network. A memory-guarded few wake at boot; the rest connect lazily on first use — mcp/tool-directory.json lets the planner see every tool without holding 35 child processes.",
+ "version": 3.2,
+ "servers": [
+  {
+   "name": "filesystem",
+   "description": "Official MCP reference server — bounded read/write file access inside the workspace roots.",
+   "transport": "stdio",
+   "command": "npx",
+   "args": [
+    "-y",
+    "@modelcontextprotocol/server-filesystem",
+    "${JEXI_WORKSPACE}"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY",
+    "LOCAL_WRITE"
+   ],
+   "notes": "Roots = the JEXI workspace only."
+  },
+  {
+   "name": "memory",
+   "description": "Official MCP reference server — knowledge-graph memory (entities, relations, observations).",
+   "transport": "stdio",
+   "command": "npx",
+   "args": [
+    "-y",
+    "@modelcontextprotocol/server-memory"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY",
+    "LOCAL_WRITE"
+   ],
+   "notes": "Cross-check on JEXI's own memory layers."
+  },
+  {
+   "name": "everything",
+   "description": "Official MCP test server from the SDK team — exercises the full protocol; used to prove real round-trips.",
+   "transport": "stdio",
+   "command": "npx",
+   "args": [
+    "-y",
+    "@modelcontextprotocol/server-everything"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY",
+    "LOCAL_WRITE"
+   ],
+   "notes": "Diagnostic server."
+  },
+  {
+   "name": "sequentialthinking",
+   "description": "Official MCP reference server — structured step-by-step thinking with branching and revision history.",
+   "transport": "stdio",
+   "command": "npx",
+   "args": [
+    "-y",
+    "@modelcontextprotocol/server-sequential-thinking"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY"
+   ],
+   "notes": "Pure computation, no I/O."
+  },
+  {
+   "name": "context7",
+   "description": "Upstash Context7 (stdio) — current version-specific library docs on demand.",
+   "transport": "stdio",
+   "command": "npx",
+   "args": [
+    "-y",
+    "@upstash/context7-mcp"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY",
+    "NETWORK"
+   ],
+   "notes": "Free tier, no key. MIT."
+  },
+  {
+   "name": "mate-tools",
+   "description": "mate.tools MCP — 35 utility tools: text metrics, case conversion, hashing, regex, JSON/CSV/XML parsing, JWT decode, DNS lookup, SSL inspection, password/CSRF generation, color, dates, SEO tags and more.",
+   "transport": "stdio",
+   "command": "npx",
+   "args": [
+    "-y",
+    "@mate-tools/mcp-server"
+   ],
+   "enabled": true,
+   "trustLevel": "community",
+   "permissions": [
+    "READ_ONLY",
+    "NETWORK"
+   ],
+   "notes": "MIT, zero deps, no key, no telemetry. Reviewed + live-tested by JEXI Sept 2026."
+  },
+  {
+   "name": "wikipedia-js",
+   "description": "Wikipedia MCP (JS) — search, summaries, sections.",
+   "transport": "stdio",
+   "command": "npx",
+   "args": [
+    "-y",
+    "wikipedia-mcp-server"
+   ],
+   "enabled": true,
+   "trustLevel": "community",
+   "permissions": [
+    "READ_ONLY",
+    "NETWORK"
+   ],
+   "notes": "Free public API. Reviewed + live-tested Sept 2026."
+  },
+  {
+   "name": "qrcode",
+   "description": "QR code generator MCP — text/URL to QR image data, fully local.",
+   "transport": "stdio",
+   "command": "npx",
+   "args": [
+    "-y",
+    "mcp-server-qrcode"
+   ],
+   "enabled": true,
+   "trustLevel": "community",
+   "permissions": [
+    "READ_ONLY"
+   ],
+   "notes": "No network, no key. Reviewed + live-tested Sept 2026. Needs the qrencode binary on the host (installed in the JEXI brain image; absent in some sandboxes — connect+list verified there, full generation verified on the brain)."
+  },
+  {
+   "name": "fetch",
+   "description": "Official MCP reference server (Python) — URL to clean markdown with size/timeout limits.",
+   "transport": "stdio",
+   "command": "uvx",
+   "args": [
+    "mcp-server-fetch"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY",
+    "NETWORK"
+   ],
+   "notes": "Complements JEXI's native deep-read."
+  },
+  {
+   "name": "time",
+   "description": "Official MCP reference server (Python) — current time and timezone conversion.",
+   "transport": "stdio",
+   "command": "uvx",
+   "args": [
+    "mcp-server-time"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY"
+   ],
+   "notes": "Timezone-aware clock tools."
+  },
+  {
+   "name": "git",
+   "description": "Official MCP reference server (Python) — repo status, diff, log, commit operations.",
+   "transport": "stdio",
+   "command": "uvx",
+   "args": [
+    "mcp-server-git",
+    "--repository",
+    "${JEXI_WORKSPACE}"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY",
+    "GIT"
+   ],
+   "notes": "Repo = the JEXI workspace. Destructive git stays with JEXI's own audited path."
+  },
+  {
+   "name": "calculator",
+   "description": "Calculator MCP (Python) — precise numerical evaluation.",
+   "transport": "stdio",
+   "command": "uvx",
+   "args": [
+    "mcp-server-calculator"
+   ],
+   "enabled": true,
+   "trustLevel": "community",
+   "permissions": [
+    "READ_ONLY"
+   ],
+   "notes": "MIT. Reviewed + live-tested Sept 2026."
+  },
+  {
+   "name": "wikipedia-py",
+   "description": "Official-style Wikipedia MCP (Python) — search, summaries, translations, links (7 tools).",
+   "transport": "stdio",
+   "command": "uvx",
+   "args": [
+    "mcp-server-wikipedia"
+   ],
+   "enabled": true,
+   "trustLevel": "community",
+   "permissions": [
+    "READ_ONLY",
+    "NETWORK"
+   ],
+   "notes": "Runs via uvx. Reviewed + live-tested Sept 2026."
+  },
+  {
+   "name": "arxiv",
+   "description": "arXiv MCP server — search and read scientific preprints (19 tools).",
+   "transport": "stdio",
+   "command": "uvx",
+   "args": [
+    "arxiv-mcp-server"
+   ],
+   "enabled": true,
+   "trustLevel": "community",
+   "permissions": [
+    "READ_ONLY",
+    "NETWORK"
+   ],
+   "notes": "Free arXiv API. Reviewed + live-tested Sept 2026."
+  },
+  {
+   "name": "markitdown",
+   "description": "Microsoft MarkItDown MCP — converts many file formats (Office, PDF, images, audio) to Markdown.",
+   "transport": "stdio",
+   "command": "uvx",
+   "args": [
+    "markitdown-mcp"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY",
+    "LOCAL_WRITE"
+   ],
+   "notes": "Microsoft OSS. Local conversion, no key."
+  },
+  {
+   "name": "sqlite",
+   "description": "Official MCP reference server (Python) — SQL over a SQLite database file.",
+   "transport": "stdio",
+   "command": "uvx",
+   "args": [
+    "--with",
+    "mcp<2",
+    "mcp-server-sqlite",
+    "--db-path",
+    "${JEXI_SQLITE_DB}"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY",
+    "LOCAL_WRITE"
+   ],
+   "notes": "Needs mcp<2 pin (v1 FastMCP). DB file in JEXI data dir."
+  },
+  {
+   "name": "osm",
+   "description": "OpenStreetMap MCP — geocoding, places, routing data from the free OSM ecosystem (12 tools).",
+   "transport": "stdio",
+   "command": "uvx",
+   "args": [
+    "--with",
+    "mcp<2",
+    "osm-mcp-server"
+   ],
+   "enabled": true,
+   "trustLevel": "community",
+   "permissions": [
+    "READ_ONLY",
+    "NETWORK"
+   ],
+   "notes": "Free OSM/Nominatim APIs. Reviewed + live-tested Sept 2026."
+  },
+  {
+   "name": "rss",
+   "description": "RSS MCP server — read and parse RSS/Atom feeds.",
+   "transport": "stdio",
+   "command": "uvx",
+   "args": [
+    "--with",
+    "mcp<2",
+    "mcp-server-rss"
+   ],
+   "enabled": true,
+   "trustLevel": "community",
+   "permissions": [
+    "READ_ONLY",
+    "NETWORK"
+   ],
+   "notes": "Reviewed + live-tested Sept 2026."
+  },
+  {
+   "name": "context7-remote",
+   "description": "Upstash Context7 hosted endpoint — same live library docs, no local process.",
+   "transport": "streamable-http",
+   "url": "https://mcp.context7.com/mcp",
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY",
+    "NETWORK"
+   ],
+   "notes": "Fallback transport for the same service; free, no key."
+  },
+  {
+   "name": "deepwiki",
+   "description": "DeepWiki MCP (hosted, by Cognition) — ask questions about any public GitHub repository, answered from its code and docs.",
+   "transport": "streamable-http",
+   "url": "https://mcp.deepwiki.com/mcp",
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY",
+    "NETWORK"
+   ],
+   "notes": "Free hosted endpoint, no auth."
+  },
+  {
+   "name": "gitmcp",
+   "description": "GitMCP (hosted) — instant documentation/context server for GitHub repositories.",
+   "transport": "streamable-http",
+   "url": "https://gitmcp.io/docs",
+   "enabled": true,
+   "trustLevel": "community",
+   "permissions": [
+    "READ_ONLY",
+    "NETWORK"
+   ],
+   "notes": "Free hosted endpoint. Reviewed + live-tested Sept 2026."
+  },
+  {
+   "name": "chroma",
+   "description": "Chroma local vector database MCP — persistent collections, embeddings, similarity search (13 tools).",
+   "transport": "stdio",
+   "command": "uvx",
+   "args": [
+    "--with",
+    "mcp<2",
+    "chroma-mcp"
+   ],
+   "enabled": true,
+   "trustLevel": "community",
+   "permissions": [
+    "READ_ONLY",
+    "LOCAL_WRITE"
+   ],
+   "notes": "Local-only vector store, no key. Reviewed + live-tested Sept 2026."
+  },
+  {
+   "name": "mermaid",
+   "description": "Mermaid MCP — render diagrams (flowcharts, sequence, class…) from text definitions.",
+   "transport": "stdio",
+   "command": "uvx",
+   "args": [
+    "--with",
+    "mcp<2",
+    "mcp-mermaid"
+   ],
+   "enabled": true,
+   "trustLevel": "community",
+   "permissions": [
+    "READ_ONLY"
+   ],
+   "notes": "Local rendering. Reviewed + live-tested Sept 2026."
+  },
+  {
+   "name": "fs-alt",
+   "description": "Community filesystem server (mcp-server-fs) — a second, richer file toolbox (search, move, metadata).",
+   "transport": "stdio",
+   "command": "npx",
+   "args": [
+    "-y",
+    "mcp-server-fs",
+    "${JEXI_WORKSPACE}"
+   ],
+   "enabled": true,
+   "trustLevel": "community",
+   "permissions": [
+    "READ_ONLY",
+    "LOCAL_WRITE"
+   ],
+   "notes": "Reviewed + live-tested by JEXI Sept 2026. Same workspace boundary as the official one."
+  },
+  {
+   "name": "playwright-ea",
+   "description": "Community Playwright MCP (executeautomation) — a richer browser automation surface (33 tools).",
+   "transport": "stdio",
+   "command": "npx",
+   "args": [
+    "-y",
+    "@executeautomation/playwright-mcp-server"
+   ],
+   "enabled": true,
+   "trustLevel": "community",
+   "permissions": [
+    "READ_ONLY",
+    "NETWORK",
+    "EXECUTION"
+   ],
+   "notes": "Same browser-binary requirement. Reviewed + live-tested Sept 2026. Needs a browser with system deps on the host. Connect+list verified here; navigation needs the host browser."
+  },
+  {
+   "name": "mcpqueen",
+   "description": "MCPQueen (hosted) — the graded MCP registry: live-probed grades for remote MCP servers, searchable.",
+   "transport": "streamable-http",
+   "url": "https://mcpqueen.com/mcp",
+   "enabled": true,
+   "trustLevel": "community",
+   "permissions": [
+    "READ_ONLY",
+    "NETWORK"
+   ],
+   "notes": "Free hosted endpoint. Reviewed + live-tested Sept 2026."
+  },
+  {
+   "name": "pandoc",
+   "description": "Pandoc MCP — convert documents between formats (markdown, HTML, docx, PDF…).",
+   "transport": "stdio",
+   "command": "uvx",
+   "args": [
+    "--with",
+    "mcp<2",
+    "mcp-pandoc"
+   ],
+   "enabled": true,
+   "trustLevel": "community",
+   "permissions": [
+    "READ_ONLY",
+    "LOCAL_WRITE"
+   ],
+   "notes": "Needs pandoc binary availability where it runs. Reviewed + live-tested Sept 2026. Needs the pandoc binary on the host (installed in the JEXI brain image). Connect+list verified everywhere; conversion verified on the brain."
+  },
+  {
+   "name": "mslearn",
+   "description": "Microsoft Learn MCP (hosted, official) — search and read Microsoft's entire documentation.",
+   "transport": "streamable-http",
+   "url": "https://learn.microsoft.com/api/mcp",
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY",
+    "NETWORK"
+   ],
+   "notes": "Free hosted endpoint, no auth."
+  },
+  {
+   "name": "cloudflare-docs",
+   "description": "Cloudflare Docs MCP (hosted, official) — search Cloudflare's documentation.",
+   "transport": "streamable-http",
+   "url": "https://docs.mcp.cloudflare.com/mcp",
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY",
+    "NETWORK"
+   ],
+   "notes": "Free hosted endpoint, no auth."
+  },
+  {
+   "name": "playwright",
+   "description": "Microsoft Playwright MCP (official) — drive a real browser: navigate, click, fill, screenshot (24 tools).",
+   "transport": "stdio",
+   "command": "npx",
+   "args": [
+    "-y",
+    "@playwright/mcp@latest",
+    "--headless"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY",
+    "NETWORK",
+    "EXECUTION"
+   ],
+   "notes": "Needs browser binaries on the host; wakes with an honest error where none exist (JEXI's native browser covers that). Needs a browser with system deps on the host. Connect+list verified here; full navigation needs the host browser. JEXI native browser control covers browsing where this cannot run."
+  },
+  {
+   "name": "chrome-devtools",
+   "description": "Chrome DevTools MCP — inspect, debug and profile pages via the DevTools protocol (29 tools).",
+   "transport": "stdio",
+   "command": "npx",
+   "args": [
+    "-y",
+    "chrome-devtools-mcp",
+    "--headless"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY",
+    "NETWORK",
+    "EXECUTION"
+   ],
+   "notes": "Needs Chrome on the host; honest error where absent. Needs Chrome at the host default path. Connect+list verified here; page tools need Chrome on the host."
+  },
+  {
+   "name": "duckduckgo",
+   "description": "DuckDuckGo web search MCP — keyless search, fetch page content, expand links.",
+   "transport": "stdio",
+   "command": "uvx",
+   "args": [
+    "duckduckgo-mcp-server"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY"
+   ],
+   "notes": "No key, no signup (MIT, nickclyde/duckduckgo-mcp-server). Rate-limited ~30 searches/min."
+  },
+  {
+   "name": "weather",
+   "description": "Weather MCP — forecasts, current conditions, alerts for any city, built on NOAA + Open-Meteo public APIs.",
+   "transport": "stdio",
+   "command": "npx",
+   "args": [
+    "-y",
+    "@dangahagan/weather-mcp@latest"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY"
+   ],
+   "notes": "17 tools, zero API keys by design (MIT)."
+  },
+  {
+   "name": "free-search",
+   "description": "Multi-engine keyless search MCP — one research() call with cited results; engines: DuckDuckGo, Wikipedia, StackExchange, GitHub repos.",
+   "transport": "stdio",
+   "command": "uvx",
+   "args": [
+    "free-search-mcp"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY"
+   ],
+   "notes": "No key for the default engines (MIT). API-key engines exist but stay unused."
+  },
+  {
+   "name": "x-docs",
+   "description": "X (Twitter) API documentation MCP — hosted, no auth: search the official docs.",
+   "transport": "streamable-http",
+   "url": "https://docs.x.com/mcp",
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY"
+   ],
+   "notes": "Hosted endpoint, no key needed."
+  },
+  {
+   "name": "hackernews",
+   "description": "Hacker News MCP — top/best/new/ask/show stories, items, comments, users via the official HN Firebase API.",
+   "transport": "stdio",
+   "command": "npx",
+   "args": [
+    "-y",
+    "mcp-hacker-news"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY"
+   ],
+   "notes": "No API key (MIT, paabloLC/mcp-hacker-news)."
+  },
+  {
+   "name": "aws-docs",
+   "description": "AWS documentation MCP — hosted: search AWS docs, list regions, check service availability. Script-run tools need AWS credentials; the docs tools are keyless.",
+   "transport": "streamable-http",
+   "url": "https://aws-mcp.us-east-1.api.aws/mcp",
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY"
+   ],
+   "notes": "Hosted. aws___search_documentation / read / list_regions work with no credentials; run_script requires AWS auth (never used)."
+  },
+  {
+   "name": "duckdb",
+   "description": "DuckDB MCP — run analytical SQL on a local DuckDB database (fast analytics on real data).",
+   "transport": "stdio",
+   "command": "uvx",
+   "args": [
+    "--with",
+    "mcp<2",
+    "mcp-server-duckdb",
+    "--db-path",
+    "${JEXI_DUCKDB_DB}"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY",
+    "LOCAL_WRITE"
+   ],
+   "notes": "Local file database in the JEXI data dir. No network, no key."
+  },
+  {
+   "name": "openlibrary",
+   "description": "Open Library MCP — search millions of books and authors, covers included. Internet Archive's open catalog.",
+   "transport": "stdio",
+   "command": "npx",
+   "args": [
+    "-y",
+    "mcp-open-library"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY"
+   ],
+   "notes": "Keyless public API (MIT)."
+  },
+  {
+   "name": "sympy",
+   "description": "SymPy MCP — exact symbolic math: solve, differentiate, integrate, limits, simplify, 170+ operations.",
+   "transport": "stdio",
+   "command": "uvx",
+   "args": [
+    "mcp-sympy"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY"
+   ],
+   "notes": "Pure local computation, no network, no key."
+  },
+  {
+   "name": "musicbrainz",
+   "description": "MusicBrainz MCP — search artists, releases, recordings; cover art. The open music encyclopedia.",
+   "transport": "stdio",
+   "command": "npx",
+   "args": [
+    "-y",
+    "musicbrainz-mcp"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY"
+   ],
+   "notes": "Keyless public API (CC0 data). Submit/tag tools unused."
+  },
+  {
+   "name": "worldbank",
+   "description": "World Bank MCP — countries, economic, social, education and health indicators for every country.",
+   "transport": "stdio",
+   "command": "npx",
+   "args": [
+    "-y",
+    "worldbank-mcp"
+   ],
+   "enabled": true,
+   "trustLevel": "curated",
+   "permissions": [
+    "READ_ONLY"
+   ],
+   "notes": "World Bank open data, keyless."
+  }
+ ]
 }

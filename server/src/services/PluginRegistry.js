@@ -118,18 +118,15 @@ function load() {
   try {
     if (fs.existsSync(STATE_FILE)) return JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
   } catch (e) { /* fresh */ }
-  // Fresh install: core + every package that declares enabledByDefault (the
-  // Sept 2026 plugin pack ships ON — Lewis's call: things work directly, no switches).
+  // Fresh install: EVERYTHING ON — Lewis's standing instruction (Sept 2026):
+  // no switches, nothing to turn on; JEXI gets every plugin and every skill
+  // from the first boot and decides herself when to use what.
   const auto = ['core'];
+  for (const p of PLUGINS) auto.push(p.id); // built-in packs: all ON
   try {
-    for (const m of discoverPlugins()) {
-      try {
-        const manifest = JSON.parse(fs.readFileSync(path.join(m.packageDir, 'plugin.json'), 'utf-8'));
-        if (manifest.enabledByDefault === true) auto.push(m.id);
-      } catch { /* skip malformed */ }
-    }
+    for (const m of discoverPlugins()) auto.push(m.id); // on-disk packages: all ON
   } catch { /* plugins dir absent */ }
-  return { enabled: auto };
+  return { enabled: [...new Set(auto)] };
 }
 
 function persist() {

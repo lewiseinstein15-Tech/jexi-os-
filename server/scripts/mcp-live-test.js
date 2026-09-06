@@ -166,6 +166,51 @@ const CALLS = {
     ['search_cloudflare_documentation', { query: 'workers' }],
     (r) => JSON.stringify(r.result || {}).length > 50,
   ],
+  // ── Sept 2026 wave 2 (registry v3.2) — 11 more keyless servers ──
+  duckduckgo: async () => [
+    ['search', { query: 'kericho kenya' }],
+    (r) => (r.result?.content || []).map((x) => x.text || '').join('').length > 40,
+  ],
+  weather: async () => [
+    ['get_weather_summary', { city_name: 'Nairobi' }],
+    (r) => JSON.stringify(r.result || {}).toLowerCase().match(/temp|°|weather|wind/) !== null,
+  ],
+  'free-search': async () => [
+    ['search', { query: 'kenya tea', engines: ['duckduckgo', 'wikipedia'] }],
+    (r) => JSON.stringify(r.result || {}).length > 80,
+  ],
+  'x-docs': async () => [
+    ['search_x', { query: 'create a post' }],
+    (r) => (r.result?.content || []).map((x) => x.text || '').join('').length > 40,
+  ],
+  hackernews: async () => [
+    ['getTopStories', {}],
+    (r) => JSON.stringify(r.result || {}).length > 40,
+  ],
+  'aws-docs': async () => [
+    ['aws___search_documentation', { search_phrase: 'S3 bucket' }],
+    (r) => JSON.stringify(r.result || {}).length > 60,
+  ],
+  duckdb: async () => [
+    ['query', { query: "SELECT COUNT(*) AS n FROM range(1, 6) t(i)" }],
+    (r) => JSON.stringify(r.result || {}).includes('5'),
+  ],
+  openlibrary: async () => [
+    ['search_books', { title: 'Things Fall Apart' }],
+    (r) => JSON.stringify(r.result || {}).length > 60,
+  ],
+  sympy: async () => [
+    ['sympy_solve', { equation: 'x**2 - 4', variables: 'x' }],
+    (r) => JSON.stringify(r.result || {}).includes('-2'),
+  ],
+  musicbrainz: async () => [
+    ['musicbrainz_search', { query: 'Fela Kuti', entity: 'artist' }],
+    (r) => JSON.stringify(r.result || {}).length > 60,
+  ],
+  worldbank: async () => [
+    ['get-countries', {}],
+    (r) => JSON.stringify(r.result || {}).length > 60,
+  ],
 };
 
 const results = new Map(); // name → { rounds: [ {connect, tools, call, error} ], evidence }
