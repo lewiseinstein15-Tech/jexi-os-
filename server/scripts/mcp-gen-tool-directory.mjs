@@ -38,7 +38,7 @@ for (const s of enabled) {
     const { gatewayServerTools } = await import('../src/services/MCPGateway.js');
     const tools = gatewayServerTools(s.name) || [];
     servers[s.name] = {
-      tools,
+      tools: tools.map((t) => ({ name: t.name, description: String(t.description || '').slice(0, 220), inputSchema: t.inputSchema || null })),
       launch: s.transport === 'streamable-http' ? `hosted: ${s.url}` : `${s.command} ${(s.args || []).join(' ')}`.trim(),
       verifiedAt: new Date().toISOString(),
     };

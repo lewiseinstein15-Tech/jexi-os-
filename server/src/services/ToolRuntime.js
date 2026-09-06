@@ -23,6 +23,8 @@
  */
 
 import { TOOL_REGISTRY, getTool, enforceToolAllowlist } from './ToolRegistry.js';
+import { invokeMcpTool } from './MCPGateway.js';
+import { resolveMcpFunction } from './CapabilityRouter.js';
 import { WORKSPACE_DIR as CFG_WORKSPACE_DIR, PUBLIC_URL as CFG_PUBLIC_URL, MANAGER_URL as CFG_MANAGER_URL } from '../config.js'; // B127 — real workspace path + public base for URL sanitizing
 import { aggregateSearch } from './SearchEngine.js';
 import { extractContent, extractPdfText, downloadBookFromUrl } from './Extractor.js';
@@ -1341,6 +1343,29 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
   // B97 — PLUGIN SEAM: plugin-mounted tools are first-class. If the static
   // registry misses, synthesize the tool record from the plugin context so
   // the same gates (allowlist, permission, risk, approval, events) apply.
+  // CAPABILITY ROUTER SEAM (Ultimate Upgrade §7/§11) — tools routed in by
+  // CapabilityRouter arrive as mcp__<server>__<tool> function names. They are
+  // not registry tools: dispatch straight through the MCP gateway, where the
+  // lazy connect, permission grants, destructive-call gates, timeout and the
+  // §19 circuit breaker all live.
+  if (slug && slug.startsWith('mcp__')) {
+    // B52 spirit: lightweight intents get NO MCP tools routed in (the
+    // CapabilityRouter gives them none) — a hallucinated mcp__ name in such a
+    // turn is refused here, same as a refused registry tool.
+    if (intent && ['direct_answer', 'conversation', 'memory_query'].includes(intent)) {
+      const refused = { ok: false, blocked: true, byAllowlist: intent, tool: slug, error: `MCP tool '${slug}' is outside the ${intent} allowlist — lightweight intents use memory/knowledge tools only.`, durationMs: Date.now() - started };
+      emit('tool.refused', { tool: slug, intent, reason: refused.error });
+      return refused;
+    }
+    const resolved = resolveMcpFunction(slug);
+    if (!resolved) return { ok: false, error: `Unknown MCP tool: ${slug}`, durationMs: Date.now() - started };
+    emit('tool.start', { tool: slug, label: `${resolved.server} · ${resolved.tool}` });
+    const r = await invokeMcpTool({ server: resolved.server, tool: resolved.tool, args });
+    const dur = Date.now() - started;
+    const payload = { tool: slug, server: resolved.server, mcpTool: resolved.tool, ok: !!r.ok, durationMs: dur };
+    emit(r.ok ? 'tool.result' : 'tool.error', { ...payload, error: r.ok ? undefined : String(r.error || '').slice(0, 200) });
+    return { ...r, tool: slug, server: resolved.server, mcpTool: resolved.tool, durationMs: dur };
+  }
   let tool = getTool(slug);
   if (!tool) {
     const pt = getPluginTool(slug);

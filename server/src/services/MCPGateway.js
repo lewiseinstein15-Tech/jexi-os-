@@ -207,14 +207,20 @@ async function defaultConnector(entry) {
     // (filesystem roots, git --repository) can start — create-on-connect.
     try { fs.mkdirSync(WORKSPACE_DIR, { recursive: true }); } catch { /* best effort */ }
     const args = (entry.args || []).map((a) => interpolateArg(a, WORKSPACE_DIR));
-    // mcp-server-git crashes unless --repository points at an existing GIT REPO
-    // (NoSuchPathError otherwise). The JEXI workspace is versioned anyway —
-    // git-init it once if it is not a repo yet.
+    // mcp-server-git crashes unless --repository points at a VALID git repo
+    // (missing dir → NoSuchPathError; partial .git skeleton → "not a valid
+    // Git repository"). `git init` is idempotent and repairs both — run it
+    // whenever the target is not a healthy repo (HEAD + refs + config).
     try {
       const repoIdx = args.indexOf('--repository');
-      if (repoIdx >= 0 && args[repoIdx + 1] && !fs.existsSync(path.join(args[repoIdx + 1], '.git'))) {
-        const { spawnSync } = await import('node:child_process');
-        spawnSync('git', ['init', '-q', args[repoIdx + 1]], { timeout: 15_000 });
+      if (repoIdx >= 0 && args[repoIdx + 1]) {
+        const repo = args[repoIdx + 1];
+        const g = path.join(repo, '.git');
+        const healthy = fs.existsSync(path.join(g, 'HEAD')) && fs.existsSync(path.join(g, 'refs')) && fs.existsSync(path.join(g, 'config'));
+        if (!healthy) {
+          const { spawnSync } = await import('node:child_process');
+          spawnSync('git', ['init', '-q', repo], { timeout: 15_000 });
+        }
       }
     } catch { /* best effort — server reports honestly if still broken */ }
     // sqlite path placeholder → make sure the parent dir exists (empty file = server opens/creates it)
@@ -500,7 +506,35 @@ export function mcpToolsUnified() {
  * Invoke an MCP tool through the permission boundary.
  * @param {object} p { server, tool, args, authorized, timeoutMs }
  */
+/* §9/§19 — per-server circuit breaker: 3 consecutive invoke failures open the
+ * circuit for 5 minutes (fast honest refusal instead of repeated slow
+ * timeouts). Any success closes it. */
+const BREAKER_THRESHOLD = 3;
+const BREAKER_COOLDOWN_MS = 5 * 60 * 1000;
+const breakers = new Map(); // server → { fails, openedAt }
+
+function breakerOpen(server) {
+  const b = breakers.get(server);
+  if (!b || !b.openedAt) return false;
+  if (Date.now() - b.openedAt > BREAKER_COOLDOWN_MS) {
+    breakers.delete(server); // half-open: let one call through
+    return false;
+  }
+  return true;
+}
+function breakerFail(server) {
+  const b = breakers.get(server) || { fails: 0, openedAt: 0 };
+  b.fails += 1;
+  if (b.fails >= BREAKER_THRESHOLD && !b.openedAt) b.openedAt = Date.now();
+  breakers.set(server, b);
+}
+function breakerSuccess(server) { breakers.delete(server); }
+
 export async function invokeMcpTool({ server, tool, args = {}, authorized = false, timeoutMs = 30_000 } = {}) {
+  if (breakerOpen(server)) {
+    audit({ type: 'MCP_BREAKER_OPEN', server, tool, reason: 'circuit open after repeated failures' });
+    return { ok: false, error: `server '${server}' is in a failure cooldown (circuit breaker) — try again in a few minutes`, circuitOpen: true };
+  }
   let conn = connections.get(server);
   if (!conn) {
     // Lazy connect: an enabled server spins up on first real use (idle servers cost no memory).
@@ -547,19 +581,21 @@ export async function invokeMcpTool({ server, tool, args = {}, authorized = fals
       clearTimeout(timer);
     }
     conn.lastSuccessAt = new Date().toISOString();
+    breakerSuccess(server);
     return { ok: true, result };
   } catch (e) {
     conn.failures += 1;
     conn.lastError = String(e && e.message).slice(0, 200);
+    breakerFail(server);
     audit({ type: 'MCP_INVOKE_FAILED', server, tool, error: conn.lastError });
-    return { ok: false, error: conn.lastError };
+    return { ok: false, error: conn.lastError, circuitOpen: breakerOpen(server) };
   }
 }
 
-/** Live tool list of a CONNECTED server (name + description each), or null. */
+/** Live tool list of a CONNECTED server (name, description, inputSchema), or null. */
 export function gatewayServerTools(name) {
   const c = connections.get(name);
-  return c ? c.tools.map((t) => ({ name: t.name, description: String(t.description || '').slice(0, 220) })) : null;
+  return c ? c.tools.map((t) => ({ name: t.name, description: String(t.description || '').slice(0, 220), inputSchema: t.inputSchema || null })) : null;
 }
 
 /** Server health snapshot (spec §17: server health + lifecycle). */
@@ -575,7 +611,8 @@ export function mcpServerHealth() {
       enabled: s.enabled,
       trustLevel: s.trustLevel,
       permissions: s.permissions,
-      status: !s.enabled ? 'disabled' : c ? (c.failures > 0 && !c.lastSuccessAt ? 'error' : 'connected') : idleStatus,
+      status: !s.enabled ? 'disabled' : breakerOpen(s.name) ? 'cooldown' : c ? (c.failures > 0 && !c.lastSuccessAt ? 'error' : 'connected') : idleStatus,
+      circuit: breakerOpen(s.name) ? 'open' : 'closed',
       tools: c ? c.tools.length : ((loadToolDirectory()[s.name] || {}).tools || []).length,
       live: !!c,
       calls: c ? c.calls : 0,

@@ -29,6 +29,7 @@
 import { planner } from './Planner.js'; // the singleton instance (the class itself has no statics)
 import { getTool } from './ToolRegistry.js';
 import { buildNativeSchemas, executeTool, activeToolProfile, TOOL_PROFILES, isToolDone } from './ToolRuntime.js';
+import { selectMcpToolset } from './CapabilityRouter.js';
 import { generateWithToolsLoop, generateContent } from './LLMClient.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { buildSkillCatalog } from './SkillDiscovery.js'; // B98 — dsh-style available-skills catalog (metadata only)
@@ -110,6 +111,17 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
     }
   }
   let schemas = buildNativeSchemas(toolDefs);
+  // CAPABILITY ROUTER (Ultimate Upgrade §7/§11): the MINIMUM useful MCP tools
+  // join the offered set — routed by intent + query keywords (e.g. a weather
+  // question gets the weather server, a paper search gets arxiv), never all
+  // 515. Dispatch goes through executeTool's mcp__ gateway seam.
+  try {
+    const sel = selectMcpToolset(query, plan);
+    if (sel.schemas.length) {
+      schemas = [...schemas, ...sel.schemas];
+      emit('agent.log', { message: `🔌 Capability routing: ${sel.reason} → offering ${sel.schemas.length} MCP tools (${sel.servers.join(', ')}).` });
+    }
+  } catch { /* MCP routing is additive — never break the loop */ }
   const profile = opts.profile || activeToolProfile();
   const prefer = providerPreferenceForIntent(plan.intent); // stage 24: per-domain model routing
   // B99 — CODE MODE (PTC): when enabled, the model may write ONE TypeScript
