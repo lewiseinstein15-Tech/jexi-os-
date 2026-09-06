@@ -1,0 +1,13 @@
+{
+  "id": "docker-basics",
+  "name": "Docker Basics",
+  "version": "1.0.0",
+  "description": "Containers that stay small, start fast, and run as one process.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "docker-practical"
+    ],
+    "skillsDir": "skills"
+  }
+}

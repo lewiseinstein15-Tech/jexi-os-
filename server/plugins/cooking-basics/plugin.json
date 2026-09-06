@@ -1,0 +1,13 @@
+{
+  "id": "cooking-basics",
+  "name": "Cooking Basics",
+  "version": "1.0.0",
+  "description": "Techniques, substitutions, and dinner without a recipe.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "kitchen-fundamentals"
+    ],
+    "skillsDir": "skills"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "react-recipes",
+  "name": "React Recipes",
+  "version": "1.0.0",
+  "description": "Hooks patterns, rendering rules, and performance that actually matters.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "react-hooks-patterns"
+    ],
+    "skillsDir": "skills"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "testing-guide",
+  "name": "Testing Guide",
+  "version": "1.0.0",
+  "description": "What to test, how, and when to stop: unit → integration → end-to-end.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "testing-strategy"
+    ],
+    "skillsDir": "skills"
+  }
+}

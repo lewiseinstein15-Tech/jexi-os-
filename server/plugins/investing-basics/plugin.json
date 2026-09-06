@@ -1,0 +1,13 @@
+{
+  "id": "investing-basics",
+  "name": "Investing Basics",
+  "version": "1.0.0",
+  "description": "Long-term investing in plain terms: risk, diversification, costs.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "investing-plain"
+    ],
+    "skillsDir": "skills"
+  }
+}

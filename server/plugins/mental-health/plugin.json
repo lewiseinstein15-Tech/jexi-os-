@@ -1,0 +1,13 @@
+{
+  "id": "mental-health",
+  "name": "Mental Health",
+  "version": "1.0.0",
+  "description": "Stress management and mental fitness basics — with real limits stated.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "stress-basics"
+    ],
+    "skillsDir": "skills"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "resume-interview",
+  "name": "Resume & Interview",
+  "version": "1.0.0",
+  "description": "Resumes that pass the 6-second scan; interviews that show impact.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "resume-basics"
+    ],
+    "skillsDir": "skills"
+  }
+}

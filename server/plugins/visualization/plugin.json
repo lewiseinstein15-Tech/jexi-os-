@@ -1,0 +1,13 @@
+{
+  "id": "visualization",
+  "name": "Visualization",
+  "version": "1.0.0",
+  "description": "Charts that tell the truth quickly: pick, simplify, label.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "chart-design"
+    ],
+    "skillsDir": "skills"
+  }
+}

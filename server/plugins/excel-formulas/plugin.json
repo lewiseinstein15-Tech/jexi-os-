@@ -1,0 +1,13 @@
+{
+  "id": "excel-formulas",
+  "name": "Spreadsheet Formulas",
+  "version": "1.0.0",
+  "description": "The formulas that cover real work: lookups, sums with conditions, dates, cleanup.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "spreadsheet-formulas"
+    ],
+    "skillsDir": "skills"
+  }
+}

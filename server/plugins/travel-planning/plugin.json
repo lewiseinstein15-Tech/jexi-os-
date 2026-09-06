@@ -1,0 +1,13 @@
+{
+  "id": "travel-planning",
+  "name": "Travel Planning",
+  "version": "1.0.0",
+  "description": "Itineraries, packing, money, and the parts people get wrong.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "trip-planning"
+    ],
+    "skillsDir": "skills"
+  }
+}

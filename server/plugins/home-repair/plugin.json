@@ -1,0 +1,13 @@
+{
+  "id": "home-repair",
+  "name": "Home Repair",
+  "version": "1.0.0",
+  "description": "The fixes that are safe to DIY, and the line where you call a pro.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "diy-home"
+    ],
+    "skillsDir": "skills"
+  }
+}

@@ -118,7 +118,18 @@ function load() {
   try {
     if (fs.existsSync(STATE_FILE)) return JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
   } catch (e) { /* fresh */ }
-  return { enabled: ['core'] }; // core is always on
+  // Fresh install: core + every package that declares enabledByDefault (the
+  // Sept 2026 plugin pack ships ON — Lewis's call: things work directly, no switches).
+  const auto = ['core'];
+  try {
+    for (const m of discoverPlugins()) {
+      try {
+        const manifest = JSON.parse(fs.readFileSync(path.join(m.packageDir, 'plugin.json'), 'utf-8'));
+        if (manifest.enabledByDefault === true) auto.push(m.id);
+      } catch { /* skip malformed */ }
+    }
+  } catch { /* plugins dir absent */ }
+  return { enabled: auto };
 }
 
 function persist() {

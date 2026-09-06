@@ -1,0 +1,13 @@
+{
+  "id": "sleep-science",
+  "name": "Sleep Science",
+  "version": "1.0.0",
+  "description": "The levers that actually move sleep quality.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "better-sleep"
+    ],
+    "skillsDir": "skills"
+  }
+}

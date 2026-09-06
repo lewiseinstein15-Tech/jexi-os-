@@ -1,0 +1,13 @@
+{
+  "id": "prompt-craft",
+  "name": "Prompt Craft",
+  "version": "1.0.0",
+  "description": "Getting what you want from AI: context, examples, constraints, iteration.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "prompting-well"
+    ],
+    "skillsDir": "skills"
+  }
+}

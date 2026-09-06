@@ -1,0 +1,13 @@
+{
+  "id": "javascript-patterns",
+  "name": "JavaScript Patterns",
+  "version": "1.0.0",
+  "description": "Modern JS: destructuring, async patterns, array methods, modules.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "js-core-patterns"
+    ],
+    "skillsDir": "skills"
+  }
+}

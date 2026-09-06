@@ -1,0 +1,13 @@
+{
+  "id": "email-craft",
+  "name": "Email Craft",
+  "version": "1.0.0",
+  "description": "Emails that get replies: subject, ask, brevity.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "effective-email"
+    ],
+    "skillsDir": "skills"
+  }
+}

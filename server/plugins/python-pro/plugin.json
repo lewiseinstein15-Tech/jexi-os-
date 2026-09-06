@@ -1,0 +1,13 @@
+{
+  "id": "python-pro",
+  "name": "Python Pro",
+  "version": "1.0.0",
+  "description": "Python idioms, stdlib gems, and writing code that reads like the language.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "python-idioms"
+    ],
+    "skillsDir": "skills"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "sql-essentials",
+  "name": "SQL Essentials",
+  "version": "1.0.0",
+  "description": "Query patterns: joins, aggregation, window functions, and how to reason about query shape.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "sql-patterns"
+    ],
+    "skillsDir": "skills"
+  }
+}

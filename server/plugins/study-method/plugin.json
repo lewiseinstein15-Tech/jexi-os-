@@ -1,0 +1,13 @@
+{
+  "id": "study-method",
+  "name": "Study Method",
+  "version": "1.0.0",
+  "description": "Learning that sticks: active recall, spacing, interleaving.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "learning-science"
+    ],
+    "skillsDir": "skills"
+  }
+}

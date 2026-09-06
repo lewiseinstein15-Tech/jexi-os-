@@ -1,0 +1,13 @@
+{
+  "id": "architecture",
+  "name": "Architecture",
+  "version": "1.0.0",
+  "description": "Structuring code: boundaries, dependencies, and when a pattern earns its cost.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "architecture-basics"
+    ],
+    "skillsDir": "skills"
+  }
+}

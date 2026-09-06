@@ -1,0 +1,13 @@
+{
+  "id": "data-analysis",
+  "name": "Data Analysis",
+  "version": "1.0.0",
+  "description": "From raw data to an answer: clean → describe → question → check.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "analysis-workflow"
+    ],
+    "skillsDir": "skills"
+  }
+}

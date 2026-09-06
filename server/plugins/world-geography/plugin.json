@@ -1,0 +1,13 @@
+{
+  "id": "world-geography",
+  "name": "World Geography",
+  "version": "1.0.0",
+  "description": "Countries, capitals and quick facts for orientation.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "geo-orientation"
+    ],
+    "skillsDir": "skills"
+  }
+}

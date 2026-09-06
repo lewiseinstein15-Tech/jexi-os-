@@ -1,0 +1,13 @@
+{
+  "id": "api-design",
+  "name": "API Design",
+  "version": "1.0.0",
+  "description": "REST and endpoint design principles: resources, verbs, status codes, versioning.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "rest-design"
+    ],
+    "skillsDir": "skills"
+  }
+}

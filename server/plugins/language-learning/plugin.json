@@ -1,0 +1,13 @@
+{
+  "id": "language-learning",
+  "name": "Language Learning",
+  "version": "1.0.0",
+  "description": "How to actually acquire a language: input, speaking early, spaced words.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "language-method"
+    ],
+    "skillsDir": "skills"
+  }
+}

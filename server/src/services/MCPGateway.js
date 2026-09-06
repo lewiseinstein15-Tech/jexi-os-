@@ -28,8 +28,18 @@ import path from 'node:path';
 import os from 'node:os';
 
 const DEFAULT_REGISTRY_PATH = () => new URL('../../../mcp/registry.json', import.meta.url).pathname;
+const DIRECTORY_PATH = () => new URL('../../../mcp/tool-directory.json', import.meta.url).pathname;
 const STATE_FILE = () => path.join(process.env.DATA_DIR || './data', 'mcp-registry-state.json');
 const AUDIT_FILE = () => path.join(process.env.DATA_DIR || './data', 'mcp-audit.jsonl');
+
+/** Tool directory: every server's tool names as last verified live — lets the planner
+ *  see all 35 servers' tools without holding 35 child processes. */
+export function loadToolDirectory() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(DIRECTORY_PATH(), 'utf8'));
+    return raw.servers || {};
+  } catch { return {}; }
+}
 
 export const PERMISSION_BOUNDARIES = ['READ_ONLY', 'LOCAL_WRITE', 'NETWORK', 'EXECUTION', 'GIT', 'DEPLOYMENT', 'DESTRUCTIVE'];
 
@@ -221,14 +231,19 @@ export async function connectEnabledMcpServers() {
   for (const s of reg.servers) {
     if (!s.enabled) continue;
     if (connections.has(s.name)) continue; // already up (e.g. retry pass)
-    // Memory guard: each connected MCP server is a child node process
+    // Hosted HTTP servers hold no child process — connect them all at boot.
+    if (s.transport === 'streamable-http') {
+      const r = await connectGatewayServer(s.name);
+      out.push({ server: s.name, ok: r.ok === true, tools: r.tools || 0, ...(r.ok ? {} : { error: r.error }) });
+      continue;
+    }
+    // Memory guard: each connected local MCP server is a child process
     // (~40-90MB). On a small host (Render free tier = 512MB total) connecting
-    // all of them starves the brain itself and the container gets recycled —
-    // observed live as servers climbing to 4/5 then the whole brain resetting.
-    // Stop before that: leave headroom, let the rest wake on first use.
+    // all of them starves the brain itself — observed live as container
+    // recycling. Stop before that: leave headroom, the rest wake on first use.
     const freeMb = Math.round(os.freemem() / 1048576);
-    if (out.length > 0 && freeMb < 200) {
-      out.push({ server: s.name, ok: true, skipped: true, note: `memory guard: ${freeMb}MB free — stays ready, wakes on first use` });
+    if (out.filter((o) => o.ok && !o.skipped && !o.hosted).length > 0 && freeMb < 200) {
+      out.push({ server: s.name, ok: true, skipped: true, note: `memory guard: ${freeMb}MB free — sleeps, wakes on first use` });
       continue;
     }
     const r = await connectGatewayServer(s.name);
@@ -264,23 +279,63 @@ function looksDestructive(tool, grants = []) {
   return false;
 }
 
-/** Unified tool shape (Phase 3 interface) for every discovered MCP tool. */
+/** Unified tool shape (Phase 3 interface). CONNECTED servers expose live tools (with schemas);
+ *  enabled-but-sleeping servers expose their directory tools (verified live previously) —
+ *  invoking one wakes the server (lazy connect). Hosted HTTP servers hold no child process. */
 export function mcpToolsUnified() {
   const out = [];
+  const directory = loadToolDirectory();
+  const reg = effectiveRegistry();
+  for (const entry of reg.servers) {
+    if (!entry.enabled) continue;
+    const grants = entry.permissions || ['READ_ONLY'];
+    const c = connections.get(entry.name);
+    if (c) {
+      for (const t of c.tools) {
+        out.push({
+          id: `mcp:${entry.name}:${t.name}`,
+          description: t.description,
+          schema: t.inputSchema,
+          source: 'mcp',
+          server: entry.name,
+          live: true,
+          permissions: grants,
+          risk: looksDestructive(t, grants) ? 'risky' : (grants.includes('LOCAL_WRITE') ? 'medium' : 'safe'),
+          timeoutMs: 30_000,
+          cost: 0,
+          requiresAuthorization: looksDestructive(t, grants),
+        });
+      }
+    } else {
+      const dir = directory[entry.name];
+      if (!dir) continue;
+      for (const t of dir.tools || []) {
+        out.push({
+          id: `mcp:${entry.name}:${t.name}`,
+          description: t.description,
+          schema: null, // wakes with the real schema on connect
+          source: 'mcp',
+          server: entry.name,
+          live: false, // sleeping — first call connects the server
+          permissions: grants,
+          risk: grants.includes('LOCAL_WRITE') ? 'medium' : 'safe',
+          timeoutMs: 45_000, // includes the wake
+          cost: 0,
+          requiresAuthorization: looksDestructive({ name: t.name }, grants),
+        });
+      }
+    }
+  }
+  // live connections from non-default registries still report
   for (const [server, conn] of connections) {
+    if (reg.servers.some((s) => s.name === server)) continue;
     const grants = conn.grants || ['READ_ONLY'];
     for (const t of conn.tools) {
       out.push({
-        id: `mcp:${server}:${t.name}`,
-        description: t.description,
-        schema: t.inputSchema,
-        source: 'mcp',
-        server,
-        permissions: grants,
+        id: `mcp:${server}:${t.name}`, description: t.description, schema: t.inputSchema, source: 'mcp',
+        server, live: true, permissions: grants,
         risk: looksDestructive(t, grants) ? 'risky' : (grants.includes('LOCAL_WRITE') ? 'medium' : 'safe'),
-        timeoutMs: 30_000,
-        cost: 0,
-        requiresAuthorization: looksDestructive(t, grants),
+        timeoutMs: 30_000, cost: 0, requiresAuthorization: looksDestructive(t, grants),
       });
     }
   }
@@ -361,7 +416,8 @@ export function mcpServerHealth() {
       trustLevel: s.trustLevel,
       permissions: s.permissions,
       status: !s.enabled ? 'disabled' : c ? (c.failures > 0 && !c.lastSuccessAt ? 'error' : 'connected') : idleStatus,
-      tools: c ? c.tools.length : 0,
+      tools: c ? c.tools.length : ((loadToolDirectory()[s.name] || {}).tools || []).length,
+      live: !!c,
       calls: c ? c.calls : 0,
       failures: c ? c.failures : 0,
       lastError: c ? c.lastError : (cs ? cs.lastConnectError : null),

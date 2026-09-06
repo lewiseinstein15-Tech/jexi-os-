@@ -1,0 +1,13 @@
+{
+  "id": "performance",
+  "name": "Performance",
+  "version": "1.0.0",
+  "description": "Measure first: profiling, hot paths, and the fixes that usually matter.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "perf-method"
+    ],
+    "skillsDir": "skills"
+  }
+}

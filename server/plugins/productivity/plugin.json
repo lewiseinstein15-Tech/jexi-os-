@@ -1,0 +1,13 @@
+{
+  "id": "productivity",
+  "name": "Productivity",
+  "version": "1.0.0",
+  "description": "Deep work, prioritization, and saying no with a system that survives busy weeks.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "deep-work"
+    ],
+    "skillsDir": "skills"
+  }
+}

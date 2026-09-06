@@ -1,0 +1,13 @@
+{
+  "id": "node-production",
+  "name": "Node in Production",
+  "version": "1.0.0",
+  "description": "Running Node services: processes, errors, logs, graceful shutdown.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "node-production-practices"
+    ],
+    "skillsDir": "skills"
+  }
+}

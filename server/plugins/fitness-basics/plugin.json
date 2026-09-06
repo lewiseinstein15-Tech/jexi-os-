@@ -1,0 +1,13 @@
+{
+  "id": "fitness-basics",
+  "name": "Fitness Basics",
+  "version": "1.0.0",
+  "description": "Training principles: consistency, progressive overload, recovery.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "training-principles"
+    ],
+    "skillsDir": "skills"
+  }
+}

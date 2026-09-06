@@ -1,0 +1,13 @@
+{
+  "id": "decision-making",
+  "name": "Decision Making",
+  "version": "1.0.0",
+  "description": "Frameworks for choices under uncertainty, from lunch to architecture.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "decision-frameworks"
+    ],
+    "skillsDir": "skills"
+  }
+}

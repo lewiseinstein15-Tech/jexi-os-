@@ -1,0 +1,13 @@
+{
+  "id": "nutrition-basics",
+  "name": "Nutrition Basics",
+  "version": "1.0.0",
+  "description": "Eating that supports energy and health without dogma.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "eating-basics"
+    ],
+    "skillsDir": "skills"
+  }
+}

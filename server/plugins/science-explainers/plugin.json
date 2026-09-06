@@ -1,0 +1,13 @@
+{
+  "id": "science-explainers",
+  "name": "Science Intuition",
+  "version": "1.0.0",
+  "description": "Physics, chemistry, biology intuition for everyday explanations.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "science-intuition"
+    ],
+    "skillsDir": "skills"
+  }
+}

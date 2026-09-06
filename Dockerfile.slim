@@ -8,12 +8,18 @@
 FROM node:22-slim
 
 # ffmpeg (video frames/audio) + python3/pip (yt-dlp) for /watch
+# qrencode + pandoc: binaries the qrcode/pandoc MCP servers shell out to.
+# uv: fast Python runner for the uvx-based MCP servers (sqlite, osm, rss,
+# chroma, mermaid, pandoc, ...) — no pip venv juggling, cached wheels.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg python3 python3-pip ca-certificates fonts-liberation \
+    ffmpeg python3 python3-pip ca-certificates fonts-liberation qrencode pandoc curl \
     && rm -rf /var/lib/apt/lists/* \
     && (pip3 install --no-cache-dir --break-system-packages yt-dlp \
         || pip3 install --no-cache-dir yt-dlp \
-        || echo 'WARN: yt-dlp install failed — /watch URL mode degrades')
+        || echo 'WARN: yt-dlp install failed — /watch URL mode degrades') \
+    && (curl -LsSf https://astral.sh/uv/install.sh | sh \
+        && cp /root/.local/bin/uv /usr/local/bin/uv && cp /root/.local/bin/uvx /usr/local/bin/uvx \
+        || echo 'WARN: uv install failed — python uvx MCP servers degrade')
 
 WORKDIR /app
 

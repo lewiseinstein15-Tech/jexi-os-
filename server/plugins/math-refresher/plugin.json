@@ -1,0 +1,13 @@
+{
+  "id": "math-refresher",
+  "name": "Math Refresher",
+  "version": "1.0.0",
+  "description": "Percentages, ratios, and the stats intuition people actually need.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "everyday-math"
+    ],
+    "skillsDir": "skills"
+  }
+}

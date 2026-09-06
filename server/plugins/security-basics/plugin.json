@@ -1,0 +1,13 @@
+{
+  "id": "security-basics",
+  "name": "Security Basics",
+  "version": "1.0.0",
+  "description": "Practical defense: validation, secrets, authz, and the mistakes that get exploited.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "practical-security"
+    ],
+    "skillsDir": "skills"
+  }
+}

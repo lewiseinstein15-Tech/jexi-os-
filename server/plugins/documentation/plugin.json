@@ -1,0 +1,13 @@
+{
+  "id": "documentation",
+  "name": "Documentation",
+  "version": "1.0.0",
+  "description": "READMEs, inline docs, and ADRs that people actually read.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "writing-docs"
+    ],
+    "skillsDir": "skills"
+  }
+}

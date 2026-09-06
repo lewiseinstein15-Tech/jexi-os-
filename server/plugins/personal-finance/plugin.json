@@ -1,0 +1,13 @@
+{
+  "id": "personal-finance",
+  "name": "Personal Finance",
+  "version": "1.0.0",
+  "description": "Budget, emergency fund, debt — the boring 90% of money.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "money-basics"
+    ],
+    "skillsDir": "skills"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "regex-toolkit",
+  "name": "Regex Toolkit",
+  "version": "1.0.0",
+  "description": "Regular expression patterns, pitfalls and recipes for text extraction, validation and cleanup.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "regex-patterns"
+    ],
+    "skillsDir": "skills"
+  }
+}

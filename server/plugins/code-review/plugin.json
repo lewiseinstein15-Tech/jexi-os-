@@ -1,0 +1,13 @@
+{
+  "id": "code-review",
+  "name": "Code Review",
+  "version": "1.0.0",
+  "description": "A checklist that catches real problems without bikeshedding.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "review-checklist"
+    ],
+    "skillsDir": "skills"
+  }
+}

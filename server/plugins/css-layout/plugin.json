@@ -1,0 +1,13 @@
+{
+  "id": "css-layout",
+  "name": "CSS Layout",
+  "version": "1.0.0",
+  "description": "Flexbox and grid recipes that cover 95% of layouts.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "flex-grid-recipes"
+    ],
+    "skillsDir": "skills"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "presentations",
+  "name": "Presentations",
+  "version": "1.0.0",
+  "description": "Structure slides so the talk carries, not the deck.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "slide-craft"
+    ],
+    "skillsDir": "skills"
+  }
+}

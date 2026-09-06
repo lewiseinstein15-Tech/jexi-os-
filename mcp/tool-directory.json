@@ -1,0 +1,1304 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-05T23:18:03.579Z",
+  "servers": {
+    "filesystem": {
+      "tools": [
+        {
+          "name": "read_file",
+          "description": "Read the complete contents of a file as text. DEPRECATED: Use read_text_file instead."
+        },
+        {
+          "name": "read_text_file",
+          "description": "Read the complete contents of a file from the file system as text. Handles various text encodings and provides detailed "
+        },
+        {
+          "name": "read_media_file",
+          "description": "Read a file and return it as a base64-encoded content block with its MIME type. Image and audio files are returned as im"
+        },
+        {
+          "name": "read_multiple_files",
+          "description": "Read the contents of multiple files simultaneously. This is more efficient than reading files one by one when you need t"
+        },
+        {
+          "name": "write_file",
+          "description": "Create a new file or completely overwrite an existing file with new content. Use with caution as it will overwrite exist"
+        },
+        {
+          "name": "edit_file",
+          "description": "Make line-based edits to a text file. Each edit replaces exact line sequences with new content. Returns a git-style diff"
+        },
+        {
+          "name": "create_directory",
+          "description": "Create a new directory or ensure a directory exists. Can create multiple nested directories in one operation. If the dir"
+        },
+        {
+          "name": "list_directory",
+          "description": "Get a detailed listing of all files and directories in a specified path. Results clearly distinguish between files and d"
+        },
+        {
+          "name": "list_directory_with_sizes",
+          "description": "Get a detailed listing of all files and directories in a specified path, including sizes. Results clearly distinguish be"
+        },
+        {
+          "name": "directory_tree",
+          "description": "Get a recursive tree view of files and directories as a JSON structure. Each entry includes 'name', 'type' (file/directo"
+        },
+        {
+          "name": "move_file",
+          "description": "Move or rename files and directories. Can move files between directories and rename them in a single operation. If the d"
+        },
+        {
+          "name": "search_files",
+          "description": "Recursively search for files and directories matching a pattern. The patterns should be glob-style patterns that match p"
+        },
+        {
+          "name": "get_file_info",
+          "description": "Retrieve detailed metadata about a file or directory. Returns comprehensive information including size, creation time, l"
+        },
+        {
+          "name": "list_allowed_directories",
+          "description": "Returns the list of directories that this server is allowed to access. Subdirectories within these allowed directories a"
+        }
+      ],
+      "launch": "npx -y @modelcontextprotocol/server-filesystem ${JEXI_WORKSPACE}",
+      "verifiedAt": "2026-09-05T23:18:03.578Z"
+    },
+    "memory": {
+      "tools": [
+        {
+          "name": "create_entities",
+          "description": "Create multiple new entities in the knowledge graph"
+        },
+        {
+          "name": "create_relations",
+          "description": "Create multiple new relations between entities in the knowledge graph. Relations should be in active voice"
+        },
+        {
+          "name": "add_observations",
+          "description": "Add new observations to existing entities in the knowledge graph"
+        },
+        {
+          "name": "delete_entities",
+          "description": "Delete multiple entities and their associated relations from the knowledge graph"
+        },
+        {
+          "name": "delete_observations",
+          "description": "Delete specific observations from entities in the knowledge graph"
+        },
+        {
+          "name": "delete_relations",
+          "description": "Delete multiple relations from the knowledge graph"
+        },
+        {
+          "name": "read_graph",
+          "description": "Read the entire knowledge graph"
+        },
+        {
+          "name": "search_nodes",
+          "description": "Search for nodes in the knowledge graph based on a query"
+        },
+        {
+          "name": "open_nodes",
+          "description": "Open specific nodes in the knowledge graph by their names"
+        }
+      ],
+      "launch": "npx -y @modelcontextprotocol/server-memory",
+      "verifiedAt": "2026-09-05T23:18:03.578Z"
+    },
+    "everything": {
+      "tools": [
+        {
+          "name": "echo",
+          "description": "Echoes back the input string"
+        },
+        {
+          "name": "get-annotated-message",
+          "description": "Demonstrates how annotations can be used to provide metadata about content."
+        },
+        {
+          "name": "get-env",
+          "description": "Returns all environment variables, helpful for debugging MCP server configuration"
+        },
+        {
+          "name": "get-resource-links",
+          "description": "Returns up to ten resource links that reference different types of resources"
+        },
+        {
+          "name": "get-resource-reference",
+          "description": "Returns a resource reference that can be used by MCP clients"
+        },
+        {
+          "name": "get-structured-content",
+          "description": "Returns structured content along with an output schema for client data validation"
+        },
+        {
+          "name": "get-sum",
+          "description": "Returns the sum of two numbers"
+        },
+        {
+          "name": "get-tiny-image",
+          "description": "Returns a tiny MCP logo image."
+        },
+        {
+          "name": "gzip-file-as-resource",
+          "description": "Compresses a single file using gzip compression. Depending upon the selected output type, returns either the compressed "
+        },
+        {
+          "name": "toggle-simulated-logging",
+          "description": "Toggles simulated, random-leveled logging on or off."
+        },
+        {
+          "name": "toggle-subscriber-updates",
+          "description": "Toggles simulated resource subscription updates on or off."
+        },
+        {
+          "name": "trigger-long-running-operation",
+          "description": "Demonstrates a long running operation with progress updates."
+        },
+        {
+          "name": "simulate-research-query",
+          "description": "Simulates a deep research operation that gathers, analyzes, and synthesizes information. Demonstrates MCP task-based ope"
+        }
+      ],
+      "launch": "npx -y @modelcontextprotocol/server-everything",
+      "verifiedAt": "2026-09-05T23:18:03.578Z"
+    },
+    "sequentialthinking": {
+      "tools": [
+        {
+          "name": "sequentialthinking",
+          "description": "A detailed tool for dynamic and reflective problem-solving through thoughts.\nThis tool helps analyze problems through a "
+        }
+      ],
+      "launch": "npx -y @modelcontextprotocol/server-sequential-thinking",
+      "verifiedAt": "2026-09-05T23:18:03.578Z"
+    },
+    "context7": {
+      "tools": [
+        {
+          "name": "resolve-library-id",
+          "description": "Resolves a package/product name to a Context7-compatible library ID and returns matching libraries.\n\nYou MUST call this "
+        },
+        {
+          "name": "query-docs",
+          "description": "Retrieves and queries up-to-date documentation and code examples from Context7 for any programming library or framework."
+        }
+      ],
+      "launch": "npx -y @upstash/context7-mcp",
+      "verifiedAt": "2026-09-05T23:18:03.578Z"
+    },
+    "mate-tools": {
+      "tools": [
+        {
+          "name": "count_lines",
+          "description": "Count lines, words, sentences, paragraphs and characters in a chunk of text. Returns sixteen text metrics including dupl"
+        },
+        {
+          "name": "base64_encode",
+          "description": "Base64-encode a string. Optional URL-safe variant (RFC 4648 §5: `-`/`_` instead of `+`/`/`, no padding)."
+        },
+        {
+          "name": "base64_decode",
+          "description": "Base64-decode a string. Accepts both standard and URL-safe Base64; missing padding is auto-fixed. Returns text when vali"
+        },
+        {
+          "name": "url_encode",
+          "description": "Percent-encode a string for URL use. mode=component (RFC 3986 strict, default), form (application/x-www-form-urlencoded)"
+        },
+        {
+          "name": "url_decode",
+          "description": "Decode a percent-encoded URL string. mode=component (rawurldecode, default) or form (interprets + as space)."
+        },
+        {
+          "name": "hash",
+          "description": "Compute one or more cryptographic hashes of a text input. Defaults to MD5, SHA-1, SHA-256, SHA-384, SHA-512, CRC32, SHA3"
+        },
+        {
+          "name": "password",
+          "description": "Generate cryptographically random passwords using a CSPRNG. Configurable length, count, character classes and ambiguous-"
+        },
+        {
+          "name": "password_strength",
+          "description": "Score a password (0-4 zxcvbn-style), compute entropy bits, identify common-password fingerprints and keyboard sequences,"
+        },
+        {
+          "name": "json_format",
+          "description": "Validate, pretty-print, minify or analyse a JSON document. Returns a structural summary (node counts, max depth, top dis"
+        },
+        {
+          "name": "json_to_csv",
+          "description": "Convert a JSON array of objects to CSV. Configurable delimiter, columns, optional flattening of nested objects with dot-"
+        },
+        {
+          "name": "case_convert",
+          "description": "Convert text into multiple case styles in one call: upper, lower, title, sentence, snake, kebab, camel, pascal, constant"
+        },
+        {
+          "name": "slugify",
+          "description": "Convert any text to a URL-safe slug. Unicode-aware: by default transliterates non-Latin characters to ASCII (set `transl"
+        },
+        {
+          "name": "sort_lines",
+          "description": "Sort lines of text. Supports asc/desc, case-insensitive, locale-aware collation, natural-sort (line2 before line10), ded"
+        },
+        {
+          "name": "lorem_ipsum",
+          "description": "Generate placeholder text — N paragraphs, sentences or words of lorem ipsum. Suitable for mocks, fixtures and test data."
+        },
+        {
+          "name": "timestamp",
+          "description": "Convert any moment in time between formats. Bidirectional Unix epoch ↔ ISO 8601 ↔ RFC 3339 ↔ human-readable. Auto-detect"
+        },
+        {
+          "name": "date_math",
+          "description": "Date arithmetic. Two modes: provide `start` + `add` (e.g. \"+90 days\", \"-2 weeks\") to compute the resulting date, OR prov"
+        },
+        {
+          "name": "regex_test",
+          "description": "Match, replace or split text with a PCRE regular expression. Returns offsets and capture groups. ReDoS-protected: catast"
+        },
+        {
+          "name": "sitemap_extract",
+          "description": "Fetch and parse an XML sitemap or sitemap index from a public HTTPS URL (or paste raw XML). SSRF-protected: refuses priv"
+        },
+        {
+          "name": "credit_card_validate",
+          "description": "Validate a card number using the Luhn algorithm and detect the brand (Visa, MasterCard, Amex, Discover, JCB, Diners, Uni"
+        },
+        {
+          "name": "xml_validate",
+          "description": "Validate XML well-formedness; with optional XSD schema. Reports errors with line/column. Network and DTD fetches are dis"
+        },
+        {
+          "name": "text_diff",
+          "description": "Diff two strings by line, word or character. Returns structured changes (+/-/=), git-style unified diff, and a Jaccard s"
+        },
+        {
+          "name": "stats",
+          "description": "Descriptive statistics for a list of numbers: count, sum, mean, median, mode, min/max/range, variance, stddev (populatio"
+        },
+        {
+          "name": "number_base",
+          "description": "Convert integers between any base 2..36 plus Roman numerals. Big-int safe when GMP is available. Use from_base=\"roman\" t"
+        },
+        {
+          "name": "finance_calc",
+          "description": "Multi-mode financial calculations. `mode` selects: loan (principal+rate+term [+extra]), compound_interest (principal+rat"
+        },
+        {
+          "name": "color_convert",
+          "description": "Convert any color (hex, rgb, rgba, hsl, hsla, named) into all standard color spaces. Returns hex, rgb, rgba, hsl, hsv, c"
+        },
+        {
+          "name": "age_calc",
+          "description": "Compute age in years/months/days from a date of birth. Returns next birthday, days until, Western zodiac sign, generatio"
+        },
+        {
+          "name": "aspect_ratio",
+          "description": "Compute the reduced aspect ratio (16:9, 4:3, 21:9, ...) from a width and height; OR scale a given width OR height to a t"
+        },
+        {
+          "name": "url_metadata",
+          "description": "Fetch a public HTTPS URL and extract structured page metadata: title, description, keywords, canonical, language, charse"
+        },
+        {
+          "name": "meta_tags_generate",
+          "description": "Generate a complete HTML head block — standard <meta>, OpenGraph, Twitter Card and Schema.org JSON-LD — from a small set"
+        },
+        {
+          "name": "text_cleanup",
+          "description": "Apply chained text cleanup operations in sequence. Operations: trim, collapse_spaces, normalize_whitespace, remove_line_"
+        },
+        {
+          "name": "random_gen",
+          "description": "Cryptographically random generator backed by random_int / random_bytes. mode=number (min/max), string (length + charset:"
+        },
+        {
+          "name": "hashtag_tools",
+          "description": "Hashtag operations on text. mode=extract (pull #hashtags out of text with offsets), remove (strip them out + tidy whites"
+        },
+        {
+          "name": "dns_lookup",
+          "description": "Resolve DNS records for a domain via the system resolver. Default lookup covers A, AAAA, MX, TXT, NS, CNAME, SOA, CAA. A"
+        },
+        {
+          "name": "ssl_check",
+          "description": "Connect to {domain}:{port} over TLS and return the leaf certificate + full chain: subject, issuer, validity dates, days "
+        },
+        {
+          "name": "jwt_decode",
+          "description": "Decode a JSON Web Token (JWT) and analyse its claims. Always returns header, payload, signature info, and expiry status "
+        }
+      ],
+      "launch": "npx -y @mate-tools/mcp-server",
+      "verifiedAt": "2026-09-05T23:18:03.578Z"
+    },
+    "wikipedia-js": {
+      "tools": [
+        {
+          "name": "search_wikipedia",
+          "description": "Search Wikipedia articles by keyword（キーワードでWikipedia記事を検索する）"
+        },
+        {
+          "name": "get_wikipedia_article",
+          "description": "Get detailed information about a Wikipedia article（Wikipedia記事の詳細情報を取得する）"
+        },
+        {
+          "name": "get_random_wikipedia",
+          "description": "Get random Wikipedia articles（ランダムなWikipedia記事を取得する）"
+        }
+      ],
+      "launch": "npx -y wikipedia-mcp-server",
+      "verifiedAt": "2026-09-05T23:18:03.578Z"
+    },
+    "qrcode": {
+      "tools": [
+        {
+          "name": "generate-qrcode",
+          "description": ""
+        }
+      ],
+      "launch": "npx -y mcp-server-qrcode",
+      "verifiedAt": "2026-09-05T23:18:03.578Z"
+    },
+    "fetch": {
+      "tools": [
+        {
+          "name": "fetch",
+          "description": "Fetches a URL from the internet and optionally extracts its contents as markdown.\n\nAlthough originally you did not have "
+        }
+      ],
+      "launch": "uvx mcp-server-fetch",
+      "verifiedAt": "2026-09-05T23:18:03.578Z"
+    },
+    "time": {
+      "tools": [
+        {
+          "name": "get_current_time",
+          "description": "Get current time in a specific timezone"
+        },
+        {
+          "name": "convert_time",
+          "description": "Convert time between timezones"
+        }
+      ],
+      "launch": "uvx mcp-server-time",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "git": {
+      "tools": [
+        {
+          "name": "git_status",
+          "description": "Shows the working tree status"
+        },
+        {
+          "name": "git_diff_unstaged",
+          "description": "Shows changes in the working directory that are not yet staged"
+        },
+        {
+          "name": "git_diff_staged",
+          "description": "Shows changes that are staged for commit"
+        },
+        {
+          "name": "git_diff",
+          "description": "Shows differences between branches or commits"
+        },
+        {
+          "name": "git_commit",
+          "description": "Records changes to the repository"
+        },
+        {
+          "name": "git_add",
+          "description": "Adds file contents to the staging area"
+        },
+        {
+          "name": "git_reset",
+          "description": "Unstages all staged changes"
+        },
+        {
+          "name": "git_log",
+          "description": "Shows the commit logs"
+        },
+        {
+          "name": "git_create_branch",
+          "description": "Creates a new branch from an optional base branch"
+        },
+        {
+          "name": "git_checkout",
+          "description": "Switches branches"
+        },
+        {
+          "name": "git_show",
+          "description": "Shows the contents of a commit"
+        },
+        {
+          "name": "git_branch",
+          "description": "List Git branches"
+        }
+      ],
+      "launch": "uvx mcp-server-git --repository ${JEXI_WORKSPACE}",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "calculator": {
+      "tools": [
+        {
+          "name": "calculate",
+          "description": "Calculates/evaluates the given expression."
+        }
+      ],
+      "launch": "uvx mcp-server-calculator",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "wikipedia-py": {
+      "tools": [
+        {
+          "name": "search_articles",
+          "description": "Search English Wikipedia and return a compact list of candidate pages.\n\nintent: Short plain-English description of what "
+        },
+        {
+          "name": "get_summaries",
+          "description": "Fetch compact summaries for one or more Wikipedia page titles."
+        },
+        {
+          "name": "get_toc",
+          "description": "Return a page's table of contents as section index, title, and anchor."
+        },
+        {
+          "name": "get_section",
+          "description": "Fetch one section by section index or exact section title."
+        },
+        {
+          "name": "get_page",
+          "description": "Fetch a full Wikipedia page as plain text.\n\nintent: Short plain-English description of what the user is trying to\nlearn/"
+        },
+        {
+          "name": "skills_list",
+          "description": "List usage skills for this server. Read one with skill_read(name) whenever\na tool returns an error or an empty result an"
+        },
+        {
+          "name": "skill_read",
+          "description": "Read a usage skill (markdown) by name — see skills_list for names.\nRead 'interpreting-errors' after any error or empty r"
+        }
+      ],
+      "launch": "uvx mcp-server-wikipedia",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "arxiv": {
+      "tools": [
+        {
+          "name": "search_papers",
+          "description": "Search arXiv by query with optional categories, date range, sort, and pagination.\n\nQuery: prefer quoted phrases; ti:/au:"
+        },
+        {
+          "name": "download_paper",
+          "description": "Download a paper from arXiv and return its text content. Tries the HTML version first for clean extraction; falls back t"
+        },
+        {
+          "name": "list_papers",
+          "description": "List all papers that have been downloaded and stored locally via download_paper. Returns id, title, authors, published, "
+        },
+        {
+          "name": "read_paper",
+          "description": "Read the text content of a paper that was previously downloaded via download_paper. Returns the paper in markdown format"
+        },
+        {
+          "name": "get_abstract",
+          "description": "Fetch abstract and metadata by arXiv ID without downloading the paper. Use before download_paper to assess relevance. Re"
+        },
+        {
+          "name": "semantic_search",
+          "description": "Semantic similarity search over papers you have already downloaded locally via download_paper. Supports free-text querie"
+        },
+        {
+          "name": "reindex",
+          "description": "Rebuild the local semantic index for downloaded papers."
+        },
+        {
+          "name": "citation_graph",
+          "description": "Return papers citing an arXiv paper and papers that it references using Semantic Scholar's citation graph. Results are b"
+        },
+        {
+          "name": "export_citations",
+          "description": "Export BibTeX citations for one or more arXiv papers using authoritative arXiv metadata (title, authors, year, primary c"
+        },
+        {
+          "name": "watch_topic",
+          "description": "Save or update a persistent research topic watch. When checked via check_alerts, returns only papers published since the"
+        },
+        {
+          "name": "check_alerts",
+          "description": "Check all saved topic watches for newly published papers since the last check. Omitting the topic parameter runs ALL sav"
+        },
+        {
+          "name": "list_watches",
+          "description": "List all saved topic watches without checking for new papers. Returns each watch's topic, categories, last_checked times"
+        },
+        {
+          "name": "unwatch_topic",
+          "description": "Delete a saved topic watch by exact topic string. The topic must match the stored watch_topic value exactly. Returns a c"
+        },
+        {
+          "name": "get_paper_latex",
+          "description": "Download, safely process, cache, and return bounded original LaTeX source. Use section tools for targeted reading."
+        },
+        {
+          "name": "list_paper_latex_sections",
+          "description": "Return a compact outline of headings from original LaTeX source."
+        },
+        {
+          "name": "get_paper_latex_section",
+          "description": "Return one bounded LaTeX section by outline ID or title (whitespace/case normalized; macros expanded)."
+        },
+        {
+          "name": "get_paper_outline",
+          "description": "Return a paginated heading outline for a downloaded paper (markdown). Stable hierarchical section IDs; use read_paper_se"
+        },
+        {
+          "name": "read_paper_section",
+          "description": "Return one bounded markdown section by outline ID (or unique title). Does not include sibling or parent sections."
+        },
+        {
+          "name": "search_paper_text",
+          "description": "Search a downloaded paper for bounded matching passages with section/source offsets. Suppresses high-overlap near-duplic"
+        }
+      ],
+      "launch": "uvx arxiv-mcp-server",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "markitdown": {
+      "tools": [
+        {
+          "name": "convert_to_markdown",
+          "description": "Convert a resource described by an http:, https:, file: or data: URI to markdown"
+        }
+      ],
+      "launch": "uvx markitdown-mcp",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "sqlite": {
+      "tools": [
+        {
+          "name": "read_query",
+          "description": "Execute a SELECT query on the SQLite database"
+        },
+        {
+          "name": "write_query",
+          "description": "Execute an INSERT, UPDATE, or DELETE query on the SQLite database"
+        },
+        {
+          "name": "create_table",
+          "description": "Create a new table in the SQLite database"
+        },
+        {
+          "name": "list_tables",
+          "description": "List all tables in the SQLite database"
+        },
+        {
+          "name": "describe_table",
+          "description": "Get the schema information for a specific table"
+        },
+        {
+          "name": "append_insight",
+          "description": "Add a business insight to the memo"
+        }
+      ],
+      "launch": "uvx --with mcp<2 mcp-server-sqlite --db-path ${JEXI_SQLITE_DB}",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "osm": {
+      "tools": [
+        {
+          "name": "geocode_address",
+          "description": "\nConvert an address or place name to geographic coordinates with detailed location information.\n\nThis tool takes a text "
+        },
+        {
+          "name": "reverse_geocode",
+          "description": "\nConvert geographic coordinates to a detailed address and location description.\n\nThis tool takes a specific point on Ear"
+        },
+        {
+          "name": "find_nearby_places",
+          "description": "\nDiscover points of interest and amenities near a specific location.\n\nThis tool performs a comprehensive search around a"
+        },
+        {
+          "name": "get_route_directions",
+          "description": "\nCalculate detailed route directions between two geographic points.\n\nThis tool provides comprehensive turn-by-turn navig"
+        },
+        {
+          "name": "search_category",
+          "description": "\nSearch for specific types of places within a defined geographic area.\n\nThis tool allows targeted searches for places ma"
+        },
+        {
+          "name": "suggest_meeting_point",
+          "description": "\nFind the optimal meeting place for multiple people coming from different locations.\n\nThis tool calculates a central mee"
+        },
+        {
+          "name": "explore_area",
+          "description": "\nGenerate a comprehensive profile of an area including all amenities and features.\n\nThis powerful analysis tool creates "
+        },
+        {
+          "name": "find_schools_nearby",
+          "description": "\nLocate educational institutions near a specific location, filtered by education level.\n\nThis specialized search tool id"
+        },
+        {
+          "name": "analyze_commute",
+          "description": "\nPerform a detailed commute analysis between home and work locations.\n\nThis advanced tool analyzes commute options betwe"
+        },
+        {
+          "name": "find_ev_charging_stations",
+          "description": "\nLocate electric vehicle charging stations near a specific location.\n\nThis specialized search tool identifies EV chargin"
+        },
+        {
+          "name": "analyze_neighborhood",
+          "description": "\nGenerate a comprehensive neighborhood analysis focused on livability factors.\n\nThis advanced analysis tool evaluates a "
+        },
+        {
+          "name": "find_parking_facilities",
+          "description": "\nLocate parking facilities near a specific location.\n\nThis tool finds parking options (lots, garages, street parking) ne"
+        }
+      ],
+      "launch": "uvx --with mcp<2 osm-mcp-server",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "rss": {
+      "tools": [
+        {
+          "name": "feed",
+          "description": "Detect and parse RSS/Atom feeds from a URL.\n\nThis function will:\n1. Try to detect RSS/Atom feeds from the given URL\n2. P"
+        }
+      ],
+      "launch": "uvx --with mcp<2 mcp-server-rss",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "context7-remote": {
+      "tools": [
+        {
+          "name": "resolve-library-id",
+          "description": "Resolves a package/product name to a Context7-compatible library ID and returns matching libraries.\n\nYou MUST call this "
+        },
+        {
+          "name": "query-docs",
+          "description": "Retrieves and queries up-to-date documentation and code examples from Context7 for any programming library or framework."
+        }
+      ],
+      "launch": "https://mcp.context7.com/mcp",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "deepwiki": {
+      "tools": [
+        {
+          "name": "ask_question",
+          "description": "Ask any question about a GitHub repository and get an AI-powered, context-grounded response."
+        },
+        {
+          "name": "read_wiki_contents",
+          "description": "View documentation about a GitHub repository."
+        },
+        {
+          "name": "read_wiki_structure",
+          "description": "Get a list of documentation topics for a GitHub repository."
+        }
+      ],
+      "launch": "https://mcp.deepwiki.com/mcp",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "gitmcp": {
+      "tools": [
+        {
+          "name": "match_common_libs_owner_repo_mapping",
+          "description": "Match a library name to an owner/repo. Don't use it if you have an owner and repo already. Use this first if only a libr"
+        },
+        {
+          "name": "fetch_generic_documentation",
+          "description": "Fetch documentation for any GitHub repository by providing owner and project name"
+        },
+        {
+          "name": "search_generic_documentation",
+          "description": "Semantically search in documentation for any GitHub repository by providing owner, project name, and search query. Usefu"
+        },
+        {
+          "name": "search_generic_code",
+          "description": "Search for code in any GitHub repository by providing owner, project name, and search query. Returns matching files. Sup"
+        },
+        {
+          "name": "fetch_generic_url_content",
+          "description": "Generic tool to fetch content from any absolute URL, respecting robots.txt rules. Use this to retrieve referenced urls ("
+        }
+      ],
+      "launch": "https://gitmcp.io/docs",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "chroma": {
+      "tools": [
+        {
+          "name": "chroma_list_collections",
+          "description": "List all collection names in the Chroma database with pagination support.\n\nArgs:\n    limit: Optional maximum number of c"
+        },
+        {
+          "name": "chroma_create_collection",
+          "description": "Create a new Chroma collection with configurable HNSW parameters.\n\nArgs:\n    collection_name: Name of the collection to "
+        },
+        {
+          "name": "chroma_peek_collection",
+          "description": "Peek at documents in a Chroma collection.\n\nArgs:\n    collection_name: Name of the collection to peek into\n    limit: Num"
+        },
+        {
+          "name": "chroma_get_collection_info",
+          "description": "Get information about a Chroma collection.\n\nArgs:\n    collection_name: Name of the collection to get info about\n"
+        },
+        {
+          "name": "chroma_get_collection_count",
+          "description": "Get the number of documents in a Chroma collection.\n\nArgs:\n    collection_name: Name of the collection to count\n"
+        },
+        {
+          "name": "chroma_modify_collection",
+          "description": "Modify a Chroma collection's name or metadata.\n\nArgs:\n    collection_name: Name of the collection to modify\n    new_name"
+        },
+        {
+          "name": "chroma_fork_collection",
+          "description": "Fork a Chroma collection.\n\nArgs:\n    collection_name: Name of the collection to fork\n    new_collection_name: Name of th"
+        },
+        {
+          "name": "chroma_delete_collection",
+          "description": "Delete a Chroma collection.\n\nArgs:\n    collection_name: Name of the collection to delete\n"
+        },
+        {
+          "name": "chroma_add_documents",
+          "description": "Add documents to a Chroma collection.\n\nArgs:\n    collection_name: Name of the collection to add documents to\n    documen"
+        },
+        {
+          "name": "chroma_query_documents",
+          "description": "Query documents from a Chroma collection with advanced filtering.\n\nArgs:\n    collection_name: Name of the collection to "
+        },
+        {
+          "name": "chroma_get_documents",
+          "description": "Get documents from a Chroma collection with optional filtering.\n\nArgs:\n    collection_name: Name of the collection to ge"
+        },
+        {
+          "name": "chroma_update_documents",
+          "description": "Update documents in a Chroma collection.\n\nArgs:\n    collection_name: Name of the collection to update documents in\n    i"
+        },
+        {
+          "name": "chroma_delete_documents",
+          "description": "Delete documents from a Chroma collection.\n\nArgs:\n    collection_name: Name of the collection to delete documents from\n "
+        }
+      ],
+      "launch": "uvx --with mcp<2 chroma-mcp",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "mermaid": {
+      "tools": [
+        {
+          "name": "generate_diagram",
+          "description": "生成Mermaid图表，支持智能布局优化、主题配置和高质量输出。内置布局优化和主题选择功能，一个工具完成所有图表生成需求。"
+        }
+      ],
+      "launch": "uvx --with mcp<2 mcp-mermaid",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "fs-alt": {
+      "tools": [
+        {
+          "name": "read_file",
+          "description": "Read the complete contents of a file as text. DEPRECATED: Use read_text_file instead."
+        },
+        {
+          "name": "read_text_file",
+          "description": "Read the complete contents of a file from the file system as text. Handles various text encodings and provides detailed "
+        },
+        {
+          "name": "read_media_file",
+          "description": "Read an image or audio file. Returns the base64 encoded data and MIME type. Only works within allowed directories."
+        },
+        {
+          "name": "read_multiple_files",
+          "description": "Read the contents of multiple files simultaneously. This is more efficient than reading files one by one when you need t"
+        },
+        {
+          "name": "write_file",
+          "description": "Create a new file or completely overwrite an existing file with new content. Use with caution as it will overwrite exist"
+        },
+        {
+          "name": "edit_file",
+          "description": "Make line-based edits to a text file. Each edit replaces exact line sequences with new content. Returns a git-style diff"
+        },
+        {
+          "name": "create_directory",
+          "description": "Create a new directory or ensure a directory exists. Can create multiple nested directories in one operation. If the dir"
+        },
+        {
+          "name": "list_directory",
+          "description": "Get a detailed listing of all files and directories in a specified path. Results clearly distinguish between files and d"
+        },
+        {
+          "name": "list_directory_with_sizes",
+          "description": "Get a detailed listing of all files and directories in a specified path, including sizes. Results clearly distinguish be"
+        },
+        {
+          "name": "directory_tree",
+          "description": "Get a recursive tree view of files and directories as a JSON structure. Each entry includes 'name', 'type' (file/directo"
+        },
+        {
+          "name": "move_file",
+          "description": "Move or rename files and directories. Can move files between directories and rename them in a single operation. If the d"
+        },
+        {
+          "name": "copy_file",
+          "description": "Copy a file or directory to a new location. Both source and destination must be within allowed directories. Fails if the"
+        },
+        {
+          "name": "search_files",
+          "description": "Recursively search for files and directories matching a pattern. The patterns should be glob-style patterns that match p"
+        },
+        {
+          "name": "get_file_info",
+          "description": "Retrieve detailed metadata about a file or directory. Returns comprehensive information including size, creation time, l"
+        },
+        {
+          "name": "list_allowed_directories",
+          "description": "Returns the list of directories that this server is allowed to access. Subdirectories within these allowed directories a"
+        }
+      ],
+      "launch": "npx -y mcp-server-fs ${JEXI_WORKSPACE}",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "playwright-ea": {
+      "tools": [
+        {
+          "name": "start_codegen_session",
+          "description": "Start a new code generation session to record Playwright actions"
+        },
+        {
+          "name": "end_codegen_session",
+          "description": "End a code generation session and generate the test file"
+        },
+        {
+          "name": "get_codegen_session",
+          "description": "Get information about a code generation session"
+        },
+        {
+          "name": "clear_codegen_session",
+          "description": "Clear a code generation session without generating a test"
+        },
+        {
+          "name": "playwright_navigate",
+          "description": "Navigate to a URL"
+        },
+        {
+          "name": "playwright_screenshot",
+          "description": "Take a screenshot of the current page or a specific element"
+        },
+        {
+          "name": "playwright_click",
+          "description": "Click an element on the page"
+        },
+        {
+          "name": "playwright_iframe_click",
+          "description": "Click an element in an iframe on the page"
+        },
+        {
+          "name": "playwright_iframe_fill",
+          "description": "Fill an element in an iframe on the page"
+        },
+        {
+          "name": "playwright_fill",
+          "description": "fill out an input field"
+        },
+        {
+          "name": "playwright_select",
+          "description": "Select an element on the page with Select tag"
+        },
+        {
+          "name": "playwright_hover",
+          "description": "Hover an element on the page"
+        },
+        {
+          "name": "playwright_upload_file",
+          "description": "Upload a file to an input[type='file'] element on the page"
+        },
+        {
+          "name": "playwright_evaluate",
+          "description": "Execute JavaScript in the browser console"
+        },
+        {
+          "name": "playwright_console_logs",
+          "description": "Retrieve console logs from the browser with filtering options"
+        },
+        {
+          "name": "playwright_resize",
+          "description": "Resize the browser viewport using manual dimensions or device presets. Supports 143+ device presets including iPhone, iP"
+        },
+        {
+          "name": "playwright_close",
+          "description": "Close the browser and release all resources"
+        },
+        {
+          "name": "playwright_get",
+          "description": "Perform an HTTP GET request"
+        },
+        {
+          "name": "playwright_post",
+          "description": "Perform an HTTP POST request"
+        },
+        {
+          "name": "playwright_put",
+          "description": "Perform an HTTP PUT request"
+        },
+        {
+          "name": "playwright_patch",
+          "description": "Perform an HTTP PATCH request"
+        },
+        {
+          "name": "playwright_delete",
+          "description": "Perform an HTTP DELETE request"
+        },
+        {
+          "name": "playwright_expect_response",
+          "description": "Ask Playwright to start waiting for a HTTP response. This tool initiates the wait operation but does not wait for its co"
+        },
+        {
+          "name": "playwright_assert_response",
+          "description": "Wait for and validate a previously initiated HTTP response wait operation."
+        },
+        {
+          "name": "playwright_custom_user_agent",
+          "description": "Set a custom User Agent for the browser"
+        },
+        {
+          "name": "playwright_get_visible_text",
+          "description": "Get the visible text content of the current page"
+        },
+        {
+          "name": "playwright_get_visible_html",
+          "description": "Get the HTML content of the current page. By default, all <script> tags are removed from the output unless removeScripts"
+        },
+        {
+          "name": "playwright_go_back",
+          "description": "Navigate back in browser history"
+        },
+        {
+          "name": "playwright_go_forward",
+          "description": "Navigate forward in browser history"
+        },
+        {
+          "name": "playwright_drag",
+          "description": "Drag an element to a target location"
+        },
+        {
+          "name": "playwright_press_key",
+          "description": "Press a keyboard key"
+        },
+        {
+          "name": "playwright_save_as_pdf",
+          "description": "Save the current page as a PDF file"
+        },
+        {
+          "name": "playwright_click_and_switch_tab",
+          "description": "Click a link and switch to the newly opened tab"
+        }
+      ],
+      "launch": "npx -y @executeautomation/playwright-mcp-server",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "mcpqueen": {
+      "tools": [
+        {
+          "name": "search_servers",
+          "description": "Search the MCP evidence registry using a natural multi-word task (e.g. 'reliable no-auth drug interaction server with ci"
+        },
+        {
+          "name": "search_tools",
+          "description": "Search across the actual tools that graded MCP servers expose (their tool names and descriptions, captured live from too"
+        },
+        {
+          "name": "list_grades",
+          "description": "List the top graded MCP servers from the mcpqueen registry (deterministic probe grades with evidence). Returns grade, sc"
+        },
+        {
+          "name": "get_server_grade",
+          "description": "Get the full grade and verbatim probe evidence for one MCP server, by its official registry name (e.g. 'com.healthai/rad"
+        },
+        {
+          "name": "get_trust_receipt",
+          "description": "Get one MCP server's complete evidence receipt: operational grade, deterministic security/data-integrity/citation/claim "
+        },
+        {
+          "name": "search_trust_evidence",
+          "description": "Search published MCP trust evidence and reviewed real-usage field reports. Use for questions such as which servers expos"
+        },
+        {
+          "name": "submit_feedback",
+          "description": "Submit a field report about an MCP server you have actually used (what worked, what failed, surprising behavior). Report"
+        }
+      ],
+      "launch": "https://mcpqueen.com/mcp",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "pandoc": {
+      "tools": [
+        {
+          "name": "convert-contents",
+          "description": "Converts content between different formats. Transforms input content from any supported format into the specified output"
+        }
+      ],
+      "launch": "uvx --with mcp<2 mcp-pandoc",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "mslearn": {
+      "tools": [
+        {
+          "name": "microsoft_docs_search",
+          "description": "Search official Microsoft/Azure documentation to find the most relevant and trustworthy content for a user's query. This"
+        },
+        {
+          "name": "microsoft_code_sample_search",
+          "description": "Search for code snippets and examples in official Microsoft Learn documentation. This tool retrieves relevant code sampl"
+        },
+        {
+          "name": "microsoft_docs_fetch",
+          "description": "Fetch and convert a Microsoft Learn documentation webpage to markdown format. This tool retrieves the latest complete co"
+        }
+      ],
+      "launch": "https://learn.microsoft.com/api/mcp",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "cloudflare-docs": {
+      "tools": [
+        {
+          "name": "search_cloudflare_documentation",
+          "description": "Search the Cloudflare documentation.\n\n\t\tThis tool should be used to answer any question about Cloudflare products or fea"
+        },
+        {
+          "name": "migrate_pages_to_workers_guide",
+          "description": "ALWAYS read this guide before migrating Pages projects to Workers."
+        }
+      ],
+      "launch": "https://docs.mcp.cloudflare.com/mcp",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "playwright": {
+      "tools": [
+        {
+          "name": "browser_close",
+          "description": "Close the page"
+        },
+        {
+          "name": "browser_resize",
+          "description": "Resize the browser window"
+        },
+        {
+          "name": "browser_console_messages",
+          "description": "Returns all console messages"
+        },
+        {
+          "name": "browser_handle_dialog",
+          "description": "Handle a dialog"
+        },
+        {
+          "name": "browser_evaluate",
+          "description": "Evaluate JavaScript expression on page or element"
+        },
+        {
+          "name": "browser_file_upload",
+          "description": "Upload one or multiple files"
+        },
+        {
+          "name": "browser_drop",
+          "description": "Drop files or MIME-typed data onto an element, as if dragged from outside the page. At least one of \"paths\" or \"data\" mu"
+        },
+        {
+          "name": "browser_find",
+          "description": "Search the accessibility snapshot of the current page for text or a regular expression. Returns matching snapshot nodes "
+        },
+        {
+          "name": "browser_fill_form",
+          "description": "Fill multiple form fields"
+        },
+        {
+          "name": "browser_press_key",
+          "description": "Press a key on the keyboard"
+        },
+        {
+          "name": "browser_type",
+          "description": "Type text into editable element"
+        },
+        {
+          "name": "browser_navigate",
+          "description": "Navigate to a URL"
+        },
+        {
+          "name": "browser_navigate_back",
+          "description": "Go back to the previous page in the history"
+        },
+        {
+          "name": "browser_network_requests",
+          "description": "Returns a numbered list of network requests since loading the page. Use browser_network_request with the number to get f"
+        },
+        {
+          "name": "browser_network_request",
+          "description": "Returns full details (headers and body) of a single network request, or a single part if `part` is set. Use the number f"
+        },
+        {
+          "name": "browser_run_code_unsafe",
+          "description": "Run a Playwright code snippet. Unsafe: executes arbitrary JavaScript in the Playwright server process and is RCE-equival"
+        },
+        {
+          "name": "browser_take_screenshot",
+          "description": "Take a screenshot of the current page. You can't perform actions based on the screenshot, use browser_snapshot for actio"
+        },
+        {
+          "name": "browser_snapshot",
+          "description": "Capture accessibility snapshot of the current page, this is better than screenshot"
+        },
+        {
+          "name": "browser_click",
+          "description": "Perform click on a web page"
+        },
+        {
+          "name": "browser_drag",
+          "description": "Perform drag and drop between two elements"
+        },
+        {
+          "name": "browser_hover",
+          "description": "Hover over element on page"
+        },
+        {
+          "name": "browser_select_option",
+          "description": "Select an option in a dropdown"
+        },
+        {
+          "name": "browser_tabs",
+          "description": "List, create, close, or select a browser tab."
+        },
+        {
+          "name": "browser_wait_for",
+          "description": "Wait for text to appear or disappear or a specified time to pass"
+        }
+      ],
+      "launch": "npx -y @playwright/mcp@latest --headless",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    },
+    "chrome-devtools": {
+      "tools": [
+        {
+          "name": "click",
+          "description": "Clicks on the provided element"
+        },
+        {
+          "name": "close_page",
+          "description": "Closes the page by its index. The last open page cannot be closed."
+        },
+        {
+          "name": "drag",
+          "description": "Drag an element onto another element"
+        },
+        {
+          "name": "emulate",
+          "description": "Emulates various features on the target page."
+        },
+        {
+          "name": "evaluate_script",
+          "description": "Evaluate a JavaScript function inside the target page. Returns the response as JSON, so returned values have to be JSON-"
+        },
+        {
+          "name": "fill",
+          "description": "Type text into an input, text area or select an option from a <select> element."
+        },
+        {
+          "name": "fill_form",
+          "description": "Fill out multiple form elements (inputs, selects, checkboxes, radios) at once. ALWAYS prefer this tool over multiple ind"
+        },
+        {
+          "name": "get_console_message",
+          "description": "Gets a console message by its ID. You can get all messages by calling list_console_messages."
+        },
+        {
+          "name": "get_network_request",
+          "description": "Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network p"
+        },
+        {
+          "name": "handle_dialog",
+          "description": "If a browser dialog was opened, use this command to handle it"
+        },
+        {
+          "name": "hover",
+          "description": "Hover over the provided element"
+        },
+        {
+          "name": "lighthouse_audit",
+          "description": "Get Lighthouse score and reports for accessibility, SEO, best practices, and agentic browsing. This excludes performance"
+        },
+        {
+          "name": "list_console_messages",
+          "description": "List all console messages for the target page since the last navigation."
+        },
+        {
+          "name": "list_network_requests",
+          "description": "Lists the most recent requests for the target page since the last navigation."
+        },
+        {
+          "name": "list_pages",
+          "description": "Get a list of pages open in the browser."
+        },
+        {
+          "name": "navigate_page",
+          "description": "Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise."
+        },
+        {
+          "name": "new_page",
+          "description": "Open a new tab and load a URL. Use project URL if not specified otherwise."
+        },
+        {
+          "name": "performance_analyze_insight",
+          "description": "Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the resul"
+        },
+        {
+          "name": "performance_start_trace",
+          "description": "Start a performance trace on the target webpage. Use to find frontend performance issues, Core Web Vitals (LCP, INP, CLS"
+        },
+        {
+          "name": "performance_stop_trace",
+          "description": "Stop the active performance trace recording on the target webpage."
+        },
+        {
+          "name": "press_key",
+          "description": "Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, "
+        },
+        {
+          "name": "resize_page",
+          "description": "Resizes the page's window so that the page has specified dimension"
+        },
+        {
+          "name": "select_page",
+          "description": "Select a page as a context for future tool calls."
+        },
+        {
+          "name": "take_heapsnapshot",
+          "description": "Capture a heap snapshot of the target page. Use to analyze the memory distribution of JavaScript objects and debug memor"
+        },
+        {
+          "name": "take_screenshot",
+          "description": "Take a screenshot of the page or element."
+        },
+        {
+          "name": "take_snapshot",
+          "description": "Take a text snapshot of the target page based on the a11y tree. The snapshot lists page elements along with a unique\nide"
+        },
+        {
+          "name": "type_text",
+          "description": "Type text using keyboard into a previously focused input"
+        },
+        {
+          "name": "upload_file",
+          "description": "Upload a file through a provided element."
+        },
+        {
+          "name": "wait_for",
+          "description": "Wait for the specified text to appear on the selected page."
+        }
+      ],
+      "launch": "npx -y chrome-devtools-mcp --headless",
+      "verifiedAt": "2026-09-05T23:18:03.579Z"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "id": "git-mastery",
+  "name": "Git Mastery",
+  "version": "1.0.0",
+  "description": "Everyday git workflows plus recovery: undo, rebase, detached heads, lost commits.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "git-recovery",
+      "git-daily-flow"
+    ],
+    "skillsDir": "skills"
+  }
+}

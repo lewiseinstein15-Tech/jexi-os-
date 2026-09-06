@@ -1,0 +1,13 @@
+{
+  "id": "first-aid",
+  "name": "First Aid Basics",
+  "version": "1.0.0",
+  "description": "Immediate response basics — with the clear limit: professionals for anything serious.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "first-aid-basics"
+    ],
+    "skillsDir": "skills"
+  }
+}

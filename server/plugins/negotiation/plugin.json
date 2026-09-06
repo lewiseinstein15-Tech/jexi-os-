@@ -1,0 +1,13 @@
+{
+  "id": "negotiation",
+  "name": "Negotiation",
+  "version": "1.0.0",
+  "description": "Prepare, anchor, trade — getting to yes without wrecking the relationship.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "negotiation-basics"
+    ],
+    "skillsDir": "skills"
+  }
+}

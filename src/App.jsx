@@ -31,25 +31,14 @@ import OrbCore from './components/OrbCore'; // B192 — the presence orb
 import { StatusCard, CalendarCard } from './components/WidgetCards'; // B192 — glass widgets
 import ErrorBoundary from './components/ErrorBoundary';
 
+// Sept 2026 (Lewis): the menu keeps ONLY what he uses — Chat, Chat history,
+// Workshop, Settings. Everything else keeps working in the background (MCP
+// servers connect directly, plugins load, missions/teams run); the screens
+// just don't clutter the drawer anymore.
 const VIEWS = {
   chat: { label: 'Chat', icon: 'chat' },
   history: { label: 'Chat history', icon: 'history' },
-  agents: { label: 'Team', icon: 'agents' },
-  missions: { label: 'Missions', icon: 'missions' },
   workshop: { label: 'Workshop', icon: 'workshop' },
-  tasks: { label: 'Tasks', icon: 'tasks', group: 'WORK' }, // B222
-  goals: { label: 'Goals', icon: 'goals', group: 'WORK' }, // B222
-  projects: { label: 'Projects', icon: 'projects', group: 'WORK' }, // B222
-  files: { label: 'Files', icon: 'files', group: 'WORK' }, // B222 — WorkspaceScreen
-  terminal: { label: 'Terminal', icon: 'terminal', group: 'WORK' }, // B222
-  skills: { label: 'Skills', icon: 'skills', group: 'INTELLIGENCE' }, // B222
-  research: { label: 'Research', icon: 'research', group: 'INTELLIGENCE' }, // B222
-  models: { label: 'Models', icon: 'models', group: 'INTELLIGENCE' }, // B222
-  notifications: { label: 'Notifications', icon: 'notifications', group: 'SYSTEM' }, // B222
-  connectors: { label: 'Connectors', icon: 'connectors', group: 'SYSTEM' }, // B222
-  memory: { label: 'Memory', icon: 'memory' }, // B221 — spec C
-  books: { label: 'Books', icon: 'books' }, // B221 — spec D
-  app: { label: 'Get the app', icon: 'app' }, // B221 — spec F
   settings: { label: 'Settings', icon: 'settings' },
 };
 
@@ -324,7 +313,7 @@ export default function App() {
 
         <section className={`jx-view${view === 'workshop' ? ' show' : ''}`}>
           <div className="jx-main">
-            <WorkshopView />
+            <WorkshopView engine={engine} />
           </div>
         </section>
 

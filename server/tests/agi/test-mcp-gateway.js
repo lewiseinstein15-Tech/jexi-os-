@@ -12,6 +12,7 @@ process.env.DATA_DIR = './data/test-agi-mcp';
 const {
   loadRegistry, effectiveRegistry, enableMcpServer, disableMcpServer,
   connectGatewayServer, mcpToolsUnified, invokeMcpTool, mcpServerHealth,
+  loadToolDirectory,
   __setConnector, __resetGateway,
 } = await import('../../src/services/MCPGateway.js');
 
@@ -34,16 +35,21 @@ function fakeServer(tools, behavior = {}) {
 
 /* ═══ 1. the shipped registry ═══════════════════════════════════════════ */
 
-test('the shipped registry is valid; enabled defaults are curated-only (Lewis switched them on Sept 2026)', () => {
+test('the shipped registry v3 is valid — every server verified live, none ships destructive grants', () => {
   const reg = loadRegistry(REGISTRY);
-  assert.ok(reg.servers.length >= 5);
+  assert.ok(reg.servers.length >= 30, `expected a big verified registry, got ${reg.servers.length}`);
+  const directory = loadToolDirectory();
   for (const s of reg.servers) {
-    // Policy update (Lewis, Sept 2026): curated servers MAY ship enabled.
-    // The invariants that still hold: community-trust ships disabled, and
-    // every entry carries an explicit permission boundary.
-    if (s.trustLevel === 'community') assert.equal(s.enabled, false, `${s.name} (community) must ship disabled`);
+    // Policy (Lewis, Sept 2026): servers connect directly — all enabled, no switches.
+    // Every entry carries a permission boundary, honest notes, and a live-verified
+    // tool directory entry proving it was REALLY connected and tool-called.
+    assert.equal(s.enabled, true, `${s.name} must ship enabled (connect directly)`);
     assert.ok(s.permissions.length, `${s.name} needs an explicit permission boundary`);
+    assert.ok(!s.permissions.includes('DESTRUCTIVE'), `${s.name} must not ship DESTRUCTIVE`);
+    assert.ok(!s.permissions.includes('DEPLOYMENT'), `${s.name} must not ship DEPLOYMENT`);
     assert.ok(['curated', 'community'].includes(s.trustLevel));
+    assert.ok(s.notes && s.notes.length > 10, `${s.name} needs honest notes`);
+    assert.ok(directory[s.name] && Array.isArray(directory[s.name].tools) && directory[s.name].tools.length > 0, `${s.name} missing from the live-verified tool directory`);
   }
 });
 
@@ -52,13 +58,16 @@ test('no shipped server holds the DESTRUCTIVE grant', () => {
   for (const s of reg.servers) assert.ok(!s.permissions.includes('DESTRUCTIVE'), `${s.name} must not ship DESTRUCTIVE`);
 });
 
-test('community-trust servers cannot be enabled without force (review first)', () => {
-  const pw = loadRegistry(REGISTRY).servers.find((s) => s.name === 'playwright');
-  assert.equal(pw.trustLevel, 'community');
-  const no = enableMcpServer('playwright', { force: false });
+test('community-trust servers still require force to (re)enable — the API guard stays', () => {
+  const mt = loadRegistry(REGISTRY).servers.find((s) => s.name === 'mate-tools');
+  assert.equal(mt.trustLevel, 'community');
+  // v3 policy: community servers ship ENABLED (each one reviewed + live-tested by JEXI,
+  // notes on every entry) — but the enableMcpServer API guard still demands force for them.
+  const no = enableMcpServer('mate-tools', { force: false });
   assert.equal(no.ok, false);
   assert.match(no.error, /force/);
-  assert.equal(effectiveRegistry(REGISTRY).servers.find((s) => s.name === 'playwright').enabled, false);
+  const yes = enableMcpServer('mate-tools', { force: true });
+  assert.equal(yes.ok, true);
 });
 
 /* ═══ 2. enable/disable lifecycle ═══════════════════════════════════════ */
@@ -75,31 +84,45 @@ test('enable + disable persist as runtime state over the shipped defaults', () =
 
 test('a disabled server cannot connect; an enabled one can, and discovery wraps its tools', async () => {
   __resetGateway();
-  const off = await connectGatewayServer('sqlite', { registryPath: REGISTRY });
+  // isolated temp registry with ONE uniquely-named server (v3 ships everything enabled)
+  const reg = JSON.parse(fs.readFileSync(REGISTRY, 'utf8'));
+  const sq = reg.servers.find((s) => s.name === 'sqlite');
+  sq.name = 'sqlite-v3-test';
+  sq.enabled = false;
+  const tmp = process.env.DATA_DIR + '/registry-v3-test.json';
+  fs.mkdirSync(process.env.DATA_DIR, { recursive: true });
+  fs.writeFileSync(tmp, JSON.stringify(reg));
+
+  const off = await connectGatewayServer('sqlite-v3-test', { registryPath: tmp });
   assert.equal(off.ok, false);
   assert.match(off.error, /not enabled/);
 
-  enableMcpServer('sqlite', { force: true });
+  sq.enabled = true;
+  fs.writeFileSync(tmp, JSON.stringify(reg));
   const fake = fakeServer([
     { name: 'read_query', description: 'Run a read-only SQL query', inputSchema: { type: 'object' } },
     { name: 'list_tables', description: 'List tables', inputSchema: { type: 'object' } },
   ]);
   __setConnector(async () => fake);
-  const on = await connectGatewayServer('sqlite', { registryPath: REGISTRY });
+  const on = await connectGatewayServer('sqlite-v3-test', { registryPath: tmp });
   assert.equal(on.ok, true);
   assert.equal(on.tools, 2);
 
-  const unified = mcpToolsUnified();
-  assert.equal(unified.length, 2);
-  for (const t of unified) {
+  // discovery: this server's tools appear live with the right shape…
+  const mine = mcpToolsUnified().filter((t) => t.server === 'sqlite-v3-test');
+  assert.equal(mine.length, 2);
+  for (const t of mine) {
     assert.equal(t.source, 'mcp');
-    assert.equal(t.server, 'sqlite');
-    assert.ok(t.id.startsWith('mcp:sqlite:'));
-    assert.deepEqual(t.permissions, ['READ_ONLY']);
-    assert.equal(t.risk, 'safe'); // read-only server → safe tools
+    assert.ok(t.id.startsWith('mcp:sqlite-v3-test:'));
+    assert.deepEqual(t.permissions, ['READ_ONLY', 'LOCAL_WRITE']); // v3 grant: it writes its db file
+    assert.equal(t.risk, 'medium'); // write-capable server → medium
+    assert.equal(t.live, true);
     assert.ok(typeof t.timeoutMs === 'number');
   }
-  disableMcpServer('sqlite');
+  // …and enabled-but-sleeping servers expose their directory tools (lazy: first call wakes them)
+  const sleeping = mcpToolsUnified().filter((t) => t.server === 'filesystem' && t.id.endsWith(':read_file'));
+  assert.ok(sleeping.length >= 1, 'filesystem read_file should be visible from the tool directory');
+  assert.equal(sleeping[0].live, false);
 });
 
 /* ═══ 4. the permission boundary ════════════════════════════════════════ */

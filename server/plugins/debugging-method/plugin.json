@@ -1,0 +1,13 @@
+{
+  "id": "debugging-method",
+  "name": "Debugging Method",
+  "version": "1.0.0",
+  "description": "A repeatable method for finding root causes instead of patching symptoms.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "systematic-debugging"
+    ],
+    "skillsDir": "skills"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "writing-clear",
+  "name": "Clear Writing",
+  "version": "1.0.0",
+  "description": "Plain-language writing: short sentences, strong verbs, structure first.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "plain-writing"
+    ],
+    "skillsDir": "skills"
+  }
+}

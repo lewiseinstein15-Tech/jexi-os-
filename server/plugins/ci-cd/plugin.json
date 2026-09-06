@@ -1,0 +1,13 @@
+{
+  "id": "ci-cd",
+  "name": "CI/CD",
+  "version": "1.0.0",
+  "description": "Pipelines that run the important checks and deploy without drama.",
+  "enabledByDefault": true,
+  "contributes": {
+    "skills": [
+      "pipeline-design"
+    ],
+    "skillsDir": "skills"
+  }
+}
