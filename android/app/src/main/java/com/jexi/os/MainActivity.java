@@ -126,6 +126,14 @@ public class MainActivity extends BridgeActivity {
         wipeWebViewDataOnUpgrade();
         super.onCreate(savedInstanceState);
         ensureRuntimePermissions();
+
+        // ARENA — the phone as a REAL browser worker for the brain: this app
+        // registers its own headless WebView with the server's APK channel
+        // and runs policy-cleared browse ops (the server gates BEFORE any op
+        // reaches us). Dormant until the user has configured a backend URL.
+        try {
+            JexiBrowserWorker.start(this, getBridge().getWebView());
+        } catch (Exception e) { /* the app must never fail to open because of the worker */ }
         // Second layer: even on a non-upgrade launch, force the local bundle
         // to bypass any residual HTTP cache.
         getBridge().getWebView().postDelayed(() -> {

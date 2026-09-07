@@ -153,3 +153,37 @@ device shell.
 (argv-precise recorder) — proving exact argv, real XML parsing, center-of-
 bounds taps, PNG validation, and every honest-absence path. Production uses
 the real adb only; nothing device-shaped is emulated in production code.
+
+---
+
+## 🌐 The phone as JEXI's browser worker (ARENA Part 17)
+
+The app can act as a **real browser worker** for the JEXI brain: when the
+brain needs browsing and no desktop browser is connected, it can route the
+work to YOUR phone — the app runs it in its own private headless WebView
+(never the one you're looking at) and reports the honest result.
+
+**How it works**
+
+- The worker starts with the app and stays **dormant until you've set a
+  backend URL** in the app's settings (the same one the chat uses).
+- It registers your phone with the brain (`/api/browser/apk/register`) and
+  long-polls for work — one request held open ~25s at a time.
+- The brain's **policy gate decides before anything reaches the phone**:
+  CAPTCHA solving, private storage, and high-impact actions are refused on
+  the server. The phone only ever sees policy-cleared work.
+- Every op (`navigate` / `read` / `screenshot` / `act`) runs in a private
+  off-screen WebView; failures are reported as failures — nothing is faked.
+- Close the app and the worker drops offline within ~90 seconds (the brain
+  reports "no online browser worker" honestly until you reopen it).
+
+**Turning it off** (debugging): the setting lives in the app's shared
+preferences (`jexi_worker` → `enabled` = false). It is ON by default.
+
+**Seeing it from the brain's side:** `/api/browser/status` shows every
+registered phone in `apkChannel` (online/offline, capabilities) and the
+matching `android-webview-<device>` worker on the router.
+
+> Server-side channel: live-proven (full round trip over HTTP). Phone side:
+> ships in the APK build; first live test happens on your phone — as always,
+> nothing is claimed until it runs.
