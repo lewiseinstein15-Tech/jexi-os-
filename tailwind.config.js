@@ -17,29 +17,29 @@ export default {
         'text-secondary': '#7C8794',
         'text-tertiary': '#46515D',
         // Brand / signal (single green)
-        brand: '#00D26A',
-        'brand-dim': 'rgba(0,210,106,0.18)',
-        'brand-line': 'rgba(0,210,106,0.38)',
+        brand: '#FF8A3D', // ARENA: warm orange (was neon green #00D26A)
+        'brand-dim': 'rgba(255,138,61,0.18)',
+        'brand-line': 'rgba(255,138,61,0.38)',
         // Semantic accents — capability identity + status only
         'acc-research': '#4A9EFF',
-        'acc-code': '#00D26A',
+        'acc-code': '#FF6F61', // ARENA: coral
         'acc-math': '#B36CFF',
         'acc-engineering': '#FF9B3D',
         'acc-analysis': '#22D3EE',
         'acc-automation': '#D8A83E',
         // Agent palette — identity + status only
         'agent-planner': '#4A9EFF',
-        'agent-coder': '#00D26A',
+        'agent-coder': '#FF6F61', // ARENA: coral
         'agent-qa': '#FF9B3D',
         'agent-security': '#FB7185',
         'agent-research': '#B36CFF',
         'agent-vision': '#22D3EE',
         // Status
-        'status-online': '#00D26A',
+        'status-online': '#F5B06B', // ARENA: warm amber
         'status-warn': '#D8A83E',
         'status-error': '#FB7185',
         'status-idle': '#46515D',
-        jexi: '#00D26A',
+        jexi: '#FF8A3D', // ARENA: warm orange
       },
       fontFamily: {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],

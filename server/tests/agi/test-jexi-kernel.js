@@ -52,13 +52,25 @@ test('long or empty messages are never small talk', () => {
 
 /* ═══ 2. the fast path: ONE small call, real personality ═══════════════════ */
 
-test('fast path answers with 1 model call and honest stats', { timeout: 90_000 }, async () => {
+test('fast path answers with ZERO model calls, instantly, even when every provider is dead', { timeout: 90_000 }, async () => {
+  // Live lesson (Sept 7 2026): on a day Gemini 503'd and Groq misbehaved, a
+  // "hello" slid the provider ladder for a minute. Pure small talk is now a
+  // deterministic pool answer — no provider can ever slow it down.
+  const t0 = Date.now();
   const r = await runFastPath({ query: 'hello', sub: 'greeting', sendEvent: () => {} });
+  const ms = Date.now() - t0;
   assert.equal(r.handled, true);
   assert.ok(r.answer.length > 0 && r.answer.length < 500, 'short conversational answer');
   assert.equal(r.stats.fastPath, true);
-  assert.ok(r.stats.modelCalls <= 1, 'the fast path never makes more than ONE call');
-  assert.ok(r.stats.durationMs > 0);
+  assert.equal(r.stats.modelCalls, 0, 'ZERO model calls — deterministic, provider-independent');
+  assert.equal(r.stats.deterministic, true);
+  assert.ok(ms < 100, `answers instantly (got ${ms}ms)`);
+  // every category has a real pool (variety without a model)
+  for (const sub of ['greeting', 'ack', 'bye', 'identity', 'howareyou']) {
+    const a = await runFastPath({ query: 'x', sub, sendEvent: () => {} });
+    assert.ok(a.answer.length > 0, `pool for "${sub}" must answer`);
+    assert.ok(a.stats.modelCalls === 0);
+  }
 });
 
 test('fast path NEVER says the banned openers', { timeout: 90_000 }, async () => {

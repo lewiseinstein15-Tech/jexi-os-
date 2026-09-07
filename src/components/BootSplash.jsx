@@ -47,7 +47,7 @@ export default function BootSplash({ status = 'Booting agent core' }) {
         ))}
         {/* Core: dark disc with a pulsing brand heart */}
         <div className="absolute inset-[22%] rounded-full bg-[#090a0e] flex items-center justify-center">
-          <span className="w-4 h-4 rounded-full bg-brand shadow-[0_0_18px_rgba(0,210,106,0.95)] animate-pulse" />
+          <span className="w-4 h-4 rounded-full bg-brand shadow-[0_0_18px_rgba(255,138,61,0.95)] animate-pulse" />
         </div>
       </div>
 

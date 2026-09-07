@@ -1,0 +1,86 @@
+{
+ "at": "2026-09-07T13:53:42.765Z",
+ "smalltalk": {
+  "zeroCallOk": true,
+  "avgMs": 78,
+  "runs": [
+   {
+    "query": "hello",
+    "wallMs": 77,
+    "firstTokenMs": 76,
+    "fastPath": true,
+    "modelCalls": 0,
+    "providers": {},
+    "failedCalls": 0,
+    "stages": "safety:22ms missionLane:0ms kernel:0ms",
+    "answer": "Hi Boss — everything's running. What do you need?",
+    "ok": true
+   },
+   {
+    "query": "thanks boss",
+    "wallMs": 141,
+    "firstTokenMs": 140,
+    "fastPath": true,
+    "modelCalls": 0,
+    "providers": {},
+    "failedCalls": 0,
+    "stages": "safety:129ms missionLane:0ms kernel:1ms",
+    "answer": "Noted, Boss. Anything else?",
+    "ok": true
+   },
+   {
+    "query": "see you later",
+    "wallMs": 85,
+    "firstTokenMs": 85,
+    "fastPath": true,
+    "modelCalls": 0,
+    "providers": {},
+    "failedCalls": 0,
+    "stages": "safety:77ms missionLane:0ms kernel:0ms",
+    "answer": "Catch you later — the work continues in the background.",
+    "ok": true
+   },
+   {
+    "query": "who built you?",
+    "wallMs": 81,
+    "firstTokenMs": 81,
+    "fastPath": true,
+    "modelCalls": 0,
+    "providers": {},
+    "failedCalls": 0,
+    "stages": "safety:74ms missionLane:0ms kernel:0ms",
+    "answer": "I'm JEXI, your AI executive partner. One boss: you. One job: get things done.",
+    "ok": true
+   },
+   {
+    "query": "how are you",
+    "wallMs": 11,
+    "firstTokenMs": 11,
+    "fastPath": true,
+    "modelCalls": 0,
+    "providers": {},
+    "failedCalls": 0,
+    "stages": "safety:3ms missionLane:0ms kernel:0ms",
+    "answer": "Better when you're around. Everything's holding steady — how are you?",
+    "ok": true
+   },
+   {
+    "query": "niaje",
+    "wallMs": 73,
+    "firstTokenMs": 73,
+    "fastPath": true,
+    "modelCalls": 0,
+    "providers": {},
+    "failedCalls": 0,
+    "stages": "safety:67ms missionLane:0ms kernel:0ms",
+    "answer": "Hello, Boss — JEXI online and ready.",
+    "ok": true
+   }
+  ]
+ },
+ "question": {
+  "query": "What is the capital of Kenya? One sentence.",
+  "error": "This operation was aborted",
+  "wallMs": 150003
+ }
+}

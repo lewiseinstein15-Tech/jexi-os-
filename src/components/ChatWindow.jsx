@@ -80,7 +80,7 @@ function MessageActions({ text, onRegenerate }) {
         className="flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-semibold uppercase tracking-wider transition-all duration-200 hover:bg-surface-2"
         style={{
           color: copied ? 'var(--brand)' : 'var(--text-tertiary)',
-          border: `1px solid ${copied ? 'rgba(0,210,106,0.3)' : 'transparent'}`,
+          border: `1px solid ${copied ? 'rgba(255,138,61,0.3)' : 'transparent'}`,
         }}
         title="Copy response"
       >
@@ -210,7 +210,7 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
               {msg.role === 'user' ? (
                 /* ---- USER MESSAGE ---- */
                 <div className="max-w-[85%] relative group">
-                  <div className="p-3 rounded-lg rounded-tr-sm bg-gradient-to-br from-brand to-[#00B55C] text-[#04140D] font-medium text-[11px] shadow-[0_4px_18px_rgba(0,210,106,0.28)]">
+                  <div className="p-3 rounded-lg rounded-tr-sm bg-gradient-to-br from-brand to-[#E8683F] text-[#04140D] font-medium text-[11px] shadow-[0_4px_18px_rgba(255,138,61,0.28)]">
                     <div className="whitespace-pre-wrap break-words">
                       {msg.image && (
                         <img src={msg.image} alt="attachment" className="max-w-[220px] rounded-lg mb-2 border border-black/20" />
@@ -252,13 +252,18 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
                     by={msg.by}
                     sourceCount={msg.sourceCount}
                   />
+                  {/* ARENA (spec Part 29): JEXI's words render in her
+                      handwriting voice (Caveat) — code/logs/JSON inside the
+                      answer stay clean mono via .jx-hand CSS overrides. */}
                   {msg.streaming ? (
-                    <div className="jx-streaming-text">
+                    <div className="jx-streaming-text jx-hand">
                       <MarkdownRenderer content={msg.text} size="text-[13px]" />
                       <span className="jx-caret" aria-hidden="true" />
                     </div>
                   ) : (
-                    <TypedMessage text={msg.text} size="text-[13px]" />
+                    <div className="jx-hand">
+                      <TypedMessage text={msg.text} size="text-[13px]" />
+                    </div>
                   )}
                   <MessageActions text={msg.text} onRegenerate={i === messages.length - 1 ? () => onSend(msg.text) : null} />
                 </div>                )}

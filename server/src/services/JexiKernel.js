@@ -19,8 +19,6 @@
  * ladder (free remote providers by default; an Ollama endpoint can be
  * configured via env — Phase 1 adds OllamaProvider to the ladder).
  */
-import { generateContent } from './LLMClient.js';
-import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 
 /* ── request meter (spec Part 3: know exactly what a turn cost) ──────────── */
 const meters = new Map(); // meterId → { t0, stages: [], modelCalls: [] }
@@ -76,6 +74,41 @@ const QUICK_IDENTITY = [
   'I\'m JEXI, your AI executive partner. One boss: you. One job: get things done.',
 ];
 
+/* ARENA (live lesson, Sept 7 2026): pure small talk gets a DETERMINISTIC
+   answer — zero model calls, zero provider dependence. The old "one small
+   call" flavor died honestly on a day Gemini was 503ing and Groq was
+   misbehaving: a "hello" slid the whole provider ladder for a minute.
+   Variety comes from rotation pools, not from a model. */
+const QUICK_POOLS = {
+  identity: QUICK_IDENTITY,
+  greeting: [
+    'Hey Boss. What are we building today?',
+    'Hello, Boss — JEXI online and ready.',
+    'Hey! Good to see you. What\'s on your mind?',
+    'Habari, Boss. Ready when you are.',
+    'Hi Boss — everything\'s running. What do you need?',
+  ],
+  ack: [
+    'Anytime, Boss.',
+    'That\'s what I\'m here for.',
+    'Good — more where that came from when you need it.',
+    'Noted, Boss. Anything else?',
+    'Karibu. What\'s next?',
+  ],
+  bye: [
+    'Later, Boss — I\'ll keep everything warm.',
+    'See you. Missions keep running while you\'re away.',
+    'Goodnight, Boss. I\'ll be here.',
+    'Catch you later — the work continues in the background.',
+  ],
+  howareyou: [
+    'Running clean, Boss — all systems green on my side. You?',
+    'Better when you\'re around. Everything\'s holding steady — how are you?',
+    'Good! Nothing broken, nothing faked. How\'s your day going?',
+    'Poa sana, Boss. All quiet — ready for real work when you are.',
+  ],
+};
+
 /** Small talk that earns ONE small model call (personality, not pipeline). */
 const SMALLTALK_RE = new RegExp(
   `^(${GREETING_RE.source.replace(/^\^|\$$/g, '')}|${THANKS_RE.source.replace(/^\^|\$$/g, '')}|${BYE_RE.source.replace(/^\^|\$$/g, '')}|${HOW_ARE_YOU_RE.source.replace(/^\^|\$$/g, '')}|haha+|lol+|nice|awesome|wow)[\\s.!?,]*$`,
@@ -93,45 +126,28 @@ export function kernelGate(raw, { activeMission = false } = {}) {
   // an ACTIVE mission gets steering priority — the kernel never intercepts
   if (activeMission) return null;
 
-  if (IDENTITY_RE.test(q) || HOW_ARE_YOU_RE.test(q)) {
-    return { kind: 'smalltalk', sub: 'identity', zeroCall: false };
-  }
-  if (GREETING_RE.test(q)) return { kind: 'smalltalk', sub: 'greeting', zeroCall: false };
-  if (THANKS_RE.test(q) || BYE_RE.test(q)) {
-    // acknowledgements are the closest to zero-call we honestly get
-    return { kind: 'smalltalk', sub: 'ack', zeroCall: false };
-  }
+  if (IDENTITY_RE.test(q)) return { kind: 'smalltalk', sub: 'identity', zeroCall: true };
+  if (HOW_ARE_YOU_RE.test(q)) return { kind: 'smalltalk', sub: 'howareyou', zeroCall: true };
+  if (GREETING_RE.test(q)) return { kind: 'smalltalk', sub: 'greeting', zeroCall: true };
+  if (BYE_RE.test(q)) return { kind: 'smalltalk', sub: 'bye', zeroCall: true };
+  if (THANKS_RE.test(q)) return { kind: 'smalltalk', sub: 'ack', zeroCall: true };
   return null;
 }
 
 /**
- * Fast path: ONE small model call with a tight prompt — personality + the
- * last message only. No planner, no team, no tools, no mission engine.
+ * Fast path: a DETERMINISTIC pool answer — zero model calls, no planner,
+ * no team, no tools, no mission engine. Immune to provider outages.
  */
 export async function runFastPath({ query, sub, convId = null, sendEvent = () => {} }) {
   const t0 = Date.now();
-  // personality core from the real identity prompt (first section only —
-  // identity + voice, no pipeline instructions: this is the FAST path)
-  const personaCore = JEXI_SYSTEM_PROMPT.split(/\n(?=\S)/).slice(0, 6).join('\n');
-  const system = `${personaCore}
-
-You are answering ONE quick ${sub} message from Lewis (your creator — call him "Boss" when natural, mirror his energy: playful when he's playful, professional when he's serious).
-Rules:
-- 1-2 short sentences MAX. This is small talk, not a briefing.
-- Never offer a giant menu of options. Never say "Sure!" or "How can I help you today?".
-- If he thanked you: warm, brief, no fluff. If he said bye: warm goodbye, one line.
-- Be real. No emoji spam (one emoji is fine when it fits).`;
-  try {
-    sendEvent('log', { agent: 'JEXI', message: '⚡ Fast path — no pipeline, one quick call.' });
-    const answer = await generateContent(`Lewis: ${query}`, system, null, { temperature: 0.8, maxTokens: 120 });
-    const text = String(answer || '').trim();
-    if (text) {
-      return { handled: true, answer: text, stats: { fastPath: true, modelCalls: 1, durationMs: Date.now() - t0 } };
-    }
-  } catch { /* fall through to lanes honestly */ }
-  // honest deterministic fallback if the quick call failed — still no pipeline
-  const fallback = QUICK_IDENTITY[Math.floor(Math.random() * QUICK_IDENTITY.length)];
-  return { handled: true, answer: fallback, stats: { fastPath: true, modelCalls: 0, durationMs: Date.now() - t0, note: 'quick call failed — deterministic fallback' } };
+  const pool = QUICK_POOLS[sub] || QUICK_POOLS.identity;
+  const answer = pool[Math.floor(Math.random() * pool.length)];
+  sendEvent('log', { agent: 'JEXI', message: '⚡ Fast path — deterministic answer, zero model calls.' });
+  return {
+    handled: true,
+    answer,
+    stats: { fastPath: true, modelCalls: 0, durationMs: Date.now() - t0, deterministic: true, sub },
+  };
 }
 
 /** Wire the kernel into a chat turn. Returns handled fast-path result or null. */

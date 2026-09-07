@@ -28,7 +28,7 @@ export default function SourceCard({ source, index }) {
         <ExternalLink className="w-3 h-3 text-gray-500 mt-1" />
       </div>
       <div className="mt-2 h-0.5 bg-black/40 rounded-full overflow-hidden">
-        <div className="h-full bg-[#00D26A]" style={{ width: `${85 + Math.random() * 15}%` }} />
+        <div className="h-full bg-[#FF8A3D]" style={{ width: `${85 + Math.random() * 15}%` }} />
       </div>
     </motion.a>
   );

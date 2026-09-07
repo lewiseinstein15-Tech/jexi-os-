@@ -79,7 +79,7 @@ export default function HomeView({ messages, logs, isProcessing, onSend, onOpenC
         <button
           type="submit"
           disabled={!input.trim() || isProcessing}
-          className="w-11 h-11 flex items-center justify-center rounded-full bg-brand text-[#04140D] disabled:bg-surface-2 disabled:text-text-tertiary transition-all duration-200 hover:scale-105 hover:shadow-[0_0_18px_rgba(0,210,106,0.4)] active:scale-95"
+          className="w-11 h-11 flex items-center justify-center rounded-full bg-brand text-[#04140D] disabled:bg-surface-2 disabled:text-text-tertiary transition-all duration-200 hover:scale-105 hover:shadow-[0_0_18px_rgba(255,138,61,0.4)] active:scale-95"
           title="Send"
         >
           {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

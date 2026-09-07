@@ -72,7 +72,7 @@ export default function ResearchScreen({ engine, onResearch }) {
         <button
           type="submit"
           disabled={!input.trim() || isProcessing}
-          className="w-11 h-11 flex items-center justify-center rounded-full bg-brand text-[#04140D] disabled:bg-surface-2 disabled:text-text-tertiary transition-all duration-200 hover:scale-105 hover:shadow-[0_0_18px_rgba(0,210,106,0.4)] active:scale-95"
+          className="w-11 h-11 flex items-center justify-center rounded-full bg-brand text-[#04140D] disabled:bg-surface-2 disabled:text-text-tertiary transition-all duration-200 hover:scale-105 hover:shadow-[0_0_18px_rgba(255,138,61,0.4)] active:scale-95"
           title="Research"
         >
           {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -134,7 +134,7 @@ export default function ResearchScreen({ engine, onResearch }) {
               >
                 <div className={`max-w-[92%] p-3 ${
                   msg.role === 'user'
-                    ? 'rounded-lg rounded-tr-sm bg-gradient-to-br from-brand to-[#00B55C] text-[#04140D] font-medium text-[11px] shadow-[0_4px_18px_rgba(0,210,106,0.28)]'
+                    ? 'rounded-lg rounded-tr-sm bg-gradient-to-br from-brand to-[#E8683F] text-[#04140D] font-medium text-[11px] shadow-[0_4px_18px_rgba(255,138,61,0.28)]'
                     : 'rounded-lg rounded-tl-sm bg-surface-1 text-text-primary border border-hairline'
                 }`}>
                   {msg.role === 'user' ? (

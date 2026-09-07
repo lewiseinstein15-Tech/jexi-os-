@@ -6,6 +6,22 @@
 
 ---
 
+## 🔥 ARENA REBUILD (Sept 2026) — the executive rebuild
+
+JEXI has been rebuilt for speed and honesty around an **Executive Kernel**:
+small talk answers in **~80ms with ZERO model calls**; every turn carries a
+meter showing exactly how many model calls it cost and where the milliseconds
+went; Ollama on your own machine is a first-class provider
+(`MODEL_PROVIDER=ollama`); missions steer mid-flight preserving finished
+work; the Memory Vault labels stale knowledge for re-verification; the
+Browser Router enforces hard safety rules (CAPTCHA never bypassed, private
+storage never read); and the UI is a warm orange/coral desktop with a left
+rail (Home / Missions / Agents / Memory / Tools / Files / Settings), a
+phone drawer (no bottom nav bar), and JEXI's dialogue in her own
+handwriting. Full evidence: **`docs/ARENA-REBUILD-REPORT.md`**.
+
+---
+
 ## 🌐 Use JEXI
 
 | Where | Link |

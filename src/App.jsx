@@ -6,6 +6,13 @@ import { getBackendUrl, jexiFetch, getSessionId } from './utils/helpers';
 import ChatWindow from './components/ChatWindow';
 import HistoryView from './components/HistoryView';
 import WorkshopView from './components/WorkshopView';
+// ARENA REBUILD (spec Part 26) — the seven nav destinations, all REAL
+// screens backed by live APIs (no mock panels, no dead links):
+import MissionsScreen from './components/MissionsScreen'; // mission instrument: work graph + events + controls
+import AgentsScreen from './components/AgentsScreen'; // pipeline + roster + team management
+import MemoryView from './components/MemoryView'; // the memory bank, alive from the brain
+import McpScreen from './components/McpScreen'; // tools: connected MCP servers + plugins
+import WorkspaceScreen from './components/WorkspaceScreen'; // files JEXI actually wrote
 // B222 — the unwired screens, back in the app (endpoints verified live on the brain)
 import SettingsView from './components/SettingsView';
 import UpdateBanner from './components/UpdateBanner';
@@ -16,15 +23,21 @@ import OrbCore from './components/OrbCore'; // B192 — the presence orb
 import { StatusCard, CalendarCard } from './components/WidgetCards'; // B192 — glass widgets
 import ErrorBoundary from './components/ErrorBoundary';
 
-// Sept 2026 (Lewis): the menu keeps ONLY what he uses — Chat, Chat history,
-// Workshop, Settings. Everything else keeps working in the background (MCP
-// servers connect directly, plugins load, missions/teams run); the screens
-// just don't clutter the drawer anymore.
+// ARENA REBUILD (spec Part 26): the nav is Lewis's spec — Home / Missions /
+// Agents / Memory / Tools / Files / Settings. The conversation is the hero
+// (Home); every other item is a real, API-backed screen. Chat history and
+// the Workshop stay reachable (top-bar shortcuts) without crowding the rail.
 const VIEWS = {
-  chat: { label: 'Chat', icon: 'chat' },
+  chat: { label: 'Home', icon: 'home' },
+  missions: { label: 'Missions', icon: 'missions' },
+  agents: { label: 'Agents', icon: 'agents' },
+  memory: { label: 'Memory', icon: 'memory' },
+  tools: { label: 'Tools', icon: 'tools' },
+  files: { label: 'Files', icon: 'files' },
+  settings: { label: 'Settings', icon: 'settings' },
+  // off-rail, reachable from the top bar:
   history: { label: 'Chat history', icon: 'history' },
   workshop: { label: 'Workshop', icon: 'workshop' },
-  settings: { label: 'Settings', icon: 'settings' },
 };
 
 function MenuIcon({ name }) {
@@ -36,6 +49,18 @@ function MenuIcon({ name }) {
       return <svg {...common} strokeWidth="1.8"><path d="M3 3v5h5" /><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" /><path d="M12 7v5l4 2" /></svg>;
     case 'workshop':
       return <svg {...common} strokeWidth="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>;
+    case 'home':
+      return <svg {...common} strokeWidth="1.8"><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h5v-6h4v6h5V9.5" /></svg>;
+    case 'missions':
+      return <svg {...common} strokeWidth="1.8"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" fill="currentColor" /></svg>;
+    case 'agents':
+      return <svg {...common} strokeWidth="1.8"><circle cx="9" cy="8" r="3.2" /><path d="M3.5 20c.6-3.2 2.9-5 5.5-5s4.9 1.8 5.5 5" /><circle cx="17" cy="9" r="2.4" /><path d="M15.5 14.6c2.6.2 4.4 1.8 5 4.4" /></svg>;
+    case 'memory':
+      return <svg {...common} strokeWidth="1.8"><path d="M12 3a4 4 0 0 0-4 4v1a4 4 0 0 0-3 6.5A4 4 0 0 0 8 21h8a4 4 0 0 0 3-6.5A4 4 0 0 0 16 8V7a4 4 0 0 0-4-4z" /><path d="M12 3v18" /></svg>;
+    case 'tools':
+      return <svg {...common} strokeWidth="1.8"><path d="M14.7 6.3a4 4 0 0 0 5 5L21 12l-9 9-4-4 9-9 .7-3.7z" /><path d="M3 3l6 6" /></svg>;
+    case 'files':
+      return <svg {...common} strokeWidth="1.8"><path d="M4 4h10l6 6v10a0 0 0 0 1 0 0H4z" /><path d="M14 4v6h6" /></svg>;
     case 'settings':
       return <svg {...common} strokeWidth="1.8"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h.09a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51h.09a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>;
     default:
@@ -159,7 +184,14 @@ export default function App() {
           </button>
           <div className="jx-word">JEXI<em>_OS</em><span style={{ opacity: .5 }}>™</span></div>
           <div className="jx-dotsep" />
-          <div className="jx-ctx">{VIEWS[view]?.label || 'Chat'}</div>
+          <div className="jx-ctx">{VIEWS[view]?.label || 'Home'}</div>
+          {/* ARENA — off-rail shortcuts: history + workshop stay one tap away */}
+          {view !== 'history' && (
+            <button type="button" className="jx-toplink" aria-label="Chat history" onClick={(e) => { e.stopPropagation(); navigate('history'); }} title="Chat history"><MenuIcon name="history" /></button>
+          )}
+          {view !== 'workshop' && (
+            <button type="button" className="jx-toplink" aria-label="Workshop" onClick={(e) => { e.stopPropagation(); navigate('workshop'); }} title="Workshop"><MenuIcon name="workshop" /></button>
+          )}
           <div className="jx-right">
             <span className={`jx-pill${engine.isProcessing ? ' violet' : ''}`}>
               <span className="pdot" />
@@ -181,8 +213,14 @@ export default function App() {
             <SidebarBrandMark />
             <SidebarBrandName />
           </div>
+          {/* ARENA — the rail lists exactly the spec seven; history/workshop
+              stay reachable from the top bar (and this drawer keeps them too
+              on phone, under a divider) */}
           {Object.entries(VIEWS).map(([id, v], i, arr) => (
             <Fragment key={id}>
+              {['history', 'workshop'].includes(id) && !['history', 'workshop'].includes(arr[i - 1]?.[0] || '') && (
+                <div className="jx-sep" />
+              )}
               {v.group && arr[i - 1]?.[1].group !== v.group && (
                 <div className="jx-mgroup">{v.group}</div>
               )}
@@ -265,6 +303,41 @@ export default function App() {
         {/* B222 — the unwired screens, wired. Each was built, styled and
             API-backed but orphaned in a shell refactor; every endpoint they
             call is live on the brain (verified). */}
+
+        {/* ARENA — Missions: the mission instrument (work graph, events, controls) */}
+        <section className={`jx-view${view === 'missions' ? ' show' : ''}`}>
+          <div className="jx-main">
+            <MissionsScreen />
+          </div>
+        </section>
+
+        {/* ARENA — Agents: pipeline + roster + team */}
+        <section className={`jx-view${view === 'agents' ? ' show' : ''}`}>
+          <div className="jx-main">
+            <AgentsScreen logs={engine.logs} websites={engine.websites} isProcessing={engine.isProcessing} plan={engine.plan} />
+          </div>
+        </section>
+
+        {/* ARENA — Memory: the memory bank */}
+        <section className={`jx-view${view === 'memory' ? ' show' : ''}`}>
+          <div className="jx-main">
+            <MemoryView />
+          </div>
+        </section>
+
+        {/* ARENA — Tools: MCP servers + plugins */}
+        <section className={`jx-view${view === 'tools' ? ' show' : ''}`}>
+          <div className="jx-main">
+            <McpScreen />
+          </div>
+        </section>
+
+        {/* ARENA — Files: the real workspace */}
+        <section className={`jx-view${view === 'files' ? ' show' : ''}`}>
+          <div className="jx-main">
+            <WorkspaceScreen />
+          </div>
+        </section>
 
         {/* settings */}
         <section className={`jx-view${view === 'settings' ? ' show' : ''}`}>

@@ -245,9 +245,9 @@ function CopyButton({ text }) {
       onClick={handleCopy}
       className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-semibold uppercase tracking-wider transition-all duration-200 z-10"
       style={{
-        background: copied ? 'rgba(0,210,106,0.18)' : 'rgba(255,255,255,0.06)',
+        background: copied ? 'rgba(255,138,61,0.18)' : 'rgba(255,255,255,0.06)',
         color: copied ? 'var(--brand)' : 'var(--text-secondary)',
-        border: `1px solid ${copied ? 'rgba(0,210,106,0.3)' : 'rgba(255,255,255,0.08)'}`,
+        border: `1px solid ${copied ? 'rgba(255,138,61,0.3)' : 'rgba(255,255,255,0.08)'}`,
       }}
       title="Copy code"
     >

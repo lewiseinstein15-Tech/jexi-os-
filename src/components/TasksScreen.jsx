@@ -355,7 +355,7 @@ export default function TasksScreen() {
           <button
             type="submit"
             disabled={!input.trim() || creating}
-            className="tap-target flex items-center gap-1.5 text-[9px] font-bold tracking-wider text-black bg-brand rounded-lg px-3.5 py-2.5 transition-all hover:shadow-[0_0_16px_rgba(0,210,106,0.35)] active:scale-95 disabled:bg-surface-2 disabled:text-text-tertiary disabled:shadow-none"
+            className="tap-target flex items-center gap-1.5 text-[9px] font-bold tracking-wider text-black bg-brand rounded-lg px-3.5 py-2.5 transition-all hover:shadow-[0_0_16px_rgba(255,138,61,0.35)] active:scale-95 disabled:bg-surface-2 disabled:text-text-tertiary disabled:shadow-none"
           >
             {creating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Rocket className="w-3 h-3" />}
             LAUNCH
@@ -445,7 +445,7 @@ export default function TasksScreen() {
             <button
               type="submit"
               disabled={!schQuery.trim() || scheduling}
-              className="tap-target flex items-center gap-1.5 text-[9px] font-bold tracking-wider text-black bg-brand rounded-lg px-3.5 py-2.5 transition-all hover:shadow-[0_0_16px_rgba(0,210,106,0.35)] active:scale-95 disabled:bg-surface-2 disabled:text-text-tertiary disabled:shadow-none"
+              className="tap-target flex items-center gap-1.5 text-[9px] font-bold tracking-wider text-black bg-brand rounded-lg px-3.5 py-2.5 transition-all hover:shadow-[0_0_16px_rgba(255,138,61,0.35)] active:scale-95 disabled:bg-surface-2 disabled:text-text-tertiary disabled:shadow-none"
             >
               {scheduling ? <Loader2 className="w-3 h-3 animate-spin" /> : <Repeat className="w-3 h-3" />}
               SCHEDULE

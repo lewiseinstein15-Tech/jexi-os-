@@ -323,7 +323,7 @@ const generalLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 600, standardHe
 app.use(['/api/chat', '/api/vision', '/api/knowledge/search', '/api/agent'], aiLimiter);
 // ARENA PHASE 1 — the Executive Kernel fast path (small talk must never pay
 // the full pipeline) and per-request model-call accounting.
-import { kernelTurn, startMeter, meterStage, meterReport } from './src/services/JexiKernel.js';
+import { kernelTurn, kernelGate, startMeter, meterStage, meterReport } from './src/services/JexiKernel.js';
 import { meterEnter, meterLap, meterFreeze, requestMeterReport } from './src/services/RequestMeter.js'; // ARENA — per-turn model-call meter, all lanes
 import { browserRouter, registerDesktopWorker, registerAndroidWorker } from './src/services/BrowserRouter.js'; // ARENA Phase 3 — browser router (workers + policy + audit)
 import { lifecycleScan, lastLifecycleReport } from './src/services/MemoryLifecycle.js'; // ARENA Phase 4 — memory vault lifecycle
@@ -1919,7 +1919,13 @@ app.post('/api/chat', async (req, res) => {
       // before planning, so "give me a roadmap for a beginner in this course"
       // becomes "…in computer science" (ChatGPT-style context awareness). Only
       // triggers on context-dependent messages; self-contained ones pass free.
-      const resolved = await resolveConversationalQuery(query);
+      // ARENA — pure small talk (greetings/thanks/bye/identity) never pays
+      // the continuity rewrite: the meter caught ONE hidden model call per
+      // "hello" here on Sept 7 2026. The kernel answers those turns with
+      // zero calls; the rewrite would add a call nothing ever uses.
+      const resolved = kernelGate(query)
+        ? { query, resolved: false, reason: 'small talk — no rewrite, no model call' }
+        : await resolveConversationalQuery(query);
       if (resolved.resolved && resolved.query && resolved.query !== raw) {
         effectiveQuery = resolved.query;
         sendEvent('log', {

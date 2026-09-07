@@ -303,7 +303,7 @@ export default function DownloadPanel() {
               <div className="w-9 h-9 rounded-xl bg-brand-dim/50 border border-brand-line/60 flex items-center justify-center">
                 <Icon className="w-4 h-4 text-brand" />
               </div>
-              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#00D26A] text-black text-[8px] font-black flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#FF8A3D] text-black text-[8px] font-black flex items-center justify-center">
                 {i + 1}
               </span>
             </div>
