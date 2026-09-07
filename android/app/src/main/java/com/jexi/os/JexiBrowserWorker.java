@@ -27,28 +27,28 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * ARENA — APK BROWSER WORKER (the phone half of spec Part 17).
+ * ARENA -- APK BROWSER WORKER (the phone half of spec Part 17).
  *
  * Turns this app's phone into a REAL browser worker for the JEXI brain:
  * it registers with the server's APK channel, long-polls for work, runs
  * each op in a private headless WebView, and posts the honest result.
  *
- *   POST /api/browser/apk/register { deviceId, capabilities }  → token
- *   POST /api/browser/apk/poll    { token }   → an op (or idle)
- *   POST /api/browser/apk/result  { token, taskId, ok, ... }  → done
+ *   POST /api/browser/apk/register { deviceId, capabilities }  -> token
+ *   POST /api/browser/apk/poll    { token }   -> an op (or idle)
+ *   POST /api/browser/apk/result  { token, taskId, ok, ... }  -> done
  *
- * The main UI WebView is NEVER used for browsing — the worker keeps its
+ * The main UI WebView is NEVER used for browsing -- the worker keeps its
  * own off-screen WebView, so JEXI's browsing never fights the user's.
  *
  * Honesty rules (mirrored on the server):
- *  - no backend URL configured → the worker stays dormant, nothing is faked
+ *  - no backend URL configured -> the worker stays dormant, nothing is faked
  *  - every failure is reported as ok:false with the real error
  *  - the user's phone stays theirs: the server's policy gate decides what
  *    ops are allowed BEFORE they ever reach this worker (CAPTCHA never
  *    arrives here; the server refuses it first)
  *
- * Enabled/disabled: SharedPreferences "jexi_worker" → "enabled" (default on).
- * Kill switch for debugging: `adb shell am broadcast` is NOT used — the
+ * Enabled/disabled: SharedPreferences "jexi_worker" -> "enabled" (default on).
+ * Kill switch for debugging: `adb shell am broadcast` is NOT used -- the
  * setting file is enough (the worker re-reads it every cycle).
  */
 public final class JexiBrowserWorker {
@@ -70,7 +70,7 @@ public final class JexiBrowserWorker {
     private final AtomicBoolean running = new AtomicBoolean(false);
     private Thread thread;
 
-    /** The app's MAIN (Capacitor) WebView — used ONLY to read the backend
+    /** The app's MAIN (Capacitor) WebView -- used ONLY to read the backend
      *  URL the user configured (localStorage), never for browsing. */
     private volatile WebView mainWebView;
 
@@ -111,7 +111,7 @@ public final class JexiBrowserWorker {
                 if (!isEnabled()) { sleepQuietly(BACKOFF_MS_DORMANT); continue; }
                 if (backendUrl == null) { refreshBackendUrl(); }
                 if (backendUrl == null || backendUrl.isEmpty()) {
-                    // user has not configured a backend — stay dormant, honestly
+                    // user has not configured a backend -- stay dormant, honestly
                     sleepQuietly(BACKOFF_MS_DORMANT); continue;
                 }
                 if (token == null && !register()) {
@@ -119,12 +119,12 @@ public final class JexiBrowserWorker {
                 }
                 JSONObject polled = poll();
                 if (polled == null) { sleepQuietly(BACKOFF_MS_ERROR); continue; }
-                if (polled.has("idle")) { continue; } // clean idle — poll again immediately
+                if (polled.has("idle")) { continue; } // clean idle -- poll again immediately
                 if (polledHasOp(polled)) {
                     runAndReportOp(polled.optJSONObject("op"));
                 }
             } catch (Exception e) {
-                // never die — the worker outlives any single bad cycle
+                // never die -- the worker outlives any single bad cycle
                 sleepQuietly(BACKOFF_MS_ERROR);
             }
         }
@@ -135,7 +135,7 @@ public final class JexiBrowserWorker {
     }
 
     /* ------------------------------------------------------------------ */
-    /* backend URL discovery — read from the app's own settings (localStorage) */
+    /* backend URL discovery -- read from the app's own settings (localStorage) */
     /* ------------------------------------------------------------------ */
 
     private void refreshBackendUrl() {
@@ -166,7 +166,7 @@ public final class JexiBrowserWorker {
                 String url = found.get();
                 if (url != null && !url.isEmpty()) {
                     if (!url.startsWith("http")) url = "https://" + url;
-                    // token invalidation on backend change — re-register
+                    // token invalidation on backend change -- re-register
                     if (!url.equals(this.backendUrl)) this.token = null;
                     this.backendUrl = url;
                 }
@@ -220,7 +220,7 @@ public final class JexiBrowserWorker {
             httpPost(backendUrl + "/api/browser/apk/result", result, 15_000);
         } catch (Exception e) {
             // the server's 60s op timeout will report this honestly if the
-            // result never arrives — nothing is silently swallowed here
+            // result never arrives -- nothing is silently swallowed here
         }
     }
 
@@ -272,7 +272,7 @@ public final class JexiBrowserWorker {
                 });
                 JexiBrowserWorker.this.workerWebView = wv;
             } catch (Exception ignored) {
-                // creation failed — caller sees the timeout and reports honestly
+                // creation failed -- caller sees the timeout and reports honestly
             } finally {
                 latch.countDown();
             }
@@ -348,7 +348,7 @@ public final class JexiBrowserWorker {
             wv.setTag(done);
             wv.loadUrl(url);
             // wait for onPageFinished inside the main thread would block the
-            // thread the WebView needs — so we wait HERE (worker thread) for
+            // thread the WebView needs -- so we wait HERE (worker thread) for
             // the latch our WebViewClient counts down.
             return "started";
         }, 10_000);
@@ -362,7 +362,7 @@ public final class JexiBrowserWorker {
             long deadline = System.currentTimeMillis() + OP_TIMEOUT_MS;
             if (tag instanceof CountDownLatch) {
                 boolean ok = ((CountDownLatch) tag).await(OP_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-                if (!ok) return fail("page did not finish loading within " + OP_TIMEOUT_MS / 1000 + "s — reported honestly");
+                if (!ok) return fail("page did not finish loading within " + OP_TIMEOUT_MS / 1000 + "s -- reported honestly");
             }
             wv.setTag(null);
             return readPageInfo(wv);
@@ -398,7 +398,7 @@ public final class JexiBrowserWorker {
                 return out;
             } catch (Exception ignored) { }
         }
-        return fail("could not read the page — reported honestly");
+        return fail("could not read the page -- reported honestly");
     }
 
     private JSONObject opScreenshot(JSONObject params) {

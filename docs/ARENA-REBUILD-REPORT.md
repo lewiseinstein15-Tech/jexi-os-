@@ -135,15 +135,29 @@ requests conservatively. **185s → 0.45s, ~1 call instead of ~6.**
    before remote); a phone that stops polling for 90s drops offline — no
    zombie workers; ops the phone never answers fail honestly at a 60s
    timeout. Also added `POST /api/browser/task` — a policy-gated manual task
-   API for scripts. The APK app itself (the Android side that hosts the
-   WebView and speaks this protocol) is the next real build — the contract it
-   plugs into is now tested (5/5) and live.
+   API for scripts. The APK app side is now WRITTEN and COMPILE-VERIFIED
+   (this continuation): `JexiBrowserWorker.java` — one new file, zero new
+   dependencies — registers the phone with the channel, long-polls for work,
+   runs navigate/read/screenshot/act ops in a private headless WebView (the
+   UI WebView is only read for the user's configured backend URL), posts
+   honest results, and stays dormant until a backend is configured. It
+   compiled clean against API-signature stubs (javac, zero errors); the
+   GitHub Action builds the real APK on the next push, and the first LIVE
+   phone test happens when Lewis installs it — nothing is claimed until it
+   runs on a real phone.
 3. **The spec file** (`docs/ARENA-REBUILD-SPEC.md`) is a faithful
    reconstruction from working notes; the verbatim 38-part message was lost
    to session compaction. Flagged in the file. Swap-in ready if re-sent.
 4. **Git history was rebuilt twice** — the sandbox resets kept eating the
-   local commit history (working files always survived). Patch backups now
-   live outside `.git` in `/home/user/arena-backup-patches/`.
+   local commit history (working files always survived). That is now fixed
+   STRUCTURALLY: the repo is **self-healing** — every commit refreshes a
+   ~2MB delta bundle outside the repo (plus the human-readable patch series
+   in the same place), and `scripts/arena-restore.sh` heals a wiped/stale
+   `.git` in ONE command without touching the working tree. Proven live by
+   simulating the exact wipe (stale history + 196 dirty files + deleted
+   config): one command → fully healed, tree untouched, second run a no-op;
+   the total-wipe case (`.git` gone entirely) heals after adding the remote.
+   Old patch backups moved to `/home/user/jexi-os-backup/patches/`.
 
 ## Test status
 
