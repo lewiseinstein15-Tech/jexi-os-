@@ -326,6 +326,7 @@ app.use(['/api/chat', '/api/vision', '/api/knowledge/search', '/api/agent'], aiL
 import { kernelTurn, startMeter, meterStage, meterReport } from './src/services/JexiKernel.js';
 import { meterEnter, meterLap, meterFreeze, requestMeterReport } from './src/services/RequestMeter.js'; // ARENA — per-turn model-call meter, all lanes
 import { browserRouter, registerDesktopWorker, registerAndroidWorker } from './src/services/BrowserRouter.js'; // ARENA Phase 3 — browser router (workers + policy + audit)
+import { lifecycleScan, lastLifecycleReport } from './src/services/MemoryLifecycle.js'; // ARENA Phase 4 — memory vault lifecycle
 app.use('/api', generalLimiter);
 
 // B56 — CONNECTOR WEBHOOKS. Mounted BEFORE express.json because GitHub /
@@ -2505,6 +2506,17 @@ if (process.env.NODE_ENV === 'production' && !API_KEY && process.env.JEXI_ALLOW_
   console.error('Refusing to start: JEXI_API_KEY is required in production (or set JEXI_ALLOW_UNLOCKED=1 for an explicit unlocked deploy).');
   process.exit(1);
 }
+
+// ARENA Phase 4 — memory vault lifecycle: what's FRESH / AGING / STALE, and
+// the honest re-verify queue. Read-only diagnostics, no secrets.
+app.get('/api/memory/lifecycle', async (req, res) => {
+  try {
+    if (req.query.scan === '1') return res.json({ ok: true, report: await lifecycleScan() });
+    return res.json({ ok: true, report: lastLifecycleReport() });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e && e.message || e).slice(0, 200) });
+  }
+});
 
 // ARENA Phase 3 — browser router observability: which workers exist, what the
 // policy refuses, and the recent audit trail. Read-only, no secrets.

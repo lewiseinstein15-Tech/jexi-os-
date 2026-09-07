@@ -53,6 +53,8 @@ function searchWorking(query, limit) {
  * layer and the store it came from — no silent blending.
  */
 export async function recall(query, { layers = null, limit = 8 } = {}) {
+  // ARENA (spec Part 19) — every recalled memory carries its lifecycle state
+  // so stale knowledge can never silently pose as fresh. Zero model calls.
   const want = layers || ['working', 'episodic', 'semantic', 'procedural', 'project', 'user'];
   const out = [];
 
@@ -98,6 +100,11 @@ export async function recall(query, { layers = null, limit = 8 } = {}) {
     } catch { /* layer unavailable in this context */ }
   }
 
+  // ARENA — lifecycle annotation (FRESH/AGING/STALE + needsReverify)
+  try {
+    const { annotateRecall } = await import('./MemoryLifecycle.js');
+    annotateRecall(out);
+  } catch { /* annotation is diagnostics — never breaks recall */ }
   return out.slice(0, limit * 2);
 }
 
