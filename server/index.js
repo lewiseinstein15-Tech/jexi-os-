@@ -26,6 +26,7 @@ import { runSimpleTask } from './src/services/SimpleTask.js'; // B66 — Orchest
 import { Director } from './src/services/director/Director.js'; // B208 — JEXI the boss: interpret→plan→staff→delegate→supervise→verify→report
 import { realLlmAdapter, realTools } from './src/services/director/RealAdapters.js';
 import { missionRunner } from './src/services/director/MissionRunner.js'; // B211 — persistent missions (work graph)
+import { activeMissionFor } from './src/services/director/Mission.js';
 import { listMissions, loadMission, loadMissionEvents } from './src/services/director/Mission.js'; // B211 — mission store + replayable event log
 import { missionEventStream } from './src/routes/missionStream.js'; // B224 — Part 29 SSE push
 import { loadWorldState, runtimeCapabilities, globalWorld } from './src/services/director/WorldState.js'; // B215 — real environment record
@@ -320,6 +321,9 @@ app.use((req, res, next) => {
 const aiLimiter = rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests — JEXI is throttling to protect your quota. Try again in a minute.' } });
 const generalLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 600, standardHeaders: 'draft-7', legacyHeaders: false });
 app.use(['/api/chat', '/api/vision', '/api/knowledge/search', '/api/agent'], aiLimiter);
+// ARENA PHASE 1 — the Executive Kernel fast path (small talk must never pay
+// the full pipeline) and per-request model-call accounting.
+import { kernelTurn, startMeter, meterStage, meterReport } from './src/services/JexiKernel.js';
 app.use('/api', generalLimiter);
 
 // B56 — CONNECTOR WEBHOOKS. Mounted BEFORE express.json because GitHub /
@@ -1971,6 +1975,36 @@ app.post('/api/chat', async (req, res) => {
             if (missionHandled) { finish(); return; }
           } catch (e) {
             sendEvent('log', { agent: 'Missions', message: `⚠ Mission lane error (${String(e && e.message || e).slice(0, 100)}) — the normal lanes take this turn.` });
+          }
+          // ARENA PHASE 1 — EXECUTIVE KERNEL FAST PATH (spec Part 2/3): small
+          // talk, identity and acknowledgement turns are answered with ONE
+          // small model call — never the planner→director→agent pipeline.
+          // Runs AFTER mission steering (an active mission owns the turn)
+          // and BEFORE the Director. Real work always passes through.
+          try {
+            const activeMissionFlag = (() => {
+              try { return Boolean(activeMissionFor(convId)); } catch { return false; }
+            })();
+            const fast = await kernelTurn({ raw, effectiveQuery, convId, activeMission: activeMissionFlag, sendEvent });
+            if (fast && fast.handled) {
+              sendEvent('agent.done', { answer: fast.answer });
+              done({
+                success: true,
+                query,
+                summary: fast.answer,
+                statistics: {
+                  executionTime: fast.stats.durationMs,
+                  fastPath: true,
+                  modelCalls: fast.stats.modelCalls,
+                  agentsUsed: 0,
+                  confidence: 1,
+                },
+              });
+              finish();
+              return;
+            }
+          } catch (e) {
+            sendEvent('log', { agent: 'Kernel', message: `⚡ Fast path skipped (${String(e && e.message || e).slice(0, 80)}) — full lanes take this turn.` });
           }
           try {
             const director = new Director({
