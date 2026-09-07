@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# ARENA — auto-backup after every commit (the sandbox wipes .git; the bundle
+# outside the repo is the durable copy). Silent unless it fails.
+bash "$(git rev-parse --show-toplevel)/scripts/arena-backup.sh" >/dev/null 2>&1 &
