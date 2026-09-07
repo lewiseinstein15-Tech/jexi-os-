@@ -45,6 +45,10 @@ COPY src ./src
 RUN npm ci --no-audit --no-fund && npm run build && mkdir -p server/public && cp -r dist/* server/public/
 
 ENV NODE_ENV=production
+# PERMANENT drop fix #1: Node's default heap (~2GB+) lets the brain grow past
+# Render free's 512MB container → cgroup OOM-kill mid-task → dropped stream.
+# Cap V8 at 384MB so GC runs early; the process stays alive instead.
+ENV NODE_OPTIONS=--max-old-space-size=384
 ENV PORT=7860
 # Ephemeral scratch storage (memory/history ride the external store instead)
 ENV DATA_DIR=/data

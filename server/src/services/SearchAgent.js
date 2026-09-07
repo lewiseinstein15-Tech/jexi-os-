@@ -20,6 +20,12 @@ import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 const serpCache = new Map();
 const SERP_TTL_MS = 10 * 60 * 1000;
 
+// LIVE TRACE (agent-transcript UI): the keyless search path runs OUTSIDE
+// ToolRuntime, so it emits its own tool_use pairs (scan + each deep read).
+// Same contract: running FIRST, one success|error AFTER, same id.
+let __sSeq = 0;
+const searchTraceId = () => `s${Date.now().toString(36)}${(++__sSeq).toString(36)}`;
+
 function cacheKey(query) {
   return String(query || '').trim().toLowerCase();
 }
@@ -221,7 +227,22 @@ async function mapPool(items, worker, limit) {
 export async function deepRead(sources, query, sendEvent) {
   const settled = await mapPool(
     sources || [],
-    (src) => withTimeout(readOne(src), SOURCE_READ_TIMEOUT_MS, src.link),
+    (src) => (async () => {
+      const id = searchTraceId();
+      const t0 = Date.now();
+      const link = String(src?.link || src?.source_name || 'source');
+      const label = `used Read \u00b7 ${link.replace(/\s+/g, ' ').trim().slice(0, 90)}`;
+      try { sendEvent?.('tool_use', { id, tool: 'Read', slug: 'deep-read', status: 'running', duration_ms: 0, summary: label, detail: `$ deep-read ${link.slice(0, 300)}` }); } catch (e) {}
+      try {
+        const v = await withTimeout(readOne(src), SOURCE_READ_TIMEOUT_MS, src.link);
+        const ok = !!(v && v.content && v.content.length > 80);
+        try { sendEvent?.('tool_use', { id, tool: 'Read', slug: 'deep-read', status: ok ? 'success' : 'error', duration_ms: Date.now() - t0, summary: label, detail: `$ deep-read ${link.slice(0, 300)}\n${ok ? `${v.content.length} chars extracted` : 'no readable content'}` }); } catch (e) {}
+        return v;
+      } catch (e) {
+        try { sendEvent?.('tool_use', { id, tool: 'Read', slug: 'deep-read', status: 'error', duration_ms: Date.now() - t0, summary: label, detail: `$ deep-read ${link.slice(0, 300)}\nerror: ${String(e && e.message || e).slice(0, 500)}` }); } catch (e2) {}
+        throw e;
+      }
+    })(),
     readConcurrency()
   );
   const deep = [];
@@ -355,6 +376,10 @@ export async function runSearchTeam(query, sendEvent, opts = {}) {
   sendEvent?.('log', { agent: 'Query Analyzer', message: `🔎 Analyzing the best way to search: "${query}"` });
   const core = coreQuery(query);
   const rawPoolP = searchOne(core).catch(() => null); // starts NOW
+  const __scanId = searchTraceId();
+  const __scanT0 = Date.now();
+  const __scanLabel = `used Read \u00b7 ${String(query).replace(/\s+/g, ' ').trim().slice(0, 90)}`;
+  try { sendEvent?.('tool_use', { id: __scanId, tool: 'Read', slug: 'web-search', status: 'running', duration_ms: 0, summary: __scanLabel, detail: `$ web-search ${String(query).slice(0, 300)}` }); } catch (e) {}
   const plan = await analyzeQuery(query, context);
   sendEvent?.('log', {
     agent: 'Query Analyzer',
@@ -374,6 +399,7 @@ export async function runSearchTeam(query, sendEvent, opts = {}) {
     rawPoolP,
     ...extras.map((q) => searchOne(q)),
   ]));
+  try { sendEvent?.('tool_use', { id: __scanId, tool: 'Read', slug: 'web-search', status: merged.length ? 'success' : 'error', duration_ms: Date.now() - __scanT0, summary: __scanLabel, detail: `$ web-search ${String(query).slice(0, 300)}\n${merged.length} sources` }); } catch (e) {}
   const engineNames = [...new Set(merged.flatMap((m) => m.engines || [m.source]))];
   sendEvent?.('log', { agent: 'Searcher', message: `🔍 Whole-internet scan done — ${merged.length} sources from ${engineNames.length} engines (${engineNames.slice(0, 4).join(' · ')}${engineNames.length > 4 ? '…' : ''}).` });
   if (merged.length === 0) return { summary: '', sources: [] };

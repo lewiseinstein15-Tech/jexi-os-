@@ -1286,8 +1286,8 @@ form.surface-float { flex-shrink: 0; }
    "Thinking · 12.3s". Done: collapsed "Thought for 43s · 8 agents · 10
    sources", one tap to review the whole trace.
    ========================================================================== */
-.jx-agent { margin: 0 0 10px; border: 1px solid var(--line); border-radius: 10px; background: rgba(124,77,255,.04); overflow: hidden; max-width: 100%; min-width: 0; }  /* B207 */
-.jx-agent.live { border-color: rgba(124,77,255,.35); animation: jx-breathe 2.4s ease-in-out infinite; }
+.jx-agent { margin: 0 0 6px; max-width: 100%; min-width: 0; }
+.jx-agent.live { animation: jx-breathe 2.4s ease-in-out infinite; }
 .jx-agent-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; background: none; border: none; cursor: pointer; text-align: left; }
 .jx-agent-ic { font-size: 12px; line-height: 1; color: var(--mag2, var(--mag)); }
 .jx-agent.live .jx-agent-ic { animation: jxblink 1.2s infinite; }
@@ -1295,14 +1295,14 @@ form.surface-float { flex-shrink: 0; }
 .jx-agent.live .jx-agent-label { color: var(--ink, #e5e7eb); font-variant-numeric: tabular-nums; }
 .jx-agent-chips { display: inline-flex; gap: 5px; flex-wrap: wrap; }
 .jx-agent-chip { font-family: var(--mono); font-size: 9px; color: var(--faint, #6b7280); border: 1px solid var(--line); border-radius: 999px; padding: 1.5px 7px; white-space: nowrap; }
-.jx-agent-body { max-height: 210px; overflow-y: auto; padding: 8px 10px 9px; border-top: 1px solid var(--line); -webkit-overflow-scrolling: touch; }
+.jx-agent-body { max-height: 210px; overflow-y: auto; padding: 4px 0 6px; -webkit-overflow-scrolling: touch; }
 .jx-agent-narr { display: flex; align-items: baseline; gap: 8px; padding: 2.5px 0; font-size: 12.5px; font-style: italic; color: var(--muted, #9ca3af); line-height: 1.5; overflow-wrap: anywhere; }
 .jx-agent-narr.now { color: var(--ink, #e5e7eb); }
 .jx-agent-narr.now .jx-narration-dot { animation: jx-pingdot 1.1s ease-in-out infinite; }
 .jx-agent-row { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); align-items: baseline; gap: 8px; padding: 1.5px 0; font-size: 11px; line-height: 1.45; min-width: 0; max-width: 100%; }
 .jx-agent-row-who { flex-shrink: 0; min-width: 0; max-width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: .02em; color: var(--mag2, var(--mag)); opacity: .85; }
 .jx-agent-row-what { color: var(--faint, #6b7280); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }  /* B207: ellipsis only works if the cell may shrink */
-.jx-agent-reason { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line); font-family: var(--mono); font-size: 11px; line-height: 1.55; color: var(--faint, #6b7280); white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; max-height: 96px; overflow-y: auto; }  /* B207 */
+.jx-agent-reason { margin-top: 4px; padding-top: 4px; font-family: var(--mono); font-size: 11px; line-height: 1.55; color: var(--faint, #6b7280); white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; max-height: 96px; overflow-y: auto; }  /* B207 */
 
 /* B206 — "+N earlier steps/notes" marker above the capped tail */
 .jx-agent-more { font-family: var(--mono); font-size: 9px; color: var(--faint, #6b7280); padding: 2px 0 4px 13px; letter-spacing: .04em; opacity: .8; }
@@ -1633,23 +1633,29 @@ body {
   border: 2px solid rgba(255,255,255,.14);
 }
 
-/* JEXI bubble: warm dark, crown header, handwriting body, timestamp */
-.jx-jbub {
-  background: var(--jexibub);
-  border: 1px solid rgba(255, 138, 61, 0.16);
-  border-radius: 5px 16px 16px 16px;
-  padding: 11px 16px 8px;
-  max-width: 100%;
-  min-width: 0;
-  box-shadow: 0 6px 22px rgba(0,0,0,.4);
-}
-.jx-jbub-head { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
-.jx-jbub-crown { display: inline-flex; }
-.jx-jbub-name { font-family: var(--wordmark); font-weight: 700; font-size: 13px; letter-spacing: .14em; color: var(--mag); }
-.jx-jbub-live { font-size: 10px; letter-spacing: .14em; color: var(--mag); animation: jxblink 1.2s infinite; font-weight: 700; }
-.jx-jbub .jx-hand p, .jx-jbub .jx-hand li { font-size: 20px; line-height: 1.42; color: #F3EDE4; }
-.jx-jbub .jx-think { background: rgba(255,255,255,.025); margin-bottom: 8px; }
-.jx-jbub-meta { font-size: 10px; color: #7C8598; margin-top: 6px; font-variant-numeric: tabular-nums; }
+/* ── Agent transcript (Claude Code style): NO card — the trace + her words
+   print directly on the page. No border, no radius, no shadow, no
+   background, no container padding anywhere in this block. ── */
+.jx-transcript { max-width: 100%; min-width: 0; }
+.jx-transcript > .jx-hand p, .jx-transcript > .jx-hand li,
+.jx-transcript .jx-streaming-text p, .jx-transcript .jx-streaming-text li { font-size: 20px; line-height: 1.42; color: #F3EDE4; }
+/* narration: plain paragraph in the flow, app handwriting via .jx-hand */
+.jx-narr { font-size: 20px; line-height: 1.42; color: #F3EDE4; margin: 2px 0; overflow-wrap: anywhere; }
+/* step row: one horizontal line — icon, label, status, duration, chevron */
+.jx-step { margin: 1px 0; }
+.jx-step-line { display: flex; align-items: center; gap: 8px; width: 100%; padding: 3px 0; text-align: left; cursor: pointer; background: none; border: none; }
+.jx-step-ic { display: inline-flex; flex-shrink: 0; color: var(--muted); }
+.jx-step-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 19px; line-height: 1.35; color: #EDE6D8; }
+.jx-step-status { display: inline-flex; flex-shrink: 0; }
+.jx-ok { color: #3DDC84; }
+.jx-err { color: #FF5C5C; }
+.jx-spin { color: var(--mag); animation: jxspin 1s linear infinite; }
+@keyframes jxspin { to { transform: rotate(360deg); } }
+.jx-step-dur { flex-shrink: 0; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.jx-step-chev { display: inline-flex; flex-shrink: 0; color: var(--muted); transition: transform .15s ease; }
+.jx-step-chev.open { transform: rotate(180deg); }
+.jx-step-detail { font-family: var(--mono); font-size: 11.5px; line-height: 1.55; color: #B9C2D0; white-space: pre-wrap; word-break: break-word; margin: 2px 0 6px 22px; max-height: 260px; overflow-y: auto; }
+.jx-trace-meta { font-size: 10px; color: #7C8598; margin-top: 6px; font-variant-numeric: tabular-nums; }
 
 /* ── Mission in Progress card (inside chat, above composer) ── */
 .jx-missioncard {
@@ -1728,6 +1734,6 @@ body {
 /* phone crown sits right of center, left of the status pill */
 @media (max-width: 600px) { .jx-crown { margin-left: 8px; } }
 .jx-railnote svg { vertical-align: -2px; }
-/* telemetry footer inside JEXI bubbles: clean mono, never handwriting */
-.jx-jbub-foot { font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-top: 8px; border-top: 1px dashed rgba(255,255,255,.09); padding-top: 6px; }
-.jx-jbub-foot::before { content: '⚙️ '; }
+/* telemetry footer under the transcript: clean mono, never handwriting */
+.jx-trace-foot { font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-top: 8px; border-top: 1px dashed rgba(255,255,255,.09); padding-top: 6px; }
+.jx-trace-foot::before { content: '⚙️ '; }

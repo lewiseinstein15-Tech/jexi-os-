@@ -10,7 +10,8 @@ import VisionPanel from './VisionPanel';
 import TeamLive from './TeamLive'; // B208 — the boss + employees strip (real Director events)
 import ComputerPanel from './ComputerPanel'; // B211 B3 — live computer-use telemetry (real events only)
 import MissionInlineCard from './MissionInlineCard'; // reference: Mission in Progress card inside chat
-import { Crown } from './JexiBrand'; // reference: orange crown mark
+import StepRow, { foldTrace } from './StepRow'; // live agent-trace: one row per tool call
+import Narration from './Narration'; // live agent-trace: her plain-spoken words
 
 const SELF_CHECK_QUERY =
   'JEXI, run a full system self-check now. Check your health, memory, eyes and recent errors. If anything is wrong, tell me the exact source file and the fix.';
@@ -242,15 +243,11 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
                 <div className="jx-uavatar" aria-hidden="true">L</div>
                 </>
               ) : (
-                /* ---- AI MESSAGE ---- */
-                <div className="jx-jbub group">
-                  <div className="jx-jbub-head">
-                    <span className="jx-jbub-crown"><Crown size={13} /></span>
-                    <span className="jx-jbub-name">
-                      {msg.streaming && msg.by ? String(msg.by).toUpperCase() : 'JEXI'}
-                    </span>
-                    {msg.streaming && <span className="jx-jbub-live">· WRITING…</span>}
-                  </div>
+                /* ---- AGENT TRANSCRIPT (Claude Code style): NO card — the
+                    trace + her words print directly on the page. Ordered
+                    vertical list: StepRow per tool_use, Narration per
+                    narration/log, in exact arrival order. ---- */
+                <div className="jx-transcript group">
                   {/* Streaming messages arrive progressively already — render
                       them directly (no typewriter) so the content never
                       re-flows mid-scroll. The typewriter reveal runs once,
@@ -262,8 +259,6 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
                       collapsed, one tap to review the whole trace. Replaces
                       the old ThinkRow + NarrationFeed + inline ActionFeed. */}
                   <AgentThinking
-                    narrations={msg.narrations}
-                    activity={msg.activity}
                     thinking={msg.thinking}
                     live={Boolean(msg.streaming)}
                     thinkMs={msg.thinkMs}
@@ -271,6 +266,22 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
                     by={msg.by}
                     sourceCount={msg.sourceCount}
                   />
+                  {/* The live trace: step rows + narration in arrival order,
+                      consecutive same-tool runs folded into one summary row. */}
+                  {foldTrace(Array.isArray(msg.trace) ? msg.trace : []).map((e, ti) => (
+                    e && e.kind === 'step' ? (
+                      <StepRow
+                        key={e.key || e.id || ti}
+                        tool={e.tool}
+                        label={e.label}
+                        status={e.status}
+                        durationMs={e.durationMs}
+                        detail={e.detail}
+                      />
+                    ) : (
+                      <Narration key={e && e.id ? e.id : `n${ti}`} text={e && e.text} />
+                    )
+                  ))}
                   {/* ARENA (spec Part 29): JEXI's words render in her
                       handwriting voice (Caveat) — code/logs/JSON inside the
                       answer stay clean mono via .jx-hand CSS overrides. */}
@@ -285,10 +296,10 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
                     </div>
                   )}
                   {splitFoot(msg.text)[1] && (
-                    <div className="jx-jbub-foot">{splitFoot(msg.text)[1].replace(/^⚙️\s*/, '')}</div>
+                    <div className="jx-trace-foot">{splitFoot(msg.text)[1].replace(/^⚙️\s*/, '')}</div>
                   )}
                   {(fmtTime(msg.at)) && (
-                    <div className="jx-jbub-meta">{fmtTime(msg.at)}</div>
+                    <div className="jx-trace-meta">{fmtTime(msg.at)}</div>
                   )}
                   <MessageActions text={msg.text} onRegenerate={i === messages.length - 1 ? () => onSend(msg.text) : null} />
                 </div>                )}

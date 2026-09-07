@@ -116,6 +116,38 @@ approved reference image (desktop + phone):
 - Bundled fonts (offline-safe): Caveat + Baloo 2 + Inter.
 - Verified: fresh build, 7 real screenshots, 14/14 DOM checks green.
 
+## 6. Agent-trace transcript rebuild (same day)
+
+The chat was rebuilt from bubbles to a live agent-trace view
+(Claude Code / Cursor style):
+
+- Agent card (`jx-jbub` JSX + all its CSS) DELETED — agent text prints
+  directly on the page: computed `transparent / 0px / none`.
+- Every tool call streams as one row: `[icon] used <Tool> ✓ 180ms ⌄`
+  (terminal / magnifier / pencil; spinner → green ✓ / red ✗ live;
+  chevron expands raw command + full output; collapsed by default).
+- Consecutive same-tool runs fold into one summary row
+  ("Explored 4 reads", "Ran N commands") — proven live in screenshots.
+- Narration = plain handwriting paragraphs between rows (existing
+  `.jx-hand` / `var(--hand)` — no new font anywhere).
+- Backend: `executeTool` (the universal choke point: AgentLoop,
+  DshResearch, WorkerRouter, run_code dispatch…) emits `tool_use`
+  running → success|error pairs keyed by id; the keyless search path
+  (`runSearchTeam` scan + each `deepRead`) emits the same contract.
+  Proven: 10 events, 5 ids, 5 clean pairs, 0 unpaired, interleaved
+  live order. Regression suite: `server/test-trace-events.js` (9/9).
+- User bubble untouched (slate, timestamp, ✓✓, avatar).
+- Connection drops fixed permanently: (1) V8 heap capped at 384MB
+  (`NODE_OPTIONS` in `Dockerfile.slim` + `render.yaml` — the 512MB
+  Render container was OOM-killing the brain mid-task; boot log now
+  prints the cap as proof); (2) the chat POST now wakes + retries
+  once on fetch-level failure (sleeping host, no response), not just
+  on 5xx; (3) `JEXI_SELF_PING=1` baked into the Blueprint so the
+  keep-warm no longer depends on dashboard env entry.
+- Verified: fresh build, real research task in a real browser,
+  `scripts/arena-trace-proof.mjs` 12/12 green, backend 11+41+4+9
+  green, DOM 14/14 green, desktop + phone screenshots eyeballed.
+
 ---
 
 *Built by Arena for Lewis · MIT · free-tier infrastructure, no credit card, ever.*

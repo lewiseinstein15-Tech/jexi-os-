@@ -1299,6 +1299,50 @@ function formatResult(result) {
 }
 
 /* ------------------------------------------------------------------ */
+/* LIVE TRACE — tool_use events for the agent-transcript UI (StepRow).  */
+/* Every tool call emits tool_use/running at start and                  */
+/* tool_use/success|error at finish, IN ORDER, over the existing NDJSON */
+/* stream. The frontend keys rows by id so status flips live            */
+/* (spinner → ✓/✗). Fail-open: tracing must never break a tool call.    */
+/* ------------------------------------------------------------------ */
+let __traceSeq = 0;
+function toolTraceKind(slug) {
+  const s = String(slug || '');
+  if (/write|edit|save|create|update|delete|apply|kill|undefine|define/i.test(s)
+      && !/(read|search|inspect|query|list)/i.test(s)) return 'Edit';
+  if (/run|exec|command|bash|shell|terminal|preview|pwsh|crunch|compute|diagnose|subagent|ralph|workflow|background|goal|schedule|send_message|interrupt/i.test(s)) return 'Bash';
+  return 'Read';
+}
+function traceHint(slug, args) {
+  const a = (args && typeof args === 'object') ? args : {};
+  const pick = a.command || a.cmd || a.file || a.path || a.filename || a.query || a.q
+    || a.url || a.question || a.goal || a.text || a.task || a.name || a.job || '';
+  const s = String(pick).replace(/\s+/g, ' ').trim();
+  if (s) return s.slice(0, 90);
+  const keys = Object.keys(a).slice(0, 3).join(', ');
+  return keys ? String(slug) : String(slug);
+}
+function toolTraceSummary(slug, args) {
+  const kind = toolTraceKind(slug);
+  const hint = traceHint(slug, args);
+  const short = hint && hint !== String(slug) ? ` · ${hint}` : '';
+  return `used ${kind}${short}`.slice(0, 140);
+}
+function toolTraceDetail(slug, args, result) {
+  const lines = [];
+  try {
+    const sa = safeArgs(slug, args || {});
+    lines.push(`$ ${String(slug)} ${JSON.stringify(sa)}`.slice(0, 1000));
+  } catch (e) { lines.push(`$ ${String(slug)}`); }
+  if (result !== undefined) {
+    if (result && result.error) lines.push(`error: ${String(result.error).slice(0, 2000)}`);
+    const out = formatResult(result && result.result !== undefined ? result.result : result);
+    if (out) lines.push(String(out).slice(0, 3000));
+  }
+  return lines.join('\n').slice(0, 4000);
+}
+
+/* ------------------------------------------------------------------ */
 /* The runtime entry point.                                            */
 /* ------------------------------------------------------------------ */
 /**
@@ -1313,6 +1357,15 @@ function formatResult(result) {
  */
 export async function executeTool(params) {
   const { slug, args = {} } = params || {};
+  // LIVE TRACE: running event FIRST so the row appears the moment work starts.
+  const __tSend = params && typeof params.sendEvent === 'function' ? params.sendEvent : null;
+  const __tKind = toolTraceKind(slug);
+  const __tId = `t${Date.now().toString(36)}${(++__traceSeq).toString(36)}`;
+  const __t0 = Date.now();
+  const __tSummary = toolTraceSummary(slug, args);
+  if (__tSend) {
+    try { __tSend('tool_use', { id: __tId, tool: __tKind, slug, status: 'running', duration_ms: 0, summary: __tSummary, detail: toolTraceDetail(slug, args) }); } catch (e) {}
+  }
   try {
     appendEvent('tool_call', {
       tool: slug,
@@ -1321,7 +1374,16 @@ export async function executeTool(params) {
       profile: (params && (params.profile || activeToolProfile())) || activeToolProfile(),
     });
   } catch (e) {}
-  const result = await executeToolInner(params);
+  let result;
+  try {
+    result = await executeToolInner(params);
+  } catch (e) {
+    // A thrown tool must still close its trace row (red X, not a spinner forever).
+    if (__tSend) {
+      try { __tSend('tool_use', { id: __tId, tool: __tKind, slug, status: 'error', duration_ms: Date.now() - __t0, summary: __tSummary, detail: toolTraceDetail(slug, args, { ok: false, error: (e && e.message) || String(e) }) }); } catch (e2) {}
+    }
+    throw e;
+  }
   try {
     appendEvent('tool_result', {
       tool: slug,
@@ -1334,6 +1396,10 @@ export async function executeTool(params) {
       durationMs: result.durationMs || 0,
     });
   } catch (e) {}
+  // LIVE TRACE: completion event — same id, so the row flips live.
+  if (__tSend) {
+    try { __tSend('tool_use', { id: __tId, tool: __tKind, slug, status: result && result.ok ? 'success' : 'error', duration_ms: Date.now() - __t0, summary: __tSummary, detail: toolTraceDetail(slug, args, result) }); } catch (e) {}
+  }
   return result;
 }
 

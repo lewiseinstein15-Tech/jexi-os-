@@ -3,6 +3,7 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import axios from 'axios';
 import crypto from 'crypto';
+import v8 from 'v8';
 import fs from 'fs';
 import path from 'path';
 import { planner } from './src/services/Planner.js';
@@ -2626,6 +2627,9 @@ app.get('/api/browser/status', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🧠 JEXI OS BRAIN running on port ${PORT}`);
+  // PERMANENT drop fix: visible proof the heap cap is active (OOM-kill was
+  // dropping mid-task streams on 512MB hosts — see NODE_OPTIONS).
+  try { console.log(`[boot] v8 heap cap: ${Math.round(v8.getHeapStatistics().heap_size_limit / 1048576)}MB (rss ${Math.round(process.memoryUsage().rss / 1048576)}MB)`); } catch (e) {}
   // ARENA Phase 3 — probe real browser workers at boot (honest: on hosts with
   // no Chromium / no paired device the router simply reports none connected).
   (async () => {

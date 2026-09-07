@@ -45,5 +45,11 @@ services:
       # (e.g. https://lewiseinstein15-tech.github.io). Unset = open.
       - key: CORS_ORIGINS
         sync: false
+      # PERMANENT drop fix: cap the V8 heap (see Dockerfile.slim) and keep
+      # the free instance warm from inside (external cron gets starved).
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=384
+      - key: JEXI_SELF_PING
+        value: "1"
       # Optional: point the frontend at this service without touching code.
       # After deploy, set VITE_JEXI_BACKEND_URL on Vercel to your onrender.com URL.

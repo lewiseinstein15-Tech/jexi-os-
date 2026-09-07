@@ -74,6 +74,29 @@ function reduceTeam(prev, evt) {
   return t;
 }
 
+// LIVE TRACE (agent-transcript UI): every tool_use / narration / log event
+// appends ONE entry to the streaming message's ordered trace, in arrival
+// order. tool_use completions UPDATE the running row by id (spinner → ✓/✗),
+// so status flips live instead of appearing after the fact. Capped like
+// activity so a marathon task cannot grow state unbounded.
+function pushTrace(prev, entry, updateId) {
+  const next = [...prev];
+  const last = next[next.length - 1];
+  const blank = { role: 'jexi', at: Date.now(), text: '', streaming: true, t0: Date.now(), trace: [] };
+  if (last && last.role === 'jexi' && last.streaming) {
+    const trace = Array.isArray(last.trace) ? [...last.trace] : [];
+    if (updateId) {
+      const k = trace.findIndex((e) => e && e.id === updateId);
+      if (k >= 0) { trace[k] = { ...trace[k], ...entry }; next[next.length - 1] = { ...last, trace }; return next; }
+    }
+    next[next.length - 1] = { ...last, trace: [...trace, entry].slice(-400) };
+  } else {
+    blank.trace = [entry];
+    next.push(blank);
+  }
+  return next;
+}
+
 async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable, setQuestions, setPlanReview, setTeam, setComputer } = {}) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -121,6 +144,7 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
         message: sanitizeText(data.message, 240),
       };
       setLogs(prev => [...prev, entry].slice(-400));
+      setMessages(prev => pushTrace(prev, { kind: 'narration', text: `${entry.agent}: ${entry.message}` }));
       setMessages(prev => {
         const next = [...prev];
         const last = next[next.length - 1];
@@ -149,6 +173,8 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
           }
           return next;
         });
+        // The transcript owns her voice now — same sentence, arrival order.
+        setMessages(prev => pushTrace(prev, { kind: 'narration', text }));
       }
     }
     else if (data.type === 'think') {
@@ -186,6 +212,20 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
           return next;
         });
       }
+    }
+    // LIVE TRACE: tool_use running → creates the row; success/error →
+    // updates the SAME row by id (live status flip, never a duplicate).
+    else if (data.type === 'tool_use') {
+      const id = String(data.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      const row = {
+        kind: 'step', id,
+        tool: ['Bash', 'Read', 'Edit'].includes(data.tool) ? data.tool : 'Read',
+        label: sanitizeText(data.summary || data.slug || 'used tool', 140),
+        status: data.status === 'success' ? 'success' : (data.status === 'error' ? 'error' : 'running'),
+        durationMs: Number(data.duration_ms) || 0,
+        detail: sanitizeText(data.detail, 4000),
+      };
+      setMessages(prev => pushTrace(prev, row, data.status === 'running' ? null : id));
     }
     else if (data.type === 'website') {
       setWebsites(prev => [...prev, data.site]);
@@ -253,6 +293,8 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
             // B205 the final message dropped narrations entirely — the
             // "HOW I WORKED" view could never render after done.)
             ...(cur && cur.narrations?.length ? { narrations: cur.narrations } : {}),
+            // LIVE TRACE: the finished transcript survives the turn.
+            ...(cur && cur.trace?.length ? { trace: cur.trace } : {}),
             ...(cur && cur.activity?.length ? { activity: cur.activity } : {}),
             ...(cur && cur.sourceCount ? { sourceCount: cur.sourceCount } : {}),
             ...(cur && cur.by ? { by: cur.by } : {}),
@@ -480,12 +522,33 @@ export const useJexiEngine = () => {
       if (codeModeOn && preset !== 'standard' && preset !== 'minimal') {
         headers['x-jexi-code-mode'] = '1';
       }
-      const res = await jexiFetch(`${backendUrl}/api/chat`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ query, image: image || undefined, files: attachments || undefined }),
-        signal: abortRef.current.signal,
-      });
+      let res;
+      try {
+        res = await jexiFetch(`${backendUrl}/api/chat`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ query, image: image || undefined, files: attachments || undefined }),
+          signal: abortRef.current.signal,
+        });
+      } catch (e) {
+        // PERMANENT drop fix #2: a sleeping host can hang/drop the first
+        // contact with NO response (fetch rejects — no status at all). That
+        // used to surface as a scary CORS/unreachable wall. Wake + retry
+        // once first; only a second failure is reported to the user.
+        if (e?.name === 'AbortError') throw e;
+        setMessages(prev => [...prev, {
+          role: 'jexi', at: Date.now(),
+          text: '🔄 Waking JEXI\u2019s brain — the first call went into the void (sleeping server). Waking it up and retrying…',
+        }]);
+        await wakeUp();
+        abortRef.current = new AbortController();
+        res = await jexiFetch(`${backendUrl}/api/chat`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ query, image: image || undefined, files: attachments || undefined }),
+          signal: abortRef.current.signal,
+        });
+      }
       if (!res.ok && res.status >= 500) {
         // Likely a cold start / host restart mid-request. Tell the user what's
         // happening, wake the brain, and retry once — no scary failure.
