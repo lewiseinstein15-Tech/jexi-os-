@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { Mic, Send, Square } from 'lucide-react';
+import { Mic, ChevronRight, Square, Paperclip, Smile } from 'lucide-react';
 
 /**
  * B195 — COMPOSER (isolated, real-app behavior).
@@ -29,11 +29,12 @@ import { Mic, Send, Square } from 'lucide-react';
 const SpeechRecognitionCtor = typeof window !== 'undefined'
   && (window.SpeechRecognition || window.webkitSpeechRecognition) ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
 
-function Composer({ isProcessing, onSendText, onStop }) {
+function Composer({ isProcessing, onSendText, onStop, onAttach }) {
   const [text, setText] = useState('');
   const [queued, setQueued] = useState(null); // queued message while busy
   const [listening, setListening] = useState(false);
   const [micNote, setMicNote] = useState(null); // honest error surfaced, never swallowed
+  const [emojiOpen, setEmojiOpen] = useState(false); // reference 🙂 quick-emoji
   const lastSend = useRef(0);
   const taRef = useRef(null);
   const recRef = useRef(null);
@@ -142,14 +143,29 @@ function Composer({ isProcessing, onSendText, onStop }) {
           <span className="qdot" /> queued: “{queued.length > 40 ? `${queued.slice(0, 40)}…` : queued}” — sends when I finish
         </div>
       )}
+      {emojiOpen && (
+        <div className="jx-emojipop" role="menu" aria-label="Insert emoji">
+          {['🙂','😄','🚀','👍','👑','🔥','💡','✅','❤️','🎉','🤖','✨'].map((e) => (
+            <button key={e} type="button" role="menuitem" onClick={() => { setText((t) => t + e); setEmojiOpen(false); taRef.current?.focus(); requestAnimationFrame(() => autosize()); }}>{e}</button>
+          ))}
+        </div>
+      )}
       <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="jx-bar" style={{ marginBottom: 0 }}>
+        {onAttach && (
+          <button type="button" onClick={onAttach} className="jx-toolbtn" title="Attach an image" aria-label="Attach an image">
+            <Paperclip size={16} />
+          </button>
+        )}
+        <button type="button" onClick={() => setEmojiOpen((o) => !o)} className="jx-toolbtn" title="Insert emoji" aria-label="Insert emoji" aria-expanded={emojiOpen}>
+          <Smile size={16} />
+        </button>
         <textarea
           ref={taRef}
           rows={1}
           value={text}
           onChange={(e) => { setText(e.target.value); autosize(); }}
           onKeyDown={onKeyDown}
-          placeholder={isProcessing ? 'Type your next message…' : 'Message JEXI…'}
+          placeholder={isProcessing ? 'Type your next message…' : 'Type a message to JEXI...'}
           className="jx-input"
           enterKeyHint="send"
           autoComplete="off"
@@ -171,8 +187,8 @@ function Composer({ isProcessing, onSendText, onStop }) {
             <Square size={15} />
           </button>
         )}
-        <button type="submit" disabled={!canSend} className="jx-sendbtn" title={queued !== null ? 'Queued' : 'Send'} aria-label="Send">
-          <Send size={15} />
+        <button type="submit" disabled={!canSend} className="jx-sendbtn send" title={queued !== null ? 'Queued' : 'Send'} aria-label="Send">
+          <ChevronRight size={19} strokeWidth={2.6} />
         </button>
       </form>
     </div>

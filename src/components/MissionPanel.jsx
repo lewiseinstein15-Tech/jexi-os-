@@ -8,6 +8,8 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { getBackendUrl, jexiFetch } from '../utils/helpers';
+import { Code2, Lightbulb, Folder, Terminal } from 'lucide-react';
+import { Crown } from './JexiBrand';
 
 const ACTIVE = ['PLANNING', 'EXECUTING', 'VERIFYING', 'AWAITING_INPUT'];
 const RESOLVED = new Set(['DONE', 'SKIPPED', 'SUPERSEDED']);
@@ -71,13 +73,13 @@ export default function MissionPanel() {
     <aside className="jx-missionpanel" aria-label="Mission status">
       {offline && missions === null ? (
         <div className="jxmp-card">
-          <div className="jxmp-title">👑 Active Mission</div>
+          <div className="jxmp-title"><Crown size={12} /> Active Mission</div>
           <div className="jxmp-empty">Brain unreachable —<br />showing nothing rather than<br />something fake.</div>
         </div>
       ) : (
         <>
           <div className="jxmp-card">
-            <div className="jxmp-title">👑 Active Mission</div>
+            <div className="jxmp-title"><Crown size={12} /> Active Mission</div>
             {active ? (
               <>
                 <div className="jxmp-mname">{String(active.objective || active.id).slice(0, 90)}</div>
@@ -111,14 +113,18 @@ export default function MissionPanel() {
           <div className="jxmp-card">
             <div className="jxmp-title">JEXI is using</div>
             <ul className="jxmp-using">
-              <li><span className={`jxmp-dot${active ? ' on' : ''}`} />Coding Agent</li>
-              <li><span className={`jxmp-dot${active ? ' on' : ''}`} />Planning Agent</li>
-              <li><span className={`jxmp-dot${active ? ' on' : ''}`} />File System</li>
-              <li><span className={`jxmp-dot${ollamaLive ? ' on' : ''}`} />{ollamaLive ? 'Ollama (local)' : 'Remote models'}</li>
+              {[
+                { Icon: Code2, label: 'Coding Agent', on: !!active },
+                { Icon: Lightbulb, label: 'Planning Agent', on: !!active },
+                { Icon: Folder, label: 'File System', on: !!active },
+                { Icon: Terminal, label: ollamaLive ? 'Ollama (local)' : 'Remote models', on: ollamaLive || !!active },
+              ].map(({ Icon, label, on }) => (
+                <li key={label}><span className={`jxmp-ico${on ? ' on' : ''}`}><Icon size={13} /></span>{label}</li>
+              ))}
             </ul>
           </div>
 
-          <div className="jxmp-note">Small steps create big things. ♡</div>
+          <div className="jxmp-note">Small steps<br />create big things. ♡<br /><span>— JEXI</span></div>
         </>
       )}
     </aside>

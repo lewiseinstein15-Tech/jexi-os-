@@ -98,6 +98,24 @@ cd server && node test-arena-astra.js
 
 Local models: `MODEL_PROVIDER=ollama MODEL_NAME=qwen3` (Ollama on `OLLAMA_BASE_URL`, default `http://127.0.0.1:11434`).
 
+## 5. Reference-match UI pass (same day)
+
+After the architecture landed, the UI was rebuilt pixel-close to the
+approved reference image (desktop + phone):
+
+- Chat = reference bubbles: slate user bubble (timestamp + ✓✓ + avatar),
+  warm JEXI bubble (orange 👑 JEXI header, Caveat handwriting body,
+  timestamp), telemetry footer split into clean mono.
+- Live "Mission in Progress" card inside the chat (real work-graph
+  progress, renders null when no mission — never fake).
+- Bolt + rounded-JEXI lockup (bundled Baloo 2), sidebar gradient Home
+  pill, centered top search, Lewis chip, right mission rail with icon
+  rows + mint done-checks, handwritten notes.
+- Phone: ☰ left, JEXI centered, 👑 + ONLINE right, no bottom nav,
+  reachable composer (attach 📎 opens the real picker, 🙂 inserts).
+- Bundled fonts (offline-safe): Caveat + Baloo 2 + Inter.
+- Verified: fresh build, 7 real screenshots, 14/14 DOM checks green.
+
 ---
 
 *Built by Arena for Lewis · MIT · free-tier infrastructure, no credit card, ever.*

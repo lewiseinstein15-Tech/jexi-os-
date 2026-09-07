@@ -127,7 +127,7 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
         if (last && last.role === 'jexi' && last.streaming) {
           next[next.length - 1] = { ...last, activity: [...(last.activity || []), entry].slice(-400) };
         } else {
-          next.push({ role: 'jexi', text: '', streaming: true, t0: Date.now(), activity: [entry] });
+          next.push({ role: 'jexi', at: Date.now(), text: '', streaming: true, t0: Date.now(), activity: [entry] });
         }
         return next;
       });
@@ -145,7 +145,7 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
           if (last && last.role === 'jexi' && last.streaming) {
             next[next.length - 1] = { ...last, narrations: [...(last.narrations || []), text] };
           } else {
-            next.push({ role: 'jexi', text: '', streaming: true, t0: Date.now(), narrations: [text] });
+            next.push({ role: 'jexi', at: Date.now(), text: '', streaming: true, t0: Date.now(), narrations: [text] });
           }
           return next;
         });
@@ -162,7 +162,7 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
           if (last && last.role === 'jexi' && last.streaming) {
             next[next.length - 1] = { ...last, thinking: (last.thinking || '') + delta, by: last.by || data.by };
           } else {
-            next.push({ role: 'jexi', text: '', thinking: delta, streaming: true, t0: Date.now(), thinkT0: Date.now(), ...(data.by ? { by: data.by } : {}) });
+            next.push({ role: 'jexi', at: Date.now(), text: '', thinking: delta, streaming: true, t0: Date.now(), thinkT0: Date.now(), ...(data.by ? { by: data.by } : {}) });
           }
           return next;
         });
@@ -181,7 +181,7 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
             if (thinkT0 !== null && thinkMs === null) thinkMs = Date.now() - thinkT0;
             next[next.length - 1] = { ...last, text: last.text + delta, by: last.by || data.by, ...(thinkMs !== null && last.thinkMs === undefined ? { thinkMs } : {}) };
           } else {
-            next.push({ role: 'jexi', text: delta, streaming: true, ...(data.by ? { by: data.by } : {}) });
+            next.push({ role: 'jexi', at: Date.now(), text: delta, streaming: true, ...(data.by ? { by: data.by } : {}) });
           }
           return next;
         });
@@ -243,7 +243,7 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
               : '✅ Task completed — the team finished, but returned no readable summary. Check the activity log above to see what ran.');
           const cur = next[idx];
           const finalMsg = {
-            role: 'jexi', text: summary + footer, sources: data.sources, files: data.files,
+            role: 'jexi', at: Date.now(), text: summary + footer, sources: data.sources, files: data.files,
             // B173 — the Think row survives the turn (tap to review reasoning)
             ...(cur && cur.thinking ? { thinking: cur.thinking } : {}),
             ...(cur && cur.thinkMs !== undefined ? { thinkMs: cur.thinkMs } : (thinkMs !== null ? { thinkMs } : {})),
@@ -267,7 +267,7 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
         // interim notice, then keep polling automatically for the real result.
         const why = data.error || 'the task hit an unexpected error';
         setMessages(prev => [...prev, {
-          role: 'jexi',
+          role: 'jexi', at: Date.now(),
           text: `⏱ ${why}\n\nI'm still running it server-side — the result will appear here automatically when it finishes.`,
         }]);
         onRecoverable?.();
@@ -279,7 +279,7 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
         // message). Without this fallback the user saw only the generic "the
         // task hit an unexpected error" instead of what actually went wrong.
         const why = data.error || (data.summary && String(data.summary).trim()) || 'the task hit an unexpected error';
-        setMessages(prev => [...prev, { role: 'jexi', text: `⚠ ${why}\n\nThe server is online — tap STOP and try again, or ask me to continue from where it stopped.` }]);
+        setMessages(prev => [...prev, { role: 'jexi', at: Date.now(), text: `⚠ ${why}\n\nThe server is online — tap STOP and try again, or ask me to continue from where it stopped.` }]);
       }
     }
   };
@@ -310,7 +310,7 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
       if (onDrop) await onDrop();
       else {
         setMessages(prev => [...prev, {
-          role: 'jexi',
+          role: 'jexi', at: Date.now(),
           text: '⚠ The connection dropped before JEXI finished — the task may still be running on the server. Wait a moment, then ask me to continue from where it stopped.',
         }]);
       }
@@ -374,7 +374,7 @@ export const useJexiEngine = () => {
     try {
       // Tell the user we're still waiting (not the scary fallback yet).
       setMessages(prev => [...prev, {
-        role: 'jexi',
+        role: 'jexi', at: Date.now(),
         text: '⚠ The connection dropped — JEXI is still working server-side. Waiting for the result…',
       }]);
       interimShown = true;
@@ -386,7 +386,7 @@ export const useJexiEngine = () => {
         if (!patienceNoteShown && Date.now() - startedAt > 120000) {
           patienceNoteShown = true;
           setMessages(prev => [...prev, {
-            role: 'jexi',
+            role: 'jexi', at: Date.now(),
             text: '⏳ Still waiting — long tasks can take several minutes. The result will appear here automatically the moment it finishes.',
           }]);
         }
@@ -400,7 +400,7 @@ export const useJexiEngine = () => {
               ? result.summary
               : `⚠ ${result.error || 'the task hit an unexpected error'}`;
             setMessages(prev => [...prev, {
-              role: 'jexi',
+              role: 'jexi', at: Date.now(),
               text: summary,
               sources: result.sources,
               files: result.files,
@@ -418,7 +418,7 @@ export const useJexiEngine = () => {
     // Never leave the user hanging — honest fallback after the recovery window.
     if (!found && !ctrl.signal.aborted) {
       setMessages(prev => [...prev, {
-        role: 'jexi',
+        role: 'jexi', at: Date.now(),
         text: '⚠ The connection dropped and the result did not return within 30 minutes. If JEXI is still running server-side, saying "continue" will pick it up — or just retry the task.',
       }]);
     }
@@ -455,7 +455,7 @@ export const useJexiEngine = () => {
     setPlan(null);
     setTeam(null); // B208 — fresh turn, fresh team strip
     setComputer(null); // B211 B3 — fresh turn, fresh computer telemetry
-    const userMsg = { role: 'user', text: query, image };
+    const userMsg = { role: 'user', text: query, image, at: Date.now() };
     setMessages(prev => [...prev, userMsg]);
     const onEvent = () => { watchdogFiredRef.current = false; };
     const onStale = () => { watchdogFiredRef.current = true; abortRef.current?.abort(); };
@@ -490,7 +490,7 @@ export const useJexiEngine = () => {
         // Likely a cold start / host restart mid-request. Tell the user what's
         // happening, wake the brain, and retry once — no scary failure.
         setMessages(prev => [...prev, {
-          role: 'jexi',
+          role: 'jexi', at: Date.now(),
           text: '🔄 Waking JEXI\u2019s brain — the free server was sleeping and the first call got dropped. Waking it up and retrying…',
         }]);
         await wakeUp();
@@ -523,7 +523,7 @@ export const useJexiEngine = () => {
       // (locked server, no access key) and CORS/unreachable get targeted
       // guidance; anything else stays honest about the drop.
       setMessages(prev => [...prev, {
-        role: 'jexi',
+        role: 'jexi', at: Date.now(),
         text: backendErrorMessage(error, backendUrl),
       }]);
     } finally {
@@ -543,7 +543,7 @@ export const useJexiEngine = () => {
     setIsProcessing(false);
     if (!wasRunning) return; // nothing was running — don't inject a phantom message
     // An agent never leaves you hanging — acknowledge the halt and propose the next move.
-    setMessages(prev => [...prev, { role: 'jexi', text: '⏹ Stopped mid-task. Tell me what to do next and I\'ll take it from there.' }]);
+    setMessages(prev => [...prev, { role: 'jexi', at: Date.now(), text: '⏹ Stopped mid-task. Tell me what to do next and I\'ll take it from there.' }]);
   }, []);
 
   // Append an assistant or user message directly (used by the camera vision panel).
@@ -561,8 +561,8 @@ export const useJexiEngine = () => {
     setSessionId(id);
     const msgs = (Array.isArray(events) ? events : [])
       .filter((e) => e && (e.kind === 'chat' || !e.kind) && e.text)
-      .map((e) => ({ role: e.role === 'user' ? 'user' : 'jexi', text: String(e.text) }));
-    if (msgs.length === 0) msgs.push({ role: 'jexi', text: 'This conversation is empty — say something and I will start it up again.' });
+      .map((e) => ({ role: e.role === 'user' ? 'user' : 'jexi', text: String(e.text), at: e.t || e.at || null }));
+    if (msgs.length === 0) msgs.push({ role: 'jexi', at: Date.now(), text: 'This conversation is empty — say something and I will start it up again.' });
     setMessages(msgs);
     setLogs([]);
     setWebsites([]);

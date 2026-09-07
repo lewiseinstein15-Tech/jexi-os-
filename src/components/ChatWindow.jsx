@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Square, ImagePlus, X, Camera, Stethoscope, Plus, Copy, Check, RefreshCw, Sparkles } from 'lucide-react';
+import { Send, Square, ImagePlus, X, Camera, Stethoscope, Plus, Copy, Check, RefreshCw } from 'lucide-react';
 import TypedMessage from './TypedMessage';
 import AgentThinking from './AgentThinking'; // B205 — unified arena-style thinking panel
 import OrbCore from './OrbCore'; // B192 — the presence orb (empty state)
@@ -9,6 +9,8 @@ import MarkdownRenderer from './MarkdownRenderer';
 import VisionPanel from './VisionPanel';
 import TeamLive from './TeamLive'; // B208 — the boss + employees strip (real Director events)
 import ComputerPanel from './ComputerPanel'; // B211 B3 — live computer-use telemetry (real events only)
+import MissionInlineCard from './MissionInlineCard'; // reference: Mission in Progress card inside chat
+import { Crown } from './JexiBrand'; // reference: orange crown mark
 
 const SELF_CHECK_QUERY =
   'JEXI, run a full system self-check now. Check your health, memory, eyes and recent errors. If anything is wrong, tell me the exact source file and the fix.';
@@ -29,6 +31,22 @@ async function copyToClipboard(text) {
 }
 
 
+
+/* Reference timestamps: 10:15 AM (shown only when the message carries a time). */
+/* Telemetry footer (⚙️ …) rides after --- : render it mono, never handwritten. */
+function splitFoot(text) {
+  const t = String(text || '');
+  const i = t.indexOf('\n\n---\n');
+  if (i < 0) return [t, ''];
+  return [t.slice(0, i), t.slice(i).replace(/^\n\n---\n/, '').trim()];
+}
+
+function fmtTime(at) {
+  if (!at) return '';
+  const d = new Date(typeof at === 'number' ? at : at);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
 
 /* ------------------------------------------------------------------ */
 /* Quick-action button                                                  */
@@ -205,32 +223,33 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`jx-row flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {msg.role === 'user' ? (
-                /* ---- USER MESSAGE ---- */
-                <div className="max-w-[85%] relative group">
-                  <div className="p-3 rounded-lg rounded-tr-sm bg-gradient-to-br from-brand to-[#E8683F] text-[#04140D] font-medium text-[11px] shadow-[0_4px_18px_rgba(255,138,61,0.28)]">
-                    <div className="whitespace-pre-wrap break-words">
-                      {msg.image && (
-                        <img src={msg.image} alt="attachment" className="max-w-[220px] rounded-lg mb-2 border border-black/20" />
-                      )}
-                      {msg.text}
-                    </div>
+                /* ---- USER BUBBLE (reference: slate, timestamp + ticks, avatar) ---- */
+                <>
+                <div className="jx-ubub group">
+                  <div className="jx-ubub-text">
+                    {msg.image && (
+                      <img src={msg.image} alt="attachment" className="jx-ubub-img" />
+                    )}
+                    {msg.text}
                   </div>
+                  {(fmtTime(msg.at)) && (
+                    <div className="jx-ubub-meta">{fmtTime(msg.at)} <span className="jx-ticks" aria-label="sent">✓✓</span></div>
+                  )}
                 </div>
+                <div className="jx-uavatar" aria-hidden="true">L</div>
+                </>
               ) : (
                 /* ---- AI MESSAGE ---- */
-                <div className="w-full min-w-0 group">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-brand/30 to-brand/10 border border-brand/20 flex items-center justify-center flex-shrink-0">
-                      <Sparkles className="w-2.5 h-2.5 text-brand" />
-                    </div>
-                    <span className="text-[9px] font-bold tracking-[0.18em] text-brand jx-writer">
-                      {msg.streaming && <span className="dot" aria-hidden="true" />}
+                <div className="jx-jbub group">
+                  <div className="jx-jbub-head">
+                    <span className="jx-jbub-crown"><Crown size={13} /></span>
+                    <span className="jx-jbub-name">
                       {msg.streaming && msg.by ? String(msg.by).toUpperCase() : 'JEXI'}
-                      {msg.streaming ? ' · WRITING…' : ''}
                     </span>
+                    {msg.streaming && <span className="jx-jbub-live">· WRITING…</span>}
                   </div>
                   {/* Streaming messages arrive progressively already — render
                       them directly (no typewriter) so the content never
@@ -257,19 +276,28 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
                       answer stay clean mono via .jx-hand CSS overrides. */}
                   {msg.streaming ? (
                     <div className="jx-streaming-text jx-hand">
-                      <MarkdownRenderer content={msg.text} size="text-[13px]" />
+                      <MarkdownRenderer content={splitFoot(msg.text)[0]} size="text-[13px]" />
                       <span className="jx-caret" aria-hidden="true" />
                     </div>
                   ) : (
                     <div className="jx-hand">
-                      <TypedMessage text={msg.text} size="text-[13px]" />
+                      <TypedMessage text={splitFoot(msg.text)[0]} size="text-[13px]" />
                     </div>
+                  )}
+                  {splitFoot(msg.text)[1] && (
+                    <div className="jx-jbub-foot">{splitFoot(msg.text)[1].replace(/^⚙️\s*/, '')}</div>
+                  )}
+                  {(fmtTime(msg.at)) && (
+                    <div className="jx-jbub-meta">{fmtTime(msg.at)}</div>
                   )}
                   <MessageActions text={msg.text} onRegenerate={i === messages.length - 1 ? () => onSend(msg.text) : null} />
                 </div>                )}
             </motion.div>
           ))
         )}
+
+        {/* Reference: live Mission in Progress card above the composer */}
+        <MissionInlineCard />
 
       </div>
 
@@ -318,7 +346,7 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
       </div>
 
       {/* B195 — isolated composer: typing never re-renders the chat */}
-      <Composer isProcessing={isProcessing} onSendText={handleComposerSend} onStop={onStop} />
+      <Composer isProcessing={isProcessing} onSendText={handleComposerSend} onStop={onStop} onAttach={() => fileRef.current?.click()} />
 
 
       <VisionPanel

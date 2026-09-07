@@ -21,6 +21,7 @@ import BootSplash from './components/BootSplash'; // B79 — branded loading scr
 import { SidebarBrandMark, SidebarBrandName } from './brand/official'; // B160 — dsh ui-brand-official
 import OrbCore from './components/OrbCore'; // B192 — the presence orb
 import MissionPanel from './components/MissionPanel'; // ARENA ASTRA — desktop right mission rail
+import { SidebarLockup, Crown } from './components/JexiBrand'; // reference: bolt + wordmark lockup
 import { StatusCard, CalendarCard } from './components/WidgetCards'; // B192 — glass widgets
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -184,8 +185,7 @@ export default function App() {
           >
             <i /><i /><i />
           </button>
-          <div className="jx-word">JEXI<em>_OS</em><span style={{ opacity: .5 }}>™</span></div>
-          <span className="jx-crown" aria-hidden="true">👑</span>
+          <div className="jx-word">JEXI</div>
           <div className="jx-dotsep" />
           <div className="jx-ctx">{VIEWS[view]?.label || 'Home'}</div>
           {/* ARENA ASTRA — top search (desktop): ask JEXI from anywhere */}
@@ -204,6 +204,7 @@ export default function App() {
             <button type="button" className="jx-toplink" aria-label="Workshop" onClick={(e) => { e.stopPropagation(); navigate('workshop'); }} title="Workshop"><MenuIcon name="workshop" /></button>
           )}
           <div className="jx-right">
+            <span className="jx-crown" aria-hidden="true">👑</span>
             {/* ARENA ASTRA — owner chip (desktop) */}
             <span className="jx-userchip" title="Lewis — owner & creator"><span className="jx-avatar" aria-hidden="true">L</span>Lewis<span className="jx-chev" aria-hidden="true">▾</span></span>
             <span className={`jx-pill${engine.isProcessing ? ' violet' : ''}`}>
@@ -222,11 +223,7 @@ export default function App() {
         {/* hamburger menu (drawer) */}
         <nav className={`jx-menu${menuOpen ? ' open' : ''}`} onClick={(e) => e.stopPropagation()}>
           {/* B160 — dsh ui-brand-official: sidebar brand occupants */}
-          <div className="jx-brand">
-            <SidebarBrandMark />
-            <SidebarBrandName />
-          </div>
-          <div className="jx-tagline">Think · Plan · Do · With You</div>
+          <SidebarLockup />
           {/* ARENA — the rail lists exactly the spec seven; history/workshop
               stay reachable from the top bar (and this drawer keeps them too
               on phone, under a divider) */}
@@ -248,7 +245,7 @@ export default function App() {
               </button>
             </Fragment>
           ))}
-          <div className="jx-railnote">Big goals.<br />Real progress.<br /><span>— JEXI 👑</span></div>
+          <div className="jx-railnote">Big goals.<br />Real progress.<br /><span>— JEXI <Crown size={15} /></span></div>
         </nav>
 
         {/* B192 — workbench: glass widgets beside the chat on desktop */}

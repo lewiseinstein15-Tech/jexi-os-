@@ -1539,3 +1539,195 @@ form.surface-float { flex-shrink: 0; }
   .jxmp-dot.on { background: var(--mag); box-shadow: 0 0 8px rgba(255,138,61,.7); }
   .jxmp-note { font-family: var(--hand); font-size: 18px; color: var(--peach); text-align: center; padding: 4px 6px; }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   REFERENCE-MATCH PASS — exact look per the approved image
+   (rounded JEXI wordmark, chat bubbles, inline mission card,
+   slate user bubble, warm JEXI bubble, circular send, bokeh glow)
+   ════════════════════════════════════════════════════════════════ */
+@font-face {
+  font-family: 'Inter';
+  src: url('./assets/fonts/Inter.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Baloo 2';
+  src: url('./assets/fonts/Baloo2.ttf') format('truetype');
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+:root {
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --wordmark: 'Baloo 2', 'Inter', sans-serif;
+  --check: #34D399; /* reference done-check mint */
+}
+
+/* warm cinematic bokeh behind everything (reference backdrop) */
+body {
+  background-image:
+    radial-gradient(1100px 600px at 85% -10%, rgba(255, 122, 61, 0.10), transparent 60%),
+    radial-gradient(900px 600px at -10% 10%, rgba(244, 63, 94, 0.07), transparent 60%),
+    radial-gradient(900px 700px at 50% 115%, rgba(255, 178, 90, 0.08), transparent 60%),
+    radial-gradient(700px 500px at 100% 90%, rgba(255, 138, 61, 0.06), transparent 60%);
+}
+
+/* ── wordmark + sidebar lockup ── */
+.jx-wordmark {
+  font-family: var(--wordmark);
+  font-weight: 800;
+  letter-spacing: .04em;
+  line-height: 1;
+  background: linear-gradient(180deg, #FFB25A 0%, #FF7A3D 55%, #F4513C 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.jx-lockup { display: flex; align-items: center; gap: 11px; padding: 4px 10px 12px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+.jx-lockup-t { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.jx-lockup-sub { font-size: 8.5px; letter-spacing: .04em; color: var(--muted); white-space: nowrap; }
+
+/* top-bar wordmark: phone/tablet only (desktop owns the sidebar lockup) */
+.jx-word { font-family: var(--wordmark); font-weight: 800; font-size: 21px; letter-spacing: .05em; background: linear-gradient(180deg, #FFB25A, #FF7A3D 60%, #F4513C); -webkit-background-clip: text; background-clip: text; color: transparent; }
+@media (min-width: 1024px) { .jx-word, .jx-ctx { display: none; } }
+@media (max-width: 600px) {
+  .jx-word { position: absolute; left: 50%; transform: translateX(-50%); font-size: 24px; }
+}
+
+/* sidebar: gradient active pill (reference Home) */
+.jx-mi.active {
+  background-color: rgba(255, 138, 61, 0.16);
+  background-image: linear-gradient(100deg, #FF8A3D 0%, #F4513C 60%, #E84393 115%);
+  color: #fff !important;
+  box-shadow: 0 6px 22px rgba(244, 81, 60, 0.35), inset 2px 0 0 rgba(255,255,255,.35);
+  font-weight: 700;
+}
+.jx-mi.active svg { color: #fff; }
+
+/* ── chat rows + bubbles ── */
+.jx-row { align-items: flex-end; gap: 10px; margin-bottom: 2px; }
+.jx-row.user { padding-left: 8%; }
+.jx-row.jexi { padding-right: 6%; }
+@media (max-width: 600px) { .jx-row.user { padding-left: 10%; } .jx-row.jexi { padding-right: 4%; } }
+
+/* user bubble: slate, timestamp + ticks, avatar */
+.jx-ubub {
+  background: var(--userbub);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 16px 16px 5px 16px;
+  padding: 10px 14px 7px;
+  max-width: 100%;
+  box-shadow: 0 6px 20px rgba(0,0,0,.35);
+}
+.jx-ubub-text { font-size: 13.5px; line-height: 1.55; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+.jx-ubub-img { max-width: 220px; border-radius: 10px; margin-bottom: 8px; display: block; border: 1px solid rgba(255,255,255,.12); }
+.jx-ubub-meta { text-align: right; font-size: 10px; color: #7C8598; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.jx-ticks { color: var(--mag); font-size: 10px; letter-spacing: -2px; margin-left: 3px; }
+.jx-uavatar {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; color: #fff;
+  background: linear-gradient(135deg, #5B8DEF, #8B5CF6);
+  border: 2px solid rgba(255,255,255,.14);
+}
+
+/* JEXI bubble: warm dark, crown header, handwriting body, timestamp */
+.jx-jbub {
+  background: var(--jexibub);
+  border: 1px solid rgba(255, 138, 61, 0.16);
+  border-radius: 5px 16px 16px 16px;
+  padding: 11px 16px 8px;
+  max-width: 100%;
+  min-width: 0;
+  box-shadow: 0 6px 22px rgba(0,0,0,.4);
+}
+.jx-jbub-head { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+.jx-jbub-crown { display: inline-flex; }
+.jx-jbub-name { font-family: var(--wordmark); font-weight: 700; font-size: 13px; letter-spacing: .14em; color: var(--mag); }
+.jx-jbub-live { font-size: 10px; letter-spacing: .14em; color: var(--mag); animation: jxblink 1.2s infinite; font-weight: 700; }
+.jx-jbub .jx-hand p, .jx-jbub .jx-hand li { font-size: 20px; line-height: 1.42; color: #F3EDE4; }
+.jx-jbub .jx-think { background: rgba(255,255,255,.025); margin-bottom: 8px; }
+.jx-jbub-meta { font-size: 10px; color: #7C8598; margin-top: 6px; font-variant-numeric: tabular-nums; }
+
+/* ── Mission in Progress card (inside chat, above composer) ── */
+.jx-missioncard {
+  background: rgba(38, 33, 38, 0.72);
+  border: 1px solid rgba(255, 138, 61, 0.18);
+  border-radius: 14px;
+  padding: 11px 15px 9px;
+  margin-top: 6px;
+  box-shadow: 0 6px 22px rgba(0,0,0,.35);
+}
+.jx-missioncard-head { display: flex; align-items: center; gap: 8px; }
+.jx-missioncard-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--faint2); flex-shrink: 0; }
+.jx-missioncard-dot.live { background: var(--mag); box-shadow: 0 0 10px rgba(255,138,61,.8); animation: jxblink 1.4s infinite; }
+.jx-missioncard-kicker { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.jx-missioncard-obj { font-family: var(--hand); font-size: 18px; color: #F3EDE4; margin: 3px 0 8px; line-height: 1.3; }
+.jx-missioncard-row { display: flex; align-items: center; gap: 10px; }
+.jx-missioncard-bar { flex: 1; height: 6px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; }
+.jx-missioncard-bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--mag), #F43F5E); transition: width .5s ease; }
+.jx-missioncard-pct { font-family: var(--mono); font-size: 10.5px; color: var(--muted); min-width: 34px; text-align: right; }
+.jx-missioncard-time { text-align: right; font-size: 10px; color: #7C8598; margin-top: 5px; font-variant-numeric: tabular-nums; }
+
+/* ── composer: reference input bar ── */
+.jx-composerwrap { position: relative; }
+.jx-emojipop {
+  position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 30;
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px;
+  background: var(--bg2); border: 1px solid var(--line2); border-radius: 12px;
+  padding: 8px; box-shadow: 0 12px 32px rgba(0,0,0,.5);
+}
+.jx-emojipop button { background: none; border: none; font-size: 19px; padding: 5px; cursor: pointer; border-radius: 8px; line-height: 1; }
+.jx-emojipop button:hover { background: rgba(255,138,61,.14); }
+.jx-bar { background: #141A26 !important; border: 1px solid var(--line2) !important; border-radius: 16px !important; }
+.jx-toolbtn {
+  background: none; border: none; cursor: pointer; flex-shrink: 0;
+  width: 34px; height: 34px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--muted); transition: .15s;
+}
+.jx-toolbtn:hover { color: #fff; background: rgba(255,255,255,.06); }
+.jx-sendbtn.send {
+  width: 38px; height: 38px; border-radius: 50% !important;
+  background: linear-gradient(135deg, #FF8A3D, #F43F5E) !important;
+  color: #fff !important; border: none !important; flex-shrink: 0;
+  box-shadow: 0 4px 16px rgba(244, 81, 60, 0.4);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.jx-sendbtn.send:disabled { opacity: .45; box-shadow: none; }
+.jx-sendbtn.mic, .jx-sendbtn.stop {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+
+/* ── right mission rail refinements ── */
+@media (min-width: 1280px) {
+  .jxmp-title { display: flex; align-items: center; gap: 7px; }
+  .jxmp-ico {
+    width: 27px; height: 27px; border-radius: 8px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(255,138,61,.12); border: 1px solid rgba(255,138,61,.3); color: var(--faint);
+  }
+  .jxmp-ico.on { color: var(--mag); border-color: rgba(255,138,61,.55); box-shadow: 0 0 12px rgba(255,138,61,.18); }
+  .jxmp-using li { gap: 10px; }
+  .jxmp-tick.done { color: var(--check); }
+  .jxmp-note span { display: block; font-size: 14px; color: var(--muted); margin-top: 2px; }
+}
+/* done-check mint everywhere (reference task lists) */
+.jxmp-tick.done { color: var(--check); }
+
+/* ── reference-match fixes round 2 ── */
+/* single left offset (the 1024 rail margin stacked on the 901 workbench margin) */
+@media (min-width: 901px) { .jx-main { margin-left: 0; } }
+/* open chat, no glass card frame (reference) */
+.jx-chatroot { background: transparent; border: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+/* stray dot separator had no neighbors left on desktop */
+@media (min-width: 1024px) { .jx-dotsep { display: none; } }
+/* phone crown sits right of center, left of the status pill */
+@media (max-width: 600px) { .jx-crown { margin-left: 8px; } }
+.jx-railnote svg { vertical-align: -2px; }
+/* telemetry footer inside JEXI bubbles: clean mono, never handwriting */
+.jx-jbub-foot { font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-top: 8px; border-top: 1px dashed rgba(255,255,255,.09); padding-top: 6px; }
+.jx-jbub-foot::before { content: '⚙️ '; }
