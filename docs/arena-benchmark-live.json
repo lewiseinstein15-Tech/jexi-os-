@@ -1,55 +1,55 @@
 {
- "at": "2026-09-07T13:53:42.765Z",
+ "at": "2026-09-07T14:26:14.430Z",
  "smalltalk": {
   "zeroCallOk": true,
-  "avgMs": 78,
+  "avgMs": 62,
   "runs": [
    {
     "query": "hello",
-    "wallMs": 77,
-    "firstTokenMs": 76,
+    "wallMs": 51,
+    "firstTokenMs": 50,
     "fastPath": true,
     "modelCalls": 0,
     "providers": {},
     "failedCalls": 0,
-    "stages": "safety:22ms missionLane:0ms kernel:0ms",
+    "stages": "safety:5ms missionLane:0ms kernel:1ms",
     "answer": "Hi Boss — everything's running. What do you need?",
     "ok": true
    },
    {
     "query": "thanks boss",
-    "wallMs": 141,
-    "firstTokenMs": 140,
+    "wallMs": 99,
+    "firstTokenMs": 99,
     "fastPath": true,
     "modelCalls": 0,
     "providers": {},
     "failedCalls": 0,
-    "stages": "safety:129ms missionLane:0ms kernel:1ms",
-    "answer": "Noted, Boss. Anything else?",
+    "stages": "safety:88ms missionLane:0ms kernel:0ms",
+    "answer": "Good — more where that came from when you need it.",
     "ok": true
    },
    {
     "query": "see you later",
-    "wallMs": 85,
-    "firstTokenMs": 85,
+    "wallMs": 70,
+    "firstTokenMs": 70,
     "fastPath": true,
     "modelCalls": 0,
     "providers": {},
     "failedCalls": 0,
-    "stages": "safety:77ms missionLane:0ms kernel:0ms",
-    "answer": "Catch you later — the work continues in the background.",
+    "stages": "safety:63ms missionLane:0ms kernel:0ms",
+    "answer": "Later, Boss — I'll keep everything warm.",
     "ok": true
    },
    {
     "query": "who built you?",
-    "wallMs": 81,
-    "firstTokenMs": 81,
+    "wallMs": 74,
+    "firstTokenMs": 74,
     "fastPath": true,
     "modelCalls": 0,
     "providers": {},
     "failedCalls": 0,
-    "stages": "safety:74ms missionLane:0ms kernel:0ms",
-    "answer": "I'm JEXI, your AI executive partner. One boss: you. One job: get things done.",
+    "stages": "safety:67ms missionLane:0ms kernel:0ms",
+    "answer": "JEXI. Lewis built me — I run your systems, plans and tools so you don't have to.",
     "ok": true
    },
    {
@@ -60,27 +60,36 @@
     "modelCalls": 0,
     "providers": {},
     "failedCalls": 0,
-    "stages": "safety:3ms missionLane:0ms kernel:0ms",
-    "answer": "Better when you're around. Everything's holding steady — how are you?",
+    "stages": "safety:4ms missionLane:0ms kernel:0ms",
+    "answer": "Poa sana, Boss. All quiet — ready for real work when you are.",
     "ok": true
    },
    {
     "query": "niaje",
-    "wallMs": 73,
-    "firstTokenMs": 73,
+    "wallMs": 66,
+    "firstTokenMs": 66,
     "fastPath": true,
     "modelCalls": 0,
     "providers": {},
     "failedCalls": 0,
-    "stages": "safety:67ms missionLane:0ms kernel:0ms",
-    "answer": "Hello, Boss — JEXI online and ready.",
+    "stages": "safety:61ms missionLane:0ms kernel:0ms",
+    "answer": "Hey Boss. What are we building today?",
     "ok": true
    }
   ]
  },
  "question": {
   "query": "What is the capital of Kenya? One sentence.",
-  "error": "This operation was aborted",
-  "wallMs": 150003
+  "wallMs": 445,
+  "firstTokenMs": 73,
+  "fastPath": false,
+  "modelCalls": 1,
+  "providers": {
+   "groq": 1
+  },
+  "failedCalls": 0,
+  "stages": "safety:67ms missionLane:0ms kernel:0ms intentLean:371ms",
+  "answer": "Nairobi is the capital city of Kenya.",
+  "ok": true
  }
 }

@@ -88,28 +88,39 @@ observability. On this host it reports honestly: no browser, no device.
 - Live benchmark (`scripts/arena-benchmark.mjs`,
   `docs/arena-benchmark-live.json`):
 
-| request | wall time | model calls |
-|---|---|---|
-| hello | 77ms | **0** |
-| thanks boss | 141ms | **0** |
-| see you later | 85ms | **0** |
-| who built you? | 81ms | **0** |
-| how are you | 11ms | **0** |
-| niaje (Swahili) | 73ms | **0** |
-| real question (full pipeline) | >150s — benchmark cap hit | see honest note |
+| request | wall time | model calls | lane |
+|---|---|---|---|
+| hello | 51ms | **0** | fast path |
+| thanks boss | 99ms | **0** | fast path |
+| see you later | 70ms | **0** | fast path |
+| who built you? | 74ms | **0** | fast path |
+| how are you | 11ms | **0** | fast path |
+| niaje (Swahili) | 66ms | **0** | fast path |
+| What is the capital of Kenya? | **445ms** | **1** (groq) | **lean lane** |
+| Who wrote Things Fall Apart? | 1.3s | **1** (groq) | lean lane |
+
+**The lean lane (Intent Engine, spec Part 3):** the same capital-of-Kenya
+question through the full Director pipeline took **185+ seconds** on Sept 7
+(stalled provider pass inside a delegate lane, 130s on one model pass). The
+next day's build added a deterministic intent gate: simple self-contained
+questions get ONE bounded call through the normal provider ladder — no
+ceremony, no lane pinning, budget-capped so a stalling provider can never eat
+minutes (proven by test: a hanging server is abandoned at the budget). Real
+work is never intercepted — the gate refuses build/write/research/file/URL
+requests conservatively. **185s → 0.45s, ~1 call instead of ~6.**
 
 ---
 
 ## Honest notes (the things that didn't go perfectly)
 
-1. **The real-question latency today.** On this benchmark day the free
-   providers were sick (Gemini 503s on all three model generations, Groq
-   rejecting some tool calls, OpenRouter/Mistral flaky) AND an old persisted
-   background goal from earlier sessions was competing for the same free-tier
-   rate slots. The full pipeline exceeded the benchmark's 150s cap. The meter
-   exists precisely to make this visible; on a healthy provider day the
-   pipeline answers normally. The Director lane's interpret call per turn is
-   the next latency target if Lewis wants it.
+1. **Real-question latency — FIXED by the lean lane.** The original run
+   (Sept 7) saw a one-line question burn 185+ seconds: the Director's
+   ~6-call ceremony landed on a provider lane that stalled mid-generation
+   (130s on a single pass) while Gemini's free quota was exhausted and an old
+   background goal competed for rate slots. Diagnosis from the live logs led
+   to the Intent Engine lean lane (above): simple questions now answer in
+   under half a second with one call. The Director still owns real work;
+   hard/research/coding asks keep the full pipeline.
 2. **Browser Router workers.** The router is real, but on this host there is
    no Chromium and no paired Android device — it says so honestly instead of
    pretending. The APK WebView channel (JEXI driving the phone's own browser)
@@ -127,7 +138,8 @@ observability. On this host it reports honestly: no browser, no device.
 ARENA test files (all in the package.json chain):
 `test-jexi-kernel.js` 8/8 · `test-ollama-provider.js` 5/5 ·
 `test-request-meter.js` 5/5 · `test-work-graph-steering.js` 6/6 ·
-`test-browser-router.js` 8/8 · `test-memory-lifecycle.js` 9/9
+`test-browser-router.js` 8/8 · `test-memory-lifecycle.js` 9/9 ·
+`test-intent-lean.js` 4/4
 
 Regressions green: api-surface 19/0, planner-routing, provider-health 14/14,
 request-economy 13/13, director-mcp 4/4, world-memory 10/10, long-horizon

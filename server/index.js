@@ -323,7 +323,7 @@ const generalLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 600, standardHe
 app.use(['/api/chat', '/api/vision', '/api/knowledge/search', '/api/agent'], aiLimiter);
 // ARENA PHASE 1 — the Executive Kernel fast path (small talk must never pay
 // the full pipeline) and per-request model-call accounting.
-import { kernelTurn, kernelGate, startMeter, meterStage, meterReport } from './src/services/JexiKernel.js';
+import { kernelTurn, kernelGate, kernelIntentGate, runLeanAnswer, startMeter, meterStage, meterReport } from './src/services/JexiKernel.js';
 import { meterEnter, meterLap, meterFreeze, requestMeterReport } from './src/services/RequestMeter.js'; // ARENA — per-turn model-call meter, all lanes
 import { browserRouter, registerDesktopWorker, registerAndroidWorker } from './src/services/BrowserRouter.js'; // ARENA Phase 3 — browser router (workers + policy + audit)
 import { lifecycleScan, lastLifecycleReport } from './src/services/MemoryLifecycle.js'; // ARENA Phase 4 — memory vault lifecycle
@@ -2027,6 +2027,45 @@ app.post('/api/chat', async (req, res) => {
             }
           } catch (e) {
             sendEvent('log', { agent: 'Kernel', message: `⚡ Fast path skipped (${String(e && e.message || e).slice(0, 80)}) — full lanes take this turn.` });
+          }
+          // ARENA — INTENT ENGINE LEAN LANE (spec Part 3): a simple,
+          // self-contained question gets ONE bounded call through the normal
+          // provider ladder — not the Director's ~6-call ceremony. Live proof
+          // it was needed: Sept 7 2026, a one-line question burned 130s on a
+          // single stalled provider pass inside a delegate lane. Real work is
+          // NEVER intercepted (the gate refuses it); on lean failure the turn
+          // falls through to the Director unchanged.
+          try {
+            const activeMissionFlagLean = (() => {
+              try { return Boolean(activeMissionFor(convId)); } catch { return false; }
+            })();
+            const intent = kernelIntentGate(effectiveQuery || raw, { activeMission: activeMissionFlagLean });
+            if (intent && intent.lean) {
+              const lean = await runLeanAnswer({ query: effectiveQuery || raw, sendEvent });
+              meterLap('intentLean');
+              if (lean && lean.handled) {
+                sendEvent('agent.done', { answer: lean.answer });
+                done({
+                  success: true,
+                  query,
+                  summary: lean.answer,
+                  statistics: {
+                    executionTime: lean.stats.durationMs,
+                    leanPath: true,
+                    modelCalls: lean.stats.modelCalls,
+                    agentsUsed: 0,
+                    confidence: 0.9,
+                  },
+                });
+                finish();
+                return;
+              }
+              if (lean && lean.reason) {
+                sendEvent('log', { agent: 'Kernel', message: `⚡ Lean lane couldn't finish (${lean.reason.slice(0, 80)}) — the full pipeline takes this turn.` });
+              }
+            }
+          } catch (e) {
+            sendEvent('log', { agent: 'Kernel', message: `⚡ Lean lane skipped (${String(e && e.message || e).slice(0, 80)}) — full lanes take this turn.` });
           }
           try {
             const director = new Director({

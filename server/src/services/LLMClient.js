@@ -603,6 +603,15 @@ async function tryOllama(prompt, system, imageBase64, opts, errors) {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), Math.min(TIMEOUT_MS, 120_000));
+    // ARENA — honor the CALLER's abort (the lean lane's budget): either
+    // signal aborts the fetch. Without this, a stalling endpoint eats the
+    // full internal timeout no matter what the caller wanted.
+    const onOuterAbort = () => controller.abort();
+    const outer = opts && opts.signal;
+    if (outer) {
+      if (outer.aborted) controller.abort();
+      else outer.addEventListener('abort', onOuterAbort, { once: true });
+    }
     try {
       const res = await fetch(`${base}/v1/chat/completions`, {
         method: 'POST',
@@ -635,6 +644,7 @@ async function tryOllama(prompt, system, imageBase64, opts, errors) {
       return null;
     } finally {
       clearTimeout(timer);
+      if (outer) try { outer.removeEventListener('abort', onOuterAbort); } catch {}
     }
   } catch (e) {
     errors.push(`ollama(${model}): ${String(e && e.message || e).slice(0, 120)}`);

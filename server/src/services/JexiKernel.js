@@ -119,6 +119,75 @@ const SMALLTALK_RE = new RegExp(
  * The kernel gate. Returns a handled fast-path turn, or null to pass to lanes.
  * Pure decision, zero model calls — the model only runs inside runFastPath.
  */
+/* ── intent engine (spec Part 3: deterministic-first) ─────────────────────
+ *
+ * A SIMPLE, self-contained question ("What is the capital of Kenya?") does
+ * not need the Director's interpret→plan→staff→delegate→verify ceremony —
+ * that's ~6 model calls and, on a day one provider stalls mid-generation,
+ * minutes of retries (proven live Sept 7 2026: a one-line question spent
+ * 130s on a single stalled OpenRouter pass inside the delegate lane).
+ * The lean lane answers such questions with ONE call through the normal
+ * provider ladder (which walks to whatever rung is actually healthy).
+ *
+ * Conservative by design: anything that smells like real work — building,
+ * writing, researching, files, URLs, missions — is REFUSED by the gate and
+ * flows to the Director unchanged. A wrong lean answer is worse than a slow
+ * right one, so the gate only takes questions it is sure about.
+ */
+const QUESTION_STARTER_RE = /^(what|who|when|where|which|why|whose|is|are|was|were|will|would|can|could|does|do|did|has|have|should|how many|how much|how long|how far|how old|how do i|how does|how to|tell me about|define|explain)\b/i;
+const LEAN_BLOCKER_RE = /(build|create|make|write|generate|develop|deploy|publish|research|analy[sz]e|design|implement|install|set ?up|fix|debug|refactor|scrape|download|convert|translate|summari[sz]e|draft|plan|mission|project|app|website|web ?app|repo|repository|code|file|folder|directory|workspace|http|https|www\.|\.com|youtube|video|image|photo|picture|screenshot)/i;
+
+/** Deterministic intent classification: is this a lean one-call question? */
+export function kernelIntentGate(raw, { activeMission = false } = {}) {
+  const q = String(raw || '').trim();
+  if (!q || q.length > 220) return null; // long asks carry context — Director territory
+  if (activeMission) return null; // an active mission owns every turn
+  if (LEAN_BLOCKER_RE.test(q)) return null; // real work is never intercepted
+  const isQuestion = /\?\s*$/.test(q) || QUESTION_STARTER_RE.test(q);
+  if (!isQuestion) return null;
+  return { kind: 'question', lean: true, sub: 'question' };
+}
+
+/**
+ * The lean answer: ONE bounded model call, plain generation with the full
+ * provider ladder underneath (healthy rung wins — no lane pinning). Falls
+ * back honestly: on failure the turn returns to the normal lanes, never a
+ * fabricated answer. Budget-capped so a stalling provider can't eat minutes.
+ */
+export async function runLeanAnswer({ query, sendEvent = () => {}, budgetMs = 30_000 }) {
+  const t0 = Date.now();
+  const { generateContent } = await import('./LLMClient.js'); // late import: no cycle at load
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), budgetMs);
+  try {
+    sendEvent('log', { agent: 'JEXI', message: '⚡ Lean lane — one direct call, no pipeline.' });
+    // airtight budget: race the call against the abort. Providers that honor
+    // the signal cancel cleanly; providers that don't get abandoned at the
+    // budget — the user's turn NEVER waits past it either way.
+    const budgetExceeded = new Promise((_, rej) => {
+      ctrl.signal.addEventListener('abort', () => rej(new Error(`lean budget of ${budgetMs}ms exceeded — providers too slow just now`)), { once: true });
+    });
+    const answer = await Promise.race([
+      generateContent(
+        `${query}\n\nAnswer directly and concisely (1-4 sentences). If you are not sure, say so plainly — never invent facts.`,
+        'You are JEXI OS, an expert AI executive. You answer simple factual questions accurately and briefly, in your own warm voice. No preamble, no filler, no "As an AI" talk. If a question needs live/current data you do not have, say exactly that.',
+        null,
+        { temperature: 0.3, signal: ctrl.signal },
+      ),
+      budgetExceeded,
+    ]);
+    const text = String(answer || '').trim();
+    if (text) {
+      return { handled: true, answer: text, stats: { leanPath: true, modelCalls: 1, durationMs: Date.now() - t0 } };
+    }
+    return { handled: false, reason: 'empty answer', stats: { leanPath: true, modelCalls: 1, durationMs: Date.now() - t0 } };
+  } catch (e) {
+    return { handled: false, reason: String(e && e.message || e).slice(0, 120), stats: { leanPath: true, modelCalls: 1, durationMs: Date.now() - t0 } };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function kernelGate(raw, { activeMission = false } = {}) {
   const q = String(raw || '').trim();
   if (!q || q.length > 200) return null; // long messages are never small talk
