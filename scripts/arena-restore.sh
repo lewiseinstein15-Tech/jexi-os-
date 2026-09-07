@@ -38,7 +38,7 @@ if [ "$CHEAD" = "$BHEAD" ]; then
   echo "✓ already current at ${BHEAD:0:8} — no restore needed."
   # still heal the small things a config-only wipe damages: identity + exec bits
   git config user.name >/dev/null 2>&1 || { git config user.name "Lewis"; git config user.email "lewis@jexi-os.dev"; }
-  chmod +x .git/hooks/post-commit scripts/arena-backup.sh scripts/arena-restore.sh 2>/dev/null || true
+  chmod +x .git/hooks/post-commit scripts/hooks/post-commit scripts/arena-backup.sh scripts/arena-restore.sh 2>/dev/null || true
   exit 0
 fi
 
@@ -75,7 +75,7 @@ git branch -q -D arena-restored 2>/dev/null || true
 
 # reinstall the post-commit hook + restore exec bits (wipes drop them)
 [ -f scripts/hooks/post-commit ] && cp scripts/hooks/post-commit .git/hooks/post-commit 2>/dev/null || true
-chmod +x .git/hooks/post-commit scripts/arena-backup.sh scripts/arena-restore.sh 2>/dev/null || true
+chmod +x .git/hooks/post-commit scripts/hooks/post-commit scripts/arena-backup.sh scripts/arena-restore.sh 2>/dev/null || true
 
 echo "✓ healed: main → $(git rev-parse --short main) — $(git log -1 --format=%s main | head -c 90)"
 DIRTY="$(git status --porcelain | wc -l | tr -d ' ')"
