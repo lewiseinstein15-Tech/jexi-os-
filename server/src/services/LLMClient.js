@@ -9,6 +9,14 @@ import { withRetry } from './RetryPolicy.js'; // B133 — dsh llm-retry: backoff
 import { recordProviderCallSuccess, recordProviderCallFailure, skipForNow, providerState } from './ProviderHealth.js'; // AGI Phase 1 — structured, persistent provider health
 import { cacheKey, cacheGet, cacheSet } from './ResponseCache.js'; // AGI Phase 1 — safe caching (opt-in per call)
 import { dedupeInflight, requestIdentity } from './RequestDedup.js'; // AGI Phase 1 — concurrent identical calls share one request
+import { noteMeterModelCall } from './RequestMeter.js'; // ARENA — every model call in a turn is metered automatically
+
+/* ARENA meter rule: a rung only counts as a model call when the provider was
+   actually CONFIGURED (key present / local endpoint enabled). A keyless rung
+   the walk slides past made NO network call — counting it would be fake. */
+const __meterNote = (provider, model, ms, ok) => {
+  try { if (configuredProviders().includes(provider)) noteMeterModelCall(provider, model, ms, ok); } catch { /* never fatal */ }
+};
 
 /**
  * Keys are resolved in this order:
@@ -680,7 +688,8 @@ async function streamPlainText(prompt, system, opts, onDelta) {
     if (!slot.ok) { errors.push(`${provider}: ${slot.reason} (rate limiter)`); continue; }
     try {
       const __st0 = Date.now(); // B172 — stream duration feeds speed routing
-      const out = await streamOpenAICompletion({
+      try {
+        const out = await streamOpenAICompletion({
         baseUrl: base, key: cfg.key, model: cfg.models[0],
         messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],
         tools: [], temperature: opts.temperature ?? 0.4,
@@ -689,7 +698,12 @@ async function streamPlainText(prompt, system, opts, onDelta) {
         // B173 — reasoning deltas ride their own channel with the same meta
         ...(typeof opts.onThink === 'function' ? { onThink: (t) => opts.onThink(t, { provider, model: cfg.models[0] }) } : {}),
         signal: opts.signal,
-      });
+        });
+        __meterNote(provider, cfg.models[0] || null, Date.now() - __st0, Boolean(out && out.text)); // ARENA meter
+      } catch (e) {
+        __meterNote(provider, cfg.models[0] || null, Date.now() - __st0, false); // ARENA meter
+        throw e;
+      }
       out.tookMs = Date.now() - __st0;
       if (out.text) {
         recordProviderSuccess(provider, out.tookMs);
@@ -765,7 +779,14 @@ async function __generateWalk(prompt, systemInstruction, imageBase64, opts) {
     }
     try {
       const __t0 = Date.now(); // B172 — measure real latency for speed routing
-      const text = await call(prompt, system, imageBase64, opts, errors);
+      let text;
+      try {
+        text = await call(prompt, system, imageBase64, opts, errors);
+        __meterNote(provider, opts.model || null, Date.now() - __t0, Boolean(text)); // ARENA meter — a null answer is a failed call
+      } catch (e) {
+        __meterNote(provider, opts.model || null, Date.now() - __t0, false); // ARENA meter
+        throw e;
+      }
       if (text) {
         recordProviderSuccess(provider, Date.now() - __t0);
         recordProviderCallSuccess(provider, { latencyMs: Date.now() - __t0 }); // Phase 1
@@ -848,7 +869,7 @@ export async function testAllProviders() {
 /* only here and are skipped for tool calling).                        */
 /* ------------------------------------------------------------------ */
 
-const TOOL_CAPABLE = new Set(['groq', 'openrouter', 'deepseek', 'xai', 'cerebras', 'deepinfra', 'mistral']);
+const TOOL_CAPABLE = new Set(['groq', 'openrouter', 'deepseek', 'xai', 'cerebras', 'deepinfra', 'mistral', 'ollama']); // ARENA — ollama speaks OpenAI tool-calling
 
 /**
  * Parse a provider's tool_calls into { id, name, arguments }. The id is
@@ -979,6 +1000,18 @@ async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, te
  * tool_calls objects — replayed verbatim into the next round's messages.
  */
 async function chatWithToolsOnce(provider, cfg, model, messages, tools, opts) {
+  const __mt0 = Date.now(); // ARENA meter — one real model call per tool round
+  try {
+    const __out = await __chatWithToolsOnce(provider, cfg, model, messages, tools, opts);
+    __meterNote(provider, model, Date.now() - __mt0, true);
+    return __out;
+  } catch (e) {
+    __meterNote(provider, model, Date.now() - __mt0, false);
+    throw e;
+  }
+}
+
+async function __chatWithToolsOnce(provider, cfg, model, messages, tools, opts) {
   // B150 — token streaming: when the caller wants live deltas, use the SSE
   // path (every OpenAI-compatible provider, incl. Groq over REST).
   if (typeof opts.onToken === 'function') {
@@ -1193,7 +1226,9 @@ export async function generateWithToolsLoop(prompt, systemInstruction = '', tool
       const slot = await takeSlot(provider);
       if (!slot.ok) { fallbackErrors.push(`${provider}: ${slot.reason} (rate limiter)`); continue; }
       try {
+        const __ft0 = Date.now(); // ARENA meter
         const text = await call(prompt, system, null, { ...opts, prefer: opts.prefer }, fallbackErrors);
+        __meterNote(provider, null, Date.now() - __ft0, Boolean(text)); // ARENA meter
         if (text) {
           recordProviderSuccess(provider);
           releaseSlot();

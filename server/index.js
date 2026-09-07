@@ -324,6 +324,7 @@ app.use(['/api/chat', '/api/vision', '/api/knowledge/search', '/api/agent'], aiL
 // ARENA PHASE 1 — the Executive Kernel fast path (small talk must never pay
 // the full pipeline) and per-request model-call accounting.
 import { kernelTurn, startMeter, meterStage, meterReport } from './src/services/JexiKernel.js';
+import { meterEnter, meterLap, meterFreeze, requestMeterReport } from './src/services/RequestMeter.js'; // ARENA — per-turn model-call meter, all lanes
 app.use('/api', generalLimiter);
 
 // B56 — CONNECTOR WEBHOOKS. Mounted BEFORE express.json because GitHub /
@@ -1507,6 +1508,9 @@ app.post('/api/chat', async (req, res) => {
   const __t0 = Date.now();
   let __firstTokenMs = null;
   let __writerName = null;
+  // ARENA — every turn gets a request meter: model calls + per-stage latency,
+  // counted automatically for every lane via AsyncLocalStorage (spec Part 1/3).
+  meterEnter({ kind: 'chat', query: String(query || '').slice(0, 120) });
   const sendEvent = (type, data) => {
     // B162 — named coworkers: raw model IDs are masked in every streamed log
     // line before it reaches the UI (answers/summaries are untouched).
@@ -1597,7 +1601,14 @@ app.post('/api/chat', async (req, res) => {
     // B172 — timings on the terminal event (telemetry + honest UX)
     if (payload && typeof payload === 'object') {
       const totalMs = Date.now() - __t0;
+      // ARENA — the honest cost of this turn: N model calls, which providers,
+      // how long each stage took. Attached to EVERY done, whatever the lane.
+      try {
+        const meter = requestMeterReport();
+        if (meter) payload.statistics = { ...(payload.statistics || {}), meter };
+      } catch { /* meter is diagnostics — never fatal */ }
       payload.statistics = { ...(payload.statistics || {}), timings: { totalMs, firstTokenMs: __firstTokenMs, ...( __writerName ? { writer: __writerName } : {}) } };
+      meterFreeze(); // the report is out — background tails can't charge this turn
       if (payload.success !== false && totalMs > 0) {
         try { sendEvent('log', { agent: 'System', message: `⚡ answered in ${(totalMs / 1000).toFixed(1)}s${__firstTokenMs !== null ? ` · first word in ${(__firstTokenMs / 1000).toFixed(1)}s` : ''}${__writerName ? ` · by ${__writerName}` : ''}.` }); } catch { /* never break the done */ }
       }
@@ -1957,6 +1968,7 @@ app.post('/api/chat', async (req, res) => {
         // GUARDRAIL FIRST — the safety scan must cover the Director lane
         // exactly as it covers the planner lane below.
         const preSafety = scanPromptSafety(effectiveQuery || raw);
+        meterLap('safety');
         if (!preSafety.safe) {
           sendEvent('log', { agent: 'Guardrail', message: `🛡 ${preSafety.reason}` });
           done({ success: false, blocked: true, query, summary: blockExplanation(preSafety), statistics: { executionTime: 0, agentsUsed: 0, confidence: 0 } });
@@ -1972,6 +1984,7 @@ app.post('/api/chat', async (req, res) => {
           // take the turn unchanged.
           try {
             const missionHandled = await missionRunner.handleChat({ raw, effectiveQuery, convId, sendEvent, done, decision });
+            meterLap('missionLane');
             if (missionHandled) { finish(); return; }
           } catch (e) {
             sendEvent('log', { agent: 'Missions', message: `⚠ Mission lane error (${String(e && e.message || e).slice(0, 100)}) — the normal lanes take this turn.` });
@@ -1986,6 +1999,7 @@ app.post('/api/chat', async (req, res) => {
               try { return Boolean(activeMissionFor(convId)); } catch { return false; }
             })();
             const fast = await kernelTurn({ raw, effectiveQuery, convId, activeMission: activeMissionFlag, sendEvent });
+            meterLap('kernel');
             if (fast && fast.handled) {
               sendEvent('agent.done', { answer: fast.answer });
               done({
@@ -2075,6 +2089,7 @@ app.post('/api/chat', async (req, res) => {
           done({ success: directorTurn.success !== false, query, summary: finalSummary, sources: [], statistics: directorTurn.statistics || {}, files: directorTurn.files || [] });
           finish(); return;
         }
+        meterLap('director');
         if (directorTurn && directorTurn.decline) {
           sendEvent('log', { agent: 'Director', message: `↩ ${directorTurn.decline} — standard pipeline.` });
         }
@@ -2132,6 +2147,7 @@ app.post('/api/chat', async (req, res) => {
     // GUARDRAIL — continuous prompt-injection / jailbreak / tool-abuse scan
     // on every message before anything runs. Blocked → abort with a clear
     // explanation instead of executing (safe-mode enforcement, Guardrail Agent).
+    meterLap('planner');
     const safety = scanPromptSafety(effectiveQuery || raw);
     if (!safety.safe) {
       sendEvent('log', { agent: 'Guardrail', message: `🛡 ${safety.reason}` });
