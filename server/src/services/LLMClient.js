@@ -698,8 +698,11 @@ async function streamPlainText(prompt, system, opts, onDelta) {
     if (!slot.ok) { errors.push(`${provider}: ${slot.reason} (rate limiter)`); continue; }
     try {
       const __st0 = Date.now(); // B172 — stream duration feeds speed routing
+      // FIX (pre-existing): `out` was block-scoped to the inner try but read
+      // below it — ReferenceError on every hit + CI no-undef failure.
+      let out = null;
       try {
-        const out = await streamOpenAICompletion({
+        out = await streamOpenAICompletion({
         baseUrl: base, key: cfg.key, model: cfg.models[0],
         messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],
         tools: [], temperature: opts.temperature ?? 0.4,
