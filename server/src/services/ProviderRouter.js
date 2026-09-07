@@ -148,12 +148,18 @@ function speedSortedHead(head) {
  * Cooldowned providers are pushed to the END, healthy ones keep priority.
  */
 export function providerOrder(prefer = '') {
+  // ARENA Phase 1 (spec Part 6): MODEL_PROVIDER=ollama puts the LOCAL model
+  // first on every ladder — Lewis switches to local models with two env vars
+  // and the rest of JEXI is unchanged. Unreachable Ollama slides to the
+  // remote rungs honestly (the walk records the failure).
+  const ollamaFirst = (process.env.MODEL_PROVIDER || '').toLowerCase() === 'ollama';
+  const ollama = ollamaFirst ? ['ollama'] : [];
   const base =
     prefer === 'gemini'
-      ? ['gemini', 'groq', 'openrouter', ...EXTRA_PROVIDERS, 'vllm', 'huggingface']
+      ? [...ollama, 'gemini', 'groq', 'openrouter', ...EXTRA_PROVIDERS, 'vllm', 'huggingface']
       : prefer === 'openrouter'
-        ? ['openrouter', 'groq', 'gemini', ...EXTRA_PROVIDERS, 'vllm', 'huggingface']
-        : ['groq', 'gemini', 'openrouter', ...EXTRA_PROVIDERS, 'vllm', 'huggingface'];
+        ? [...ollama, 'openrouter', 'groq', 'gemini', ...EXTRA_PROVIDERS, 'vllm', 'huggingface']
+        : [...ollama, 'groq', 'gemini', 'openrouter', ...EXTRA_PROVIDERS, 'vllm', 'huggingface'];
 
   const healthy = base.filter((k) => !providerInCooldown(k));
   const cooling = base.filter((k) => providerInCooldown(k));
@@ -163,7 +169,11 @@ export function providerOrder(prefer = '') {
     // (fastest first). The slow tail (vLLM → HuggingFace) never reorders.
     const head = speedSortedHead(healthy.slice(0, 3));
     const tail = healthy.slice(3);
-    return [...head, ...tail, ...cooling];
+    const rest = [...head, ...tail, ...cooling];
+    // ARENA Phase 6: an explicitly enabled LOCAL Ollama stays pinned FIRST —
+    // the user chose local, so the latency sorter may not demote it.
+    if (ollamaFirst) return ['ollama', ...rest.filter((k) => k !== 'ollama')];
+    return rest;
   }
   return [...healthy, ...cooling];
 }
@@ -184,7 +194,11 @@ const ENV_MAP = {
 
 /** Which providers have keys configured right now (no secrets exposed). */
 export function configuredProviders() {
-  return Object.keys(ENV_MAP).filter((k) => !!process.env[ENV_MAP[k]]);
+  const list = Object.keys(ENV_MAP).filter((k) => !!process.env[ENV_MAP[k]]);
+  // ARENA Phase 6 — Ollama is "configured" when MODEL_PROVIDER=ollama (it
+  // needs no key, only an endpoint). Reported honestly in health views.
+  if (String(process.env.MODEL_PROVIDER || '').toLowerCase() === 'ollama' && !list.includes('ollama')) list.push('ollama');
+  return list;
 }
 
 /** Snapshot for /api/health and the self-check (never leaks key material). */
@@ -194,6 +208,7 @@ export function providerHealthSnapshot() {
     groq: 'Groq', gemini: 'Gemini', openrouter: 'OpenRouter', huggingface: 'HuggingFace',
     mistral: 'Mistral', nvidia: 'NVIDIA NIM',
     vllm: 'vLLM (self-hosted)',
+    ollama: `Ollama (local, ${process.env.OLLAMA_HOST || 'http://127.0.0.1:11434'})`,
   };
   // B77 — compute the order ONCE (it rotates, so a second call could change
   // the positions and make indexOf return -1 for every key).

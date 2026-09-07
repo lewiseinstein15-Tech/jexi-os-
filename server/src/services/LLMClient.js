@@ -574,7 +574,69 @@ async function tryVllm(prompt, system, imageBase64, opts, errors) {
   return null;
 }
 
+/**
+ * OLLAMA PROVIDER (Arena Phase 1, spec Part 6) — local models as ONE rung of
+ * the provider ladder, never a system-wide dependency. Ollama exposes an
+ * OpenAI-compatible endpoint (`http://<host>:11434/v1`), so this is a plain
+ * HTTP call: no SDK, no local model hosted by JEXI, no key required.
+ *
+ * Enable with:  MODEL_PROVIDER=ollama  (puts Ollama FIRST on the ladder)
+ * Endpoint:     OLLAMA_HOST (default http://127.0.0.1:11434)
+ * Model:        MODEL_NAME or OLLAMA_MODEL (e.g. qwen3, deepseek-r1)
+ *
+ * Honest fallback: if the endpoint is unreachable, the ladder slides to the
+ * remote providers — JEXI keeps working (spec: "the rest of JEXI must
+ * continue functioning without architectural changes").
+ */
+async function tryOllama(prompt, system, imageBase64, opts, errors) {
+  if (imageBase64) return null; // text-only rung; vision stays on hosted providers
+  const base = String(process.env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/+$/, '');
+  const model = opts.model || process.env.MODEL_NAME || process.env.OLLAMA_MODEL || 'qwen3';
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Math.min(TIMEOUT_MS, 120_000));
+    try {
+      const res = await fetch(`${base}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OLLAMA_API_KEY || 'ollama'}` },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: prompt },
+          ],
+          temperature: opts.temperature ?? 0.4,
+          max_tokens: opts.maxTokens || undefined,
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        errors.push(`ollama(${model}): HTTP ${res.status}`);
+        recordProviderFailure('ollama', `HTTP ${res.status}`);
+        return null;
+      }
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content;
+      if (typeof text === 'string' && text.trim()) {
+        recordProviderSuccess('ollama');
+        // the walk returns provider output DIRECTLY as the answer text
+        return text.trim();
+      }
+      errors.push(`ollama(${model}): empty response`);
+      recordProviderFailure('ollama', 'empty response');
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (e) {
+    errors.push(`ollama(${model}): ${String(e && e.message || e).slice(0, 120)}`);
+    recordProviderFailure('ollama', String(e && e.message || e).slice(0, 120));
+    return null;
+  }
+}
+
 const PROVIDER_CALLS = {
+  ollama: tryOllama,
   groq: tryGroq,
   gemini: tryGemini,
   openrouter: tryOpenRouter,
@@ -819,6 +881,13 @@ function providerToolConfig(provider, opts) {
     // chain already leads with these; the tool loop can finally reach them.
     nvidia: { key: keys.nvidiaKey, baseUrl: process.env.NVIDIA_API_URL || 'https://integrate.api.nvidia.com/v1', models: [opts.model || NVIDIA_MODELS[0]] },
     sambanova: { key: keys.sambanovaKey, baseUrl: 'https://api.sambanova.ai/v1', models: [opts.model || SAMBANOVA_MODELS[0]] },
+    // ARENA Phase 6 — Ollama streams through the same OpenAI-compatible SSE
+    // lane (endpoint /v1, dummy key — a local Ollama never needs a real one).
+    ollama: {
+      key: process.env.OLLAMA_API_KEY || 'ollama',
+      baseUrl: `${String(process.env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/+$/, '')}/v1`,
+      models: [opts.model || process.env.MODEL_NAME || process.env.OLLAMA_MODEL || 'qwen3'],
+    },
   }[provider];
 }
 
