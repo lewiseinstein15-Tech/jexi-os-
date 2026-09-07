@@ -325,6 +325,7 @@ app.use(['/api/chat', '/api/vision', '/api/knowledge/search', '/api/agent'], aiL
 // the full pipeline) and per-request model-call accounting.
 import { kernelTurn, startMeter, meterStage, meterReport } from './src/services/JexiKernel.js';
 import { meterEnter, meterLap, meterFreeze, requestMeterReport } from './src/services/RequestMeter.js'; // ARENA — per-turn model-call meter, all lanes
+import { browserRouter, registerDesktopWorker, registerAndroidWorker } from './src/services/BrowserRouter.js'; // ARENA Phase 3 — browser router (workers + policy + audit)
 app.use('/api', generalLimiter);
 
 // B56 — CONNECTOR WEBHOOKS. Mounted BEFORE express.json because GitHub /
@@ -2505,8 +2506,36 @@ if (process.env.NODE_ENV === 'production' && !API_KEY && process.env.JEXI_ALLOW_
   process.exit(1);
 }
 
+// ARENA Phase 3 — browser router observability: which workers exist, what the
+// policy refuses, and the recent audit trail. Read-only, no secrets.
+app.get('/api/browser/status', (req, res) => {
+  res.json({
+    ok: true,
+    workers: browserRouter.listWorkers(),
+    policy: {
+      captchaBypass: 'refused — never solved or bypassed',
+      privateStorage: 'refused — passwords/cookies/wallets are never read or exported',
+      urlScheme: 'http/https only',
+      highImpact: 'payment/delete/login/submit actions need explicit authorization',
+    },
+    recentAudit: browserRouter.recentAudit(20),
+  });
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🧠 JEXI OS BRAIN running on port ${PORT}`);
+  // ARENA Phase 3 — probe real browser workers at boot (honest: on hosts with
+  // no Chromium / no paired device the router simply reports none connected).
+  (async () => {
+    try {
+      const d = await registerDesktopWorker();
+      console.log(`[BrowserRouter] desktop worker: ${d.ok ? 'registered (local Chromium live)' : `not registered — ${String(d.error).slice(0, 120)}`}`);
+    } catch (e) { console.log(`[BrowserRouter] desktop probe failed: ${String(e && e.message || e).slice(0, 120)}`); }
+    try {
+      const a = await registerAndroidWorker();
+      console.log(`[BrowserRouter] android worker: ${a.ok ? 'registered (device connected)' : `not registered — ${String(a.error).slice(0, 120)}`}`);
+    } catch (e) { console.log(`[BrowserRouter] android probe failed: ${String(e && e.message || e).slice(0, 120)}`); }
+  })().catch(() => {});
   // AGI Phase 2 (live) — MCP gateway boot: connect Lewis's enabled servers
   // shortly after the brain is up, sequentially + fail-soft. npx cold starts
   // are slow (a fresh container downloads every package), so a second pass
