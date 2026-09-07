@@ -327,6 +327,7 @@ import { kernelTurn, kernelGate, kernelIntentGate, runLeanAnswer, startMeter, me
 import { meterEnter, meterLap, meterFreeze, requestMeterReport } from './src/services/RequestMeter.js'; // ARENA — per-turn model-call meter, all lanes
 import { browserRouter, registerDesktopWorker, registerAndroidWorker } from './src/services/BrowserRouter.js'; // ARENA Phase 3 — browser router (workers + policy + audit)
 import { lifecycleScan, lastLifecycleReport } from './src/services/MemoryLifecycle.js'; // ARENA Phase 4 — memory vault lifecycle
+import { apkRegister, apkPoll, apkResult, apkChannelStatus, attachApkWorkerToRouter } from './src/services/APKBrowserChannel.js'; // ARENA — the phone's WebView registers as a real browser worker
 app.use('/api', generalLimiter);
 
 // B56 — CONNECTOR WEBHOOKS. Mounted BEFORE express.json because GitHub /
@@ -2563,12 +2564,54 @@ app.get('/api/memory/lifecycle', async (req, res) => {
   }
 });
 
+// ARENA — APK BROWSER CHANNEL: the Android app registers its WebView as a
+// real browser worker (long-poll transport; the APK side is the next build).
+// The policy gate in the router runs BEFORE any op reaches the phone.
+app.post('/api/browser/apk/register', (req, res) => {
+  try {
+    const out = apkRegister(req.body || {});
+    if (out.ok && out.deviceId) {
+      // every registered phone immediately becomes a REAL router worker —
+      // offline until it first polls, online from then on
+      attachApkWorkerToRouter(browserRouter, out.deviceId);
+    }
+    res.json(out);
+  } catch (e) { res.status(400).json({ ok: false, error: String(e && e.message || e).slice(0, 160) }); }
+});
+app.post('/api/browser/apk/poll', async (req, res) => {
+  try {
+    const out = await apkPoll(req.body || {});
+    if (out && out.error) return res.status(401).json(out);
+    res.json(out && out.idle ? { idle: true } : out);
+  } catch (e) { res.status(500).json({ ok: false, error: String(e && e.message || e).slice(0, 160) }); }
+});
+app.post('/api/browser/apk/result', (req, res) => {
+  try {
+    const out = apkResult(req.body || {});
+    if (out && out.error) return res.status(404).json(out);
+    res.json(out);
+  } catch (e) { res.status(500).json({ ok: false, error: String(e && e.message || e).slice(0, 160) }); }
+});
+
+// ARENA — run a policy-gated browser task through the router by hand (scripts,
+// tests, and Lewis driving the phone's WebView from outside). Same policy gate
+// as every other path: CAPTCHA/private storage/impact rules all apply here.
+app.post('/api/browser/task', async (req, res) => {
+  const { intent, url, reason, params } = req.body || {};
+  if (!intent) return res.status(400).json({ ok: false, error: 'intent required: navigate | read | act | screenshot' });
+  try {
+    const out = await browserRouter.runTask({ intent, url, reason: reason || 'manual api task', params: params || {} });
+    res.json(out);
+  } catch (e) { res.status(500).json({ ok: false, error: String(e && e.message || e).slice(0, 200) }); }
+});
+
 // ARENA Phase 3 — browser router observability: which workers exist, what the
 // policy refuses, and the recent audit trail. Read-only, no secrets.
 app.get('/api/browser/status', (req, res) => {
   res.json({
     ok: true,
     workers: browserRouter.listWorkers(),
+    apkChannel: apkChannelStatus(),
     policy: {
       captchaBypass: 'refused — never solved or bypassed',
       privateStorage: 'refused — passwords/cookies/wallets are never read or exported',
@@ -2592,6 +2635,10 @@ app.listen(PORT, '0.0.0.0', () => {
       const a = await registerAndroidWorker();
       console.log(`[BrowserRouter] android worker: ${a.ok ? 'registered (device connected)' : `not registered — ${String(a.error).slice(0, 120)}`}`);
     } catch (e) { console.log(`[BrowserRouter] android probe failed: ${String(e && e.message || e).slice(0, 120)}`); }
+    try {
+      attachApkWorkerToRouter(browserRouter); // the APK WebView slot — online the moment the app polls
+      console.log('[BrowserRouter] apk webview slot attached — waiting for the phone to register (offline until it polls).');
+    } catch (e) { console.log(`[BrowserRouter] apk slot attach failed: ${String(e && e.message || e).slice(0, 120)}`); }
   })().catch(() => {});
   // AGI Phase 2 (live) — MCP gateway boot: connect Lewis's enabled servers
   // shortly after the brain is up, sequentially + fail-soft. npx cold starts

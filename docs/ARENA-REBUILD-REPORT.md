@@ -123,9 +123,21 @@ requests conservatively. **185s → 0.45s, ~1 call instead of ~6.**
    hard/research/coding asks keep the full pipeline.
 2. **Browser Router workers.** The router is real, but on this host there is
    no Chromium and no paired Android device — it says so honestly instead of
-   pretending. The APK WebView channel (JEXI driving the phone's own browser)
-   is the next real build: protocol defined, APK work not done — not
-   promised until tested.
+   pretending. **The APK WebView channel's server side is now BUILT and
+   LIVE-PROVEN** (this continuation): the phone's app registers its WebView
+   as a real router worker (`POST /api/browser/apk/register`), long-polls for
+   work (`/poll`, instant check-in via `waitMs:0`), and posts results
+   (`/result`). Full round trip over real HTTP proven: register → op
+   delivered to the polling phone in **7ms** → result back to the caller in
+   **12ms**; a CAPTCHA ask was refused by the router's policy gate and the
+   phone never saw it; both events on the audit trail. Every registered
+   device becomes an `android` worker on the router (ranked after desktop,
+   before remote); a phone that stops polling for 90s drops offline — no
+   zombie workers; ops the phone never answers fail honestly at a 60s
+   timeout. Also added `POST /api/browser/task` — a policy-gated manual task
+   API for scripts. The APK app itself (the Android side that hosts the
+   WebView and speaks this protocol) is the next real build — the contract it
+   plugs into is now tested (5/5) and live.
 3. **The spec file** (`docs/ARENA-REBUILD-SPEC.md`) is a faithful
    reconstruction from working notes; the verbatim 38-part message was lost
    to session compaction. Flagged in the file. Swap-in ready if re-sent.
@@ -139,7 +151,7 @@ ARENA test files (all in the package.json chain):
 `test-jexi-kernel.js` 8/8 · `test-ollama-provider.js` 5/5 ·
 `test-request-meter.js` 5/5 · `test-work-graph-steering.js` 6/6 ·
 `test-browser-router.js` 8/8 · `test-memory-lifecycle.js` 9/9 ·
-`test-intent-lean.js` 4/4
+`test-intent-lean.js` 4/4 · `test-apk-browser-channel.js` 5/5
 
 Regressions green: api-surface 19/0, planner-routing, provider-health 14/14,
 request-economy 13/13, director-mcp 4/4, world-memory 10/10, long-horizon
