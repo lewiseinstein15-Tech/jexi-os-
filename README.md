@@ -20,6 +20,20 @@ rail (Home / Missions / Agents / Memory / Tools / Files / Settings), a
 phone drawer (no bottom nav bar), and JEXI's dialogue in her own
 handwriting. Full evidence: **`docs/ARENA-REBUILD-REPORT.md`**.
 
+## ⚡ ARENA ASTRA (Sept 2026) — the executive architecture
+
+The rebuild continued into a full Astra-class execution architecture: a
+unified **Observer** event bus, deterministic-first **IntentEngine**
+(2ms p50, 0 model calls), provider-independent **ReasoningEngine** with
+first-class **OllamaProvider**, budgeted **ContextEngine**, persistent
+**MemoryVault**, dependency-aware **Scheduler**, diagnose→retry→replan
+**Recovery**, human-gated **SelfImprovement**, external **JEXI Market**
+provider (honest when unconnected), and a private **UserProfile** for
+Lewis — plus a reference-look UI (top search, Lewis chip, live desktop
+mission rail, phone hamburger, zero neon green). Proven live: 11/11 new
+test suites, 14/14 DOM checks, real screenshots. Full evidence:
+**`docs/ARENA-ASTRA-REBUILD-REPORT.md**`.
+
 ---
 
 ## 🌐 Use JEXI

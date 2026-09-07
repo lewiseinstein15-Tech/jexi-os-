@@ -97,6 +97,7 @@ import { listLocks, getWorkspaceId } from './src/services/ConcurrencyAgent.js';
 import { chaosEnabled, listInjections } from './src/services/ChaosAgent.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
 import { mountMcp } from './mcp-server.js';
+import { mountArena } from './src/routes/arena.js'; // ARENA ASTRA — executive architecture observability
 import { taskManager } from './src/services/TaskManager.js';
 import { taskScheduler } from './src/services/TaskScheduler.js';
 import { PORT, WORKSPACE_DIR, DATA_DIR, SERVER_ROOT } from './src/config.js';
@@ -380,6 +381,7 @@ app.use(express.json({ limit: '30mb' })); // Room for base64 book uploads + code
 // === MODEL CONTEXT PROTOCOL (MCP) — let Claude Desktop / Cursor / any MCP
 // client connect to JEXI's tools and data at /mcp (read-only + ask_jexi only).
 mountMcp(app);
+mountArena(app); // ARENA ASTRA — /api/kernel/* /api/intent /api/observer /api/vault /api/market /api/reasoning /api/scheduler /api/persona /api/improve
 
 // Every instance has its own id (Render injects RENDER_INSTANCE_ID automatically).
 // A load balancer can see which instance answered, and you can verify stickiness.

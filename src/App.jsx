@@ -20,6 +20,7 @@ import { discoverBrainUrl, setBrainUrl } from './utils/updateCenter'; // B179 �
 import BootSplash from './components/BootSplash'; // B79 — branded loading screen on open (never a blank screen)
 import { SidebarBrandMark, SidebarBrandName } from './brand/official'; // B160 — dsh ui-brand-official
 import OrbCore from './components/OrbCore'; // B192 — the presence orb
+import MissionPanel from './components/MissionPanel'; // ARENA ASTRA — desktop right mission rail
 import { StatusCard, CalendarCard } from './components/WidgetCards'; // B192 — glass widgets
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -73,6 +74,7 @@ export default function App() {
   const [clock, setClock] = useState(() => new Date());
   useEffect(() => { const t = setInterval(() => setClock(new Date()), 1000); return () => clearInterval(t); }, []);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [topQuery, setTopQuery] = useState(''); // ARENA ASTRA — top search
   const [booted, setBooted] = useState(false);
   const [bootStatus, setBootStatus] = useState('Connecting to JEXI\u2019s brain…');
   const engine = useJexiEngine();
@@ -183,8 +185,17 @@ export default function App() {
             <i /><i /><i />
           </button>
           <div className="jx-word">JEXI<em>_OS</em><span style={{ opacity: .5 }}>™</span></div>
+          <span className="jx-crown" aria-hidden="true">👑</span>
           <div className="jx-dotsep" />
           <div className="jx-ctx">{VIEWS[view]?.label || 'Home'}</div>
+          {/* ARENA ASTRA — top search (desktop): ask JEXI from anywhere */}
+          <form
+            className="jx-topsearch"
+            onSubmit={(e) => { e.preventDefault(); const q = topQuery.trim(); if (!q) return; setTopQuery(''); navigate('chat'); engine.runSearch(q); }}
+          >
+            <span className="jx-topsearch-ic" aria-hidden="true">⌕</span>
+            <input value={topQuery} onChange={(e) => setTopQuery(e.target.value)} placeholder="Ask JEXI anything…" aria-label="Ask JEXI anything" />
+          </form>
           {/* ARENA — off-rail shortcuts: history + workshop stay one tap away */}
           {view !== 'history' && (
             <button type="button" className="jx-toplink" aria-label="Chat history" onClick={(e) => { e.stopPropagation(); navigate('history'); }} title="Chat history"><MenuIcon name="history" /></button>
@@ -193,6 +204,8 @@ export default function App() {
             <button type="button" className="jx-toplink" aria-label="Workshop" onClick={(e) => { e.stopPropagation(); navigate('workshop'); }} title="Workshop"><MenuIcon name="workshop" /></button>
           )}
           <div className="jx-right">
+            {/* ARENA ASTRA — owner chip (desktop) */}
+            <span className="jx-userchip" title="Lewis — owner & creator"><span className="jx-avatar" aria-hidden="true">L</span>Lewis<span className="jx-chev" aria-hidden="true">▾</span></span>
             <span className={`jx-pill${engine.isProcessing ? ' violet' : ''}`}>
               <span className="pdot" />
               {engine.isProcessing ? 'THINKING' : 'ONLINE'}
@@ -213,6 +226,7 @@ export default function App() {
             <SidebarBrandMark />
             <SidebarBrandName />
           </div>
+          <div className="jx-tagline">Think · Plan · Do · With You</div>
           {/* ARENA — the rail lists exactly the spec seven; history/workshop
               stay reachable from the top bar (and this drawer keeps them too
               on phone, under a divider) */}
@@ -234,6 +248,7 @@ export default function App() {
               </button>
             </Fragment>
           ))}
+          <div className="jx-railnote">Big goals.<br />Real progress.<br /><span>— JEXI 👑</span></div>
         </nav>
 
         {/* B192 — workbench: glass widgets beside the chat on desktop */}
@@ -347,6 +362,7 @@ export default function App() {
         </section>
 
         </div>{/* /jx-stage */}
+        <MissionPanel />
         </div>{/* /jx-workbench */}
 
         <UpdateBanner />

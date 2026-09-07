@@ -1425,3 +1425,117 @@ form.surface-float { flex-shrink: 0; }
 }
 .jx-toplink:hover { background: var(--bg3); color: var(--mag); }
 .jx-toplink svg { width: 15px; height: 15px; stroke-width: 1.8; }
+
+/* ════════════════════════════════════════════════════════════════
+   ARENA ASTRA — reference-look polish (spec Parts 25–30)
+   Palette per the approved reference: cinematic dark + warm
+   orange/coral/salmon/peach. Conversation stays the hero: no giant
+   cards inside chat; mission detail lives in the desktop right rail.
+   ════════════════════════════════════════════════════════════════ */
+:root {
+  --bg: #0B0E14;      /* reference Background */
+  --bg2: #121826;     /* reference panels */
+  --bg3: #1a2233;
+  --ink: #EAEAEA;     /* reference Text (primary) */
+  --muted: #A0A6B1;   /* reference Text (secondary) */
+  --userbub: #1E2838; /* reference User Bubble */
+  --jexibub: #262126; /* reference JEXI Bubble */
+}
+
+/* ── top search (desktop): "Ask JEXI anything…" ── */
+.jx-topsearch { display: none; }
+@media (min-width: 1024px) {
+  .jx-topsearch {
+    display: flex; align-items: center; gap: 8px; flex: 1 1 auto;
+    max-width: 460px; margin: 0 auto; padding: 7px 14px;
+    background: var(--bg2); border: 1px solid var(--line2); border-radius: 99px;
+  }
+  .jx-topsearch:focus-within { border-color: var(--mag); box-shadow: 0 0 0 3px rgba(255,138,61,.12); }
+  .jx-topsearch-ic { color: var(--faint); font-size: 14px; }
+  .jx-topsearch input {
+    flex: 1; min-width: 0; background: none; border: none; outline: none;
+    color: var(--ink); font-size: 12.5px; font-family: var(--font);
+  }
+  .jx-topsearch input::placeholder { color: var(--faint); }
+}
+
+/* ── owner chip (desktop) ── */
+.jx-userchip { display: none; }
+@media (min-width: 1024px) {
+  .jx-userchip {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 600; color: var(--ink);
+    padding: 4px 10px 4px 4px; border-radius: 99px;
+    background: var(--bg2); border: 1px solid var(--line2); cursor: default;
+  }
+  .jx-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; color: #fff;
+    background: linear-gradient(135deg, var(--mag), var(--mag2));
+  }
+  .jx-chev { font-size: 10px; color: var(--faint); }
+}
+
+/* ── phone crown (top bar, small screens only) ── */
+.jx-crown { display: none; }
+@media (max-width: 600px) {
+  .jx-crown { display: inline; margin-left: auto; font-size: 15px; }
+  .jx-top { gap: 10px; }
+  .jx-ctx, .jx-toplink, .jx-clock, .jx-dotsep { display: none; }
+  .jx-word { font-size: 13px; }
+  .jx-right { gap: 8px; }
+}
+
+/* ── sidebar tagline + handwritten rail note ── */
+.jx-tagline {
+  font-size: 10px; letter-spacing: .06em; color: var(--faint);
+  padding: 0 12px 10px; border-bottom: 1px solid var(--line); margin-bottom: 8px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.jx-railnote { display: none; }
+@media (min-width: 1024px) {
+  .jx-railnote {
+    display: block; margin-top: auto; padding: 16px 14px 10px;
+    font-family: var(--hand); font-size: 19px; line-height: 1.35; color: var(--peach);
+  }
+  .jx-railnote span { font-size: 15px; color: var(--muted); }
+  .jx-menu { display: flex; flex-direction: column; }
+}
+
+/* ── right mission rail (wide desktop only) ── */
+.jx-missionpanel { display: none; }
+@media (min-width: 1280px) {
+  .jx-widgets { display: none !important; } /* the mission rail owns the side space */
+  .jx-missionpanel {
+    display: flex; flex-direction: column; gap: 12px;
+    width: 296px; flex-shrink: 0; padding: 18px 20px 18px 0;
+    overflow-y: auto; min-height: 0;
+  }
+  .jxmp-card {
+    background: var(--bg2); border: 1px solid var(--line2);
+    border-radius: 14px; padding: 13px 14px;
+  }
+  .jxmp-title { font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--peach); margin-bottom: 9px; }
+  .jxmp-mname { font-size: 12.5px; font-weight: 600; color: var(--ink); line-height: 1.45; word-break: break-word; }
+  .jxmp-mstate { font-family: var(--mono); font-size: 10px; color: var(--muted); margin: 5px 0 8px; letter-spacing: .06em; }
+  .jxmp-bar { height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; }
+  .jxmp-bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--mag), var(--mag2)); transition: width .5s ease; }
+  .jxmp-empty { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .jxmp-empty.small { font-size: 11.5px; }
+  .jxmp-tasks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+  .jxmp-tasks li { display: flex; gap: 9px; align-items: flex-start; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+  .jxmp-tasks li.live { color: var(--ink); }
+  .jxmp-tick { flex-shrink: 0; width: 16px; text-align: center; font-size: 11px; }
+  .jxmp-tick.done { color: var(--ok); }
+  .jxmp-tick.run { color: var(--mag); animation: jxblink 1.2s infinite; }
+  .jxmp-tick.fail { color: var(--bad); }
+  .jxmp-tick.skip { color: var(--faint); }
+  .jxmp-tick.idle { color: var(--faint2); }
+  .jxmp-more { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-top: 8px; }
+  .jxmp-using { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .jxmp-using li { display: flex; gap: 9px; align-items: center; font-size: 11.5px; color: var(--muted); }
+  .jxmp-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint2); flex-shrink: 0; }
+  .jxmp-dot.on { background: var(--mag); box-shadow: 0 0 8px rgba(255,138,61,.7); }
+  .jxmp-note { font-family: var(--hand); font-size: 18px; color: var(--peach); text-align: center; padding: 4px 6px; }
+}
