@@ -1122,6 +1122,9 @@ function maskConnectorAuth(auth = {}) {
 app.get('/api/plugins', (req, res) => res.json({ plugins: listRegistryPlugins() }));
 // B162 — the named coworker roster (people names only; no raw model IDs).
 app.get('/api/team', (req, res) => res.json({ team: teamRoster() }));
+// M8 — setup-wizard key verification: gated by the x-jexi-key middleware
+// above (NOT in OPEN_PATHS), so 200 = key accepted, 401 = wrong key.
+app.get('/api/key/verify', (req, res) => res.json({ ok: true, at: new Date().toISOString() }));
 // B180 — the Hermes-style agent surface
 app.get('/api/agents/coverage', (req, res) => res.json(profileCoverage()));
 app.get('/api/agents/profiles', (req, res) => res.json({ profiles: listProfiles().map((p) => ({ name: p.name, displayName: p.displayName, role: p.role, tools: p.config.tools, model: p.config.model })) }));

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, Fragment } from 'react';
 import { StatusBar } from '@capacitor/status-bar';
 import { useJexiEngine } from './hooks/useJexiEngine';
 import usePhoneNotifications from './hooks/usePhoneNotifications'; // B83 — real phone notifications when tasks/goals finish
-import { getBackendUrl, jexiFetch, getSessionId } from './utils/helpers';
+import { getBackendUrl, jexiFetch, getSessionId, getAccessKey, setAccessKey, setBackendUrl } from './utils/helpers';
+import SetupWizard from './components/SetupWizard'; // M8 — first-run phone setup (brain + key)
 import ChatWindow from './components/ChatWindow';
 import HistoryView from './components/HistoryView';
 import WorkshopView from './components/WorkshopView';
@@ -196,8 +197,34 @@ export default function App() {
     return () => document.removeEventListener('click', onDoc);
   }, []);
 
+  // M8 — first-run setup: no stored key and setup never completed (or
+  // explicitly skipped) → pair the brain + key before entering the shell.
+  const [setupOpen, setSetupOpen] = useState(() => {
+    try {
+      return !getAccessKey() && !localStorage.getItem('jexi_setup_done');
+    } catch { return false; }
+  });
+
   if (!booted) {
     return <BootSplash status={bootStatus} />;
+  }
+
+  if (setupOpen) {
+    return (
+      <SetupWizard
+        initialUrl={getBackendUrl()}
+        onDone={(url, key) => {
+          if (url) setBackendUrl(url);
+          if (key) setAccessKey(key);
+          try { localStorage.setItem('jexi_setup_done', '1'); } catch {}
+          setSetupOpen(false);
+        }}
+        onSkip={() => {
+          try { localStorage.setItem('jexi_setup_done', '1'); } catch {}
+          setSetupOpen(false);
+        }}
+      />
+    );
   }
 
   return (
