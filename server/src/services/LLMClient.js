@@ -10,6 +10,7 @@ import { recordProviderCallSuccess, recordProviderCallFailure, skipForNow, provi
 import { cacheKey, cacheGet, cacheSet } from './ResponseCache.js'; // AGI Phase 1 — safe caching (opt-in per call)
 import { dedupeInflight, requestIdentity } from './RequestDedup.js'; // AGI Phase 1 — concurrent identical calls share one request
 import { noteMeterModelCall } from './RequestMeter.js'; // ARENA — every model call in a turn is metered automatically
+import { tryUnified, unifiedToolConfig, unifiedAnthropicToolRound, configForCall } from './providers/unified.js'; // UNIFIED — one-secret model leg (provider + key + model + baseURL)
 
 /* ARENA meter rule: a rung only counts as a model call when the provider was
    actually CONFIGURED (key present / local endpoint enabled). A keyless rung
@@ -684,6 +685,7 @@ async function tryOllama(prompt, system, imageBase64, opts, errors) {
 }
 
 const PROVIDER_CALLS = {
+  unified: tryUnified, // UNIFIED — the user's chosen model (JEXI_MODEL_* / setup wizard); first when configured
   ollama: tryOllama,
   groq: tryGroq,
   gemini: tryGemini,
@@ -858,7 +860,7 @@ async function __generateWalk(prompt, systemInstruction, imageBase64, opts) {
   if (keys.length > 0) {
     throw new Error(`All AI providers failed. ${errors.join(' | ')}`);
   }
-  throw new Error('No AI provider answered (tried the keyless Pollinations leg too). Add a key in Settings (Groq, Gemini, OpenRouter, Cloudflare, Cerebras, DeepInfra, Mistral, Grok, DeepSeek or HuggingFace), or set the matching env var in Render.');
+  throw new Error('No AI provider answered (tried the keyless Pollinations leg too). Configure ONE model in Settings → Model (provider + key + model), or set JEXI_MODEL_PROVIDER + JEXI_MODEL_API_KEY + JEXI_MODEL_NAME in Render — legacy per-provider keys still work as fallback.');
 }
 
 /** Ask the LLM a yes/no or one-word verification question. */
@@ -914,7 +916,7 @@ export async function testAllProviders() {
 /* only here and are skipped for tool calling).                        */
 /* ------------------------------------------------------------------ */
 
-const TOOL_CAPABLE = new Set(['groq', 'openrouter', 'deepseek', 'xai', 'cerebras', 'deepinfra', 'mistral', 'ollama']); // ARENA — ollama speaks OpenAI tool-calling
+const TOOL_CAPABLE = new Set(['unified', 'groq', 'openrouter', 'deepseek', 'xai', 'cerebras', 'deepinfra', 'mistral', 'ollama']); // ARENA — ollama speaks OpenAI tool-calling; UNIFIED — user-chosen model (OpenAI lane or native Anthropic)
 
 /**
  * Parse a provider's tool_calls into { id, name, arguments }. The id is
@@ -936,6 +938,8 @@ function parseToolCalls(msg) {
 function providerToolConfig(provider, opts) {
   const keys = resolveKeys();
   return {
+    // UNIFIED — null when unconfigured (the loop slides past it honestly).
+    unified: unifiedToolConfig(opts),
     groq: { key: keys.groqKey, baseUrl: null, sdk: true, models: [opts.model || groqModelCache || GROQ_TEXT_MODEL] },
     openrouter: { key: keys.openrouterKey, baseUrl: 'https://openrouter.ai/api/v1', models: [opts.model || OPENROUTER_TEXT_MODELS[0]] },
     deepseek: { key: keys.deepseekKey, baseUrl: 'https://api.deepseek.com/v1', models: [opts.model || 'deepseek-chat'] },
@@ -1057,6 +1061,13 @@ async function chatWithToolsOnce(provider, cfg, model, messages, tools, opts) {
 }
 
 async function __chatWithToolsOnce(provider, cfg, model, messages, tools, opts) {
+  // UNIFIED/Anthropic — native Messages round with per-round translation
+  // (OpenAI-shaped messages in, OpenAI-shaped tool_calls out).
+  if (provider === 'unified' && cfg && cfg.unifiedNative === 'anthropic') {
+    const ucfg = configForCall(opts);
+    if (!ucfg) throw new Error('unified model is not configured');
+    return unifiedAnthropicToolRound({ cfg: ucfg, model, messages, tools, opts });
+  }
   // B150 — token streaming: when the caller wants live deltas, use the SSE
   // path (every OpenAI-compatible provider, incl. Groq over REST).
   if (typeof opts.onToken === 'function') {

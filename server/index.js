@@ -77,6 +77,10 @@ import { listHooks, addHook, updateHook, removeHook } from './src/services/HookE
 import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services/PluginRegistry.js';
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications } from './src/services/NotificationCenter.js';
 import { modelRoutingTable, providerPreferenceForIntent } from './src/services/ModelRouting.js';
+import { publicCatalog } from './src/services/providers/catalog.js'; // UNIFIED — one-secret model catalog
+import { resolveModelConfig, validateModelConfig, mergeUnifiedConfig, maskConfig } from './src/services/providers/modelConfig.js';
+import { probeConfig } from './src/services/providers/unified.js';
+import { capabilitiesFor } from './src/services/providers/capabilities.js';
 import { MCP_PORT, MCP_TOOL_ALLOWLIST, listMcpTools } from './mcp-server.js';
 import { enableMcpServer, disableMcpServer, connectGatewayServer, disconnectGatewayServer, connectEnabledMcpServers, startIdleSweeper, invokeMcpTool, mcpServerHealth, mcpToolsUnified } from './src/services/MCPGateway.js';
 import { unifiedToolCatalog, invokeUnifiedTool } from './src/services/UnifiedTools.js';
@@ -307,7 +311,7 @@ app.use(cors({ origin: CORS_ALLOWLIST }));
 // else under /api/* (chat, vision, knowledge, memory, desktop, settings write,
 // APK proxy) is gated when JEXI_API_KEY is set.
 // NOTE: mounted on the app root (not '/api') so req.path keeps its full form.
-const OPEN_PATHS = ['/api/health', '/api/settings/status', '/api/metrics', '/api/update/version', '/api/brand', '/api/team']; // B162b: /api/team open — coworker NAMES only, no secrets; doubles as a deploy fingerprint
+const OPEN_PATHS = ['/api/health', '/api/settings/status', '/api/metrics', '/api/update/version', '/api/brand', '/api/team', '/api/providers/catalog']; // B162b: /api/team open — coworker NAMES only, no secrets; doubles as a deploy fingerprint. UNIFIED: the provider catalog is static public data (no secrets) so the setup wizard can render before pairing.
 app.use((req, res, next) => {
   if (!API_KEY || req.method === 'OPTIONS') return next();
   if (!req.path.startsWith('/api')) return next();
@@ -886,6 +890,68 @@ app.get('/api/models', (req, res) => {
     workers,
     preferenceFor: Object.fromEntries(routing.map((r) => [r.intent, providerPreferenceForIntent(r.intent)])),
   });
+});
+
+// === UNIFIED MODEL CONFIG (one-secret model) ===
+// ONE credential runs the product: provider + API key + model (+ base URL).
+// The catalog is open (static public data); active/configure are key-gated
+// like the rest of /api (configure can spend quota via its live probe and
+// persists a secret — both require the access key).
+app.get('/api/providers/catalog', (req, res) => {
+  res.json({ ok: true, providers: publicCatalog() });
+});
+
+app.get('/api/providers/active', (req, res) => {
+  try {
+    const cfg = resolveModelConfig({ settings: loadSettings() });
+    res.json({
+      ok: true,
+      active: maskConfig(cfg),
+      capabilities: cfg ? capabilitiesFor(cfg.model) : null,
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String((e && e.message) || e).slice(0, 200) });
+  }
+});
+
+app.post('/api/providers/configure', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const settings = loadSettings();
+    const merged = mergeUnifiedConfig(settings.unified || {}, body);
+    const v = validateModelConfig(merged);
+    if (!v.ok) return res.status(400).json({ ok: false, errors: v.errors });
+    let probe = null;
+    if (body.probe !== false) {
+      probe = await probeConfig(v.normalized).catch((e) => ({ ok: false, error: (e && e.message) || String(e) }));
+      if (!probe || !probe.ok) {
+        return res.status(422).json({
+          ok: false,
+          error: (probe && probe.error) || 'provider probe failed',
+          code: (probe && probe.code) || null,
+          probe,
+          hint: 'Not saved. Fix the key/model/URL, or re-send with probe:false to save without testing.',
+        });
+      }
+    }
+    settings.unified = { ...v.normalized, updatedAt: new Date().toISOString() };
+    if (!saveSettings(settings)) return res.status(500).json({ ok: false, error: 'could not persist settings' });
+    const cfg = resolveModelConfig({ settings });
+    res.json({ ok: true, active: maskConfig(cfg), capabilities: cfg ? capabilitiesFor(cfg.model) : null, probe });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String((e && e.message) || e).slice(0, 200) });
+  }
+});
+
+app.delete('/api/providers/configure', (req, res) => {
+  try {
+    const settings = loadSettings();
+    delete settings.unified;
+    if (!saveSettings(settings)) return res.status(500).json({ ok: false, error: 'could not persist settings' });
+    res.json({ ok: true, active: { configured: false } });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String((e && e.message) || e).slice(0, 200) });
+  }
 });
 
 // === RISK GUARD / TRUST (roadmap stage 17) ===

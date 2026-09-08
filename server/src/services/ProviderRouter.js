@@ -19,6 +19,8 @@
  * tiers + self-hosted vLLM.
  */
 
+import { isUnifiedConfigured } from './providers/modelConfig.js';
+
 const COOLDOWN_MS = 30_000;        // skip a provider for 30s after a failure
 const CONSECUTIVE_COOLDOWN = 3;    // 3 consecutive failures → cooldown
 
@@ -29,7 +31,7 @@ const health = new Map();
  * provider is measured on THIS host, route by well-known tier speed —
  * Groq is the fastest free tier, Gemini next, OpenRouter free models are the
  * slowest lane. First call after a cold start no longer fumbles the order. */
-const LATENCY_PRIORS_MS = { groq: 1200, gemini: 2500, openrouter: 8000, mistral: 4000, nvidia: 4000, sambanova: 3000, vllm: 3000, huggingface: 20000, cloudflare: 3500, pollinations: 6000 };
+const LATENCY_PRIORS_MS = { unified: 1500, groq: 1200, gemini: 2500, openrouter: 8000, mistral: 4000, nvidia: 4000, sambanova: 3000, vllm: 3000, huggingface: 20000, cloudflare: 3500, pollinations: 6000 };
 
 function h(key) {
   if (!health.has(key)) health.set(key, { fails: 0, lastFail: 0, cooldownUntil: 0, calls: 0, ok: 0, latencyEma: null, lastLatency: null });
@@ -151,18 +153,25 @@ function speedSortedHead(head) {
  * Cooldowned providers are pushed to the END, healthy ones keep priority.
  */
 export function providerOrder(prefer = '') {
+  // UNIFIED (one-secret model): an explicitly configured JEXI_MODEL_*
+  // provider (or settings.unified from the setup wizard) ALWAYS leads the
+  // ladder — the user chose their reasoning engine. Legacy legs remain as
+  // automatic fallback when it fails or is unconfigured.
+  let unifiedHead = [];
+  try { if (isUnifiedConfigured()) unifiedHead = ['unified']; } catch { unifiedHead = []; }
   // ARENA Phase 1 (spec Part 6): MODEL_PROVIDER=ollama puts the LOCAL model
   // first on every ladder — Lewis switches to local models with two env vars
   // and the rest of JEXI is unchanged. Unreachable Ollama slides to the
   // remote rungs honestly (the walk records the failure).
-  const ollamaFirst = (process.env.MODEL_PROVIDER || '').toLowerCase() === 'ollama';
+  // (The unified leg above wins when configured — it is the explicit choice.)
+  const ollamaFirst = unifiedHead.length === 0 && (process.env.MODEL_PROVIDER || '').toLowerCase() === 'ollama';
   const ollama = ollamaFirst ? ['ollama'] : [];
   const base =
     prefer === 'gemini'
-      ? [...ollama, 'gemini', 'groq', 'openrouter', ...EXTRA_PROVIDERS, 'vllm', 'huggingface', 'pollinations']
+      ? [...unifiedHead, ...ollama, 'gemini', 'groq', 'openrouter', ...EXTRA_PROVIDERS, 'vllm', 'huggingface', 'pollinations']
       : prefer === 'openrouter'
-        ? [...ollama, 'openrouter', 'groq', 'gemini', ...EXTRA_PROVIDERS, 'vllm', 'huggingface', 'pollinations']
-        : [...ollama, 'groq', 'gemini', 'openrouter', ...EXTRA_PROVIDERS, 'vllm', 'huggingface', 'pollinations'];
+        ? [...unifiedHead, ...ollama, 'openrouter', 'groq', 'gemini', ...EXTRA_PROVIDERS, 'vllm', 'huggingface', 'pollinations']
+        : [...unifiedHead, ...ollama, 'groq', 'gemini', 'openrouter', ...EXTRA_PROVIDERS, 'vllm', 'huggingface', 'pollinations'];
 
   const healthy = base.filter((k) => !providerInCooldown(k));
   const cooling = base.filter((k) => providerInCooldown(k));
@@ -170,9 +179,13 @@ export function providerOrder(prefer = '') {
   if (!prefer) {
     // B172 — deterministic: the healthy head is sorted by MEASURED latency
     // (fastest first). The slow tail (vLLM → HuggingFace) never reorders.
-    const head = speedSortedHead(healthy.slice(0, 3));
-    const tail = healthy.slice(3);
+    // (The unified leg never enters the sorter — the explicit choice stays
+    // pinned first, same rule as the Ollama pin below.)
+    const noUnified = healthy.filter((k) => k !== 'unified');
+    const head = speedSortedHead(noUnified.slice(0, 3));
+    const tail = noUnified.slice(3);
     const rest = [...head, ...tail, ...cooling];
+    if (unifiedHead.length) return ['unified', ...rest.filter((k) => k !== 'unified')];
     // ARENA Phase 6: an explicitly enabled LOCAL Ollama stays pinned FIRST —
     // the user chose local, so the latency sorter may not demote it.
     if (ollamaFirst) return ['ollama', ...rest.filter((k) => k !== 'ollama')];
@@ -199,6 +212,8 @@ const ENV_MAP = {
 /** Which providers have keys configured right now (no secrets exposed). */
 export function configuredProviders() {
   const list = Object.keys(ENV_MAP).filter((k) => !!process.env[ENV_MAP[k]]);
+  // Unified one-secret config leads when present (env or setup wizard).
+  try { if (isUnifiedConfigured() && !list.includes('unified')) list.unshift('unified'); } catch { /* never break */ }
   // ARENA Phase 6 — Ollama is "configured" when MODEL_PROVIDER=ollama (it
   // needs no key, only an endpoint). Reported honestly in health views.
   if (String(process.env.MODEL_PROVIDER || '').toLowerCase() === 'ollama' && !list.includes('ollama')) list.push('ollama');
@@ -211,6 +226,7 @@ export function configuredProviders() {
 export function providerHealthSnapshot() {
   const now = Date.now();
   const names = {
+    unified: 'Unified (your model)',
     groq: 'Groq', gemini: 'Gemini', openrouter: 'OpenRouter', huggingface: 'HuggingFace',
     mistral: 'Mistral', nvidia: 'NVIDIA NIM',
     vllm: 'vLLM (self-hosted)',
@@ -223,11 +239,15 @@ export function providerHealthSnapshot() {
   const order = providerOrder();
   return order.map((k) => {
     const s = h(k);
+    let configured = !!process.env[ENV_MAP[k]];
+    if (k === 'unified') {
+      try { configured = isUnifiedConfigured(); } catch { configured = false; }
+    }
     return {
       provider: names[k] || k,
       key: k,
       order: order.indexOf(k) + 1,
-      configured: !!process.env[ENV_MAP[k]],
+      configured,
       calls: s.calls,
       ok: s.ok,
       fails: s.fails,

@@ -30,6 +30,14 @@ services:
       - key: PLAYWRIGHT_BROWSERS_PATH
         value: "0"
       # Set these in the Render dashboard (secrets) — or paste them below:
+      # THE ONE MODEL SECRET: provider + key + model run the whole product.
+      - key: JEXI_MODEL_PROVIDER
+        value: groq
+      - key: JEXI_MODEL_API_KEY
+        sync: false
+      - key: JEXI_MODEL_NAME
+        value: openai/gpt-oss-120b
+      # Legacy per-provider fallback keys (optional — unified config wins):
       - key: GROQ_API_KEY
         sync: false
       - key: GEMINI_API_KEY
