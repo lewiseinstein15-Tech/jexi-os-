@@ -320,8 +320,20 @@ app.use((req, res, next) => {
 });
 
 // Rate limiting: protects your AI quota from runaway loops / abuse.
-const aiLimiter = rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests — JEXI is throttling to protect your quota. Try again in a minute.' } });
-const generalLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 600, standardHeaders: 'draft-7', legacyHeaders: false });
+// PERMANENT 429 fix: key limiters by the TRUE client IP. Behind
+// Render+Cloudflare, req.ip is the edge proxy — SHARED BY EVERYONE — so all
+// clients sat in ONE 600/15min bucket and innocent users got throttled
+// ("backend keeps dropping"). CF-Connecting-IP is set by Cloudflare itself
+// and cannot be spoofed through it; XFF-first covers non-CF paths.
+const clientIpKey = (req) => {
+  const cf = req.headers['cf-connecting-ip'];
+  if (typeof cf === 'string' && cf.trim()) return `cf:${cf.trim().slice(0, 64)}`;
+  const xff = req.headers['x-forwarded-for'];
+  if (typeof xff === 'string' && xff.trim()) return `xff:${xff.split(',')[0].trim().slice(0, 64)}`;
+  return `ip:${String(req.ip || 'unknown').slice(0, 64)}`;
+};
+const aiLimiter = rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false, keyGenerator: clientIpKey, message: { error: 'Too many requests — JEXI is throttling to protect your quota. Try again in a minute.' } });
+const generalLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 600, standardHeaders: 'draft-7', legacyHeaders: false, keyGenerator: clientIpKey });
 app.use(['/api/chat', '/api/vision', '/api/knowledge/search', '/api/agent'], aiLimiter);
 // ARENA PHASE 1 — the Executive Kernel fast path (small talk must never pay
 // the full pipeline) and per-request model-call accounting.
