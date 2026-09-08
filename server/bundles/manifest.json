@@ -1,6 +1,6 @@
 {
   "generatedAt": "2026-08-19T00:00:00Z",
-  "note": "Complete DeepSeek Harness → JEXI parity manifest — regenerated from the real monorepo package list (219 packages).",
+  "note": "Complete DeepSeek Harness \u2192 JEXI parity manifest \u2014 regenerated from the real monorepo package list (219 packages).",
   "packages": [
     {
       "package": "acp/acp",
@@ -113,7 +113,7 @@
       "status": "ported",
       "port": "src/utils/schemaForm.js",
       "batch": "B141",
-      "note": "upstream removed this package after B141 — JEXI port retained (used by SettingsPanel schema forms)"
+      "note": "upstream removed this package after B141 \u2014 JEXI port retained (used by SettingsPanel schema forms)"
     },
     {
       "package": "client/ui-agent-preset",
@@ -155,7 +155,8 @@
       "area": "client",
       "status": "ported",
       "port": "src/components (DownloadPanel)",
-      "batch": "B117-B144"
+      "batch": "B117-B144",
+      "note": "dead UI removed (unreachable, untested) \u2014 backend endpoints stay; file retained in git history"
     },
     {
       "package": "client/ui-directory-picker-browse",
@@ -176,7 +177,8 @@
       "area": "client",
       "status": "ported",
       "port": "src/components (GoalsScreen)",
-      "batch": "B117-B144"
+      "batch": "B117-B144",
+      "note": "dead UI removed (unreachable, untested) \u2014 backend endpoints stay; file retained in git history"
     },
     {
       "package": "client/ui-input-trigger",
@@ -295,7 +297,8 @@
       "area": "client",
       "status": "ported",
       "port": "src/components (SkillsScreen)",
-      "batch": "B117-B144"
+      "batch": "B117-B144",
+      "note": "dead UI removed (unreachable, untested) \u2014 backend endpoints stay; file retained in git history"
     },
     {
       "package": "client/ui-slots",
@@ -351,7 +354,8 @@
       "area": "client",
       "status": "ported",
       "port": "src/components (ProjectsScreen + WorkspaceEntity UI)",
-      "batch": "B136/B144"
+      "batch": "B136/B144",
+      "note": "dead UI removed (unreachable, untested) \u2014 backend endpoints stay; file retained in git history"
     },
     {
       "package": "client/web",
@@ -366,7 +370,7 @@
       "status": "ported",
       "port": "src/hooks/index.js (hooks barrel)",
       "batch": "B143",
-      "note": "upstream removed this package after B143 — JEXI port retained (src/hooks barrel is used app-wide)"
+      "note": "upstream removed this package after B143 \u2014 JEXI port retained (src/hooks barrel is used app-wide)"
     },
     {
       "package": "code-runtime/code-runtime",
@@ -1227,7 +1231,8 @@
       "area": "skill",
       "status": "ported",
       "port": "skill catalog badges (SkillsScreen)",
-      "batch": "B98/B107"
+      "batch": "B98/B107",
+      "note": "dead UI removed (unreachable, untested) \u2014 backend endpoints stay; file retained in git history"
     },
     {
       "package": "skill/skill-filesystem",

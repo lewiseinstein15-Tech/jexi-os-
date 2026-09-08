@@ -97,7 +97,20 @@ export default function SettingsView() {
         </div>
         <div className="jx-setline">
           <div className="lab"><b>GitHub</b><span>one-time paste in chat · never stored</span></div>
-          <span className="jx-st on">{providers && providers.github && providers.github.configured ? (providers.github.source === 'session' ? 'key active' : 'env') : 'no key'}</span>
+          {providers && providers.github && providers.github.source === 'session' ? (
+            <button
+              type="button" className="jx-st on" style={{ background: 'none', font: 'inherit', cursor: 'pointer' }}
+              onClick={async () => {
+                try {
+                  await jexiFetch(`${getBackendUrl()}/api/secrets/forget`, { method: 'POST' });
+                  const p = await jexiFetch(`${getBackendUrl()}/api/settings/status`);
+                  if (p.ok) setProviders(await p.json());
+                } catch (e) { /* noop */ }
+              }}
+            >forget key</button>
+          ) : (
+            <span className="jx-st on">{providers && providers.github && providers.github.configured ? 'env' : 'no key'}</span>
+          )}
         </div>
 
         <div className="jx-grp">Meet the team</div>
