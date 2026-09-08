@@ -81,6 +81,32 @@ export default function App() {
   const engine = useJexiEngine();
   usePhoneNotifications();
 
+  // One-time key card: paste -> memory-only session key -> auto-continue.
+  const [secretBusy, setSecretBusy] = useState(false);
+  const [secretError, setSecretError] = useState('');
+  useEffect(() => { setSecretError(''); }, [engine.secretAsk && engine.secretAsk.id]);
+  const submitSecretKey = async (value) => {
+    const ask = engine.secretAsk;
+    if (!ask || secretBusy) return;
+    setSecretBusy(true);
+    setSecretError('');
+    try {
+      const res = await jexiFetch(`${getBackendUrl()}/api/secrets/answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conv: ask.conv, id: ask.id, value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || `Backend replied HTTP ${res.status}`);
+      engine.setSecretAsk(null);
+      engine.runSearch('Continue — I just pasted the one-time GitHub key in the key card.');
+    } catch (e) {
+      setSecretError((e && e.message) || 'Could not use that key — try again.');
+    } finally {
+      setSecretBusy(false);
+    }
+  };
+
   // B79 — REAL loading page on open (never a blank frame, never a fake
   // flash): the branded splash stays up until the shell has painted AND the
   // backend is reachable. Hard cap so the splash can never trap the app.
@@ -274,6 +300,11 @@ export default function App() {
               onStop={engine.stopGeneration}
               questions={engine.questions}
               onDismissQuestions={() => engine.setQuestions(null)}
+              secretAsk={engine.secretAsk}
+              secretBusy={secretBusy}
+              secretError={secretError}
+              onSecretSubmit={submitSecretKey}
+              onDismissSecret={() => engine.setSecretAsk(null)}
               planReview={engine.planReview}
               team={engine.team}
               computer={engine.computer}

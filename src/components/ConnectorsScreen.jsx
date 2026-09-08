@@ -6,7 +6,8 @@ import { getBackendUrl, jexiFetch } from '../utils/helpers';
 // call time; these are the Settings-stored fallbacks).
 const FIELDS = {
   github: [
-    { key: 'token', label: 'TOKEN (PAT)', ph: 'ghp_…', hint: 'env: GITHUB_TOKEN / GH_TOKEN — or GitHub App via GITHUB_APP_ID + PRIVATE KEY' },
+    // one-time-paste order: no stored PAT field — keys arrive via the chat
+    // key card (memory-only) or the GITHUB_TOKEN env var.
     { key: 'webhookSecret', label: 'WEBHOOK SECRET', ph: '…', hint: 'X-Hub-Signature verify · env: GITHUB_WEBHOOK_SECRET' },
   ],
   email: [
@@ -130,6 +131,13 @@ export default function ConnectorsScreen() {
               <ShieldCheck className="w-2.5 h-2.5 text-brand" />
               <span className="truncate">{c.detail}</span>
             </div>
+
+            {/* one-time-paste note (github PATs are never stored) */}
+            {c.name === 'github' && (
+              <p className="text-[8px] leading-snug text-text-tertiary border border-hairline rounded-md px-2 py-1.5 bg-surface-2">
+                🔑 No stored token here — JEXI asks you to paste a one-time key in chat when she needs to push/commit (memory-only, 30 min), or set GITHUB_TOKEN in Render for silent auth.
+              </p>
+            )}
 
             {/* Config fields */}
             <div className="space-y-1.5">

@@ -4,6 +4,7 @@
  */
 
 import { BuilderAgent } from './src/services/BuilderAgent.js';
+import { setGithubKey, forgetGithubKey, pendingGithubAsk } from './src/services/SessionKeys.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -31,8 +32,10 @@ console.log('\n== Happy path: plan → write → run clean → report (no github
   const events = [];
   const out = await agent.run({ prompt: 'build a hello app', sendEvent: (t) => events.push(t) });
   // No GITHUB_TOKEN → the agent builds, runs clean, then PARKS asking for
-  // repo + token (that IS the success path until the user provides them).
-  ok(out.needInfo && out.needInfo.length >= 2, 'asks for repo + token when no GITHUB_TOKEN');
+  // the repo name only; the token arrives via the memory-only key card.
+  ok(out.needInfo && out.needInfo.length === 1 && out.needInfo[0].field === 'repo', 'parks asking repo only (token via key card)');
+  ok(events.includes('ask.secret'), 'emits ask.secret for the one-time key');
+  ok(pendingGithubAsk('default') !== null, 'a key request is pending for the session');
   ok(events.includes('builder.start') && events.includes('builder.plan') && events.includes('builder.run-ok'), 'event stream complete');
   ok(out.repoUrl === undefined, 'no github push yet (parked for credentials)');
   ok(runs() === 1, 'ran once');
@@ -72,7 +75,7 @@ console.log('\n== GitHub phase: token + repo → creates + pushes (mocked git) =
   });
   // no token → needInfo
   const out = await agent.run({ prompt: 'build x' });
-  ok(out.needInfo && out.needInfo.length === 2, 'needInfo asks repo + token');
+  ok(out.needInfo && out.needInfo.length === 1 && out.needInfo[0].field === 'repo', 'needInfo asks repo only (token via key card)');
   // resumeBuild skips plan/write/run and asks for github
   const resume = await agent.run({ prompt: 'build x', opts: { resumeBuild: { dir: '/tmp', prompt: 'build x', entry: 'app.js', runClean: true, rounds: 1, written: 1, language: 'js' } } });
   ok(resume.needInfo, 'resume without token → still asks for github');
@@ -92,14 +95,18 @@ console.log('\n== Resume with token → github phase proceeds (git available or 
   ok(out.error === undefined || typeof out.error === 'string', 'errors are strings');
 }
 
-console.log('\n== resolveToken: env > settings > opts ==');
+console.log('\n== resolveToken: opts > session > env (never disk) ==');
 {
   const agent = new BuilderAgent({});
   process.env.GITHUB_TOKEN = 'env-token';
   ok(agent.resolveToken({}) === 'env-token', 'env token used');
   ok(agent.resolveToken({ token: 'opt-token' }) === 'opt-token', 'opts token wins');
+  setGithubKey('ghp_' + 's'.repeat(36));
+  ok(agent.resolveToken({}) === 'ghp_' + 's'.repeat(36), 'pasted session key beats env');
+  forgetGithubKey();
+  ok(agent.resolveToken({}) === 'env-token', 'env again after forget');
   delete process.env.GITHUB_TOKEN;
-  ok(agent.resolveToken({}) === null, 'null when nothing set (settings absent in CI)');
+  ok(agent.resolveToken({}) === null, 'null when nothing set');
 }
 
 console.log('\n== No planner → honest failure ==');

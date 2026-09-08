@@ -10,9 +10,9 @@
  *                FAILURE → HISTORY → CORRECT → VERIFY). If the runtime isn't
  *                runnable (no interpreter), syntax-check what we can and
  *                treat "not runnable" honestly (not as a pass).
- *   4. GITHUB  — needs a token: env GITHUB_TOKEN / settings githubToken /
- *                opts.token. Missing → needInfo (parked): ask for repo name
- *                and token (or "use my name" for the repo). Resume creates
+ *   4. GITHUB  — needs a token: opts.token / one-time session key /
+ *                env GITHUB_TOKEN. Missing → key card (paste, memory-only)
+ *                + needInfo (parked): ask for repo name only. Resume creates
  *                the repo via the GitHub API and pushes via git with the
  *                token (never printed, never committed).
  *   5. REPORT  — files, fix rounds, run output, repo URL + commit SHA →
@@ -25,6 +25,7 @@ import fs from 'fs';
 import path from 'path';
 import { execFile } from 'child_process';
 import { WORKSPACE_DIR } from '../config.js';
+import { getGithubKey as getSessionGithubKey } from './SessionKeys.js';
 
 const MAX_FIX_ROUNDS = 4;
 const MAX_FILE_CHARS = 200000;
@@ -70,14 +71,14 @@ export class BuilderAgent {
     this.generateContent = deps.generateContent || null;
   }
 
-  /** Resolve a token: explicit > env > settings file. */
+  /** Resolve a token: explicit > one-time session key > env. Never disk. */
   resolveToken(opts = {}) {
     if (opts.token) return opts.token;
-    if (process.env.GITHUB_TOKEN || process.env.GH_TOKEN) return process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
     try {
-      const settings = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'settings.json'), 'utf-8'));
-      if (settings.githubToken) return settings.githubToken;
-    } catch { /* no settings */ }
+      const s = getSessionGithubKey();
+      if (s) return s;
+    } catch { /* session keys unavailable */ }
+    if (process.env.GITHUB_TOKEN || process.env.GH_TOKEN) return process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
     return null;
   }
 
@@ -166,12 +167,17 @@ export class BuilderAgent {
     const token = opts.token;
     if (!token) {
       emit('builder.need-github', {});
+      // One-time-paste order: the token NEVER travels as chat text anymore
+      // (chat history is persisted) — it arrives via the memory-only key card.
+      try {
+        const { requestGithubKey } = await import('./SessionKeys.js');
+        requestGithubKey({ conv: session || 'default', tool: 'builder:push', reason: 'to push this build to GitHub', sendEvent });
+      } catch { /* ask channel unavailable — the summary below still guides */ }
       return {
         needInfo: [
           { field: 'repo', question: 'What should the GitHub repository be called? (or "my-name/project-name" to use your account)' },
-          { field: 'token', question: 'Paste a GitHub token with repo scope (create one free at github.com/settings/tokens → repo)' },
         ],
-        summary: '### 📦 Project built — ready to push\n\nI need two things to push it to GitHub: the **repository name** and a **GitHub token** (fine-grained, Contents read+write on that repo). Reply with both, e.g. `my-app` and `github_pat_...`.',
+        summary: '### 📦 Project built — ready to push\n\nReply with the **repository name**, and **paste a one-time GitHub key in the key card** (fine-grained, Contents read+write on that repo). The key lives only in my memory for 30 minutes and is never stored.',
       };
     }
 

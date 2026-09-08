@@ -12,6 +12,7 @@ import ComputerPanel from './ComputerPanel'; // B211 B3 — live computer-use te
 import MissionInlineCard from './MissionInlineCard'; // reference: Mission in Progress card inside chat
 import StepRow, { foldTrace } from './StepRow'; // live agent-trace: one row per tool call
 import Narration from './Narration'; // live agent-trace: her plain-spoken words
+import SecretKeyCard from './SecretKeyCard'; // one-time-paste key card (ask.secret)
 
 const SELF_CHECK_QUERY =
   'JEXI, run a full system self-check now. Check your health, memory, eyes and recent errors. If anything is wrong, tell me the exact source file and the fix.';
@@ -124,7 +125,7 @@ function MessageActions({ text, onRegenerate }) {
 /* ------------------------------------------------------------------ */
 /* Main ChatWindow                                                      */
 /* ------------------------------------------------------------------ */
-export default function ChatWindow({ messages, logs, isProcessing, onSend, onStop, onVisionResult, team, computer }) {
+export default function ChatWindow({ messages, logs, isProcessing, onSend, onStop, onVisionResult, team, computer, secretAsk, secretBusy, secretError, onSecretSubmit, onDismissSecret }) {
   const [image, setImage] = useState(null);
   const [visionOpen, setVisionOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -356,6 +357,9 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
           <Plus size={17} strokeWidth={2.2} style={{ transform: plusOpen ? 'rotate(45deg)' : 'none', transition: 'transform .2s' }} />
         </button>
       </div>
+
+      {/* one-time key card: JEXI asked for a GitHub key — paste, never stored */}
+      <SecretKeyCard ask={secretAsk} busy={secretBusy} error={secretError} onSubmit={onSecretSubmit} onCancel={onDismissSecret} />
 
       {/* B195 — isolated composer: typing never re-renders the chat */}
       <Composer isProcessing={isProcessing} onSendText={handleComposerSend} onStop={onStop} onAttach={() => fileRef.current?.click()} />

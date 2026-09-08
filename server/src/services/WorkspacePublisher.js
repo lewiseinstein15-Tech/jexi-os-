@@ -18,7 +18,7 @@
  */
 
 import fetch from 'node-fetch';
-import { resolveCredential } from './CredentialStore.js';
+import { getGithubKey as getSessionGithubKey } from './SessionKeys.js';
 
 const REPO = process.env.JEXI_WORKSPACE_REPO || 'lewiseinstein15-Tech/jexi-workspace';
 const BASE = process.env.JEXI_WORKSPACE_URL || 'https://lewiseinstein15-tech.github.io/jexi-workspace';
@@ -28,10 +28,11 @@ const TTL_MS = Number(process.env.JEXI_WORKSPACE_TTL_HOURS || 24) * 3600 * 1000;
 const MANIFEST = '.jexi-projects.json'; // hidden from the index, drives listing+TTL
 
 function token() {
+  // one-time-paste order: session key > env. Nothing is ever read from disk.
   try {
-    const v = resolveCredential('github') || resolveCredential('github_token');
-    if (v) return v;
-  } catch { /* store absent */ }
+    const s = getSessionGithubKey();
+    if (s) return s;
+  } catch { /* session keys unavailable */ }
   return process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
 }
 

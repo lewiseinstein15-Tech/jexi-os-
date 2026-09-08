@@ -272,8 +272,10 @@ const ok = (cond, label) => { console.log(`${cond ? '✅' : '❌'} ${label}`); i
 // for irreversible actions (money / destructive repo ops) — one confirmation
 // right before commit, never per-step.
 {
-  const { saveSettings } = await import('./src/services/SettingsManager.js');
-  saveSettings({ githubToken: 'fake-token-for-audit-test' }); // auth passes
+  // one-time-paste order: auth comes from a memory-only session key now
+  // (stored githubToken fixtures are stripped, never persisted).
+  const { setGithubKey, forgetGithubKey } = await import('./src/services/SessionKeys.js');
+  setGithubKey('fake-token-for-audit-test-000000000000000000'); // auth passes
   const graph = orchestrator.buildGraph();
   const results = { success: true, query: '', intent: 'github', tasks: [], steps: [], agentResults: {}, summary: '', sources: [], statistics: { executionTime: 0, agentsUsed: 0, confidence: 0 } };
   const mkState = (query) => ({
@@ -300,7 +302,7 @@ const ok = (cond, label) => { console.log(`${cond ? '✅' : '❌'} ${label}`); i
   const outB = await graph.run({ ...mkState('force push to main'), startNode: 'contextResolve' });
   ok(outB.needsConfirmation === true && outB.status === 'paused' && outB.confirmationPayload?.risk === 'irreversible',
     'B54 P5: irreversible actions pause once with risk=irreversible (single checkpoint, never per-step)');
-  saveSettings({ githubToken: '' });
+  forgetGithubKey();
 }
 
 /* ================================================================

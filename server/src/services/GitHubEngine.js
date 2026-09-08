@@ -16,16 +16,17 @@
  */
 
 import fetch from 'node-fetch';
-import { resolveCredential } from './CredentialStore.js';
+import { getGithubKey as getSessionGithubKey } from './SessionKeys.js';
 
 const API = 'https://api.github.com';
 const UA = 'JEXI-OS/1.0 (github engine)';
 
 function token() {
+  // one-time-paste order: session key > env. Nothing is ever read from disk.
   try {
-    const v = resolveCredential('github') || resolveCredential('github_token');
-    if (v) return v;
-  } catch { /* store unavailable */ }
+    const s = getSessionGithubKey();
+    if (s) return s;
+  } catch { /* session keys unavailable */ }
   return process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
 }
 
@@ -38,7 +39,7 @@ async function gh(pathname, opts = {}) {
   const remaining = res.headers.get('x-ratelimit-remaining');
   if (res.status === 401 || res.status === 403) {
     if (remaining === '0') return { ok: false, code: 'GITHUB_RATE_LIMIT', error: 'GitHub API rate limit exhausted — try again in a few minutes' };
-    return { ok: false, code: 'GITHUB_UNAUTHORIZED', error: !t ? 'No GITHUB_TOKEN configured — add it in Settings or Render env to use the GitHub engine' : 'Token rejected (403/401) — check its scopes (repo)' };
+    return { ok: false, code: 'GITHUB_UNAUTHORIZED', error: !t ? 'No GitHub key available — paste a one-time key when JEXI asks, or set GITHUB_TOKEN env' : 'Token rejected (403/401) — check its scopes (repo)' };
   }
   return { ok: res.ok, status: res.status, res };
 }
@@ -128,7 +129,7 @@ export async function readFile(target, filePath) {
 export async function editFile(target, filePath, newText, { message = 'Update via JEXI', branch = null } = {}) {
   const t = typeof target === 'string' ? parseGitHubTarget(target) : target;
   if (!t) return { ok: false, code: 'GITHUB_BAD_TARGET' };
-  if (!token()) return { ok: false, code: 'GITHUB_UNAUTHORIZED', error: 'editing needs a GITHUB_TOKEN with repo scope' };
+  if (!token()) return { ok: false, code: 'GITHUB_UNAUTHORIZED', error: 'editing needs a GitHub key (one-time paste when JEXI asks, or GITHUB_TOKEN env) with repo scope' };
   const p = String(filePath).replace(/^\/+/, '');
   const cur = await gh(`/repos/${t.owner}/${t.repo}/contents/${p}${branch ? `?ref=${branch}` : ''}`);
   let sha = null;

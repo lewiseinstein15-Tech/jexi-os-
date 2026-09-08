@@ -715,6 +715,14 @@ async function runEngine(slug, args, opts = {}) {
       // module resolves the registered instance by name.
       const { callConnector } = await import('../connectors/index.js');
       const res = await callConnector(args.name, { method: args.method || 'send', payload: args.payload || {} });
+      // One-time-paste order: a GitHub call with no key asks the user to
+      // paste one (memory-only, never stored) instead of failing flat.
+      if (!res.ok && args.name === 'github' && (res.code === 'NOT_CONFIGURED' || /not configured/i.test(String(res.error || '')))) {
+        const { requestGithubKey } = await import('./SessionKeys.js');
+        const conv = (opts && opts.spillOwner) || 'default';
+        requestGithubKey({ conv, tool: `connector:${args.payload && args.payload.action ? args.payload.action : 'github'}`, reason: 'JEXI needs a one-time GitHub key to run this step', sendEvent: opts && opts.sendEvent });
+        return { ok: false, code: 'GITHUB_NEED_KEY', error: 'No GitHub key — I asked the user to paste a one-time key (see the key card). End your turn now; retry after they paste it.' };
+      }
       if (!res.ok) {
         return { ok: false, connector: args.name, error: { code: res.code || 'CONNECTOR_FAILED', message: res.error || 'connector call failed' }, ...(res.retryAfter ? { retryAfter: res.retryAfter } : {}) };
       }

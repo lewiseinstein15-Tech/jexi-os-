@@ -943,11 +943,14 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
       if (['commit', 'push', 'pr_create', 'issue_create', 'repo_create'].includes(req.action)) {
         const auth = await checkGithubAuth(sendEvent);
         if (!auth.authed) {
+          // One-time-paste order: ask for a memory-only key (never stored)
+          // instead of pointing at Settings.
+          const { requestGithubKey } = await import('./SessionKeys.js');
+          const conv = (opts && (opts.spillOwner || opts.conv || opts.convId)) || 'default';
+          requestGithubKey({ conv, tool: `github:${req.action}`, reason: `to ${req.action === 'repo_create' ? 'create that repository' : 'run that GitHub step'}`, sendEvent });
           results.summary = `### 🔗 GITHUB AGENT
 
-⚠ I'm not authenticated with GitHub yet, so I can't ${req.action === 'repo_create' ? 'create that repository' : 'run that command'}.
-
-**To fix:** add a GitHub token — Settings → GitHub (or the \`GITHUB_TOKEN\` env var). Create one at *github.com → Settings → Developer settings → Personal access tokens* with the **repo** scope.
+⚠ I need a GitHub key to ${req.action === 'repo_create' ? 'create that repository' : 'run that command'} — **paste a one-time key in the key card above** (create one free at *github.com → Settings → Developer settings → Personal access tokens*, **repo** scope). It lives only in my memory for 30 minutes, is never stored, and you can forget it anytime.
 
 What I saw:\n${auth.detail.slice(0, 300)}`;
           results.statistics.confidence = 100;

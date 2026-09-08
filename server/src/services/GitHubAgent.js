@@ -2,21 +2,21 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import { WORKSPACE_DIR } from '../config.js';
-import { loadSettings } from './SettingsManager.js';
+import { getGithubKey as getSessionGithubKey } from './SessionKeys.js';
 
 const execP = promisify(exec);
 
 /**
- * GitHub token resolution, same precedence as the AI keys (LLMClient.resolveKeys):
- *   1. GITHUB_TOKEN env (Render/HF/Docker)
- *   2. GH_TOKEN env
- *   3. the token pasted in Settings → GitHub (settings.json)
+ * GitHub token resolution (one-time-paste order — NOTHING is read from disk):
+ *   1. one-time session key (pasted in chat when JEXI asks, memory-only)
+ *   2. GITHUB_TOKEN env (Render/HF/Docker)
+ *   3. GH_TOKEN env
  * When set, every `gh` command runs with GH_TOKEN so commits/pushes/PRs work
  * without the user's own gh login. When unset, gh falls back to its ambient
  * auth (or honestly reports not-authenticated).
  */
 export function getGhToken() {
-  return process.env.GITHUB_TOKEN || process.env.GH_TOKEN || loadSettings().githubToken || '';
+  return getSessionGithubKey() || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
 }
 
 /**
@@ -115,7 +115,7 @@ export async function runGitHubAction({ action, args = {} }, sendEvent) {
       const authed = r.ok && !/not logged in|no auth/i.test(r.output);
       return {
         success: true,
-        summary: `### 🔗 GITHUB CONNECTION\n\n${authed ? '✅ **Authenticated** — I can commit, push and open PRs for you.' : '⚠ **Not authenticated.** Add a `GITHUB_TOKEN` (or the GitHub token in Settings → GitHub) and I will be able to push, open PRs and manage issues.\n\n' + r.output.slice(0, 500)}`,
+        summary: `### 🔗 GITHUB CONNECTION\n\n${authed ? '✅ **Authenticated** — I can commit, push and open PRs for you.' : '⚠ **Not authenticated.** Ask me to push/commit and I will ask you to paste a one-time key (memory-only, never stored) — or set the `GITHUB_TOKEN` env var and I will use it silently.\n\n' + r.output.slice(0, 500)}`,
         raw: r.output.slice(0, 1200),
       };
     }

@@ -97,7 +97,7 @@ function pushTrace(prev, entry, updateId) {
   return next;
 }
 
-async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable, setQuestions, setPlanReview, setTeam, setComputer } = {}) {
+async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable, setQuestions, setPlanReview, setTeam, setComputer, setSecretAsk } = {}) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -252,6 +252,7 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
     // Build 47 — intelligence metadata (classification, task id, confidence).
     else if (data.type === 'intel') setPlan(prev => ({ ...prev, intel: data }));
     else if (data.type === 'ask.user') setQuestions?.(data);
+    else if (data.type === 'ask.secret') setSecretAsk?.(data);
     else if (data.type === 'plan.review') setPlanReview?.(data);
     else if (data.type === 'done') {
       sawDone = true;
@@ -371,6 +372,7 @@ export const useJexiEngine = () => {
   const [plan, setPlan] = useState(null); // { intent, steps, roster, skillsLine } from the /api/chat plan event
   const [isProcessing, setIsProcessing] = useState(false);
   const [questions, setQuestions] = useState(null); // { conv, questions: [...] }
+  const [secretAsk, setSecretAsk] = useState(null); // { conv, id, tool, reason } — one-time key card
   const [planReview, setPlanReview] = useState(null); // { conv, plan }
   const [team, setTeam] = useState(null); // B208 — live team strip state (from 'team' events)
   const [computer, setComputer] = useState(null); // B211 B3 — live computer-use telemetry (real events only)
@@ -588,7 +590,7 @@ export const useJexiEngine = () => {
         return;
       }
       if (!res.ok) throw new Error(`Backend replied HTTP ${res.status}`);
-      await consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable, setQuestions, setPlanReview, setTeam, setComputer });
+      await consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { onEvent, onStale, onDrop, onRecoverable, setQuestions, setPlanReview, setTeam, setComputer, setSecretAsk });
     } catch (error) {
       // Aborted by the user (STOP) — don't show a scary network error.
       if (error?.name === 'AbortError') {
@@ -652,5 +654,5 @@ export const useJexiEngine = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { messages, logs, websites, plan, team, computer, isProcessing, runSearch, stopGeneration, pushMessage, questions, setQuestions, planReview, setPlanReview, openConversation };
+  return { messages, logs, websites, plan, team, computer, isProcessing, runSearch, stopGeneration, pushMessage, questions, setQuestions, planReview, setPlanReview, openConversation, secretAsk, setSecretAsk };
 };

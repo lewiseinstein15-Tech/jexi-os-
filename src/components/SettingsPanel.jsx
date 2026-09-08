@@ -55,7 +55,7 @@ export default function SettingsPanel() {
   const [xaiKey, setXaiKey] = useState('');
   const [nvidiaKey, setNvidiaKey] = useState('');
   const [sambanovaKey, setSambanovaKey] = useState('');
-  const [githubToken, setGithubToken] = useState('');
+  const [ghForgetBusy, setGhForgetBusy] = useState(false); // one-time key revoke
   const [keyStatus, setKeyStatus] = useState(null); // { groq, gemini, github }
   const [status, setStatus] = useState('idle'); // idle, loading, saved, error
   const [initialLoad, setInitialLoad] = useState(true);
@@ -121,7 +121,6 @@ export default function SettingsPanel() {
         setXaiKey(data.xaiKey || '');
         setNvidiaKey(data.nvidiaKey || '');
         setSambanovaKey(data.sambanovaKey || '');
-        setGithubToken(data.githubToken || '');
         setAutonomyMode(['ask', 'full'].includes(data.autonomyMode) ? data.autonomyMode : 'ask');
         setGoalReportEmail(data.goalReportEmail || '');
         try { setKeyStatus(await statusRes.json()); } catch (e) { /* status endpoint optional */ }
@@ -176,7 +175,6 @@ export default function SettingsPanel() {
       if (!keyStatus?.xai?.configured) body.xaiKey = xaiKey;
       if (!keyStatus?.nvidia?.configured) body.nvidiaKey = nvidiaKey;
       if (!keyStatus?.sambanova?.configured) body.sambanovaKey = sambanovaKey;
-      if (!keyStatus?.github?.configured) body.githubToken = githubToken;
       body.autonomyMode = autonomyMode; // goal autonomy level (ask = pause at confirmations, full = preflight questions then run)
       body.goalReportEmail = goalReportEmail; // email address for goal completion reports (empty = off)
       const res = await jexiFetch(`${backendUrl}/api/settings`, {
@@ -322,17 +320,36 @@ export default function SettingsPanel() {
             envNames={['SAMBANOVA_API_KEY']}
           />
 
-          {/* GitHub Token — powers the GitHub Agent (commit, push, PR, issues) */}
-          <KeyField
-            label="GITHUB TOKEN (COMMIT, PUSH, PRS)"
-            icon={<Github className="w-3 h-3 text-white" />}
-            value={githubToken}
-            onChange={(e) => setGithubToken(e.target.value)}
-            placeholder="ghp_… (Settings → Developer settings → Personal access tokens → repo scope)"
-            hint={'Without it, GitHub actions show "not authenticated" — set GITHUB_TOKEN in Render, or paste a token with the repo scope here to let JEXI commit, push and open pull requests for you.'}
-            status={keyStatus?.github}
-            envNames={['GITHUB_TOKEN / GH_TOKEN']}
-          />
+          {/* GitHub — one-time paste only (memory-only, never stored) */}
+          <div className="bg-surface-2 border border-hairline rounded-md p-3">
+            <div className="flex items-center gap-2 text-[10px] font-bold text-text-secondary tracking-wider">
+              <Github className="w-3 h-3 text-white" />
+              GITHUB (COMMIT, PUSH, PRS) — ONE-TIME PASTE, NEVER STORED
+              {keyStatus?.github?.configured
+                ? <span className="ml-auto text-[9px] font-black text-status-online">● ACTIVE{keyStatus.github.source === 'session' ? ' — PASTED KEY' : ' — RENDER ENV'}</span>
+                : <span className="ml-auto text-[9px] font-black text-text-tertiary">○ NO KEY</span>}
+            </div>
+            <p className="mt-1.5 text-[10px] leading-snug text-text-tertiary">
+              Ask JEXI to push, commit or ship and she asks you to paste a one-time key right in chat. It lives only in her memory for 30 minutes — nothing is ever saved here. Prefer silence? Set GITHUB_TOKEN in Render instead.
+            </p>
+            {keyStatus?.github?.source === 'session' && (
+              <button
+                type="button"
+                disabled={ghForgetBusy}
+                onClick={async () => {
+                  setGhForgetBusy(true);
+                  try {
+                    await jexiFetch(`${getBackendUrl()}/api/secrets/forget`, { method: 'POST' });
+                    const s = await jexiFetch(`${getBackendUrl()}/api/settings/status`);
+                    try { setKeyStatus(await s.json()); } catch { /* noop */ }
+                  } finally { setGhForgetBusy(false); }
+                }}
+                className="mt-2 rounded-md border border-hairline px-2.5 py-1.5 text-[9px] font-bold text-text-secondary disabled:opacity-50"
+              >
+                {ghForgetBusy ? 'FORGETTING…' : 'FORGET ACTIVE KEY NOW'}
+              </button>
+            )}
+          </div>
 
           {/* JEXI Access Key — required only if the backend is locked with JEXI_API_KEY */}
           <div className="bg-surface-2 border border-hairline rounded-md p-3">
@@ -708,7 +725,7 @@ export default function SettingsPanel() {
         <PanelHeader icon={Key} title="WHERE YOUR KEYS LIVE" color="text-cyan-400" />
         <p className="text-[9px] text-text-secondary leading-relaxed space-y-1">
           <span className="flex items-start gap-1.5"><Globe className="w-3 h-3 mt-0.5 text-[#34D399] flex-shrink-0" /> <span><span className="text-text-primary">Production (Render):</span> keys are set as environment variables (<span className="font-mono text-text-secondary">GEMINI_API_KEY</span>, <span className="font-mono text-text-secondary">GROQ_API_KEY</span>, <span className="font-mono text-text-secondary">OPENROUTER_API_KEY</span>, <span className="font-mono text-text-secondary">HF_TOKEN</span>, <span className="font-mono text-text-secondary">GITHUB_TOKEN</span>) — JEXI reads them automatically, no pasting required.</span></span>
-          <span className="flex items-start gap-1.5"><ShieldCheck className="w-3 h-3 mt-0.5 text-cyan-400 flex-shrink-0" /> <span><span className="text-text-primary">Local / self-hosted:</span> the fields above store keys in JEXI's settings file on your device. They're never sent anywhere except the official AI provider / GitHub API, and only for actions you explicitly ask for.</span></span>
+          <span className="flex items-start gap-1.5"><ShieldCheck className="w-3 h-3 mt-0.5 text-cyan-400 flex-shrink-0" /> <span><span className="text-text-primary">Local / self-hosted:</span> the fields above store keys in JEXI's settings file on your device. They're never sent anywhere except the official AI provider API, and only for actions you explicitly ask for. (GitHub is the exception: one-time paste in chat, memory-only, never stored.)</span></span>
         </p>
       </div>
     </div>

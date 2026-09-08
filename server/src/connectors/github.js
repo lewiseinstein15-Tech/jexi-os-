@@ -22,6 +22,7 @@
 import { Connector, ConnectorConfig, ConnectorError, ERROR_CODES, httpJson, createHmacSha256, createHmacSha1, assertAsciiSecret } from './ConnectorBase.js';
 import { ConnectorRegistry } from './ConnectorRegistry.js';
 import crypto from 'crypto';
+import { getGithubKey as getSessionGithubKey } from '../services/SessionKeys.js';
 
 export class GitHubConnector extends Connector {
   static toolName = 'github';
@@ -30,8 +31,12 @@ export class GitHubConnector extends Connector {
   get defaultBaseUrl() { return 'https://api.github.com'; }
 
   resolveAuth() {
+    // one-time-paste order: a pasted session key wins; env is the fallback.
+    // A token persisted in the settings file is IGNORED (never stored).
+    let session = '';
+    try { session = getSessionGithubKey() || ''; } catch { /* session keys unavailable */ }
     const env = {
-      token: process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '',
+      token: session || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '',
       appId: process.env.GITHUB_APP_ID || '',
       privateKey: process.env.GITHUB_PRIVATE_KEY || '',
       installationId: process.env.GITHUB_INSTALLATION_ID || '',

@@ -60,8 +60,12 @@ export function registerConnectors() {
   const stored = storedConfigs();
   for (const name of CONNECTOR_NAMES) {
     const cfg = stored[name] || {};
+    // one-time-paste order: a persisted GitHub PAT is NEVER loaded into the
+    // live instance (explicit constructor configs — tests, App flows — still work).
+    const auth = { ...(cfg.auth || {}) };
+    if (name === 'github') delete auth.token;
     try {
-      REGISTRARS[name](new ConnectorConfig({ name, auth: cfg.auth || {}, enabled: cfg.enabled !== false }));
+      REGISTRARS[name](new ConnectorConfig({ name, auth, enabled: cfg.enabled !== false }));
     } catch (e) {
       console.error(`[connectors] failed to register ${name}:`, (e && e.message) || e);
     }
@@ -76,8 +80,11 @@ export function saveConnectorConfig(name, { auth, enabled } = {}) {
   const s = loadSettings();
   const connectors = s.connectors || (s.connectors = {});
   const prev = connectors[key] || {};
+  const nextAuth = { ...prev.auth, ...(auth || {}) };
+  // one-time-paste order: a GitHub PAT is NEVER persisted (session or env only).
+  if (key === 'github') delete nextAuth.token;
   connectors[key] = {
-    auth: { ...prev.auth, ...(auth || {}) },
+    auth: nextAuth,
     enabled: enabled !== undefined ? !!enabled : prev.enabled !== false,
   };
   saveSettings(s);

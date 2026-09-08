@@ -4,6 +4,7 @@ import rateLimit from 'express-rate-limit';
 import axios from 'axios';
 import crypto from 'crypto';
 import v8 from 'v8';
+import { githubKeyStatus, answerGithubKey, forgetGithubKey, migrateStoredGithubSecrets } from './src/services/SessionKeys.js';
 import fs from 'fs';
 import path from 'path';
 import { planner } from './src/services/Planner.js';
@@ -178,6 +179,10 @@ process.on('unhandledRejection', (e) => { recordError('process', (e && e.message
 // config + env. Agents reach them through the gated `connector-call`
 // tool; providers reach JEXI through /webhooks/connectors/<name>.
 registerConnectors();
+
+// One-time-paste order: remove any GitHub PAT persisted by older builds
+// (settings.json / credentials.json). Memory-only session keys from here on.
+try { migrateStoredGithubSecrets(); } catch (e) { recordError('boot', e.message); }
 
 // Boot profile + launch env + config snapshot (documented in .env.example
 // and B136/B138, but never actually called from the server entrypoint).
@@ -601,6 +606,21 @@ app.get('/workspace', (req, res) => {
 app.get('/api/settings', (req, res) => res.json(loadSettings()));
 app.post('/api/settings', (req, res) => res.json({ success: saveSettings(req.body) }));
 
+// === ONE-TIME SECRETS (memory-only — nothing here is ever persisted) ===
+// The user pastes a GitHub key ONLY after JEXI asks (ask.secret event with
+// a matching request id). Answers with no live request are refused.
+app.post('/api/secrets/answer', (req, res) => {
+  const r = answerGithubKey({ conv: req.body && req.body.conv, id: req.body && req.body.id, value: req.body && req.body.value });
+  if (!r.ok) return res.status(400).json({ ok: false, error: r.error });
+  res.json({ ok: true, expiresInSec: r.expiresInSec });
+});
+app.post('/api/secrets/forget', (req, res) => {
+  res.json({ ok: true, ...forgetGithubKey() });
+});
+app.get('/api/secrets/status', (req, res) => {
+  res.json({ ok: true, github: githubKeyStatus() });
+});
+
 // Reports WHERE each credential is configured (env / settings file / none) so the
 // Settings panel can show "ACTIVE — from Render environment" instead of an empty
 // input. NEVER returns actual key values.
@@ -622,7 +642,12 @@ app.get('/api/settings/status', (req, res) => {
     mistral: statusOf(['MISTRAL_API_KEY'], 'mistralKey'),
     xai: statusOf(['XAI_API_KEY'], 'xaiKey'),
     deepseek: statusOf(['DEEPSEEK_API_KEY'], 'deepseekKey'), // B66 — coding coworker
-    github: statusOf(['GITHUB_TOKEN', 'GH_TOKEN'], 'githubToken'),
+    github: (() => {
+      // one-time-paste order: session key or env — settings storage is gone.
+      try { if (githubKeyStatus().set) return { configured: true, source: 'session' }; } catch { /* noop */ }
+      if (process.env.GITHUB_TOKEN || process.env.GH_TOKEN) return { configured: true, source: 'env' };
+      return { configured: false, source: 'none' };
+    })(),
     // B166c — the FREE stack surfaces here too (NVIDIA/SambaNova = free DeepSeek brains)
     nvidia: statusOf(['NVIDIA_API_KEY'], 'nvidiaKey'),
     sambanova: statusOf(['SAMBANOVA_API_KEY'], 'sambanovaKey'),
