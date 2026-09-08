@@ -70,6 +70,21 @@ export function recommendedToolsForSubtask(discovery, subtask) {
   return matched.length ? matched.map((t) => t.slug) : null;
 }
 
+/**
+ * Pure-github-turn detector. Mirrors the planner's own github rule
+ * (Planner.js gitActionFirst/gitDominant/gitPhrases) plus a composite guard:
+ * when other real work is mentioned, the boss still takes the turn.
+ */
+export function isPureGithubTurn(q) {
+  const text = String(q || '');
+  const gitActionFirst = /^(?:please\s+)?(?:can you\s+)?(?:commit|push|clone|pull|git status|upload to github|send to github)\b/i.test(text);
+  const gitDominant = /\b(push|commit|clone|pull|upload|sync)\b[^.!?\n]{0,50}\b(github|git|remote|origin)\b/i.test(text);
+  const gitPhrases = /(create|make|new|start|open)\s+(a\s+|an\s+)?(repo|repository)|\brepo(ository)?\s+(create|new)|open (a )?pull request|create (a )?pull request|pr (create|list)|list (pull requests|prs|issues)|issue (create|list)|open (an? )?issue|create (an? )?issue|file (an? )?issue|git status|github (connected|token|auth|connected\?)|check github|init (a )?(git )?repo\b/i.test(text);
+  if (!(gitActionFirst || gitDominant || gitPhrases)) return false;
+  if (/\b(research|search the web|look up|build|create an app|make an app|analy[sz]e|write|draw|paint|video|watch|email|schedule|remind|math|calculate|translate|learn)\b/i.test(text)) return false;
+  return true;
+}
+
 export class Director {
   /**
    * @param {object} adapters — injectable seams (tests pass fakes):
@@ -97,6 +112,15 @@ export class Director {
     } = ctx;
 
     if (!this.llm) return { decline: 'no llm adapter' };
+
+    // One-time-paste order: PURE GitHub operations (push/commit/PR/repo)
+    // decline to the planner lane's GitHub Agent (real gh CLI + the one-time
+    // key card). Employees have no git path — run-command allowlists git out
+    // — so a boss-run push can only fail at the blocked command. Composite
+    // turns (research/build AND push) stay with the boss.
+    if (isPureGithubTurn(String(effectiveQuery || raw || ''))) {
+      return { decline: 'GitHub operation — the GitHub Agent lane handles it (one-time key card if no key)' };
+    }
 
     const task = new DirectorTask({ conversationId: convId, rawQuery: raw, effectiveQuery, contextBlock });
     const mailbox = new TaskMailbox(task.id);

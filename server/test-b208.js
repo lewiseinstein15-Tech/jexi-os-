@@ -478,5 +478,21 @@ console.log('\n[22] Expanded canonical events');
   check('OBJECTIVE_REFINED emitted', types.has('OBJECTIVE_REFINED'));
   check('MODEL_REQUEST_STARTED/COMPLETED emitted', types.has('MODEL_REQUEST_STARTED') && types.has('MODEL_REQUEST_COMPLETED'));
 }
+/* ═════════════════ 17. pure github turns decline to the agent lane ═════════════════ */
+console.log('\n[17] GitHub decline (one-time-paste order)');
+{
+  const { isPureGithubTurn } = await import('./src/services/director/Director.js');
+  check('push-to-github is pure github', isPureGithubTurn('Push my workspace to GitHub now.') === true);
+  check('commit+push is pure github', isPureGithubTurn('commit and push my code to github') === true);
+  check('composite (research+push) stays with the boss', isPureGithubTurn('Research the best router and push the report to github') === false);
+  check('unrelated stays with the boss', isPureGithubTurn('how deep is crater lake') === false);
+  const h = harness({ refinement: REFINEMENT() });
+  const r = await runTurn(h, { raw: 'Push my workspace to GitHub now.', convId: 'github-decline-test' });
+  check('pure github turn declines (planner lane takes it)', Boolean(r.decline));
+  check('decline happens before interpretation (no wasted model call)', h.llm.calls.interpret === 0);
+  const h2 = harness({ refinement: REFINEMENT() });
+  const r2 = await runTurn(h2, { raw: 'Research the best router and push the report to github', convId: 'github-composite-test' });
+  check('composite turn is NOT declined', !r2.decline);
+}
 console.log(`\nB208: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
