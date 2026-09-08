@@ -193,8 +193,10 @@ console.log('\n== 7. Wiring ==');
   ok('wikipedia is ONE provider among many, not the fallback', se.includes('activeSearchProviders'));
   const wsp = fs.readFileSync('./src/services/WebSearchProviders.js', 'utf-8');
   ok('status surface reports LIVE health (cooldowns, configured)', wsp.includes('webSearchHealth()'));
-  const card = fs.readFileSync(path.join(ROOT, 'src/components/SourceCard.jsx'), 'utf-8');
-  ok('source cards badge multi-engine finds', card.includes('found by') && card.includes('source.engines'));
+  // SourceCard.jsx was deleted as never-imported dead UI — search results
+  // surface live as transcript step rows with command/stdout detail.
+  const row = fs.readFileSync(path.join(ROOT, 'src/components/StepRow.jsx'), 'utf-8');
+  ok('search results surface as step rows with stdout detail', row.includes('jx-step-detail') && row.includes('stdout'));
   const css = fs.readFileSync(path.join(ROOT, 'src/index.css'), 'utf-8');
   ok('streaming caret styled', css.includes('.jx-caret'));
   const chat = fs.readFileSync(path.join(ROOT, 'src/components/ChatWindow.jsx'), 'utf-8');
