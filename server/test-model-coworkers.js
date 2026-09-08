@@ -105,7 +105,12 @@ console.log('\n== 3. Streaming wires ==');
   const hook = fs.readFileSync(path.join(ROOT, 'src/hooks/useJexiEngine.js'), 'utf-8');
   ok('engine carries `by` onto the streaming message', hook.includes('by: last.by || data.by') && hook.includes('...(data.by ? { by: data.by } : {})'));
   const chat = fs.readFileSync(path.join(ROOT, 'src/components/ChatWindow.jsx'), 'utf-8');
-  ok('chat header shows the writer NAME while streaming (never the model)', chat.includes("msg.streaming && msg.by ? String(msg.by).toUpperCase() : 'JEXI'") && chat.includes('· WRITING…'));
+  const think = fs.readFileSync(path.join(ROOT, 'src/components/AgentThinking.jsx'), 'utf-8');
+  // Transcript UI: the card header is gone — the writer NAME rides the live
+  // Thought row instead ("Thinking · NAME · 12.3s"), fed by by={msg.by}.
+  // Same guarantee: a coworker NAME shows while streaming, never a model id
+  // (model ids are masked server-side — see the sanitizer tests above).
+  ok('chat header shows the writer NAME while streaming (never the model)', chat.includes('by={msg.by}') && think.includes('Thinking${safeBy'));
   const settings = fs.readFileSync(path.join(ROOT, 'src/components/SettingsView.jsx'), 'utf-8');
   ok('Settings shows the named team (Meet the team)', settings.includes('Meet the team') && settings.includes('/api/team'));
 }
