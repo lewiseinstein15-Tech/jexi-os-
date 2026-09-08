@@ -99,7 +99,9 @@ export default function App() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.error || `Backend replied HTTP ${res.status}`);
       engine.setSecretAsk(null);
-      engine.runSearch('Continue — I just pasted the one-time GitHub key in the key card.');
+      // Resume with a push-first message so the turn routes back to the
+      // planner GitHub lane (which now finds the pasted session key).
+      engine.runSearch('Push to GitHub now — I just pasted the one-time key, use it to run the GitHub step.');
     } catch (e) {
       setSecretError((e && e.message) || 'Could not use that key — try again.');
     } finally {
