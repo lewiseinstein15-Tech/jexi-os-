@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
+import './jexi-theme.css' // FINAL — visual system layer (fonts, flat reskin, a11y)
 import 'katex/dist/katex.min.css' // B151 — KaTeX math rendering (bundled)
 import { setupPushSubscription } from './utils/pushSubscribe'
 import { setupFcm, armFcmForegroundRetry } from './utils/fcmSetup'

@@ -48,7 +48,8 @@ export default function MissionInlineCard() {
   if (!mission) return null;
   const items = detail?.graph?.items || [];
   const resolved = items.filter((i) => RESOLVED.has(i.status)).length;
-  const pct = items.length ? Math.round((resolved / items.length) * 100) : (ACTIVE.includes(mission.state) ? 3 : 0);
+  // FINAL — no invented progress: with zero graph items there is no percent.
+  const pct = items.length ? Math.round((resolved / items.length) * 100) : null;
   const live = ACTIVE.includes(mission.state);
 
   return (
@@ -58,12 +59,16 @@ export default function MissionInlineCard() {
         <span className="jx-missioncard-kicker">{live ? 'Mission in Progress' : `Mission ${mission.state.replace(/_/g, ' ').toLowerCase()}`}</span>
       </div>
       <div className="jx-missioncard-obj">{String(mission.objective || mission.id).slice(0, 120)}</div>
-      <div className="jx-missioncard-row">
-        <div className="jx-missioncard-bar" role="progressbar" aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100">
-          <i style={{ width: `${pct}%` }} />
+      {pct === null ? (
+        <div className="jx-missioncard-state">{mission.state.replace(/_/g, ' ')}</div>
+      ) : (
+        <div className="jx-missioncard-row">
+          <div className="jx-missioncard-bar" role="progressbar" aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100">
+            <i style={{ width: `${pct}%` }} />
+          </div>
+          <span className="jx-missioncard-pct">{pct}%</span>
         </div>
-        <span className="jx-missioncard-pct">{pct}%</span>
-      </div>
+      )}
       <div className="jx-missioncard-time">{fmtTime(mission.updatedAt || mission.createdAt)}</div>
     </div>
   );

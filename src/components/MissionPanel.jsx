@@ -8,7 +8,6 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { getBackendUrl, jexiFetch } from '../utils/helpers';
-import { Code2, Lightbulb, Folder, Terminal } from 'lucide-react';
 import { Crown } from './JexiBrand';
 
 const ACTIVE = ['PLANNING', 'EXECUTING', 'VERIFYING', 'AWAITING_INPUT'];
@@ -26,15 +25,16 @@ export default function MissionPanel() {
   const [missions, setMissions] = useState(null); // null = not loaded yet
   const [detail, setDetail] = useState(null);
   const [health, setHealth] = useState(null);
-  const [offline, setOffline] = useState(false);
+  const [conn, setConn] = useState('ok'); // ok | locked | offline | error (FINAL: honest failure modes)
 
   const load = useCallback(async () => {
     try {
       const res = await jexiFetch(`${getBackendUrl()}/api/missions`);
+      if (res.status === 401 || res.status === 403) { setConn('locked'); return; }
       const data = await res.json().catch(() => ({}));
       if (!data.ok) throw new Error('bad missions payload');
       setMissions(data.missions || []);
-      setOffline(false);
+      setConn('ok');
       const list = data.missions || [];
       const active = list.find((m) => ACTIVE.includes(m.state)) || list[0] || null;
       if (active) {
@@ -52,7 +52,7 @@ export default function MissionPanel() {
         setHealth(h.ok ? h : null);
       } catch { /* health is supplementary */ }
     } catch {
-      setOffline(true);
+      setConn('offline');
     }
   }, []);
 
@@ -65,16 +65,20 @@ export default function MissionPanel() {
   const active = (missions || []).find((m) => ACTIVE.includes(m.state)) || null;
   const items = detail?.graph?.items || [];
   const resolved = items.filter((i) => RESOLVED.has(i.status)).length;
-  const pct = items.length ? Math.round((resolved / items.length) * 100) : (active ? 5 : 0);
+  // FINAL — no invented progress: with zero graph items there is no percent.
+  const pct = items.length ? Math.round((resolved / items.length) * 100) : null;
   const ollama = health?.providers?.ollama;
   const ollamaLive = ollama?.ok === true;
 
   return (
     <aside className="jx-missionpanel" aria-label="Mission status">
-      {offline && missions === null ? (
+      {conn !== 'ok' && missions === null ? (
         <div className="jxmp-card">
           <div className="jxmp-title"><Crown size={12} /> Active Mission</div>
-          <div className="jxmp-empty">Brain unreachable —<br />showing nothing rather than<br />something fake.</div>
+          <div className="jxmp-empty">
+            {conn === 'locked' ? (<>Brain is locked —<br />paste the access key in<br />Settings → System.</>) : (
+              <>Brain unreachable —<br />showing nothing rather than<br />something fake.</>)}
+          </div>
         </div>
       ) : (
         <>
@@ -83,10 +87,12 @@ export default function MissionPanel() {
             {active ? (
               <>
                 <div className="jxmp-mname">{String(active.objective || active.id).slice(0, 90)}</div>
-                <div className="jxmp-mstate">{active.state.replace(/_/g, ' ')} · {pct}%</div>
-                <div className="jxmp-bar" role="progressbar" aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100">
-                  <i style={{ width: `${pct}%` }} />
-                </div>
+                <div className="jxmp-mstate">{active.state.replace(/_/g, ' ')}{pct === null ? '' : ` · ${pct}%`}</div>
+                {pct !== null && (
+                  <div className="jxmp-bar" role="progressbar" aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100">
+                    <i style={{ width: `${pct}%` }} />
+                  </div>
+                )}
               </>
             ) : (
               <div className="jxmp-empty">No active mission.<br />Tell JEXI what to build.</div>
@@ -110,21 +116,25 @@ export default function MissionPanel() {
             {items.length > 7 && <div className="jxmp-more">+{items.length - 7} more</div>}
           </div>
 
-          <div className="jxmp-card">
-            <div className="jxmp-title">JEXI is using</div>
-            <ul className="jxmp-using">
-              {[
-                { Icon: Code2, label: 'Coding Agent', on: !!active },
-                { Icon: Lightbulb, label: 'Planning Agent', on: !!active },
-                { Icon: Folder, label: 'File System', on: !!active },
-                { Icon: Terminal, label: ollamaLive ? 'Ollama (local)' : 'Remote models', on: ollamaLive || !!active },
-              ].map(({ Icon, label, on }) => (
-                <li key={label}><span className={`jxmp-ico${on ? ' on' : ''}`}><Icon size={13} /></span>{label}</li>
-              ))}
-            </ul>
-          </div>
+          {/* FINAL — shown only while a mission is live; rows are real
+              RUNNING graph items, never assumed agent names. */}
+          {active && (
+            <div className="jxmp-card">
+              <div className="jxmp-title">Now running</div>
+              {items.some((i) => i.status === 'RUNNING') ? (
+                <ul className="jxmp-using">
+                  {items.filter((i) => i.status === 'RUNNING').slice(0, 4).map((it) => (
+                    <li key={it.id}><span className="jxmp-dot on" />{String(it.title || it.id).slice(0, 48)}</li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="jxmp-empty small">Between tasks — the next step is being decided.</div>
+              )}
+              <div className="jxmp-more">models · {ollamaLive ? 'ollama (local) live' : 'remote'}</div>
+            </div>
+          )}
 
-          <div className="jxmp-note">Small steps<br />create big things. ♡<br /><span>— JEXI</span></div>
+          <div className="jxmp-note jx-hand-display">Small steps create big things.<br /><span>— JEXI</span></div>
         </>
       )}
     </aside>

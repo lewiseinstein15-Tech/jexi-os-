@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Square, ImagePlus, X, Camera, Stethoscope, Plus, Copy, Check, RefreshCw } from 'lucide-react';
 import TypedMessage from './TypedMessage';
 import AgentThinking from './AgentThinking'; // B205 — unified arena-style thinking panel
-import OrbCore from './OrbCore'; // B192 — the presence orb (empty state)
+import HomeView from './HomeView'; // FINAL — mission-first home (empty state)
 import Composer from './Composer'; // B195 — isolated, real-app input
 import MarkdownRenderer from './MarkdownRenderer';
 import VisionPanel from './VisionPanel';
@@ -125,7 +125,7 @@ function MessageActions({ text, onRegenerate }) {
 /* ------------------------------------------------------------------ */
 /* Main ChatWindow                                                      */
 /* ------------------------------------------------------------------ */
-export default function ChatWindow({ messages, logs, isProcessing, onSend, onStop, onVisionResult, team, computer, secretAsk, secretBusy, secretError, onSecretSubmit, onDismissSecret }) {
+export default function ChatWindow({ messages, logs, isProcessing, onSend, onStop, onVisionResult, team, computer, secretAsk, secretBusy, secretError, onSecretSubmit, onDismissSecret, onOpenCommand }) {
   const [image, setImage] = useState(null);
   const [visionOpen, setVisionOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -203,20 +203,14 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
         <TeamLive team={team} live={isProcessing} />
         <ComputerPanel computer={computer} live={isProcessing} />
         {messages.length === 0 && !isProcessing ? (
-          /* B192 — ORB HERO: her presence center-stage (the ZOEY_OS look) */
-          <div className="jx-orb-wrap">
-            <OrbCore size={Math.min(300, 260)} state="idle" label="JEXI CORE" />
-            <p className="jx-orb-hello">
-              <b>I'm listening.</b> Build something, research anything, watch a video,
-              or just talk — I stream every step as I work.
-            </p>
-            <div className="jx-suggest">
-              <button type="button" onClick={() => onSend('build me a quiz app as a web app')}>build an app</button>
-              <button type="button" onClick={() => onSend('what is 2/3 + 1/4? show working')}>solve math</button>
-              <button type="button" onClick={() => onSend('research the latest AI news')}>research</button>
-              <button type="button" onClick={() => onSend('show me a picture of a lion')}>show a picture</button>
-            </div>
-          </div>
+          /* FINAL — mission-first home: greeting, live mission, suggestions */
+          <HomeView
+            messages={messages}
+            logs={logs}
+            isProcessing={isProcessing}
+            onSend={onSend}
+            onOpenCommand={onOpenCommand}
+          />
         ) : (
           /* Message list */
           messages.map((msg, i) => (
@@ -309,8 +303,10 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
           ))
         )}
 
-        {/* Reference: live Mission in Progress card above the composer */}
-        <MissionInlineCard />
+        {/* FINAL — the in-progress card rides above the composer only once a
+            conversation exists; on the empty home the mission-first HomeView
+            already carries the mission, so a second card would duplicate it. */}
+        {!(messages.length === 0 && !isProcessing) && <MissionInlineCard />}
 
       </div>
 

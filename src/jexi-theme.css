@@ -1,0 +1,126 @@
+/**
+ * JEXI FINAL — visual system layer (loaded AFTER index.css, wins ties).
+ *
+ * Identity: an executive operator's instrument — calm graphite, one warm
+ * accent, flat surfaces, honest states. No gradients-as-decoration, no
+ * glow, no glass, no purple. JEXI's handwriting (Caveat, OFL, self-hosted)
+ * appears ONLY on short display lines — greetings, mottos, signatures,
+ * brief spoken asides — never on body text, answers, or code (legibility
+ * lesson of 2026-09-08 stands).
+ */
+@import './assets/fonts/caveat.css';
+
+:root {
+  /* JEXI's hand — display lines only (see header note). */
+  --hand-display: 'Caveat', 'Segoe Script', 'Comic Sans MS', cursive;
+  /* Proper monospace for code/logs/labels (system stack: zero downloads). */
+  --mono: ui-monospace, SFMono-Regular, SFMono-RegularConsole, Menlo, Consolas,
+    'Liberation Mono', monospace;
+  --info: #4a9eff;
+  --focus-ring: rgba(255, 138, 61, 0.55);
+}
+
+/* ── handwriting: short display lines only ─────────────────────────── */
+.jx-hand-display {
+  font-family: var(--hand-display);
+  font-weight: 600;
+  font-size: 21px;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+}
+
+/* ── flatten decorative gradients/glows ───────────────────────────── */
+body { background-image: none; }
+body::before { background-image: none; }
+
+/* Sidebar: flat active state with an accent edge (was: gradient pill). */
+.jx-mi.active {
+  background-color: rgba(255, 138, 61, 0.13);
+  background-image: none;
+  color: #fff;
+  box-shadow: inset 2px 0 0 var(--mag);
+  font-weight: 600;
+}
+.jx-mi.active svg { color: var(--mag); }
+
+/* Wordmark: solid warm ink (was: gradient-clipped text). */
+.jx-wordmark, .jx-word {
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: var(--peach);
+}
+
+/* Mission progress + status dots: flat (was: gradient bar, glowing dots). */
+.jxmp-bar i { background: var(--mag); transition: width 0.5s ease; }
+.jx-pill .pdot, .jx-pill.violet .pdot, .jxmp-dot.on { box-shadow: none; }
+
+/* Send button: warm hover (was: leftover neon-green hover). */
+.jx-send:hover { background: #e06a1f; transform: none; box-shadow: none; }
+.jx-send:active { background: #c85a17; transform: none; }
+
+/* ── mission-first home ───────────────────────────────────────────── */
+.jx-home { display: flex; flex-direction: column; gap: 18px; max-width: 660px;
+  margin: 0 auto; padding: 34px 20px 20px; width: 100%; }
+.jx-home-greet { margin: 0; color: var(--peach); }
+.jx-home-status { margin: 2px 0 0; font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+.jx-home-status b { color: var(--ink); font-weight: 600; }
+.jx-home-mode { margin: 0; font-family: var(--mono); font-size: 9.5px;
+  letter-spacing: 0.22em; color: var(--faint); }
+.jx-home-mission { border: 1px solid var(--line2); border-radius: 12px;
+  background: var(--bg2); padding: 14px 16px; }
+.jx-home-mission .t { font-size: 10px; font-weight: 800; letter-spacing: 0.14em;
+  color: var(--muted); margin-bottom: 8px; }
+.jx-home-mission .o { font-size: 14px; font-weight: 600; color: var(--ink);
+  line-height: 1.5; margin-bottom: 6px; }
+.jx-home-mission .s { font-family: var(--mono); font-size: 10.5px; color: var(--muted);
+  letter-spacing: 0.05em; margin-bottom: 10px; }
+.jx-home-mission .bar { height: 5px; background: var(--line); border-radius: 99px; overflow: hidden; }
+.jx-home-mission .bar i { display: block; height: 100%; background: var(--mag); border-radius: 99px; }
+.jx-home-mission button.link { background: none; border: none; padding: 0; margin-top: 10px;
+  color: var(--mag); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.jx-home-tasks { list-style: none; margin: 10px 0 0; padding: 10px 0 0;
+  border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.jx-home-tasks li { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; color: var(--muted); }
+.jx-home-tasks li.live { color: var(--ink); }
+.jx-suggest { display: flex; flex-wrap: wrap; gap: 8px; }
+.jx-suggest button { min-height: 44px; padding: 10px 16px; border-radius: 10px;
+  border: 1px solid var(--line2); background: transparent; color: var(--muted);
+  font-family: var(--font); font-size: 13px; cursor: pointer; }
+.jx-suggest button:hover { border-color: var(--mag); color: var(--ink); box-shadow: none; }
+
+/* Composer input stays in the UI face — real monospace is reserved for
+   code, logs, and technical micro-labels. */
+.jx-input, .jx-input::placeholder { font-family: var(--font); }
+
+/* Honest mission state line (shown instead of a progress bar when the
+   work graph has no items yet — never an invented percent). */
+.jx-missioncard-state { font-family: var(--mono); font-size: 10.5px;
+  letter-spacing: 0.08em; color: var(--muted); margin-top: 6px; }
+
+/* ── focus visibility (a11y) ──────────────────────────────────────── */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Skip link: hidden until focused. */
+.jx-skip { position: fixed; top: -48px; left: 12px; z-index: 100;
+  background: var(--bg3); color: var(--ink); border: 1px solid var(--mag);
+  border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 600;
+  text-decoration: none; transition: top 0.15s ease; }
+.jx-skip:focus-visible { top: 12px; }
+
+/* ── reduced motion ───────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+/* ── phone: mission-first stacking ────────────────────────────────── */
+@media (max-width: 600px) {
+  .jx-home { padding: 22px 16px 16px; gap: 14px; }
+  .jx-hand-display { font-size: 23px; }
+  .jx-suggest button { flex: 1 1 40%; text-align: center; }
+}

@@ -136,7 +136,7 @@ function Composer({ isProcessing, onSendText, onStop, onAttach }) {
   const canSend = text.trim().length > 0;
 
   return (
-    <div className="jx-composerwrap">
+    <div className="jx-composerwrap" id="jx-composer" role="region" aria-label="Message composer">
       {micNote && <div className="jx-micnote" role="status">{micNote}</div>}
       {queued !== null && (
         <div className="jx-queued">

@@ -11,14 +11,14 @@ import { probeHealth, verifyAccessKey, normalizeBase } from '../utils/setupProbe
 const S = {
   wrap: { minHeight: '100vh', background: '#0f1115', color: '#e8eaf0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: 'system-ui, -apple-system, sans-serif' },
   card: { width: '100%', maxWidth: 440, background: '#171a21', border: '1px solid #262b36', borderRadius: 14, padding: 26 },
-  brand: { fontSize: 13, letterSpacing: 4, color: '#8b93a7', marginBottom: 4 },
+  brand: { fontFamily: "'Caveat','Segoe Script',cursive", fontWeight: 600, fontSize: 26, color: '#FFD1A9', marginBottom: 4 },
   title: { fontSize: 22, fontWeight: 650, margin: '0 0 6px' },
   sub: { fontSize: 14, color: '#9aa3b5', lineHeight: 1.5, margin: '0 0 18px' },
   dots: { display: 'flex', gap: 8, marginBottom: 18 },
   label: { display: 'block', fontSize: 13, color: '#9aa3b5', marginBottom: 6 },
   input: { width: '100%', boxSizing: 'border-box', background: '#0f1115', border: '1px solid #2c3342', color: '#e8eaf0', borderRadius: 9, padding: '12px 14px', fontSize: 15, outline: 'none' },
   btn: { width: '100%', boxSizing: 'border-box', border: 'none', borderRadius: 9, padding: '13px 14px', fontSize: 15, fontWeight: 650, cursor: 'pointer', marginTop: 12 },
-  primary: { background: '#4f7cff', color: '#fff' },
+  primary: { background: '#FF8A3D', color: '#14100b' },
   ghost: { background: 'transparent', color: '#9aa3b5', border: '1px solid #2c3342' },
   ok: { marginTop: 12, fontSize: 13.5, color: '#7ee2a8', background: '#12261b', border: '1px solid #1e4d32', borderRadius: 8, padding: '9px 12px' },
   err: { marginTop: 12, fontSize: 13.5, color: '#ff9d9d', background: '#2a1414', border: '1px solid #5a2323', borderRadius: 8, padding: '9px 12px' },
@@ -31,7 +31,7 @@ function Dots({ step }) {
   return (
     <div style={S.dots} aria-label={`Step ${step} of 3`}>
       {[1, 2, 3].map((n) => (
-        <div key={n} style={{ flex: 1, height: 4, borderRadius: 2, background: n <= step ? '#4f7cff' : '#262b36' }} />
+        <div key={n} style={{ flex: 1, height: 4, borderRadius: 2, background: n <= step ? '#FF8A3D' : '#262b36' }} />
       ))}
     </div>
   );

@@ -20,10 +20,10 @@ import UpdateBanner from './components/UpdateBanner';
 import { discoverBrainUrl, setBrainUrl } from './utils/updateCenter'; // B179 — brain discovery self-heal
 import BootSplash from './components/BootSplash'; // B79 — branded loading screen on open (never a blank screen)
 import { SidebarBrandMark, SidebarBrandName } from './brand/official'; // B160 — dsh ui-brand-official
-import OrbCore from './components/OrbCore'; // B192 — the presence orb
+/* FINAL — OrbCore presence orb retired from the main view. */
 import MissionPanel from './components/MissionPanel'; // ARENA ASTRA — desktop right mission rail
-import { SidebarLockup, Crown } from './components/JexiBrand'; // reference: bolt + wordmark lockup
-import { StatusCard, CalendarCard } from './components/WidgetCards'; // B192 — glass widgets
+import { SidebarLockup } from './components/JexiBrand'; // reference: bolt + wordmark lockup
+/* FINAL — WidgetCards glass widgets retired from the main view. */
 import ErrorBoundary from './components/ErrorBoundary';
 
 // ARENA REBUILD (spec Part 26): the nav is Lewis's spec — Home / Missions /
@@ -230,6 +230,8 @@ export default function App() {
   return (
     <ErrorBoundary>
       <div className="jx-app">
+        {/* FINAL a11y — skip straight to the composer (visible on focus). */}
+        <a className="jx-skip" href="#jx-composer">Skip to message composer</a>
         {/* top bar with the three lines */}
         <header className="jx-top">
           <button
@@ -259,7 +261,7 @@ export default function App() {
             <button type="button" className="jx-toplink" aria-label="Workshop" onClick={(e) => { e.stopPropagation(); navigate('workshop'); }} title="Workshop"><MenuIcon name="workshop" /></button>
           )}
           <div className="jx-right">
-            <span className="jx-crown" aria-hidden="true">👑</span>
+            {/* FINAL — emoji crown removed (tofu on some devices, decoration everywhere) */}
             {/* ARENA ASTRA — owner chip (desktop) */}
             <span className="jx-userchip" title="Lewis — owner & creator"><span className="jx-avatar" aria-hidden="true">L</span>Lewis<span className="jx-chev" aria-hidden="true">▾</span></span>
             <span className={`jx-pill${engine.isProcessing ? ' violet' : ''}`}>
@@ -300,22 +302,14 @@ export default function App() {
               </button>
             </Fragment>
           ))}
-          <div className="jx-railnote">Big goals.<br />Real progress.<br /><span>— JEXI <Crown size={15} /></span></div>
+          <div className="jx-railnote jx-hand-display">Big goals. Real progress.<br /><span>— JEXI</span></div>
         </nav>
 
-        {/* B192 — workbench: glass widgets beside the chat on desktop */}
+        {/* FINAL — no side widgets: mission state lives in the mission-first
+            home and the mission rail. (StatusCard's "done" counted chat
+            messages, not completed work; the calendar and presence orb were
+            decoration.) */}
         <div className="jx-workbench">
-        <aside className="jx-widgets" aria-hidden="true">
-          <StatusCard active={engine.isProcessing ? 1 : 0} done={engine.messages.filter((m) => m.role === 'jexi' && !m.streaming).length} idle={!engine.isProcessing} />
-          <CalendarCard date={clock} />
-          <div className="jx2-card">
-            <div className="jx2-card-title">PRESENCE</div>
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0' }}>
-              <OrbCore size={170} state={engine.isProcessing ? 'thinking' : 'idle'} label="" />
-            </div>
-            <div className="jx2-card-foot" style={{ textAlign: 'center' }}>{engine.isProcessing ? 'WORKING' : 'STANDBY'}</div>
-          </div>
-        </aside>
         <div className="jx-stage">
 
         {/* chat */}
@@ -334,6 +328,7 @@ export default function App() {
               secretError={secretError}
               onSecretSubmit={submitSecretKey}
               onDismissSecret={() => engine.setSecretAsk(null)}
+              onOpenCommand={() => navigate('missions')}
               planReview={engine.planReview}
               team={engine.team}
               computer={engine.computer}
