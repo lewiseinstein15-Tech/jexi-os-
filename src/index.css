@@ -25,7 +25,7 @@
   --bad: #FB7185;
   --amber: #D8A83E; /* B221: system amber */
   --font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --mono: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; /* ONE-FONT (user order): every face in JEXI is Inter */
 }
 
 html, body, #root { height: 100%; width: 100%; max-width: 100%; }
@@ -1544,16 +1544,10 @@ form.surface-float { flex-shrink: 0; }
   font-style: normal;
   font-display: swap;
 }
-@font-face {
-  font-family: 'Baloo 2';
-  src: url('./assets/fonts/Baloo2.ttf') format('truetype');
-  font-weight: 400 800;
-  font-style: normal;
-  font-display: swap;
-}
+/* ONE-FONT (user order): the Baloo 2 wordmark face was removed — the wordmark is Inter too. */
 :root {
   --font: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  --wordmark: 'Baloo 2', 'Inter', sans-serif;
+  --wordmark: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --check: #34D399; /* reference done-check mint */
 }
 

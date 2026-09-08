@@ -75,19 +75,19 @@ function barChart({ rows, title, unit }) {
     const y = bottom - ((bottom - top) * i) / 4;
     const val = (max * i) / 4;
     g += `\n  <line x1="46" y1="${y}" x2="${W - 14}" y2="${y}" stroke="#222a36" stroke-width="1"/>`;
-    g += `\n  <text x="40" y="${y + 3}" text-anchor="end" font-size="9" fill="#7a828e" font-family="JetBrains Mono,monospace">${fmtNum(val)}</text>`;
+    g += `\n  <text x="40" y="${y + 3}" text-anchor="end" font-size="9" fill="#7a828e" font-family="Inter,sans-serif">${fmtNum(val)}</text>`;
   }
   rows.forEach((r, i) => {
     const cx = 46 + slot * i + slot / 2;
     const h1 = (r.value / max) * (bottom - top);
     const x1 = hasSecond ? cx - barW - 2 : cx - barW / 2;
     g += `\n  <rect x="${x1}" y="${bottom - h1}" width="${barW}" height="${Math.max(1, h1)}" rx="3" fill="${PALETTE[0]}"/>`;
-    g += `\n  <text x="${x1 + barW / 2}" y="${bottom - h1 - 5}" text-anchor="middle" font-size="9" fill="#e8e8e8" font-family="JetBrains Mono,monospace">${fmtNum(r.value)}${unit ? esc(unit) : ''}</text>`;
+    g += `\n  <text x="${x1 + barW / 2}" y="${bottom - h1 - 5}" text-anchor="middle" font-size="9" fill="#e8e8e8" font-family="Inter,sans-serif">${fmtNum(r.value)}${unit ? esc(unit) : ''}</text>`;
     if (hasSecond && r.value2 !== undefined) {
       const h2 = (r.value2 / max) * (bottom - top);
       const x2 = cx + 2;
       g += `\n  <rect x="${x2}" y="${bottom - h2}" width="${barW}" height="${Math.max(1, h2)}" rx="3" fill="${PALETTE[1]}"/>`;
-      g += `\n  <text x="${x2 + barW / 2}" y="${bottom - h2 - 5}" text-anchor="middle" font-size="9" fill="#e8e8e8" font-family="JetBrains Mono,monospace">${fmtNum(r.value2)}</text>`;
+      g += `\n  <text x="${x2 + barW / 2}" y="${bottom - h2 - 5}" text-anchor="middle" font-size="9" fill="#e8e8e8" font-family="Inter,sans-serif">${fmtNum(r.value2)}</text>`;
     }
     g += `\n  <text x="${cx}" y="${bottom + 14}" text-anchor="middle" font-size="9.5" fill="#9a9a9a" font-family="Inter,sans-serif">${esc(String(r.label).slice(0, 10))}</text>`;
   });
@@ -107,13 +107,13 @@ function lineChart({ rows, title, unit }) {
   for (let i = 0; i <= 4; i++) {
     const yy = bottom - ((bottom - top) * i) / 4;
     g += `\n  <line x1="46" y1="${yy}" x2="${W - 14}" y2="${yy}" stroke="#222a36" stroke-width="1"/>`;
-    g += `\n  <text x="40" y="${yy + 3}" text-anchor="end" font-size="9" fill="#7a828e" font-family="JetBrains Mono,monospace">${fmtNum((max * i) / 4)}</text>`;
+    g += `\n  <text x="40" y="${yy + 3}" text-anchor="end" font-size="9" fill="#7a828e" font-family="Inter,sans-serif">${fmtNum((max * i) / 4)}</text>`;
   }
   const path = (key) => rows.map((r, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(key === 1 ? r.value : (r.value2 ?? 0)).toFixed(1)}`).join(' ');
   g += `\n  <path d="${path(1)}" fill="none" stroke="${PALETTE[0]}" stroke-width="2.2" stroke-linejoin="round"/>`;
   rows.forEach((r, i) => {
     g += `\n  <circle cx="${x(i)}" cy="${y(r.value)}" r="3" fill="${PALETTE[0]}"/>`;
-    if (i === rows.length - 1) g += `\n  <text x="${Math.min(x(i), W - 60)}" y="${y(r.value) - 8}" font-size="9" fill="#e8e8e8" font-family="JetBrains Mono,monospace">${fmtNum(r.value)}${unit ? esc(unit) : ''}</text>`;
+    if (i === rows.length - 1) g += `\n  <text x="${Math.min(x(i), W - 60)}" y="${y(r.value) - 8}" font-size="9" fill="#e8e8e8" font-family="Inter,sans-serif">${fmtNum(r.value)}${unit ? esc(unit) : ''}</text>`;
   });
   if (hasSecond) {
     g += `\n  <path d="${path(2)}" fill="none" stroke="${PALETTE[1]}" stroke-width="2.2" stroke-dasharray="5 3"/>`;
@@ -151,7 +151,7 @@ function pieChart({ rows, title, unit }) {
     const pct = Math.round((Math.max(0, r.value) / total) * 100);
     g += `\n  <rect x="268" y="${ly - 8}" width="10" height="10" rx="2" fill="${PALETTE[i % PALETTE.length]}"/>`;
     g += `\n  <text x="284" y="${ly + 1}" font-size="10.5" fill="#e8e8e8" font-family="Inter,sans-serif">${esc(String(r.label).slice(0, 16))}</text>`;
-    g += `\n  <text x="546" y="${ly + 1}" text-anchor="end" font-size="10" fill="#9a9a9a" font-family="JetBrains Mono,monospace">${pct}% · ${fmtNum(r.value)}${unit ? esc(unit) : ''}</text>`;
+    g += `\n  <text x="546" y="${ly + 1}" text-anchor="end" font-size="10" fill="#9a9a9a" font-family="Inter,sans-serif">${pct}% · ${fmtNum(r.value)}${unit ? esc(unit) : ''}</text>`;
   });
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} 240" width="100%" role="img" aria-label="${esc(title)}">${g}\n</svg>`;
 }
