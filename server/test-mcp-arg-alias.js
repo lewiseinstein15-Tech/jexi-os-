@@ -14,7 +14,7 @@ const researchDef = {
   name: 'research',
   inputSchema: {
     type: 'object',
-    properties: { question: { type: 'string' }, max_results: { type: 'number' } },
+    properties: { question: { type: 'string' }, freshness: { type: 'string', enum: ['day', 'week', 'month', 'year'] }, max_results: { type: 'number' } },
     required: ['question'],
   },
 };
@@ -46,6 +46,17 @@ test('type mismatches are not copied', () => {
 test('symmetric: question fills a required query field', () => {
   const def = { name: 'search', inputSchema: { properties: { query: { type: 'string' } }, required: ['query'] } };
   assert.equal(applyMcpArgAliases(def, { question: 'q' }).query, 'q');
+});
+
+test('enum-violating values are pruned so the server default applies (live freshness failure)', () => {
+  const out = applyMcpArgAliases(researchDef, { question: 'x', freshness: 'recent' });
+  assert.equal(out.question, 'x');
+  assert.equal(out.freshness, undefined);
+});
+
+test('valid enum values pass through with the identical object', () => {
+  const args = { question: 'x', freshness: 'week' };
+  assert.equal(applyMcpArgAliases(researchDef, args), args);
 });
 
 test('non-required fields are never invented', () => {

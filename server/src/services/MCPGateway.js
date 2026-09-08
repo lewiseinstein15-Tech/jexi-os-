@@ -609,9 +609,11 @@ function breakerSuccess(server) { breakers.delete(server); }
  * send `query` even when a tool's live schema requires `question`
  * (free-search:research rejects anything else with pydantic validation
  * errors) — so the gateway fills missing required fields from known aliases
- * before the call. Schema-driven (only declared-required fields, only when
- * the value type fits), never blind. Returns the original object when
- * nothing needed filling.
+ * before the call. It also prunes provided values that violate the schema's
+ * own enum (e.g. free-search freshness must be day|week|month|year) — those
+ * can never succeed server-side, so dropping them lets the server default
+ * apply instead of a guaranteed 422. Schema-driven, never blind. Returns
+ * the original object when nothing needed repairing.
  */
 const MCP_ARG_ALIASES = {
   question: ['query', 'q', 'prompt', 'text', 'input'],
@@ -633,7 +635,7 @@ function aliasTypeFits(want, value) {
 export function applyMcpArgAliases(toolDef, args) {
   const schema = toolDef && toolDef.inputSchema ? toolDef.inputSchema : null;
   const required = schema && Array.isArray(schema.required) ? schema.required : [];
-  if (!required.length || !args || typeof args !== 'object') return args;
+  if (!args || typeof args !== 'object' || !schema) return args;
   const props = schema.properties && typeof schema.properties === 'object' ? schema.properties : {};
   let out = null;
   for (const field of required) {
@@ -647,6 +649,16 @@ export function applyMcpArgAliases(toolDef, args) {
         out[field] = v;
         break;
       }
+    }
+  }
+  const src = out || args;
+  for (const [field, spec] of Object.entries(props)) {
+    const allowed = spec && Array.isArray(spec.enum) ? spec.enum : null;
+    if (!allowed || !allowed.length) continue;
+    const v = src[field];
+    if (v !== undefined && v !== null && !allowed.includes(v)) {
+      if (!out) out = { ...args };
+      delete out[field];
     }
   }
   return out || args;
@@ -711,9 +723,13 @@ export async function invokeMcpTool({ server, tool, args = {}, authorized = fals
     breakerSuccess(server);
     return { ok: true, result };
   } catch (e) {
-    conn.failures += 1;
     conn.lastError = String(e && e.message).slice(0, 200);
-    breakerFail(server);
+    // A schema-validation rejection means the ARGS were wrong, not that the
+    // server is down — record it but never let it trip the circuit breaker.
+    if (!/validation error/i.test(conn.lastError)) {
+      conn.failures += 1;
+      breakerFail(server);
+    }
     audit({ type: 'MCP_INVOKE_FAILED', server, tool, error: conn.lastError });
     return { ok: false, error: conn.lastError, circuitOpen: breakerOpen(server) };
   }

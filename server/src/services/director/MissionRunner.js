@@ -332,7 +332,12 @@ Output ONLY JSON:
         mcpMenu = `# AVAILABLE LIVE SERVICES (capability-routed for this mission)\n${sel.schemas.map((sc) => {
           const name = sc.function.name.replace(/^mcp__/, '').replace('__', ' \u00b7 ');
           const argSpec = Object.entries(sc.function.parameters.properties || {})
-            .map(([k, v]) => `${k}${v.type === 'number' ? ':number' : ''}${Array.isArray(sc.function.parameters.required) && sc.function.parameters.required.includes(k) ? ' (required)' : ''}`)
+            .map(([k, v]) => {
+              const req = Array.isArray(sc.function.parameters.required) && sc.function.parameters.required.includes(k) ? ' (required)' : '';
+              const num = v.type === 'number' ? ':number' : '';
+              const en = v && Array.isArray(v.enum) && v.enum.length ? ` (= ${v.enum.slice(0, 8).join('|')})` : '';
+              return `${k}${num}${req}${en}`;
+            })
             .join(', ');
           return `- ${name}${argSpec ? ` \u2014 args: ${argSpec}` : ''}`;
         }).join('\n')}\nPrefer the simplest single call that answers the need (e.g. weather: get_weather_summary with city_name).\nData from these services is REAL \u2014 prefer it over web search for its domain.`;
