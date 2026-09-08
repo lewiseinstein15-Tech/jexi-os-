@@ -627,6 +627,10 @@ app.get('/api/settings/status', (req, res) => {
     sambanova: statusOf(['SAMBANOVA_API_KEY'], 'sambanovaKey'),
     tavily: statusOf(['TAVILY_API_KEY'], 'tavilyKey'),
     brave: statusOf(['BRAVE_API_KEY'], 'braveKey'),
+    cloudflare: statusOf(['CLOUDFLARE_API_TOKEN'], 'cloudflareKey'), // + CLOUDFLARE_ACCOUNT_ID
+    pollinations: (process.env.POLLINATIONS_API_KEY || settings.pollinationsKey)
+      ? { configured: true, source: process.env.POLLINATIONS_API_KEY ? 'env-key' : 'settings-key' }
+      : { configured: true, source: 'keyless' }, // always-on last resort
   });
 });
 

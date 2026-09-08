@@ -37,6 +37,9 @@ export function resolveKeys() {
     deepseekKey: process.env.DEEPSEEK_API_KEY || settings.deepseekKey || '',
     nvidiaKey: process.env.NVIDIA_API_KEY || settings.nvidiaKey || '',
     sambanovaKey: process.env.SAMBANOVA_API_KEY || settings.sambanovaKey || '',
+    pollinationsKey: process.env.POLLINATIONS_API_KEY || settings.pollinationsKey || '',
+    cloudflareKey: process.env.CLOUDFLARE_API_TOKEN || settings.cloudflareKey || '',
+    cloudflareAccount: process.env.CLOUDFLARE_ACCOUNT_ID || settings.cloudflareAccount || '',
   };
 }
 
@@ -205,6 +208,23 @@ export const OPENROUTER_FREE_TEXT_MODELS = ['nvidia/nemotron-3-super-120b-a12b:f
 export const HF_FREE_QWEN_MODELS = ['Qwen/Qwen2.5-7B-Instruct', 'Qwen/Qwen2.5-Coder-7B-Instruct'];
 // B73 follow-up — free DeepSeek on the HF serverless tier (live-verified 401).
 export const HF_FREE_DEEPSEEK_MODELS = ['deepseek-ai/deepseek-coder-6.7b-instruct', 'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B'];
+
+// ONE-KEY FREE ROUTERS (user request, Sept 2026 — researched, live-verified).
+// Pollinations (github.com/pollinations — MIT, Berlin): one OpenAI-compat
+// endpoint (gen.pollinations.ai/v1) serving many models with NO key for
+// basic use (free registered keys raise limits). Live-verified keyless
+// 2026-09-08: model "openai" (+alias "openai-fast", GPT-OSS 20B) answered.
+// Cloudflare Workers AI: ONE free token → 50+ open models (Llama, Qwen,
+// Mistral, Gemma, DeepSeek-distill, gpt-oss-120b…), 10k neurons/day, no
+// card, OpenAI-compat at /client/v4/accounts/{id}/ai/v1. Pollinations is
+// the keyless last-resort leg: it is NEVER skipped for a missing key.
+const POLLINATIONS_MODELS = ['openai', 'openai-fast'];
+const CLOUDFLARE_MODELS = [
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  '@cf/qwen/qwen3-30b-a3b-fp8',
+  '@cf/google/gemma-4-26b-a4b-it',
+  '@cf/openai/gpt-oss-120b',
+];
 
 // B75 — no-card free AI providers (research: GitHub Models was RETIRED on
 // 2026-07-30, so the no-card frontier tier is NVIDIA NIM + SambaNova + the
@@ -454,6 +474,16 @@ async function tryOpenRouter(prompt, system, imageBase64, opts, errors) {
  */
 const tryHuggingFace = (p, s, img, o, e) =>
   tryOpenAICompat({ key: resolveKeys().hfKey, baseUrl: 'https://router.huggingface.co/v1', models: o.model ? [o.model] : HF_TEXT_MODELS, label: 'HuggingFace', providerKey: 'huggingface' }, p, s, img, o, e);
+// Pollinations: keyless by design — a missing key sends a dummy bearer
+// (proven accepted: the OpenWebUI guide connects with Key "dummy-key").
+const tryPollinations = (p, s, img, o, e) =>
+  tryOpenAICompat({ key: resolveKeys().pollinationsKey || 'pollinations-keyless', baseUrl: 'https://gen.pollinations.ai/v1', models: o.model ? [o.model] : POLLINATIONS_MODELS, label: 'Pollinations', providerKey: 'pollinations' }, p, s, img, o, e);
+// Cloudflare Workers AI: needs BOTH the free API token and the account ID.
+const tryCloudflare = (p, s, img, o, e) => {
+  const k = resolveKeys();
+  if (!k.cloudflareKey || !k.cloudflareAccount) return null;
+  return tryOpenAICompat({ key: k.cloudflareKey, baseUrl: `https://api.cloudflare.com/client/v4/accounts/${k.cloudflareAccount}/ai/v1`, models: o.model ? [o.model] : CLOUDFLARE_MODELS, label: 'Cloudflare', providerKey: 'cloudflare' }, p, s, img, o, e);
+};
 
 /**
  * Generic OpenAI-compatible chat-completions caller — Cerebras, DeepInfra and
@@ -667,6 +697,8 @@ const PROVIDER_CALLS = {
   nvidia: tryNvidia,
   sambanova: trySambaNova,
   vllm: tryVllm,
+  cloudflare: tryCloudflare,
+  pollinations: tryPollinations,
 };
 
 /**
@@ -826,7 +858,7 @@ async function __generateWalk(prompt, systemInstruction, imageBase64, opts) {
   if (keys.length > 0) {
     throw new Error(`All AI providers failed. ${errors.join(' | ')}`);
   }
-  throw new Error('No API keys configured. Add a key in Settings (Groq, Gemini, OpenRouter, Cerebras, DeepInfra, Mistral, Grok, DeepSeek or HuggingFace), or set the matching env var in Render.');
+  throw new Error('No AI provider answered (tried the keyless Pollinations leg too). Add a key in Settings (Groq, Gemini, OpenRouter, Cloudflare, Cerebras, DeepInfra, Mistral, Grok, DeepSeek or HuggingFace), or set the matching env var in Render.');
 }
 
 /** Ask the LLM a yes/no or one-word verification question. */

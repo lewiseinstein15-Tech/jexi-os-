@@ -29,7 +29,7 @@ const health = new Map();
  * provider is measured on THIS host, route by well-known tier speed —
  * Groq is the fastest free tier, Gemini next, OpenRouter free models are the
  * slowest lane. First call after a cold start no longer fumbles the order. */
-const LATENCY_PRIORS_MS = { groq: 1200, gemini: 2500, openrouter: 8000, mistral: 4000, nvidia: 4000, sambanova: 3000, vllm: 3000, huggingface: 20000 };
+const LATENCY_PRIORS_MS = { groq: 1200, gemini: 2500, openrouter: 8000, mistral: 4000, nvidia: 4000, sambanova: 3000, vllm: 3000, huggingface: 20000, cloudflare: 3500, pollinations: 6000 };
 
 function h(key) {
   if (!health.has(key)) health.set(key, { fails: 0, lastFail: 0, cooldownUntil: 0, calls: 0, ok: 0, latencyEma: null, lastLatency: null });
@@ -111,11 +111,14 @@ export function markProviderUnavailable(key, minutes = 60) {
  * B77 — FREE-ONLY extras. The payment-gated providers (cerebras, deepinfra,
  * xai, deepseek, sambanova — all live-probed 402/403) were REMOVED from this
  * list so the router can never attempt them. Only the live-verified free
- * tiers remain: Mistral (Experiment free tier) and NVIDIA NIM (no-card free
- * key, DeepSeek V4 Flash). The provider code still exists in LLMClient for
- * anyone who later funds an account — re-adding here is a one-line change.
+ * tiers remain: Mistral (Experiment free tier), NVIDIA NIM (no-card free
+ * key, DeepSeek V4 Flash) and Cloudflare Workers AI (one free token →
+ * 50+ open models). Pollinations rides AFTER huggingface on every ladder
+ * as the keyless last resort. The provider code still exists in LLMClient
+ * for anyone who later funds an account — re-adding here is a one-line
+ * change.
  */
-const EXTRA_PROVIDERS = ['mistral', 'nvidia'];
+const EXTRA_PROVIDERS = ['mistral', 'nvidia', 'cloudflare'];
 
 /* B172 — SPEED-AWARE ROUTING (replaces B77's random rotation). DSH's
  * delegate-router principle: route by MEASURED latency, deterministically.
@@ -156,10 +159,10 @@ export function providerOrder(prefer = '') {
   const ollama = ollamaFirst ? ['ollama'] : [];
   const base =
     prefer === 'gemini'
-      ? [...ollama, 'gemini', 'groq', 'openrouter', ...EXTRA_PROVIDERS, 'vllm', 'huggingface']
+      ? [...ollama, 'gemini', 'groq', 'openrouter', ...EXTRA_PROVIDERS, 'vllm', 'huggingface', 'pollinations']
       : prefer === 'openrouter'
-        ? [...ollama, 'openrouter', 'groq', 'gemini', ...EXTRA_PROVIDERS, 'vllm', 'huggingface']
-        : [...ollama, 'groq', 'gemini', 'openrouter', ...EXTRA_PROVIDERS, 'vllm', 'huggingface'];
+        ? [...ollama, 'openrouter', 'groq', 'gemini', ...EXTRA_PROVIDERS, 'vllm', 'huggingface', 'pollinations']
+        : [...ollama, 'groq', 'gemini', 'openrouter', ...EXTRA_PROVIDERS, 'vllm', 'huggingface', 'pollinations'];
 
   const healthy = base.filter((k) => !providerInCooldown(k));
   const cooling = base.filter((k) => providerInCooldown(k));
@@ -190,6 +193,7 @@ const ENV_MAP = {
   nvidia: 'NVIDIA_API_KEY',
   // B74 — vLLM has no API key; "configured" = a VLLM_BASE_URL is set.
   vllm: 'VLLM_BASE_URL',
+  cloudflare: 'CLOUDFLARE_API_TOKEN',
 };
 
 /** Which providers have keys configured right now (no secrets exposed). */
@@ -198,6 +202,8 @@ export function configuredProviders() {
   // ARENA Phase 6 — Ollama is "configured" when MODEL_PROVIDER=ollama (it
   // needs no key, only an endpoint). Reported honestly in health views.
   if (String(process.env.MODEL_PROVIDER || '').toLowerCase() === 'ollama' && !list.includes('ollama')) list.push('ollama');
+  // Pollinations is keyless: always available as the last-resort leg.
+  if (!list.includes('pollinations')) list.push('pollinations');
   return list;
 }
 
@@ -208,6 +214,8 @@ export function providerHealthSnapshot() {
     groq: 'Groq', gemini: 'Gemini', openrouter: 'OpenRouter', huggingface: 'HuggingFace',
     mistral: 'Mistral', nvidia: 'NVIDIA NIM',
     vllm: 'vLLM (self-hosted)',
+    cloudflare: 'Cloudflare Workers AI',
+    pollinations: 'Pollinations (keyless)',
     ollama: `Ollama (local, ${process.env.OLLAMA_HOST || 'http://127.0.0.1:11434'})`,
   };
   // B77 — compute the order ONCE (it rotates, so a second call could change
