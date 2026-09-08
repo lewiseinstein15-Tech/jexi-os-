@@ -15,6 +15,7 @@ import { loadSkillForModel } from './SkillDiscovery.js';
 import { listPluginTools } from './PluginContext.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { listWorkspace } from './WorkspaceRuntime.js';
+import { WORKSPACE_DIR } from '../config.js';
 
 const MAX_ITERATIONS = 12;
 
@@ -43,7 +44,11 @@ export async function runAutonomousCoding({ query, convId = null, sendEvent = ()
   const schemas = buildNativeSchemas(defs);
 
   const skill = loadSkillForModel('coder');
-  const system = await assemblePrompt({ convId, codeMode: false, presetFlavor: '' })
+  // M4 — the coder sees a bounded map of its own staging area (exactly
+  // what its tools see), and the compile stats ride home in `statistics`.
+  // Empty/missing staging area maps to '' — the section simply disappears.
+  const contextStats = {};
+  const system = await assemblePrompt({ convId, codeMode: false, presetFlavor: '', repoRoot: WORKSPACE_DIR, stats: contextStats })
     + (skill ? `\n## CODER SKILL (loaded)\n${String(skill.content).slice(0, 6000)}\n` : '');
 
   const toolContext = [];
@@ -163,6 +168,9 @@ export async function runAutonomousCoding({ query, convId = null, sendEvent = ()
       confidence: success ? 88 : 0,
       toolCalls: toolContext.length,
       fileCount: uniqueFiles.length,
+      contextChars: contextStats.chars ?? null,
+      contextTokens: contextStats.tokens ?? null,
+      contextTrimmed: contextStats.trimmed ?? [],
     },
   };
 }

@@ -28,6 +28,7 @@ import { recentSessionsBlock } from './SessionConversations.js';
 import { todoList } from './TodoStore.js';
 import { planGet } from './PlanStore.js';
 import { PLAN_POLICY_SECTION } from './PlanMode.js';
+import { compileSections, getCachedRepoMap } from './ContextEngine.js'; // M4 — budget enforcement + repo map
 
 /* ---------------- live-state sections (dsh todo/plan/goal injection) ---- */
 
@@ -99,31 +100,39 @@ export async function assemblePrompt({
   base = null,
   normalMode = false,
   userText = null, // B160 — raw user message; @file mentions become file references
+  repoRoot = null, // M4 — workspace root for the bounded repo-map section
+  budget = null, // M4 — total budget override { maxChars, maxTokens, perSection }
+  stats = null, // M4 — optional object filled with { chars, tokens, trimmed, kept }
 } = {}) {
   const sections = [];
+  const push = (name, content, keep = false) => {
+    const text = String(content || '').trim();
+    if (text) sections.push({ name, content: text, keep });
+  };
 
   // -100 persona + core principles (single source: the canonical system prompt).
-  sections.push(base || (normalMode ? JEXI_NORMAL_PROMPT : JEXI_SYSTEM_PROMPT));
+  const persona = base || (normalMode ? JEXI_NORMAL_PROMPT : JEXI_SYSTEM_PROMPT);
+  push('persona', persona, true);
 
   // -90 agent instructions: project knowledge is embedded in the core prompt
   // (loadProjectKnowledge in JEXI_SYSTEM_PROMPT) — nothing extra here.
 
   // -80 time context (idempotent with the LLMClient fallback).
   const tz = timeContextBlock();
-  if (!sections[sections.length - 1].includes('Current date and time:')) sections.push(tz);
+  if (!String(persona).includes('Current date and time:')) push('time', tz);
 
   // -75 terminal context (B138 — dsh tmux-context): only when JEXI runs
   // inside a tmux session; empty elsewhere (never injected).
   try {
     const { tmuxContextBlock } = await import('./TmuxContext.js');
     const tmux = tmuxContextBlock();
-    if (tmux) sections.push(tmux);
+    if (tmux) push('tmux', tmux);
   } catch { /* noop */ }
 
   // -70 session references (past conversations).
   if (includeSessionRefs && convId) {
     const refs = recentSessionsBlock(convId, 5);
-    if (refs) sections.push(refs);
+    if (refs) push('sessions', refs);
   }
 
   // -72 file references (B160 — dsh file-reference/file-reference-local):
@@ -135,7 +144,7 @@ export async function assemblePrompt({
       const mentioned = parseFileReferences(userText);
       if (mentioned.length) {
         const snap = renderFileReferenceSnapshot(mentioned);
-        if (snap.text) sections.push(snap.text);
+        if (snap.text) push('files', snap.text);
       }
     } catch { /* file references are best-effort */ }
   }
@@ -149,14 +158,23 @@ export async function assemblePrompt({
     try {
       const { projectedConversationBlock } = await import('./SessionProjection.js');
       const tail = projectedConversationBlock(convId, { maxChars: 4000 });
-      if (tail) sections.push(tail);
+      if (tail) push('thread', tail);
     } catch { /* the tail must never break the prompt */ }
   }
 
   // -60 skill catalog (metadata only).
   if (includeSkills) {
     const skills = buildSkillCatalog(30);
-    if (skills) sections.push(skills);
+    if (skills) push('skills', skills);
+  }
+
+  // -58 repo map (M4): bounded tree of the caller's workspace, cached by
+  // mtime. Only when the caller passes repoRoot — otherwise absent.
+  if (repoRoot) {
+    try {
+      const map = getCachedRepoMap(repoRoot);
+      if (map) push('repo', `Working repo (bounded map — read files with tools for full content):\n${map}`);
+    } catch { /* the repo map must never break the prompt */ }
   }
 
   // -55 project instructions (B136 — dsh agent-instructions): AGENTS.md
@@ -168,7 +186,7 @@ export async function assemblePrompt({
       const inst = loadBaselineInstructionSet();
       const block = renderInstructionsBlock(inst);
       if (block) {
-        sections.push(block);
+        push('instructions', block, true);
         markInstructionsSeen(inst);
       }
     } catch { /* the instructions section must never break the prompt */ }
@@ -177,27 +195,37 @@ export async function assemblePrompt({
   // -50 live state: todo + plan + goal.
   if (includeState) {
     const todo = todoStateBlock();
-    if (todo) sections.push(todo);
+    if (todo) push('todo', todo);
     const plan = planStateBlock();
-    if (plan) sections.push(plan);
+    if (plan) push('plan', plan);
     const goal = goalStateBlock();
-    if (goal) sections.push(goal);
+    if (goal) push('goal', goal);
   }
 
   // -40 tool guidance: code-mode SDK.
   if (codeMode && codeTools && codeTools.length) {
     const { renderToolsSdk } = await import('./CodeModeRuntime.js');
-    sections.push(`\n${renderToolsSdk(codeTools)}\n`);
+    push('tools-sdk', renderToolsSdk(codeTools), true);
   }
 
   // -30 preset flavor.
-  if (presetFlavor) sections.push(`\n${presetFlavor}\n`);
+  if (presetFlavor) push('flavor', presetFlavor);
 
   // -20 preferences.
-  sections.push(preferencesBlock());
+  push('preferences', preferencesBlock());
 
   // -10 policy (plan mode).
-  if (planMode) sections.push(`\n${PLAN_POLICY_SECTION}\n`);
+  if (planMode) push('policy', PLAN_POLICY_SECTION, true);
 
-  return sections.join('\n');
+  // M4 — total budget enforcement: lowest-priority sections drop first,
+  // `keep` sections survive (clipped at most). Defaults hold the whole
+  // system prompt under ~24k chars / ~8k tokens.
+  const compiled = compileSections(sections, budget || {});
+  if (stats && typeof stats === 'object') {
+    stats.chars = compiled.chars;
+    stats.tokens = compiled.tokens;
+    stats.trimmed = compiled.trimmed;
+    stats.kept = compiled.kept;
+  }
+  return compiled.text;
 }
