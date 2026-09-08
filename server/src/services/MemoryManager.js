@@ -50,7 +50,10 @@ const CAPS = { internetKnowledge: 150, codingKnowledge: 100, learnedAnswers: 100
 
 let cache = null;
 let redisClient = null;
-let redisEnabled = Boolean(process.env.REDIS_URL);
+// Durable layer on/off. Turso (TURSO_URL) is the preferred backend since Sept
+// 2026; legacy REDIS_URL still works when Turso is unset. The `redis*` names
+// below are historic — the layer is backend-blind (see resolveDurableMode).
+let redisEnabled = Boolean(process.env.TURSO_URL || process.env.REDIS_URL);
 let consolidated = false; // run the merge pass once per process (on boot)
 
 /* ------------------------------------------------------------------ */
@@ -120,6 +123,7 @@ export function memoryPersistenceProbe() {
       try { return fs.readdirSync(SESSIONS_DIR).filter((f) => f.endsWith('.json')).length; } catch (e) { return 0; }
     })();
     const redisConfigured = Boolean(process.env.REDIS_URL);
+    const tursoConfigured = Boolean(process.env.TURSO_URL);
     return {
       dataDir: DATA_DIR,
       instance: id,
@@ -127,15 +131,19 @@ export function memoryPersistenceProbe() {
       persistentDisk: previous.length > 0, // evidence-based, not assumed
       persistent: previous.length > 0, // B158 — disk-only summary (the child probe ORs in Redis proof)
       redisConfigured, // B68 — a free-tier alternative: REDIS_URL survives restarts without a disk
+      tursoConfigured, // Sept 2026 — Turso is the preferred durable layer (REDIS_URL = legacy fallback)
       // B158 — sync summary (the async boot-stamp probe enriches this to
       // { configured, connected, previousBootsSeen } in the probe child).
       redis: { configured: redisConfigured },
+      durable: { configured: tursoConfigured || redisConfigured, mode: resolveDurableMode() },
       sessionCount,
       note: previous.length > 0
         ? 'previous boot stamps survived — the memory directory is persistent across restarts'
-        : redisConfigured
-          ? 'no disk stamps found, but REDIS_URL is configured — memory persists via Redis across restarts (see the redis field in /api/health/memory)'
-          : 'no previous boot stamps found — disk persistence not yet proven (mount a persistent disk at DATA_DIR on Render, or set REDIS_URL for cross-restart memory)',
+        : tursoConfigured
+          ? 'no disk stamps found, but TURSO_URL is configured — memory persists via Turso across restarts (see the durable field in /api/health/memory)'
+          : redisConfigured
+            ? 'no disk stamps found, but REDIS_URL is configured — memory persists via Redis across restarts (see the redis field in /api/health/memory)'
+            : 'no previous boot stamps found — disk persistence not yet proven (mount a persistent disk at DATA_DIR on Render, or set TURSO_URL for cross-restart memory)',
     };
   } catch (e) {
     return { dataDir: DATA_DIR, error: (e && e.message) || String(e), persistentDisk: false };
@@ -172,6 +180,32 @@ export function resolveRedisMode() {
   if (!url) return 'none';
   return isRestRedisUrl(url) ? 'rest' : 'tcp';
 }
+
+/**
+ * TURSO MODE (Sept 2026 — the Upstash DB is gone; Turso is the durable
+ * layer). TURSO_URL is libsql://… (+ TURSO_TOKEN) and is preferred over
+ * REDIS_URL when both are set. Same adapter surface as the Redis modes
+ * (get/set/del/keys/ping/connect/disconnect) so every caller stays blind.
+ */
+export function tursoUrl() {
+  return normalizeRedisUrl(process.env.TURSO_URL); // normalize is scheme-agnostic: trim + strip wrapping quotes
+}
+export function tursoToken() {
+  return process.env.TURSO_TOKEN || process.env.TURSO_AUTH_TOKEN || '';
+}
+export function isTursoUrl(url) {
+  const u = String(url || '').trim();
+  return /^libsql:\/\//i.test(u) || /^https?:\/\/[^/]*\.turso\.io(\/|$)/i.test(u);
+}
+/** 'turso' | 'rest' | 'tcp' | 'none' — pure (tested). Turso wins when both set. */
+export function resolveDurableMode() {
+  if (tursoUrl()) return 'turso';
+  return resolveRedisMode();
+}
+/** The durable-layer URL: Turso first, legacy REDIS_URL second. */
+function durableUrl() {
+  return tursoUrl() || normalizeRedisUrl(process.env.REDIS_URL);
+}
 /** Wrap an @upstash/redis client in the ioredis-shaped surface JEXI uses.
  *  `client` is injected so tests run hermetic (no network). */
 export function createRestAdapter(client) {
@@ -192,10 +226,98 @@ export function createRestAdapter(client) {
     disconnect: () => {},
   };
 }
-/** One factory for BOTH modes: TCP (ioredis) or REST (Upstash HTTPS).
+
+/** Bound any durable-layer op so a hung backend can never hang boot/chat. */
+function withDurableTimeout(promise, ms, op) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`durable ${op} timed out after ${ms} ms`)), ms);
+    promise.then(
+      (v) => { clearTimeout(t); resolve(v); },
+      (e) => { clearTimeout(t); reject(e); },
+    );
+  });
+}
+
+const TURSO_TABLE = 'jexi_kv';
+const TURSO_SCHEMA = `CREATE TABLE IF NOT EXISTS ${TURSO_TABLE} (k TEXT PRIMARY KEY, v TEXT, exp INTEGER)`;
+const TURSO_OP_TIMEOUT_MS = (() => {
+  const n = parseInt(process.env.JEXI_TURSO_OP_TIMEOUT_MS || '8000', 10);
+  return Number.isFinite(n) && n > 0 ? n : 8000;
+})(); // JEXI_TURSO_OP_TIMEOUT_MS: tests shrink this; prod keeps 8s
+
+/** Wrap a libsql client in the ioredis-shaped surface JEXI uses.
+ *  `client` is injected so tests run hermetic (no network). EX expiry is
+ *  lazy (enforced on read/keys; expired rows are deleted on sight). */
+export function createTursoAdapter(client) {
+  const pick = (row, name, idx) => {
+    if (Array.isArray(row)) return row[idx];
+    return row ? row[name] : undefined;
+  };
+  const parseEx = (args) => {
+    let ex;
+    for (let i = 0; i < args.length; i++) {
+      if (String(args[i]).toUpperCase() === 'EX' && args[i + 1] != null) ex = parseInt(args[i + 1], 10);
+    }
+    return Number.isFinite(ex) ? ex : undefined;
+  };
+  const run = (op, fn) => withDurableTimeout(Promise.resolve().then(fn), TURSO_OP_TIMEOUT_MS, `turso-${op}`);
+  return {
+    __turso: true,
+    get: (k) => run('get', async () => {
+      const r = await client.execute({ sql: `SELECT v, exp FROM ${TURSO_TABLE} WHERE k = ?`, args: [String(k)] });
+      const row = (r.rows || [])[0];
+      if (!row) return null;
+      const exp = pick(row, 'exp', 1);
+      if (exp != null && Number(exp) <= Date.now()) {
+        client.execute({ sql: `DELETE FROM ${TURSO_TABLE} WHERE k = ?`, args: [String(k)] }).catch(() => {});
+        return null;
+      }
+      const v = pick(row, 'v', 0);
+      return v == null ? null : String(v);
+    }),
+    set: (k, v, ...args) => run('set', async () => {
+      const ex = parseEx(args);
+      const exp = ex === undefined ? null : Date.now() + ex * 1000;
+      await client.execute({ sql: `INSERT OR REPLACE INTO ${TURSO_TABLE} (k, v, exp) VALUES (?, ?, ?)`, args: [String(k), String(v), exp] });
+      return 'OK';
+    }),
+    del: (...ks) => run('del', async () => {
+      const keys = ks.flat().map(String).filter(Boolean);
+      if (!keys.length) return 0;
+      const r = await client.execute({ sql: `DELETE FROM ${TURSO_TABLE} WHERE k IN (${keys.map(() => '?').join(',')})`, args: keys });
+      return Number(r.rowsAffected ?? 0);
+    }),
+    keys: (pattern) => run('keys', async () => {
+      const now = Date.now();
+      const p = String(pattern || '');
+      let r;
+      if (p.endsWith('*')) {
+        const prefix = p.slice(0, -1).replace(/[%_\\]/g, (c) => `\\${c}`);
+        r = await client.execute({ sql: `SELECT k FROM ${TURSO_TABLE} WHERE k LIKE ? ESCAPE '\\' AND (exp IS NULL OR exp > ?)`, args: [`${prefix}%`, now] });
+      } else {
+        r = await client.execute({ sql: `SELECT k FROM ${TURSO_TABLE} WHERE k = ? AND (exp IS NULL OR exp > ?)`, args: [p, now] });
+      }
+      return (r.rows || []).map((row) => String(pick(row, 'k', 0)));
+    }),
+    ping: async () => 'PONG',
+    connect: async () => {},
+    disconnect: () => {},
+  };
+}
+/** One factory for ALL modes: Turso (libsql/HTTPS) > REST (Upstash HTTPS) > TCP (ioredis).
  *  `tcpOpts` overrides the default ioredis options (the boot probe keeps its
  *  original tighter settings — B68 timeout semantics depend on them). */
 async function connectRedisClient(url, tcpOpts = {}) {
+  if (isTursoUrl(url)) {
+    const token = tursoToken();
+    if (!token) throw new Error('TURSO_URL is set — also set TURSO_TOKEN (Turso dashboard → database → API tokens).');
+    const { createClient } = await import('@libsql/client');
+    const libsql = createClient({ url, authToken: token });
+    // Schema + liveness in one bounded round trip (bad token/sleeping DB
+    // surfaces here, inside the B218 retry budget — never hangs a boot).
+    await withDurableTimeout(libsql.execute(TURSO_SCHEMA), TURSO_OP_TIMEOUT_MS, 'turso-init-schema');
+    return createTursoAdapter(libsql);
+  }
   if (isRestRedisUrl(url)) {
     const token = redisRestToken();
     if (!token) throw new Error('REDIS_URL is an Upstash REST URL (https://…) — also set REDIS_TOKEN (Upstash dashboard → REST API → token).');
@@ -218,6 +340,10 @@ async function connectRedisClient(url, tcpOpts = {}) {
  * of bare TypeErrors. Allowed: redis:// rediss:// or a bare host:port.
  */
 function validateRedisUrl(url) {
+  if (isTursoUrl(url)) {
+    if (!tursoToken()) throw new Error('TURSO_URL is set — also set TURSO_TOKEN (Turso dashboard → database → API tokens).');
+    return true;
+  }
   const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//.exec(url);
   if (scheme && ['http', 'https'].includes(scheme[1].toLowerCase())) {
     if (!redisRestToken()) throw new Error('REDIS_URL is an Upstash REST URL (https://…) — also set REDIS_TOKEN (Upstash dashboard → REST API → token).');
@@ -244,7 +370,7 @@ function validateRedisUrl(url) {
  * even without a persistent disk (Render free tier).
  */
 export async function redisBootProbe() {
-  const url = normalizeRedisUrl(process.env.REDIS_URL);
+  const url = durableUrl();
   if (!url) return { configured: false, connected: false, previousBootsSeen: [] };
   const id = process.env.RENDER_INSTANCE_ID || process.env.POD_NAME || `boot-${Math.random().toString(36).slice(2, 10)}`;
   let r = null;
@@ -282,14 +408,15 @@ export async function redisBootProbe() {
  * (which has no persistent disks).
  */
 export async function probeRedis() {
-  if (!process.env.REDIS_URL) return { configured: false, active: false };
+  const mode = resolveDurableMode();
+  if (mode === 'none') return { configured: false, active: false, mode };
   const r = await getRedis();
-  if (!r) return { configured: true, active: false, error: 'Redis client failed to init' };
+  if (!r) return { configured: true, active: false, mode, error: 'Durable client failed to init' };
   try {
     const pong = await r.ping();
-    return { configured: true, active: pong === 'PONG' };
+    return { configured: true, active: pong === 'PONG', mode };
   } catch (e) {
-    return { configured: true, active: false, error: (e && e.message) || String(e) };
+    return { configured: true, active: false, mode, error: (e && e.message) || String(e) };
   }
 }
 
@@ -304,7 +431,7 @@ export async function getRedis() {
   if (!redisEnabled) return null;
   if (redisClient) return redisClient;
   try {
-    redisClient = await connectRedisClient(normalizeRedisUrl(process.env.REDIS_URL)); // B158 — tolerate whitespace/quoted mis-pastes
+    redisClient = await connectRedisClient(durableUrl()); // B158 — tolerate whitespace/quoted mis-pastes
     return redisClient;
   } catch (e) {
     console.error('[Memory] Redis client failed to init, using local file only:', e.message);
@@ -379,7 +506,7 @@ async function redisPush(memory) {
   catch (e) { console.error('[Memory] Redis write failed:', e.message); }
 }
 
-/** True when a Redis layer is configured (used by the load-balancer health check). */
+/** True when the durable layer (Turso preferred, legacy Redis fallback) is up — used by the load-balancer health check. Name is historic. */
 export function isRedisActive() {
   return redisEnabled && !!redisClient;
 }
@@ -400,13 +527,17 @@ export function closeRedis() {
  * proven failure; 'down' = configured but the client is not connected.
  */
 export function redisConnectionInfo() {
-  if (!process.env.REDIS_URL) return { configured: false, status: 'unset' };
-  if (!redisEnabled) return { configured: true, status: 'off', error: 'disabled after a connection failure this process' };
-  if (!redisClient) return { configured: true, status: 'connecting' };
+  const mode = resolveDurableMode();
+  if (mode === 'none') return { configured: false, status: 'unset', mode };
+  if (!redisEnabled) return { configured: true, status: 'off', mode, error: 'disabled after a connection failure this process' };
+  if (!redisClient) return { configured: true, status: 'connecting', mode };
+  // HTTP adapters (Turso/REST) have no .status field — a live client IS ready
+  // (previously REST wrongly reported 'down' here).
+  if (redisClient.__turso || redisClient.__rest) return { configured: true, status: 'ready', mode };
   const st = String(redisClient.status || 'unknown');
-  if (st === 'ready') return { configured: true, status: 'ready' };
-  if (st === 'connecting' || st === 'connect' || st === 'reconnecting' || st === 'wait') return { configured: true, status: 'connecting' };
-  return { configured: true, status: 'down', error: `client status: ${st}` };
+  if (st === 'ready') return { configured: true, status: 'ready', mode };
+  if (st === 'connecting' || st === 'connect' || st === 'reconnecting' || st === 'wait') return { configured: true, status: 'connecting', mode };
+  return { configured: true, status: 'down', mode, error: `client status: ${st}` };
 }
 
 /* ---------------- Local JSON store ---------------- */

@@ -55,6 +55,7 @@ import {
   resolveConversationalQuery,
   // B66 — per-session conversation memory + persistence probe
   setActiveSession, clearActiveSession, memoryPersistenceProbe, probeRedis,
+  resolveDurableMode,
 } from './src/services/MemoryManager.js';
 import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
 import { discoverTools } from './src/services/ToolDiscovery.js'; // B223 — Part 20 discovery
@@ -122,7 +123,7 @@ import { openSessionPersistence } from './src/services/SessionPersistenceSqlite.
 import { loadPlugins, setActivePluginContext } from './src/services/PluginContext.js';
 import { startSkillWatcher } from './src/services/SkillDiscovery.js';
 
-// If REDIS_URL is set, pull JEXI's memory core from Redis so she remembers
+// If a durable layer is set (TURSO_URL preferred, REDIS_URL legacy), pull JEXI's memory core from it so she remembers
 // everything across restarts/redeploys (non-blocking).
 hydrateFromRedis().catch((e) => { recordError('memory', (e && e.message) || String(e)); });
 
@@ -2489,6 +2490,7 @@ app.get('/api/health', (req, res) => {
     instanceId: INSTANCE_ID,
     uptime: Math.round(process.uptime()),
     redis: isRedisActive(),
+    durable: { backend: resolveDurableMode(), active: isRedisActive() },
     port: PORT,
     providers: providerHealthSnapshot(),
     // Round-6 platform & reliability status (aggregates only — no secrets)
