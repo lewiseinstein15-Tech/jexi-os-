@@ -367,7 +367,7 @@ console.log('\n[8] Event vocabulary, chained envelope, router behavior');
   const llmRejects = async () => { attempts++; const e = new Error('429 rate limited'); e.status = 429; throw e; };
   try { await runWithModel(empl, 'research', llmRejects, { onEvent: (e) => events.push(e) }); } catch { /* expected */ }
   check('MODEL_PROVIDER_FAILED was evented on lane failure', events.some((e) => e.type === 'MODEL_PROVIDER_FAILED'));
-  check('a failing lane is climbed (bounded by the 9-rung ladder), not retried forever', attempts >= 2 && attempts <= 9);
+  check('a failing lane is climbed (bounded by the 10-rung ladder), not retried forever', attempts >= 2 && attempts <= 10);
   check('each failed lane emitted its own MODEL_PROVIDER_FAILED', events.filter((e) => e.type === 'MODEL_PROVIDER_FAILED').length === attempts);
 
   const before = attempts;
