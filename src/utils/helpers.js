@@ -90,6 +90,9 @@ export const backendErrorMessage = (error, backendUrl = '') => {
   if (status === 401) {
     return '🔒 The backend is locked. Open Settings → System and paste your JEXI access key (the exact value of JEXI_API_KEY set on Render), then try again.';
   }
+  if (status === 429) {
+    return '⏳ JEXI is rate-limited right now (too many requests at once). Wait about a minute and try again — nothing is broken, she is just busy.';
+  }
   // A fetch that never got a response (no status) fails with TypeError
   // 'Failed to fetch' / 'fetch failed' / 'NetworkError' — that's the
   // browser-level CORS block or an unreachable host. Anything else is a real

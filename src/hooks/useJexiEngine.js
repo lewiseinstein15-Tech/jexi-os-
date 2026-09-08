@@ -549,6 +549,25 @@ export const useJexiEngine = () => {
           signal: abortRef.current.signal,
         });
       }
+      // PERMANENT 429 fix: a throttle is BUSY, not dead. Honor Retry-After
+      // and retry once automatically instead of scaring the user.
+      if (res.status === 429) {
+        const ra = Number(res.headers.get('retry-after'));
+        const waitMs = Math.min(Math.max(Number.isFinite(ra) && ra > 0 ? ra * 1000 : 15000, 5000), 60000);
+        setMessages(prev => [...prev, {
+          role: 'jexi', at: Date.now(),
+          text: `⏳ JEXI is busy right now (rate limit) — retrying automatically in ${Math.round(waitMs / 1000)}s…`,
+        }]);
+        await delay(waitMs);
+        if (abortRef.current?.signal.aborted) throw new DOMException('aborted', 'AbortError');
+        abortRef.current = new AbortController();
+        res = await jexiFetch(`${backendUrl}/api/chat`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ query, image: image || undefined, files: attachments || undefined }),
+          signal: abortRef.current.signal,
+        });
+      }
       if (!res.ok && res.status >= 500) {
         // Likely a cold start / host restart mid-request. Tell the user what's
         // happening, wake the brain, and retry once — no scary failure.

@@ -332,8 +332,18 @@ const clientIpKey = (req) => {
   if (typeof xff === 'string' && xff.trim()) return `xff:${xff.split(',')[0].trim().slice(0, 64)}`;
   return `ip:${String(req.ip || 'unknown').slice(0, 64)}`;
 };
-const aiLimiter = rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false, keyGenerator: clientIpKey, message: { error: 'Too many requests — JEXI is throttling to protect your quota. Try again in a minute.' } });
-const generalLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 600, standardHeaders: 'draft-7', legacyHeaders: false, keyGenerator: clientIpKey });
+// Session-first buckets: every real client sends a stable x-jexi-session,
+// so each user gets their OWN budget even behind carrier-grade NAT (one
+// public IP for thousands of phones). Sessions are client-chosen, so a
+// loose IP-only backstop below still bounds rotation abuse.
+const clientBucketKey = (req) => {
+  const sess = req.headers['x-jexi-session'];
+  if (typeof sess === 'string' && /^[A-Za-z0-9_-]{8,80}$/.test(sess.trim())) return `sess:${sess.trim()}`;
+  return clientIpKey(req);
+};
+const aiLimiter = rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false, keyGenerator: clientBucketKey, message: { error: 'Too many requests — JEXI is throttling to protect your quota. Try again in a minute.' } });
+const generalLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 600, standardHeaders: 'draft-7', legacyHeaders: false, keyGenerator: clientBucketKey });
+const ipBackstop = rateLimit({ windowMs: 15 * 60_000, limit: 2000, standardHeaders: 'draft-7', legacyHeaders: false, keyGenerator: clientIpKey });
 app.use(['/api/chat', '/api/vision', '/api/knowledge/search', '/api/agent'], aiLimiter);
 // ARENA PHASE 1 — the Executive Kernel fast path (small talk must never pay
 // the full pipeline) and per-request model-call accounting.
@@ -343,6 +353,7 @@ import { browserRouter, registerDesktopWorker, registerAndroidWorker } from './s
 import { lifecycleScan, lastLifecycleReport } from './src/services/MemoryLifecycle.js'; // ARENA Phase 4 — memory vault lifecycle
 import { apkRegister, apkPoll, apkResult, apkChannelStatus, attachApkWorkerToRouter } from './src/services/APKBrowserChannel.js'; // ARENA — the phone's WebView registers as a real browser worker
 app.use('/api', generalLimiter);
+app.use('/api', ipBackstop); // backstop: bounds session-rotation abuse per real IP
 
 // B56 — CONNECTOR WEBHOOKS. Mounted BEFORE express.json because GitHub /
 // Resend signatures are HMACs over the RAW request body — parsing it first

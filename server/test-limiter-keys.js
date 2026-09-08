@@ -15,11 +15,12 @@ const ok = (c, n) => { if (c) { passed++; console.log(`  ✅ ${n}`); } else { fa
 
 const idx = fs.readFileSync('./index.js', 'utf-8');
 
-ok(idx.includes('cf-connecting-ip'), 'client key prefers CF-Connecting-IP (unspoofable via Cloudflare)');
-ok(idx.includes("x-forwarded-for") && idx.includes("split(',')[0]"), 'client key falls back to first X-Forwarded-For entry');
-const keyed = (idx.match(/keyGenerator:\s*clientIpKey/g) || []).length;
-ok(keyed >= 2, `both Express limiters use the proxy-aware key (found ${keyed}, need 2+)`);
-ok(!/rateLimit\(\{\s*windowMs[^}]*keyGenerator(?!:\s*clientIpKey)/s.test(idx), 'no Express limiter keys on raw req.ip');
+ok(idx.includes('x-jexi-session') && idx.includes('sess:${'), 'bucket key prefers the stable session id (survives carrier NAT)');
+ok(idx.includes('cf-connecting-ip'), 'IP key prefers CF-Connecting-IP (unspoofable via Cloudflare)');
+ok(idx.includes("x-forwarded-for") && idx.includes("split(',')[0]"), 'IP key falls back to first X-Forwarded-For entry');
+const keyed = (idx.match(/keyGenerator:\s*clientBucketKey/g) || []).length;
+ok(keyed >= 2, `ai + general limiters use the session-first bucket key (found ${keyed}, need 2+)`);
+ok(idx.includes('ipBackstop') && idx.includes("app.use('/api', ipBackstop)"), 'a loose IP-only backstop bounds session-rotation abuse');
 
 console.log(`\nLIMITER-KEYS: ${passed} passed, ${failedCount} failed.`);
 process.exit(failedCount ? 1 : 0);
