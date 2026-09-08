@@ -219,7 +219,7 @@ async function consumeStream(res, setMessages, setLogs, setWebsites, setPlan, { 
       const id = String(data.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`);
       const row = {
         kind: 'step', id,
-        tool: ['Bash', 'Read', 'Edit'].includes(data.tool) ? data.tool : 'Read',
+        tool: ['Bash', 'Read', 'Edit', 'GitHub'].includes(data.tool) ? data.tool : 'Read',
         label: sanitizeText(data.summary || data.slug || 'used tool', 140),
         status: data.status === 'success' ? 'success' : (data.status === 'error' ? 'error' : 'running'),
         durationMs: Number(data.duration_ms) || 0,

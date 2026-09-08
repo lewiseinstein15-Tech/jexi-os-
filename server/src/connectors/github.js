@@ -118,7 +118,8 @@ export class GitHubConnector extends Connector {
    *   { action: 'create_issue', owner, repo, title, body? }
    *   { action: 'create_comment', owner, repo, issue_number, body }
    *   { action: 'create_pr', owner, repo, title, head, base, body? }
-   *   { action: 'create_commit', owner, repo, branch, message, changes: [{path, content}] }
+   *   { action: 'create_commit', owner, repo, branch, message, changes: [{path, content}], base? }
+   *     (missing branches are created from `base` or the repo default branch)
    * Returns the provider's real response.
    */
   async send(payload = {}) {
@@ -165,33 +166,57 @@ export class GitHubConnector extends Connector {
     }
   }
 
-  /** Minimal real commit: blob(s) → tree → commit → update ref. */
-  async createCommit(payload, headers, url) {
-    const { owner, repo, branch, message, changes } = payload;
-    if (!branch || !message || !Array.isArray(changes) || !changes.length) {
-      throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, 'create_commit requires branch + message + changes [{path, content}]', { provider: this.label });
-    }
-    // 1. current head of the branch
-    let headSha;
+  /**
+   * Ensure `branch` exists, creating it from `base` (default: the repo's
+   * default branch) when missing. Returns { sha, created } — the head the
+   * caller must build on. Pushing to a specified branch never 404s.
+   */
+  async ensureBranch(owner, repo, branch, headers, url, base) {
     try {
       const { data } = await httpJson(url(`/repos/${owner}/${repo}/git/ref/heads/${branch}`), { headers, provider: 'GitHub API', timeout: this.requestTimeoutMs });
-      headSha = data.object && data.object.sha;
+      if (data && data.object && data.object.sha) return { sha: data.object.sha, created: false };
     } catch (e) {
       if (!(e instanceof ConnectorError && e.status === 404)) throw e;
     }
+    let baseBranch = base;
+    if (!baseBranch) {
+      const { data: repoData } = await httpJson(url(`/repos/${owner}/${repo}`), { headers, provider: 'GitHub API', timeout: this.requestTimeoutMs });
+      baseBranch = (repoData && repoData.default_branch) || 'main';
+    }
+    const { data: baseRef } = await httpJson(url(`/repos/${owner}/${repo}/git/ref/heads/${baseBranch}`), { headers, provider: 'GitHub API', timeout: this.requestTimeoutMs });
+    const baseSha = baseRef && baseRef.object && baseRef.object.sha;
+    if (!baseSha) {
+      throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, `cannot create branch "${branch}" — base "${baseBranch}" has no resolvable head`, { provider: this.label });
+    }
+    await httpJson(url(`/repos/${owner}/${repo}/git/refs`), { method: 'POST', headers, body: { ref: `refs/heads/${branch}`, sha: baseSha }, provider: 'GitHub API', timeout: this.requestTimeoutMs });
+    return { sha: baseSha, created: true };
+  }
+
+  /** Minimal real commit: blob(s) → tree → commit → update ref. */
+  async createCommit(payload, headers, url) {
+    const { owner, repo, branch, message, changes, base } = payload;
+    if (!branch || !message || !Array.isArray(changes) || !changes.length) {
+      throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, 'create_commit requires branch + message + changes [{path, content}]', { provider: this.label });
+    }
+    // 1. head of the branch (created from base when the branch is new)
+    const ensured = await this.ensureBranch(owner, repo, branch, headers, url, base);
+    const headSha = ensured.sha;
     // 2. blobs
     const treeEntries = [];
     for (const change of changes) {
+      if (!change || !change.path) {
+        throw new ConnectorError(ERROR_CODES.PROVIDER_ERROR, 'create_commit: every change needs a path', { provider: this.label });
+      }
       const { data: blob } = await httpJson(url(`/repos/${owner}/${repo}/git/blobs`), { method: 'POST', headers, body: { content: change.content || '', encoding: 'utf-8' }, provider: 'GitHub API', timeout: this.requestTimeoutMs });
       treeEntries.push({ path: change.path, mode: '100644', type: 'blob', sha: blob.sha });
     }
     // 3. tree
-    const { data: tree } = await httpJson(url(`/repos/${owner}/${repo}/git/trees`), { method: 'POST', headers, body: { ...(headSha ? { base_tree: headSha } : {}), tree: treeEntries }, provider: 'GitHub API', timeout: this.requestTimeoutMs });
+    const { data: tree } = await httpJson(url(`/repos/${owner}/${repo}/git/trees`), { method: 'POST', headers, body: { base_tree: headSha, tree: treeEntries }, provider: 'GitHub API', timeout: this.requestTimeoutMs });
     // 4. commit
-    const { data: commit } = await httpJson(url(`/repos/${owner}/${repo}/git/commits`), { method: 'POST', headers, body: { message, tree: tree.sha, ...(headSha ? { parents: [headSha] } : {}) }, provider: 'GitHub API', timeout: this.requestTimeoutMs });
+    const { data: commit } = await httpJson(url(`/repos/${owner}/${repo}/git/commits`), { method: 'POST', headers, body: { message, tree: tree.sha, parents: [headSha] }, provider: 'GitHub API', timeout: this.requestTimeoutMs });
     // 5. update ref
     const { status, data: ref } = await httpJson(url(`/repos/${owner}/${repo}/git/refs/heads/${branch}`), { method: 'PATCH', headers, body: { sha: commit.sha, force: false }, provider: 'GitHub API', timeout: this.requestTimeoutMs });
-    return { ok: true, provider: 'github', action: 'create_commit', sha: commit.sha, branch, ref: ref.ref, status };
+    return { ok: true, provider: 'github', action: 'create_commit', sha: commit.sha, branch, ref: ref.ref, status, createdBranch: ensured.created };
   }
 
   /**
@@ -230,6 +255,7 @@ export class GitHubConnector extends Connector {
       }
     }
 
+    if (branch) await this.ensureBranch(owner, repo, branch, headers, url, payload.base);
     const body = { message, content: b64, ...(finalSha ? { sha: finalSha } : {}), ...(branch ? { branch } : {}) };
     const { status, data } = await httpJson(fileUrl, { method: 'PUT', headers, body, provider: 'GitHub API', timeout: this.requestTimeoutMs });
     if (!data || !data.commit || !data.commit.sha) {

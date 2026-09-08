@@ -993,7 +993,7 @@ nav.jx-menu { overflow-y: auto; } /* B222 — 21 items: the drawer scrolls, trun
 @keyframes jxcaret { 50% { opacity: 0; } }
 
 /* B173 — THINK ROW (dsh ReasoningRow port): live reasoning, collapsible */
-.jx-think { margin: 0 0 8px; border-left: 2px solid var(--line2); border-radius: 0 8px 8px 0; background: rgba(255,255,255,.02); }
+.jx-think { margin: 0 0 8px; border: none; background: none; }
 .jx-think.live { border-left-color: #fff; }
 .jx-think-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; background: none; border: none; cursor: pointer; text-align: left; }
 .jx-think-ic { font-size: 12px; line-height: 1; }
@@ -1633,7 +1633,7 @@ body {
 .jx-transcript > .jx-hand p, .jx-transcript > .jx-hand li,
 .jx-transcript .jx-streaming-text p, .jx-transcript .jx-streaming-text li { font-size: 20px; line-height: 1.42; color: #F3EDE4; }
 /* narration: plain paragraph in the flow, app handwriting via .jx-hand */
-.jx-narr { font-size: 20px; line-height: 1.42; color: #F3EDE4; margin: 2px 0; overflow-wrap: anywhere; }
+.jx-narr { font-size: 20px; line-height: 1.42; color: #F3EDE4; margin: 2px 0; overflow-wrap: anywhere; font-style: italic; }
 /* step row: one horizontal line — icon, label, status, duration, chevron */
 .jx-step { margin: 1px 0; }
 .jx-step-line { display: flex; align-items: center; gap: 8px; width: 100%; padding: 3px 0; text-align: left; cursor: pointer; background: none; border: none; }
@@ -1647,7 +1647,10 @@ body {
 .jx-step-dur { flex-shrink: 0; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .jx-step-chev { display: inline-flex; flex-shrink: 0; color: var(--muted); transition: transform .15s ease; }
 .jx-step-chev.open { transform: rotate(180deg); }
-.jx-step-detail { font-family: var(--mono); font-size: 11.5px; line-height: 1.55; color: #B9C2D0; white-space: pre-wrap; word-break: break-word; margin: 2px 0 6px 22px; max-height: 260px; overflow-y: auto; }
+.jx-step-detail { font-family: var(--mono); font-size: 11.5px; line-height: 1.55; color: #B9C2D0; white-space: pre-wrap; word-break: break-word; margin: 2px 0 6px 22px; max-height: 260px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: rgba(255,255,255,.02); }
+.jx-step-sec { display: block; font-size: 9.5px; letter-spacing: .08em; color: var(--faint); margin: 6px 0 2px; }
+.jx-step-sec:first-child { margin-top: 0; }
+.jx-step-cmd, .jx-step-out { display: block; }
 .jx-trace-meta { font-size: 10px; color: #7C8598; margin-top: 6px; font-variant-numeric: tabular-nums; }
 
 /* ── Mission in Progress card (inside chat, above composer) ── */

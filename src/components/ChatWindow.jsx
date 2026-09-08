@@ -282,9 +282,10 @@ export default function ChatWindow({ messages, logs, isProcessing, onSend, onSto
                       <Narration key={e && e.id ? e.id : `n${ti}`} text={e && e.text} />
                     )
                   ))}
-                  {/* ARENA (spec Part 29): JEXI's words render in her
-                      handwriting voice (Caveat) — code/logs/JSON inside the
-                      answer stay clean mono via .jx-hand CSS overrides. */}
+                  {/* ARENA (spec Part 29): JEXI's words render in the app voice
+                      (.jx-hand → readable UI font; Caveat was removed as
+                      unreadable) — code/logs/JSON inside the answer stay
+                      clean mono via .jx-hand CSS overrides. */}
                   {msg.streaming ? (
                     <div className="jx-streaming-text jx-hand">
                       <MarkdownRenderer content={splitFoot(msg.text)[0]} size="text-[13px]" />

@@ -1306,8 +1306,12 @@ function formatResult(result) {
 /* (spinner → ✓/✗). Fail-open: tracing must never break a tool call.    */
 /* ------------------------------------------------------------------ */
 let __traceSeq = 0;
-function toolTraceKind(slug) {
+export function toolTraceKind(slug, args) {
   const s = String(slug || '');
+  const a = (args && typeof args === 'object') ? args : {};
+  // GitHub pushes get their own transcript row + icon (spec: GitHub step row).
+  if (s === 'connector-call' && String(a.name || '').toLowerCase() === 'github') return 'GitHub';
+  if (/^github([_-]|$)|^git([_-]|$)/i.test(s)) return 'GitHub'; // github-cli, git-status, pr flows
   if (/write|edit|save|create|update|delete|apply|kill|undefine|define/i.test(s)
       && !/(read|search|inspect|query|list)/i.test(s)) return 'Edit';
   if (/run|exec|command|bash|shell|terminal|preview|pwsh|crunch|compute|diagnose|subagent|ralph|workflow|background|goal|schedule|send_message|interrupt/i.test(s)) return 'Bash';
@@ -1322,13 +1326,38 @@ function traceHint(slug, args) {
   const keys = Object.keys(a).slice(0, 3).join(', ');
   return keys ? String(slug) : String(slug);
 }
-function toolTraceSummary(slug, args) {
-  const kind = toolTraceKind(slug);
+const GITHUB_ACTION_LABEL = {
+  create_commit: 'committing to github',
+  create_file: 'creating file on github',
+  update_file: 'updating file on github',
+  create_pr: 'opening pull request',
+  create_issue: 'creating issue',
+  create_comment: 'commenting on github',
+};
+/** First-line commit message + repo@branch — no file contents, no secrets. */
+export function toolTraceSummary(slug, args) {
+  if (String(slug) === 'connector-call' && String((args && args.name) || '').toLowerCase() === 'github') {
+    return githubTraceSummary(args);
+  }
+  const kind = toolTraceKind(slug, args);
   const hint = traceHint(slug, args);
   const short = hint && hint !== String(slug) ? ` · ${hint}` : '';
-  return `used ${kind}${short}`.slice(0, 140);
+  return `used ${String(kind).toLowerCase()}${short}`.slice(0, 140);
 }
-function toolTraceDetail(slug, args, result) {
+function githubTraceSummary(args) {
+  const a = (args && typeof args === 'object') ? args : {};
+  const p = (a.payload && typeof a.payload === 'object') ? a.payload : {};
+  const base = GITHUB_ACTION_LABEL[String(p.action || '')] || 'using github';
+  const repo = p.owner && p.repo ? `${p.owner}/${p.repo}` : '';
+  const where = [repo, p.branch || ''].filter(Boolean).join('@');
+  const msg = String(p.message || '').split('\n')[0].trim().slice(0, 60);
+  const tail = [where, msg].filter(Boolean).join(' \u00b7 ');
+  return (tail ? `${base} \u00b7 ${tail}` : base).slice(0, 140);
+}
+export function toolTraceDetail(slug, args, result) {
+  if (String(slug) === 'connector-call' && String((args && args.name) || '').toLowerCase() === 'github') {
+    return githubTraceDetail(args, result);
+  }
   const lines = [];
   try {
     const sa = safeArgs(slug, args || {});
@@ -1338,6 +1367,34 @@ function toolTraceDetail(slug, args, result) {
     if (result && result.error) lines.push(`error: ${String(result.error).slice(0, 2000)}`);
     const out = formatResult(result && result.result !== undefined ? result.result : result);
     if (out) lines.push(String(out).slice(0, 3000));
+  }
+  return lines.join('\n').slice(0, 4000);
+}
+/** GitHub row detail: command + message + files changed + real commit SHA. */
+function githubTraceDetail(args, result) {
+  const lines = [];
+  const a = (args && typeof args === 'object') ? args : {};
+  const p = (a.payload && typeof a.payload === 'object') ? a.payload : {};
+  const cmd = `$ github ${String(p.action || 'send')} ${p.owner || ''}/${p.repo || ''}${p.branch ? `@${p.branch}` : ''}`;
+  lines.push(cmd.replace(/\s+/g, ' ').trim().slice(0, 300));
+  if (p.message) lines.push(`message: ${String(p.message).split('\n')[0].slice(0, 300)}`);
+  const files = Array.isArray(p.changes)
+    ? p.changes.map((c) => c && c.path).filter(Boolean)
+    : (p.path ? [String(p.path)] : []);
+  if (files.length) lines.push(`files: ${files.slice(0, 10).join(', ')}${files.length > 10 ? ` +${files.length - 10} more` : ''}`.slice(0, 500));
+  if (result !== undefined) {
+    if (result && result.error) lines.push(`error: ${String(result.error).slice(0, 2000)}`);
+    let r = result && result.result !== undefined ? result.result : result;
+    // The runtime JSON-stringifies inner results (spill path) — parse back
+    // so the SHA check below sees the real object, not a string.
+    if (typeof r === 'string') { try { r = JSON.parse(r); } catch { /* keep the raw string */ } }
+    if (r && typeof r === 'object' && (r.sha || r.commit)) {
+      lines.push(`commit: ${String(r.sha || r.commit).slice(0, 40)}`);
+      if (r.html_url) lines.push(`url: ${String(r.html_url).slice(0, 300)}`);
+    } else {
+      const out = formatResult(r);
+      if (out) lines.push(String(out).slice(0, 2000));
+    }
   }
   return lines.join('\n').slice(0, 4000);
 }
@@ -1359,7 +1416,7 @@ export async function executeTool(params) {
   const { slug, args = {} } = params || {};
   // LIVE TRACE: running event FIRST so the row appears the moment work starts.
   const __tSend = params && typeof params.sendEvent === 'function' ? params.sendEvent : null;
-  const __tKind = toolTraceKind(slug);
+  const __tKind = toolTraceKind(slug, args);
   const __tId = `t${Date.now().toString(36)}${(++__traceSeq).toString(36)}`;
   const __t0 = Date.now();
   const __tSummary = toolTraceSummary(slug, args);

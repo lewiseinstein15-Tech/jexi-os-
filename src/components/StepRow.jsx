@@ -1,21 +1,23 @@
-import { useState } from 'react';
-import { Terminal, Search, Pencil, Loader2, Check, X, ChevronDown } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Terminal, Search, Pencil, Github, Wrench, Loader2, Check, X, ChevronDown } from 'lucide-react';
 
 /**
  * StepRow — ONE tool call as a single transcript line (Claude Code style):
  *
- *   [icon] used <Tool> [hint]   ✓/spinner/X   180ms        ⌄
+ *   [icon] used bash · npm test   ✓   180ms        ⌄
  *
  * No card, no bubble, no border, no background — the row sits directly in
  * the transcript flow with only its own horizontal layout. Click (or the
- * chevron) expands the raw command + full output underneath.
+ * chevron) expands the real command + real output underneath in a hairline
+ * box with command/stdout section labels.
  *
  * Props: { tool, label, status, durationMs, detail }
- *   tool: 'Bash' | 'Read' | 'Edit' (picks the icon)
- *   label: collapsed one-line label, e.g. "used Bash · npm test"
- *   status: 'running' | 'success' | 'error'
- *   durationMs: number — shown after the status icon
- *   detail: raw command + full output, revealed on expand
+ *   tool: 'Bash' | 'Read' | 'Edit' | 'GitHub' (picks the icon)
+ *   label: collapsed one-line label, e.g. "used bash · npm test"
+ *   status: 'running' | 'success' | 'error' — flips live by backend event
+ *   durationMs: backend-measured ms once done; while running the row ticks
+ *     its own real elapsed time (measured from the running event's arrival)
+ *   detail: real command + real output, revealed on expand
  */
 export function formatDuration(ms) {
   const n = Number(ms);
@@ -25,12 +27,46 @@ export function formatDuration(ms) {
   return `${Math.floor(n / 60000)}m ${Math.round((n % 60000) / 1000)}s`;
 }
 
-const ICONS = { Bash: Terminal, Read: Search, Edit: Pencil };
+const ICONS = { Bash: Terminal, Read: Search, Edit: Pencil, GitHub: Github };
+
+/** Split "command\noutput…" into labeled sections (image 2: command/stdout). */
+function DetailBody({ text, status }) {
+  const t = String(text || '');
+  const i = t.indexOf('\n');
+  const head = i < 0 ? t : t.slice(0, i);
+  const rest = i < 0 ? '' : t.slice(i + 1);
+  const outLabel = status === 'error' ? 'stderr' : 'stdout';
+  return (
+    <>
+      <span className="jx-step-sec">command</span>
+      <span className="jx-step-cmd">{head}</span>
+      {rest.trim() !== '' && (
+        <>
+          <span className="jx-step-sec">{outLabel}</span>
+          <span className="jx-step-out">{rest}</span>
+        </>
+      )}
+    </>
+  );
+}
 
 export default function StepRow({ tool, label, status, durationMs, detail }) {
   const [open, setOpen] = useState(false);
-  const Icon = ICONS[tool] || Search;
-  const dur = formatDuration(durationMs);
+  const Icon = ICONS[tool] || Wrench;
+  // Live elapsed ticker: while the backend says "running", show the real
+  // wall-clock time since this row appeared (4Hz). The moment the done
+  // event lands, status flips and the backend-measured duration takes over.
+  const t0Ref = useRef(0);
+  if (!t0Ref.current) t0Ref.current = Date.now();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (status !== 'running') return undefined;
+    const t = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, [status]);
+  const shownMs = status === 'running' ? Math.max(0, now - t0Ref.current) : durationMs;
+  const dur = formatDuration(shownMs);
+  const fallbackLabel = `used ${String(tool || 'tool').toLowerCase()}`;
 
   return (
     <div className="jx-step">
@@ -39,12 +75,12 @@ export default function StepRow({ tool, label, status, durationMs, detail }) {
         className="jx-step-line"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        title={open ? 'Collapse output' : 'Expand raw command + output'}
+        title={open ? 'Collapse output' : 'Expand real command + output'}
       >
         <span className="jx-step-ic" aria-hidden="true">
           <Icon size={14} strokeWidth={2} />
         </span>
-        <span className="jx-step-label jx-hand">{label || `used ${tool || 'tool'}`}</span>
+        <span className="jx-step-label jx-hand">{label || fallbackLabel}</span>
         <span className="jx-step-status" aria-label={status}>
           {status === 'running' && <Loader2 size={13} strokeWidth={2.4} className="jx-spin" />}
           {status === 'success' && <Check size={14} strokeWidth={2.6} className="jx-ok" />}
@@ -56,7 +92,9 @@ export default function StepRow({ tool, label, status, durationMs, detail }) {
         </span>
       </button>
       {open && detail != null && String(detail).trim() !== '' && (
-        <pre className="jx-step-detail">{String(detail).slice(0, 6000)}</pre>
+        <div className="jx-step-detail">
+          <DetailBody text={String(detail).slice(0, 6000)} status={status} />
+        </div>
       )}
     </div>
   );
@@ -64,14 +102,15 @@ export default function StepRow({ tool, label, status, durationMs, detail }) {
 
 /**
  * foldTrace — group CONSECUTIVE completed same-tool steps into ONE summary
- * row ("Ran 3 commands", "Explored 2 reads"). Running rows never fold (the
+ * row ("ran 3 commands", "explored 2 reads"). Running rows never fold (the
  * live spinner must stay visible). Grouping is a pure view derivation over
  * the ordered event trace, so the live stream stays one-event-at-a-time.
  */
 const GROUP_LABEL = {
-  Bash: (n) => `Ran ${n} command${n === 1 ? '' : 's'}`,
-  Read: (n) => `Explored ${n} read${n === 1 ? '' : 's'}`,
-  Edit: (n) => `Edited ${n} file${n === 1 ? '' : 's'}`,
+  Bash: (n) => `ran ${n} command${n === 1 ? '' : 's'}`,
+  Read: (n) => `explored ${n} read${n === 1 ? '' : 's'}`,
+  Edit: (n) => `edited ${n} file${n === 1 ? '' : 's'}`,
+  GitHub: (n) => `made ${n} github update${n === 1 ? '' : 's'}`,
 };
 
 export function foldTrace(trace) {
@@ -97,7 +136,7 @@ export function foldTrace(trace) {
           .slice(0, 6000);
         out.push({
           kind: 'step', group: true, tool: e.tool,
-          label: (GROUP_LABEL[e.tool] || ((n) => `Used ${e.tool} ×${n}`))(run.length),
+          label: (GROUP_LABEL[e.tool] || ((n) => `used ${String(e.tool || 'tool').toLowerCase()} ×${n}`))(run.length),
           status: failed > 0 ? 'error' : 'success',
           durationMs: totalMs, detail,
           key: run.map((r) => r.id).join('+'),
