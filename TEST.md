@@ -5,12 +5,18 @@ All tests live in `server/` and run with plain Node (no test framework needed).
 ## Run everything
 
 ```bash
+npm install           # repo root: required for the UI render suites (react)
+cd server && npm install  # server deps
 npm test              # from the repo root (forwards to server)
 # or
 cd server && npm test  # directly
 ```
 
-This runs all 15 suites sequentially — a failure stops the run (exit code 1).
+This runs every suite sequentially (170+ files — see the `test` script in
+`server/package.json`, the authoritative list). A failure stops the run
+(exit code 1). Without the root `npm install`, the four UI suites that
+render React components (`test-rich-render`, `test-b197`, `test-b200`,
+`test-b206b`) crash on a missing `react` package — install first.
 
 ## The suites
 
@@ -31,6 +37,13 @@ This runs all 15 suites sequentially — a failure stops the run (exit code 1).
 | `test-context-resolution.js` | Conversational continuity (anaphora + query rewriting) |
 | `test-roster-skills.js` | Agent/skill/tool catalog integrity + auto tool routing |
 | `test-mcp.js` | MCP endpoint: initialize, tool/resource allowlist, tool call |
+| … | (170+ further suites — the `test` script in `server/package.json` is the full list) |
+| `test-agent-contracts.js` | M3: professional agent contracts + spawn gate (26 checks) |
+| `test-context-engine.js` | M4: context budgets, repo map, token caps (32 checks) |
+| `test-recovery-lessons.js` | M5: coding failure/recovery lessons (15 checks) |
+| `test-judge-gates.js` | M6: independent judge gate (24 checks) |
+| `test-code-intel.js` | M7: lsp symbols + diagnostics (19 checks) |
+| `test-setup-wizard.js` | M8: phone setup wizard + probes (22 checks) |
 
 ## Notes
 
