@@ -73,6 +73,7 @@ import { listWorkspace, readWorkspace, writeWorkspace, createCheckpoint, listChe
 import { listProcesses, getProcessLog, startProcess, stopProcess, deleteProcess, onProcessEvent } from './src/services/ProcessManager.js';
 import { verifyDomainAnswer, detectDomain, deterministicChecks } from './src/services/DomainVerifier.js';
 import { runSubagents, decomposeQuery } from './src/services/SubagentRuntime.js';
+import { validateAllAgentContracts, CONTRACT_VERSION } from './src/services/AgentDefinitions.js'; // M3 — professional agent contracts
 import { listHooks, addHook, updateHook, removeHook } from './src/services/HookEngine.js';
 import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services/PluginRegistry.js';
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications } from './src/services/NotificationCenter.js';
@@ -1124,6 +1125,11 @@ app.get('/api/team', (req, res) => res.json({ team: teamRoster() }));
 // B180 — the Hermes-style agent surface
 app.get('/api/agents/coverage', (req, res) => res.json(profileCoverage()));
 app.get('/api/agents/profiles', (req, res) => res.json({ profiles: listProfiles().map((p) => ({ name: p.name, displayName: p.displayName, role: p.role, tools: p.config.tools, model: p.config.model })) }));
+// M3 — professional agent contracts: validated definitions (no prompt bodies).
+app.get('/api/agents/definitions', (req, res) => {
+  const r = validateAllAgentContracts({ toolSlugs: TOOL_REGISTRY.map((t) => t.slug) });
+  res.json({ contractVersion: CONTRACT_VERSION, valid: r.valid, count: r.count, agents: r.agents.map((a) => a.summary), errors: r.errors });
+});
 app.get('/api/agents/:name/memory', (req, res) => res.json({ agent: req.params.name, memories: searchMemory(req.params.name, String(req.query.q || ''), { limit: 10 }) }));
 app.post('/api/agents/delegate', async (req, res) => {
   const { agents, briefs, mode } = req.body || {};

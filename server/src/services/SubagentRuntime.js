@@ -21,11 +21,34 @@
  */
 
 import { runAgentLoop } from './AgentLoop.js';
-import { loadAgentDefinition, wantsIsolation } from './AgentDefinitions.js';
+import { loadAgentDefinition, wantsIsolation, validateAgentContract } from './AgentDefinitions.js';
+import { TOOL_REGISTRY } from './ToolRegistry.js';
 import { skillWantsIsolation } from './SkillChain.js';
 
 const MAX_PARALLEL = 3;   // bounded concurrency (Grok Build: never unlimited)
 const MAX_SUBAGENTS = 8;
+const TOOL_SLUGS = TOOL_REGISTRY.map((t) => t.slug);
+
+/**
+ * M3 decideJob seam — resolve a subagent job to its agent definition.
+ * The SPAWN GATE: a job naming an agent definition whose contract is
+ * invalid (or missing) is BLOCKED, never spawned. Returns
+ * { def, isolated, blocked } where blocked is null or a refusal reason.
+ */
+export function resolveJobAgent(job = {}) {
+  if (!job.agentDef) {
+    return {
+      def: null,
+      isolated: job.context === 'fork' || skillWantsIsolation(job.skillSlug || job.name),
+      blocked: null,
+    };
+  }
+  const def = loadAgentDefinition(job.agentDef);
+  if (!def) return { def: null, isolated: false, blocked: `unknown agent definition "${job.agentDef}"` };
+  const v = validateAgentContract(def, { toolSlugs: TOOL_SLUGS });
+  if (!v.ok) return { def, isolated: wantsIsolation(def), blocked: `agent contract refused: ${v.errors.join('; ')}` };
+  return { def, isolated: wantsIsolation(def), blocked: null };
+}
 const MAX_SUMMARY_CHARS = 350; // what the parent is allowed to see for forked runs
 
 /** Deterministic mission decomposition: split on 'and/then/also', ';' or newlines. */
@@ -126,10 +149,10 @@ export async function runSubagents({ tasks, sendEvent, opts = {} }) {  if (typeo
   }
 
   // Decide isolation per job: explicit flag, agent definition, or skill frontmatter.
+  // The spawn gate runs here — contract-invalid jobs are marked blocked.
   const decided = jobs.map((job) => {
-    const def = job.agentDef ? loadAgentDefinition(job.agentDef) : null;
-    const isolated = job.context === 'fork' || wantsIsolation(def) || skillWantsIsolation(job.skillSlug || job.name);
-    return { ...job, def, isolated };
+    const r = resolveJobAgent(job);
+    return { ...job, def: r.def, isolated: r.isolated, blocked: r.blocked };
   });
 
   emit('subagent.plan', { total: decided.length, names: decided.map((j) => j.name || 'sub'), isolated: decided.filter((j) => j.isolated).length });
@@ -144,6 +167,11 @@ export async function runSubagents({ tasks, sendEvent, opts = {} }) {  if (typeo
     while (cursor < decided.length && !cancelled()) {
       const job = decided[cursor++];
       const name = job.name || `sub-${cursor}`;
+      if (job.blocked) {
+        results.push({ name, query: job.query, status: 'failed', durationMs: 0, answer: '', error: job.blocked });
+        emit('subagent.done', { name, status: 'failed', error: job.blocked });
+        continue;
+      }
       if (job.isolated) {
         results.push(await runIsolatedSubagent({ name, query: job.query, image: job.image, sendEvent: (t, d) => sendEvent(t, { ...d, subagent: name }), opts: { ...opts, systemPromptOverride: job.def?.systemPrompt } }));
         continue;
