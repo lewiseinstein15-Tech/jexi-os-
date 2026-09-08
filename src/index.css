@@ -48,19 +48,12 @@ body {
 ::selection { background: var(--mag2); color: #fff; }
 
 /* ════════════════════════════════════════════════════════════════
-   ARENA REBUILD — JEXI'S VOICE (spec Part 29)
-   Caveat (bundled, OFL): mature handwriting for JEXI's dialogue and
-   notes. Code, logs, JSON and tables NEVER inherit it — they stay in
-   the clean mono face for readability.
+   JEXI'S VOICE — READABILITY OVERRIDE (user request, 2026-09-08)
+   The Caveat handwriting face was unreadable on-device, so --hand now
+   follows the normal readable UI font (--font). .jx-hand sizing stays,
+   only the face changes. Code/logs/JSON/tables still use clean mono.
    ════════════════════════════════════════════════════════════════ */
-@font-face {
-  font-family: 'Caveat';
-  src: url('./assets/fonts/Caveat.ttf') format('truetype');
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-}
-:root { --hand: 'Caveat', 'Segoe Script', 'Bradley Hand', cursive; }
+:root { --hand: var(--font); }
 .jx-hand { font-family: var(--hand); }
 .jx-hand p, .jx-hand li { font-family: var(--hand); font-size: 17.5px; line-height: 1.5; }
 .jx-hand h1, .jx-hand h2, .jx-hand h3 { font-family: var(--hand); }
