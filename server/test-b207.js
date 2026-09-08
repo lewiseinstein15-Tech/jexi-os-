@@ -51,8 +51,9 @@ console.log('[1] Fix contracts');
   check('app shell sized by viewport, not content (jx-workbench min-width:0)', /\.jx-workbench \{[^}]*min-width: 0;/.test(css));
   check('activity rows use zero-minimum grid tracks', /\.jx-agent-row \{[^}]*grid-template-columns: minmax\(0, auto\) minmax\(0, 1fr\)/.test(css));
 
-  const chat = read('src/components/ChatWindow.jsx');
-  check('message wrapper is a shrinkable flex item (min-w-0)', /w-full min-w-0 group/.test(chat));
+  // The card-era `w-full min-w-0 group` wrapper is gone — the guard now
+  // asserts the real wrapper (.jx-row) can shrink.
+  check('message wrapper is a shrinkable flex item (min-w-0)', /\.jx-row \{[^}]*min-width: 0/.test(css));
 }
 
 // --- 2. live layout audit (self-skip without browser + stack) ---

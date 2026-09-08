@@ -65,7 +65,9 @@ console.log('\n== 4. streaming upgrade ==');
   // B196: per-delta fade removed (replayed every chunk — blinked images)
   ok('streaming renders plainly (per-delta fade removed B196)', !css.includes('.jx-streaming-text .markdown-body { animation'));
   const chat = fs.readFileSync(path.join(ROOT, 'src/components/ChatWindow.jsx'), 'utf-8');
-  ok('writer badge pulses while a coworker types', chat.includes('jx-writer') && chat.includes('className="dot"'));
+  // Transcript UI: the card-era jx-writer badge is gone — the live pulse now
+  // lives on the Thought row (breathing panel + blinking ✻ while typing).
+  ok('writer badge pulses while a coworker types', css.includes('.jx-agent.live') && css.includes('jx-breathe') && css.includes('jx-agent.live .jx-agent-ic'));
 }
 
 console.log(`\n${failures === 0 ? '🎉 ALL B183 CHECKS PASSED' : `💥 ${failures} FAILURES`}`);

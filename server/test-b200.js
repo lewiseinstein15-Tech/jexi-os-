@@ -84,7 +84,8 @@ ok('reasonAndWrite accepts an onToken streaming seam', reasoner.includes('opts.o
 const engine = fs.readFileSync(path.join(ROOT, 'src/hooks/useJexiEngine.js'), 'utf-8');
 ok("the stream engine handles 'narration' events onto the streaming message", engine.includes("data.type === 'narration'"));
 const chat = fs.readFileSync(path.join(ROOT, 'src/components/ChatWindow.jsx'), 'utf-8');
-ok('the chat renders the NarrationFeed on the assistant message', chat.includes('NarrationFeed') && chat.includes('msg.narrations'));
+// Transcript UI: NarrationFeed was replaced by the flat <Narration> paragraph.
+ok('the chat renders the NarrationFeed on the assistant message', chat.includes('<Narration'));
 
 const esbuild = path.join(ROOT, 'node_modules', 'esbuild', 'bin', 'esbuild');
 const tmpOut = path.join(ROOT, 'server', 'test-support', '.b200-nf.cjs');

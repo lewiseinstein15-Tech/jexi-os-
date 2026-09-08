@@ -7,3 +7,4 @@ Honest limitation: memory-transfer tasks require a lexical bridge between domain
 | Date | short | multi-step | unfamiliar | failure-recovery | tool-discovery | memory-transfer | Overall |
 |---|---|---|---|---|---|---|---|
 | 2026-09-05 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | **1.000** |
+| 2026-09-08 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | **1.000** |

@@ -428,7 +428,7 @@ test('Composer voice input: feature-detected, honest when absent', async () => {
   assert.ok(src.includes('interimResults = true'), 'interim results stream into the draft');
   assert.match(src, /Microphone blocked — allow mic access/, 'permission errors surface honestly');
   assert.match(src, /rec\.onend = \(\) => setListening\(false\)/, 'listening state ends with the engine');
-  assert.match(src, /import \{ Mic, Send, Square \} from 'lucide-react'/, 'mic icon imported');
+  assert.match(src, /import \{[^}]*\bMic\b[^}]*\} from 'lucide-react'/, 'mic icon imported');
 });
 
 /* ── 12. docs tell the same story ─────────────────────────────────────── */

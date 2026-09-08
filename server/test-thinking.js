@@ -89,7 +89,7 @@ console.log('\n== 3. engine + UI wiring ==');
 {
   const hook = fs.readFileSync(path.join(ROOT, 'src/hooks/useJexiEngine.js'), 'utf-8');
   ok("engine consumes 'think' events into message.thinking", hook.includes("data.type === 'think'") && hook.includes('thinking: (last.thinking') );
-  ok('think row created before the first answer token', hook.includes("next.push({ role: 'jexi', text: '', thinking: delta"));
+  ok('think row created before the first answer token', hook.includes("next.push({ role: 'jexi', at: Date.now(), text: '', thinking: delta"));
   ok('first answer token stamps thinkMs (live phase ends)', hook.includes('thinkMs = Date.now() - thinkT0'));
   ok('reasoning + thinkMs survive the done event', hook.includes('cur.thinking ? { thinking: cur.thinking }'));
 

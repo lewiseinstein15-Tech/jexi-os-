@@ -1607,7 +1607,7 @@ body {
 .jx-mi.active svg { color: #fff; }
 
 /* ── chat rows + bubbles ── */
-.jx-row { align-items: flex-end; gap: 10px; margin-bottom: 2px; }
+.jx-row { align-items: flex-end; gap: 10px; margin-bottom: 2px; min-width: 0; }
 .jx-row.user { padding-left: 8%; }
 .jx-row.jexi { padding-right: 6%; }
 @media (max-width: 600px) { .jx-row.user { padding-left: 10%; } .jx-row.jexi { padding-right: 4%; } }

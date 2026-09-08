@@ -124,7 +124,7 @@ test('provider layer: text-only providers honestly decline images; vision provid
 
 test('frontend: the captured photo is sent with the vision question', () => {
   const engine = read('../src/hooks/useJexiEngine.js');
-  assert.match(engine, /const userMsg = \{ role: 'user', text: query, image \}/, 'the message carries the image');
+  assert.match(engine, /const userMsg = \{ role: 'user', text: query, image(, at: Date\.now\(\))? \}/, 'the message carries the image');
   assert.match(engine, /body: JSON\.stringify\(\{ query, image: image \|\| undefined/, 'the request carries the image');
 });
 

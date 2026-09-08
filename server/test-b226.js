@@ -76,6 +76,6 @@ test('App + CommandCenter: onVisionResult is actually wired (captures go somewhe
 
 test('engine: runSearch carries the image into the chat message + request', async () => {
   const src = read('../src/hooks/useJexiEngine.js');
-  assert.match(src, /const userMsg = \{ role: 'user', text: query, image \}/, 'the user message carries the image (rendered in chat)');
+  assert.match(src, /const userMsg = \{ role: 'user', text: query, image(, at: Date\.now\(\))? \}/, 'the user message carries the image (rendered in chat)');
   assert.match(src, /body: JSON\.stringify\(\{ query, image: image \|\| undefined/, 'the request body carries the image');
 });
