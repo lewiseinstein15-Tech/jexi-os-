@@ -132,11 +132,11 @@ export default function ResearchScreen({ engine, onResearch }) {
                 transition={{ duration: 0.2 }}
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`max-w-[92%] p-3 ${
+                <div className={
                   msg.role === 'user'
-                    ? 'rounded-lg rounded-tr-sm bg-gradient-to-br from-brand to-[#E8683F] text-[#04140D] font-medium text-[11px] shadow-[0_4px_18px_rgba(255,138,61,0.28)]'
-                    : 'rounded-lg rounded-tl-sm bg-surface-1 text-text-primary border border-hairline'
-                }`}>
+                    ? 'max-w-[92%] p-3 rounded-lg rounded-tr-sm bg-gradient-to-br from-brand to-[#E8683F] text-[#04140D] font-medium text-[11px] shadow-[0_4px_18px_rgba(255,138,61,0.28)]'
+                    : 'w-full text-text-primary jx-hand text-[15px] leading-relaxed'
+                }>
                   {msg.role === 'user' ? (
                     <div className="whitespace-pre-wrap break-words">
                       {msg.image && <img src={msg.image} alt="attachment" className="max-w-[220px] rounded-lg mb-2 border border-black/20" />}

@@ -308,7 +308,7 @@ export default function MissionsScreen() {
           {/* objective — the display voice: what she understood */}
           <div className="min-w-0">
             <div className="text-[9px] font-bold tracking-[0.14em] text-text-tertiary mb-1">OBJECTIVE</div>
-            <div className="font-display text-[15px] leading-snug text-text-primary break-words">{m.objective}</div>
+            <div className="font-sans text-[15px] leading-snug text-text-primary break-words">{m.objective}</div>
           </div>
 
           {/* live phase line — real telemetry, never a spinner */}
@@ -628,7 +628,7 @@ export default function MissionsScreen() {
                 <span className={`text-[9px] font-bold tracking-[0.12em] border rounded-full px-2 py-0.5 shrink-0 ${meta.cls}`}>{meta.label}</span>
                 <span className="text-[10px] text-text-tertiary ml-auto shrink-0">{timeAgo(mi.updatedAt)}</span>
               </div>
-              <div className="font-display text-[13px] text-text-primary leading-snug mt-1.5 break-words line-clamp-2">{mi.objective}</div>
+              <div className="font-sans text-[13px] text-text-primary leading-snug mt-1.5 break-words line-clamp-2">{mi.objective}</div>
               <div className="text-[10px] font-mono text-text-tertiary mt-1 truncate">{mi.id}</div>
             </button>
           );

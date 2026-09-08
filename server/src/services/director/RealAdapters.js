@@ -75,7 +75,7 @@ export function realLlmAdapter() {
       // backstop stays, but it should only fire when the lanes truly have
       // nothing usable.
       if (!parsed) {
-        for (const alt of ['openrouter', 'groq', 'deepinfra', 'cerebras']) {
+        for (const alt of ['groq', 'cloudflare', 'gemini', 'deepinfra']) {
           try {
             parsed = extractJson(await generateContent(user, INTERPRET_SYSTEM, image || null, { prefer: alt }));
             if (parsed) break;

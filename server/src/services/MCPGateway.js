@@ -604,6 +604,54 @@ function breakerFail(server) {
 }
 function breakerSuccess(server) { breakers.delete(server); }
 
+/**
+ * Required-arg aliases, keyed by the schema's field name. Models habitually
+ * send `query` even when a tool's live schema requires `question`
+ * (free-search:research rejects anything else with pydantic validation
+ * errors) — so the gateway fills missing required fields from known aliases
+ * before the call. Schema-driven (only declared-required fields, only when
+ * the value type fits), never blind. Returns the original object when
+ * nothing needed filling.
+ */
+const MCP_ARG_ALIASES = {
+  question: ['query', 'q', 'prompt', 'text', 'input'],
+  query: ['question', 'q', 'prompt', 'text', 'input'],
+  url: ['uri', 'link', 'href'],
+  urls: ['links', 'uris'],
+};
+
+function aliasTypeFits(want, value) {
+  if (!want) return true;
+  if (want === 'string') return typeof value === 'string';
+  if (want === 'array') return Array.isArray(value);
+  if (want === 'number' || want === 'integer') return typeof value === 'number';
+  if (want === 'boolean') return typeof value === 'boolean';
+  if (want === 'object') return !!value && typeof value === 'object';
+  return true;
+}
+
+export function applyMcpArgAliases(toolDef, args) {
+  const schema = toolDef && toolDef.inputSchema ? toolDef.inputSchema : null;
+  const required = schema && Array.isArray(schema.required) ? schema.required : [];
+  if (!required.length || !args || typeof args !== 'object') return args;
+  const props = schema.properties && typeof schema.properties === 'object' ? schema.properties : {};
+  let out = null;
+  for (const field of required) {
+    const cur = args[field];
+    if (cur !== undefined && cur !== null && cur !== '') continue;
+    const want = props[field] && props[field].type;
+    for (const a of MCP_ARG_ALIASES[field] || []) {
+      const v = args[a];
+      if (v !== undefined && v !== null && v !== '' && aliasTypeFits(want, v)) {
+        if (!out) out = { ...args };
+        out[field] = v;
+        break;
+      }
+    }
+  }
+  return out || args;
+}
+
 export async function invokeMcpTool({ server, tool, args = {}, authorized = false, timeoutMs = 30_000 } = {}) {
   if (breakerOpen(server)) {
     audit({ type: 'MCP_BREAKER_OPEN', server, tool, reason: 'circuit open after repeated failures' });
@@ -638,6 +686,11 @@ export async function invokeMcpTool({ server, tool, args = {}, authorized = fals
     return { ok: false, error: `server '${server}' has no granted permissions` };
   }
 
+  const callArgs = applyMcpArgAliases(toolDef, args);
+  if (callArgs !== args) {
+    audit({ type: 'MCP_ARGS_ALIASED', server, tool, reason: 'filled required schema fields from argument aliases' });
+  }
+
   conn.calls += 1;
   audit({ type: 'MCP_INVOKE', server, tool, authorized: destructive ? true : undefined });
   try {
@@ -650,7 +703,7 @@ export async function invokeMcpTool({ server, tool, args = {}, authorized = fals
     });
     let result;
     try {
-      result = await Promise.race([client.callTool({ name: tool, arguments: args }), timeoutP]);
+      result = await Promise.race([client.callTool({ name: tool, arguments: callArgs }), timeoutP]);
     } finally {
       clearTimeout(timer);
     }

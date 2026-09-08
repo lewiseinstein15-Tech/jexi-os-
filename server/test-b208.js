@@ -154,7 +154,7 @@ console.log('\n[2] Agent communication protocol');
 console.log('\n[3] Model routing & identity-preserving fallback');
 {
   const order = preferenceOrder('research');
-  check('preference order is a ladder ending in neutral', order.length >= 3 && order[order.length - 1] === '' && order[0] === 'openrouter');
+  check('preference order is a ladder ending in neutral', order.length >= 3 && order[order.length - 1] === '' && order[0] === 'groq');
   const emp = getEmployee('zola');
   let attempts = 0;
   const events = [];

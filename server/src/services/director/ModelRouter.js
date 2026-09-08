@@ -23,22 +23,23 @@ import { telemetry } from './Telemetry.js';
 
 /** Which provider family leads for a task type (data, not code). '' = neutral. */
 const TASK_HINTS = {
-  research: 'openrouter',
+  research: 'groq',
   search: 'groq',
   synthesis: '',
   code: 'groq',
-  verification: 'gemini',
+  verification: 'cloudflare',
   security: 'groq',
-  planning: 'gemini',
+  planning: 'cloudflare',
   memory: '',
-  data: 'openrouter',
-  design: 'openrouter',
-  reasoning: 'gemini',
+  data: 'groq',
+  design: 'groq',
+  reasoning: 'cloudflare',
   report: '',
 };
 
 /** Every provider family the LLM client can speak to, in rough capability order. */
-const PROVIDER_LADDER = ['groq', 'openrouter', 'gemini', 'deepinfra', 'cerebras', 'mistral', 'xai', 'huggingface'];
+/** Configured providers lead (groq + cloudflare hold the live keys); the rest stay as fallback rungs. */
+const PROVIDER_LADDER = ['groq', 'cloudflare', 'openrouter', 'gemini', 'deepinfra', 'cerebras', 'mistral', 'xai', 'huggingface'];
 
 /**
  * Build the preference order for an employee session:
