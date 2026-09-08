@@ -33,7 +33,7 @@ check('memory-recall is safe', toolPermission('memory-recall') === 'safe');
 
 /* ---------------- Profiles ---------------- */
 check('three profiles exist', Object.keys(TOOL_PROFILES).length === 3);
-check('default profile is auto', ['auto', 'ask', 'full'].includes(activeToolProfile()));
+check('default profile is auto', ['auto', 'readonly', 'full'].includes(activeToolProfile())); // FINAL F4: 'ask' retired → 'readonly'
 setToolProfile('auto');
 check('profile can be set', activeToolProfile() === 'auto');
 setToolProfile('full');

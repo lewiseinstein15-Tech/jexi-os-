@@ -10,6 +10,9 @@ export default function SettingsView() {
   const [memory, setMemory] = useState(null);
   const [erasing, setErasing] = useState(false);
   const [team, setTeam] = useState(null);
+  const [toolProfiles, setToolProfiles] = useState(null); // FINAL F4 — permission profiles
+  const [toolProfile, setToolProfile] = useState(null);
+  const [toolBusy, setToolBusy] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -28,6 +31,14 @@ export default function SettingsView() {
       try {
         const t = await jexiFetch(`${getBackendUrl()}/api/team`);
         if (t.ok) setTeam((await t.json()).team || []);
+      } catch (e) { /* noop */ }
+      try {
+        const t = await jexiFetch(`${getBackendUrl()}/api/tools`);
+        if (t.ok) {
+          const td = await t.json();
+          if (td.profiles) setToolProfiles(td.profiles);
+          if (td.activeProfile) setToolProfile(td.activeProfile);
+        }
       } catch (e) { /* noop */ }
       try {
         const m = await jexiFetch(`${getBackendUrl()}/api/memory`);
@@ -110,6 +121,45 @@ export default function SettingsView() {
             >forget key</button>
           ) : (
             <span className="jx-st on">{providers && providers.github && providers.github.configured ? 'env' : 'no key'}</span>
+          )}
+        </div>
+
+        {/* FINAL F4 — the operator's mode switch. Server-enforced in
+            ToolRuntime; external/irreversible actions always ask first. */}
+        <div className="jx-grp">Safety</div>
+        <div className="jx-setline" style={{ alignItems: 'flex-start', flexDirection: 'column', gap: 8 }}>
+          <div className="lab"><b>Tool permissions</b><span>what JEXI may run on her own</span></div>
+          {toolProfiles ? (
+            <div className="jx-seg" role="radiogroup" aria-label="Tool permission profile">
+              {['readonly', 'auto', 'full'].filter((k) => toolProfiles[k]).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  role="radio"
+                  aria-checked={toolProfile === k}
+                  disabled={toolBusy}
+                  title={toolProfiles[k].desc}
+                  className={toolProfile === k ? 'on' : ''}
+                  onClick={async () => {
+                    if (toolProfile === k) return;
+                    setToolBusy(true);
+                    try {
+                      const r = await jexiFetch(`${getBackendUrl()}/api/tools/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile: k }) });
+                      const d = await r.json();
+                      if (d && d.success && d.profile) setToolProfile(d.profile);
+                    } catch { /* keeps the last confirmed value */ }
+                    setToolBusy(false);
+                  }}
+                >
+                  {toolProfiles[k].label || k}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span className="jx-st">…</span>
+          )}
+          {toolProfile && toolProfiles && toolProfiles[toolProfile] && (
+            <div className="lab"><span>{toolProfiles[toolProfile].desc}</span></div>
           )}
         </div>
 

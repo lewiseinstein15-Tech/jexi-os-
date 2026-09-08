@@ -58,6 +58,24 @@ export function repeatReminderFor(key, count) {
   return null;
 }
 
+/**
+ * FINAL F4 — doom-loop hard breaker (OpenCode rule: the same tool with the
+ * same arguments must never execute forever). The advisory reminders above
+ * stay, but at LOOP_BREAKER_LIMIT identical consecutive calls the loop
+ * STOPS EXECUTING that call and feeds back a breaker message instead: no
+ * side effects, no budget burn, and the turn iteration cap still bounds
+ * a model that refuses to change approach.
+ */
+export const LOOP_BREAKER_LIMIT = 5;
+
+export function loopBreakerMessage(tool, count) {
+  return `[LOOP BREAKER: \"${tool}\" with identical arguments was blocked after ${count} consecutive identical calls. It did NOT execute. Do NOT call it again with these arguments — use different arguments, another tool, or answer from the evidence you already have.]`;
+}
+
+export function loopBreakerTrips(repeatCount) {
+  return Number(repeatCount) >= LOOP_BREAKER_LIMIT;
+}
+
 /** planner.analyzeIntent returns a plan (intent/teamSlugs/steps/tools/toolsLine). */
 async function safePlan(query, image) {
   try {
@@ -237,6 +255,19 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
               results.push({ tool_call_id: call.id, content: 'ERROR: tool-call budget exhausted for this task.' });
               continue;
             }
+            // FINAL F4 — the breaker is checked BEFORE execution (and before the
+            // budget counter moves): a tripped call never runs and burns nothing.
+            const preKey = `${call.name}|${JSON.stringify(call.arguments || {})}`;
+            const preCount = preKey === lastCallKey ? repeatCount + 1 : 1;
+            if (loopBreakerTrips(preCount)) {
+              lastCallKey = preKey; repeatCount = preCount;
+              const msg = loopBreakerMessage(call.name, preCount);
+              try { emit('tool/call', { callId: call.id, name: call.name, arguments: JSON.stringify(call.arguments || {}).slice(0, 500), breaker: true }); } catch (e) {}
+              emit('agent.log', { message: `🛑 Loop breaker: blocked identical call #${preCount} to ${call.name} — no execution, no side effects.` });
+              toolContext.push({ tool: call.name, args: call.arguments || {}, ok: false, done: false, blocked: true, breaker: true, error: 'loop breaker tripped' });
+              results.push({ tool_call_id: call.id, content: msg });
+              continue;
+            }
             callsMade++;
             // B96 — dsh-style step events: tool/call + tool/result on the wire.
             try { emit('step/start', { turn: 1, step: callsMade }); } catch (e) {}
@@ -255,6 +286,10 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
             const callKey = `${call.name}|${JSON.stringify(call.arguments || {})}`;
             if (callKey === lastCallKey) repeatCount += 1;
             else { lastCallKey = callKey; repeatCount = 1; }
+            // FINAL F4 — TDZ fix: content is declared BEFORE the reminder
+            // appends to it (previously the 3rd identical call crashed the
+            // whole turn with "Cannot access 'content' before initialization").
+            let content = r.ok && r.result ? String(r.result).slice(0, 6000) : `ERROR: ${r.error || 'tool returned no output'}`;
             const reminder = repeatReminderFor(callKey, repeatCount);
             if (reminder) content = `${content}\n\n${reminder}`;
             if (r.paused || r.approvalRequired) {
@@ -266,7 +301,6 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
             if (r.routed) {
               emit('agent.log', { message: `🧭 ${call.name} is routed to its owning agents for the pipeline — it did NOT execute here, so it is not counted as a completed step.` });
             }
-            let content = r.ok && r.result ? String(r.result).slice(0, 6000) : `ERROR: ${r.error || 'tool returned no output'}`;
             results.push({ tool_call_id: call.id, content });
           }
           return results;

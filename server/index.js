@@ -734,7 +734,10 @@ app.post('/api/agent', async (req, res) => {
   }, 10 * 60 * 1000);
 
   try {
-    await runAgentLoop({ query, image, profile, sendEvent });
+    // FINAL F4 — profile rides inside opts (runAgentLoop reads opts.profile;
+    // the old top-level key was silently ignored, so per-request profiles
+    // never applied).
+    await runAgentLoop({ query, image, sendEvent, opts: profile ? { profile } : {} });
     finished = true;
     clearTimeout(deadline);
     finish();

@@ -569,19 +569,27 @@ export function isToolDone(res) {
   return true;
 }
 
-/** Permission profiles the user can pick in Settings. */
+/**
+ * Permission profiles the user picks in Settings → Tools (FINAL F4).
+ * Three honest modes — the old 'ask' profile is retired: it enforced
+ * exactly the read-only set while its description promised approvals that
+ * no execution path could grant. Legacy 'ask' settings transparently map
+ * to 'readonly' (same enforcement, honest name).
+ */
 export const TOOL_PROFILES = {
-  auto: { label: 'Auto', desc: 'Auto-run safe + medium tools; risky tools are blocked', allow: ['safe', 'medium'] },
-  ask: { label: 'Ask', desc: 'Auto-run safe tools; medium/risky need your approval', allow: ['safe'] },
+  readonly: { label: 'Read-only', desc: 'Run reads only; writes, code execution and external actions are blocked', allow: ['safe'] },
+  auto: { label: 'Standard', desc: 'Auto-run safe + medium tools; risky tools are blocked', allow: ['safe', 'medium'] },
   full: { label: 'Full', desc: 'Auto-run everything including code execution', allow: ['safe', 'medium', 'risky'] },
 };
 
 export function activeToolProfile() {
   const s = loadSettings();
+  if (s.toolProfile === 'ask') return 'readonly'; // legacy → same enforcement
   return TOOL_PROFILES[s.toolProfile] ? s.toolProfile : 'auto';
 }
 
 export function setToolProfile(profile) {
+  if (profile === 'ask') profile = 'readonly'; // legacy clients keep working
   if (!TOOL_PROFILES[profile]) throw new Error(`Unknown tool profile: ${profile}`);
   const s = loadSettings();
   s.toolProfile = profile;
@@ -1555,7 +1563,7 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
   // Permission gate
   const allowed = TOOL_PROFILES[useProfile]?.allow || [];
   if (!allowed.includes(perm)) {
-    const blocked = { ok: false, blocked: true, permission: perm, profile: useProfile, tool: slug, error: `${tool.name} needs ${perm} permission (profile: ${useProfile}). Switch to Full or Ask in Settings.`, durationMs: Date.now() - started };
+    const blocked = { ok: false, blocked: true, permission: perm, profile: useProfile, tool: slug, error: `${tool.name} needs ${perm} permission (profile: ${useProfile}). Switch to Standard or Full in Settings → Tools.`, durationMs: Date.now() - started };
     emit('tool.result', { tool: slug, ok: false, blocked: true, permission: perm, profile: useProfile, error: blocked.error, durationMs: blocked.durationMs });
     return blocked;
   }
