@@ -341,9 +341,13 @@ const clientBucketKey = (req) => {
   if (typeof sess === 'string' && /^[A-Za-z0-9_-]{8,80}$/.test(sess.trim())) return `sess:${sess.trim()}`;
   return clientIpKey(req);
 };
-const aiLimiter = rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false, keyGenerator: clientBucketKey, message: { error: 'Too many requests — JEXI is throttling to protect your quota. Try again in a minute.' } });
-const generalLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 600, standardHeaders: 'draft-7', legacyHeaders: false, keyGenerator: clientBucketKey });
-const ipBackstop = rateLimit({ windowMs: 15 * 60_000, limit: 2000, standardHeaders: 'draft-7', legacyHeaders: false, keyGenerator: clientIpKey });
+// LIMIT SPLIT (self-429 postmortem): the app's own pollers (mission rail +
+// inline card + screens) legitimately make ~60 reads/min from ONE user, so a
+// 600/15min bucket throttles real usage. Expensive chat stays STRICT + IP-keyed
+// (rotation-proof quota guard); cheap reads get headroom per session.
+const aiLimiter = rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false, keyGenerator: clientIpKey, message: { error: 'Too many requests — JEXI is throttling to protect your quota. Try again in a minute.' } });
+const generalLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 2400, standardHeaders: 'draft-7', legacyHeaders: false, keyGenerator: clientBucketKey });
+const ipBackstop = rateLimit({ windowMs: 15 * 60_000, limit: 6000, standardHeaders: 'draft-7', legacyHeaders: false, keyGenerator: clientIpKey });
 app.use(['/api/chat', '/api/vision', '/api/knowledge/search', '/api/agent'], aiLimiter);
 // ARENA PHASE 1 — the Executive Kernel fast path (small talk must never pay
 // the full pipeline) and per-request model-call accounting.

@@ -17,7 +17,7 @@ export const useMemory = (activeNav) => {
   useEffect(() => {
     if (activeNav !== 'memory') return;
     fetchMemory();
-    const interval = setInterval(fetchMemory, 3000);
+    const interval = setInterval(fetchMemory, 6000); // 429 fix: was 3s
     return () => clearInterval(interval);
   }, [activeNav, fetchMemory]);
 

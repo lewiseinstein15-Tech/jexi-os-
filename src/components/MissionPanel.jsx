@@ -58,7 +58,7 @@ export default function MissionPanel() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 5000);
+    const t = setInterval(load, 10000); // 429 fix: was 5s — halves rail traffic
     return () => clearInterval(t);
   }, [load]);
 

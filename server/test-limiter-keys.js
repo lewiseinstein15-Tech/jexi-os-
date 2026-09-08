@@ -18,9 +18,10 @@ const idx = fs.readFileSync('./index.js', 'utf-8');
 ok(idx.includes('x-jexi-session') && idx.includes('sess:${'), 'bucket key prefers the stable session id (survives carrier NAT)');
 ok(idx.includes('cf-connecting-ip'), 'IP key prefers CF-Connecting-IP (unspoofable via Cloudflare)');
 ok(idx.includes("x-forwarded-for") && idx.includes("split(',')[0]"), 'IP key falls back to first X-Forwarded-For entry');
-const keyed = (idx.match(/keyGenerator:\s*clientBucketKey/g) || []).length;
-ok(keyed >= 2, `ai + general limiters use the session-first bucket key (found ${keyed}, need 2+)`);
-ok(idx.includes('ipBackstop') && idx.includes("app.use('/api', ipBackstop)"), 'a loose IP-only backstop bounds session-rotation abuse');
+ok(/const aiLimiter = rateLimit\(\{[^}]*keyGenerator: clientIpKey/s.test(idx), 'ai limiter (expensive chat) is IP-keyed: rotation-proof quota guard');
+ok(/const generalLimiter = rateLimit\(\{[^}]*keyGenerator: clientBucketKey/s.test(idx), 'general limiter (cheap reads) is session-keyed: NAT-friendly');
+ok(/const generalLimiter = rateLimit\(\{[^}]*limit: 2400/s.test(idx), 'general budget fits real poller traffic (2400/15min)');
+ok(idx.includes('ipBackstop') && idx.includes("app.use('/api', ipBackstop)"), 'a loose IP-only backstop bounds floods');
 
 console.log(`\nLIMITER-KEYS: ${passed} passed, ${failedCount} failed.`);
 process.exit(failedCount ? 1 : 0);

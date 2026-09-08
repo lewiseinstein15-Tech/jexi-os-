@@ -41,7 +41,7 @@ export default function MissionInlineCard() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 4000);
+    const t = setInterval(load, 8000); // 429 fix: was 4s — halves chat-view traffic
     return () => clearInterval(t);
   }, [load]);
 
