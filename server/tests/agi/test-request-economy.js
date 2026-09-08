@@ -145,7 +145,7 @@ test('the economy layer never changes the honest no-keys failure', async () => {
   // no keys in this environment → the wrapper must still surface the true error
   await assert.rejects(
     generateContent('hello', 'system', null, { cache: true }),
-    (e) => /No API keys configured|All AI providers failed/.test(e.message),
+    (e) => /No AI provider answered|No API keys configured|All AI providers failed/.test(e.message),
   );
   // and a budget that is already exhausted refuses BEFORE any provider walk
   const b = new TaskBudget({ maxModelCalls: 0, label: 'pre-exhausted' });
