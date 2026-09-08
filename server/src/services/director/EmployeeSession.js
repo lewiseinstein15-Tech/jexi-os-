@@ -23,6 +23,12 @@ import { runWithModel } from './ModelRouter.js';
 import { Supervisor } from './Supervisor.js'; // B209 — live mid-work supervision
 import { checkToolPermission } from './Permissions.js'; // B209 — enforced tool gates
 import { runEmployeeCommand, isTestCommand, validateCommand, taskCommandDir } from './CommandRunner.js'; // B210 — real command execution for employees
+
+let __toolSeq = 0;
+/** Unique id pairing a tool's STARTED event with its completion (transcript rows via ToolUseBridge). */
+function nextToolId() {
+  return `e${Date.now().toString(36)}${(++__toolSeq).toString(36)}`;
+}
 import { runBrowserRound, browserToolInstructions } from './ComputerOps.js'; // B211 B3 — real browser driving for computer-ops employees
 import { WorldState } from './WorldState.js'; // B215 — real environment record (files/processes/browser)
 
@@ -189,19 +195,24 @@ export async function runEmployeeSession(p) {
   }
   if (wantsSearch && checkToolPermission(employee, 'web-search').allowed) {
     for (const q of brief.searchQueries.slice(0, 3)) {
+      // TOOL-USE BRIDGE: this search becomes a transcript row (running→done,
+      // real duration). The SEARCH_* pair carries the toolId; the TOOL_STARTED
+      // twin stays untagged so no second row is born.
+      const searchToolId = nextToolId();
+      const searchT0 = Date.now();
       emit('TOOL_STARTED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Searching: ${q}` });
-      emit('SEARCH_STARTED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Search: ${q}` });
+      emit('SEARCH_STARTED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Search: ${q}`, data: { toolId: searchToolId, kind: 'Read', slug: 'web-search', detail: `$ web-search ${String(q).slice(0, 300)}` } });
       try {
         const resultText = await tools.search(q);
         toolContext += `\n\n[web-search results for "${q}"]\n${String(resultText || '').slice(0, 12000)}`;
         emit('TOOL_COMPLETED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Search returned sources for "${q}".` });
-        emit('SEARCH_COMPLETED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Search finished: ${q}.` });
+        emit('SEARCH_COMPLETED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Search finished: ${q}.`, data: { toolId: searchToolId, kind: 'Read', slug: 'web-search', durationMs: Date.now() - searchT0, detail: `$ web-search ${String(q).slice(0, 300)}\n${countSources(resultText)} sources` } });
         mailbox.post(message({
           from: employee.agentId, to: 'jexi', taskId: task.id, subtaskId: subtask.id,
           type: 'FINDING', content: `Ran a search for "${q}" — ${countSources(resultText)} sources to work through.`, title: q,
         }));
       } catch (e) {
-        emit('TOOL_FAILED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Search failed for "${q}" — ${String(e.message || e).slice(0, 80)}`, severity: 'warn' });
+        emit('TOOL_FAILED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Search failed for "${q}" — ${String(e.message || e).slice(0, 80)}`, severity: 'warn', data: { toolId: searchToolId, kind: 'Read', slug: 'web-search', durationMs: Date.now() - searchT0, detail: `$ web-search ${String(q).slice(0, 300)}\nerror: ${String((e && e.message) || e).slice(0, 300)}` } });
         // tool failure is not fatal: the employee proceeds with less material
       }
     }
@@ -219,7 +230,10 @@ export async function runEmployeeSession(p) {
       const tool = String((call && call.tool) || '');
       const args = call && call.args && typeof call.args === 'object' && !Array.isArray(call.args) ? call.args : {};
       if (!server || !tool) continue;
-      emit('TOOL_STARTED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Live data: ${server} · ${tool}` });
+      // TOOL-USE BRIDGE: this live-data call becomes a transcript row (real duration).
+      const mcpToolId = nextToolId();
+      const mcpT0 = Date.now();
+      emit('TOOL_STARTED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Live data: ${server} · ${tool}`, data: { toolId: mcpToolId, kind: 'Read', slug: 'mcp-call', detail: `$ mcp ${server} ${tool}` } });
       try {
         // 120s boot budget: the FIRST call on a cold server pays its startup
         // (npx/uvx boot can exceed the default 30s on slow hosts) — the same
@@ -229,16 +243,16 @@ export async function runEmployeeSession(p) {
           const content = (r.result && Array.isArray(r.result.content)) ? r.result.content : [];
           const text = content.map((c) => c && c.text ? c.text : '').join('\n').trim() || JSON.stringify(r.result).slice(0, 12_000);
           toolContext += `\n\n[live data from the "${server}" service — tool "${tool}", REAL result. Ground your deliverable in this data and cite the service. If the data you need is NOT in here, say exactly that — NEVER invent values, NEVER present "simulated" numbers, and NEVER promise that data will arrive later.]\n${String(text).slice(0, 12_000)}`;
-          emit('TOOL_COMPLETED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Live data received from ${server} · ${tool}.` });
+          emit('TOOL_COMPLETED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Live data received from ${server} · ${tool}.`, data: { toolId: mcpToolId, kind: 'Read', slug: 'mcp-call', durationMs: Date.now() - mcpT0, detail: `$ mcp ${server} ${tool}\n${String(text).length} chars received` } });
           mailbox.post(message({
             from: employee.agentId, to: 'jexi', taskId: task.id, subtaskId: subtask.id,
             type: 'FINDING', content: `Pulled real data from the ${server} service (${tool}) for this assignment.`, title: `${server}:${tool}`,
           }));
         } else {
-          emit('TOOL_FAILED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Live data unavailable (${server} · ${tool}): ${String((r && r.error) || 'unknown error').slice(0, 90)}`, severity: 'warn' });
+          emit('TOOL_FAILED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Live data unavailable (${server} · ${tool}): ${String((r && r.error) || 'unknown error').slice(0, 90)}`, severity: 'warn', data: { toolId: mcpToolId, kind: 'Read', slug: 'mcp-call', durationMs: Date.now() - mcpT0, detail: `$ mcp ${server} ${tool}\nerror: ${String((r && r.error) || 'unknown error').slice(0, 300)}` } });
         }
       } catch (e) {
-        emit('TOOL_FAILED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Live data call failed (${server} · ${tool}) — proceeding without it.`, severity: 'warn' });
+        emit('TOOL_FAILED', { agentId: employee.agentId, agentName: employee.displayName, summary: `Live data call failed (${server} · ${tool}) — proceeding without it.`, severity: 'warn', data: { toolId: mcpToolId, kind: 'Read', slug: 'mcp-call', durationMs: Date.now() - mcpT0, detail: `$ mcp ${server} ${tool}\nerror: ${String((e && e.message) || e).slice(0, 300)}` } });
       }
     }
   }
@@ -353,10 +367,12 @@ export async function runEmployeeSession(p) {
       for (const cmd of requests.slice(0, 4)) {
         const asTest = isTestCommand(cmd);
         const cmdLabel = cmd.length > 70 ? `${cmd.slice(0, 67)}…` : cmd;
+        // TOOL-USE BRIDGE: this command becomes a Bash transcript row (real ms + output).
+        const cmdToolId = nextToolId();
         emit(asTest ? 'TEST_STARTED' : 'COMMAND_STARTED', {
           agentId: employee.agentId, agentName: employee.displayName,
           summary: `${employee.displayName} runs \`${cmdLabel}\`${asTest ? ' (tests)' : ''}.`,
-          data: { command: cmd, round: commandRounds },
+          data: { toolId: cmdToolId, kind: 'Bash', slug: asTest ? 'test' : 'command', command: cmd, round: commandRounds, detail: `$ ${cmd}` },
         });
         totalCommandsExecuted++;
         const r = await runEmployeeCommand({ taskId: task.id, workspaceId: task.workspaceId || null, command: cmd });
@@ -371,13 +387,14 @@ export async function runEmployeeSession(p) {
         const verdict = r.blocked ? `blocked (${r.reason})`
           : r.timedOut ? `timed out after ${r.ms}ms`
           : r.ok ? `exit 0 in ${r.ms}ms` : `exit ${r.exitCode} in ${r.ms}ms`;
+        const cmdDetail = `$ ${cmd}\n[exit ${r.exitCode}${r.timedOut ? ' · timed out' : ''}${r.blocked ? ` · ${r.reason}` : ''}]\n${r.output || '(no output)'}`;
         emit(evtType, {
           agentId: employee.agentId, agentName: employee.displayName,
           summary: `\`${cmdLabel}\` → ${verdict}.${asTest ? (r.ok ? ' Tests passed.' : ' Tests FAILED.') : ''}`,
           severity: r.ok ? 'info' : 'warn',
-          data: { command: cmd, exitCode: r.exitCode, ms: r.ms, bytes: r.output.length, round: commandRounds },
+          data: { toolId: cmdToolId, kind: 'Bash', slug: asTest ? 'test' : 'command', command: cmd, exitCode: r.exitCode, ms: r.ms, bytes: r.output.length, round: commandRounds, durationMs: r.ms, detail: cmdDetail.slice(0, 3500) },
         });
-        results.push(`$ ${cmd}\n[exit ${r.exitCode}${r.timedOut ? ' · timed out' : ''}${r.blocked ? ` · ${r.reason}` : ''}]\n${r.output || '(no output)'}`);
+        results.push(cmdDetail);
       }
       commandContext += `\n\n# COMMAND RESULTS (real execution in your task workspace — round ${commandRounds})\n${results.join('\n\n')}\n\nDeliver your final structured output now (REPORT / DELIVERABLE / CONFIDENCE), using the real results above. You may run one more round of commands if genuinely needed.`;
         }

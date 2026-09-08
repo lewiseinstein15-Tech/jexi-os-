@@ -28,6 +28,7 @@ import { rankEmployees, selectEmployee, getEmployee, appendEmployeeHistory } fro
 import { runEmployeeCommand } from './CommandRunner.js'; // B210 — the execution backstop
 import { checkToolPermission } from './Permissions.js'; // B210 — executor check
 import { telemetry } from './Telemetry.js';
+import { missionEventToToolUse } from './ToolUseBridge.js'; // transcript rows for real tool runs
 import { runEmployeeSession, assembleBrief } from './EmployeeSession.js';
 import { verifyDeliverable, acceptanceGates } from './Verifier.js';
 import { structureObjective } from './ObjectiveInterpreter.js'; // B215 — provenance-tagged objective state
@@ -109,6 +110,9 @@ export class Director {
       if (evt.type !== 'OBJECTIVE_INTERPRETED') {
         try { sendEvent('log', { agent: evt.agentName, message: evt.summary }); } catch { /* same */ }
       }
+      // TOOL-USE BRIDGE: real tool executions also become transcript rows.
+      const toolUse = missionEventToToolUse(evt);
+      if (toolUse) { try { sendEvent('tool_use', toolUse); } catch { /* same */ } }
       return evt;
     };
     const narrate = (text) => { if (text) { try { sendEvent('narration', { text }); } catch { /* same */ } } };

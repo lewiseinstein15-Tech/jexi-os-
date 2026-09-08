@@ -29,6 +29,7 @@ import { analyzeObjective } from './ComplexityAnalyzer.js';
 import { imagine, comparePredictedVsActual } from './ImaginationEngine.js';
 import { recordLesson, retrieveLessons, formatLessonsBlock, lessonCount } from './Lessons.js';
 import { loadWorldState, runtimeCapabilities } from './WorldState.js'; // B215 — real environment record
+import { missionEventToToolUse } from './ToolUseBridge.js'; // transcript rows for real tool runs
 
 const MAX_PARALLEL = 3;
 const PLAN_MAX_ITEMS = 8;
@@ -1087,6 +1088,9 @@ Output ONLY JSON: {"affectedItemIds":["wi-..."],"newItems":[{"title":"...","deta
       try {
         sendEvent('team', { event: evt });
         if (evt.type !== 'MISSION_CREATED') sendEvent('log', { agent: (evt.data && evt.data.agentName) || 'JEXI', message: evt.summary });
+        // TOOL-USE BRIDGE: real tool executions also become transcript rows.
+        const toolUse = missionEventToToolUse(evt);
+        if (toolUse) sendEvent('tool_use', toolUse);
       } catch { /* viewer gone; work continues */ }
     });
     // REPLAY: a viewer that attaches late (or reconnects) first receives the
