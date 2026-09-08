@@ -2749,8 +2749,9 @@ app.get('/api/browser/status', (req, res) => {
   });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🧠 JEXI OS BRAIN running on port ${PORT}`);
+const HOST = process.env.HOST || '0.0.0.0'; // CLI sets HOST=127.0.0.1 for a laptop-only brain
+app.listen(PORT, HOST, () => {
+  console.log(`🧠 JEXI OS BRAIN running on http://${HOST}:${PORT}`);
   // PERMANENT drop fix: visible proof the heap cap is active (OOM-kill was
   // dropping mid-task streams on 512MB hosts — see NODE_OPTIONS).
   try { console.log(`[boot] v8 heap cap: ${Math.round(v8.getHeapStatistics().heap_size_limit / 1048576)}MB (rss ${Math.round(process.memoryUsage().rss / 1048576)}MB)`); } catch (e) {}
