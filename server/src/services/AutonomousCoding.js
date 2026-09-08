@@ -16,6 +16,7 @@ import { listPluginTools } from './PluginContext.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { listWorkspace } from './WorkspaceRuntime.js';
 import { recordLesson, retrieveLessons, formatLessonsBlock } from './director/Lessons.js'; // M5 — the coder learns from past builds
+import { deterministicCodeChecks, judgeVerdict } from './CodeJudge.js'; // M6 — independent judge gate
 import { WORKSPACE_DIR } from '../config.js';
 
 const MAX_ITERATIONS = 12;
@@ -167,7 +168,7 @@ export async function runAutonomousCoding({ query, convId = null, sendEvent = ()
     finalText = `### ⚠ JEXI OS\n\nI could not complete the build because the AI providers were temporarily unavailable. ${reason ? 'Details: ' + reason.slice(0, 300) : ''}\n\nPlease try again in about a minute — or add another provider key in Settings → System.`;
     success = true;
   } else {
-    emit('log', { agent: 'Coder', message: `🎯 Build complete — ${uniqueFiles.length} file(s) written, verified by running.` });
+    emit('log', { agent: 'Coder', message: `🎯 Build complete — ${uniqueFiles.length} file(s) written. Running the independent judge gate…` });
   }
 
   // M5 — the build teaches the NEXT build. Keyed off TOOL evidence (the
@@ -197,11 +198,39 @@ export async function runAutonomousCoding({ query, convId = null, sendEvent = ()
     }
   } catch { /* lesson recording must never break the result */ }
 
+  // M6 — INDEPENDENT JUDGE GATE. Deterministic checks always run (offline);
+  // the reviewer/security passes run best-effort when a model is reachable.
+  // No files → nothing to judge (gate stays null, never a fake pass).
+  let gate = null;
+  if (uniqueFiles.length) {
+    try {
+      const fileNames = uniqueFiles.map((f) => f.path);
+      const checks = deterministicCodeChecks(WORKSPACE_DIR, fileNames);
+      const qaReport = toolContext.length
+        ? `Tool activity (${toolContext.length} calls):\n${toolContext.slice(-12).map((c) => `- ${c.tool}: ${c.ok ? 'ok' : `ERROR ${String(c.error || '').slice(0, 160)}`}`).join('\n')}`
+        : 'No tool activity recorded.';
+      let reviewVerdict = null, secVerdict = null;
+      try {
+        const { runReviewerPass, runSecurityPass } = await import('./SkillChain.js');
+        const r = await runReviewerPass({ query, plan: null, files: fileNames, qaReport, sendEvent: emit }).catch(() => null);
+        if (r) reviewVerdict = r.verdict || null;
+        const s = await runSecurityPass({ files: fileNames, qaReport, review: r ? r.review : '', sendEvent: emit }).catch(() => null);
+        if (s) secVerdict = s.verdict || null;
+      } catch { /* model passes are best-effort — UNKNOWN, never fake */ }
+      const v = judgeVerdict({ checks, reviewVerdict, secVerdict });
+      gate = { verdict: v.verdict, checks, review: reviewVerdict, security: secVerdict, reasons: v.reasons };
+      const icon = v.verdict === 'PASS' ? '✅' : v.verdict === 'FAIL' ? '❌' : '❔';
+      emit('log', { agent: 'Judge', message: `${icon} Judge gate: ${v.verdict} — ${v.reasons.join(' · ').slice(0, 300)}` });
+      finalText += `\n\nJudge gate: ${v.verdict} — ${v.reasons.join(' · ').slice(0, 200)}`;
+    } catch { /* the gate must never break the result */ }
+  }
+
   return {
     success,
     summary: success ? finalText : '### ⚠ JEXI OS\n\nI could not complete the build right now (AI providers unavailable). Please try again in a minute.',
     files: uniqueFiles,
     ...(preview ? { preview } : {}),
+    gate,
     statistics: {
       executionTime: Date.now() - start,
       agentsUsed: 1,
@@ -214,6 +243,7 @@ export async function runAutonomousCoding({ query, convId = null, sendEvent = ()
       contextTrimmed: contextStats.trimmed ?? [],
       lesson: lessonKind,
       lessonsInjected,
+      verdict: gate ? gate.verdict : null,
     },
   };
 }
