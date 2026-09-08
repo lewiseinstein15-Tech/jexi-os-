@@ -95,6 +95,10 @@ export default function SettingsView() {
           <div className="lab"><b>AI providers</b><span>all healthy right now</span></div>
           <span className="jx-st on">{providerCount !== null ? `${providerCount} configured` : '…'}</span>
         </div>
+        <div className="jx-setline">
+          <div className="lab"><b>GitHub</b><span>one-time paste in chat · never stored</span></div>
+          <span className="jx-st on">{providers && providers.github && providers.github.configured ? (providers.github.source === 'session' ? 'key active' : 'env') : 'no key'}</span>
+        </div>
 
         <div className="jx-grp">Meet the team</div>
         <div className="jx-setline" style={{ alignItems: 'flex-start', flexDirection: 'column', gap: 6 }}>
