@@ -143,12 +143,14 @@ ok(
 );
 
 // 6b. B74 — vLLM is part of the general provider walk too (right before the
-//     slow HF free tier; huggingface must stay last per test-roster-skills).
+//     slow HF free tier; pollinations (keyless last resort) stays last per
+//     test-roster-skills, huggingface just before it).
 ok(providerOrder().includes('vllm'), 'vLLM is in the general provider walk');
 ok(providerOrder().includes('nvidia'), 'NVIDIA NIM (no-card free tier) is in the general provider walk');
 ok(!providerOrder().includes('sambanova'), 'payment-gated sambanova removed from the general provider walk');
 ok(!['cerebras', 'deepinfra', 'xai', 'deepseek'].some((k) => providerOrder().includes(k)), 'no payment-gated provider in the general provider walk');
-ok(providerOrder()[providerOrder().length - 1] === 'huggingface', 'general order keeps huggingface last (vLLM sits just before it)');
+ok(providerOrder()[providerOrder().length - 1] === 'pollinations', 'general order keeps pollinations (keyless last resort) last');
+ok(providerOrder()[providerOrder().length - 2] === 'huggingface', 'huggingface rides just before the keyless leg');
 ok(COWORKERS.fallback.providers[0].key === 'vllm', 'vLLM leads the last-resort fallback tier (self-hosted free inference)');
 
 // 7. workerRoster() (Models screen) reflects the free-first chains.
