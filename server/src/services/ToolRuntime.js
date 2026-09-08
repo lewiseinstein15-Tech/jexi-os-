@@ -315,7 +315,7 @@ export const TOOL_OUTPUT_SCHEMAS = {
   // B127 — tappable preview URLs.
   'preview-server': z.object({ ok: z.boolean(), kind: z.literal('preview').optional(), url: z.string().optional(), file: z.string().optional(), note: z.string().optional(), error: z.string().optional() }).passthrough(),
   // B131 — LSP code intelligence contract (dsh tool-lsp).
-  'lsp': z.object({ ok: z.boolean(), kind: z.enum(['locations', 'hover']).optional(), locations: z.array(z.object({ uri: z.string(), range: z.unknown() })).optional(), resolvedWorkspaceUri: z.string().optional(), hover: z.unknown().nullable().optional(), error: z.string().optional() }).passthrough(),
+  'lsp': z.object({ ok: z.boolean(), kind: z.enum(['locations', 'hover', 'symbols', 'diagnostics']).optional(), locations: z.array(z.object({ uri: z.string(), range: z.unknown() })).optional(), resolvedWorkspaceUri: z.string().optional(), hover: z.unknown().nullable().optional(), symbols: z.array(z.unknown()).optional(), truncated: z.boolean().optional(), diagnostics: z.array(z.unknown()).optional(), supported: z.boolean().optional(), file: z.string().optional(), note: z.string().optional(), error: z.string().optional() }).passthrough(), // M7 — symbols + diagnostics kinds
   // B132 — goal tools (dsh tool-goal).
   'get_goal': z.object({ ok: z.boolean(), goal: z.unknown().nullable().optional(), error: z.string().optional() }).passthrough(),
   'create_goal': z.object({ ok: z.boolean(), goal_id: z.string().optional(), revision: z.number().optional(), objective: z.string().optional(), started: z.boolean().optional(), note: z.string().optional(), error: z.string().optional() }).passthrough(),

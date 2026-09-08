@@ -10,6 +10,14 @@
  *   → { kind: 'locations', locations: [{uri, range:{start, end}}], resolvedWorkspaceUri }
  *   → { kind: 'hover', hover: { contents, range? } | null }
  *
+ * M7 extensions (same tool, more code intelligence):
+ *   lsp({ operation: documentSymbols, file_path })
+ *   → { kind: 'symbols', symbols: [{name, kind, file, line, col}] }
+ *   lsp({ operation: workspaceSymbols, query? })
+ *   → { kind: 'symbols', symbols: [...], truncated }
+ *   lsp({ operation: diagnostics, file_path })
+ *   → { kind: 'diagnostics', diagnostics: [{file, line, character, message, severity}], supported }
+ *
  * Backed by a built-in workspace symbol indexer (no external LSP server, no
  * node_modules needed): declarations/definitions are indexed from the
  * workspace files, references are word-boundary occurrences (the declaration
@@ -22,9 +30,10 @@ import fs from 'fs';
 import path from 'path';
 import { WORKSPACE_DIR } from '../../src/config.js';
 import { listWorkspace } from '../../src/services/WorkspaceRuntime.js';
+import { diagnoseJsFile } from '../../src/services/CodeJudge.js'; // M7 — real JS diagnostics
 
 export const name = 'lsp';
-export const version = '1.0.0';
+export const version = '1.1.0';
 export const inject = ['tools', 'skills', 'events'];
 
 const MAX_LOCATIONS = 50;
@@ -33,7 +42,8 @@ const LSP_TIMEOUT_MS = 60000;
 const MAX_FILE_CHARS = 400000;
 const MAX_FILES = 400;
 
-const OPERATIONS = ['goToDefinition', 'findReferences', 'goToImplementation', 'hover'];
+const OPERATIONS = ['goToDefinition', 'findReferences', 'goToImplementation', 'hover', 'documentSymbols', 'workspaceSymbols', 'diagnostics'];
+const CURSOR_OPS = new Set(['goToDefinition', 'findReferences', 'goToImplementation', 'hover']);
 
 const CODE_EXTS = new Set(['js', 'jsx', 'ts', 'tsx', 'py', 'html', 'css', 'json', 'md', 'sh', 'yml', 'yaml', 'c', 'cpp', 'h', 'java', 'go', 'rb', 'php', 'rs', 'kt', 'swift', 'vue', 'svelte']);
 
@@ -154,12 +164,13 @@ export async function apply(ctx) {
   const unregister = ctx.tools.register({
     slug: 'lsp',
     name: 'LSP',
-    desc: 'Query a language server for precise code navigation. operation is one of goToDefinition, findReferences, goToImplementation, hover. line and character are one-based UTF-16 cursor coordinates. findReferences includes the declaration.',
+    desc: 'Query a language server for precise code navigation. operation is one of goToDefinition, findReferences, goToImplementation, hover, documentSymbols, workspaceSymbols, diagnostics. line and character are one-based UTF-16 cursor coordinates (cursor ops only). findReferences includes the declaration. documentSymbols lists one file; workspaceSymbols searches all (optional query); diagnostics reports JS syntax errors with line numbers.',
     args: {
-      operation: { type: 'string', required: true, desc: 'goToDefinition | findReferences | goToImplementation | hover' },
-      file_path: { type: 'string', required: true, desc: 'The source file to query, relative to the workspace.' },
-      line: { type: 'number', required: true, desc: 'One-based line of the cursor.' },
-      character: { type: 'number', required: true, desc: 'One-based UTF-16 column of the cursor.' },
+      operation: { type: 'string', required: true, desc: 'goToDefinition | findReferences | goToImplementation | hover | documentSymbols | workspaceSymbols | diagnostics' },
+      file_path: { type: 'string', required: false, desc: 'The source file to query, relative to the workspace (required except workspaceSymbols).' },
+      line: { type: 'number', required: false, desc: 'One-based line of the cursor (cursor ops only).' },
+      character: { type: 'number', required: false, desc: 'One-based UTF-16 column of the cursor (cursor ops only).' },
+      query: { type: 'string', required: false, desc: 'Substring filter for workspaceSymbols (case-insensitive).' },
     },
     timeoutMs: LSP_TIMEOUT_MS,
     handler: async (args) => {
@@ -168,14 +179,51 @@ export async function apply(ctx) {
       const line = Number(args && args.line);
       const character = Number(args && args.character);
       if (!OPERATIONS.includes(operation)) return { ok: false, error: `operation must be one of ${OPERATIONS.join(', ')}` };
-      if (!filePath) return { ok: false, error: 'file_path required' };
-      if (!Number.isInteger(line) || line < 1 || !Number.isInteger(character) || character < 1) {
+      const query = String((args && args.query) || '').trim().toLowerCase();
+      // M7 — per-operation requirements (cursor ops need a position; symbol
+      // and diagnostic ops need only a file; workspaceSymbols needs nothing).
+      if (operation !== 'workspaceSymbols' && !filePath) return { ok: false, error: 'file_path required' };
+      if (CURSOR_OPS.has(operation) && (!Number.isInteger(line) || line < 1 || !Number.isInteger(character) || character < 1)) {
         return { ok: false, error: 'line and character are required one-based integers' };
       }
-      const full = path.join(WORKSPACE_DIR, filePath);
-      if (!fs.existsSync(full)) return { ok: false, error: `file not found: ${filePath}` };
+      const full = filePath ? path.join(WORKSPACE_DIR, filePath) : null;
+      if (full && !fs.existsSync(full)) return { ok: false, error: `file not found: ${filePath}` };
 
       const { symbols } = indexWorkspace();
+
+      // M7 — documentSymbols: every indexed symbol in one file.
+      if (operation === 'documentSymbols') {
+        const list = (symbols.get(filePath) || []).map((s) => ({ name: s.name, kind: s.kind, file: filePath, line: s.line, col: s.col + 1 }));
+        return { ok: true, kind: 'symbols', symbols: list.slice(0, MAX_LOCATIONS) };
+      }
+
+      // M7 — workspaceSymbols: every indexed symbol, optional query filter.
+      if (operation === 'workspaceSymbols') {
+        const all = [];
+        for (const [file, list] of symbols) {
+          for (const s of list) {
+            if (query && !s.name.toLowerCase().includes(query)) continue;
+            all.push({ name: s.name, kind: s.kind, file, line: s.line, col: s.col + 1 });
+          }
+        }
+        const truncated = all.length > MAX_LOCATIONS;
+        return { ok: true, kind: 'symbols', symbols: all.slice(0, MAX_LOCATIONS), truncated };
+      }
+
+      // M7 — diagnostics: real JS syntax errors with line numbers; other
+      // languages honestly report no engine instead of fake-clean.
+      if (operation === 'diagnostics') {
+        const ext = path.extname(filePath).slice(1).toLowerCase();
+        if (!['js', 'mjs', 'cjs', 'jsx'].includes(ext)) {
+          return { ok: true, kind: 'diagnostics', supported: false, file: filePath, diagnostics: [], note: `no diagnostics engine for .${ext || '?'} — only JS is checked` };
+        }
+        const d = diagnoseJsFile(full);
+        return {
+          ok: true, kind: 'diagnostics', supported: true, file: filePath,
+          diagnostics: d.pass ? [] : [{ file: filePath, line: d.line, character: d.character, message: d.message, severity: 'error' }],
+        };
+      }
+
       const name = wordAt(filePath, line, character);
       if (!name) return { ok: false, error: `no identifier at ${filePath}:${line}:${character} — move the cursor onto a symbol` };
 

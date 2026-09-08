@@ -19,6 +19,30 @@ const MAX_JUDGED_FILES = 20;
 const MAX_FILE_BYTES = 300000;
 
 /**
+ * M7 — structured JS diagnosis for one absolute file path.
+ * Returns { pass, line|null, character|null, message } (1-based).
+ * Never throws (unreadable files report pass:false with the reason).
+ */
+export function diagnoseJsFile(absPath) {
+  const file = String(absPath || '');
+  try {
+    if (!file || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+      return { pass: false, line: null, character: null, message: `not a readable file: ${file.slice(0, 120)}` };
+    }
+    execFileSync(process.execPath, ['--check', file], { timeout: 10000, stdio: 'pipe' });
+    return { pass: true, line: null, character: null, message: 'node --check passed' };
+  } catch (e) {
+    const raw = String((e && e.stderr) || (e && e.message) || 'syntax error');
+    // node --check prints "<file>:<line>\n<detail...>" — recover the line.
+    let line = null;
+    const m = raw.match(/:(\d+)\s*\n/);
+    if (m) line = Number(m[1]);
+    const detail = raw.split('\n').slice(1).join(' ').replace(/\s+/g, ' ').trim().slice(0, 220) || 'syntax error';
+    return { pass: false, line, character: null, message: detail };
+  }
+}
+
+/**
  * Deterministic checks over delivered files (offline, no model).
  * @param {string} workspaceDir live staging area the paths resolve against
  * @param {string[]} files workspace-relative file paths
@@ -51,13 +75,10 @@ export function deterministicCodeChecks(workspaceDir, files = []) {
     checks.push({ name: `nonempty:${rel}`, pass: true, detail: `${size} bytes` });
     if (size > MAX_FILE_BYTES) continue; // too big to syntax-check; presence is the claim
     if (/\.m?jsx?$/.test(rel)) {
-      try {
-        execFileSync(process.execPath, ['--check', target], { timeout: 10000, stdio: 'pipe' });
-        checks.push({ name: `syntax:${rel}`, pass: true, detail: 'node --check passed' });
-      } catch (e) {
-        const msg = String((e && e.stderr) || (e && e.message) || 'syntax error').slice(0, 220).replace(/\s+/g, ' ');
-        checks.push({ name: `syntax:${rel}`, pass: false, detail: `node --check failed: ${msg}` });
-      }
+      const d = diagnoseJsFile(target);
+      checks.push(d.pass
+        ? { name: `syntax:${rel}`, pass: true, detail: 'node --check passed' }
+        : { name: `syntax:${rel}`, pass: false, detail: `node --check failed${d.line ? ` (line ${d.line})` : ''}: ${d.message}` });
     }
   }
   return checks;
