@@ -14,7 +14,13 @@ const researchDef = {
   name: 'research',
   inputSchema: {
     type: 'object',
-    properties: { question: { type: 'string' }, freshness: { type: 'string', enum: ['day', 'week', 'month', 'year'] }, max_results: { type: 'number' } },
+    properties: {
+      question: { type: 'string' },
+      // the REAL advertised shape: Optional[Literal[..]] nests the enum inside anyOf
+      freshness: { anyOf: [{ enum: ['day', 'week', 'month', 'year'], type: 'string' }, { type: 'null' }], default: null },
+      format: { type: 'string', enum: ['markdown', 'json'] },
+      max_results: { type: 'number' },
+    },
     required: ['question'],
   },
 };
@@ -57,6 +63,11 @@ test('enum-violating values are pruned so the server default applies (live fresh
 test('valid enum values pass through with the identical object', () => {
   const args = { question: 'x', freshness: 'week' };
   assert.equal(applyMcpArgAliases(researchDef, args), args);
+});
+
+test('top-level enums prune the same way', () => {
+  const out = applyMcpArgAliases(researchDef, { question: 'x', format: 'yaml' });
+  assert.equal(out.format, undefined);
 });
 
 test('non-required fields are never invented', () => {

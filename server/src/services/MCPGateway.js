@@ -632,6 +632,21 @@ function aliasTypeFits(want, value) {
   return true;
 }
 
+/** Enum options for a schema node — pydantic serializes Optional[Literal[..]]
+ *  as anyOf:[{enum:[..]}, {type:'null'}], so look inside anyOf/oneOf too. */
+function schemaEnumValues(spec) {
+  if (!spec || typeof spec !== 'object') return null;
+  if (Array.isArray(spec.enum) && spec.enum.length) return spec.enum;
+  for (const key of ['anyOf', 'oneOf']) {
+    const alts = spec[key];
+    if (!Array.isArray(alts)) continue;
+    for (const alt of alts) {
+      if (alt && Array.isArray(alt.enum) && alt.enum.length) return alt.enum;
+    }
+  }
+  return null;
+}
+
 export function applyMcpArgAliases(toolDef, args) {
   const schema = toolDef && toolDef.inputSchema ? toolDef.inputSchema : null;
   const required = schema && Array.isArray(schema.required) ? schema.required : [];
@@ -653,8 +668,8 @@ export function applyMcpArgAliases(toolDef, args) {
   }
   const src = out || args;
   for (const [field, spec] of Object.entries(props)) {
-    const allowed = spec && Array.isArray(spec.enum) ? spec.enum : null;
-    if (!allowed || !allowed.length) continue;
+    const allowed = schemaEnumValues(spec);
+    if (!allowed) continue;
     const v = src[field];
     if (v !== undefined && v !== null && !allowed.includes(v)) {
       if (!out) out = { ...args };

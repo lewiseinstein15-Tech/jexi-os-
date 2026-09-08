@@ -129,6 +129,18 @@ export function sanitizeJsonSchema(schema, depth = 0) {
   else if (schema.properties || schema.required) out.type = 'object';
   if (schema.description && typeof schema.description === 'string') out.description = schema.description.slice(0, 180);
   if (Array.isArray(schema.enum)) out.enum = schema.enum.slice(0, 24);
+  if (!out.enum) {
+    // pydantic Optional[Literal[..]] nests the enum inside anyOf/oneOf —
+    // hoist it so menus (and validators) see the allowed values.
+    for (const key of ['anyOf', 'oneOf']) {
+      const alts = schema[key];
+      if (!Array.isArray(alts)) continue;
+      for (const alt of alts) {
+        if (alt && Array.isArray(alt.enum) && alt.enum.length) { out.enum = alt.enum.slice(0, 24); break; }
+      }
+      if (out.enum) break;
+    }
+  }
   if (schema.default !== undefined && ['string', 'number', 'boolean'].includes(typeof schema.default)) out.default = schema.default;
   if (schema.items) out.items = sanitizeJsonSchema(schema.items, depth + 1);
   if (schema.properties && typeof schema.properties === 'object') {
