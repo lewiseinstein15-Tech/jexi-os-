@@ -15,6 +15,7 @@ import { loadSkillForModel } from './SkillDiscovery.js';
 import { listPluginTools } from './PluginContext.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { listWorkspace } from './WorkspaceRuntime.js';
+import { recordLesson, retrieveLessons, formatLessonsBlock } from './director/Lessons.js'; // M5 — the coder learns from past builds
 import { WORKSPACE_DIR } from '../config.js';
 
 const MAX_ITERATIONS = 12;
@@ -48,8 +49,20 @@ export async function runAutonomousCoding({ query, convId = null, sendEvent = ()
   // what its tools see), and the compile stats ride home in `statistics`.
   // Empty/missing staging area maps to '' — the section simply disappears.
   const contextStats = {};
-  const system = await assemblePrompt({ convId, codeMode: false, presetFlavor: '', repoRoot: WORKSPACE_DIR, stats: contextStats })
+  let system = await assemblePrompt({ convId, codeMode: false, presetFlavor: '', repoRoot: WORKSPACE_DIR, stats: contextStats })
     + (skill ? `\n## CODER SKILL (loaded)\n${String(skill.content).slice(0, 6000)}\n` : '');
+  // M5 — past build lessons join the brief (offline retrieval, empty when
+  // nothing real matches). Visible in the event stream for transparency.
+  let lessonsInjected = 0;
+  try {
+    const past = retrieveLessons(query, 2);
+    const block = formatLessonsBlock(past);
+    if (block) {
+      system += `\n${block}\n`;
+      lessonsInjected = past.length;
+      emit('log', { agent: 'Coder', message: `📚 ${past.length} past build lesson(s) inform this run — avoiding known failure modes.` });
+    }
+  } catch { /* lessons must never break the build */ }
 
   const toolContext = [];
   const files = [];
@@ -61,7 +74,8 @@ export async function runAutonomousCoding({ query, convId = null, sendEvent = ()
       for (const call of calls || []) {
         const item = (over && over.find((x) => x && x.tool_call_id === call.id)) || {};
         const content = String(item.content || '');
-        toolContext.push({ tool: call.name, ok: !/^ERROR/.test(content), error: null });
+        const failed = /^ERROR/.test(content);
+        toolContext.push({ tool: call.name, ok: !failed, error: failed ? content.replace(/^ERROR:\s*/, '').slice(0, 300) : null });
         if ((call.name === 'write' || call.name === 'edit') && !/^ERROR/.test(content)) {
           try { const parsed = JSON.parse(content); if (parsed.path) files.push({ path: parsed.path, operation: parsed.operation || 'write', size: parsed.size || null }); } catch { /* noop */ }
         }
@@ -156,6 +170,33 @@ export async function runAutonomousCoding({ query, convId = null, sendEvent = ()
     emit('log', { agent: 'Coder', message: `🎯 Build complete — ${uniqueFiles.length} file(s) written, verified by running.` });
   }
 
+  // M5 — the build teaches the NEXT build. Keyed off TOOL evidence (the
+  // `success` flag is nearly always true — degraded provider-outage runs
+  // carry no work lesson and record nothing).
+  let lessonKind = null;
+  try {
+    const errors = toolContext.filter((c) => !c.ok);
+    const last = errors[errors.length - 1];
+    const lastSig = last ? `${last.tool}: ${String(last.error || 'error').slice(0, 140)}` : '';
+    if (errors.length && uniqueFiles.length) {
+      recordLesson({
+        kind: 'recovery', missionId: convId || null, objective: `autonomous build: ${query}`.slice(0, 300),
+        cause: lastSig, strategy: `fix loop over ${toolContext.length} tool call(s), ${errors.length} error(s)`,
+        lesson: `Build "${String(query).slice(0, 100)}" hit ${errors.length} tool error(s) (last: ${lastSig}) but still delivered ${uniqueFiles.length} file(s) — expect this failure mode and keep the write→run→fix loop.`,
+      });
+      lessonKind = 'recovery';
+      emit('log', { agent: 'Coder', message: '📚 Recovery lesson recorded — the next similar build will expect this failure mode.' });
+    } else if (errors.length && !uniqueFiles.length) {
+      recordLesson({
+        kind: 'failure', missionId: convId || null, objective: `autonomous build: ${query}`.slice(0, 300),
+        failure: lastSig, cause: lastSig, strategy: `autonomous coding, ${toolContext.length} tool call(s), no files delivered`,
+        lesson: `Build "${String(query).slice(0, 100)}" failed for: ${lastSig} — plan a different approach for this kind of build, do not retry the same calls.`,
+      });
+      lessonKind = 'failure';
+      emit('log', { agent: 'Coder', message: '📚 Failure lesson recorded — future builds will avoid repeating it.' });
+    }
+  } catch { /* lesson recording must never break the result */ }
+
   return {
     success,
     summary: success ? finalText : '### ⚠ JEXI OS\n\nI could not complete the build right now (AI providers unavailable). Please try again in a minute.',
@@ -171,6 +212,8 @@ export async function runAutonomousCoding({ query, convId = null, sendEvent = ()
       contextChars: contextStats.chars ?? null,
       contextTokens: contextStats.tokens ?? null,
       contextTrimmed: contextStats.trimmed ?? [],
+      lesson: lessonKind,
+      lessonsInjected,
     },
   };
 }
