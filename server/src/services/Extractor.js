@@ -6,6 +6,7 @@ import { isSSRF, safeFetchUrl } from './Security.js';
 import { YoutubeTranscript } from 'youtube-transcript';
 import { convert } from 'html-to-text';
 import { extractText, getDocumentProxy } from 'unpdf';
+import { extractPageContent } from './WebSearch.js'; // mesh extraction (AnySearch → Jina)
 
 let browser;
 async function getBrowser() {
@@ -262,6 +263,15 @@ export async function extractContent(url) {
       throw new Error(`PDF extraction failed: ${e.message}`);
     }
   }
+
+  // MESH EXTRACTION — pages that block datacenter HTTP (or need JS text)
+  // are often readable via the keyless extraction legs first.
+  try {
+    const mesh = await extractPageContent(url, { timeoutMs: 15000 });
+    if (mesh && mesh.markdown && mesh.markdown.length > 200) {
+      return { title: mesh.title || url, content: mesh.markdown, length: mesh.markdown.length, method: `mesh-${mesh.via}` };
+    }
+  } catch { /* fall through to legacy HTTP */ }
 
   // HTML PAGES
   const html = await fetchHTML(url); // js rendering off — search extraction stays lightweight

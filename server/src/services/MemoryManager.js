@@ -153,14 +153,78 @@ export function normalizeRedisUrl(raw) {
 }
 
 /**
+ * UPSTASH REST MODE (Sept 2026 — Lewis's creds are REST URL + token, not a
+ * rediss:// connection string). When REDIS_URL is https://…, commands go
+ * over the Upstash REST API (@upstash/redis) instead of ioredis/TCP. Both
+ * modes expose the SAME surface (get/set/del/keys/ping/connect/disconnect)
+ * so every caller below is mode-blind.
+ */
+export function isRestRedisUrl(url) {
+  return /^https?:\/\//i.test(String(url || '').trim());
+}
+/** REST token: Upstash dashboard → database → REST API → token. */
+export function redisRestToken() {
+  return process.env.UPSTASH_REDIS_REST_TOKEN || process.env.REDIS_TOKEN || '';
+}
+/** 'rest' | 'tcp' | 'none' — pure (tested). */
+export function resolveRedisMode() {
+  const url = normalizeRedisUrl(process.env.REDIS_URL);
+  if (!url) return 'none';
+  return isRestRedisUrl(url) ? 'rest' : 'tcp';
+}
+/** Wrap an @upstash/redis client in the ioredis-shaped surface JEXI uses.
+ *  `client` is injected so tests run hermetic (no network). */
+export function createRestAdapter(client) {
+  return {
+    __rest: true,
+    get: (k) => Promise.resolve(client.get(k)).then((v) => (v == null ? null : String(v))),
+    set: (k, v, ...args) => {
+      let ex;
+      for (let i = 0; i < args.length; i++) {
+        if (String(args[i]).toUpperCase() === 'EX' && args[i + 1] != null) ex = parseInt(args[i + 1], 10);
+      }
+      return Number.isFinite(ex) ? client.set(k, String(v), { ex }) : client.set(k, String(v));
+    },
+    del: (...ks) => client.del(...ks),
+    keys: (pattern) => client.keys(pattern),
+    ping: async () => 'PONG',
+    connect: async () => {},
+    disconnect: () => {},
+  };
+}
+/** One factory for BOTH modes: TCP (ioredis) or REST (Upstash HTTPS).
+ *  `tcpOpts` overrides the default ioredis options (the boot probe keeps its
+ *  original tighter settings — B68 timeout semantics depend on them). */
+async function connectRedisClient(url, tcpOpts = {}) {
+  if (isRestRedisUrl(url)) {
+    const token = redisRestToken();
+    if (!token) throw new Error('REDIS_URL is an Upstash REST URL (https://…) — also set REDIS_TOKEN (Upstash dashboard → REST API → token).');
+    const { Redis } = await import('@upstash/redis');
+    return createRestAdapter(new Redis({ url, token }));
+  }
+  const { Redis } = await import('ioredis');
+  return new Redis(url, {
+    lazyConnect: true,
+    maxRetriesPerRequest: 2,
+    enableReadyCheck: true,
+    commandTimeout: 3000, // B158 — an unresponsive Redis must never hang a boot/hydrate
+    ...tcpOpts,
+  });
+}
+
+/**
  * B158 — validate a Redis connection string BEFORE handing it to ioredis so
  * misconfigurations get actionable errors (naming the scheme/hostname) instead
  * of bare TypeErrors. Allowed: redis:// rediss:// or a bare host:port.
  */
 function validateRedisUrl(url) {
   const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//.exec(url);
+  if (scheme && ['http', 'https'].includes(scheme[1].toLowerCase())) {
+    if (!redisRestToken()) throw new Error('REDIS_URL is an Upstash REST URL (https://…) — also set REDIS_TOKEN (Upstash dashboard → REST API → token).');
+    return true;
+  }
   if (scheme && !['redis', 'rediss'].includes(scheme[1].toLowerCase())) {
-    throw new Error(`REDIS_URL scheme "${scheme[1]}:" is not a Redis scheme — use redis:// or rediss:// (the value starts with ${scheme[1]}:)`);
+    throw new Error(`REDIS_URL scheme "${scheme[1]}:" is not a Redis scheme — use redis://, rediss:// or an Upstash REST https:// URL (the value starts with ${scheme[1]}:)`);
   }
   if (scheme) {
     let u;
@@ -186,8 +250,7 @@ export async function redisBootProbe() {
   let r = null;
   try {
     validateRedisUrl(url); // throws an actionable error naming the cause
-    const { Redis } = await import('ioredis');
-    r = new Redis(url, { lazyConnect: true, maxRetriesPerRequest: 1, enableReadyCheck: true, connectTimeout: 3000, commandTimeout: 5000 });
+    r = await connectRedisClient(url, { maxRetriesPerRequest: 1, connectTimeout: 3000, commandTimeout: 5000 });
     // Bounded: an unresponsive server must never hang a boot (withTimeout).
     await Promise.race([
       r.connect(),
@@ -241,13 +304,7 @@ export async function getRedis() {
   if (!redisEnabled) return null;
   if (redisClient) return redisClient;
   try {
-    const { Redis } = await import('ioredis');
-    redisClient = new Redis(normalizeRedisUrl(process.env.REDIS_URL), { // B158 — tolerate whitespace/quoted mis-pastes
-      lazyConnect: true,
-      maxRetriesPerRequest: 2,
-      enableReadyCheck: true,
-      commandTimeout: 3000, // B158 — an unresponsive Redis must never hang a boot/hydrate
-    });
+    redisClient = await connectRedisClient(normalizeRedisUrl(process.env.REDIS_URL)); // B158 — tolerate whitespace/quoted mis-pastes
     return redisClient;
   } catch (e) {
     console.error('[Memory] Redis client failed to init, using local file only:', e.message);

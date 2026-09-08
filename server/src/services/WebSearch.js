@@ -24,6 +24,10 @@
  *                                (dsh web-search-perplexity).
  *   KEYLESS ddg-html / ddg-lite / mojeek / bing / searxng / wikipedia /
  *           arxiv — the whole internet without any API key.
+ *   MESH    exa-anon / parallel / anysearch — premium engines on ANONYMOUS
+ *           tiers (live-verified Sept 2026, no signup); commoncrawl (the
+ *           archive, domain queries); dynamic SearXNG rotation (self-healing
+ *           instance discovery instead of a hardcoded list).
  *
  * Health: a provider that fails (or returns nothing) 3× in a row enters a
  * 10-minute cooldown and the seam slides down the order — the same
@@ -131,6 +135,9 @@ const KEY_ALIASES = {
   PERPLEXITY_API_KEY: ['perplexity_api_key', 'perplexitykey', 'perplexity'],
   TAVILY_API_KEY: ['tavily_api_key', 'tavilykey', 'tavily'],
   BRAVE_API_KEY: ['brave_api_key', 'bravekey', 'brave'],
+  FIRECRAWL_API_KEY: ['firecrawl_api_key', 'firecrawlkey', 'firecrawl'],
+  PARALLEL_API_KEY: ['parallel_api_key', 'parallelkey', 'parallel'],
+  ANYSEARCH_API_KEY: ['anysearch_api_key', 'anysearchkey', 'anysearch'],
 };
 
 function keyFor(envName) {
@@ -247,14 +254,38 @@ export const bingProvider = {
   },
 };
 
-const SEARX_INSTANCES = ['https://search.sapti.me', 'https://searx.be', 'https://search.bus-hit.me', 'https://paulgo.io', 'https://priv.au', 'https://opnxng.com'];
+// Static fallback — public instances rot constantly (2/2 probed dead Sept
+// 2026), so the live list below is preferred whenever it answers.
+const SEARX_STATIC = ['https://search.sapti.me', 'https://searx.be', 'https://search.bus-hit.me', 'https://paulgo.io', 'https://priv.au', 'https://opnxng.com'];
+/** Parse searx.space/instances.json → healthy main instance base URLs. Pure (tested). */
+export function __parseSearxInstances(data) {
+  const out = [];
+  for (const [u, v] of Object.entries((data && data.instances) || {})) {
+    try {
+      if (v && v.http && v.http.status_code === 200 && v.main && !(v.timing && v.timing.search && v.timing.search.error)) out.push(String(u).replace(/\/+$/, ''));
+    } catch { /* malformed entry — skip */ }
+  }
+  return out;
+}
+let __searxCache = { at: 0, instances: [] };
+async function discoverSearxInstances() {
+  if (__searxCache.instances.length && Date.now() - __searxCache.at < 3600_000) return __searxCache.instances;
+  try {
+    const res = await httpCall('https://searx.space/data/instances.json', { signal: AbortSignal.timeout(15000) });
+    if (!res.ok) throw new Error(`searx.space ${res.status}`);
+    const found = __parseSearxInstances(await res.json()).slice(0, 12);
+    if (found.length >= 3) { __searxCache = { at: Date.now(), instances: found }; return found; }
+  } catch { /* fall through to static */ }
+  return SEARX_STATIC;
+}
 
 export const searxngProvider = {
   id: 'searxng', name: 'SearXNG', keyless: true,
   configured: () => true,
   async search(req) {
-    // All instances in parallel — take the healthiest pool (instances rotate).
-    const attempts = SEARX_INSTANCES.map(async (instance) => {
+    // Live-discovered instances in parallel — take the healthiest pool.
+    const instances = await discoverSearxInstances();
+    const attempts = instances.map(async (instance) => {
       try {
         const url = `${instance}/search?q=${encodeURIComponent(req.query)}&format=json`;
         const res = await fetchWithFallback(url, { 'User-Agent': 'Mozilla/5.0' }, 6000);
@@ -595,25 +626,253 @@ export const perplexityProvider = {
   },
 };
 
+/* ══════════ KEYLESS PREMIUM MESH (verified live, Sept 2026) ══════════
+ * Three premium engines serve ANONYMOUS tiers over plain HTTPS POST in
+ * MCP/JSON-RPC wire format (no MCP SDK needed): Exa (mcp.exa.ai), Parallel
+ * (search.parallel.ai), AnySearch (api.anysearch.com). All LIVE-PROBED from
+ * this repo 2026-09-08 (fresh Sept-2026 news returned, zero signup).
+ * Parallel/AnySearch accept an optional Bearer key (same endpoint) for
+ * higher quotas. Exa-anon NEVER sends the key: the keyed Exa REST leg
+ * already spends it, and fan-out would otherwise double-bill every search.
+ */
+
+async function mcpToolsCall(url, tool, args, { apiKey = '', signal } = {}) {
+  const headers = { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' };
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+  const res = await httpCall(url, {
+    method: 'POST', headers, signal: signal || AbortSignal.timeout(25000),
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: tool, arguments: args } }),
+  }).catch((e) => { throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `mcp ${tool}: ${e.message}`); });
+  const raw = await res.text().catch(() => '');
+  if (!res.ok) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `mcp ${tool} HTTP ${res.status}: ${raw.slice(0, 120)}`);
+  return raw;
+}
+
+/** MCP tools/call envelope → first text block. Accepts pure JSON
+ *  (Parallel/AnySearch) or SSE event-stream (Exa: `data: {...}` lines). */
+export function mcpFirstText(raw) {
+  const t = String(raw || '');
+  const datas = [...t.matchAll(/^data:\s*(\{.*\})\s*$/gm)].map((m) => m[1]);
+  const payload = datas.length ? datas[datas.length - 1] : t;
+  let d;
+  try { d = JSON.parse(payload); } catch { throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'mcp: bad envelope'); }
+  if (d && d.error) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `mcp: ${d.error.message || d.error.code || 'error'}`);
+  const content = (d && d.result && d.result.content) || [];
+  const text = content.filter((c) => c && c.type === 'text' && c.text).map((c) => c.text).join('\n');
+  if (!text.trim()) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'mcp: empty content');
+  if (/^error executing tool/i.test(text.trim())) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `mcp tool: ${text.trim().slice(0, 160)}`);
+  return text;
+}
+
+/** Exa MCP text → sources. Blocks look like:
+ *  Title: …\nURL: https://…\nPublished: …\nAuthor: …\nHighlights:\n… */
+export function parseExaSearchText(text) {
+  const out = [];
+  for (const b of String(text || '').split(/\n(?=Title: )/)) {
+    const url = ((b.match(/^URL:\s*(\S+)/m) || [])[1] || '').trim();
+    if (!url || !/^https?:\/\//.test(url)) continue;
+    const title = (((b.match(/^Title:\s*(.+)$/m) || [])[1]) || url).trim();
+    const pub = (((b.match(/^Published:\s*(\S+)/m) || [])[1]) || '').trim();
+    const snippet = b.split('\n')
+      .map((l) => l.trim().replace(/^-\s+/, ''))
+      .filter((l) => l && !/^(Title|URL|Published|Author|Highlights):/i.test(l) && !/^#+\s/.test(l) && l.length > 20)
+      .join(' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+    out.push({ url, title, ...(snippet ? { snippet } : {}), ...(pub ? { publishedAt: pub } : {}) });
+  }
+  return out;
+}
+
+/** AnySearch `search` markdown → sources. Shape:
+ *  ## Search Results (N results…)\n### 1. Title\n- **URL**: …\n- snippet… */
+export function parseAnysearchResults(text) {
+  const out = [];
+  for (const chunk of String(text || '').split(/\n### \d+\.\s+/)) {
+    if (!chunk.trim() || !chunk.includes('**URL**')) continue;
+    const lines = chunk.split('\n').map((l) => l.trim()).filter(Boolean);
+    const title = (lines[0] || '').replace(/^#+\s*/, '').trim();
+    const urlLine = lines.find((l) => l.includes('**URL**')) || '';
+    const url = ((urlLine.match(/\*\*URL\*\*:\s*(\S+)/) || [])[1] || '').trim();
+    if (!url || !/^https?:\/\//.test(url)) continue;
+    const snippet = lines.filter((l) => l !== lines[0] && l !== urlLine).map((l) => l.replace(/^-\s+/, '')).join(' ').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim().slice(0, 300);
+    out.push({ url, title: title || url, ...(snippet ? { snippet } : {}) });
+  }
+  return out;
+}
+
+/** Parallel MCP text (a JSON string with search_id/results[]) → sources. */
+export function parseParallelResults(text) {
+  let d;
+  try { d = JSON.parse(String(text || '')); } catch { throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'parallel: bad payload'); }
+  return ((d && d.results) || []).map((r) => ({
+    url: r.url,
+    title: r.title || r.url,
+    ...((r.excerpts || []).length ? { snippet: r.excerpts.join(' ').slice(0, 300) } : {}),
+    ...(r.publish_date ? { publishedAt: r.publish_date } : {}),
+  })).filter((s) => s.url && /^https?:\/\//.test(s.url));
+}
+
+export const exaAnonProvider = {
+  id: 'exa-anon', name: 'Exa Free', keyless: true,
+  configured: () => true,
+  async search(req, signal) {
+    const raw = await mcpToolsCall('https://mcp.exa.ai/mcp', 'web_search_exa', { query: req.query, numResults: req.maxResults ?? 8 }, { signal });
+    const sources = parseExaSearchText(mcpFirstText(raw)).filter((x) => !isGarbageUrl(x.url) && !isGarbageText(x.title, x.snippet));
+    if (!sources.length) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'exa-anon empty');
+    return { sources };
+  },
+};
+
+export const parallelProvider = {
+  id: 'parallel', name: 'Parallel', keyless: true,
+  configured: () => true,
+  async search(req, signal) {
+    const key = keyFor('PARALLEL_API_KEY'); // optional: higher quota, same endpoint
+    const raw = await mcpToolsCall('https://search.parallel.ai/mcp', 'web_search',
+      { objective: req.query, search_queries: [req.query], max_results: req.maxResults ?? 8 }, { apiKey: key, signal });
+    const sources = parseParallelResults(mcpFirstText(raw)).filter((x) => !isGarbageUrl(x.url) && !isGarbageText(x.title, x.snippet));
+    if (!sources.length) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'parallel empty');
+    return { sources };
+  },
+};
+
+export const anysearchProvider = {
+  id: 'anysearch', name: 'AnySearch', keyless: true,
+  configured: () => true,
+  async search(req, signal) {
+    const key = keyFor('ANYSEARCH_API_KEY'); // optional: higher quota, same endpoint
+    const raw = await mcpToolsCall('https://api.anysearch.com/mcp', 'search', { query: req.query }, { apiKey: key, signal });
+    const sources = parseAnysearchResults(mcpFirstText(raw)).filter((x) => !isGarbageUrl(x.url) && !isGarbageText(x.title, x.snippet));
+    if (!sources.length) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'anysearch empty');
+    return { sources };
+  },
+};
+
+/** Full-page extraction: AnySearch `extract` (anonymous) → Jina Reader
+ *  (keyless). Returns { url, title, markdown, via } or null. */
+export async function extractPageContent(url, { timeoutMs = 25000 } = {}) {
+  const target = String(url || '');
+  if (!/^https?:\/\//.test(target)) return null;
+  const signal = AbortSignal.timeout(timeoutMs); // one shared budget for both legs
+  try {
+    const raw = await mcpToolsCall('https://api.anysearch.com/mcp', 'extract', { url: target }, { apiKey: keyFor('ANYSEARCH_API_KEY'), signal });
+    const d = JSON.parse(mcpFirstText(raw)); // {"url","title","content"}
+    if (d && d.content && String(d.content).length > 100) {
+      return { url: d.url || target, title: d.title || '', markdown: String(d.content).slice(0, 8000), via: 'anysearch' };
+    }
+  } catch { /* fall through to Jina */ }
+  try {
+    const res = await httpCall(`https://r.jina.ai/${target}`, { headers: { 'User-Agent': BROWSER_UA }, signal });
+    if (!res.ok) return null;
+    const md = await res.text();
+    if (!md || md.length < 200) return null;
+    return { url: target, title: '', markdown: md.slice(0, 8000), via: 'jina' };
+  } catch { return null; }
+}
+
+/* ══════════ COMMON CRAWL (the archive — any page that ever existed) ══════ */
+
+let __ccCache = { at: 0, index: '' };
+async function ccLatestIndex() {
+  if (__ccCache.index && Date.now() - __ccCache.at < 24 * 3600_000) return __ccCache.index;
+  const res = await httpCall('https://index.commoncrawl.org/collinfo.json', { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `commoncrawl collinfo ${res.status}`);
+  const list = await res.json();
+  const id = list && list[0] && list[0].id;
+  if (!id) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'commoncrawl: no index listed');
+  __ccCache = { at: Date.now(), index: `https://index.commoncrawl.org/${id}-index` };
+  return __ccCache.index;
+}
+
+/** Domain-ish substring in a query (the archive is keyword-blind). Pure (tested). */
+export function ccDomainFromQuery(q) {
+  const m = String(q || '').match(/([a-z0-9-]+\.)+[a-z]{2,}/i);
+  return m ? m[0].toLowerCase() : '';
+}
+
+export const commoncrawlProvider = {
+  id: 'commoncrawl', name: 'Common Crawl', keyless: true,
+  configured: () => true,
+  async search(req) {
+    const domain = ccDomainFromQuery(req.query);
+    if (!domain) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'commoncrawl: needs a domain (keyword-blind archive)');
+    const idx = await ccLatestIndex();
+    const res = await httpCall(`${idx}?url=${encodeURIComponent(domain)}/*&output=json&filter=status:200&limit=8`, { signal: AbortSignal.timeout(20000) });
+    if (!res.ok) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `commoncrawl ${res.status}`);
+    const sources = (await res.text()).trim().split('\n').filter(Boolean).map((l) => {
+      try {
+        const r = JSON.parse(l);
+        return { url: r.url, title: r.url, snippet: `${r.timestamp || ''} · ${r.mime || ''} · archived`.trim() };
+      } catch { return null; }
+    }).filter((x) => x && !isGarbageUrl(x.url));
+    if (!sources.length) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'commoncrawl empty');
+    return { sources };
+  },
+};
+
+/* ══════════ FIRECRAWL (keyed REST — 1,000 credits/mo free, no card) ══════ */
+
+export const firecrawlProvider = {
+  id: 'firecrawl', name: 'Firecrawl', keyless: false,
+  envKey: 'FIRECRAWL_API_KEY',
+  configured() { return !!keyFor(this.envKey); },
+  async search(req, signal) {
+    const apiKey = keyFor(this.envKey);
+    if (!apiKey) throw new WebError(WEB_ERRORS.CREDENTIAL_MISSING, 'FIRECRAWL_API_KEY not set (free at firecrawl.dev — 1,000/month, no card)');
+    const res = await httpCall('https://api.firecrawl.dev/v1/search', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      signal,
+      body: JSON.stringify({ query: req.query, limit: req.maxResults ?? 8 }),
+    }).catch((e) => { throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `firecrawl: ${e.message}`); });
+    if (!res.ok) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `firecrawl HTTP ${res.status}`);
+    const data = await res.json().catch(() => { throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'firecrawl: bad json'); });
+    const sources = ((data && (data.data || data.results)) || []).map((r) => ({
+      url: r.url, title: r.title || r.url,
+      snippet: r.description ? String(r.description).slice(0, 300) : undefined,
+      ...(r.publishedDate ? { publishedAt: r.publishedDate } : {}),
+    }));
+    if (!sources.length) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'firecrawl empty');
+    return { sources: sources.filter((x) => !isGarbageUrl(x.url)) };
+  },
+};
+
 /* ══════════════════ THE SEAM (ctx.web port) ══════════════════════════════ */
 
 /** Registry + order. Keyed DSH providers first WHEN configured; the keyless
  *  whole-web engines always follow — search works with zero keys. */
 export const SEARCH_PROVIDERS = [
-  tavilyProvider, braveProvider,                              // free-tier APIs (email-only keys)
+  tavilyProvider, braveProvider, firecrawlProvider,           // free-tier keyed APIs
   deepseekSearchProvider, exaProvider, perplexityProvider,   // DSH trio (paid keys)
+  exaAnonProvider, parallelProvider, anysearchProvider,       // keyless premium mesh
   googleNewsRssProvider, ddgInstantProvider, marginaliaProvider, hnSearchProvider, // datacenter-proof
   ddgHtmlProvider, ddgLiteProvider, mojeekProvider, bingProvider, searxngProvider, // HTML engines
-  wikipediaProvider, arxivProvider, openAlexProvider, stackoverflowProvider, // verticals
+  wikipediaProvider, arxivProvider, openAlexProvider, stackoverflowProvider, commoncrawlProvider, // verticals + archive
 ];
 
 const COOLDOWN_MS = 10 * 60 * 1000;
 const FAIL_LIMIT = 3;
 const health = new Map(); // id → { fails, until }
+// Free-quota brake: a leg that somehow serves 500 calls in one day sits out
+// until tomorrow (a runaway loop must never burn a whole free month in hours).
+const DAILY_BUDGET = 500;
+const __calls = new Map(); // id → { day, n }
+function __today() { return new Date().toISOString().slice(0, 10); }
+export function __noteCall(id) {
+  const day = __today();
+  const e = __calls.get(id);
+  if (!e || e.day !== day) __calls.set(id, { day, n: 1 });
+  else e.n += 1;
+}
+export function callsToday(id) {
+  const e = __calls.get(id);
+  return e && e.day === __today() ? e.n : 0;
+}
+export function __resetBudgets() { __calls.clear(); }
 
 function available(p, { includeAcademic = false } = {}) {
   if (p.academicOnly && !includeAcademic) return false;
   if (!p.configured()) return false;
+  if (callsToday(p.id) >= DAILY_BUDGET) return false;
   const h = health.get(p.id);
   if (h && h.until > Date.now()) return false;
   return true;
@@ -647,6 +906,7 @@ export function webSearchHealth() {
       id: p.id, name: p.name, free: !!p.keyless,
       env: p.keyless ? null : p.envKey,
       configured: p.configured(),
+      callsToday: callsToday(p.id),
       cooling: !!(h && h.until > Date.now()),
       cooldownLeftSec: h && h.until > Date.now() ? Math.ceil((h.until - Date.now()) / 1000) : 0,
       ...(h && h.lastError ? { lastError: h.lastError, lastErrorAt: h.lastErrorAt } : {}),
@@ -663,6 +923,7 @@ export function webSearchHealth() {
 export async function providerSearch(providerId, req, { signal } = {}) {
   const p = SEARCH_PROVIDERS.find((x) => x.id === providerId);
   if (!p) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `unknown provider ${providerId}`);
+  __noteCall(p.id);
   try {
     const out = await p.search({ query: String(req.query || ''), ...(req.maxResults ? { maxResults: req.maxResults } : {}) }, signal);
     noteSuccess(p.id);
