@@ -1635,7 +1635,7 @@ body {
 /* narration: plain paragraph in the flow, app handwriting via .jx-hand */
 .jx-narr { font-size: 20px; line-height: 1.42; color: #F3EDE4; margin: 2px 0; overflow-wrap: anywhere; font-style: italic; }
 /* step row: one horizontal line — icon, label, status, duration, chevron */
-.jx-step { margin: 1px 0; }
+.jx-trace-step { display: block; margin: 1px 0; }
 .jx-step-line { display: flex; align-items: center; gap: 8px; width: 100%; padding: 3px 0; text-align: left; cursor: pointer; background: none; border: none; }
 .jx-step-ic { display: inline-flex; flex-shrink: 0; color: var(--muted); }
 .jx-step-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 19px; line-height: 1.35; color: #EDE6D8; }

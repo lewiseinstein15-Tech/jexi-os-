@@ -69,7 +69,7 @@ export default function StepRow({ tool, label, status, durationMs, detail }) {
   const fallbackLabel = `used ${String(tool || 'tool').toLowerCase()}`;
 
   return (
-    <div className="jx-step">
+    <div className="jx-step jx-trace-step">
       <button
         type="button"
         className="jx-step-line"
