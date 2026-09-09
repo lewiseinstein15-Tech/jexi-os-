@@ -37,8 +37,9 @@
 | F5.7 | Uncapped generation → 3×180s ramble, zero output | `maxTokens` employee 1500 / verify 600, plumbed incl. stream leg | forwarding suite §7 |
 | F5.8 | MCP boot connected 42 servers (~460 MB) | `JEXI_MCP_MINIMAL=1` lazy rows | boot log + `test-mcp-minimal.js` |
 | F5.9 | Budget/redirect stopped waiting but orphaned the stream (378s lane hog) | AbortSignal threaded round→attempt→leg; budget/redirect abort the fetch | suite §8 (pre/mid-stream abort) |
+| F5.10 | Planner returned string criteria → `.map is not a function` killed the mission | `asStringArray` coercion (string wraps, null/object → [], capped) | suite §9 |
 
-Suite: `server/test-f5-hardening.js` — **25/25, 3 consecutive runs**.
+Suite: `server/test-f5-hardening.js` — **29/29, 3 consecutive runs**.
 Regressions green: b208 (96), b213 (28), b199, b220 (7/0), b227 (11/0), b177,
 llm-models, model-coworkers, onekey-providers (14), hermes-full, team-router.
 

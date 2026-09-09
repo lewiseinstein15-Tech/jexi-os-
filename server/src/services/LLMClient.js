@@ -631,6 +631,7 @@ async function tryOllama(prompt, system, imageBase64, opts, errors) {
   if (imageBase64) return null; // text-only rung; vision stays on hosted providers
   const base = String(process.env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/+$/, '');
   const model = opts.model || process.env.MODEL_NAME || process.env.OLLAMA_MODEL || 'qwen3';
+  const outer = opts && opts.signal; // outside try: the catch must read it (caller-abort != leg failure)
   try {
     const controller = new AbortController();
     // Final F5 — local inference is SLOW (CPU, ~11 tok/s): the shared 90s
@@ -643,7 +644,6 @@ async function tryOllama(prompt, system, imageBase64, opts, errors) {
     // signal aborts the fetch. Without this, a stalling endpoint eats the
     // full internal timeout no matter what the caller wanted.
     const onOuterAbort = () => controller.abort();
-    const outer = opts && opts.signal;
     if (outer) {
       if (outer.aborted) controller.abort();
       else outer.addEventListener('abort', onOuterAbort, { once: true });
@@ -683,6 +683,7 @@ async function tryOllama(prompt, system, imageBase64, opts, errors) {
       if (outer) try { outer.removeEventListener('abort', onOuterAbort); } catch {}
     }
   } catch (e) {
+    if (outer && outer.aborted) throw e; // Final F5 - caller abort is not a leg failure: propagate, do not fall through
     errors.push(`ollama(${model}): ${String(e && e.message || e).slice(0, 120)}`);
     recordProviderFailure('ollama', String(e && e.message || e).slice(0, 120));
     return null;
@@ -768,6 +769,9 @@ async function streamPlainText(prompt, system, opts, onDelta) {
         return out.text;
       }
     } catch (e) {
+      // Final F5 - caller-initiated abort (round budget / redirect) is not a
+      // provider failure: fail fast WITHOUT health penalty or fallback legs.
+      if (opts && opts.signal && opts.signal.aborted) { releaseSlot(); throw e; }
       errors.push(`${provider}: ${e.message}`);
       recordProviderCallFailure(provider, e); // Phase 1 — classified + persisted
     }
@@ -857,6 +861,9 @@ async function __generateWalk(prompt, systemInstruction, imageBase64, opts) {
         return text;
       }
     } catch (e) {
+      // Final F5 - caller-initiated abort (round budget / redirect) is not a
+      // provider failure: fail fast WITHOUT health penalty or fallback legs.
+      if (opts && opts.signal && opts.signal.aborted) { releaseSlot(); throw e; }
       errors.push(`${provider}: ${e.message}`);
       recordProviderCallFailure(provider, e); // Phase 1 — classified + persisted
     }

@@ -218,5 +218,40 @@ console.log('\n== 9. Planner-shape coercion ==');
   ok(asStringArray(['a', 'b', 'c'], 2).length === 2, 'cap honored');
 }
 
+console.log('\n== 10. Caller-abort fail-fast (no health penalty) ==');
+{
+  const http = await import('node:http');
+  const { generateContent } = await import('./src/services/LLMClient.js');
+  const { providerHealthSnapshot } = await import('./src/services/ProviderHealth.js');
+  const chunk = (t) => `data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\n`;
+  const server = http.createServer((req, res) => {
+    if (req.url.includes('chat/completions') && req.headers['content-type']?.includes('json')) {
+      // non-stream walk leg answers slow-but-valid JSON
+      let raw = '';
+      req.on('data', (c) => { raw += c; });
+      req.on('end', () => {
+        const body = JSON.parse(raw);
+        if (body.stream) { res.writeHead(200, { 'Content-Type': 'text/event-stream' }); res.end(`${chunk('ok')}\ndata: [DONE]\n\n`); }
+        else setTimeout(() => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ choices: [{ message: { content: 'ok' } }] })); }, 400);
+      });
+    } else { res.writeHead(404); res.end(); }
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const prev = process.env.OLLAMA_HOST;
+  process.env.OLLAMA_HOST = `http://127.0.0.1:${server.address().port}`;
+  const dead = new AbortController(); dead.abort();
+  const before = JSON.stringify((providerHealthSnapshot().find((r) => r.provider === 'ollama') || {}));
+  try {
+    let streamErr = '';
+    try { await generateContent('hi', 'sys', null, { provider: 'ollama', onToken: () => {}, signal: dead.signal }); } catch (e) { streamErr = String(e && e.message || e); }
+    ok(/abort/i.test(streamErr) && !/No AI provider answered/.test(streamErr), `stream path fails fast with the abort (${streamErr.slice(0, 60)})`);
+    let walkErr = '';
+    try { await generateContent('hi', 'sys', null, { provider: 'ollama', signal: dead.signal }); } catch (e) { walkErr = String(e && e.message || e); }
+    ok(/abort/i.test(walkErr) && !/No AI provider answered/.test(walkErr), `walk path fails fast with the abort (${walkErr.slice(0, 60)})`);
+    const after = JSON.stringify((providerHealthSnapshot().find((r) => r.provider === 'ollama') || {}));
+    ok(before === after, 'caller aborts leave provider health untouched');
+  } finally { process.env.OLLAMA_HOST = prev; server.close(); }
+}
+
 console.log(`\nF5 hardening: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
