@@ -209,5 +209,14 @@ console.log('\n== 8. Abort propagation (no orphaned legs) ==');
   } finally { server.close(); }
 }
 
+console.log('\n== 9. Planner-shape coercion ==');
+{
+  const { asStringArray } = await import('./src/services/director/MissionRunner.js');
+  ok(JSON.stringify(asStringArray(['a', 'b', 3], 10)) === '["a","b","3"]', 'arrays pass through as strings');
+  ok(JSON.stringify(asStringArray('just do it', 10)) === '["just do it"]', 'bare string wraps (the observed crash shape)');
+  ok(JSON.stringify(asStringArray(null, 10)) === '[]' && JSON.stringify(asStringArray({ x: 1 }, 10)) === '[]', 'null/object coerce to empty, never throw');
+  ok(asStringArray(['a', 'b', 'c'], 2).length === 2, 'cap honored');
+}
+
 console.log(`\nF5 hardening: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

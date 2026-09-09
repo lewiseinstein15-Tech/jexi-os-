@@ -29,6 +29,15 @@ import { analyzeObjective } from './ComplexityAnalyzer.js';
 import { imagine, comparePredictedVsActual } from './ImaginationEngine.js';
 import { recordLesson, retrieveLessons, formatLessonsBlock, lessonCount } from './Lessons.js';
 import { loadWorldState, runtimeCapabilities } from './WorldState.js'; // B215 — real environment record
+
+/* Final F5 — coerce planner JSON fields that SHOULD be string arrays but a
+ * weak model may emit as a bare string, number, or object. Never throws. */
+export function asStringArray(v, n = 10) {
+  if (Array.isArray(v)) return v.map((x) => String(x)).slice(0, n);
+  if (typeof v === 'string' && v.trim()) return [v.trim().slice(0, 500)];
+  if (typeof v === 'number' && Number.isFinite(v)) return [String(v)];
+  return [];
+}
 import { missionEventToToolUse } from './ToolUseBridge.js'; // transcript rows for real tool runs
 
 const MAX_PARALLEL = 3;
@@ -396,9 +405,12 @@ const user = [
     }
 
     mission.objective = String(parsed.refinedObjective || mission.objective).slice(0, 2000);
-    mission.assumptions = (parsed.assumptions || []).slice(0, 8);
-    mission.constraints = (parsed.constraints || []).slice(0, 8);
-    mission.successCriteria = (parsed.successCriteria || []).slice(0, 10).map(String);
+    // Final F5 — weak models return a bare string (or object) instead of an
+    // array; coerce instead of crashing the mission (observed: successCriteria
+    // as string → `.map is not a function` → whole mission FAILED).
+    mission.assumptions = asStringArray(parsed.assumptions, 8);
+    mission.constraints = asStringArray(parsed.constraints, 8);
+    mission.successCriteria = asStringArray(parsed.successCriteria, 10);
     if (!mission.successCriteria.length) mission.successCriteria = [mission.objective];
     mission.usage.itemsCreated += items.length;
     mission._persist();

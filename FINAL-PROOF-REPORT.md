@@ -36,8 +36,9 @@
 | F5.6 | Non-stream local rung capped at 90s (107s plan turn died) | Ollama rung 5-min budget + `opts.timeoutMs` | stub-server suite §6 |
 | F5.7 | Uncapped generation → 3×180s ramble, zero output | `maxTokens` employee 1500 / verify 600, plumbed incl. stream leg | forwarding suite §7 |
 | F5.8 | MCP boot connected 42 servers (~460 MB) | `JEXI_MCP_MINIMAL=1` lazy rows | boot log + `test-mcp-minimal.js` |
+| F5.9 | Budget/redirect stopped waiting but orphaned the stream (378s lane hog) | AbortSignal threaded round→attempt→leg; budget/redirect abort the fetch | suite §8 (pre/mid-stream abort) |
 
-Suite: `server/test-f5-hardening.js` — **22/22, 3 consecutive runs**.
+Suite: `server/test-f5-hardening.js` — **25/25, 3 consecutive runs**.
 Regressions green: b208 (96), b213 (28), b199, b220 (7/0), b227 (11/0), b177,
 llm-models, model-coworkers, onekey-providers (14), hermes-full, team-router.
 
@@ -48,9 +49,8 @@ llm-models, model-coworkers, onekey-providers (14), hermes-full, team-router.
    is labeled model capacity, not architecture.
 2. **Single-lane box**: concurrent missions starve each other (90s queue
    timeouts). Proof runs are serial; hosted backends have parallel capacity.
-3. **Orphaned streams**: `withTimeout` stops waiting but the ollama stream
-   keeps generating (observed 378s), hogging the single lane. Fix queued:
-   propagate abort to the leg on budget fire.
+3. **Orphaned streams**: FIXED (F5.9) — budget/redirect now abort the leg.
+   Observed before the fix: a 378s orphan hogging the single lane.
 4. **Push blocked**: commits `1a626e0` + follow-ups are local-only (no GitHub
    credentials in this sandbox); operator pushes from their machine.
 
