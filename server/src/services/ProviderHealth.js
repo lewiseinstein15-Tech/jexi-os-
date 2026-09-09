@@ -152,6 +152,20 @@ export function skipForNow(provider, now = Date.now()) {
   return false;
 }
 
+/* Final F5 — cooldown-aware recovery: an instant retry right after a leg
+ * timeout re-enters the walker while the provider is still in cooldown, so
+ * the retry fails in ~1s without doing any work (observed: a 91s ollama
+ * model-swap timeout cascaded to MISSION_FAILED through two instant
+ * retries). Callers wait this out before retrying the same lane. */
+export function maxCooldownRemainingMs(now = Date.now()) {
+  load();
+  let max = 0;
+  for (const r of state.values()) {
+    if (r && r.cooldownUntil && now < r.cooldownUntil) max = Math.max(max, r.cooldownUntil - now);
+  }
+  return max;
+}
+
 /** Derived state for one provider (spec §12 vocabulary). */
 export function providerState(provider, now = Date.now()) {
   load();

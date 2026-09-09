@@ -363,10 +363,17 @@ export async function connectEnabledMcpServers() {
   // NOTHING stdio at boot: every server wakes on first use (lazy, warm cache
   // from the image prewarm) and sleeps again via the idle sweeper.
   const totalMb = hostMemoryLimitMb();
+  // FINAL F5 — JEXI_MCP_MINIMAL=1 (laptops, CI, model-hosting boxes): connect
+  // NOTHING at boot (stdio or http) — every server wakes lazily on first use.
+  const minimal = process.env.JEXI_MCP_MINIMAL === '1';
   const smallHost = totalMb < 768;
   for (const s of reg.servers) {
     if (!s.enabled) continue;
     if (connections.has(s.name)) continue; // already up (e.g. retry pass)
+    if (minimal) {
+      out.push({ server: s.name, ok: true, skipped: true, note: 'JEXI_MCP_MINIMAL=1 — lazy only, wakes on first use' });
+      continue;
+    }
     // Hosted HTTP servers hold no child process — connect them all at boot.
     if (s.transport === 'streamable-http') {
       const r = await connectGatewayServer(s.name);

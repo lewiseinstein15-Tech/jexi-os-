@@ -538,11 +538,17 @@ async function generateWithSupervision({ employee, subtask, brief, task, mailbox
     const work = runWithModel(
       employee,
       subtask.capability || 'reasoning',
-      ({ prefer }) => llm({
+      ({ prefer, noteProvider }) => llm({
         system: employeeSystemPrompt(employee, brief),
         user: finalPrompt,
         prefer,
-        onToken: (t) => { supervisor.observe(t); if (hooks.onToken) { try { hooks.onToken(t); } catch { /* never break */ } } },
+        // FINAL F5 — provenance: report the provider that REALLY generates
+        // (LLM token metadata), so the router credits actual work.
+        onToken: (t, meta) => {
+          supervisor.observe(t);
+          try { if (meta && meta.provider && typeof noteProvider === 'function') noteProvider(meta.provider); } catch { /* provenance never breaks */ }
+          if (hooks.onToken) { try { hooks.onToken(t); } catch { /* never break */ } }
+        },
       }),
       { onEvent: emit },
     );

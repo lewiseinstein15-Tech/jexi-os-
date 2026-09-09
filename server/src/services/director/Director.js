@@ -28,6 +28,9 @@ import { rankEmployees, selectEmployee, getEmployee, appendEmployeeHistory } fro
 import { runEmployeeCommand } from './CommandRunner.js'; // B210 — the execution backstop
 import { checkToolPermission } from './Permissions.js'; // B210 — executor check
 import { telemetry } from './Telemetry.js';
+import { maxCooldownRemainingMs } from '../ProviderHealth.js'; // Final F5 — cooldown-aware retry backoff
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 import { missionEventToToolUse } from './ToolUseBridge.js'; // transcript rows for real tool runs
 import { runEmployeeSession, assembleBrief } from './EmployeeSession.js';
 import { verifyDeliverable, acceptanceGates } from './Verifier.js';
@@ -468,8 +471,15 @@ export class Director {
         task.recordRecovery({ subtaskId: subtask.id, employeeId: current.employee.agentId, action, reason: String(err.message || err).slice(0, 160), ok: false });
         emit({ type: 'RECOVERY_STARTED', agentId: current.employee.agentId, agentName: current.employee.displayName, summary: recoveryLine(current.employee, action, err), severity: 'warn' });
         attempt += 1;
-        if (action === 'RETRY') continue;
-        if (action === 'REBRIEF') continue; // next attempt passes sharper instructions
+        // Final F5 — never retry a lane that is still cooling down: wait out
+        // the longest active provider cooldown (plus a breather), capped, so
+        // a transient leg timeout gets a retry that can actually do work.
+        if (action === 'RETRY' || action === 'REBRIEF') {
+          const waitMs = Math.min(Math.max(3000, maxCooldownRemainingMs() + 500), 60000);
+          emit({ type: 'RECOVERY_WAIT', agentId: current.employee.agentId, agentName: current.employee.displayName, summary: `Giving the model lane ${Math.round(waitMs / 1000)}s to settle before ${current.employee.displayName} retries.` });
+          await sleep(waitMs);
+          continue;
+        }
         if (action === 'REASSIGN') {
           const next = rankEmployees(subtask.requirements || [subtask.capability], { exclude: new Set([current.employee.agentId]) })[0]?.employee;
           if (next) {

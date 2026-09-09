@@ -59,6 +59,35 @@ export function claimsBrowserMethod(text) {
   return false;
 }
 
+/* ── FINAL F5: TEMPLATE-ECHO GATE ─────────────────────────────────────────
+ * Found by the first real ollama missions: a weak model echoes the
+ * employee brief's instruction scaffolding AS the deliverable ("The actual
+ * work product — complete and directly usable...") — and a weak rubric
+ * judge passes it. No real deliverable ever contains the brief's
+ * meta-instructions, so ≥2 distinct scaffolding fingerprints = echo.
+ * Fingerprints mirror EmployeeSession.js employeeSystemPrompt — keep in
+ * sync if that brief text changes.
+ */
+const ECHO_FINGERPRINTS = [
+  'the actual work product',
+  'complete and directly usable',
+  'what the team ships',
+  'filename in the info string',
+  'answer in exactly this structure',
+  'operational lines: what you did',
+  'each factual claim you make',
+  'critical honesty rule',
+  'high | medium | low',
+];
+
+/** True when the text echoes brief scaffolding instead of delivering work. */
+export function echoesBriefScaffolding(text) {
+  const s = String(text || '').toLowerCase();
+  let hits = 0;
+  for (const f of ECHO_FINGERPRINTS) if (s.includes(f)) hits += 1;
+  return hits >= 2;
+}
+
 /** Compact, honest summary of what ACTUALLY executed in a task — the only
  *  source of truth for HOW work was done. Fed to the rubric prompt. */
 export function executionEvidence(events = []) {
@@ -114,6 +143,20 @@ export async function verifyDeliverable(p) {
     }
   }
 
+  // Gate 1.5b (FINAL F5) — FAILURE DENIAL: a deliverable that claims commands
+  // ran SUCCESSFULLY ("executed successfully", "tests passed", "returned the
+  // correct result") while the task record holds failures and NO success is
+  // denying observed evidence. Seen live: exit-1 run claimed as success.
+  {
+    const claimsSuccess = /executed?\s+(successfully|correctly|without (error|issue))|ran\s+(successfully|correctly)|tests?\s+(all\s+)?passed|returned\s+the\s+correct\s+result|verified\s+that\s+the\s+code\s+was\s+executed\s+successfully/i.test(String(deliverable || ''));
+    const evts = task?.events || [];
+    const hasFailure = evts.some((e) => e.type === 'COMMAND_FAILED' || e.type === 'TEST_FAILED');
+    const hasSuccess = evts.some((e) => e.type === 'COMMAND_COMPLETED' || e.type === 'TEST_COMPLETED');
+    if (claimsSuccess && hasFailure && !hasSuccess) {
+      gateProblems.push('the deliverable claims commands ran successfully but the task record shows failures and NO successful run — the observed exit codes are the truth, not the claim');
+    }
+  }
+
   // Gate 1.6 (B213) — METHOD PROVENANCE: claims of browser-driven work are
   // honest only if browser events exist in the task record. A COMPUTER_BLOCKED
   // means the browser was tried and honestly unavailable — claiming browser
@@ -125,6 +168,15 @@ export async function verifyDeliverable(p) {
       if (!hasBrowserEvidence) {
         gateProblems.push('the deliverable claims browser-driven work (headless/real browser) but NO browser action ever executed in this task — fabricated method; report only what really ran');
       }
+    }
+  }
+
+  // Gate 1.7 (FINAL F5) — TEMPLATE ECHO: a deliverable that repeats the
+  // brief's instruction scaffolding is not work — fail deterministically so
+  // a weak rubric judge can never pass it (rubric pass is ANDed with gates).
+  {
+    if (echoesBriefScaffolding(deliverable)) {
+      gateProblems.push('the deliverable echoes the assignment instructions instead of doing the work (template echo) — produce the real work product, not the scaffolding words');
     }
   }
 

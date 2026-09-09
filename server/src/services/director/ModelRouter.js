@@ -114,13 +114,20 @@ export async function runWithModel(employee, taskType, work, hooks = {}) {
   let lastErr = null;
   while (true) {
     const t0 = Date.now();
+    // FINAL F5 — provider provenance: the lane label is only a PREFERENCE.
+    // The work closure reports the provider that REALLY generated (from the
+    // LLM client's token metadata); telemetry + events record that, never
+    // the preference. (Before: ollama's work was credited to "groq".)
+    let usedProvider = null;
+    const noteProvider = (p) => { if (p && !usedProvider) usedProvider = String(p); };
     emit('MODEL_REQUEST_STARTED', { agentId: employee.agentId, agentName: employee.displayName, summary: `${employee.displayName} is working (lane: ${session.providerLabel}).` });
     try {
-      const result = await work({ session, prefer: session.prefer, attempt: session.attempt });
+      const result = await work({ session, prefer: session.prefer, attempt: session.attempt, noteProvider });
       const ms = Date.now() - t0;
-      telemetry.record('provider', session.prefer || 'auto', { ok: true, ms });
-      session.providerUsed = session.prefer || 'auto';
-      emit('MODEL_REQUEST_COMPLETED', { agentId: employee.agentId, agentName: employee.displayName, summary: `${employee.displayName} finished a model pass in ${(ms / 1000).toFixed(1)}s.` });
+      const used = usedProvider || session.prefer || 'auto';
+      telemetry.record('provider', used, { ok: true, ms });
+      session.providerUsed = used;
+      emit('MODEL_REQUEST_COMPLETED', { agentId: employee.agentId, agentName: employee.displayName, summary: `${employee.displayName} finished a model pass in ${(ms / 1000).toFixed(1)}s.`, data: { provider: used, preferred: session.prefer || 'auto' } });
       return result;
     } catch (err) {
       // B209 — a SUPERVISION redirect is not a provider failure: it passes
