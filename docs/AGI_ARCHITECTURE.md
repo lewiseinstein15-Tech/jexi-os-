@@ -22,10 +22,10 @@ unifies them; it does not rewrite them.
                         │ 21 views · SSE live events (real only) ·     │
                         │ mission instrument · computer panel · mic    │
                         └───────────────┬──────────────────────────────┘
-                                        │ /api/* (x-jexi-key or ?key=)
+                                        │ /api/* (open, no key)
         ┌───────────────────────────────┴───────────────────────────────┐
         │                        SERVER (Express)                       │
-        │  auth middleware · rate limits · NDJSON/SSE streaming         │
+        │  rate limits · NDJSON/SSE streaming (open API, no key)        │
         └──┬────────────────────────────────────────────────────────────┘
            │
    ┌───────┴───────────────── THREE EXECUTION PATHS (see §6 risk) ─────┐

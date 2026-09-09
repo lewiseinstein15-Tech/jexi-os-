@@ -23,7 +23,7 @@ The repo ships a Render Blueprint (`render.yaml`) that pre-fills the service:
    - `OPENROUTER_API_KEY`, `CEREBRAS_API_KEY`, `DEEPINFRA_API_KEY`, `MISTRAL_API_KEY`,
      `XAI_API_KEY`, `HF_TOKEN` (optional failover providers)
    - `GITHUB_TOKEN` (optional — GitHub agent commit/push/PRs)
-   - `JEXI_API_KEY` (recommended — locks the API; the app sends it from Settings → JEXI Access Key)
+   - (no access key — the API is open by operator directive)
    - `JEXI_MCP_KEY` (optional — locks the `/mcp` endpoint with Bearer auth)
    - `CORS_ORIGINS` (optional — comma-separated browser origins allowed to call the API)
 4. **Runtime env (Blueprint sets these automatically):** `NODE_VERSION=22`,
@@ -66,7 +66,7 @@ bun install && bun run dev                # frontend dev (Vite proxy → :3002)
 | `XAI_API_KEY` | optional | Grok (xAI) frontier models failover |
 | `HF_TOKEN` | optional | HuggingFace Inference API (last-resort fallback) |
 | `GITHUB_TOKEN` | optional | GitHub agent (commit/push/PRs) |
-| `JEXI_API_KEY` | optional | Locks the API (all `/api` requests need `x-jexi-key`) |
+| ~~`JEXI_API_KEY`~~ | removed | API is open (no key gate) |
 | `JEXI_MCP_KEY` | optional | Locks `/mcp` (Bearer auth) |
 | `CORS_ORIGINS` | optional | Comma-separated allowed browser origins |
 | `REDIS_URL` | optional | Shared memory across instances/restarts |

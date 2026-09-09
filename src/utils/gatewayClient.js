@@ -2,13 +2,13 @@
  * B140 — GATEWAY CLIENT (DeepSeek Harness `packages/api/gateway` client
  * mirror, JEXI-branded).
  *
- * The browser-side API gateway client: a fetch wrapper that always sends
- * the JEXI access key, normalizes errors, and retries idempotent GETs with
- * capped exponential backoff. Every fetch in the app should go through here
- * (jexiFetch already exists for chat-path calls; this is the general
- * surface with retry + error shaping).
+ * The browser-side API gateway client: a fetch wrapper that normalizes
+ * errors and retries idempotent GETs with capped exponential backoff.
+ * Every fetch in the app should go through here (jexiFetch already exists
+ * for chat-path calls; this is the general surface with retry + shaping).
+ * The backend is open — no access key is sent.
  *
- *   gatewayFetch(path, { method, body, retries, timeoutMs, key })
+ *   gatewayFetch(path, { method, body, retries, timeoutMs })
  *     → { ok, status, data } | throws GatewayError on network failure
  */
 
@@ -26,24 +26,16 @@ export class GatewayError extends Error {
   }
 }
 
-/** Read the JEXI access key (Settings → System). */
-export function getAccessKey() {
-  try {
-    return localStorage.getItem('jexi_access_key') || '';
-  } catch { return ''; }
-}
-
 /** Sleep helper (capped backoff). */
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * One gateway fetch with timeout + retry + error normalization.
  * @param {string} url absolute or relative URL
- * @param {object} opts { method, body, headers, retries, timeoutMs, key, signal }
+ * @param {object} opts { method, body, headers, retries, timeoutMs, signal }
  */
 export async function gatewayFetch(url, opts = {}) {
-  const { method = 'GET', body, headers = {}, retries = MAX_RETRIES, timeoutMs = DEFAULT_TIMEOUT_MS, key = null, signal } = opts;
-  const finalKey = key !== null ? key : getAccessKey();
+  const { method = 'GET', body, headers = {}, retries = MAX_RETRIES, timeoutMs = DEFAULT_TIMEOUT_MS, signal } = opts;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const onOuterAbort = () => controller.abort();
@@ -58,7 +50,6 @@ export async function gatewayFetch(url, opts = {}) {
         method,
         headers: {
           'Content-Type': 'application/json',
-          ...(finalKey ? { 'x-jexi-key': finalKey } : {}),
           ...headers,
         },
         body: body !== undefined && method !== 'GET' ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,

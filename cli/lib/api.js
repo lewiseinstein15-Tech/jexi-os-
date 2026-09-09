@@ -7,9 +7,8 @@
  */
 
 export class JexiApi {
-  constructor({ baseUrl, accessKey = '', session = 'cli', fetchImpl = null } = {}) {
+  constructor({ baseUrl, session = 'cli', fetchImpl = null } = {}) {
     this.baseUrl = String(baseUrl || '').replace(/\/+$/, '');
-    this.accessKey = accessKey;
     this.session = session;
     this.fetch = fetchImpl || fetch;
   }
@@ -17,7 +16,6 @@ export class JexiApi {
   headers(extra = {}) {
     return {
       'Content-Type': 'application/json',
-      ...(this.accessKey ? { 'x-jexi-key': this.accessKey } : {}),
       'x-jexi-session': this.session,
       ...extra,
     };

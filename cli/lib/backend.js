@@ -1,7 +1,7 @@
 /**
  * JEXI CLI — local backend supervisor.
  *
- * `jexi` runs the brain on the laptop itself (127.0.0.1, random access key):
+ * `jexi` runs the brain on the laptop itself (127.0.0.1, open backend):
  * no cloud needed for local engineering. The backend is spawned detached,
  * tracked via a pidfile, and health-gated before any command proceeds.
  */
@@ -70,7 +70,7 @@ export async function waitHealthy(api, { timeoutMs = 45000, intervalMs = 500 } =
 export async function ensureBackend({ cfg, serverDir, workspace, home, onLog = null }) {
   const log = (m) => { try { onLog?.(m); } catch {} };
   const meta = readPid(home);
-  const api = new JexiApi({ baseUrl: `http://${cfg.host}:${cfg.port}`, accessKey: cfg.accessKey });
+  const api = new JexiApi({ baseUrl: `http://${cfg.host}:${cfg.port}` });
   const sameWorkspace = (w) => path.resolve(w) === path.resolve(workspace);
 
   if (meta && meta.pid && pidAlive(meta.pid)) {
@@ -107,7 +107,6 @@ export async function ensureBackend({ cfg, serverDir, workspace, home, onLog = n
       ...process.env,
       PORT: String(cfg.port),
       HOST: cfg.host || '127.0.0.1',
-      JEXI_API_KEY: cfg.accessKey,
       WORKSPACE_DIR: workspace,
       DATA_DIR: ps.data,
     },

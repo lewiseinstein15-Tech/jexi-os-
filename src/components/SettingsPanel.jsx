@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server, Github, ShieldCheck, Shield, Globe, Lock, Cpu, Cloud, Mail, Bell, Loader2 , Puzzle } from 'lucide-react';
-import { getBackendUrl, setBackendUrl, getAccessKey, setAccessKey, jexiFetch } from '../utils/helpers';
+import { Settings, Key, Save, CheckCircle2, AlertCircle, Zap, Sparkles, Server, Github, ShieldCheck, Shield, Globe, Cpu, Cloud, Mail, Bell, Loader2 , Puzzle } from 'lucide-react';
+import { getBackendUrl, setBackendUrl, jexiFetch } from '../utils/helpers';
 import { setupFcm } from '../utils/fcmSetup';
 import PanelHeader from './PanelHeader';
 
@@ -60,7 +60,7 @@ export default function SettingsPanel() {
   const [status, setStatus] = useState('idle'); // idle, loading, saved, error
   const [initialLoad, setInitialLoad] = useState(true);
 
-  const [accessKey, setAccessKeyState] = useState(getAccessKey());
+
   const [autonomyMode, setAutonomyMode] = useState('ask'); // ask | full — goal autonomy level
   const [goalReportEmail, setGoalReportEmail] = useState(''); // email address for goal completion reports
   const [fcmServer, setFcmServer] = useState(false); // server FCM configured
@@ -349,39 +349,6 @@ export default function SettingsPanel() {
                 {ghForgetBusy ? 'FORGETTING…' : 'FORGET ACTIVE KEY NOW'}
               </button>
             )}
-          </div>
-
-          {/* JEXI Access Key — required only if the backend is locked with JEXI_API_KEY */}
-          <div className="bg-surface-2 border border-hairline rounded-md p-3">
-            <label className="flex items-center gap-2 text-[10px] font-bold text-text-secondary mb-1.5 tracking-wider">
-              <Lock className="w-3 h-3 text-brand" />
-              JEXI ACCESS KEY (OPTIONAL)
-              {accessKey ? (
-                <span className="ml-auto flex items-center gap-1 text-brand text-[8px] bg-brand-dim border border-brand-line rounded-full px-2 py-0.5">
-                  <CheckCircle2 className="w-2.5 h-2.5" /> KEY SET
-                </span>
-              ) : (
-                <span className="ml-auto text-text-tertiary text-[8px] bg-surface-1 border border-hairline rounded-full px-2 py-0.5">
-                  NOT LOCKED
-                </span>
-              )}
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                value={accessKey}
-                onChange={(e) => setAccessKeyState(e.target.value)}
-                placeholder="Leave empty if your server is open"
-                className="w-full bg-surface-1 text-text-primary border border-hairline rounded-md px-3 py-2.5 text-xs focus:outline-none focus:border-brand-line font-mono"
-              />
-              <button
-                onClick={() => { setAccessKey(accessKey.trim()); setStatus('saved'); setTimeout(() => setStatus('idle'), 3000); }}
-                className="bg-brand text-black rounded-md px-3 py-2.5 text-xs font-bold flex items-center gap-1.5 flex-shrink-0"
-              >
-                <Save className="w-3.5 h-3.5" /> APPLY
-              </button>
-            </div>
-            <p className="text-[8px] text-text-tertiary mt-1">If you set <span className="font-mono text-text-secondary">JEXI_API_KEY</span> on the server (Render → Environment), every request must carry this key. Stored in your browser, sent only to your own backend.</p>
           </div>
 
           {/* Autonomy level — goal-level execution behavior */}

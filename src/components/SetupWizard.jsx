@@ -1,12 +1,13 @@
 /**
- * M8 — PHONE SETUP WIZARD (first run: point at a brain, prove the key).
+ * M8 — PHONE SETUP WIZARD (first run: point at a brain).
  *
- * Rendered instead of the app shell when no access key is stored and setup
- * never completed. Three honest steps — every transition is earned by a
- * live probe, never by typing alone. Static-markup safe (no effects).
+ * Rendered instead of the app shell when setup never completed. Two honest
+ * steps — the transition is earned by a live health probe, never by typing
+ * alone. Static-markup safe (no effects). The backend is open (no access
+ * key), so pairing is just the brain address.
  */
 import React, { useState } from 'react';
-import { probeHealth, verifyAccessKey, normalizeBase } from '../utils/setupProbe';
+import { probeHealth, normalizeBase } from '../utils/setupProbe';
 
 const S = {
   wrap: { minHeight: '100vh', background: '#0f1115', color: '#e8eaf0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: 'system-ui, -apple-system, sans-serif' },
@@ -29,8 +30,8 @@ const S = {
 
 function Dots({ step }) {
   return (
-    <div style={S.dots} aria-label={`Step ${step} of 3`}>
-      {[1, 2, 3].map((n) => (
+    <div style={S.dots} aria-label={`Step ${step} of 2`}>
+      {[1, 2].map((n) => (
         <div key={n} style={{ flex: 1, height: 4, borderRadius: 2, background: n <= step ? '#FF8A3D' : '#262b36' }} />
       ))}
     </div>
@@ -40,10 +41,8 @@ function Dots({ step }) {
 export default function SetupWizard({ initialUrl = '', onDone = () => {}, onSkip = () => {} }) {
   const [step, setStep] = useState(1);
   const [url, setUrl] = useState(initialUrl || '');
-  const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [health, setHealth] = useState(null);
-  const [keyCheck, setKeyCheck] = useState(null);
 
   const testConnection = async () => {
     setBusy(true);
@@ -52,15 +51,6 @@ export default function SetupWizard({ initialUrl = '', onDone = () => {}, onSkip
     setHealth(r);
     setBusy(false);
     if (r.ok) setStep(2);
-  };
-
-  const verifyKey = async () => {
-    setBusy(true);
-    setKeyCheck(null);
-    const r = await verifyAccessKey(url, key);
-    setKeyCheck(r);
-    setBusy(false);
-    if (r.ok) setStep(3);
   };
 
   return (
@@ -79,35 +69,21 @@ export default function SetupWizard({ initialUrl = '', onDone = () => {}, onSkip
             <button type="button" style={{ ...S.btn, ...S.primary, opacity: busy ? 0.6 : 1 }} disabled={busy} onClick={testConnection}>
               {busy ? 'Testing…' : 'Test connection'}
             </button>
-            <button type="button" style={S.link} onClick={onSkip}>Continue without a key (keyless local brain)</button>
+            <button type="button" style={S.link} onClick={onSkip}>Skip setup for now</button>
           </div>
         )}
 
         {step === 2 && (
           <div>
-            <h1 style={S.title}>Unlock with your key</h1>
-            <p style={S.sub}>The brain at <span style={S.mono}>{normalizeBase(url)}</span> answered{health && health.ms != null ? ` in ${health.ms}ms` : ''}. Now paste the access key (server setting <span style={S.mono}>JEXI_API_KEY</span>).</p>
-            <label style={S.label} htmlFor="jx-setup-key">Access key</label>
-            <input id="jx-setup-key" style={S.input} type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="Paste JEXI_API_KEY" autoCapitalize="off" autoCorrect="off" />
-            {keyCheck && !keyCheck.ok && <div style={S.err}>✗ {keyCheck.error}</div>}
-            <button type="button" style={{ ...S.btn, ...S.primary, opacity: busy ? 0.6 : 1 }} disabled={busy} onClick={verifyKey}>
-              {busy ? 'Verifying…' : 'Verify key'}
+            <h1 style={S.title}>Connected ✓</h1>
+            <p style={S.sub}>Brain <span style={S.mono}>{normalizeBase(url)}</span> is online{health && health.ms != null ? ` (answered in ${health.ms}ms)` : ''}. This device is paired.</p>
+            <div style={S.ok}>✓ Connection proven — no key needed, the brain is open</div>
+            <button type="button" style={{ ...S.btn, ...S.primary }} onClick={() => onDone(normalizeBase(url))}>
+              Open JEXI
             </button>
             <div style={S.row}>
               <button type="button" style={{ ...S.btn, ...S.ghost, marginTop: 0 }} onClick={() => setStep(1)}>← Back</button>
             </div>
-            <button type="button" style={S.link} onClick={onSkip}>Continue without a key (keyless local brain)</button>
-          </div>
-        )}
-
-        {step === 3 && (
-          <div>
-            <h1 style={S.title}>Connected ✓</h1>
-            <p style={S.sub}>Brain <span style={S.mono}>{normalizeBase(url)}</span> is online and your key is verified. This device is paired.</p>
-            <div style={S.ok}>✓ Connection proven · key accepted{keyCheck && keyCheck.ms != null ? ` · verified in ${keyCheck.ms}ms` : ''}</div>
-            <button type="button" style={{ ...S.btn, ...S.primary }} onClick={() => onDone(normalizeBase(url), key.trim())}>
-              Open JEXI
-            </button>
           </div>
         )}
       </div>

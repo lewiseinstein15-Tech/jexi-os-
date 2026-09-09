@@ -14,8 +14,8 @@
  *   - Read-mostly: the only "action" tool is ask_jexi, which runs JEXI's own
  *     planner — the same safe pipeline the chat UI uses (it writes generated
  *     apps only into WORKSPACE_DIR; no destructive operations).
- *   - Auth: the endpoint rides the existing Express API gate (JEXI_API_KEY) and
- *     can additionally require MCP_MCP_KEY on every client request.
+ *   - Auth: the Express API is open (no key gate); the endpoint can still
+ *     require MCP_MCP_KEY on every client request.
  *   - No destructive tools (no clearMemory, no deleteBook, no settings writes).
  *
  * Run standalone (dev):  node mcp-server.js            → http://127.0.0.1:3457/mcp

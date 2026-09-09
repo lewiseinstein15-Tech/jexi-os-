@@ -11,7 +11,7 @@
 ```
 Android APK (Capacitor)   PWA / GitHub Pages        (frontend — React + Vite)
         └────────────┬────────────┘
-                     │ HTTPS + x-jexi-key
+                     │ HTTPS (open API, no key)
                      ▼
         JEXI BRAIN — Node.js (server/, port 3002)
         ├── index.js (~2.4k lines) — HTTP surface, SSE, 3 execution paths
@@ -129,8 +129,8 @@ roadmap's CognitiveCore phase addresses):
   format proven in B226; mission event stream (missionStream.js).
 - **Notifications**: NotificationCenter + GoalNotifier (email goal reports,
   GOAL_REPORT_EMAIL).
-- **Auth**: single access key (`x-jexi-key` header; JEXI_API_KEY /
-  key set via Settings) — locked server returns 401; CORS_ORIGINS allowlist.
+- **Auth**: none — open API by operator directive (no key gate, no 401);
+  CORS_ORIGINS allowlist + per-IP rate limiter remain.
 - **Persistence**: JSON files under DATA_DIR (atomicWrite), Upstash Redis
   mirror for mission survival across container replacement (B217/B218),
   hydrate-retry on boot; Firebase service account (Android push);
@@ -144,7 +144,7 @@ Integrations: GITHUB_TOKEN / GITHUB_APP_ID / GITHUB_PRIVATE_KEY /
 GITHUB_WEBHOOK_SECRET, FIREBASE_SERVICE_ACCOUNT(_B64), E2B_URL, UPSTASH_*.
 Behavior flags: DATA_DIR, CORS_ORIGINS, JEXI_NO_BROWSER, JEXI_CHAOS,
 JEXI_COMPACTION_TOKENS, COMPUTER_RUNTIME, COMPUTER_USE_MAX_ATTEMPTS,
-JEXI_HYDRATE_RETRY_DELAYS_MS, DESKTOP_ALLOW_PRIVATE, JEXI_ALLOW_UNLOCKED…
+JEXI_HYDRATE_RETRY_DELAYS_MS, DESKTOP_ALLOW_PRIVATE…
 
 ## 11. CI/CD & quality gates
 

@@ -9,14 +9,9 @@
  * once and served line-by-line, because repeated readline.question() calls
  * lose buffered input on non-TTY streams.
  */
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import readline from 'node:readline';
 import { defaultConfig, importServerModule } from './config.js';
-
-export function randomAccessKey() {
-  return `jx-local-${crypto.randomBytes(24).toString('hex')}`;
-}
 
 export function validPort(v) {
   const n = Number(v);
@@ -163,7 +158,6 @@ export async function runInitWizard({ serverDir, cwd, io = null } = {}) {
     ...defaultConfig(),
     port: Number(portAns),
     host: '127.0.0.1',
-    accessKey: randomAccessKey(),
     workspace: cwd,
     unified: v.normalized,
   };

@@ -178,9 +178,7 @@ export default function MissionsScreen() {
   // polling fabric is the fallback, not the primary.
   useEffect(() => {
     if (!selectedId || typeof EventSource === 'undefined') return;
-    const key = getAccessKey();
-    const streamUrl = `${getBackendUrl()}/api/missions/${selectedId}/events/stream`;
-    const url = key ? `${streamUrl}?key=${encodeURIComponent(key)}` : streamUrl;
+    const url = `${getBackendUrl()}/api/missions/${selectedId}/events/stream`;
     let es;
     try { es = new EventSource(url); } catch { return; }
     es.addEventListener('ready', () => setEsLive(true));

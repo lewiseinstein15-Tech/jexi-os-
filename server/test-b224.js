@@ -178,11 +178,11 @@ test('disconnect clears the push loop (no interval leak)', async () => {
 
 /* ── wiring contracts ─────────────────────────────────────────────────── */
 
-test('index.js: the stream is mounted and the ?key= auth path exists (EventSource cannot set headers)', async () => {
+test('index.js: the stream is mounted and open (key gate removed)', async () => {
   const src = fs.readFileSync(path.join(SERVER_DIR, 'index.js'), 'utf-8');
   assert.ok(src.includes("app.get('/api/missions/:id/events/stream', missionEventStream)"), 'route mounted from the extracted handler');
-  assert.ok(src.includes('keyMatches(req.query.key)'), 'query-key auth for the SSE path only');
-  assert.ok(src.includes('/^\\/api\\/missions\\/[^/]+\\/events\\/stream$/'), 'the query-key exception is scoped to the stream path via regex');
+  assert.ok(!src.includes('keyMatches(req.query.key)'), 'no query-key auth (backend is open)');
+  assert.ok(!src.includes('x-jexi-key'), 'no key header checks anywhere in the server');
 });
 
 test('frontend: EventSource subscription + duplicate-safe append + stretched poll while live', async () => {

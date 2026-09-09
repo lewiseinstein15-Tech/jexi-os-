@@ -2,12 +2,13 @@
  * B138 — CONFIG RELOAD (DeepSeek Harness `packages/boot/app-boot` config-reload
  * mirror, JEXI-branded).
  *
- * Boot-config hot reload: derived flags (key lock, allow-unlocked, feature
- * toggles from env + settings) are folded into one snapshot. Subscribers are
- * notified when a reload produces a DIFFERENT snapshot, so long-lived
- * surfaces (the key-lock middleware, the gateway) can react without a
- * restart. Reload is fail-open: a broken settings file keeps the previous
- * snapshot.
+ * Boot-config hot reload: derived flags (feature toggles from env + settings)
+ * are folded into one snapshot. Subscribers are notified when a reload
+ * produces a DIFFERENT snapshot, so long-lived surfaces (the gateway) can
+ * react without a restart. Reload is fail-open: a broken settings file keeps
+ * the previous snapshot. (The API-key lock was removed by operator directive;
+ * keyLocked/allowUnlocked/hasApiKey stay in the snapshot as permanent false
+ * so older status consumers keep their shape.)
  */
 
 const listeners = new Set();
@@ -20,9 +21,9 @@ let lastDiff = null;
 export function foldConfigSnapshot({ env = process.env, settings = {} } = {}) {
   const s = settings && typeof settings === 'object' ? settings : {};
   return {
-    keyLocked: !!env.JEXI_API_KEY && env.JEXI_ALLOW_UNLOCKED !== '1',
-    allowUnlocked: env.JEXI_ALLOW_UNLOCKED === '1',
-    hasApiKey: !!env.JEXI_API_KEY,
+    keyLocked: false, // lock removed — always open (JEXI_API_KEY ignored when present)
+    allowUnlocked: false,
+    hasApiKey: false,
     hasRedis: !!env.REDIS_URL,
     hasFirebase: !!env.FIREBASE_SERVICE_ACCOUNT_B64,
     preset: typeof s.agentPresets === 'object' && s.agentPresets ? (s.agentPresets.default || null) : null,

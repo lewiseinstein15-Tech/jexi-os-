@@ -28,7 +28,7 @@
   biggest block of genuinely new work in the spec.
 
 ### Backend API (Express, `server/index.js` + `src/routes/surface.js`)
-- **Entry:** `index.js` (boot gate: `JEXI_API_KEY` required in prod) — 153 routes;
+- **Entry:** `index.js` (open API, no key gate) — 153 routes;
   `surface.js` (B186+, thin adapters over existing services) — 72 routes. Total ~225.
 - **Status: WORKING.** No TODO/FIXME/placeholder markers in production paths (grep clean).
 
@@ -199,7 +199,7 @@
 - **Status: WORKING** (just verified end-to-end on prod today: jexi-demo images).
 
 ### Security (spec Part 30)
-- Boot gate (JEXI_API_KEY prod), x-jexi-key enforcement, permission presets, trust
+- Open API (key gate removed by operator directive), permission presets, trust
   folders, risk guard, rate limiter, AnswerSanitizer, secret redaction in logs
   (CredentialStore + resolveCredential; keys never in prompts/logs/artifacts — enforced
   across B-builds; .env untracked).

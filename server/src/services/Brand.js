@@ -12,7 +12,6 @@ export const BRAND = {
   tagline: 'Your personal AI operating system',
   home: '~/.jexi',
   envHome: 'JEXI_HOME',
-  apiKeyEnv: 'JEXI_API_KEY',
   defaultBackendPort: 3002,
   version: '1.0.0',
 };

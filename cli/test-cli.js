@@ -41,7 +41,7 @@ console.log('jexi cli:');
 
 await ok('config: defaults + roundtrip in isolated HOME', () => {
   assert.strictEqual(loadConfig(TMP_HOME), null);
-  const cfg = { ...defaultConfig(), port: 3210, accessKey: 'k1', unified: { provider: 'groq', apiKey: 'x', model: 'm', baseUrl: 'https://g/v1' } };
+  const cfg = { ...defaultConfig(), port: 3210, unified: { provider: 'groq', apiKey: 'x', model: 'm', baseUrl: 'https://g/v1' } };
   assert.ok(saveConfig(cfg, TMP_HOME));
   const back = loadConfig(TMP_HOME);
   assert.strictEqual(back.port, 3210);
@@ -65,16 +65,16 @@ await ok('config: server module reuse (catalog)', async () => {
   assert.ok(Array.isArray(cat.PROVIDERS) && cat.PROVIDERS.length >= 10);
 });
 
-await ok('api: headers carry key + session', async () => {
+await ok('api: headers carry session, no key (open backend)', async () => {
   let seen = null;
   const api = new JexiApi({
-    baseUrl: 'http://x:1/', accessKey: 'AK', session: 's1',
+    baseUrl: 'http://x:1/', session: 's1',
     fetchImpl: async (url, init) => { seen = { url, init }; return { status: 200, ok: true, text: async () => '{"ok":true}' }; },
   });
   const r = await api.get('/api/health');
   assert.ok(r.ok && r.data.ok);
   assert.strictEqual(seen.url, 'http://x:1/api/health');
-  assert.strictEqual(seen.init.headers['x-jexi-key'], 'AK');
+  assert.ok(!('x-jexi-key' in seen.init.headers));
   assert.strictEqual(seen.init.headers['x-jexi-session'], 's1');
 });
 

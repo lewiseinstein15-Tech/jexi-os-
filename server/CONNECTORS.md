@@ -28,9 +28,9 @@ docs — zero references remain).
 | `GET /api/connectors/:name/health` | open (GET) | Real health check (calls the provider; read-only, no secrets) |
 | `GET /api/connectors/:name/inbound` | open (GET) | Recent verified inbound webhook events (newest first, no secrets) |
 | `GET /api/connectors/:name/conversations` | open (GET) | Per-partner chat threads (inbound + our replies, both directions) |
-| `POST /api/connectors/:name/call` | API key (`x-jexi-key`) | Real action: body `{ "method": "send"\|"receive"\|"reply"\|"health", "payload": {...} }` |
-| `POST /api/connectors/:name/config` | API key | Save Settings-stored keys (env always wins at call time) |
-| `POST /api/connectors/:name/toggle` | API key | Enable/disable a connector |
+| `POST /api/connectors/:name/call` | open | Real action: body `{ "method": "send"\|"receive"\|"reply"\|"health", "payload": {...} }` |
+| `POST /api/connectors/:name/config` | open | Save Settings-stored keys (env always wins at call time) |
+| `POST /api/connectors/:name/toggle` | open | Enable/disable a connector |
 | `POST /webhooks/connectors/github` | HMAC (`x-hub-signature-256`/`sha1` with `GITHUB_WEBHOOK_SECRET`) | GitHub webhook events |
 | `POST /webhooks/connectors/email` | Svix HMAC-SHA256 (`RESEND_WEBHOOK_SECRET`) | Resend inbound (`email.received`) + delivery events |
 
@@ -80,29 +80,29 @@ Each health URL is a normal GET — open it in a phone browser, or curl it from
 your laptop. A `PASS` means the provider answered the real API call; `FAIL`
 carries the provider's exact error; `NOT_CONFIGURED` names the missing env var.
 
-### Test sends (need the `x-jexi-key` header if `JEXI_API_KEY` is set)
+### Test sends (the API is open — no key header)
 
 From your laptop (no shell on the server needed):
 
 ```bash
-# Email — replace <key> with your JEXI access key if JEXI_API_KEY is set
+# Email
 curl -X POST https://YOUR-RENDER-URL/api/connectors/email/call \
-  -H 'Content-Type: application/json' -H 'x-jexi-key: <key>' \
+  -H 'Content-Type: application/json' \
   -d '{"method":"send","payload":{"to":"you@example.com","subject":"test","html":"<p>hi</p>"}}'
 
 # GitHub — create a real file commit (returns commit SHA + file URL)
 curl -X POST https://YOUR-RENDER-URL/api/connectors/github/call \
-  -H 'Content-Type: application/json' -H 'x-jexi-key: <key>' \
+  -H 'Content-Type: application/json' \
   -d '{"method":"send","payload":{"action":"create_file","owner":"octocat","repo":"disposable-repo","path":"notes.md","content":"# Notes\nhello","message":"JEXI created this file"}}'
 
 # GitHub — update that file (reads the current SHA first, commits the change)
 curl -X POST https://YOUR-RENDER-URL/api/connectors/github/call \
-  -H 'Content-Type: application/json' -H 'x-jexi-key: <key>' \
+  -H 'Content-Type: application/json' \
   -d '{"method":"send","payload":{"action":"update_file","owner":"octocat","repo":"disposable-repo","path":"notes.md","content":"# Notes\nupdated by JEXI","message":"JEXI updated this file"}}'
 ```
 
 Each returns the provider's raw response (email id / GitHub commit SHA + URL).
-No `JEXI_API_KEY` on Render? Then drop the `x-jexi-key` header entirely.
+No key header is ever needed — the API is open.
 
 ### Full live script (for any host where the keys exist)
 

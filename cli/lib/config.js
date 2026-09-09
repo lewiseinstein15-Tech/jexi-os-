@@ -32,7 +32,6 @@ export function defaultConfig() {
     version: 1,
     port: 3210,
     host: '127.0.0.1',
-    accessKey: '',
     workspace: process.cwd(),
     createdAt: new Date().toISOString(),
     unified: null, // { provider, apiKey, model, baseUrl } — the ONE model credential

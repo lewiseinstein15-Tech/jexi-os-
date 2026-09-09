@@ -25,7 +25,7 @@ The repo ships a **`render.yaml` blueprint** that pre-configures everything.
    - `GROQ_API_KEY` — from console.groq.com/keys
    - `GEMINI_API_KEY` (optional fallback) — from aistudio.google.com/app/apikey
    - `GITHUB_TOKEN` (optional) — lets the GitHub Agent commit/push/PR for you
-   - `JEXI_API_KEY` (**recommended**) — a secret passphrase that locks the API; the app sends it as `x-jexi-key` (Settings → JEXI Access Key). Without it, anyone with your URL can use your AI quota.
+   - (no access key — the API is open; anyone with your URL can use your AI quota, throttled only by the per-IP rate limiter)
    - `CORS_ORIGINS` (optional) — comma-separated browser origins allowed to call the API, e.g. `https://lewiseinstein15-Tech.github.io`
    - Then **Manual Deploy → Deploy latest commit** to apply them.
 
@@ -103,7 +103,6 @@ The frontend finds the backend in this order:
 > and `http://localhost` for the Android app in dev. If the app says the backend is blocked
 > (CORS) or unreachable, add the origin shown in the message — or clear `CORS_ORIGINS`
 > entirely (unset = open to all browsers).
-> If you set `JEXI_API_KEY` on Render, paste the same key in the app's **Settings → JEXI Access Key** so the UI can unlock the API.
 
 ---
 

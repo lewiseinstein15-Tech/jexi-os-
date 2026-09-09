@@ -31,8 +31,8 @@ export function featureFlags(env = process.env) {
   return {
     redis: !!env.REDIS_URL,
     firebase: !!env.FIREBASE_SERVICE_ACCOUNT_B64,
-    apiKeyLock: !!env.JEXI_API_KEY,
-    allowUnlocked: env.JEXI_ALLOW_UNLOCKED === '1',
+    apiKeyLock: false, // API-key lock removed (operator directive) — always open
+    allowUnlocked: false,
     sqlite: true, // node:sqlite built-in (Node ≥ 22.5)
     plugins: true,
   };

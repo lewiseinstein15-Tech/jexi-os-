@@ -129,7 +129,6 @@ async function cmdInit(args) {
   if (modelOnly && existing) {
     cfg.port = existing.port;
     cfg.host = existing.host;
-    cfg.accessKey = existing.accessKey;
     cfg.workspace = existing.workspace;
   }
   if (!saveConfig(cfg, HOME)) { err('Could not write ~/.jexi/config.json'); process.exit(1); }
@@ -148,7 +147,7 @@ async function cmdInit(args) {
 
 async function cmdChat(args) {
   const cfg = loadConfig(HOME);
-  if (!cfg || !cfg.accessKey) return needInit();
+  if (!cfg) return needInit();
   const workspace = process.cwd();
   const { api } = await withBackend(cfg, workspace);
   const query = args.join(' ').trim();
@@ -163,7 +162,7 @@ async function cmdChat(args) {
 
 async function cmdRun(args) {
   const cfg = loadConfig(HOME);
-  if (!cfg || !cfg.accessKey) return needInit();
+  if (!cfg) return needInit();
   const objective = args.join(' ').trim();
   if (!objective) { err('Usage: jexi run "objective"'); process.exitCode = 2; return; }
   const { api } = await withBackend(cfg, process.cwd());
@@ -172,7 +171,7 @@ async function cmdRun(args) {
 
 async function cmdMissions() {
   const cfg = loadConfig(HOME);
-  if (!cfg || !cfg.accessKey) return needInit();
+  if (!cfg) return needInit();
   const { api } = await withBackend(cfg, process.cwd());
   const r = await api.get('/api/missions').catch((e) => ({ ok: false, data: { error: e.message } }));
   if (!r.ok) { err(`  ✕ HTTP ${r.status}`); process.exitCode = 1; return; }
@@ -185,7 +184,7 @@ async function cmdMissions() {
 
 async function cmdModels() {
   const cfg = loadConfig(HOME);
-  if (!cfg || !cfg.accessKey) return needInit();
+  if (!cfg) return needInit();
   const { api } = await withBackend(cfg, process.cwd());
   const [cat, act] = await Promise.all([api.providersCatalog(), api.providersActive()]);
   if (act.ok && act.data && act.data.active && act.data.active.configured) {
@@ -205,8 +204,8 @@ async function cmdDoctor() {
   const cfg = loadConfig(HOME);
   const serverDir = findServerDir();
   let api = null;
-  if (cfg && cfg.accessKey) {
-    api = new JexiApi({ baseUrl: `http://${cfg.host}:${cfg.port}`, accessKey: cfg.accessKey });
+  if (cfg) {
+    api = new JexiApi({ baseUrl: `http://${cfg.host}:${cfg.port}` });
     // A health check must not START the backend — report reachability only.
     const h = await api.health().catch(() => null);
     if (!h) api = { health: async () => { throw new Error('backend not running (start it: jexi)'); }, providersActive: async () => { throw new Error('backend not running'); } };
@@ -225,7 +224,7 @@ async function cmdStop() {
 async function cmdRestart() {
   await stopBackend(HOME);
   const cfg = loadConfig(HOME);
-  if (!cfg || !cfg.accessKey) return needInit();
+  if (!cfg) return needInit();
   cfg.workspace = process.cwd();
   saveConfig(cfg, HOME);
   await withBackend(cfg, process.cwd());

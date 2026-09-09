@@ -95,18 +95,20 @@ console.log('\n== 2. Code-runtime bootstrap hardening ==');
 console.log('\n== 3. Config hot-reload ==');
 {
   const { foldConfigSnapshot, initConfigSnapshot, reloadConfig, configStatus, onConfigChange } = await import('./src/services/ConfigReload.js');
-  const snap = foldConfigSnapshot({ env: { JEXI_API_KEY: 'x', REDIS_URL: 'r' }, settings: { agentPresets: { default: 'ptc' } } });
-  ok('fold: keyLocked + features', snap.keyLocked === true && snap.hasRedis === true && snap.preset === 'ptc');
-  const init = initConfigSnapshot({ env: { JEXI_API_KEY: 'x' }, settings: {} });
-  ok('init snapshot', init.keyLocked === true && init.allowUnlocked === false);
+  const snap = foldConfigSnapshot({ env: { REDIS_URL: 'r' }, settings: { agentPresets: { default: 'ptc' } } });
+  ok('fold: unlocked + features', snap.keyLocked === false && snap.hasApiKey === false && snap.hasRedis === true && snap.preset === 'ptc');
+  const legacy = foldConfigSnapshot({ env: { JEXI_API_KEY: 'x', JEXI_ALLOW_UNLOCKED: '1' }, settings: {} });
+  ok('fold: legacy lock envs ignored (lock removed)', legacy.keyLocked === false && legacy.allowUnlocked === false && legacy.hasApiKey === false);
+  const init = initConfigSnapshot({ env: {}, settings: {} });
+  ok('init snapshot', init.keyLocked === false && init.allowUnlocked === false);
   let events = 0;
   const off = onConfigChange(() => { events += 1; });
-  const same = reloadConfig({ env: { JEXI_API_KEY: 'x' }, settings: {} });
+  const same = reloadConfig({ env: {}, settings: {} });
   ok('unchanged reload → no change, no event', same.changed === false && events === 0);
-  const changed = reloadConfig({ env: { JEXI_ALLOW_UNLOCKED: '1' }, settings: {} });
-  ok('changed reload detected', changed.changed === true && changed.diff.allowUnlocked.from === false && changed.diff.allowUnlocked.to === true);
+  const changed = reloadConfig({ env: { REDIS_URL: 'r' }, settings: {} });
+  ok('changed reload detected', changed.changed === true && changed.diff.hasRedis.from === false && changed.diff.hasRedis.to === true);
   ok('listener notified once', events === 1);
-  ok('status shape', configStatus().snapshot.allowUnlocked === true && configStatus().listenerCount === 1);
+  ok('status shape', configStatus().snapshot.hasRedis === true && configStatus().listenerCount === 1);
   off();
 }
 

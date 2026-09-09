@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
-import { getBackendUrl, jexiFetch, getAccessKey, setAccessKey } from '../utils/helpers';
+import { getBackendUrl, jexiFetch } from '../utils/helpers';
 
 export default function SettingsView() {
-  const [key, setKey] = useState(getAccessKey());
-  const [keySaved, setKeySaved] = useState(false);
   const [health, setHealth] = useState(null);
   const [providers, setProviders] = useState(null);
   const [version, setVersion] = useState(null);
@@ -53,12 +51,6 @@ export default function SettingsView() {
     })();
   }, []);
 
-  const saveKey = () => {
-    setAccessKey(key.trim());
-    setKeySaved(true);
-    setTimeout(() => setKeySaved(false), 1400);
-  };
-
   const eraseAll = async () => {
     if (!window.confirm('Erase everything? Facts, history and preferences will be gone. This cannot be undone.')) return;
     setErasing(true);
@@ -96,11 +88,6 @@ export default function SettingsView() {
               window.dispatchEvent(new CustomEvent('jexi:backend-url', { detail: v }));
             }}
           />
-        </div>
-        <div className="jx-setline">
-          <div className="lab"><b>Access key</b><span>your private lock</span></div>
-          <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="your key" />
-          <button type="button" className="jx-btn black" onClick={saveKey}>{keySaved ? '✓ saved' : 'Save'}</button>
         </div>
         <div className="jx-setline">
           <div className="lab"><b>AI providers</b><span>all healthy right now</span></div>

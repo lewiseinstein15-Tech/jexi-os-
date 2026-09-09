@@ -27,8 +27,8 @@ The image is built and public: `ghcr.io/lewiseinstein15-tech/jexi-os:latest`
 ### 3. Environment variables
 Copy the same list from your old service (old service → Environment → open
 each value). Must-haves:
-- `JEXI_API_KEY` = your access key
 - all AI keys (Groq/Gemini/OpenRouter/etc.), `TAVILY_API_KEY`, `GITHUB_TOKEN`
+  (no access key — the API is open by operator directive)
 - **Do NOT add** `JEXI_NO_BROWSER` — the slim image already defaults it on.
 
 ### 4. Deploy → paste the new URL to your engineer

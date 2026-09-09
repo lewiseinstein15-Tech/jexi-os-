@@ -3,11 +3,11 @@
  * JEXI-branded).
  *
  * Scriptable JEXI client: talk to a JEXI backend (local or the hosted
- * Render brain) from any Node script. Handles the access key, NDJSON chat
- * streams, and error normalization.
+ * Render brain) from any Node script. Handles NDJSON chat streams and error
+ * normalization. (The backend is open — no access key.)
  *
  *   import { JexiClient } from './sdk/client.js';
- *   const jexi = new JexiClient({ baseUrl, key });
+ *   const jexi = new JexiClient({ baseUrl });
  *   const answer = await jexi.chat('what time is it in Nairobi?');
  *   const health = await jexi.health();
  *   const tools = await jexi.tools();
@@ -16,14 +16,13 @@
 const DEFAULT_BASE = 'http://127.0.0.1:3002';
 
 export class JexiClient {
-  constructor({ baseUrl = DEFAULT_BASE, key = null, timeoutMs = 60000 } = {}) {
+  constructor({ baseUrl = DEFAULT_BASE, timeoutMs = 60000 } = {}) {
     this.baseUrl = String(baseUrl || DEFAULT_BASE).replace(/\/$/, '');
-    this.key = key || process.env.JEXI_API_KEY || '';
     this.timeoutMs = timeoutMs;
   }
 
   _headers(extra = {}) {
-    return { 'Content-Type': 'application/json', ...(this.key ? { 'x-jexi-key': this.key } : {}), ...extra };
+    return { 'Content-Type': 'application/json', ...extra };
   }
 
   async _fetch(path, { method = 'GET', body = null, headers = {} } = {}) {
@@ -104,6 +103,6 @@ export function sdkSelfCheck() {
   const checks = [];
   const client = new JexiClient({ baseUrl: 'http://127.0.0.1:1' }); // unreachable on purpose
   checks.push({ name: 'sdk client constructed', ok: client.baseUrl === 'http://127.0.0.1:1' });
-  checks.push({ name: 'sdk key from env', ok: new JexiClient({}).key === (process.env.JEXI_API_KEY || '') });
+  checks.push({ name: 'sdk sends no key header (open backend)', ok: !('x-jexi-key' in client._headers()) });
   return checks;
 }

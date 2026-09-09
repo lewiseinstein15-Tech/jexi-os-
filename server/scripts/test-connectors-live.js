@@ -106,12 +106,11 @@ console.log('   receive() parsed payload:', JSON.stringify(gh.receive(JSON.parse
 // ---- How to hit the live endpoints ----
 console.log('\n── Hit the deployed endpoints (replace BASE with your Render URL) ──');
 console.log(`
-  # Connector status / health (open GETs, no key) + test sends (need
-  # x-jexi-key header only if JEXI_API_KEY is set):
+  # Connector status / health + test sends (the API is open, no key):
   curl https://BASE/api/connectors
   curl https://BASE/api/connectors/github/health
   curl https://BASE/api/connectors/email/health
-  curl -X POST https://BASE/api/connectors/email/call -H 'Content-Type: application/json' -H 'x-jexi-key: KEY' \\
+  curl -X POST https://BASE/api/connectors/email/call -H 'Content-Type: application/json' \\
     -d '{"method":"send","payload":{"to":"you@example.com","subject":"test","html":"<p>hi</p>"}}'
 `);
 

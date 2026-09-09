@@ -6,22 +6,7 @@ export const getFavicon = (url) => {
 };
 export const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
-/**
- * JEXI access key (optional). If the backend was locked with JEXI_API_KEY
- * (recommended on Render), every /api call must carry it as `x-jexi-key`.
- * Stored in localStorage, never sent anywhere except your own backend.
- */
-export const getAccessKey = () => localStorage.getItem('jexi_access_key') || '';
-export const setAccessKey = (key) => {
-  if (key) localStorage.setItem('jexi_access_key', key);
-  else localStorage.removeItem('jexi_access_key');
-  window.dispatchEvent(new CustomEvent('jexi:access-key', { detail: key || '' }));
-};
-export const onAccessKeyChange = (cb) => {
-  const h = (e) => cb(e.detail || '');
-  window.addEventListener('jexi:access-key', h);
-  return () => window.removeEventListener('jexi:access-key', h);
-};
+
 
 /**
  * Stable per-browser session id (Build 48, P5). The backend keys its
@@ -45,11 +30,9 @@ export const getSessionId = () => {
   return id;
 };
 
-/** fetch() wrapper that attaches the JEXI access key + session headers. */
+/** fetch() wrapper that attaches session + timezone headers (backend is open, no key). */
 export const jexiFetch = (url, opts = {}) => {
-  const key = getAccessKey();
   const headers = new Headers(opts.headers || {});
-  if (key) headers.set('x-jexi-key', key);
   if (!headers.has('x-jexi-session')) headers.set('x-jexi-session', getSessionId());
   // B104 — the user's real timezone rides every request so JEXI always
   // knows the local date/time (dsh time-context).
@@ -75,10 +58,9 @@ export const BACKEND_URL_EVENT = 'jexi:backend-url';
 
 /**
  * Turn a failed backend call into an actionable, user-facing message.
- * Distinguishes the three real failure modes so "the app can't reach the
+ * Distinguishes the real failure modes so "the app can't reach the
  * backend" isn't a mystery:
- *  - HTTP 401  → the server is locked (JEXI_API_KEY) and this browser doesn't
- *                have the access key set in Settings → System.
+ *  - HTTP 429 → rate-limited: too many requests at once, wait a minute.
  *  - fetch-level failure → the browser blocked the call (CORS allowlist on
  *    Render) or the backend is unreachable/wrong URL.
  *  - anything else → generic honest message.
@@ -87,9 +69,6 @@ export const backendErrorMessage = (error, backendUrl = '') => {
   const m = String((error && error.message) || error || '');
   const statusMatch = m.match(/HTTP (\d{3})/);
   const status = (error && error.status) ? Number(error.status) : (statusMatch ? Number(statusMatch[1]) : 0);
-  if (status === 401) {
-    return '🔒 The backend is locked. Open Settings → System and paste your JEXI access key (the exact value of JEXI_API_KEY set on Render), then try again.';
-  }
   if (status === 429) {
     return '⏳ JEXI is rate-limited right now (too many requests at once). Wait about a minute and try again — nothing is broken, she is just busy.';
   }
@@ -100,7 +79,7 @@ export const backendErrorMessage = (error, backendUrl = '') => {
   const looksBlocked = /fetch failed|failed to fetch|networkerror|network error|load failed/i.test(m);
   if (looksBlocked) {
     const origin = (typeof window !== 'undefined' && window.location) ? window.location.origin : '';
-    return `⚠️ The backend refused this browser's request (CORS) or is unreachable.\n\nFix (Render dashboard → jexi-brain-image → Environment):\n1. Add ${origin || 'your frontend origin'} to CORS_ORIGINS (for GitHub Pages: https://lewiseinstein15-tech.github.io), or clear CORS_ORIGINS to allow all browsers.\n2. Confirm the backend URL in Settings → Server is ${backendUrl || 'https://jexi-brain-image.onrender.com'}.\n3. If the server is locked, also set the access key in Settings → System.`;
+    return `⚠️ The backend refused this browser's request (CORS) or is unreachable.\n\nFix (Render dashboard → jexi-brain-image → Environment):\n1. Add ${origin || 'your frontend origin'} to CORS_ORIGINS (for GitHub Pages: https://lewiseinstein15-tech.github.io), or clear CORS_ORIGINS to allow all browsers.\n2. Confirm the backend URL in Settings → Server is ${backendUrl || 'https://jexi-brain-image.onrender.com'}.`;
   }
   return `⚠ The connection to the backend dropped (${m || 'network error'}). The work may still be running on the server — wait a moment, then ask me to continue from where it stopped.`;
 };

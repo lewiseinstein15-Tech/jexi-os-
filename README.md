@@ -166,7 +166,7 @@ cd server && npm ci && npm start          # port 3002, DATA_DIR for memory
 # web
 npm ci && npm run dev                     # proxies /api → 3002
 ```
-Env keys: any of GROQ/GEMINI/OPENROUTER/MISTRAL/NVIDIA/SAMBANOVA/TAVILY (all free tiers) + GITHUB_TOKEN. `JEXI_API_KEY` locks the API. Full guide: `DEPLOY-IMAGE-RENDER.md`.
+Env keys: any of GROQ/GEMINI/OPENROUTER/MISTRAL/NVIDIA/SAMBANOVA/TAVILY (all free tiers) + GITHUB_TOKEN. The API is open (no key). Full guide: `DEPLOY-IMAGE-RENDER.md`.
 
 Small-box / local-model operation (proven live on 2GB, CPU-only — see `FINAL-PROOF-REPORT.md`):
 `MODEL_PROVIDER=ollama` + `OLLAMA_MODEL=qwen2.5:0.5b` runs the whole mission loop on a local model;

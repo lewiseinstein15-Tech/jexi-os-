@@ -64,5 +64,4 @@ curl -s http://localhost:3002/api/personas
 curl -s -X POST http://localhost:3002/api/chat -H 'x-jexi-persona: concise' -d '{"query":"hi"}'
 ```
 
-> Note: the live backend is key-locked — add `-H 'x-jexi-key: <your key>'` when
-> talking to `https://jexi-brain-image.onrender.com`.
+> Note: the live backend is open — no key header needed, local or hosted.

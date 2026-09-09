@@ -81,30 +81,30 @@ console.log('\n== 2. Bundle base (manifest + parity tracker) ==');
 console.log('\n== 3. Gateway client (api/gateway client mirror) ==');
 {
   const mod = await import(pathToFileURL(path.join(SERVER_DIR, '..', 'src', 'utils', 'gatewayClient.js')).href);
-  const { gatewayFetch, GatewayError, getAccessKey } = mod;
+  const { gatewayFetch, GatewayError } = mod;
 
-  // A tiny local HTTP server to exercise retry + key header + errors.
+  // A tiny local HTTP server to exercise retry + errors (no key header sent).
   let hits = 0;
   const server = http.createServer((req, res) => {
     hits += 1;
-    const key = req.headers['x-jexi-key'] || '';
+    const sawKey = 'x-jexi-key' in req.headers;
     if (req.url === '/flaky') {
       if (hits < 3) { res.writeHead(500); res.end('{}'); return; }
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, key }));
+      res.end(JSON.stringify({ ok: true, sawKey }));
       return;
     }
     if (req.url === '/boom') { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'bad thing' })); return; }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, key }));
+    res.end(JSON.stringify({ ok: true, sawKey }));
   });
   await new Promise((r) => server.listen(0, r));
   const port = server.address().port;
   const base = `http://127.0.0.1:${port}`;
 
-  const normal = await gatewayFetch(`${base}/ok`, { key: 'sekret' });
-  ok('sends x-jexi-key', normal.ok && normal.data.key === 'sekret');
-  const flaky = await gatewayFetch(`${base}/flaky`, { key: 'k', retries: 3, timeoutMs: 5000 });
+  const normal = await gatewayFetch(`${base}/ok`);
+  ok('sends no x-jexi-key (open backend)', normal.ok && normal.data.sawKey === false);
+  const flaky = await gatewayFetch(`${base}/flaky`, { retries: 3, timeoutMs: 5000 });
   ok('retries idempotent GETs with backoff', flaky.ok && hits >= 3);
   let boomErr = null;
   try { await gatewayFetch(`${base}/boom`, { retries: 0 }); } catch (e) { boomErr = e; }
@@ -113,7 +113,7 @@ console.log('\n== 3. Gateway client (api/gateway client mirror) ==');
   try { await gatewayFetch(`${base}/ok`, { timeoutMs: 1, retries: 0, signal: AbortSignal.timeout(5) }); } catch (e) { timeoutErr = e; }
   ok('timeout → GatewayError code TIMEOUT or NETWORK', timeoutErr instanceof GatewayError && (timeoutErr.code === 'TIMEOUT' || timeoutErr.code === 'NETWORK'));
   server.close();
-  ok('getAccessKey defined', typeof getAccessKey === 'function');
+  ok('no getAccessKey export (lock removed)', !('getAccessKey' in mod));
 }
 
 /* ══════════════ 4. CLIENT RUNTIME (frontend) ══════════════ */
@@ -161,12 +161,12 @@ console.log('\n== 5. JEXI SDK (sdk/client) ==');
     res.writeHead(404); res.end('{}');
   });
   await new Promise((r) => server.listen(0, r));
-  const client = new JexiClient({ baseUrl: `http://127.0.0.1:${server.address().port}`, key: 'sdkkey' });
+  const client = new JexiClient({ baseUrl: `http://127.0.0.1:${server.address().port}` });
   const health = await client.health();
   ok('sdk health', health.ok === true && health.build.commit === 'sdk-test');
   const answer = await client.chat('hello');
   ok('sdk chat returns summary from NDJSON stream', answer === 'SDK ANSWER');
-  ok('sdk sends key header', (() => { const h = client._headers(); return h['x-jexi-key'] === 'sdkkey'; })());
+  ok('sdk sends no key header', (() => { const h = client._headers(); return !('x-jexi-key' in h); })());
   server.close();
   const checks = sdkSelfCheck();
   ok('sdk self-check passes', checks.length === 2 && checks.every((c) => c.ok));

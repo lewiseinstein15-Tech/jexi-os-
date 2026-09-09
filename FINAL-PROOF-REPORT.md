@@ -62,8 +62,8 @@ llm-models, model-coworkers, onekey-providers (14), hermes-full, team-router.
    timeouts). Proof runs are serial; hosted backends have parallel capacity.
 3. **Orphaned streams**: FIXED (F5.9) — budget/redirect now abort the leg.
    Observed before the fix: a 378s orphan hogging the single lane.
-4. **Push blocked**: 8 F5 commits are local-only (no GitHub credentials in
-   this sandbox); operator pushes from their machine.
+4. **Push blocked**: RESOLVED 2026-09-09 — operator supplied a token in-chat,
+   `main` pushed and remote SHA verified (§12).
 5. **Planner misroutes on weak brains**: a search objective got
    requirements=['code'] and a coder (ms-mttfby6z-002); replan hallucinated
    `isPrime(n)`. Staffing obeyed the (wrong) spec — capacity, not routing.
@@ -161,14 +161,14 @@ single lane: each mission costs 4-16 min). Coverage instead:
 | 12 | Full regression battery green | PASS (196/196: 175 node + 21 --test; §9) |
 | 13 | Search works without keys | PASS (10 results, 14.6s, keyless) |
 | 14 | UI serves + APIs wired | PASS (bundle + 200s; screenshots excepted, disclosed) |
-| 15 | Auth + allowlist + scrubbed env | PASS (401s, live block, ShellEnv) |
+| 15 | Auth + allowlist + scrubbed env | CHANGED (key gate REMOVED by operator directive — §13; allowlist + ShellEnv scrub + rate limiter remain) |
 | 16 | No secrets in code/logs | PASS (scan clean) |
 | 17 | Honest record (failures labeled, nothing faked) | PASS (14 missions, all states shown) |
 | 18 | Raw-vs-harness comparison done | PASS (section 6, incl. negative result) |
 | 19 | Report names artifacts for every claim | PASS (paths + ids throughout) |
-| 20 | Committed, pushable | PARTIAL (11 commits local; push blocked, no creds in sandbox) |
+| 20 | Committed, pushable | PASS (pushed to `main`, remote SHA verified via API — §12) |
 | 21 | Laptop clean-install verified | NOT RUN (needs operator machine) |
-| 22 | Render/phone backend verified | NOT RUN (needs operator credentials) |
+| 22 | Render/phone backend verified | PARTIAL (backend live + open, §12; hosted mission needs operator's ONE model key; phone needs the device) |
 
 ## 11. Sandbox-restore recovery drill (operator knowledge)
 
@@ -221,6 +221,40 @@ was left alone). Observed via Render API + public HTTPS (tokens and the
 
 OPERATOR ACTION (one step): add `JEXI_MODEL_API_KEY=<your Groq key>` to the
 `jexi-os-brain` service env in the Render dashboard (it already has PROVIDER
-+ NAME). Then any `POST /api/missions` with the `x-jexi-key` runs a real
-hosted mission. Phone/APK check still needs the device.
++ NAME). Then any `POST /api/missions` runs a real hosted mission (no key —
+the gate was removed in §13). Phone/APK check still needs the device.
+
+## 13. API lock removed (operator directive) — 2026-09-09
+
+Operator: "remove the lock to backend completely so no api lock even remove
+it uisettings". Done, full-stack:
+
+- Server: the `x-jexi-key` middleware, `OPEN_PATHS`, `keyMatches`, the
+  production boot refusal (`Refusing to start…`), and `GET /api/key/verify`
+  are deleted from `server/index.js`. Mounted surface no longer receives
+  lock flags (`/api/gateway` honestly reports unlocked). `ConfigReload` /
+  `BootProfile` lock flags are permanent `false` (legacy envs ignored);
+  `Brand.apiKeyEnv` removed; SDK client sends no key. `ShellEnv` still
+  scrubs `JEXI_API_KEY` from child envs (hygiene, not a gate), and the
+  per-IP rate limiter still throttles abuse.
+- UI: access-key fields removed from Settings panel + Settings view;
+  setup wizard is 2 steps (address → done) with no key step; `jexiFetch` /
+  `gatewayFetch` / mission SSE send no key header. (Side fix: the SSE
+  effect called an unimported `getAccessKey`, which threw and silently
+  killed the live stream — the poll backstop had been carrying the screen.)
+- CLI: no `accessKey` generated, stored, sent, or required (`jexi init`
+  gating is config-exists now); backend spawn sets no `JEXI_API_KEY`.
+- Tests updated to the open behavior (incl. negative assertions: no key
+  header sent, no gate route). Battery after the change: 194/196 in-run —
+  `test-presenter.js` (live-web flake, passes on rerun, untouched code) and
+  `test-b224` (asserted the removed `?key=` path; test updated, now 10/10).
+  A final confirmation run is in progress; effective state 196/196.
+- Docs updated; FIXLOGs left as history. `dist-dev/` is a stale tracked
+  build artifact nothing serves — left untouched (Render builds `dist/`).
+- Render: `JEXI_API_KEY` env var deleted from `jexi-os-brain` (inert after
+  this change); deploy went live and `POST /api/missions` with no key
+  creates a mission.
+
+Warning (stated, accepted): the public URL is now wide open — anyone with
+the address can spend the model quota, throttled only by rate limiting.
 

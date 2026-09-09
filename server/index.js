@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import axios from 'axios';
-import crypto from 'crypto';
+
 import v8 from 'v8';
 import { githubKeyStatus, answerGithubKey, forgetGithubKey, migrateStoredGithubSecrets } from './src/services/SessionKeys.js';
 import fs from 'fs';
@@ -282,19 +282,10 @@ setInboundReplyGenerator(async (event) => {
 const app = express();
 
 // === API ACCESS CONTROL (optional but recommended for production) ===
-// Set JEXI_API_KEY in the host env (Render dashboard) and every AI-spend / data
-// endpoint requires the `x-jexi-key` header (the Settings panel has a matching
-// field). Without it, JEXI stays wide open — fine locally, risky on the public
-// internet where strangers could burn your Groq/Gemini quota. When unset, local
-// dev and self-hosted use are unchanged.
-const API_KEY = process.env.JEXI_API_KEY || '';
-const keyMatches = (sent) => {
-  if (!API_KEY || !sent) return false;
-  const a = Buffer.from(String(sent));
-  const b = Buffer.from(API_KEY);
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
-};
+// OPEN BACKEND (operator directive): no API-key gate. Every /api endpoint
+// answers any caller — the Settings panel has no key field and no header is
+// required. Quota protection comes from the per-IP rate limiter below, not
+// from access control. Anyone with the URL can spend the model quota.
 
 // CORS: when CORS_ORIGINS is set (comma-separated origins), only browsers from
 // those origins may call the API. Unset → open (local dev / curl / mobile).
@@ -308,27 +299,7 @@ const NATIVE_APP_ORIGINS = ['http://localhost', 'https://localhost', 'capacitor:
 const CORS_ALLOWLIST = CORS_ORIGINS.length ? [...new Set([...CORS_ORIGINS, ...NATIVE_APP_ORIGINS])] : true;
 app.use(cors({ origin: CORS_ALLOWLIST }));
 
-// Cheap, always-open endpoints the infra + onboarding path needs. Everything
-// else under /api/* (chat, vision, knowledge, memory, desktop, settings write,
-// APK proxy) is gated when JEXI_API_KEY is set.
-// NOTE: mounted on the app root (not '/api') so req.path keeps its full form.
-const OPEN_PATHS = ['/api/health', '/api/settings/status', '/api/metrics', '/api/update/version', '/api/brand', '/api/team', '/api/providers/catalog']; // B162b: /api/team open — coworker NAMES only, no secrets; doubles as a deploy fingerprint. UNIFIED: the provider catalog is static public data (no secrets) so the setup wizard can render before pairing.
-app.use((req, res, next) => {
-  if (!API_KEY || req.method === 'OPTIONS') return next();
-  if (!req.path.startsWith('/api')) return next();
-  if (OPEN_PATHS.includes(req.path)) return next();
-  // B57 — connector status + per-connector health are GET-only, read-only,
-  // never return secrets (masked), and fire the real provider call inside the
-  // deployed process where the env vars live — same class as /api/health, so
-  // they stay open for browser verification with no shell access. Connector
-  // sends/config/toggle stay API-key gated.
-  if (req.method === 'GET' && (req.path.startsWith('/api/connectors') || req.path === '/api/memory/persistence')) return next();
-  // B224 — SSE push: EventSource cannot set headers, so the mission event
-  // stream authenticates with the same key as a query parameter.
-  if (req.method === 'GET' && /^\/api\/missions\/[^/]+\/events\/stream$/.test(req.path) && keyMatches(req.query.key)) return next();
-  if (keyMatches(req.headers['x-jexi-key'])) return next();
-  res.status(401).json({ error: 'Unauthorized — this server is locked. Set the JEXI access key in Settings → System.' });
-});
+// (no API-key gate: all /api endpoints are open by operator directive)
 
 // Rate limiting: protects your AI quota from runaway loops / abuse.
 // PERMANENT 429 fix: key limiters by the TRUE client IP. Behind
@@ -373,7 +344,7 @@ app.use('/api', ipBackstop); // backstop: bounds session-rotation abuse per real
 // B56 — CONNECTOR WEBHOOKS. Mounted BEFORE express.json because GitHub /
 // Resend signatures are HMACs over the RAW request body — parsing it first
 // would break verification. Mounted OUTSIDE /api so provider webhooks
-// (GitHub, Resend) are not gated by JEXI_API_KEY or the API rate limiter.
+// (GitHub, Resend) are not subject to the API rate limiter.
 // Each provider's POST returns 200 immediately after verification +
 // normalization; failures are logged, never fabricated.
 const connectorWebhooks = express.Router();
@@ -1125,9 +1096,7 @@ function maskConnectorAuth(auth = {}) {
 app.get('/api/plugins', (req, res) => res.json({ plugins: listRegistryPlugins() }));
 // B162 — the named coworker roster (people names only; no raw model IDs).
 app.get('/api/team', (req, res) => res.json({ team: teamRoster() }));
-// M8 — setup-wizard key verification: gated by the x-jexi-key middleware
-// above (NOT in OPEN_PATHS), so 200 = key accepted, 401 = wrong key.
-app.get('/api/key/verify', (req, res) => res.json({ ok: true, at: new Date().toISOString() }));
+
 // B180 — the Hermes-style agent surface
 app.get('/api/agents/coverage', (req, res) => res.json(profileCoverage()));
 app.get('/api/agents/profiles', (req, res) => res.json({ profiles: listProfiles().map((p) => ({ name: p.name, displayName: p.displayName, role: p.role, tools: p.config.tools, model: p.config.model })) }));
@@ -2681,16 +2650,8 @@ if (fs.existsSync(publicDir)) {
 const publicDirForSurface = path.join(SERVER_ROOT, 'public');
 mountSurface(app, {
   publicDir: fs.existsSync(publicDirForSurface) ? publicDirForSurface : null,
-  openPaths: OPEN_PATHS,
-  keyLocked: !!API_KEY && process.env.JEXI_ALLOW_UNLOCKED !== '1',
-  allowUnlocked: process.env.JEXI_ALLOW_UNLOCKED === '1',
   scheduler: taskScheduler,
 });
-
-if (process.env.NODE_ENV === 'production' && !API_KEY && process.env.JEXI_ALLOW_UNLOCKED !== '1') {
-  console.error('Refusing to start: JEXI_API_KEY is required in production (or set JEXI_ALLOW_UNLOCKED=1 for an explicit unlocked deploy).');
-  process.exit(1);
-}
 
 // ARENA Phase 4 — memory vault lifecycle: what's FRESH / AGING / STALE, and
 // the honest re-verify queue. Read-only diagnostics, no secrets.

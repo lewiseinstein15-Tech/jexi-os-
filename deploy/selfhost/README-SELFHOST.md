@@ -44,7 +44,7 @@ if the process ever dies, it comes back in ~3 seconds, no human needed.
 Then put your keys in `/etc/jexi-os.env` and restart:
 
 ```bash
-sudo nano /etc/jexi-os.env   # add GROQ_API_KEY / GEMINI_API_KEY / JEXI_API_KEY / CORS_ORIGINS
+sudo nano /etc/jexi-os.env   # add GROQ_API_KEY / GEMINI_API_KEY / CORS_ORIGINS
 sudo systemctl restart jexi-os-brain
 ```
 
@@ -57,7 +57,7 @@ The frontend already runs free on **GitHub Pages** — just set the backend URL:
 # VITE_JEXI_BACKEND_URL=https://YOUR_VPS_IP:3002
 ```
 
-Or in Settings → JEXI ACCESS KEY paste the same `JEXI_API_KEY` if you locked the API.
+The API is open — no key to paste anywhere.
 
 ### Optional: HTTPS + nice domain (5 extra min, recommended)
 

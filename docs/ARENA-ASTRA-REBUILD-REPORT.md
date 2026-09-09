@@ -88,8 +88,8 @@ Capture tools: `scripts/arena-screenshots.mjs` (suite) + `scripts/arena-chat-pro
 ## 4. Run it
 
 ```bash
-# brain (needs JEXI_API_KEY in prod; unlocked for local dev)
-cd server && npm ci && JEXI_ALLOW_UNLOCKED=1 PORT=3002 npm start
+# brain (open API, no key)
+cd server && npm ci && PORT=3002 npm start
 # web
 npm ci && npm run dev            # dev, or: npm run build && npx vite preview --host --port 4173
 # tests

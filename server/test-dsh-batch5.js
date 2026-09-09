@@ -204,7 +204,7 @@ console.log('\n== 7. Boot profile (dsh app-boot profile/config-dump) ==');
 console.log('\n== 8. Headless CLI (dsh bundle/headless) ==');
 {
   const run = (args, timeoutMs = 60000) => new Promise((resolve) => {
-    const child = spawn(process.execPath, [path.join(SERVER_DIR, 'cli.js'), ...args], { cwd: SERVER_DIR, env: { ...process.env, JEXI_ALLOW_UNLOCKED: '1' } });
+    const child = spawn(process.execPath, [path.join(SERVER_DIR, 'cli.js'), ...args], { cwd: SERVER_DIR, env: { ...process.env } });
     let out = '';
     let err = '';
     const timer = setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* noop */ } }, timeoutMs);

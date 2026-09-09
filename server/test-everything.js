@@ -586,8 +586,8 @@ section('H. LIFECYCLE & PERSISTENCE');
   ok('home paths resolve', resolveJexiHome(undefined, {}) === path.join(os.homedir(), '.jexi'));
   ok('launch env resolves', typeof launchEnvironmentOf().get('PATH').value === 'string');
 
-  initConfigSnapshot({ env: { JEXI_API_KEY: 'x' }, settings: {} });
-  const cr = reloadConfig({ env: { JEXI_ALLOW_UNLOCKED: '1' }, settings: {} });
+  initConfigSnapshot({ env: {}, settings: {} });
+  const cr = reloadConfig({ env: { REDIS_URL: 'r' }, settings: {} });
   ok('config reload detects change', cr.changed === true);
 
   const hooks = runHooks('beforeTask', { query: 'gauntlet' }, () => {});
@@ -603,7 +603,7 @@ section('I. API SURFACE — live server boot');
   const PORT = 3996;
   const child = spawn(process.execPath, ['index.js'], {
     cwd: SERVER_DIR,
-    env: { ...process.env, JEXI_ALLOW_UNLOCKED: '1', PORT: String(PORT), REDIS_URL: '' },
+    env: { ...process.env, PORT: String(PORT), REDIS_URL: '' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let booted = false;
@@ -667,7 +667,7 @@ section('I. API SURFACE — live server boot');
 section('J. HEADLESS CLI + SDK');
 {
   const cli = await new Promise((resolve) => {
-    const c = spawn(process.execPath, ['cli.js', '--self-test'], { cwd: SERVER_DIR, env: { ...process.env, JEXI_ALLOW_UNLOCKED: '1' } });
+    const c = spawn(process.execPath, ['cli.js', '--self-test'], { cwd: SERVER_DIR, env: { ...process.env } });
     let out = '';
     c.stdout.on('data', (d) => { out += d; });
     c.stderr.on('data', (d) => { out += d; });
@@ -680,7 +680,7 @@ section('J. HEADLESS CLI + SDK');
   const client = new JexiClient({ baseUrl: 'http://127.0.0.1:3996' });
   // SDK against a booted server
   const PORT = 3997;
-  const child = spawn(process.execPath, ['index.js'], { cwd: SERVER_DIR, env: { ...process.env, JEXI_ALLOW_UNLOCKED: '1', PORT: String(PORT), REDIS_URL: '' }, stdio: 'ignore' });
+  const child = spawn(process.execPath, ['index.js'], { cwd: SERVER_DIR, env: { ...process.env, PORT: String(PORT), REDIS_URL: '' }, stdio: 'ignore' });
   let booted = false;
   for (let i = 0; i < 40; i += 1) {
     await sleep(500);

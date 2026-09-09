@@ -62,7 +62,6 @@ PLAYWRIGHT_BROWSERS_PATH=0
 # GROQ_API_KEY=your_groq_key
 # GEMINI_API_KEY=your_gemini_key
 # --- optional hardening ---
-# JEXI_API_KEY=your_secret_passphrase
 # CORS_ORIGINS=https://lewiseinstein15-Tech.github.io
 # REDIS_URL=rediss://...
 EOF
