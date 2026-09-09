@@ -325,15 +325,31 @@ export async function runEmployeeSession(p) {
     // really execute against the virtual desktop and the REAL observed page
     // state comes back. Bounded: 3 rounds, 4 actions per round.
     for (let round = 0; round <= MAX_COMMAND_ROUNDS + MAX_BROWSER_ROUNDS; round++) {
-      const raw = await withTimeout(
-        generateWithSupervision({
+      // Final F5 — ABORT ON BUDGET: the old withTimeout stopped WAITING but
+      // left the model stream running (observed: a 378s orphan hogging the
+      // single local lane while recovery spun). The budget now aborts the
+      // leg itself; the error shape stays identical for recovery semantics.
+      const budgetCtrl = new AbortController();
+      const budgetTimer = setTimeout(() => budgetCtrl.abort(), brief.timeBudgetMs);
+      let raw;
+      try {
+        raw = await generateWithSupervision({
           employee, subtask, brief, task, mailbox, hooks, emit, llm,
           userPrompt: [userPrompt, commandContext, browserContext].filter(Boolean).join('\n\n'),
           review: hooks.review || null,
           liveReview: hooks.liveReview !== false,
-        }),
-        brief.timeBudgetMs,
-      );
+          signal: budgetCtrl.signal,
+        });
+      } catch (e) {
+        if (budgetCtrl.signal.aborted && e?.code !== 'REDIRECT') {
+          const t = new Error(`assignment exceeded its ${Math.round(brief.timeBudgetMs / 1000)}s time budget`);
+          t.code = 'TIMEOUT';
+          throw t;
+        }
+        throw e;
+      } finally {
+        clearTimeout(budgetTimer);
+      }
       // B209 — model/provider identifiers NEVER enter work product (masked to
       // coworker names by the same B162 masking the whole app uses)
       const clean = sanitizeWorkProduct(String(raw || ''));
@@ -507,9 +523,14 @@ export async function runEmployeeSession(p) {
  * live Supervisor. A redirect decision aborts the output, tells the
  * employee over AgentMail, and restarts ONCE with the instruction.
  */
-async function generateWithSupervision({ employee, subtask, brief, task, mailbox, hooks, emit, llm, userPrompt, review, liveReview }) {
+async function generateWithSupervision({ employee, subtask, brief, task, mailbox, hooks, emit, llm, userPrompt, review, liveReview, signal }) {
   let redirectInstruction = null;
   for (let attempt = 0; attempt <= 1; attempt++) {
+    // Final F5 — the attempt dies when the ROUND budget fires (outer signal)
+    // or when a redirect decision lands (inner controller): either way the
+    // leg is aborted, never orphaned.
+    const attemptCtrl = new AbortController();
+    const attemptSignal = signal ? AbortSignal.any([signal, attemptCtrl.signal]) : attemptCtrl.signal;
     const finalPrompt = redirectInstruction
       ? `${userPrompt}\n\n# REDIRECTION FROM JEXI (your boss)\nPrevious approach stopped because it was off-track. ${redirectInstruction}\n\nStart the assignment fresh with this correction applied.`
       : userPrompt;
@@ -533,6 +554,7 @@ async function generateWithSupervision({ employee, subtask, brief, task, mailbox
       const err = new Error(`redirected: ${d.reason}`);
       err.code = 'REDIRECT';
       err.instruction = d.instruction;
+      try { attemptCtrl.abort(); } catch { /* the race still settles via the gate */ }
       redirectReject(err);
     };
     const work = runWithModel(
@@ -542,6 +564,7 @@ async function generateWithSupervision({ employee, subtask, brief, task, mailbox
         system: employeeSystemPrompt(employee, brief),
         user: finalPrompt,
         prefer,
+        signal: attemptSignal, // Final F5 — budget/redirect abort the leg, never orphan it
         // FINAL F5 — provenance: report the provider that REALLY generates
         // (LLM token metadata), so the router credits actual work.
         onToken: (t, meta) => {
@@ -648,11 +671,3 @@ function isProviderErr(e) {
   return /rate|quota|429|503|timeout|econn|fetch failed|network|all ai providers failed|api key/.test(msg);
 }
 
-function withTimeout(promise, ms) {
-  if (!Number.isFinite(ms) || ms <= 0) return promise;
-  let timer;
-  return Promise.race([
-    promise,
-    new Promise((_, rej) => { timer = setTimeout(() => { const e = new Error(`assignment exceeded its ${Math.round(ms / 1000)}s time budget`); e.code = 'TIMEOUT'; rej(e); }, ms); }),
-  ]).finally(() => clearTimeout(timer));
-}

@@ -168,5 +168,46 @@ console.log('\n== 7. Bounded turns (maxTokens) ==');
   } finally { process.env.OLLAMA_HOST = prev; server.close(); }
 }
 
+console.log('\n== 8. Abort propagation (no orphaned legs) ==');
+{
+  const http = await import('node:http');
+  const { __streamOpenAICompletion, generateContent } = await import('./src/services/LLMClient.js');
+  const chunk = (t) => `data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\n`;
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    if (req.url.startsWith('/slow200')) {
+      setTimeout(() => { res.end(`${chunk('done')}\ndata: [DONE]\n\n`); }, 200);
+    } else { // /endless
+      const iv = setInterval(() => { try { res.write(chunk('w')); } catch { clearInterval(iv); } }, 50);
+      req.on('close', () => clearInterval(iv));
+    }
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    // pre-aborted signal rejects without waiting for the leg
+    const dead = new AbortController(); dead.abort();
+    const t0 = Date.now();
+    let threw = false;
+    try { await __streamOpenAICompletion({ baseUrl: `${base}/slow200`, key: 'k', model: 'm', messages: [], signal: dead.signal }); } catch { threw = true; }
+    ok(threw && Date.now() - t0 < 200, 'pre-aborted signal rejects immediately');
+    // mid-stream abort kills the leg
+    const mid = new AbortController();
+    setTimeout(() => mid.abort(), 300);
+    const t1 = Date.now();
+    let threwMid = false;
+    try { await __streamOpenAICompletion({ baseUrl: `${base}/endless`, key: 'k', model: 'm', messages: [], idleMs: 5000, maxMs: 30000, signal: mid.signal }); } catch { threwMid = true; }
+    ok(threwMid && Date.now() - t1 < 2000, 'mid-stream abort kills the leg promptly');
+    // generateContent honors a dead signal end to end (the adapter path)
+    const prev = process.env.OLLAMA_HOST;
+    process.env.OLLAMA_HOST = base;
+    try {
+      let threwGc = false;
+      try { await generateContent('hi', 'sys', null, { provider: 'ollama', onToken: () => {}, signal: dead.signal }); } catch { threwGc = true; }
+      ok(threwGc, 'generateContent honors an aborted signal');
+    } finally { process.env.OLLAMA_HOST = prev; }
+  } finally { server.close(); }
+}
+
 console.log(`\nF5 hardening: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
