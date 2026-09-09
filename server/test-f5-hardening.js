@@ -77,5 +77,38 @@ console.log('\n== 4. Cooldown-aware recovery ==');
   __resetProviderHealth();
 }
 
+console.log('\n== 5. Progress-aware stream budget ==');
+{
+  const http = await import('node:http');
+  const { __streamOpenAICompletion } = await import('./src/services/LLMClient.js');
+  const chunk = (t) => `data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\n`;
+  // stub SSE server with scripted per-path behavior
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    if (req.url.startsWith('/slow')) { // chunk every 50ms x10 (0.5s total, idle budget 500ms)
+      let i = 0;
+      const iv = setInterval(() => { i += 1; res.write(chunk('w')); if (i >= 10) { clearInterval(iv); res.write('data: [DONE]\n\n'); res.end(); } }, 50);
+    } else if (req.url.startsWith('/stall')) { // one chunk then silence
+      res.write(chunk('w')); // never ends — the idle timer must kill it
+    } else { // /endless — chunks forever; the cap must kill it
+      const iv = setInterval(() => { try { res.write(chunk('w')); } catch { clearInterval(iv); } }, 50);
+      req.on('close', () => clearInterval(iv));
+    }
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const slow = await __streamOpenAICompletion({ baseUrl: `${base}/slow`, key: 'k', model: 'm', messages: [], idleMs: 300, maxMs: 5000 });
+    ok(slow.text === 'w'.repeat(10), 'slow-but-steady stream completes past the idle budget');
+    let stalled = false;
+    try { await __streamOpenAICompletion({ baseUrl: `${base}/stall`, key: 'k', model: 'm', messages: [], idleMs: 300, maxMs: 5000 }); } catch { stalled = true; }
+    ok(stalled, 'stalled stream aborts on idle timeout');
+    const t0 = Date.now();
+    let capped = false;
+    try { await __streamOpenAICompletion({ baseUrl: `${base}/endless`, key: 'k', model: 'm', messages: [], idleMs: 2000, maxMs: 800 }); } catch { capped = true; }
+    ok(capped && Date.now() - t0 < 3000, 'endless stream aborts at the overall cap despite progress');
+  } finally { server.close(); }
+}
+
 console.log(`\nF5 hardening: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

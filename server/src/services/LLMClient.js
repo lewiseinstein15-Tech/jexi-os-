@@ -966,11 +966,20 @@ function providerToolConfig(provider, opts) {
  * stream for chat/completions. Accumulates text + tool_calls deltas and
  * calls onDelta(text) per chunk so the UI renders the answer live.
  */
-async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, temperature, onDelta, onThink, signal }) {
+async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, temperature, onDelta, onThink, signal, idleMs, maxMs }) {
   const controller = new AbortController();
   const onAbort = () => controller.abort();
   if (signal) { if (signal.aborted) controller.abort(); else signal.addEventListener('abort', onAbort, { once: true }); }
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  // Final F5 — PROGRESS-AWARE stream budget. A fixed wall-clock abort kills
+  // slow-but-working legs (observed: local 11 tok/s turns producing deltas
+  // were aborted at 90s). Now: abort only when the stream goes IDLE (no
+  // chunk at all for idleMs), with a generous overall cap as backstop.
+  const IDLE_MS = Number.isFinite(idleMs) && idleMs > 0 ? idleMs : TIMEOUT_MS;
+  const MAX_MS = Number.isFinite(maxMs) && maxMs > 0 ? maxMs : 10 * 60_000;
+  const armIdle = () => setTimeout(() => controller.abort(), IDLE_MS);
+  let timer = armIdle();
+  const capTimer = setTimeout(() => controller.abort(), MAX_MS);
+  const poke = () => { clearTimeout(timer); timer = armIdle(); };
   let doneRead = false;
   try {
     const res = await fetch(`${String(baseUrl).replace(/\/$/, '')}/chat/completions`, {
@@ -998,6 +1007,7 @@ async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, te
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
+      poke(); // progress — the leg is alive, extend the idle budget
       buf += decoder.decode(value, { stream: true });
       const lines = buf.split('\n');
       buf = lines.pop() || '';
@@ -1038,9 +1048,13 @@ async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, te
     return { text, think, toolCalls: parseToolCalls(msg), rawToolCalls, model };
   } finally {
     clearTimeout(timer);
+    clearTimeout(capTimer);
     if (signal) signal.removeEventListener('abort', onAbort);
   }
 }
+
+// Final F5 — test seam for the progress-aware stream budget.
+export { streamOpenAICompletion as __streamOpenAICompletion };
 
 /**
  * ONE native tool-calling request against one provider with a full message
