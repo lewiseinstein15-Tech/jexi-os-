@@ -248,7 +248,7 @@ it uisettings". Done, full-stack:
   header sent, no gate route). Battery after the change: 194/196 in-run —
   `test-presenter.js` (live-web flake, passes on rerun, untouched code) and
   `test-b224` (asserted the removed `?key=` path; test updated, now 10/10).
-  A final confirmation run is in progress; effective state 196/196.
+  Final confirmation run after the fix: **196/196 green**.
 - Docs updated; FIXLOGs left as history. `dist-dev/` is a stale tracked
   build artifact nothing serves — left untouched (Render builds `dist/`).
 - Render: `JEXI_API_KEY` env var deleted from `jexi-os-brain` (inert after
