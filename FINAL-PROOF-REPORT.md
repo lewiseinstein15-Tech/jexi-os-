@@ -27,6 +27,9 @@
 | ms-mttergf6-001 | file write+read (rerun) | FAILED, verify fail/0 (echo x2) | crash fixed; Forge pure-echo; live SUPERVISION_REDIRECT; redirect-abort health poison -> F5.11; bundle correctly failed |
 | ms-mttf56q2-001 | memory store BLUEVAULT | COMPLETED pass/1.0 (FALSE pass) | deliverable was template tags; memory search empty - no memory-write tool for mission employees; weak verifier passed degenerate output |
 | ms-mttfby6z-002 | web search (Ollama?) | FAILED, verify fail/0 | planner specified code/coder for search (capacity); replan hallucinated isPrime(n); verify correctly failed. Engine separately live-proven: 10 results/14.6s |
+| ms-mtth7l07-001 | echo+report (true-pass try) | FAILED 2xBAD_OUTPUT, no verdict | bounded turns complete (124s/19s) but unstructured; exposed format-fatal -> F6 salvage |
+| ms-mtthh33e-001 | echo+report (salvage build) | FAILED, verify fail/0, 88 events | OUTPUT_SALVAGED fired live; model never emitted run block, confabulated tool outcomes, discovery spun 8 garbage items; echo gate correctly failed bundle |
+| ms-mtthxu7u-002 | two-item (1+1, Paris) | FAILED, verify fail/0.2 | 2 planned items DONE + 11 discovered (budget deferred); salvage 4x; item 1 contained correct '1+1 = 2' buried in template noise; bundle poisoned by pure-echo item; verdict by deterministic gates only |
 
 ## 3. Bugs found live + fixed (all committed, all tested)
 
@@ -44,7 +47,9 @@
 | F5.10 | Planner returned string criteria → `.map is not a function` killed the mission | `asStringArray` coercion (string wraps, null/object → [], capped) | suite §9 |
 | F5.11 | Our own redirect/budget aborts poisoned provider health (cooldown → 1s fail on retry) | Caller-abort fail-fast: rethrow, no health record, no fallback legs | suite §10 |
 
-Suite: `server/test-f5-hardening.js` — **32/32, 3 consecutive runs**.
+| F6.1 | Unstructured output killed missions as BAD_OUTPUT despite real content | Salvage as low-confidence deliverable + OUTPUT_SALVAGED event; empty/refusal still fatal | suite §11 |
+
+Suite: `server/test-f5-hardening.js` — **37/37** (32/32 x3 before F6.1; 37/37 after).
 Regressions green: b208 (96), b213 (28), b199, b220 (7/0), b227 (11/0), b177,
 llm-models, model-coworkers, onekey-providers (14), hermes-full, team-router.
 
@@ -64,6 +69,12 @@ llm-models, model-coworkers, onekey-providers (14), hermes-full, team-router.
    `isPrime(n)`. Staffing obeyed the (wrong) spec — capacity, not routing.
 6. **No memory-write tool for mission employees** (read-only
    `memory_lookup` via MCP): "remember X" missions cannot execute the store.
+7. **Sandbox resets wipe /tmp + /opt**: pre-F6 mission artifacts lived in
+   /tmp and are gone with the reset; the report + commits are the record.
+   Recovery (npm ci, ollama reinstall, 0.5b re-pull) takes ~5 min.
+8. **Tool-outcome confabulation** (ms-mtthh33e-001): the 0.5b asserted
+   outcomes for commands it never ran. Left to the echo/criteria gates (the
+   bundle failed honestly); a dedicated gate was judged diminishing returns.
 
 ## 5. Acceptance gates (absolute)
 
@@ -92,6 +103,13 @@ capacity dominates quality on both sides.
 - Probed live: `GET /api/memory /api/mcp/servers /api/projects
   /api/notifications /api/conversations` all 200; `/api/missions` lists live
   missions; `/api/health` reports ollama legs (2/2 ok at probe time).
+- Static markers in the shipped bundle: `aria-*` x12, `role=` x3, mobile
+  viewport meta, `@media (max-width: 900px)` breakpoints, `Caveat` identity,
+  `EventSource` live feed.
+- Rebuild reproducibility: after a sandbox reset wiped `dist/`, `npm ci &&
+  npm run build` reproduced the byte-identical bundle hash (`index-BttpvWIS.js`)
+  in 20s; `/` serves a branded fallback page when `dist/` is absent (degraded,
+  never broken).
 - Screenshots: NOT available in this sandbox (no browser installed; playwright
   explicitly absent). Operator screenshots on the laptop against the live
   preview. Nothing here is faked to compensate.
@@ -110,12 +128,17 @@ capacity dominates quality on both sides.
 
 Full 20+ LIVE missions are infeasible on this rig (11 tok/s, 2GB, serial
 single lane: each mission costs 4-16 min). Coverage instead:
-- 11 live missions across 6 types (math, code+run, file, memory, search,
+- 14 live missions across 6 types (math, code+run, file, memory, search,
   degenerate/probe) + live search-engine probe + 5 raw-model probes.
-- 32/32 F5 hardening suite + full regression battery (b208: 96, b211: 111,
-  b211b2: 74, b211b3: 57, b212: 15, b213: 28, b215: 44, b220: 7/0, b227: 11/0,
-  b177, b199, hermes-full, team-router, llm-models, model-coworkers,
-  onekey-providers: 14, mcp-minimal).
+- 37/37 F5 hardening suite + FULL regression battery: 175/175 suites green
+  via a continue-on-fail runner (574s; `npm test`'s `&&` chain stops at the
+  first failure so it cannot report a full result). First pass showed
+  170/175: the 5 failures were 5 suites importing `react`, which only exists
+  in root `node_modules` (pre-existing coupling: server suites resolve it via
+  parent-dir hoisting) — all 5 passed after root `npm ci`, no code touched.
+  Spot counts: b208: 96, b211: 111, b211b2: 74, b211b3: 57, b212: 15, b213: 28,
+  b215: 44, b220: 7/0, b227: 11/0, onekey-providers: 14; at-risk BAD_OUTPUT
+  suites (b211b3, mcp, web-search, workflow) all green post-F6.
 - Every live failure was root-caused to code (fixed + tested) or labeled
   model capacity with the artifact quoted.
 
@@ -139,10 +162,31 @@ single lane: each mission costs 4-16 min). Coverage instead:
 | 14 | UI serves + APIs wired | PASS (bundle + 200s; screenshots excepted, disclosed) |
 | 15 | Auth + allowlist + scrubbed env | PASS (401s, live block, ShellEnv) |
 | 16 | No secrets in code/logs | PASS (scan clean) |
-| 17 | Honest record (failures labeled, nothing faked) | PASS (11 missions, all states shown) |
+| 17 | Honest record (failures labeled, nothing faked) | PASS (14 missions, all states shown) |
 | 18 | Raw-vs-harness comparison done | PASS (section 6, incl. negative result) |
 | 19 | Report names artifacts for every claim | PASS (paths + ids throughout) |
-| 20 | Committed, pushable | PARTIAL (8 commits local; push blocked, no creds in sandbox) |
+| 20 | Committed, pushable | PARTIAL (11 commits local; push blocked, no creds in sandbox) |
 | 21 | Laptop clean-install verified | NOT RUN (needs operator machine) |
 | 22 | Render/phone backend verified | NOT RUN (needs operator credentials) |
+
+## 11. Sandbox-restore recovery drill (operator knowledge)
+
+This rig lives in an ephemeral sandbox: every agent turn starts from a fresh restore where
+background processes, `node_modules/`, `dist/`, `/tmp`, and ollama model blobs are wiped, and
+the ollama tree loses exec bits and `lib/ollama/*.so*` symlinks (real `.so` files survive).
+Recovery is mechanical (~3 min) and was executed twice with identical results:
+
+1. `chmod +x ollama/bin/ollama ollama/lib/ollama/llama-server`; recreate the ten
+   `libggml/libllama/libmtmd/libgomp` `.so.0`/`.so` symlinks in `ollama/lib/ollama/`.
+2. `cd jexi-os/server && npm ci` (F5 suite back to 37/37 immediately after).
+3. `ollama serve` + `ollama pull qwen2.5:0.5b`; smoke-test one chat completion.
+4. Root `npm ci && npm run build` reproduces the UI bundle byte-identically
+   (`index-BttpvWIS.js`, verified).
+5. Recreate the tracked `server/public -> ../dist` symlink (the restore drops it, and
+   `/` falls back to the branded status page without it — the server checks once at boot,
+   so restart JEXI after recreating it). Restore exec bits on `cli/*` and `scripts/*`.
+6. Start JEXI with `PORT=18095` env (`--port` flag is ignored; default is 3002).
+7. `/tmp` evidence from prior missions is gone after a restore; the git record in this
+   report is the durable copy. `.git` history itself has been reset to `09a37cf` at
+   least once — verify with `git log` and re-commit if work is unexpectedly uncommitted.
 

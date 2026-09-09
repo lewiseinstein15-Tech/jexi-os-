@@ -168,6 +168,12 @@ npm ci && npm run dev                     # proxies /api → 3002
 ```
 Env keys: any of GROQ/GEMINI/OPENROUTER/MISTRAL/NVIDIA/SAMBANOVA/TAVILY (all free tiers) + GITHUB_TOKEN. `JEXI_API_KEY` locks the API. Full guide: `DEPLOY-IMAGE-RENDER.md`.
 
+Small-box / local-model operation (proven live on 2GB, CPU-only — see `FINAL-PROOF-REPORT.md`):
+`MODEL_PROVIDER=ollama` + `OLLAMA_MODEL=qwen2.5:0.5b` runs the whole mission loop on a local model;
+`JEXI_MCP_MINIMAL=1` keeps the 42 MCP servers lazy (~460MB saved at boot). Missions must run
+serially on a single local slot; budgets are progress-aware (idle+cap for streams, 5min for the
+local rung) and bounded per turn (1500/600 tokens), so weak brains terminate instead of hanging.
+
 ---
 
 *Built by Lewis & the JEXI agent · MIT · 100% free-tier infrastructure, no credit card, ever.*
