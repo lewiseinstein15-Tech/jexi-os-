@@ -750,6 +750,9 @@ async function streamPlainText(prompt, system, opts, onDelta) {
         // B173 — reasoning deltas ride their own channel with the same meta
         ...(typeof opts.onThink === 'function' ? { onThink: (t) => opts.onThink(t, { provider, model: cfg.models[0] }) } : {}),
         signal: opts.signal,
+        // Final F5 — bound generation: an uncapped rambling model burns the
+        // whole turn budget producing unusable output (observed: 3×180s).
+        ...(Number.isFinite(opts.maxTokens) && opts.maxTokens > 0 ? { maxTokens: opts.maxTokens } : {}),
         });
         __meterNote(provider, cfg.models[0] || null, Date.now() - __st0, Boolean(out && out.text)); // ARENA meter
       } catch (e) {
@@ -971,7 +974,7 @@ function providerToolConfig(provider, opts) {
  * stream for chat/completions. Accumulates text + tool_calls deltas and
  * calls onDelta(text) per chunk so the UI renders the answer live.
  */
-async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, temperature, onDelta, onThink, signal, idleMs, maxMs }) {
+async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, temperature, onDelta, onThink, signal, idleMs, maxMs, maxTokens }) {
   const controller = new AbortController();
   const onAbort = () => controller.abort();
   if (signal) { if (signal.aborted) controller.abort(); else signal.addEventListener('abort', onAbort, { once: true }); }
@@ -995,6 +998,7 @@ async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, te
         messages,
         ...(tools && tools.length ? { tools, tool_choice: 'auto' } : {}),
         temperature: temperature ?? 0.3,
+        ...(Number.isFinite(maxTokens) && maxTokens > 0 ? { max_tokens: maxTokens } : {}),
         stream: true,
       }),
       signal: controller.signal,

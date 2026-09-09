@@ -90,11 +90,15 @@ export function realLlmAdapter() {
       return parsed;
     },
 
+    // Final F5 — BOUNDED TURNS: tool-loop rounds are incremental (a few
+    // hundred tokens each), so cap output per turn. Uncapped, a rambling
+    // small model burns the whole 180s budget on unusable output (3×180s
+    // observed live); capped, every turn terminates with parseable text.
     employee: async ({ system, user, prefer, onToken }) =>
-      generateContent(user, system, null, { prefer: prefer || undefined, ...(onToken ? { onToken } : {}) }),
+      generateContent(user, system, null, { prefer: prefer || undefined, maxTokens: 1500, ...(onToken ? { onToken } : {}) }),
 
     verify: async ({ system, user, prefer }) =>
-      generateContent(user, system, null, { prefer: prefer || undefined }),
+      generateContent(user, system, null, { prefer: prefer || undefined, maxTokens: 600 }),
 
     report: async ({ system, user, onToken }) =>
       generateContent(user, system, null, { ...(onToken ? { onToken } : {}) }),

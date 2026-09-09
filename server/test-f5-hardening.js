@@ -67,14 +67,24 @@ console.log('\n== 3. Failure-denial gate ==');
 
 console.log('\n== 4. Cooldown-aware recovery ==');
 {
-  __resetProviderHealth();
-  ok(maxCooldownRemainingMs() === 0, 'no cooldown outstanding on clean state');
-  const t0 = Date.now();
-  recordProviderCallFailure('ollama-probe', new Error('This operation was aborted'), { at: t0 });
-  const rem = maxCooldownRemainingMs(t0 + 1000);
-  ok(rem > 0 && rem <= 30000, `fresh failure reports remaining cooldown (${rem}ms)`);
-  ok(maxCooldownRemainingMs(t0 + 10 * 60_000 + 1000) === 0, 'cooldown expires (cap is 10 min)');
-  __resetProviderHealth();
+  // hermetic: the health record persists to ./data — stash it for the test
+  const fs = await import('node:fs');
+  const hf = './data/provider-health.json';
+  const stash = fs.existsSync(hf) ? fs.readFileSync(hf) : null;
+  try {
+    if (fs.existsSync(hf)) fs.rmSync(hf);
+    __resetProviderHealth();
+    ok(maxCooldownRemainingMs() === 0, 'no cooldown outstanding on clean state');
+    const t0 = Date.now();
+    recordProviderCallFailure('ollama-probe', new Error('This operation was aborted'), { at: t0 });
+    const rem = maxCooldownRemainingMs(t0 + 1000);
+    ok(rem > 0 && rem <= 30000, `fresh failure reports remaining cooldown (${rem}ms)`);
+    ok(maxCooldownRemainingMs(t0 + 10 * 60_000 + 1000) === 0, 'cooldown expires (cap is 10 min)');
+  } finally {
+    __resetProviderHealth();
+    if (stash) { fs.mkdirSync('./data', { recursive: true }); fs.writeFileSync(hf, stash); }
+    else if (fs.existsSync(hf)) fs.rmSync(hf);
+  }
 }
 
 console.log('\n== 5. Progress-aware stream budget ==');
@@ -130,6 +140,31 @@ console.log('\n== 6. Local-rung time budget ==');
     ok(threw, 'tiny budget aborts the local rung (override honored)');
     const text = await generateContent('hi', 'sys', null, { provider: 'ollama', timeoutMs: 3000 });
     ok(text === 'stub answer', 'adequate budget lets the slow local rung answer');
+  } finally { process.env.OLLAMA_HOST = prev; server.close(); }
+}
+
+console.log('\n== 7. Bounded turns (maxTokens) ==');
+{
+  const http = await import('node:http');
+  const { generateContent } = await import('./src/services/LLMClient.js');
+  let seenBody = null;
+  const server = http.createServer((req, res) => {
+    let raw = '';
+    req.on('data', (c) => { raw += c; });
+    req.on('end', () => {
+      try { seenBody = JSON.parse(raw); } catch { seenBody = null; }
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+      res.end(`data: ${JSON.stringify({ choices: [{ delta: { content: 'ok' } }] })}\n\ndata: [DONE]\n\n`);
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const prev = process.env.OLLAMA_HOST;
+  process.env.OLLAMA_HOST = `http://127.0.0.1:${server.address().port}`;
+  try {
+    await generateContent('hi', 'sys', null, { provider: 'ollama', onToken: () => {}, maxTokens: 1500 });
+    ok(seenBody && seenBody.max_tokens === 1500 && seenBody.stream === true, 'stream leg forwards max_tokens');
+    await generateContent('hi', 'sys', null, { provider: 'ollama', onToken: () => {} });
+    ok(seenBody && !('max_tokens' in seenBody), 'no cap sent when unset (back-compat)');
   } finally { process.env.OLLAMA_HOST = prev; server.close(); }
 }
 
