@@ -130,9 +130,10 @@ Full 20+ LIVE missions are infeasible on this rig (11 tok/s, 2GB, serial
 single lane: each mission costs 4-16 min). Coverage instead:
 - 14 live missions across 6 types (math, code+run, file, memory, search,
   degenerate/probe) + live search-engine probe + 5 raw-model probes.
-- 37/37 F5 hardening suite + FULL regression battery: 175/175 suites green
-  via a continue-on-fail runner (574s; `npm test`'s `&&` chain stops at the
-  first failure so it cannot report a full result). First pass showed
+- 37/37 F5 hardening suite + FULL regression battery: 196/196 suites green
+  via continue-on-fail runners (175 `node` suites in 574s + 21 `node --test`
+  suites in 53s; `npm test`'s `&&` chain stops at the first failure so it
+  cannot report a full result). First pass showed
   170/175: the 5 failures were 5 suites importing `react`, which only exists
   in root `node_modules` (pre-existing coupling: server suites resolve it via
   parent-dir hoisting) — all 5 passed after root `npm ci`, no code touched.
@@ -157,7 +158,7 @@ single lane: each mission costs 4-16 min). Coverage instead:
 | 9 | Weak-model JSON never crashes the runner | PASS (F5.10, tested) |
 | 10 | Own aborts don't poison provider health | PASS (F5.11, tested) |
 | 11 | Small-box operability (2GB) | PASS (F5.8 minimal MCP, 0.5b resident) |
-| 12 | Full regression battery green | PASS (listed in section 9) |
+| 12 | Full regression battery green | PASS (196/196: 175 node + 21 --test; §9) |
 | 13 | Search works without keys | PASS (10 results, 14.6s, keyless) |
 | 14 | UI serves + APIs wired | PASS (bundle + 200s; screenshots excepted, disclosed) |
 | 15 | Auth + allowlist + scrubbed env | PASS (401s, live block, ShellEnv) |
@@ -189,4 +190,37 @@ Recovery is mechanical (~3 min) and was executed twice with identical results:
 7. `/tmp` evidence from prior missions is gone after a restore; the git record in this
    report is the durable copy. `.git` history itself has been reset to `09a37cf` at
    least once — verify with `git log` and re-commit if work is unexpectedly uncommitted.
+
+## 12. Hosted (Render) verification — 2026-09-09
+
+Push `0209181` auto-deployed `jexi-os-brain` (`srv-...5f40`, the service whose
+prior deploy was `live`; the `-1jiz` sibling's history is `update_failed` and
+was left alone). Observed via Render API + public HTTPS (tokens and the
+`x-jexi-key` used only in headers, never printed or stored):
+
+- Deploy `dep-dagd3ecs728c73d2g840` on `0209181`: `build_in_progress` →
+  `update_in_progress` → `live` (~3 min). `/api/health`: `ok`, v1.6.2, fresh
+  instance, port 10000. `/` serves the SPA; `/api/team` fingerprint OK.
+- Auth gates work: `POST /api/missions` without key → 401 locked message;
+  with key → mission created.
+- Hosted brain has NO model: env sets `JEXI_MODEL_PROVIDER=groq` +
+  `JEXI_MODEL_NAME=openai/gpt-oss-120b` but `JEXI_MODEL_API_KEY` is missing,
+  and no legacy provider keys exist → `/api/health` showed 0/9 providers.
+- 3 hosted missions, all honest-failed at planning (3 events each:
+  CREATED → ANALYZED → `MISSION_FAILED: Planning unavailable — no model
+  lane produced a valid plan`): `ms-mttjhayo-001` (probe, no brain),
+  `ms-mttjhouc-002` (runtime keyless `custom` → Pollinations `openai`),
+  `ms-mttjj4jp-003` (same, `openai-fast`). Runtime settings DID apply
+  live (`Unified (your model): configured True` in health).
+- Keyless path is dead, verified independently from the sandbox:
+  `openai-fast` → `402 Payment Required`; `openai` worked once then →
+  `402 KEY_BUDGET_EXHAUSTED` ("API key budget too low... this key has
+  0.0000"). Pollinations anonymous tier is exhausted/deprecated.
+- Hosted settings were reverted afterwards (`groqKey`/`geminiKey` empty,
+  no `unified`, health back to 9× unconfigured) — the box is exactly as found.
+
+OPERATOR ACTION (one step): add `JEXI_MODEL_API_KEY=<your Groq key>` to the
+`jexi-os-brain` service env in the Render dashboard (it already has PROVIDER
++ NAME). Then any `POST /api/missions` with the `x-jexi-key` runs a real
+hosted mission. Phone/APK check still needs the device.
 
