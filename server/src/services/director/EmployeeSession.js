@@ -355,9 +355,21 @@ export async function runEmployeeSession(p) {
       const clean = sanitizeWorkProduct(String(raw || ''));
       parsed = parseEmployeeOutput(clean);
       if (parsed.bad) {
-        const err = new Error('employee output unparseable or empty');
-        err.code = 'BAD_OUTPUT';
-        throw err;
+        // Final F6 — UNSTRUCTURED SALVAGE: a weak model that emits real
+        // content without the ## REPORT/## DELIVERABLE sections still did
+        // SOMETHING (observed live: 2× BAD_OUTPUT killed an echo mission
+        // that had produced text). Failing the mission on format alone
+        // wastes it — salvage as a LOW-confidence deliverable. Verification
+        // gates still apply downstream, so garbage still fails, honestly.
+        const salvage = clean.trim();
+        if (salvage.length >= 40 && !/^(as an ai|i cannot|i'm sorry|sorry, but)/i.test(salvage)) {
+          parsed = { ...parsed, bad: false, unstructured: true, report: '', deliverable: salvage.slice(0, 20000), confidence: 'low', claims: [] };
+          emit('OUTPUT_SALVAGED', { agentId: employee.agentId, agentName: employee.displayName, summary: `${employee.displayName} skipped the report format — treating the raw answer as the deliverable (low confidence).`, severity: 'warn' });
+        } else {
+          const err = new Error('employee output unparseable or empty');
+          err.code = 'BAD_OUTPUT';
+          throw err;
+        }
       }
       const requests = extractCommandRequests(clean);
       const browserLines = extractBrowserRequests(clean); // B211 B3

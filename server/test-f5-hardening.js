@@ -253,5 +253,37 @@ console.log('\n== 10. Caller-abort fail-fast (no health penalty) ==');
   } finally { process.env.OLLAMA_HOST = prev; server.close(); }
 }
 
+console.log('\n== 11. Unstructured-output salvage ==');
+{
+  const { runEmployeeSession, assembleBrief } = await import('./src/services/director/EmployeeSession.js');
+  const { getEmployee } = await import('./src/services/director/Employees.js');
+  const { TaskMailbox } = await import('./src/services/director/AgentMail.js');
+  const emp = getEmployee('zola');
+  const mk = (script) => {
+    const task = { id: 't-salvage', objective: 'say the thing', successCriteria: ['says it'] };
+    const subtask = { id: 'st1', title: 'say the thing', capability: 'research', timeBudgetMs: 5000 };
+    const brief = assembleBrief({ task, subtask, employee: emp, dependencies: [] });
+    const events = [];
+    return {
+      events,
+      run: () => runEmployeeSession({
+        task, subtask, employee: emp, brief, mailbox: new TaskMailbox(task.id),
+        hooks: { onEvent: (e) => events.push(e) }, llm: async () => script, tools: null,
+      }),
+    };
+  };
+  const free = mk('The backup drive is called BLUEVAULT and it holds nightly snapshots of the workspace.');
+  const res = await free.run();
+  ok(res && res.parsed && res.parsed.unstructured === true && res.parsed.deliverable.includes('BLUEVAULT'), 'free-form answer salvaged as low-confidence deliverable');
+  ok(res.parsed.confidence === 'low', 'salvaged confidence capped at low');
+  ok(free.events.some((e) => e.type === 'OUTPUT_SALVAGED'), 'salvage emits OUTPUT_SALVAGED (visible, not silent)');
+  let threwEmpty = false;
+  try { await mk('   ').run(); } catch (e) { threwEmpty = e && e.code === 'BAD_OUTPUT'; }
+  ok(threwEmpty, 'empty output still throws BAD_OUTPUT');
+  let threwRefusal = false;
+  try { await mk('As an AI I cannot help with that request at all, sorry.').run(); } catch (e) { threwRefusal = e && e.code === 'BAD_OUTPUT'; }
+  ok(threwRefusal, 'refusal is not salvaged (still BAD_OUTPUT)');
+}
+
 console.log(`\nF5 hardening: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
