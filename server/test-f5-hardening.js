@@ -110,5 +110,28 @@ console.log('\n== 5. Progress-aware stream budget ==');
   } finally { server.close(); }
 }
 
+console.log('\n== 6. Local-rung time budget ==');
+{
+  const http = await import('node:http');
+  const { generateContent } = await import('./src/services/LLMClient.js');
+  // stub ollama: answers after 600ms with a valid chat.completion payload
+  const server = http.createServer((req, res) => {
+    setTimeout(() => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: 'stub answer' } }] }));
+    }, 600);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const prev = process.env.OLLAMA_HOST;
+  process.env.OLLAMA_HOST = `http://127.0.0.1:${server.address().port}`;
+  try {
+    let threw = false;
+    try { await generateContent('hi', 'sys', null, { provider: 'ollama', timeoutMs: 200 }); } catch { threw = true; }
+    ok(threw, 'tiny budget aborts the local rung (override honored)');
+    const text = await generateContent('hi', 'sys', null, { provider: 'ollama', timeoutMs: 3000 });
+    ok(text === 'stub answer', 'adequate budget lets the slow local rung answer');
+  } finally { process.env.OLLAMA_HOST = prev; server.close(); }
+}
+
 console.log(`\nF5 hardening: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -633,7 +633,12 @@ async function tryOllama(prompt, system, imageBase64, opts, errors) {
   const model = opts.model || process.env.MODEL_NAME || process.env.OLLAMA_MODEL || 'qwen3';
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), Math.min(TIMEOUT_MS, 120_000));
+    // Final F5 — local inference is SLOW (CPU, ~11 tok/s): the shared 90s
+    // budget killed working non-streamed turns (observed: a 107s plan turn
+    // aborted at 90s). The local rung gets its own 5-minute budget; the
+    // caller's abort is still honored, and opts.timeoutMs may override.
+    const budget = Number.isFinite(opts.timeoutMs) && opts.timeoutMs > 0 ? opts.timeoutMs : 300_000;
+    const timer = setTimeout(() => controller.abort(), budget);
     // ARENA — honor the CALLER's abort (the lean lane's budget): either
     // signal aborts the fetch. Without this, a stalling endpoint eats the
     // full internal timeout no matter what the caller wanted.
