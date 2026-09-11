@@ -329,7 +329,7 @@ export async function analyzeGithubRepo(url, opts = {}) {
         `## FIXES — concrete, prioritized fixes for the issues.\n` +
         `## VERDICT — would you use this / what is it ready for.\n` +
         `Be specific and honest. If the repository is too thin to judge something, say so — never invent files or claims.`;
-      summary = String(await generateContent(prompt, 'You are JEXI OS, an autonomous agent. You write concise, accurate technical reviews.', null, { prefer: 'groq', temperature: 0.3 })).trim();
+      summary = String(await generateContent(prompt, 'You are JEXI OS, an autonomous agent. You write concise, accurate technical reviews.', null, { prefer: '', temperature: 0.3 })).trim();
     } catch { summary = ''; }
   }
 

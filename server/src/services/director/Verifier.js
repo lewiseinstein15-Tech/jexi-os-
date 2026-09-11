@@ -193,7 +193,7 @@ Answer ONLY with JSON: {"pass": boolean, "score": 0.0-1.0, "problems": ["..."], 
       // evidence, not just the deliverable's internal coherence.
       const evidence = executionEvidence(task?.events || []);
       const user = `# OBJECTIVE\n${task.objective}\n\n# SUCCESS CRITERIA\n${criteria.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n\n# WHAT ACTUALLY EXECUTED (the only source of truth for HOW the work was done)\n${evidence}\n\n# DELIVERABLE TO VERIFY\n${String(deliverable || '').slice(0, 30000)}\n\nA claim about how the work was done (browser, commands, files, searches) that contradicts the execution evidence is fabrication — fail the deliverable and name the contradiction.\n\nIs this deliverable acceptable? JSON only.`;
-      const raw = await llm({ system, user, prefer: 'gemini' });
+      const raw = await llm({ system, user });
       const parsed = extractJson(raw);
       if (parsed && typeof parsed.pass === 'boolean') {
         rubric = {

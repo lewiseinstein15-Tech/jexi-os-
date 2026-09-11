@@ -12,6 +12,7 @@
  */
 
 import { generateContent } from '../LLMClient.js';
+import { providerOrder, configuredProviders } from '../ProviderRouter.js';
 import { parseModelJson } from './JsonRepair.js'; // B209 — salvage sloppy-but-complete model JSON
 import { executeTool } from '../ToolRuntime.js';
 
@@ -77,10 +78,16 @@ export function realLlmAdapter() {
       // B209 — a lane that answers WITHOUT JSON is as bad as a failed lane
       // (refusals, empty bodies, degraded free-tier responses): retry on
       // other lanes before declining the turn. The Director's honesty
-      // backstop stays, but it should only fire when the lanes truly have
-      // nothing usable.
+      // backstop stays,but it should only fire when the lanes truly have
+      // nothing usable. Alt lanes resolve dynamically from the provider ladder
+      // (healthy first, configured only) — no provider names in logic.
+
+
+      // Configured healthy providers in priority order (the ladder / health
+      // state are the single source of truth; no provider is named in logic).
+      const altLanes = configuredProviders().filter((k) => providerOrder().includes(k));
       if (!parsed) {
-        for (const alt of ['groq', 'cloudflare', 'gemini', 'deepinfra']) {
+        for (const alt of altLanes) {
           try {
             parsed = extractJson(await generateContent(user, INTERPRET_SYSTEM, image || null, { prefer: alt }));
             if (parsed) break;
@@ -108,7 +115,7 @@ export function realLlmAdapter() {
     review: async ({ objective, criteria, draft, employeeName }) => {
       const system = `You are a supervisor reviewing an employee's in-progress draft about 600 characters into their work. Decide ONLY if the approach is clearly off-track for the objective (wrong deliverable, misunderstanding the task, refusing, or drifting). Normal drafts pass. Respond with JSON only: {"redirect": true|false, "reason": "short", "instruction": "if redirect, what to do instead"}`;
       const user = `# OBJECTIVE\n${String(objective || '').slice(0, 400)}\n\n# SUCCESS CRITERIA\n${(criteria || []).slice(0, 4).map((c) => `- ${c}`).join('\n') || '- not specified'}\n\n# EMPLOYEE\n${employeeName || 'employee'}\n\n# DRAFT SO FAR\n${String(draft || '').slice(0, 1200)}`;
-      const raw = await generateContent(user, system, null, { prefer: 'flash' });
+      const raw = await generateContent(user, system, null, {});
       try {
         const m = String(raw).match(/\{[\s\S]*\}/);
         const parsed = m ? JSON.parse(m[0]) : {};

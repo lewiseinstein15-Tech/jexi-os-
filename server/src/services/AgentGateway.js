@@ -61,13 +61,11 @@ export async function agentAsk(fromAgent, toAgent, question, { sendEvent = () =>
 
 /* B185 — LANE ROTATION: each agent cycles through DIFFERENT model lanes on
  * retry so the team uses many models, not one. Named per the coworker roster. */
+// B185 — model-independence: lane rotation cycles the ROUTER's health order
+// (each retry re-derives providers), never a hardcoded provider name.
+
 const LANES = [
-  { prefer: 'groq', name: 'Leonardo/Luna' },
-  { prefer: 'gemini', name: 'Maya' },
-  { prefer: 'openrouter', name: 'Sasha/Nemo' },
-  { prefer: 'mistral', name: 'Milo/Marcel' },
-  { prefer: 'nvidia', name: 'Wei (DeepSeek)' },
-  null, // null = router's own health order (no preference)
+  { prefer: undefined, name: 'auto-router' },
 ];
 const laneTick = new Map();
 function pickAlternateLane(agent) {
