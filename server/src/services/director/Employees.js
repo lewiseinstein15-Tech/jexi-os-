@@ -25,6 +25,21 @@ import { fileURLToPath } from 'node:url';
 import { telemetry } from './Telemetry.js';
 import { DATA_DIR } from '../../config.js';
 
+/**
+ * SCOPE C (phase-1) — HOT-PATH AUTHORITATIVE ROSTER.
+ * This module (the Director's stable employees, data-overridable via
+ * `data/employees.json`) is THE live roster the Director actually uses on the
+ * hot path: capability-driven discovery. The legacy specialist catalog
+ * (AgentRoster.js / AGENT_ROSTER — surfaced at
+ * `/api/roster` and by the UI's RosterPanel)is ARCHIVAL/compat data, marked
+ * @deprecated, NOT the hot-path roster — see its own top-file deprecation.
+
+ *
+ * Do NOT treat AGENT_ROSTER as "the roster" in any kernel/Director logic;
+ * kernel teams compose from THE roster (this registry) only.
+ */
+export const AUTHORITATIVE_ROSTER = 'employees'; // hot-path roster source
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // B211 B3: the roster override lives under DATA_DIR — test isolation
 // (DATA_DIR override) no longer leaks a stale shadow over the defaults.

@@ -188,7 +188,7 @@ export default function AgentsScreen({ logs, websites, isProcessing, plan }) {
       <div className="flex items-center gap-1.5">
         <Tab active={tab === 'active'} onClick={() => setTab('active')}>ACTIVE</Tab>
         <Tab active={tab === 'pipeline'} onClick={() => setTab('pipeline')}>PIPELINE</Tab>
-        <Tab active={tab === 'roster'} onClick={() => setTab('roster')}>ROSTER</Tab>
+        <Tab active={tab === 'roster'} onClick={() => setTab('roster')}>CATALOG (LEGACY)</Tab>
         <Tab active={tab === 'team'} onClick={() => setTab('team')}>TEAM</Tab>
         {tab === 'active' && isProcessing && (
           <span className="ml-auto flex items-center gap-1.5 text-[8px] text-brand font-bold">

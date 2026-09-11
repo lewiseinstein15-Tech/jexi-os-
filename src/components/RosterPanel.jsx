@@ -105,7 +105,7 @@ export default function RosterPanel() {
           />
         </div>
         <div className="flex items-center gap-1 text-text-tertiary text-[9px] font-bold tracking-wider">
-          <Users className="w-3 h-3" /> {agents.length} AGENTS
+          <Users className="w-3 h-3" /> {agents.length} CATALOG AGENTS (LEGACY)
         </div>
       </div>
 

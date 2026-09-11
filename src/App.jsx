@@ -377,7 +377,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* ARENA — Agents: pipeline + roster + team */}
+        {/* ARENA — Agents: pipeline + catalog (legacy) + team (hot-path roster) */}
         <section className={`jx-view${view === 'agents' ? ' show' : ''}`}>
           <div className="jx-main">
             <AgentsScreen logs={engine.logs} websites={engine.websites} isProcessing={engine.isProcessing} plan={engine.plan} />
