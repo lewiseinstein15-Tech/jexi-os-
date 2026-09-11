@@ -111,7 +111,7 @@ export class DoAnythingAgent {
         `{"goal": "one-line restatement", "steps": [{"tool": "slug", "args": {...}, "why": "short reason"}]}\n` +
         `RULES: max ${MAX_STEPS} steps; prefer the smallest number; only use listed tools; ` +
         `args must match the tool's needs (queries, urls, filenames, commands); do NOT invent tools.`;
-      const raw = await this.generateContent(prompt, 'You output strict JSON only.', null, { prefer: 'groq', temperature: 0.2 });
+      const raw = await this.generateContent(prompt, 'You output strict JSON only.', null, { prefer: '', temperature: 0.2 });
       const parsed = parseJson(raw);
       const checked = PLAN_SCHEMA.safeParse(parsed);
       plan = checked.success ? checked.data : null;
@@ -165,7 +165,7 @@ export class DoAnythingAgent {
         const prompt =
           `TASK: "${taskText.slice(0, 800)}"\n\nExecuted steps so far:\n${digest}\n\n` +
           `Is the task complete? STRICT JSON: {"complete": true|false, "missing": ["what is still missing"]}`;
-        const raw = await this.generateContent(prompt, 'You output strict JSON only.', null, { prefer: 'groq', temperature: 0.1 });
+        const raw = await this.generateContent(prompt, 'You output strict JSON only.', null, { prefer: '', temperature: 0.1 });
         const verdict = VERDICT_SCHEMA.safeParse(parseJson(raw));
         if (verdict.success && verdict.data.complete) { verifiedComplete = true; needsVerify = false; break; }
         if (verdict.success) verifiedComplete = false;
@@ -174,7 +174,7 @@ export class DoAnythingAgent {
         const repairPlanRaw = await this.generateContent(
           `TASK: "${taskText.slice(0, 800)}"\nMissing: ${verdict.data.missing.slice(0, 3).join(' | ')}\n` +
           `Pick 1-3 NEW tool steps to fix exactly that. STRICT JSON: {"steps": [{"tool": "slug", "args": {...}, "why": "..."}]}`,
-          'You output strict JSON only.', null, { prefer: 'groq', temperature: 0.2 }
+          'You output strict JSON only.', null, { prefer: '', temperature: 0.2 }
         );
         const repairPlan = PLAN_SCHEMA.safeParse(parseJson(repairPlanRaw));
         if (!repairPlan.success || !repairPlan.data.steps.length) { needsVerify = false; break; }
@@ -199,7 +199,7 @@ export class DoAnythingAgent {
         `TASK: "${taskText.slice(0, 800)}"\n\nSteps executed:\n${digest}\n\n` +
         `Write the final report to the user: what was done, the key findings/results, ` +
         `and anything that needs their attention or approval. 2-5 short paragraphs, plain markdown.`;
-      summary = String(await this.generateContent(prompt, 'You are JEXI OS, an autonomous agent reporting to its owner.', null, { prefer: 'groq', temperature: 0.4 })).trim();
+      summary = String(await this.generateContent(prompt, 'You are JEXI OS, an autonomous agent reporting to its owner.', null, { prefer: '', temperature: 0.4 })).trim();
     } catch { /* fall through */ }
     if (!summary || summary.length < 20) {
       summary = `### 🛠 JEXI OS — TASK COMPLETE\n\nExecuted ${results.length} step(s): ${okCount} succeeded${approvalCount ? `, ${approvalCount} need your approval` : ''}${blockedCount ? `, ${blockedCount} blocked by safety rules` : ''}${failedCount ? `, ${failedCount} failed` : ''}.\n\nCheck the activity log above for details.`;

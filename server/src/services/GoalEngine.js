@@ -322,7 +322,7 @@ export class GoalEngine {
     if (!this.generateContent) return [];
     try {
       const prompt = `You are the preflight planner for an autonomous agent. The user gave this GOAL:\n"${String(goal).slice(0, 1000)}"\n\nPlanned intent: ${plan.intent}. Team: ${(plan.steps || []).join(', ') || 'general'}.\n\nTo execute this goal END-TO-END without pausing, what personal details do you GENUINELY need from the user? STRICT RULES:\n- Ask ONLY for blocking facts the agent cannot know or infer: specific dates, cities/flights, budgets, account handles, contact/email addresses.\n- NEVER ask about preferences that have sensible defaults (depth, tone, region, count, time range, sources). Default those.\n- Ask at most 3 questions. Prefer 0-1. If everything can be defaulted, ask nothing.\n\nReply with STRICT JSON only: {"questions": [{"field": "short_key", "question": "one clear question"}]}. Max 3 questions. If nothing is needed, reply {"questions": []}.`;
-      const raw = await this.generateContent(prompt, 'You output strict JSON only.', null, { prefer: 'groq', temperature: 0.2 });
+      const raw = await this.generateContent(prompt, 'You output strict JSON only.', null, { prefer: '', temperature: 0.2 });
       const parsed = JSON.parse(String(raw || '').replace(/```json|```/g, '').trim());
       const checked = QUESTIONS_SCHEMA.safeParse(parsed);
       return checked.success ? checked.data.questions : [];

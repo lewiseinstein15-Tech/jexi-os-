@@ -31,6 +31,7 @@ export const TEAM_PLAN = {
   math_solve: ['math', 'reasoner', 'memory'],
   self_check: ['self-diagnose', 'reasoner', 'memory', 'tool-router', 'toolsmith', 'agent-builder', 'prompt', 'guardrail', 'goal-owner'],
   code_task: ['product', 'designer', 'engineer', 'ux-researcher', 'accessibility', 'architect', 'coder', 'runner', 'sandbox', 'debugger', 'qa', 'reviewer', 'critic', 'security', 'shipper', 'reflector', 'ui-developer', 'frontend', 'landing-page-builder', 'email-developer'],
+  code_fix: ['coder'], // Scope B — focused bug-fix: exactly ONE coworker (Coder), file/terminal tools, no team rat-race.
   computer_use: ['navigator', 'vision', 'computer-use', 'reasoner', 'memory'],
   study_topic: ['scholar', 'researcher', 'history', 'science', 'document-analyst', 'memory'],
   // B51 P2 — simple definitional/factual questions: model knowledge + optional
@@ -619,7 +620,10 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
     //    track habits", "/team build…" and "/careful check my code" all land here
     //    (slash commands are stripped first — isCoding tests the scopedQuery).
     if (this.isCoding(scopedQuery)) {
-      return { intent: 'code_task', tasks: ['architect', 'coder', 'runner', 'debugger', 'qa', 'reviewer', 'memory'], reasoning: 'Coding task — the team: product → designer → engineer → coder → QA → reviewer → shipper.', scope, query: scopedQuery };
+      if (this.isFixRequest(scopedQuery)) {
+        return { intent: 'code_fix', tasks: ['coder'], reasoning: 'Focused bug-fix request — exactly ONE coworker (Coder)with file/terminal tools; no product/design/QA rat-race.', scope, query: scopedQuery };
+      }
+      return { intent: 'code_task', tasks: ['architect', 'coder', 'runner', 'debugger', 'qa', 'reviewer', 'memory'], reasoning: 'Coding task —the team: product → designer → engineer → coder → QA → reviewer → shipper.', scope, query: scopedQuery };
     }
 
     // 6.1 B53 P3 — MODIFY an existing product: with an active product task,
@@ -871,6 +875,13 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
       if (re.test(q)) return res;
     }
     return null;
+  }
+
+  isFixRequest(q) {
+    // Scope B — pure bug-fix requests (no new-build intent) take the lean single-coworker lane.
+    const fixCore = /\b(fix|debug|repair|patch|resolve|correct|troubleshoot)\b.*?\b(bug|code|crash|error|issue|test|function|route|endpoint|page|build|app(lication)?|script|import|export|render|compile|deploy|login|auth|query|regex|loop|memory|leak)\b|\b(bug|crash|error|exception|traceback|syntax ?error)\b/i;
+    const newBuildIntent = /\b(write|build|create|make|develop|implement|generate|add|need|want)\b.*?\b(app(lication)?|website|web ?app|game|quiz|calculator|dashboard|tool|bot|plugin|extension|landing page|portfolio|template|scraper|script|planner|tracker|manager|reminder|timer|stopwatch|converter|generator|logger|monitor|todo|habit|budget|panel|page|form|screen)\b/i;
+    return fixCore.test(q) && !newBuildIntent.test(q);
   }
 
   isCoding(q) {

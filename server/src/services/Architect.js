@@ -44,7 +44,7 @@ async function parseProject(raw, prompt, systemInstruction, sendEvent) {
       `${prompt}\n\nIMPORTANT: Reply with ONLY the raw JSON object. No markdown, no code fences, no explanation, no trailing text — it is parsed directly with JSON.parse().`,
       systemInstruction + '\nOUTPUT FORMAT: ONLY the raw JSON object, nothing else.',
       null,
-      { prefer: 'gemini', temperature: 0.2 }
+      { prefer: '', temperature: 0.2 }
     );
     const retryProject = JSON.parse(jsonrepair(isolateJson(retry)));
     retryProject.files = normalizeFiles(retryProject.files);
@@ -106,7 +106,7 @@ RULES:
 
   // Code planning + debugging uses Gemini first (much stronger at writing and
   // fixing code than the fast Groq text model), with Groq as automatic fallback.
-  const response = await generateContent(prompt, systemInstruction, null, { prefer: 'gemini', temperature: 0.2 });
+  const response = await generateContent(prompt, systemInstruction, null, { prefer: '', temperature: 0.2 });
   const cleanResponse = isolateJson(response);
 
   try {

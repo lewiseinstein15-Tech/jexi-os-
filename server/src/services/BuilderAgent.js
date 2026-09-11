@@ -230,7 +230,7 @@ export class BuilderAgent {
           `Result: ${written} file(s) (${language || 'unknown'}), ${rounds} run/fix round(s), run ${runClean ? 'PASSED' : (this.runFile ? 'STILL FAILING after fixes' : 'not runnable on this host')}, ` +
           `pushed to ${repoUrl}${gitFail ? ' (push step failed: ' + gitFail.label + ')' : ''}.\n\n` +
           `Write the final report to the user: what was built, how it ran, the GitHub link, and any honest caveats. 2-5 short paragraphs, plain markdown.`,
-          'You are JEXI OS, an autonomous builder reporting to its owner.', null, { prefer: 'groq', temperature: 0.4 }
+          'You are JEXI OS, an autonomous builder reporting to its owner.', null, { prefer: '', temperature: 0.4 }
         )).trim();
       } catch { /* fall through */ }
     }

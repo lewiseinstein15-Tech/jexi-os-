@@ -135,7 +135,7 @@ export class UniversalLinkAgent {
           `CONTENT (${contentMeta.kind}, ~${String(content).length} chars):\n${String(content).slice(0, 12000)}\n\n` +
           `Do exactly what the instruction asks using ONLY this content. Be specific and cite what you saw/heard. ` +
           `If the instruction cannot be fully done from this content, say what is missing. Plain markdown, 2-6 short paragraphs.`;
-        summary = String(await this.generateContent(prompt, 'You are JEXI OS, an autonomous agent.', null, { prefer: 'groq', temperature: 0.3 })).trim();
+        summary = String(await this.generateContent(prompt, 'You are JEXI OS, an autonomous agent.', null, { prefer: '', temperature: 0.3 })).trim();
       }
     } catch {
       summary = `### 🔗 Link — ${contentMeta.title || link.slice(0, 60)}\n\n${String(content).slice(0, 2000)}`;

@@ -565,7 +565,7 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
         `The user attached an image and asked: \"${query || 'What is this?'}\"\n\nAnalyze the image thoroughly: describe what it shows, read any text/numbers/symbols, and if it is a math problem, solve it with full LaTeX steps.`,
         JEXI_SYSTEM_PROMPT + preferencesBlock(),
         visionImage,
-        { prefer: 'gemini', temperature: 0.4 } // same proven lane as /api/vision
+        { prefer: '', temperature: 0.4 } // same proven lane as /api/vision
       );
       try { addChat('jexi', reply); } catch (e) {}
       results.summary = `### 👁️ JEXI VISION\n\n${reply}`;
@@ -1235,6 +1235,39 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
       return state; // edge → debugger
     };
 
+    N.codeFixPipeline = async (state) => {
+      // Scope B — focused bug-fix lane: exactly ONE coworker (Coder),
+      // real tools (editor · shell · python · github), write → run → fix until
+      // clean. No Product/Designer/QA/reviewer rat-race. The graph's '*' edge
+      // edge lands success → responder,and errors → replanner (safe terminal).
+      const { results, sendEvent } = state.context;
+      const query = state.query;
+      const plan = state.plan || {};
+      const effQuery = (plan.scope && plan.scope.query) || query;
+      state.context.fix = { effQuery, done: false };
+      sendEvent('log', { agent: 'Coder', message: `🐛 Fix lane — one coder, real tools: editor · shell · tests.` });
+      try {
+        const { runDshCoding } = await import('./DshCoding.js');
+        const built = await runDshCoding({
+          goal: effQuery,
+          plan: '',
+          sendEvent,
+          signal: state.context.opts?.signal || null,
+          owner: state.context.opts?.taskId || 'code-fix',
+        });
+        if (built && built.files && built.files.length) {
+          results.files = built.files;
+          results.statistics.buildNotes = built.summary ? String(built.summary).slice(0, 600) : undefined;
+        }
+        results.statistics.confidence = built && built.files && built.files.length ? 88 : 45;
+      } catch (e) {
+        sendEvent('log', { agent: 'Coder', message: `⚠ Fix lane failed: ${e.message}` });
+        state.lastError = e.message;
+      }
+      state.context.fix.done = true;
+      return state; // '*'-edge → responder on success; replanner on error
+    };
+
     N.debugger = async (state) => {
       // P3 — the DEBUG LOOP now runs through the first-class CodingLoop
       // (server/src/services/CodingLoop.js): write → run → observe the EXACT
@@ -1580,6 +1613,7 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
         case 'math_solve': return 'mathSolve';
         case 'direct_answer': return 'directAnswer'; // B51 P2
         case 'code_task': return 'codePipeline';
+        case 'code_fix': return 'codeFixPipeline';
         case 'research':
         case 'learning_research': return 'research';
         case 'study_topic': return 'studyTopic';
