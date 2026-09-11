@@ -7,16 +7,28 @@
  * is LARGE but the Planner composes only the small subset a task needs — that
  * is how pro systems run 60+ agents "without sweating". None of these run all
  * at once; composeTeam() picks the right specialists per intent.
- *
+
  * Roster entries route to real, implemented JEXI services (Reasoner,
  * SearchAgent, SkillChain, …) — each specialist is a focused mandate with its
  * own prompt, and several specialists can share one engine with different
  * instructions (the Atomic Agents "atomic" pattern).
+ *
+ * @deprecated (phase-1, SCOPE C) — LEGACY CATALOG, NOT the hot-path roster. The
+ * Director's live workforce is `director/Employees.js` (data-overridable via
+ * `data/employees.json`), composition is capability-driven via the Director's
+ * interpreter; this 200+ specialist catalog is retained for archival/compat
+ * (the legacy `/api/roster` endpoint, RosterPanel, Planner/TaskManager/
+ * PluginRegistry/Reachability/JexiIdentity/ArchitectureViews/etc consumers),
+ * and is NOT spun up at runtime for kernel paths. See
+ * `director/Employees.js` (AUTHORITATIVE_ROSTER) for the inverse declaration.
+
+ * Do NOT delete this catalog (dependency audit in Phase 2+ first;this
+ * module remains in use by legacy consumers listed below).
  */
 
 import { TEAM_PLAN } from './Planner.js'; // single team map — composeTeam delegates to it (B49 P1/P3)
 
-/** Agent roster: slug → mandate + the skills that specialist masters. */
+/** @deprecated — LEGACY CATALOG: slug → mandate + the skills that specialist masters. */
 export const AGENT_ROSTER = [
   // ── Core brain ──────────────────────────────────────────────
   { slug: 'planner', name: 'Planner', role: 'Classifies every request and composes the right team before anything runs.', skills: ['intent-detection', 'team-composition', 'task-decomposition'] },
