@@ -686,7 +686,26 @@ export function applyMcpArgAliases(toolDef, args) {
   return out || args;
 }
 
-export async function invokeMcpTool({ server, tool, args = {}, authorized = false, timeoutMs = 30_000 } = {}) {
+export async function invokeMcpTool({ server, tool, args = {}, authorized = false, timeoutMs = 30_000, mcpGrants = null } = {}) {
+  // PER-AGENT MCP GRANT GATE (phase-1 D2) — deny-by-default at the agent
+  // layer: when an employee session tags a call with its grants, the call is
+  // allowed ONLY servers+tools the employee was explicitly granted. `null`
+  // =  legacy/agentless path (no per-agent layer; server-level grants still
+  // enforce). Runs BEFORE any connect/spawn so a denial costs nothing.
+
+  if (Array.isArray(mcpGrants)) {
+
+    const grantsForAgent = mcpGrants.filter((g) => g.server === server);
+    if (!grantsForAgent.length) {
+
+      audit({ type: 'MCP_DENIED', server, tool, reason: `agent has no grant for server '${server}'` });
+      return { ok: false, error: `refused: agent has no MCP grant for server '${server}'` };
+    }
+    if (!grantsForAgent.some((g) => g.tools.includes('*') || g.tools.includes(tool))) {
+      audit({ type: 'MCP_DENIED', server, tool, reason: `agent grant for '${server}' does not include tool '${tool}'` });
+      return { ok: false, error: `refused: agent MCP grant for '${server}' does not include tool '${tool}'` };
+    }
+  }
   if (breakerOpen(server)) {
     audit({ type: 'MCP_BREAKER_OPEN', server, tool, reason: 'circuit open after repeated failures' });
     return { ok: false, error: `server '${server}' is in a failure cooldown (circuit breaker) — try again in a few minutes`, circuitOpen: true };

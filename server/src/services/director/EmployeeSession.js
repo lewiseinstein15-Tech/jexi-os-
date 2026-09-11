@@ -238,7 +238,7 @@ export async function runEmployeeSession(p) {
         // 120s boot budget: the FIRST call on a cold server pays its startup
         // (npx/uvx boot can exceed the default 30s on slow hosts) — the same
         // discipline the gateway's connect budget uses.
-        const r = await invokeMcpTool({ server, tool, args, timeoutMs: 120_000 });
+        const r = await invokeMcpTool({ server, tool, args, timeoutMs: 120_000, mcpGrants: employee.allowedMCP });
         if (r && r.ok) {
           const content = (r.result && Array.isArray(r.result.content)) ? r.result.content : [];
           const text = content.map((c) => c && c.text ? c.text : '').join('\n').trim() || JSON.stringify(r.result).slice(0, 12_000);

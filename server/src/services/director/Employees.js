@@ -103,6 +103,7 @@ const DEFAULT_EMPLOYEES = [
     personality: 'curious, precise, analytical',
     capabilities: ['research', 'search', 'synthesis', 'reasoning'],
     supportedTools: ['web-search', 'memory-recall', 'knowledge-save'],
+    allowedMCP: [{ server: 'duckduckgo', tools: ['*'] }, { server: 'free-search', tools: ['*'] }, { server: 'fetch', tools: ['*'] }, { server: 'hackernews', tools: ['*'] }],
     permissions: ['READ', 'NETWORK'],
   },
   {
@@ -113,6 +114,7 @@ const DEFAULT_EMPLOYEES = [
     personality: 'pragmatic, thorough, no-nonsense',
     capabilities: ['code', 'reasoning', 'planning'],
     supportedTools: ['web-search', 'memory-recall', 'knowledge-save', 'file-write', 'run-command'],
+    allowedMCP: [{ server: 'git', tools: ['*'] }],
     permissions: ['READ', 'WRITE', 'EXECUTE', 'NETWORK'],
   },
   {
@@ -123,6 +125,7 @@ const DEFAULT_EMPLOYEES = [
     personality: 'rigorous, honest, unsentimental',
     capabilities: ['verification', 'reasoning', 'synthesis'],
     supportedTools: ['web-search', 'memory-recall'],
+    allowedMCP: [{ server: 'duckduckgo', tools: ['*'] }, { server: 'free-search', tools: ['*'] }, { server: 'fetch', tools: ['*'] }],
     permissions: ['READ', 'NETWORK'],
   },
   {
@@ -133,6 +136,7 @@ const DEFAULT_EMPLOYEES = [
     personality: 'cautious, sharp, direct',
     capabilities: ['security', 'verification', 'reasoning'],
     supportedTools: ['web-search', 'memory-recall'],
+    allowedMCP: [{ server: 'duckduckgo', tools: ['*'] }, { server: 'free-search', tools: ['*'] }, { server: 'fetch', tools: ['*'] }],
     permissions: ['READ', 'NETWORK'],
   },
   {
@@ -143,6 +147,7 @@ const DEFAULT_EMPLOYEES = [
     personality: 'methodical, visual, scrupulously honest about what he saw',
     capabilities: ['computer', 'planning', 'reasoning'],
     supportedTools: ['browser-act', 'memory-recall', 'file-write', 'web-search'],
+    allowedMCP: [{ server: 'playwright', tools: ['*'] }, { server: 'chrome-devtools', tools: ['*'] }],
     permissions: ['READ', 'WRITE', 'NETWORK', 'COMPUTER'],
   },
   {
@@ -164,6 +169,7 @@ const DEFAULT_EMPLOYEES = [
     support: true,
     capabilities: ['search'],
     supportedTools: ['web-search'],
+    allowedMCP: [{ server: 'duckduckgo', tools: ['*'] }, { server: 'free-search', tools: ['*'] }, { server: 'fetch', tools: ['*'] }, { server: 'hackernews', tools: ['*'] }],
     permissions: ['READ', 'NETWORK'],
   },
   {
@@ -174,6 +180,7 @@ const DEFAULT_EMPLOYEES = [
     personality: 'methodical, exact, patient',
     capabilities: ['data', 'reasoning', 'synthesis'],
     supportedTools: ['web-search', 'memory-recall'],
+    allowedMCP: [{ server: 'duckdb', tools: ['*'] }, { server: 'sqlite', tools: ['*'] }, { server: 'calculator', tools: ['*'] }, { server: 'sympy', tools: ['*'] }],
     permissions: ['READ', 'NETWORK'],
   },
   {
@@ -208,6 +215,21 @@ export function loadEmployees() {
   return _cache;
 }
 
+/** Normalize per-agent MCP grants: [{ server, tools }] — deny-by-default layer.
+ * `tools: ['*']` = all tools on that server. Invalid entries are dropped. */
+function normalizeMCPGrants(grants) {
+  if (!Array.isArray(grants)) return [];
+  const out = [];
+  for (const g of grants) {
+    if (!g || typeof g !== 'object') continue;
+    const server = String(g.server || '').trim();
+    if (!server) continue;
+    const tools = Array.isArray(g.tools) ? g.tools.map(String) : [];
+    out.push({ server, tools: tools.length ? tools : ['*'] });
+  }
+  return out;
+}
+
 function normalizeEmployee(e) {
   const caps = (e.capabilities || []).map(normalizeCap).filter((c) => KNOWN_CAPS.has(c));
   return {
@@ -218,6 +240,7 @@ function normalizeEmployee(e) {
     personality: String(e.personality || '').slice(0, 200),
     capabilities: caps.length ? caps : ['reasoning'],
     supportedTools: Array.isArray(e.supportedTools) ? e.supportedTools.map(String) : [],
+    allowedMCP: normalizeMCPGrants(e.allowedMCP),
     permissions: Array.isArray(e.permissions) ? e.permissions.map(String) : ['READ'],
     support: Boolean(e.support),
     disabled: Boolean(e.disabled),

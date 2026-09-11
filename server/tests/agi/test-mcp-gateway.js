@@ -40,10 +40,9 @@ test('the shipped registry v3 is valid — every server verified live, none ship
   assert.ok(reg.servers.length >= 30, `expected a big verified registry, got ${reg.servers.length}`);
   const directory = loadToolDirectory();
   for (const s of reg.servers) {
-    // Policy (Lewis, Sept 2026): servers connect directly — all enabled, no switches.
+    // Policy (phase-1 D1 order): curated servers ship enabled; 9 community NETWORK/GIT servers ship enabled:false.
     // Every entry carries a permission boundary, honest notes, and a live-verified
     // tool directory entry proving it was REALLY connected and tool-called.
-    assert.equal(s.enabled, true, `${s.name} must ship enabled (connect directly)`);
     assert.ok(s.permissions.length, `${s.name} needs an explicit permission boundary`);
     assert.ok(!s.permissions.includes('DESTRUCTIVE'), `${s.name} must not ship DESTRUCTIVE`);
     assert.ok(!s.permissions.includes('DEPLOYMENT'), `${s.name} must not ship DEPLOYMENT`);
