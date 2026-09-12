@@ -1,0 +1,166 @@
+# JEXI OS — provider bridge — model catalog.
+#
+# Per-provider model metadata: context window, max output, pricing (USD per
+# 1M input / 1M output tokens), and capability flags. The CostOptimizer and
+# CapabilityRouter read ONLY this table — never hardcoded names in logic.
+
+models:
+  openai:
+    gpt-4o-mini:
+      contextWindow: 128000
+      maxOutput: 16384
+      priceInPer1M: 0.15
+      priceOutPer1M: 0.60
+      codeReasoning: medium
+      toolCalling: true
+      vision: true
+      streaming: true
+      structuredOutput: true
+    gpt-4o:
+      contextWindow: 128000
+      maxOutput: 16384
+      priceInPer1M: 2.50
+      priceOutPer1M: 10.00
+      codeReasoning: strong
+      toolCalling: true
+      vision: true
+      streaming: true
+      structuredOutput: true
+  anthropic:
+    claude-3-5-haiku:
+      contextWindow: 200000
+      maxOutput: 8192
+      priceInPer1M: 0.80
+      priceOutPer1M: 4.00
+      codeReasoning: medium
+      toolCalling: true
+      vision: true
+      streaming: true
+      structuredOutput: true
+    claude-3-7-sonnet:
+      contextWindow: 200000
+      maxOutput: 32000
+      priceInPer1M: 3.00
+      priceOutPer1M: 15.00
+      codeReasoning: strong
+      toolCalling: true
+      vision: true
+      streaming: true
+      structuredOutput: true
+  google:
+    gemini-2.5-flash:
+      contextWindow: 1000000
+      maxOutput: 65536
+      priceInPer1M: 0.30
+      priceOutPer1M: 2.50
+      codeReasoning: strong
+      toolCalling: true
+      vision: true
+      streaming: true
+      structuredOutput: true
+    gemini-2.5-pro:
+      contextWindow: 1000000
+      maxOutput: 65536
+      priceInPer1M: 1.25
+      priceOutPer1M: 10.00
+      codeReasoning: strong
+      toolCalling: true
+      vision: true
+      streaming: true
+      structuredOutput: true
+  deepseek:
+    deepseek-chat:
+      contextWindow: 128000
+      maxOutput: 8192
+      priceInPer1M: 0.27
+      priceOutPer1M: 1.10
+      codeReasoning: medium
+      toolCalling: true
+      vision: false
+      streaming: true
+      structuredOutput: true
+    deepseek-reasoner:
+      contextWindow: 128000
+      maxOutput: 32768
+      priceInPer1M: 0.55
+      priceOutPer1M: 2.19
+      codeReasoning: strong
+      toolCalling: false
+      vision: false
+      streaming: true
+      structuredOutput: false
+  groq:
+    llama-3.3-70b-versatile:
+      contextWindow: 128000
+      maxOutput: 8192
+      priceInPer1M: 0.59
+      priceOutPer1M: 0.79
+      codeReasoning: medium
+      toolCalling: true
+      vision: true
+      streaming: true
+      structuredOutput: true
+    openai-gpt-oss-120b:
+      contextWindow: 131072
+      maxOutput: 32768
+      priceInPer1M: 0.60
+      priceOutPer1M: 0.80
+      codeReasoning: strong
+      toolCalling: true
+      vision: false
+      streaming: true
+      structuredOutput: true
+  mistral:
+    mistral-large:
+      contextWindow: 128000
+      maxOutput: 8192
+      priceInPer1M: 2.00
+      priceOutPer1M: 6.00
+      codeReasoning: strong
+      toolCalling: true
+      vision: true
+      streaming: true
+      structuredOutput: true
+    mistral-small:
+      contextWindow: 128000
+      maxOutput: 8192
+      priceInPer1M: 0.20
+      priceOutPer1M: 0.60
+      codeReasoning: medium
+      toolCalling: true
+      vision: false
+      streaming: true
+      structuredOutput: true
+  openrouter:
+    auto:
+      contextWindow: 200000
+      maxOutput: 8192
+      priceInPer1M: 0.0
+      priceOutPer1M: 0.0
+      codeReasoning: medium
+      toolCalling: true
+      vision: true
+      streaming: true
+      structuredOutput: true
+  ollama:
+    llama3.1:
+      contextWindow: 128000
+      maxOutput: 8192
+      priceInPer1M: 0.0
+      priceOutPer1M: 0.0
+      codeReasoning: medium
+      toolCalling: true
+      vision: false
+      streaming: true
+      structuredOutput: true
+
+# Task-class default chains: first-success-wins fallback order per task class.
+# Router is NOT a load balancer — these are ordered preference chains.
+taskClasses:
+  default: [openai, anthropic, openrouter]
+  cheap: [groq, deepseek, openrouter]
+  fast: [groq, openai, openrouter]
+  reasoning: [anthropic, openai, google, deepseek]
+  long_context: [google, anthropic, openai]
+  vision: [openai, google, anthropic]
+  local: [ollama]

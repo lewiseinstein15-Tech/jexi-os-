@@ -194,3 +194,31 @@ to `replanner`.
   - every other team — Option B: deliberately bundled. Their specialist node
     makes one well-constructed composite pass; the catalog and UI mark those
     members as composed so the PLAN view never implies an independent agent ran.
+
+## 10. Provider bridge (Phase 2, Scope A)
+
+- **Location:** `server/src/providers/` — a self-contained model-provider bridge
+  behind ONE public API (`providers/index.js`). Business logic imports only
+  that module; no provider name reaches the agent loop.
+- **Contract:** `interface/LLMProvider.js` — every adapter implements
+  `chat` / `stream` / `countTokens` / `estimateCost` / `listModels` /
+  `isConfigured` and a capabilities table. `interface/NormalizedResponse.js`
+  and `interface/NormalizedToolCall.js` are the Hermes canonical shapes.
+- **Adapters:** 8 thin files (openai, anthropic, google, deepseek, groq,
+  mistral, openrouter, ollama) sharing `adapters/chatClientBase.js` +
+  `adapters/base.js` for HTTP/auth/normalize machinery.
+- **Routing:** `router/CapabilityRouter.js` resolves a `CapabilityProfile` →
+  `{ provider, model }` first-success-wins over a task-class chain
+  (`router/TaskClassChain.js`); `router/FallbackChain.js` walks providers on
+  retryable `ClassifiedError`s and never hides hard failures;
+  `router/CostOptimizer.js` picks the cheapest satisfying model.
+- **Transform:** `transform/normalize.js` (OpenCode pattern) unifies message /
+  tool-call / reasoning / error shapes so provider quirks never leak up.
+- **Config:** `config/providers.yaml` (keys/endpoints only) +
+  `config/models.yaml` (model catalog, prices, task-class chains).
+- **/model command:** `server/src/services/ModelCommand.js` renders providers +
+  models through the registry; `/model provider/model [--persist]` switches.
+- **Invariant:** grep for provider names outside `src/providers/` must return
+  only the pre-existing legacy key-resolution / router infrastructure
+  (`LLMClient.js`, `ProviderRouter.js`, `ModelRouting.js`, `ModelRouter.js`), which
+  are config-driven and were audited in Phase 1 as infrastructure, not leaks.

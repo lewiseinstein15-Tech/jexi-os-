@@ -1,0 +1,49 @@
+# JEXI OS — provider bridge — connection config (ONLY keys + endpoints here).
+#
+# No business logic may name a provider. This file is the ONLY place where
+# provider ids / base urls live outside the adapter layer.
+#
+# Keys are resolved from the environment by name (e.g. OPENAI_API_KEY).
+# `enabled: true` means the adapter may be used; false = disabled.
+# Default model per provider is read from `models.yaml`.
+
+openai:
+  enabled: true
+  keyEnv: OPENAI_API_KEY
+  baseUrl: https://api.openai.com/v1
+
+anthropic:
+  enabled: true
+  keyEnv: ANTHROPIC_API_KEY
+  baseUrl: https://api.anthropic.com/v1
+
+google:
+  enabled: true
+  keyEnv: GEMINI_API_KEY
+  baseUrl: https://generativelanguage.googleapis.com/v1beta/openai
+
+deepseek:
+  enabled: true
+  keyEnv: DEEPSEEK_API_KEY
+  baseUrl: https://api.deepseek.com/v1
+
+groq:
+  enabled: true
+  keyEnv: GROQ_API_KEY
+  baseUrl: https://api.groq.com/openai/v1
+
+mistral:
+  enabled: true
+  keyEnv: MISTRAL_API_KEY
+  baseUrl: https://api.mistral.ai/v1
+
+openrouter:
+  enabled: true
+  keyEnv: OPENROUTER_API_KEY
+  baseUrl: https://openrouter.ai/api/v1
+
+ollama:
+  enabled: true
+  keyEnv: OLLAMA_HOST
+  baseUrl: http://localhost:11434/v1
+  needsKey: false

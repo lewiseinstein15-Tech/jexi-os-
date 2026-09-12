@@ -338,6 +338,7 @@ import { meterEnter, meterLap, meterFreeze, requestMeterReport } from './src/ser
 import { browserRouter, registerDesktopWorker, registerAndroidWorker } from './src/services/BrowserRouter.js'; // ARENA Phase 3 — browser router (workers + policy + audit)
 import { lifecycleScan, lastLifecycleReport } from './src/services/MemoryLifecycle.js'; // ARENA Phase 4 — memory vault lifecycle
 import { apkRegister, apkPoll, apkResult, apkChannelStatus, attachApkWorkerToRouter } from './src/services/APKBrowserChannel.js'; // ARENA — the phone's WebView registers as a real browser worker
+import { registerModelCommand } from './src/services/ModelCommand.js'; // Phase 2(A) — /model via provider bridge
 app.use('/api', generalLimiter);
 app.use('/api', ipBackstop); // backstop: bounds session-rotation abuse per real IP
 
@@ -2805,4 +2806,9 @@ try {
       return { ok: skill.ok, summary: skill.ok ? `### 🧠 Skill saved\n\n**${skill.name}** → \`${skill.file}\`\n\nNext similar task starts from this precedent.` : `Could not save: ${skill.error}` };
     },
   });
+} catch (e) { /* already registered */ }
+
+// Phase 2(A) — /model: show/switch the model provider through the provider bridge
+try {
+  registerModelCommand(registerCommand);
 } catch (e) { /* already registered */ }
