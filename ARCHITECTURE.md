@@ -222,3 +222,26 @@ to `replanner`.
   only the pre-existing legacy key-resolution / router infrastructure
   (`LLMClient.js`, `ProviderRouter.js`, `ModelRouting.js`, `ModelRouter.js`), which
   are config-driven and were audited in Phase 1 as infrastructure, not leaks.
+
+## 11. Tool calling normalization (Phase 2, Scope B)
+
+- **Location:** `server/src/tools/` — provider-agnostic tool layer.
+  `interface/` (ToolDefinition contract, normalized ToolCall/ToolResult),
+  `registry/` (ToolRegistry + JSON-Schema validator), `domains/`
+  (filesystem, terminal, web, browser, git, github, testing, data, memory,
+  delegation, lsp, communication), `execution/` (executor, deny-by-default
+  permission gate, risk guard).
+- **One shape for every provider:** the agent loop consumes
+  `NormalizedResponse.tool_calls` via `ToolCall.from()` — OpenAI
+  `{id, function:{name,arguments}}`, Anthropic `{id, name, input}`, and Hermes
+  `{id, name, arguments}` all land in the SAME `ToolCall` shape. Verified by
+  mock providers in `tests/agi/test-worker-router.js`.
+- **Pipeline:** schema validation → permission gate (deny-by-default) → risk
+  guard (runtime ring + side-effect approval) → engine execution → normalized
+  `ToolResult` fed back to the provider layer. Order is deliberate: never let
+  an unknown tool name, ungranted tool, or risky ring execute.
+- **Agent-loop entry point:** `runToolCalls(response, executor, ctx)` in
+  `tools/index.js`.
+- **Executors are injected:** domain modules register definitions always but
+  execute through injectable engines — keyless for deterministic tests, and
+  wireable to the real JEXI engines (ToolRuntime / TOOL_REGISTRY) at deploy.
