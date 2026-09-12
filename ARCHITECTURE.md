@@ -245,3 +245,29 @@ to `replanner`.
 - **Executors are injected:** domain modules register definitions always but
   execute through injectable engines — keyless for deterministic tests, and
   wireable to the real JEXI engines (ToolRuntime / TOOL_REGISTRY) at deploy.
+
+## 12. Architecture cleanup + layer skeleton (Phase 2, Scope C)
+
+- **Layer map.** The OS target structure is documented as README placeholders
+  at repo root: `kernel/` (L3), `runtimes/` (L1), `workforce/` (L5), `router/`
+  (L6), `tools/` (L4), `lsp/` (L4), `mcp/` (L4), `skills/` (L4), `memory/`
+  (L4), `workgraph/` (L6), `verification/` (L4), `security/`, `events/`,
+  `scheduler/` (L6), `web/` (L4), `context/` (L4), `plugins/`, `ui/` (L7, thin
+  client), plus `.jexi/` declarative config (`config.yaml`, `providers.yaml`,
+  `permissions.yaml`, `plugins.yaml`). Each README names where the current
+  implementation lives. The flat `server/src/services/` tree is the current
+  implementation; groups migrate into the layer slots as they are rebuilt.
+- **Dead-code audit (Scope C).** Static + dynamic + string-reference scan over
+  every `.js` under `server/` plus repo docs, with a reachability BFS from
+  `server/index.js`. Result: only `server/src/services/Coder.js` was truly dead
+  (zero importers, superseded by autonomous-coding loops) → quarantined to
+  `server/src/legacy/Coder.js` via `git mv` (history preserved).
+- **Deprecated-but-LIVE (NOT moved):** `AgentRoster.js` (18 importers incl.
+  Planner/Orchestrator/ToolRegistry), `SkillChain.js` (4), `ComputerUseAgent.js`
+  (1), `DesktopManager.js` (6) — all still reachable from the hot path, so they
+  stay until Phase 3 migrates consumers. Full table in
+  `server/src/legacy/README.md`.
+- **Look-dead-but-live:** a set of files only reached via `await import()` from
+  `ToolRuntime.js`, `routes/arena.js`, `routes/surface.js` (BackgroundJobs,
+  GoalTools, FileReference, TerminalSessions, OllamaProvider, WorkflowEngine,
+  etc.) — verified live, kept in place.

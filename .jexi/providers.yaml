@@ -1,0 +1,3 @@
+# JEXI OS — model provider keys (Phase 2 target)
+# ONLY provider keys here. Never write provider names into logic.
+# Prefer environment variables (LLM_*_KEY); entries here are for local dev only.

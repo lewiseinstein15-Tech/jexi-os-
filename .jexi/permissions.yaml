@@ -1,0 +1,2 @@
+# JEXI OS — permissions (Phase 2 target)
+# deny-by-default. Ring 0 sandbox / 1 container / 2 host / 3 privileged.

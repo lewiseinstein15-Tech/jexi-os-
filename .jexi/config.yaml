@@ -1,0 +1,8 @@
+# JEXI OS — declarative config (target state; Phase 2 Scope C skeleton)
+# Secrets/keys belong in environment variables, NOT here.
+providers:
+  # model provider keys live in providers.yaml (or env) — never code
+permissions:
+  # deny-by-default; runtime rings 0-3
+plugins:
+  # extension registry (root plugins/ dir)
