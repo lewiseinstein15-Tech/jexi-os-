@@ -271,3 +271,36 @@ to `replanner`.
   `ToolRuntime.js`, `routes/arena.js`, `routes/surface.js` (BackgroundJobs,
   GoalTools, FileReference, TerminalSessions, OllamaProvider, WorkflowEngine,
   etc.) — verified live, kept in place.
+
+## 13. Workforce registry + two-stage router + MCP grant gate (Phase 2, Scope D)
+
+Location: `server/src/workforce/` — the "Agents + MCP" OS layer.
+
+- **Registry** (`workforce/registry/index.js`) — a capability index built over
+  the authoritative `director/Employees.js` roster. Registration is idempotent
+  and additive (never rewires the hot path). It enforces two contracts:
+  - **OVERLAP** — `validateOverlaps()` refuses any pair of agents whose
+    capability/role/description overlap ≥ 0.85 in the same slot (colocated
+    responsibility is a registration error, surfaced under `strict` mode).
+  - **BUDGET** — `checkCatalogBudget()` keeps the catalog under a 15k-token
+    description budget so it can never bloat a prompt.
+- **Two-stage router** (`workforce/registry/router.js`) —
+  - Stage 1 `classifyRequest(query)` maps task words to capability tokens
+    (`fix`/`debug` → `code`, `run tests` → `verification`, …) and flags
+    mutation verbs. It never matches agent names.
+  - Stage 2 `resolveAgent(requirements)` deterministically scores the
+    capability index and returns exactly one agent per requirement set, with
+    a write-permission gate: a *code-mutation* request (e.g. "Fix this bug and
+    run the tests") implies WRITE and resolves to the WRITE-capable engineer —
+    so a read-only coding analyst and the writer are always DIFFERENT agents,
+    and read-only work never lands on the writer.
+- **MCP grant gate** (`workforce/mcp-gate.js`) — deny-by-default. `MCPGateway
+  .invokeMcpTool` now delegates its per-agent check to the gate: an agent with
+  no grants is denied every server; a `weather` grant allows weather and
+  nothing else; per-tool grants allow only the listed tools. The gate is a
+  pure function (keyless, deterministic) so the same policy that runs in
+  production is unit-tested directly.
+- **Proven by** `tests/agi/test-worker-registry.js` (10/10) covering: index
+  by capability, overlap refusal ≥ 0.85, budget, exact-one-coworker routing,
+  read/write distinct agents, deny-by-default MCP, per-server and per-tool
+  grants.

@@ -26,6 +26,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import * as mcpGrantGate from '../workforce/mcp-gate.js';
 
 const DEFAULT_REGISTRY_PATH = () => new URL('../../../mcp/registry.json', import.meta.url).pathname;
 const DIRECTORY_PATH = () => new URL('../../../mcp/tool-directory.json', import.meta.url).pathname;
@@ -694,16 +695,11 @@ export async function invokeMcpTool({ server, tool, args = {}, authorized = fals
   // enforce). Runs BEFORE any connect/spawn so a denial costs nothing.
 
   if (Array.isArray(mcpGrants)) {
-
-    const grantsForAgent = mcpGrants.filter((g) => g.server === server);
-    if (!grantsForAgent.length) {
-
-      audit({ type: 'MCP_DENIED', server, tool, reason: `agent has no grant for server '${server}'` });
-      return { ok: false, error: `refused: agent has no MCP grant for server '${server}'` };
-    }
-    if (!grantsForAgent.some((g) => g.tools.includes('*') || g.tools.includes(tool))) {
-      audit({ type: 'MCP_DENIED', server, tool, reason: `agent grant for '${server}' does not include tool '${tool}'` });
-      return { ok: false, error: `refused: agent MCP grant for '${server}' does not include tool '${tool}'` };
+    // Single policy definition: the workforce grant gate (Phase 2 Scope D).
+    const gate = mcpGrantGate.authorizeMcpCall(mcpGrants, server, tool);
+    if (!gate.allowed) {
+      audit({ type: 'MCP_DENIED', server, tool, reason: gate.reason });
+      return { ok: false, error: `refused: ${gate.reason}` };
     }
   }
   if (breakerOpen(server)) {
