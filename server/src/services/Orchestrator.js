@@ -565,7 +565,7 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
         `The user attached an image and asked: \"${query || 'What is this?'}\"\n\nAnalyze the image thoroughly: describe what it shows, read any text/numbers/symbols, and if it is a math problem, solve it with full LaTeX steps.`,
         JEXI_SYSTEM_PROMPT + preferencesBlock(),
         visionImage,
-        { prefer: '', temperature: 0.4 } // same proven lane as /api/vision
+        { prefer: 'gemini', temperature: 0.4 } // same proven lane as /api/vision — capability-required image lane (the configured vision-capable provider; NOT a business-logic preference)
       );
       try { addChat('jexi', reply); } catch (e) {}
       results.summary = `### 👁️ JEXI VISION\n\n${reply}`;
