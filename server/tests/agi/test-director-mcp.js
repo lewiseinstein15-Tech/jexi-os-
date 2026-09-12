@@ -19,7 +19,11 @@ const GOOD_OUTPUT = ['## REPORT', 'Used the live data.', '', '## DELIVERABLE', '
 
 function fakeEmployee() {
   const z = getEmployee('zola');
-  return { ...z, supportedTools: ['web-search', 'memory-recall'] };
+  // D2: the session now carries the employee's MCP grants — this test's fake
+  // employee runs a WEATHER lane,so it grants weather (deterministic: no keys,
+  // the real weather server is curated+enabled and this assertion keeps the live
+  // call honest;every OTHER server stays denied by default).
+  return { ...z, supportedTools: ['web-search', 'memory-recall'], allowedMCP: [{ server: 'weather', tools: ['*'] }] };
 }
 
 /* ═══ brief shape ═══════════════════════════════════════════════════════════ */
@@ -108,6 +112,79 @@ test('an unavailable service fails HONESTLY and the session continues', { timeou
 });
 
 /* ═══ cleanup: close the live connection the test opened ═══════════════════ */
+/* ═══ D2 — per-agent MCP grant gate (deny-by-default) ═════════════════ */
+
+function fakeConnector(seen) {
+  return {
+    listTools: async function () {
+      return { tools: [{ name: 'get_weather_summary', description: '', inputSchema: { type: 'object', properties: {} } }] };
+    },
+    callTool: async function (c) {
+      seen.push(c.name);
+      return { content: [{ type: 'text', text: 'ok 21C' }] };
+    },
+  };
+}
+
+test('an employee with NO grants is denied EVERY MCP call before any connect', async () => {
+  const { invokeMcpTool, __setConnector, __resetGateway } = await import('../../src/services/MCPGateway.js');
+  __resetGateway();
+  let connected = false;
+  __setConnector(async function () {
+    connected = true;
+    return fakeConnector([]);
+  });
+  const r = await invokeMcpTool({ server: 'weather', tool: 'get_weather_summary', mcpGrants: [] });
+  assert.equal(r.ok, false);
+  assert.ok(r.error.includes('no MCP grant'), r.error);
+  assert.equal(connected, false, 'deny must happen BEFORE any connect');
+  __resetGateway();
+});
+
+test('an employee with a weather-only grant: weather passes, other servers denied', async () => {
+  const { invokeMcpTool, __setConnector, __resetGateway, connectGatewayServer } = await import('../../src/services/MCPGateway.js');
+  __resetGateway();
+  const seen = [];
+  __setConnector(async function () {
+    return fakeConnector(seen);
+  });
+  const grants = [{ server: 'weather', tools: ['*'] }];
+  const warm = await connectGatewayServer('weather');
+  assert.ok(warm.ok, warm.error || 'connect failed');
+  const okCall = await invokeMcpTool({ server: 'weather', tool: 'get_weather_summary', args: { city: 'Nairobi' }, mcpGrants: grants });
+  assert.equal(okCall.ok, true);
+  assert.ok(okCall.result.content[0].text.includes('ok 21C'), 'weather call must reach the fake server');
+  const denied = await invokeMcpTool({ server: 'git', tool: 'status', mcpGrants: grants });
+  assert.equal(denied.ok, false);
+  assert.ok(denied.error.includes("no MCP grant for server 'git'"), denied.error);
+  __resetGateway();
+});
+/* ═══ cleanup: close the live connection the test opened ═══════════════════ */
+
+/* ═══ D2 — the 9 Director employees' grants resolve against the shipped registry ═══ */
+
+test('all 9 Director employees: every declared grant names a real, ENABLED server', async () => {
+  const MCPG = await import('../../src/services/MCPGateway.js');
+  const reg = MCPG.loadRegistry();
+  const enabled = new Set();
+  for (const s of reg.servers) {
+    if (s.enabled === true) enabled.add(s.name);
+  }
+  const EMP = await import('../../src/services/director/Employees.js');
+  const employees = EMP.loadEmployees();
+  assert.equal(employees.length, 9);
+  for (const e of employees) {
+    assert.ok(Array.isArray(e.allowedMCP));
+    for (const g of e.allowedMCP) {
+      const okServer = enabled.has(g.server);
+      const okTools = Array.isArray(g.tools);
+      assert.ok(typeof g.server === 'string');
+      assert.ok(okServer);
+      assert.ok(okTools);
+      assert.ok(g.tools.length > 0);
+    }
+  }
+});
 
 test('cleanup: gateway connections closed', async () => {
   const { disconnectGatewayServer } = await import('../../src/services/MCPGateway.js');

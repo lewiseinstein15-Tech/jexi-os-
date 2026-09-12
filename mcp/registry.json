@@ -96,7 +96,7 @@
     "-y",
     "@mate-tools/mcp-server"
    ],
-   "enabled": true,
+   "enabled": false,
    "trustLevel": "community",
    "permissions": [
     "READ_ONLY",
@@ -113,7 +113,7 @@
     "-y",
     "wikipedia-mcp-server"
    ],
-   "enabled": true,
+   "enabled": false,
    "trustLevel": "community",
    "permissions": [
     "READ_ONLY",
@@ -209,7 +209,7 @@
    "args": [
     "mcp-server-wikipedia"
    ],
-   "enabled": true,
+   "enabled": false,
    "trustLevel": "community",
    "permissions": [
     "READ_ONLY",
@@ -225,7 +225,7 @@
    "args": [
     "arxiv-mcp-server"
    ],
-   "enabled": true,
+   "enabled": false,
    "trustLevel": "community",
    "permissions": [
     "READ_ONLY",
@@ -279,7 +279,7 @@
     "mcp<2",
     "osm-mcp-server"
    ],
-   "enabled": true,
+   "enabled": false,
    "trustLevel": "community",
    "permissions": [
     "READ_ONLY",
@@ -297,7 +297,7 @@
     "mcp<2",
     "mcp-server-rss"
    ],
-   "enabled": true,
+   "enabled": false,
    "trustLevel": "community",
    "permissions": [
     "READ_ONLY",
@@ -336,7 +336,7 @@
    "description": "GitMCP (hosted) — instant documentation/context server for GitHub repositories.",
    "transport": "streamable-http",
    "url": "https://gitmcp.io/docs",
-   "enabled": true,
+   "enabled": false,
    "trustLevel": "community",
    "permissions": [
     "READ_ONLY",
@@ -406,7 +406,7 @@
     "-y",
     "@executeautomation/playwright-mcp-server"
    ],
-   "enabled": true,
+   "enabled": false,
    "trustLevel": "community",
    "permissions": [
     "READ_ONLY",
@@ -420,7 +420,7 @@
    "description": "MCPQueen (hosted) — the graded MCP registry: live-probed grades for remote MCP servers, searchable.",
    "transport": "streamable-http",
    "url": "https://mcpqueen.com/mcp",
-   "enabled": true,
+   "enabled": false,
    "trustLevel": "community",
    "permissions": [
     "READ_ONLY",
