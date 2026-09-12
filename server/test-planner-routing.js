@@ -8,7 +8,7 @@ const tests = [
   { q: 'are you okay?', expect: 'self_check' },
   { q: 'run a system health check and monitor yourself for any errors', expect: 'self_check' },
   { q: 'Build me a python script that prints hello world', expect: 'code_task' },
-  { q: 'fix this code, it has errors and it does not work', expect: 'code_task' },
+  { q: 'fix this code, it has errors and it does not work', expect: 'code_fix' /* B: pure fix/debug/repair phrasing routes to the dedicated single-coworker code_fix lane */ },
   // B51 P2 — simple factual questions answer directly, no web/study pipeline.
   { q: 'What is the capital of Kenya?', expect: 'direct_answer' },
   { q: 'define photosynthesis', expect: 'domain:biology' },
