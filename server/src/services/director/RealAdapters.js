@@ -11,8 +11,8 @@
  *   tools.search   → executeTool('web-search') — the real search runtime
  */
 
-import { generateContent } from '../LLMClient.js';
-import { providerOrder, configuredProviders } from '../ProviderRouter.js';
+import { generateContent } from '../../providers/runtime/LLMClient.js';
+import { providerOrder, configuredProviders } from '../../providers/runtime/ProviderRouter.js';
 import { parseModelJson } from './JsonRepair.js'; // B209 — salvage sloppy-but-complete model JSON
 import { executeTool } from '../ToolRuntime.js';
 

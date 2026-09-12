@@ -3,8 +3,8 @@
 // legs can never silently detach from the router ladder.
 import fs from 'node:fs';
 
-const llm = fs.readFileSync(new URL('./src/services/LLMClient.js', import.meta.url), 'utf8');
-const router = fs.readFileSync(new URL('./src/services/ProviderRouter.js', import.meta.url), 'utf8');
+const llm = fs.readFileSync(new URL('./src/providers/runtime/LLMClient.js', import.meta.url), 'utf8');
+const router = fs.readFileSync(new URL('./src/providers/runtime/ProviderRouter.js', import.meta.url), 'utf8');
 const index = fs.readFileSync(new URL('./index.js', import.meta.url), 'utf8');
 
 let pass = 0, fail = 0;
@@ -27,7 +27,13 @@ ok(llm.includes('/client/v4/accounts/${k.cloudflareAccount}/ai/v1'), 'cloudflare
 ok(llm.includes('pollinations: tryPollinations') && llm.includes('cloudflare: tryCloudflare'), 'both legs registered in PROVIDER_CALLS');
 // --- ProviderRouter: ladder placement (cloudflare in free extras, pollinations dead last) ---
 ok(router.includes("const EXTRA_PROVIDERS = ['mistral', 'nvidia', 'cloudflare']"), 'cloudflare rides the free-extras rung');
-ok((router.match(/'vllm', 'huggingface', 'pollinations'\]/g) || []).length === 3, 'pollinations is last on all 3 ladders');
+// every ladder (code / vision / research / fast / default) must END with the
+// keyless Pollinations leg — verified functionally, not by source layout.
+const { providerOrder } = await import('./src/providers/runtime/ProviderRouter.js');
+const lanes = ['code', 'vision', 'research', 'fast', ''];
+const lastOf = (arr) => arr[arr.length - 1];
+const ladderTails = lanes.map((prefer) => lastOf(providerOrder(prefer)));
+ok(ladderTails.every((x) => x === 'pollinations'), 'pollinations is last on all ladders');
 ok(router.includes("if (!list.includes('pollinations')) list.push('pollinations')"), 'pollinations always reported configured (keyless)');
 ok(router.includes("cloudflare: 'CLOUDFLARE_API_TOKEN'"), 'cloudflare in ENV_MAP');
 // --- server/index.js: visible in settings status ---

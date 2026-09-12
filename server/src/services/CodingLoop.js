@@ -17,7 +17,7 @@
  * Every iteration records attempt count + the exact error observed, so the
  * caller (and tests) can prove multi-iteration fix behaviour.
  */
-import { generateContent } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { runFile } from './Runner.js';
 

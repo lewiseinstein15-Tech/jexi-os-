@@ -1,4 +1,4 @@
-import { generateContent } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
 import { aggregateSearch } from './SearchEngine.js';
 import { extractContent } from './Extractor.js';
 import { searchTrustedBooks, getTrustedBookText } from './TrustedLibrary.js';

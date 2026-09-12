@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 
-const { generateContent } = await import('../../src/services/LLMClient.js');
+const { generateContent } = await import('../../src/providers/runtime/LLMClient.js');
 const { runWithMeter, meterEnter, meterLap, meterFreeze, requestMeterReport, noteMeterModelCall, currentMeter } = await import('../../src/services/RequestMeter.js');
 
 /* ── mock OpenAI-compatible endpoint (same protocol Ollama speaks) ───────── */
@@ -100,7 +100,7 @@ test('tool-loop rounds each count as one model call', async () => {
   process.env.MODEL_PROVIDER = 'ollama';
   process.env.OLLAMA_HOST = `http://127.0.0.1:${mock.port}`;
   try {
-    const { generateWithToolsLoop } = await import('../../src/services/LLMClient.js');
+    const { generateWithToolsLoop } = await import('../../src/providers/runtime/LLMClient.js');
     const report = await runWithMeter({ kind: 'test' }, async () => {
       // __mockCompletions bypasses providers; force the REAL walk so the
       // meter sees a genuine chatWithToolsOnce round through the mock.

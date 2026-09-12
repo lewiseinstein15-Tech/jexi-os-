@@ -64,7 +64,7 @@ console.log('\n== 1. no-link message no longer crashes the turn ==');
 /* ══════════════ 2. GROQ MODEL SELF-HEALING ══════════════ */
 console.log('\n== 2. Groq model retirement self-heals ==');
 {
-  const llmSrc = fs.readFileSync('./src/services/LLMClient.js', 'utf-8');
+  const llmSrc = fs.readFileSync('./src/providers/runtime/LLMClient.js', 'utf-8');
   ok('default model is the live catalog flagship (B219: llama line retired)', llmSrc.includes("const GROQ_TEXT_MODEL = process.env.GROQ_TEXT_MODEL || 'openai/gpt-oss-120b'"));
   ok('runtime discovery on model_not_found', llmSrc.includes('discoverGroqModel') && llmSrc.includes('/models'));
   ok('discovered model cached for the process', llmSrc.includes('groqModelCache'));
@@ -72,7 +72,7 @@ console.log('\n== 2. Groq model retirement self-heals ==');
   ok('streaming/REST path uses the cache too', llmSrc.includes('opts.model || groqModelCache || GROQ_TEXT_MODEL'));
 
   // Behavioral: the discovery picker prefers sensible models
-  const { __pickGroqModel } = await import('./src/services/LLMClient.js');
+  const { __pickGroqModel } = await import('./src/providers/runtime/LLMClient.js');
   // B219 — preference follows the LIVE catalog: llama is retired, gpt-oss leads.
   const good = __pickGroqModel(['openai/gpt-oss-20b', 'groq/llama-3.3-70b-versatile', 'qwen/qwen3-32b']);
   ok(`picker prefers gpt-oss over retired llama (got: ${good})`, good === 'openai/gpt-oss-20b');

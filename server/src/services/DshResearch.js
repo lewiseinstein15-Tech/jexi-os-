@@ -8,7 +8,7 @@
  * from web_search results ride the done payload for the UI.
  */
 
-import { generateWithToolsLoop, generateContent } from './LLMClient.js';
+import { generateWithToolsLoop, generateContent } from '../providers/runtime/LLMClient.js';
 import { buildNativeSchemas, executeTool } from './ToolRuntime.js';
 import { assemblePrompt } from './PromptAssembly.js';
 import { loadSkillForModel } from './SkillDiscovery.js';

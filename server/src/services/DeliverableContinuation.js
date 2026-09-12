@@ -105,7 +105,7 @@ export async function continueDeliverable({
     try {
       if (typeof generate === 'function') reply = await generate(prompt, r, have);
       else {
-        const { generateContent } = await import('./LLMClient.js');
+        const { generateContent } = await import('../providers/runtime/LLMClient.js');
         const { JEXI_SYSTEM_PROMPT } = await import('./JexiPrompt.js');
         reply = await generateContent(prompt, (JEXI_SYSTEM_PROMPT || '') + '\nYou are finishing a writing deliverable. Output the missing files only.', null, { temperature: 0.3 });
       }

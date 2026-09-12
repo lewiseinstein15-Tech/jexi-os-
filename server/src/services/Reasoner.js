@@ -1,4 +1,4 @@
-import { generateContent } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { preferencesBlock } from './PreferenceLearner.js';
 import { saveInternetKnowledge } from './MemoryManager.js';

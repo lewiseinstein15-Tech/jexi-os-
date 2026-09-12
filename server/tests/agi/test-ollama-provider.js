@@ -12,8 +12,8 @@ import http from 'node:http';
 
 process.env.DATA_DIR = './data/test-agi-ollama';
 
-const { generateContent } = await import('../../src/services/LLMClient.js');
-const { providerOrder, configuredProviders, providerHealthSnapshot, resetProviderHealth } = await import('../../src/services/ProviderRouter.js');
+const { generateContent } = await import('../../src/providers/runtime/LLMClient.js');
+const { providerOrder, configuredProviders, providerHealthSnapshot, resetProviderHealth } = await import('../../src/providers/runtime/ProviderRouter.js');
 
 /* ── the mock Ollama: OpenAI-compatible /v1 endpoint ─────────────────────── */
 

@@ -27,7 +27,7 @@ const ok = (name, cond) => {
 console.log('\n== 1. reasoning streams on its own channel ==');
 {
   process.env.OPENROUTER_API_KEY = 'sk-test-b173';
-  const { generateContent } = await import('./src/services/LLMClient.js');
+  const { generateContent } = await import('./src/providers/runtime/LLMClient.js');
 
   const chunk = (delta) => `data: ${JSON.stringify({ choices: [{ delta }] })}`;
   const sse = [
@@ -78,7 +78,7 @@ console.log('\n== 1. reasoning streams on its own channel ==');
 /* ══════════════ 2. THINK-TEXT SANITIZE ══════════════ */
 console.log('\n== 2. think text sanitized ==');
 {
-  const { sanitizeStreamText } = await import('./src/services/ModelCoworkers.js');
+  const { sanitizeStreamText } = await import('./src/providers/catalog/ModelCoworkers.js');
   const out = sanitizeStreamText('I will use deepseek-ai/deepseek-v4-flash-0731 for this, taking 2.5s');
   ok('model ids masked inside reasoning (people name replaces the id)', !out.includes('deepseek') && !out.includes('v4-flash') && /[A-Z][a-z]+/.test(out));
   ok('numbers with units survive', out.includes('2.5s'));
@@ -113,7 +113,7 @@ console.log('\n== 3. engine + UI wiring ==');
   const al = fs.readFileSync('./src/services/AgentLoop.js', 'utf-8');
   const st = fs.readFileSync('./src/services/SimpleTask.js', 'utf-8');
   ok("AgentLoop + SimpleTask emit 'think' events with the writer name", al.includes("emit('think'") && st.includes("emit('think'"));
-  const wr = fs.readFileSync('./src/services/WorkerRouter.js', 'utf-8');
+  const wr = fs.readFileSync('./src/providers/catalog/WorkerRouter.js', 'utf-8');
   ok('WorkerRouter forwards onThink through both lanes', wr.includes('onThink') && wr.split('onThink').length >= 3);
 }
 

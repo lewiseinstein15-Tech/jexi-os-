@@ -9,8 +9,8 @@
  *     __mockCompletions seam drives the loop without network calls)
  */
 import { getToolCatalog, TOOL_PROFILES, toolPermission, activeToolProfile, setToolProfile, executeTool, buildNativeSchemas } from './src/services/ToolRuntime.js';
-import { generateWithToolsLoop } from './src/services/LLMClient.js';
-import { executeNativeToolCalls } from './src/services/WorkerRouter.js';
+import { generateWithToolsLoop } from './src/providers/runtime/LLMClient.js';
+import { executeNativeToolCalls } from './src/providers/catalog/WorkerRouter.js';
 import { getTool, TOOL_COUNT } from './src/services/ToolRegistry.js';
 
 let passed = 0, failed = 0;

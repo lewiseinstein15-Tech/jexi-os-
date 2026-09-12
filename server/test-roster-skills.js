@@ -1,7 +1,7 @@
 // Regression tests: Agent Roster (60+ specialists), Skill Registry (100+ skills),
 // Provider Router (health-aware fallback), and VerificationLoop (no-key safety).
 import { AGENT_ROSTER, SKILL_REGISTRY, composeTeam, skillsForTeam, rosterSummary, rosterStats, rosterFor, skillsFor, skillsLine, getAgent, getSkill } from './src/services/AgentRoster.js';
-import { providerOrder, recordProviderFailure, recordProviderSuccess, providerInCooldown, resetProviderHealth, providerHealthSnapshot } from './src/services/ProviderRouter.js';
+import { providerOrder, recordProviderFailure, recordProviderSuccess, providerInCooldown, resetProviderHealth, providerHealthSnapshot } from './src/providers/runtime/ProviderRouter.js';
 import { verifyAnswer, shouldVerify } from './src/services/VerificationLoop.js';
 import { TOOL_REGISTRY, toolsForIntent, toolsForTeam, getTool } from './src/services/ToolRegistry.js';
 import { planner } from './src/services/Planner.js';

@@ -9,7 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { planner } from './src/services/Planner.js';
 import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B158 — user/message lifecycle event
-import { sanitizeStreamText, teamRoster } from './src/services/ModelCoworkers.js'; // B162 — named model coworkers in every log line
+import { sanitizeStreamText, teamRoster } from './src/providers/catalog/ModelCoworkers.js'; // B162 — named model coworkers in every log line
 import { createMathStreamBuffer, normalizeMathDelimiters } from './src/services/Formatting.js';
 import { sanitizeOutgoingLinks, createLinkSafeStream } from './src/services/Formatting.js'; // B187 — never send localhost links // B174 — math-safe streaming + B174c delimiter normalization
 import { tryExecuteCommand, helpText, registerCommand } from './src/services/CommandRegistry.js'; // B167 — /watch + friends
@@ -35,7 +35,8 @@ import { loadWorldState, runtimeCapabilities, globalWorld } from './src/services
 import { loadTask as loadDirectorTask, loadTaskById, listDirectorTasks } from './src/services/director/TaskState.js'; // B209 — multi-task records
 import { rosterSummary as employeeRoster, rosterDetail, setEmployeeDisabled, upsertEmployee, employeeHistory } from './src/services/director/Employees.js'; // B209 — runtime team management
 import { normalizeFinalAnswer } from './src/services/Formatting.js'; // B66 — normalize every final answer
-import { generateContent, resolveKeys, testAllProviders } from './src/services/LLMClient.js';
+import { generateContent, resolveKeys, testAllProviders } from './src/providers/runtime/LLMClient.js';
+import { canChat } from './src/providers/index.js';
 import { providerHealthSnapshot as providerHealthDetail } from './src/services/ProviderHealth.js'; // AGI Phase 1 — structured, persistent health (dashboard layer)
 import { learnFromExchange } from './src/services/PreferenceLearner.js';
 import { rollingConversationSummary } from './src/services/MemoryManager.js';
@@ -44,7 +45,7 @@ import {
   collectSystemStatus, readSourceFile,
 } from './src/services/SelfMonitor.js';
 import { loadSettings, saveSettings } from './src/services/SettingsManager.js';
-import { providerHealthSnapshot } from './src/services/ProviderRouter.js';
+import { providerHealthSnapshot } from './src/providers/runtime/ProviderRouter.js';
 import { AGENT_ROSTER, SKILL_REGISTRY, ROSTER_COUNT, SKILL_COUNT, getAgent } from './src/services/AgentRoster.js';
 import { executionModel } from './src/services/Reachability.js';
 import { DesktopManager, ensureBrowser, browserStatus, restartBrowser } from './src/services/DesktopManager.js';
@@ -77,7 +78,7 @@ import { validateAllAgentContracts, CONTRACT_VERSION } from './src/services/Agen
 import { listHooks, addHook, updateHook, removeHook } from './src/services/HookEngine.js';
 import { listPlugins as listRegistryPlugins, togglePlugin } from './src/services/PluginRegistry.js';
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications } from './src/services/NotificationCenter.js';
-import { modelRoutingTable, providerPreferenceForIntent } from './src/services/ModelRouting.js';
+import { modelRoutingTable, providerPreferenceForIntent } from './src/providers/catalog/ModelRouting.js';
 import { publicCatalog } from './src/services/providers/catalog.js'; // UNIFIED — one-secret model catalog
 import { resolveModelConfig, validateModelConfig, mergeUnifiedConfig, maskConfig } from './src/services/providers/modelConfig.js';
 import { probeConfig } from './src/services/providers/unified.js';
@@ -221,7 +222,7 @@ try {
 (async () => {
   try {
     const t0 = Date.now();
-    await import('./src/services/LLMClient.js').then(async (m) => {
+    await import('./src/providers/runtime/LLMClient.js').then(async (m) => {
       await m.generateContent('Reply with just: ok', 'You are a warmup ping.', null, { temperature: 0 });
     });
     const { planner } = await import('./src/services/Planner.js');
@@ -259,8 +260,7 @@ hydrateGoalJobsFromRedis().catch((e) => recordError('goals', e.message));
 // creator (Lewis) and gets creator-aware tone/priority in the prompt.
 const CREATOR_EMAIL = process.env.JEXI_CREATOR_EMAIL || 'lewiseinstein15@gmail.com';
 setInboundReplyGenerator(async (event) => {
-  const keys = resolveKeys();
-  if (!keys.groqKey && !keys.geminiKey && !keys.openrouterKey && !keys.deepseekKey && !keys.xaiKey) return null;
+  if (!canChat()) return null;
   const from = String(event.from || '').replace(/^[^<]*<([^>]+)>$/, '$1').trim().toLowerCase();
   const isCreator = from === String(CREATOR_EMAIL).toLowerCase();
   const senderLine = isCreator
@@ -270,7 +270,7 @@ setInboundReplyGenerator(async (event) => {
   const system = 'You are JEXI OS, an AI operating system owned by Lewis Einstein. Reply in the first person as JEXI. Keep it short, clear, and helpful.';
   try {
     return await Promise.race([
-      generateContent(prompt, system, null, { prefer: 'groq', temperature: 0.4 }),
+      generateContent(prompt, system, null, { prefer: 'fast', temperature: 0.4 }),
       new Promise((_, reject) => setTimeout(() => reject(new Error('reply generation exceeded 12s budget')), 12000)),
     ]);
   } catch (e) {
@@ -1397,9 +1397,8 @@ app.post('/api/vision', async (req, res) => {
     const { image, prompt } = req.body;
     recordVision();
     if (!image) return res.status(400).json({ success: false, error: 'No image provided' });
-    const { groqKey, geminiKey } = resolveKeys();
-    if (!groqKey && !geminiKey && !process.env.OPENROUTER_API_KEY) {
-      return res.status(400).json({ success: false, error: 'No AI keys configured. Add GROQ_API_KEY, GEMINI_API_KEY or OPENROUTER_API_KEY (Render env or Settings).' });
+    if (!canChat(['vision'])) {
+      return res.status(400).json({ success: false, error: 'No vision-capable AI provider configured. Add a provider key in Settings (or env).' });
     }
     const text = await generateContent(
       prompt || 'Describe what you see in this image in 2-3 warm sentences.',
@@ -1407,10 +1406,8 @@ app.post('/api/vision', async (req, res) => {
       'Describe what you see warmly and precisely: who or what is in frame, expressions, lighting, surroundings. ' +
       'Be honest if the image is unclear or if no face is visible. Keep it natural and short (2-4 sentences).',
       image,
-      // prefer Gemini first — its vision (gemini-2.5-flash) is far sharper than
-      // Groq's llama-4-scout, and it is a key the user already has. Seed-family
-      // vision (via OpenRouter) is tried last when OPENROUTER_API_KEY is set.
-      { prefer: 'gemini', temperature: 0.5 }
+      // capability lane — the provider layer picks the vision-capable backend
+      { prefer: 'vision', temperature: 0.5 }
     );
     res.json({ success: true, text });
   } catch (e) {

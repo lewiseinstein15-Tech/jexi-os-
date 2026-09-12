@@ -6,7 +6,7 @@
  */
 
 import fetch from 'node-fetch';
-import { generateContent } from './LLMClient.js'; // B171 — vision-verified pictures
+import { generateContent } from '../providers/runtime/LLMClient.js'; // B171 — vision-verified pictures
 
 const UA = 'JEXI-OS/1.0 (image search; research agent)';
 

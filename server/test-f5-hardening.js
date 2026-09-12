@@ -5,7 +5,7 @@
  * template-echo gate — a deliverable echoing brief scaffolding fails
  * deterministically even when the rubric judge says pass.
  */
-import { runWithModel } from './src/services/director/ModelRouter.js';
+import { runWithModel } from './src/providers/catalog/ModelRouter.js';
 import { echoesBriefScaffolding, verifyDeliverable } from './src/services/director/Verifier.js';
 import { recordProviderCallFailure, maxCooldownRemainingMs, __resetProviderHealth } from './src/services/ProviderHealth.js';
 
@@ -90,7 +90,7 @@ console.log('\n== 4. Cooldown-aware recovery ==');
 console.log('\n== 5. Progress-aware stream budget ==');
 {
   const http = await import('node:http');
-  const { __streamOpenAICompletion } = await import('./src/services/LLMClient.js');
+  const { __streamOpenAICompletion } = await import('./src/providers/runtime/LLMClient.js');
   const chunk = (t) => `data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\n`;
   // stub SSE server with scripted per-path behavior
   const server = http.createServer((req, res) => {
@@ -123,7 +123,7 @@ console.log('\n== 5. Progress-aware stream budget ==');
 console.log('\n== 6. Local-rung time budget ==');
 {
   const http = await import('node:http');
-  const { generateContent } = await import('./src/services/LLMClient.js');
+  const { generateContent } = await import('./src/providers/runtime/LLMClient.js');
   // stub ollama: answers after 600ms with a valid chat.completion payload
   const server = http.createServer((req, res) => {
     setTimeout(() => {
@@ -146,7 +146,7 @@ console.log('\n== 6. Local-rung time budget ==');
 console.log('\n== 7. Bounded turns (maxTokens) ==');
 {
   const http = await import('node:http');
-  const { generateContent } = await import('./src/services/LLMClient.js');
+  const { generateContent } = await import('./src/providers/runtime/LLMClient.js');
   let seenBody = null;
   const server = http.createServer((req, res) => {
     let raw = '';
@@ -171,7 +171,7 @@ console.log('\n== 7. Bounded turns (maxTokens) ==');
 console.log('\n== 8. Abort propagation (no orphaned legs) ==');
 {
   const http = await import('node:http');
-  const { __streamOpenAICompletion, generateContent } = await import('./src/services/LLMClient.js');
+  const { __streamOpenAICompletion, generateContent } = await import('./src/providers/runtime/LLMClient.js');
   const chunk = (t) => `data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\n`;
   const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/event-stream' });
@@ -221,7 +221,7 @@ console.log('\n== 9. Planner-shape coercion ==');
 console.log('\n== 10. Caller-abort fail-fast (no health penalty) ==');
 {
   const http = await import('node:http');
-  const { generateContent } = await import('./src/services/LLMClient.js');
+  const { generateContent } = await import('./src/providers/runtime/LLMClient.js');
   const { providerHealthSnapshot } = await import('./src/services/ProviderHealth.js');
   const chunk = (t) => `data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\n`;
   const server = http.createServer((req, res) => {

@@ -145,7 +145,7 @@ const main = (async () => {
 
   console.log('\n== B78 — RUNTIME WIRING: workers, orchestrator, tools emit events ==');
   // --- D1. runWorker: coworker_call + coworker_result ---
-  const { runWorker } = await import('./src/services/WorkerRouter.js');
+  const { runWorker } = await import('./src/providers/catalog/WorkerRouter.js');
   const wr = await runWorker('memory', 'The user asked: "what is my name?"', 'You are JEXI OS.', {
     tools: [{ slug: 'memory-recall', name: 'Memory Recall', desc: 'Recall', schema: {} }],
     maxIterations: 3,

@@ -10,11 +10,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { __parseRetryAfterMs } = await import('./src/services/LLMClient.js');
+const { __parseRetryAfterMs } = await import('./src/providers/runtime/LLMClient.js');
 const {
   recordProviderFailure, recordProviderSuccess, providerInCooldown,
   providerOrder, resetProviderHealth,
-} = await import('./src/services/ProviderRouter.js');
+} = await import('./src/providers/runtime/ProviderRouter.js');
 
 test('parser: Gemini "Please retry in 46.802877072s" → ~47s (bounded, ms-precision kept)', () => {
   const msg = 'Quota exceeded ... Please retry in 46.802877072s. [{"@type":"type.googleapis.com/google.rpc.Help"}]';

@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { searchKnowledge } from './MemoryManager.js';
 import { AGENT_ROSTER, getAgent, skillsForTeam, rosterStats } from './AgentRoster.js';
 import { toolsForTeam } from './ToolRegistry.js';
-import { generateContent, resolveKeys } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
+import { canChat } from '../providers/index.js';
 import { DOMAINS, matchDomains } from './DomainRegistry.js';
 
 /**
@@ -473,8 +474,7 @@ export class Planner {
    * (never a crash).
    */
   async _classifyLLM(query, opts = {}) {
-    const keys = resolveKeys();
-    if (!keys.groqKey && !keys.geminiKey && !keys.openrouterKey && !keys.xaiKey) return null;
+    if (!canChat()) return null;
     try {
       const memoryContext = opts.memoryContext
         ? `\n\nRemembered context about the user/project (use it ONLY if it directly decides this request):\n${opts.memoryContext.slice(0, 1500)}`

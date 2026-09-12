@@ -156,7 +156,7 @@ export function kernelIntentGate(raw, { activeMission = false } = {}) {
  */
 export async function runLeanAnswer({ query, sendEvent = () => {}, budgetMs = 30_000 }) {
   const t0 = Date.now();
-  const { generateContent } = await import('./LLMClient.js'); // late import: no cycle at load
+  const { generateContent } = await import('../providers/runtime/LLMClient.js'); // late import: no cycle at load
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), budgetMs);
   try {

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import fetch from 'node-fetch';
-import { generateContent } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { WORKSPACE_DIR } from '../config.js';
 
@@ -215,10 +215,10 @@ export async function runDataAgent({ query, sendEvent }) {
   const missing = table.columns.filter((c) => stats.columns[c].missing > 0);
   if (findings.length === 0) findings.push('- No numeric or categorical columns could be profiled.');
 
-  // Deep answer with AI when a key exists
+  // Deep answer with AI when a provider is configured
   let insight = '';
-  const keys = (await import('./LLMClient.js')).resolveKeys();
-  if ((keys.groqKey || keys.geminiKey) && table.rows.length <= 200) {
+  const { canChat } = await import('../providers/index.js');
+  if (canChat() && table.rows.length <= 200) {
     try {
       insight = '\n\n' + await generateContent(
         `Here is real data (${shape}):\n${JSON.stringify({ columns: table.columns, rows: table.rows.slice(0, 60) })}\n\nComputed statistics:\n${JSON.stringify(stats.columns, null, 1)}\n\nThe user asked: "${query}".\nGive a concise insight (## INSIGHT): answer their question with the real numbers, 3-6 bullets, then ## CAVEATS (missing values, small samples, what I ignored and why). Be honest — never invent numbers.`,

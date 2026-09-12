@@ -22,7 +22,7 @@ import fs from 'fs';
 import path from 'path';
 import { DATA_DIR } from '../config.js';
 import { conversationFilePath, loadConversationEvents } from './SessionConversations.js';
-import { generateContent } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
 import { appendEvent } from './EventLog.js'; // B102 — compaction is a first-class durable event
 
 /** Auto-compaction pressure: total chat characters before we compact. */

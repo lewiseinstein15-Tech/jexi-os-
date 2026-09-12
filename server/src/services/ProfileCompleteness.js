@@ -21,6 +21,7 @@ import crypto from 'crypto';
 import { DATA_DIR } from '../config.js';
 import { loadProfile, listProfiles, parseSimpleYaml } from './AgentProfiles.js';
 import { AGENT_ROSTER } from './AgentRoster.js';
+import { preferredLaneForRole } from '../providers/catalog/CapabilityLanes.js';
 
 const NAMED_DIR = path.join(process.cwd(), 'agents', 'profiles');
 const AUTO_DIR = path.join(DATA_DIR, 'agent-profiles', 'auto');
@@ -78,7 +79,7 @@ export function ensureProfile(role) {
   if (!fs.existsSync(cfgPath)) {
     fs.mkdirSync(dir, { recursive: true });
     // inherit the closest named profile's lane by domain
-    const lane = laneFor(slug);
+    const lane = preferredLaneForRole(slug);
     fs.writeFileSync(cfgPath, [
       `name: ${slug}`,
       `display_name: ${titleCase(slug.replace(/-/g, ' '))}`,
@@ -112,12 +113,7 @@ export function ensureProfile(role) {
   return profile;
 }
 
-function laneFor(slug) {
-  if (/coder|developer|engineer|backend|frontend|api|database|devops|security|app-?sec|qa|debug|release|kubernetes|terraform|sre|infra|cloud|deploy|mobile|android|ios|react/.test(slug)) return 'nvidia';
-  if (/research|scholar|science|history|study|analyst|data|market|news|fact|report|bi/.test(slug)) return 'gemini';
-  if (/writer|editor|copy|poet|novel|screen|blog|content|brand|social|marketing|seo/.test(slug)) return 'mistral';
-  return 'groq';
-}
+
 
 /** Eagerly generate a profile for EVERY planner-deployable role (idempotent). */
 export function generateAllProfiles(deployedRoles = null) {

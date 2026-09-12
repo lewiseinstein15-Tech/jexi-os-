@@ -17,8 +17,8 @@ import { addChat } from './MemoryManager.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { assemblePrompt } from './PromptAssembly.js'; // B119 — dsh prompt assembly
 import { preferencesBlock } from './PreferenceLearner.js';
-import { runWorker, coworkerFor, coworkerChain } from './WorkerRouter.js';
-import { coworkerName, coworkerLeadName } from './ModelCoworkers.js'; // B162 — named model coworkers
+import { runWorker, coworkerFor, coworkerChain } from '../providers/catalog/WorkerRouter.js';
+import { coworkerName, coworkerLeadName } from '../providers/catalog/ModelCoworkers.js'; // B162 — named model coworkers
 import { listPluginTools } from './PluginContext.js'; // B105 — plugin tools visible to SIMPLE-path coworkers
 import { normalizeFinalAnswer, FORMAT_RULES } from './Formatting.js';
 import { loadCoworker, orchestratorPromptFragment } from './CoworkerFiles.js'; // B78 — filesystem-native coworker mandates

@@ -30,15 +30,15 @@ import { planner } from './Planner.js'; // the singleton instance (the class its
 import { getTool } from './ToolRegistry.js';
 import { buildNativeSchemas, executeTool, activeToolProfile, TOOL_PROFILES, isToolDone } from './ToolRuntime.js';
 import { selectMcpToolset } from './CapabilityRouter.js';
-import { generateWithToolsLoop, generateContent } from './LLMClient.js';
+import { generateWithToolsLoop, generateContent } from '../providers/runtime/LLMClient.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { buildSkillCatalog } from './SkillDiscovery.js'; // B98 — dsh-style available-skills catalog (metadata only)
 import { listPluginTools } from './PluginContext.js'; // B105 — plugin tools are visible to the model (weather-now etc.)
 import { preferencesBlock } from './PreferenceLearner.js';
 import { assemblePrompt } from './PromptAssembly.js'; // B119 — dsh systemPrompt.assemble mirror
-import { coworkerName } from './ModelCoworkers.js'; // B162 — named model coworkers
+import { coworkerName } from '../providers/catalog/ModelCoworkers.js'; // B162 — named model coworkers
 import { lifecycleTurnStart, lifecycleStepStart, lifecycleToolCall, lifecycleToolResult, lifecycleStepEnd, lifecycleTurnEnd } from './SessionLifecycle.js'; // B119 — dsh session-event vocabulary
-import { providerPreferenceForIntent } from './ModelRouting.js';
+import { providerPreferenceForIntent } from '../providers/catalog/ModelRouting.js';
 import { REPORT_GUIDANCE } from './SubagentReport.js'; // B137 — dsh tool-subagent-report guidance for children
 
 // B96 — DeepSeek-Harness-style loop: more steps per turn (the rate limiter

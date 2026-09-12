@@ -50,7 +50,7 @@ console.log('\n== 3. Idempotent append + LLMClient injection ==');
 const withTime = appendTimeContext('SYSTEM');
 ok(withTime.includes('Current date and time:'), 'appendTimeContext adds the block');
 ok(appendTimeContext(withTime) === withTime, 'append is idempotent (no duplicates)');
-const src = fs.readFileSync('./src/services/LLMClient.js', 'utf-8');
+const src = fs.readFileSync('./src/providers/runtime/LLMClient.js', 'utf-8');
 ok(src.includes('appendTimeContext(systemInstruction)') && (src.match(/appendTimeContext\(systemInstruction\)/g) || []).length === 2,
   'LLMClient injects time context in BOTH generateContent and generateWithToolsLoop');
 

@@ -19,7 +19,7 @@
  */
 
 import { message, normalizeArtifact } from './AgentMail.js';
-import { runWithModel } from './ModelRouter.js';
+import { runWithModel } from '../../providers/catalog/ModelRouter.js';
 import { Supervisor } from './Supervisor.js'; // B209 — live mid-work supervision
 import { checkToolPermission } from './Permissions.js'; // B209 — enforced tool gates
 import { runEmployeeCommand, isTestCommand, validateCommand, taskCommandDir } from './CommandRunner.js'; // B210 — real command execution for employees
@@ -41,7 +41,7 @@ function listWorkspaceFiles(ownerId) {
     return { path: e.name, bytes: st.size, mtime: new Date(st.mtimeMs).toISOString() };
   }).slice(0, 60);
 }
-import { sanitizeWorkProduct } from '../ModelCoworkers.js'; // B209/B210 — model ids never enter work product, but CODE FENCES are never corrupted
+import { sanitizeWorkProduct } from '../../providers/catalog/ModelCoworkers.js'; // B209/B210 — model ids never enter work product, but CODE FENCES are never corrupted
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'node:url';

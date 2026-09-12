@@ -1,4 +1,4 @@
-import { generateContent } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
 import { jsonrepair } from 'jsonrepair';
 import { recordError } from './SelfMonitor.js';
 

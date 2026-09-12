@@ -20,9 +20,9 @@
  */
 
 import http from 'node:http';
-import { COWORKERS, coworkerChain, coworkerFor, workerRoster, runWorker } from './src/services/WorkerRouter.js';
-import { QWEN_MODELS, OPENROUTER_FREE_TEXT_MODELS, HF_FREE_QWEN_MODELS, HF_FREE_DEEPSEEK_MODELS, generateContent } from './src/services/LLMClient.js';
-import { providerOrder } from './src/services/ProviderRouter.js';
+import { COWORKERS, coworkerChain, coworkerFor, workerRoster, runWorker } from './src/providers/catalog/WorkerRouter.js';
+import { QWEN_MODELS, OPENROUTER_FREE_TEXT_MODELS, HF_FREE_QWEN_MODELS, HF_FREE_DEEPSEEK_MODELS, generateContent } from './src/providers/runtime/LLMClient.js';
+import { providerOrder } from './src/providers/runtime/ProviderRouter.js';
 
 let passed = 0;
 let failed = 0;

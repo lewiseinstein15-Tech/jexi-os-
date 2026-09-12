@@ -23,8 +23,8 @@
 
 import fs from 'fs';
 import path from 'path';
-import { generateWithToolsLoop } from './LLMClient.js';
-import { coworkerName } from './ModelCoworkers.js';
+import { generateWithToolsLoop } from '../providers/runtime/LLMClient.js';
+import { coworkerName } from '../providers/catalog/ModelCoworkers.js';
 import { view, create, strReplace, insert } from './StrReplaceEditor.js';
 import { runPwsh } from './PwshPersistent.js';
 import { pythonToolHandler } from './CodeRuntimePython.js';

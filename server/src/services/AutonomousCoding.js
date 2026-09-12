@@ -8,7 +8,7 @@
  * workspace has an index.html (served by preview-server after the run).
  */
 
-import { generateWithToolsLoop, generateContent } from './LLMClient.js';
+import { generateWithToolsLoop, generateContent } from '../providers/runtime/LLMClient.js';
 import { buildNativeSchemas, executeTool } from './ToolRuntime.js';
 import { assemblePrompt } from './PromptAssembly.js';
 import { loadSkillForModel } from './SkillDiscovery.js';

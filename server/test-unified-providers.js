@@ -25,7 +25,7 @@ import {
 import { capabilitiesFor, noteProbe, clearProbes, inputTokenBudget, estimateTokens } from './src/services/providers/capabilities.js';
 import { tryUnified, unifiedToolConfig, probeConfig, configForCall } from './src/services/providers/unified.js';
 import { isUnifiedConfigured } from './src/services/providers/modelConfig.js';
-import { providerOrder, configuredProviders } from './src/services/ProviderRouter.js';
+import { providerOrder, configuredProviders } from './src/providers/runtime/ProviderRouter.js';
 
 let passed = 0;
 const ok = (name, fn) => {

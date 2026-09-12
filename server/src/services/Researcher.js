@@ -1,6 +1,6 @@
 import { aggregateSearch } from './SearchEngine.js';
 import { extractContent } from './Extractor.js';
-import { generateContent } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
 import { MANAGER_URL } from '../config.js';
 
 export async function learnHowTo(query, sendEvent) {

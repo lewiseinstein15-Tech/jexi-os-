@@ -27,7 +27,7 @@ import { TaskMailbox, message, mailToActivityLine } from './AgentMail.js';
 import { rankEmployees, selectEmployee, getEmployee, appendEmployeeHistory } from './Employees.js'; // B209 — history rides results
 import { runEmployeeCommand } from './CommandRunner.js'; // B210 — the execution backstop
 import { checkToolPermission } from './Permissions.js'; // B210 — executor check
-import { telemetry } from './Telemetry.js';
+import { telemetry } from '../../providers/catalog/Telemetry.js';
 import { maxCooldownRemainingMs } from '../ProviderHealth.js'; // Final F5 — cooldown-aware retry backoff
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -37,7 +37,7 @@ import { verifyDeliverable, acceptanceGates } from './Verifier.js';
 import { structureObjective } from './ObjectiveInterpreter.js'; // B215 — provenance-tagged objective state
 import { discoverTools } from '../ToolDiscovery.js'; // B223 — Part 20: objective → capability → tool discovery
 import { preferencesBlock } from '../PreferenceLearner.js'; // B208b — employees receive relevant user context
-import { isProviderError } from './ModelRouter.js';
+import { isProviderError } from '../../providers/catalog/ModelRouter.js';
 
 const MAX_SUBTASKS = 5;
 const MAX_PARALLEL = 3;

@@ -26,7 +26,7 @@ const ok = (c, n) => { if (c) { passed++; console.log(`  ✅ ${n}`); } else { fa
 
 const { loadPlugins, setActivePluginContext, getPluginTool, listPluginTools, listPluginSkills } = await import('./src/services/PluginContext.js');
 const { executeTool, buildNativeSchemas } = await import('./src/services/ToolRuntime.js');
-const { normalizeTools } = await import('./src/services/LLMClient.js');
+const { normalizeTools } = await import('./src/providers/runtime/LLMClient.js');
 const { TOOL_REGISTRY, TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
 const { enforceToolAllowlist } = await import('./src/services/ToolRegistry.js');
 

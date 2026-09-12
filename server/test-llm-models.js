@@ -1,5 +1,5 @@
 // Regression test: image MIME detection + no stale Gemini model names (gemini-1.5-flash-latest was removed from Google's API).
-import { mimeFromDataUrl } from './src/services/LLMClient.js';
+import { mimeFromDataUrl } from './src/providers/runtime/LLMClient.js';
 
 let failures = 0;
 const check = (label, actual, expect) => {
@@ -17,7 +17,7 @@ check('empty fallback', mimeFromDataUrl(''), 'image/png');
 
 // No stale model names used as actual models (comments may mention the removed name).
 import fs from 'fs';
-const src = fs.readFileSync(new URL('./src/services/LLMClient.js', import.meta.url), 'utf-8');
+const src = fs.readFileSync(new URL('./src/providers/runtime/LLMClient.js', import.meta.url), 'utf-8');
 const codeOnly = src.split('\n').filter(l => !l.trim().startsWith('//') && !l.trim().startsWith('*')).join('\n');
 const stale = codeOnly.match(/gemini-1\.5-flash-latest/g) || [];
 if (stale.length > 0) failures++;

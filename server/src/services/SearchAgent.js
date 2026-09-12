@@ -1,6 +1,6 @@
 import { aggregateSearch, isAcademicQuery } from './SearchEngine.js';
 import { extractContent } from './Extractor.js';
-import { generateContent } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
 import { saveInternetKnowledge } from './MemoryManager.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 

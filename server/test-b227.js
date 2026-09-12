@@ -66,7 +66,7 @@ test('SimpleTask: reads opts.image, validates it, and instructs real grounding',
 /* ── B: the worker lanes ───────────────────────────────────────────────── */
 
 test('WorkerRouter: vision turns skip the tools lane and carry the image on the text lane', () => {
-  const src = read('./src/services/WorkerRouter.js');
+  const src = read('./src/providers/catalog/WorkerRouter.js');
   assert.match(src, /const toolLane = wantsTools && !image/, 'the native-tools loop (which cannot carry images) is skipped for vision turns');
   assert.match(src, /generateContentSafe\(prompt, system, image,/, 'the plain lane passes the REAL image (was hardcoded null)');
   assert.match(src, /if \(image && !VISION_PROVIDERS\.has\(p\.key\)\) continue/, 'text-only providers are skipped for vision turns — no wasted attempts, no text-only guesses');
@@ -93,7 +93,7 @@ test('graph lane: the vision node gets the image with a fallback + honest absenc
   assert.match(orch, /🔍 Analyzing image \(\$\{Math\.round\(visionImage\.length \/ 1024\)\}KB attached to the model\)/, 'the size of what actually reached the model is LOGGED (the observability the live debugging needed)');
   assert.match(orch, /⚠ No image reached the vision node/, 'no image → one honest warning, never a blind guess');
   assert.match(orch, /I did not receive the image on this turn/, 'the no-image answer is honest, not a hallucinated description');
-  assert.match(orch, /visionImage,\s*\{ prefer: 'gemini', temperature: 0\.4 \}/, 'the vision call uses the proven /api/vision lane');
+  assert.match(orch, /visionImage,\s*\{ prefer: 'vision', temperature: 0\.4 \}/, 'the vision call uses the capability lane (provider layer picks the vision backend)');
 });
 
 test('graph lane (functional): the image reaches the vision node through the real graph', async () => {
@@ -112,7 +112,7 @@ test('graph lane (functional): the image reaches the vision node through the rea
 });
 
 test('provider layer: text-only providers honestly decline images; vision providers carry them', () => {
-  const src = read('./src/services/LLMClient.js');
+  const src = read('./src/providers/runtime/LLMClient.js');
   assert.match(src, /async function tryOpenAICompat\(\{[^}]*\}, prompt, system, imageBase64, opts, errors\) \{\s*\n\s*if \(imageBase64\) return null;/, 'the OpenAI-compat family (cerebras/deepinfra/mistral/etc.) declines images instead of answering text-only');
   assert.match(src, /if \(imageBase64\) return null; \/\/ text-only — vision stays on hosted providers/, 'vllm declines too');
   assert.match(src, /let models = imageBase64 \? GROQ_VISION_MODELS :/, 'groq switches to its vision models when an image is present');

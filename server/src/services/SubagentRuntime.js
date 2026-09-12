@@ -69,7 +69,7 @@ async function summarizeForParent(fullAnswer, name) {
   const text = String(fullAnswer || '');
   if (text.length <= MAX_SUMMARY_CHARS) return text;
   try {
-    const { generateContent } = await import('./LLMClient.js');
+    const { generateContent } = await import('../providers/runtime/LLMClient.js');
     const s = await generateContent(
       `Summarize this ${name} report for a parent agent in at most 3 sentences — the key conclusion and the strongest evidence only. No preamble.\n\n${text.slice(0, 8000)}`,
       'You write tight 3-sentence summaries.',
@@ -210,7 +210,7 @@ export async function runSubagents({ tasks, sendEvent, opts = {} }) {  if (typeo
     aggregate = ok[0].answer || ok[0].summary || reports; // single subagent — no synthesis needed
   } else if (ok.length > 1) {
     try {
-      const { generateContent } = await import('./LLMClient.js');
+      const { generateContent } = await import('../providers/runtime/LLMClient.js');
       const { JEXI_SYSTEM_PROMPT } = await import('./JexiPrompt.js');
       const { preferencesBlock } = await import('./PreferenceLearner.js');
       const parts = ok.map((r) => {

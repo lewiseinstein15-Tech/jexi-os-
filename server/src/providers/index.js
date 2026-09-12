@@ -36,6 +36,43 @@ export {
   NormalizedResponse, NormalizedToolCall, isLLMProvider,
 };
 
+/**
+ * True when at least one KEYED provider is configured with a key AND has a
+ * model satisfying the given capabilities.
+ *
+ * Keyed-only by design: it is the capability mirror of the legacy
+ * `resolveKeys()` presence checks that business logic used to gate on
+ * ("should I call the model?"). Keyless lanes (a local engine without a key)
+ * are deliberately excluded so deterministic fallbacks still engage when no
+ * cloud key exists — exactly what the old gates did.
+ *
+ * Capability flags (optional): 'vision', 'tool_calling', 'code_reasoning'.
+ */
+export function canChat(capabilities = []) {
+  const providers = registry();
+  for (const p of providers) {
+    const needsKey = p.cfg?.needsKey !== false;
+    if (!needsKey) continue; // keyless lanes (ollama) do not satisfy key-presence gates
+    if (!p.isConfigured || !p.isConfigured()) continue;
+    const models = p.listModels ? p.listModels() : [];
+    if (!models.length) continue;
+    if (!capabilities.length) return true;
+    const ok = capabilities.every((cap) => {
+      if (cap === 'vision') return models.some((m) => m.capabilities?.vision === true);
+      if (cap === 'tool_calling') return models.some((m) => m.capabilities?.toolCalling === true);
+      if (cap === 'code_reasoning') return models.some((m) => (m.capabilities?.codeReasoning ?? 'weak') !== 'weak');
+      return true;
+    });
+    if (ok) return true;
+  }
+  return false;
+}
+
+/** Convenience: can the current setup do the most demanding common lanes? */
+export function canVision() {
+  return canChat(['vision']);
+}
+
 /** Single-entry chat with optional automatic capability resolution + fallback. */
 export async function chat(request, opts = {}) {
   if (opts.providerId) {

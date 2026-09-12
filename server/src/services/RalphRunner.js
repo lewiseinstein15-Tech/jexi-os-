@@ -19,7 +19,7 @@
  * Terminal statuses: complete | blocked | budget-limited | round-failed.
  */
 
-import { generateContent } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
 
 const REPORT_SCHEMA_DOC = `{
   "status": "continue" | "complete" | "blocked",

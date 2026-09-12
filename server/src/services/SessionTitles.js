@@ -120,7 +120,7 @@ export function cleanTitle(raw, maxBytes = MAX_TITLE_BYTES) {
 
 async function generateTitle(convId) {
   if (generator) return cleanTitle(await generator(excerptFor(convId)));
-  const { generateContent } = await import('./LLMClient.js');
+  const { generateContent } = await import('../providers/runtime/LLMClient.js');
   const raw = await generateContent(TITLE_PROMPT(excerptFor(convId)), 'You generate short conversation titles. Output only the title.', null, { temperature: 0.4 });
   return cleanTitle(raw);
 }

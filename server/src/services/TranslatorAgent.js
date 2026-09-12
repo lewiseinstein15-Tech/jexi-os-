@@ -1,4 +1,5 @@
-import { generateContent, resolveKeys } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
+import { canChat } from '../providers/index.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 
 /**
@@ -45,9 +46,8 @@ export async function runTranslatorAgent({ query, sendEvent }) {
     return { success: true, summary: `### 🌍 TRANSLATOR\n\nI need the text to translate into **${target}** — e.g. *"translate \\"good morning\\" to ${target}"* or paste a whole paragraph.` };
   }
 
-  const keys = resolveKeys();
-  if (!keys.groqKey && !keys.geminiKey) {
-    return { success: true, summary: `### 🌍 TRANSLATOR\n\nTranslation needs my AI brain — add a **Groq or Gemini key** in Settings and I will translate "${text.slice(0, 80)}…" into ${target} with a full reflection pass.` };
+  if (!canChat()) {
+    return { success: true, summary: `### 🌍 TRANSLATOR\n\nTranslation needs my AI brain — add an AI **provider key** in Settings and I will translate "${text.slice(0, 80)}…" into ${target} with a full reflection pass.` };
   }
 
   sendEvent?.('log', { agent: 'Translator', message: `🌍 Translating "${text.slice(0, 60)}${text.length > 60 ? '…' : ''}" → ${target}${source ? ` (from ${source})` : ''}` });

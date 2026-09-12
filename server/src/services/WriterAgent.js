@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { generateContent, resolveKeys } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
+import { canChat } from '../providers/index.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { WORKSPACE_DIR } from '../config.js';
 
@@ -65,8 +66,7 @@ export async function runWriterAgent({ query, sendEvent, saveToDisk = false }) {
   const docType = /api reference|api doc/i.test(query) ? 'API reference' : /how.to|guide|tutorial/i.test(query) ? 'How-to guide' : /release note/i.test(query) ? 'Release notes' : 'README';
 
   let doc;
-  const keys = resolveKeys();
-  if (keys.groqKey || keys.geminiKey) {
+  if (canChat()) {
     try {
       doc = await generateContent(
         `Write a ${docType} for this project. You are the technical writer — you READ the files, so the docs must match them exactly.\n\nFiles in the workspace:\n${files.join('\n\n')}\n\nThe user asked: "${query}"\n\nRules:\n- Real commands, real file names, real env var names (names only, never values).\n- If a file is an entry point (${entry}), explain how to run it.\n- No lorem ipsum, no "very powerful and flexible" filler. Skimmable: headings, bullets, one idea per line.\n- End with a "## HONEST GAPS" section listing anything you could not verify from the code.`,
@@ -88,7 +88,7 @@ export async function runWriterAgent({ query, sendEvent, saveToDisk = false }) {
   const missing = keyTerms.filter((t) => !doc.toLowerCase().includes(t));
   if (missing.length > 0) {
     sendEvent?.('log', { agent: 'Technical Writer', message: `🔎 Self-critique: the ${docType} doesn't yet cover: ${missing.join(', ')}.` });
-    if (keys.groqKey || keys.geminiKey) {
+    if (canChat()) {
       try {
         const revised = await generateContent(
           `You are writing a ${docType}. The draft below is missing coverage of: ${missing.join(', ')}.\n\nReturn the FULL ${docType} (keep everything useful) with a new or expanded section covering each missing item, using the workspace files as the source of truth.\n\nDRAFT:\n${doc.slice(0, 6000)}`,

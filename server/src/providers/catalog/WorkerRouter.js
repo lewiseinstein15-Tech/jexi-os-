@@ -30,10 +30,10 @@
  * tool calls, not JSON-in-prose parsing.
  */
 
-import { generateWithToolsLoop, generateContentSafe } from './LLMClient.js';
-import { executeTool } from './ToolRuntime.js';
-import { appendEvent } from './EventLog.js'; // B78 — coworker calls/results are first-class events
-import { getActiveSession } from './MemoryManager.js';
+import { generateWithToolsLoop, generateContentSafe } from '../runtime/LLMClient.js';
+import { executeTool } from '../../services/ToolRuntime.js';
+import { appendEvent } from '../../services/EventLog.js'; // B78 — coworker calls/results are first-class events
+import { getActiveSession } from '../../services/MemoryManager.js';
 
 /** Coworker assignments — exact models per task type (B66 3b). */
 export const COWORKERS = {
@@ -188,7 +188,7 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
   let effectiveTools = opts.tools;
   if (wantsTools && opts.codeMode) {
     try {
-      const { renderToolsSdk, buildRunCodeSchema } = await import('./CodeModeRuntime.js');
+      const { renderToolsSdk, buildRunCodeSchema } = await import('../../services/CodeModeRuntime.js');
       effectiveTools = [...opts.tools, buildRunCodeSchema()];
       codeTools = opts.tools;
       system = `${system}\n${renderToolsSdk(opts.tools)}\n`;

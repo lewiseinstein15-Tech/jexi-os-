@@ -25,12 +25,12 @@ import { streamWatchers, Supervisor } from './src/services/director/Supervisor.j
 import { checkToolPermission, toolPermissionsFor } from './src/services/director/Permissions.js';
 import { loadEmployees, getEmployee, rankEmployees, setEmployeeDisabled, upsertEmployee, employeeHistory, rosterDetail, appendEmployeeHistory } from './src/services/director/Employees.js';
 import { DirectorTask, teamEvent, loadTask, loadTaskById, listDirectorTasks } from './src/services/director/TaskState.js';
-import { telemetry } from './src/services/director/Telemetry.js';
+import { telemetry } from './src/providers/catalog/Telemetry.js';
 import { runEmployeeSession, parseEmployeeOutput, assembleBrief } from './src/services/director/EmployeeSession.js';
 import { TaskMailbox, message } from './src/services/director/AgentMail.js';
-import { runWithModel } from './src/services/director/ModelRouter.js';
+import { runWithModel } from './src/providers/catalog/ModelRouter.js';
 import { parseModelJson } from './src/services/director/JsonRepair.js';
-import { sanitizeStreamText } from './src/services/ModelCoworkers.js';
+import { sanitizeStreamText } from './src/providers/catalog/ModelCoworkers.js';
 import { fileURLToPath } from 'node:url';
 
 const here_ = path.dirname(fileURLToPath(import.meta.url));

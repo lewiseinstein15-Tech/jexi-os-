@@ -19,7 +19,7 @@
  * tiers + self-hosted vLLM.
  */
 
-import { isUnifiedConfigured } from './providers/modelConfig.js';
+import { isUnifiedConfigured } from '../../services/providers/modelConfig.js';
 
 const COOLDOWN_MS = 30_000;        // skip a provider for 30s after a failure
 const CONSECUTIVE_COOLDOWN = 3;    // 3 consecutive failures → cooldown
@@ -144,13 +144,25 @@ function speedSortedHead(head) {
   return out;
 }
 
+// Capability lane → biased provider head (named only inside the provider layer).
+// 'code'      → Gemini first (strong at structured reasoning), then Groq/OpenRouter
+// 'research'  → OpenRouter free models first (broad, current), then Groq/Gemini
+// 'vision'    → Gemini vision first, then Groq/OpenRouter
+// 'fast'      → Groq first (generous free tier, low latency)
+// default     → Groq / Gemini / OpenRouter + extras
+const PREFER_HEAD = {
+  code: ['gemini', 'groq', 'openrouter'],
+  research: ['openrouter', 'groq', 'gemini'],
+  vision: ['gemini', 'groq', 'openrouter'],
+  fast: ['groq', 'gemini', 'openrouter'],
+};
+
 /**
  * Ordered provider keys for a request, adjusted by health.
- * `prefer` biases the order for the task type:
- *   'gemini'     → Gemini first (strong at code), then Groq, then OpenRouter, then HF
- *   'openrouter' → OpenRouter free models first (Seed vision family)
- *   default      → rotated across Groq / Gemini / OpenRouter (load spread), then extras
- * Cooldowned providers are pushed to the END, healthy ones keep priority.
+ * `prefer` is a CAPABILITY LANE ('code' | 'research' | 'vision' | '') biased
+ * for the task type; legacy literal provider names are still honored for
+ * internal providers/ callers. Cooldowned providers are pushed to the END,
+ * healthy ones keep priority.
  */
 export function providerOrder(prefer = '') {
   // UNIFIED (one-secret model): an explicitly configured JEXI_MODEL_*
@@ -166,12 +178,13 @@ export function providerOrder(prefer = '') {
   // (The unified leg above wins when configured — it is the explicit choice.)
   const ollamaFirst = unifiedHead.length === 0 && (process.env.MODEL_PROVIDER || '').toLowerCase() === 'ollama';
   const ollama = ollamaFirst ? ['ollama'] : [];
-  const base =
-    prefer === 'gemini'
-      ? [...unifiedHead, ...ollama, 'gemini', 'groq', 'openrouter', ...EXTRA_PROVIDERS, 'vllm', 'huggingface', 'pollinations']
-      : prefer === 'openrouter'
-        ? [...unifiedHead, ...ollama, 'openrouter', 'groq', 'gemini', ...EXTRA_PROVIDERS, 'vllm', 'huggingface', 'pollinations']
-        : [...unifiedHead, ...ollama, 'groq', 'gemini', 'openrouter', ...EXTRA_PROVIDERS, 'vllm', 'huggingface', 'pollinations'];
+  const TAIL = [...EXTRA_PROVIDERS, 'vllm', 'huggingface', 'pollinations'];
+  let preferHead;
+  if (prefer === 'gemini') preferHead = ['gemini', 'groq', 'openrouter', ...TAIL];
+  else if (prefer === 'openrouter') preferHead = ['openrouter', 'groq', 'gemini', ...TAIL];
+  else if (PREFER_HEAD[prefer]) preferHead = [...PREFER_HEAD[prefer], ...TAIL];
+  else preferHead = ['groq', 'gemini', 'openrouter', ...TAIL];
+  const base = [...unifiedHead, ...ollama, ...preferHead];
 
   const healthy = base.filter((k) => !providerInCooldown(k));
   const cooling = base.filter((k) => providerInCooldown(k));

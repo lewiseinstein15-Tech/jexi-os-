@@ -27,7 +27,7 @@ export function mountArena(app) {
         import('../services/Scheduler.js'),
         import('../services/Observer.js'),
         import('../services/ReasoningEngine.js').catch(() => null),
-        import('../services/OllamaProvider.js').catch(() => null),
+        import('../providers/runtime/OllamaProvider.js').catch(() => null),
       ]);
       let reasoningHealth = null;
       try { reasoningHealth = await reasoning?.reasoningHealth?.(); } catch { reasoningHealth = { error: 'health probe failed' }; }

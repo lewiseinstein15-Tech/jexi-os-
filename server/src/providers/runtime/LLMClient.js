@@ -1,16 +1,16 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Groq } from 'groq-sdk';
-import { loadSettings } from './SettingsManager.js';
+import { loadSettings } from '../../services/SettingsManager.js';
 import { providerOrder, recordProviderSuccess, recordProviderFailure, configuredProviders, markProviderUnavailable } from './ProviderRouter.js';
-import { takeSlot, releaseSlot } from './ProviderRateLimiter.js'; // free-tier pacing
-import { queryLocalLLM } from './OfflineAgent.js';
-import { appendTimeContext } from './TimeContext.js'; // B104 — every LLM call knows the current date/time (dsh time-context)
-import { withRetry } from './RetryPolicy.js'; // B133 — dsh llm-retry: backoff on 429/5xx/network
-import { recordProviderCallSuccess, recordProviderCallFailure, skipForNow, providerState } from './ProviderHealth.js'; // AGI Phase 1 — structured, persistent provider health
-import { cacheKey, cacheGet, cacheSet } from './ResponseCache.js'; // AGI Phase 1 — safe caching (opt-in per call)
-import { dedupeInflight, requestIdentity } from './RequestDedup.js'; // AGI Phase 1 — concurrent identical calls share one request
-import { noteMeterModelCall } from './RequestMeter.js'; // ARENA — every model call in a turn is metered automatically
-import { tryUnified, unifiedToolConfig, unifiedAnthropicToolRound, configForCall } from './providers/unified.js'; // UNIFIED — one-secret model leg (provider + key + model + baseURL)
+import { takeSlot, releaseSlot } from '../../services/ProviderRateLimiter.js'; // free-tier pacing
+import { queryLocalLLM } from '../../services/OfflineAgent.js';
+import { appendTimeContext } from '../../services/TimeContext.js'; // B104 — every LLM call knows the current date/time (dsh time-context)
+import { withRetry } from '../../services/RetryPolicy.js'; // B133 — dsh llm-retry: backoff on 429/5xx/network
+import { recordProviderCallSuccess, recordProviderCallFailure, skipForNow, providerState } from '../../services/ProviderHealth.js'; // AGI Phase 1 — structured, persistent provider health
+import { cacheKey, cacheGet, cacheSet } from '../../services/ResponseCache.js'; // AGI Phase 1 — safe caching (opt-in per call)
+import { dedupeInflight, requestIdentity } from '../../services/RequestDedup.js'; // AGI Phase 1 — concurrent identical calls share one request
+import { noteMeterModelCall } from '../../services/RequestMeter.js'; // ARENA — every model call in a turn is metered automatically
+import { tryUnified, unifiedToolConfig, unifiedAnthropicToolRound, configForCall } from '../../services/providers/unified.js'; // UNIFIED — one-secret model leg (provider + key + model + baseURL)
 
 /* ARENA meter rule: a rung only counts as a model call when the provider was
    actually CONFIGURED (key present / local endpoint enabled). A keyless rung

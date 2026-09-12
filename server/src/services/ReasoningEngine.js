@@ -38,13 +38,13 @@ export function listProviders() {
 async function ensureBuiltins() {
   if (!providers.has('ollama')) {
     try {
-      const { OllamaProvider } = await import('./OllamaProvider.js');
+      const { OllamaProvider } = await import('../providers/runtime/OllamaProvider.js');
       registerProvider(OllamaProvider);
     } catch {}
   }
   if (!providers.has('remote')) {
     try {
-      const llm = await import('./LLMClient.js');
+      const llm = await import('../providers/runtime/LLMClient.js');
       registerProvider({
         id: 'remote',
         kind: 'remote',

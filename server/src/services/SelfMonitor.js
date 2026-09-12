@@ -2,8 +2,8 @@ import os from 'os';
 import fs from 'fs';
 import path from 'path';
 import { SERVER_ROOT, PORT, DATA_DIR, WORKSPACE_DIR } from '../config.js';
-import { resolveKeys } from './LLMClient.js';
-import { providerHealthSnapshot } from './ProviderRouter.js';
+import { canChat } from '../providers/index.js';
+import { providerHealthSnapshot } from '../providers/runtime/ProviderRouter.js';
 import { browserStatus } from './DesktopManager.js';
 
 /**
@@ -40,7 +40,7 @@ export function getRecentErrors(n = 10) {
 
 export function collectSystemStatus() {
   const mem = process.memoryUsage();
-  const { groqKey, geminiKey } = resolveKeys();
+  const chatReady = canChat();
   const dirCheck = (d) => { try { fs.accessSync(d, fs.constants.W_OK); return true; } catch { return false; } };
   return {
     ok: true,
@@ -50,7 +50,7 @@ export function collectSystemStatus() {
     host: os.hostname(),
     node: process.version,
     port: PORT,
-    keys: { groq: !!groqKey, gemini: !!geminiKey },
+    keys: { any: chatReady, cloud: chatReady },
     providers: providerHealthSnapshot(),
     browser: browserStatus(),
     requests: { chat: chatCount, vision: visionCount },

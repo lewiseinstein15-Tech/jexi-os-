@@ -22,7 +22,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'node:url';
-import { telemetry } from './Telemetry.js';
+import { telemetry } from '../../providers/catalog/Telemetry.js';
 import { DATA_DIR } from '../../config.js';
 
 /**

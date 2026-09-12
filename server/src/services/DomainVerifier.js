@@ -13,7 +13,8 @@
  * draft ships unchanged with the findings reported.
  */
 
-import { generateContent, resolveKeys } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
+import { canChat } from '../providers/index.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { buildVerificationPrompt, parseVerificationVerdict, buildRevisionPrompt } from './VerificationPrompt.js';
 
@@ -115,10 +116,8 @@ export async function verifyDomainAnswer({ query, draft, domain, sources = [], s
 
   emit(`⚠ ${checks.issues.length} deterministic check(s) failed: ${checks.issues.join('; ')}`);
 
-  // AI critic pass — only with keys, only for long-enough drafts.
-  const keys = resolveKeys();
-  const hasKeys = keys.groqKey || keys.geminiKey || process.env.OPENROUTER_API_KEY || keys.xaiKey;
-  if (!hasKeys || original.length < (opts.minLength ?? 120)) {
+  // AI critic pass — only with a configured provider, only for long-enough drafts.
+  if (!canChat() || original.length < (opts.minLength ?? 120)) {
     return { text: original, changed: false, verdict: 'best-effort', domain: useDomain, issues: checks.issues, checks };
   }
 

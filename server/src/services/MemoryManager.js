@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { MEMORY_FILE, KNOWLEDGE_DIR, WORKSPACE_DIR, DATA_DIR } from '../config.js';
-import { generateContent, resolveKeys, embedText } from './LLMClient.js';
+import { generateContent, embedText } from '../providers/runtime/LLMClient.js';
+import { canChat } from '../providers/index.js';
 import { appendEvent } from './EventLog.js'; // B78/B158 — context_compaction events (dsh compaction/* mirror)
 import { clearEventLog } from './EventLog.js'; // B162d — deep clear
 import { clearAllConversations } from './SessionConversations.js'; // B162d — deep clear
@@ -723,11 +724,10 @@ function attachEmbedding(entry, store) {
 /**
  * Boot-time pass: attach embeddings to entries saved before the vector layer
  * existed (bounded to the first 50 per boot so startup stays instant).
- * Returns how many got an embedding. No-op without a Groq key.
+ * Returns how many got an embedding. No-op without a configured provider.
  */
 export async function backfillEmbeddings() {
-  const { groqKey } = resolveKeys();
-  if (!groqKey) return 0;
+  if (!canChat()) return 0;
   const mem = loadMemory();
   const targets = [];
   for (const store of ['internetKnowledge', 'codingKnowledge', 'userFacts']) {
@@ -1044,8 +1044,7 @@ export async function resolveConversationalQuery(query) {
   const topic = String(lastUser.text || '').trim().replace(/\s+/g, ' ').slice(0, 120);
 
   try {
-    const keys = resolveKeys();
-    if (!keys.groqKey && !keys.geminiKey && !keys.openrouterKey) throw new Error('no key');
+    if (!canChat()) throw new Error('no key');
     const rewritten = await generateContent(
       `The user just said: "${q}"\n\nRecent conversation (most recent last):\n${transcript}\n\nRewrite ONLY the user's latest message into a single self-contained request that an AI with NO memory of this conversation could answer correctly. Resolve every pronoun and reference — "this course", "it", "the app", "that", "the roadmap", "continue", "go on", "more" — using the conversation. Keep the user's exact intent and tone, and do NOT add new instructions to the assistant. If the message is already self-contained, return it unchanged.\n\nNEGATIVE EXAMPLES — return these EXACTLY as written, unchanged (they are already self-contained):\n1. "What is the derivative of x squared?" → "What is the derivative of x squared?"\n2. "Explain quantum entanglement to me." → "Explain quantum entanglement to me."\n3. "Write a Python function to reverse a string." → "Write a Python function to reverse a string."\n\nReturn ONLY the rewritten text: no quotes, no labels, no markdown, no explanation. Your entire reply must be exactly the rewritten user message and nothing else.`,
       'You rewrite context-dependent chat messages into self-contained ones. Return ONLY the rewritten text and nothing else — no quotes, no labels, no commentary.',
@@ -1109,8 +1108,8 @@ export async function rollingConversationSummary({ force = false, __generate = n
   // prove the compaction path without any key). Production keeps the
   // provider router.
   const gen = typeof __generate === 'function' ? __generate : null;
-  const keys = gen ? { groqKey: true } : resolveKeys();
-  if (!keys.groqKey && !keys.geminiKey && !keys.openrouterKey) return mem.conversationSummary || '';
+  const canCompress = gen ? true : canChat();
+  if (!canCompress) return mem.conversationSummary || '';
 
   const prior = mem.conversationSummary ? `Previous running summary:\n${mem.conversationSummary}\n\n` : '';
   const text = old

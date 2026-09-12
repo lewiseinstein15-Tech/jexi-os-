@@ -3,7 +3,7 @@
  * and model routing (stage 24).
  */
 import { notify, listNotifications, unreadCount, markAllRead, markRead, clearNotifications } from './src/services/NotificationCenter.js';
-import { INTENT_PREFERENCE, providerPreferenceForIntent, modelRoutingTable } from './src/services/ModelRouting.js';
+import { INTENT_PREFERENCE, providerPreferenceForIntent, modelRoutingTable } from './src/providers/catalog/ModelRouting.js';
 
 let passed = 0;
 let failed = 0;
@@ -39,21 +39,30 @@ for (let i = 0; i < 60; i++) notify({ title: `n${i}` });
 ok(listNotifications().length === 50, 'ring capped at 50');
 clearNotifications();
 
-// --- ModelRouting ---
-console.log('\n== Model Routing ==');
-ok(providerPreferenceForIntent('math_solve') === 'gemini', 'math → gemini');
-ok(providerPreferenceForIntent('research') === 'openrouter', 'research → openrouter');
-ok(providerPreferenceForIntent('code_task') === 'groq', 'code → groq');
-ok(providerPreferenceForIntent('image_recognition') === 'gemini', 'vision → gemini');
+// --- ModelRouting: capability lanes, never provider names ---
+console.log('\n== Model Routing (capability lanes) ==');
+ok(providerPreferenceForIntent('math_solve') === 'code', 'math → code lane');
+ok(providerPreferenceForIntent('research') === 'research', 'research → research lane');
+ok(providerPreferenceForIntent('code_task') === 'code', 'code → code lane');
+ok(providerPreferenceForIntent('image_recognition') === 'vision', 'vision → vision lane');
+ok(providerPreferenceForIntent('vision') === 'vision', 'vision intent → vision lane');
 ok(providerPreferenceForIntent('conversation') === '', 'conversation → default order');
 ok(providerPreferenceForIntent('no_such_intent') === '', 'unknown intent → default order');
+
+// The routing layer must never leak a provider name into business logic.
+const LANE_VALUES = new Set(['code', 'research', 'vision', 'fast', '']);
+for (const lane of Object.values(INTENT_PREFERENCE)) {
+  ok(LANE_VALUES.has(lane), `lane value is a capability lane (got: ${JSON.stringify(lane)})`);
+}
+const PROVIDER_WORDS = /\b(gemini|groq|openrouter|cerebras|deepinfra|mistral|xai|huggingface|nvidia|cloudflare|ollama|openai|anthropic|google|deepseek)\b/i;
+ok(!PROVIDER_WORDS.test(JSON.stringify(INTENT_PREFERENCE)), 'INTENT_PREFERENCE contains no provider name');
 
 const table = modelRoutingTable();
 ok(Array.isArray(table) && table.length === Object.keys(INTENT_PREFERENCE).length, 'table covers every intent');
 const mathRow = table.find((r) => r.intent === 'math_solve');
-ok(mathRow && mathRow.provider === 'gemini' && mathRow.providerLabel === 'Gemini', 'table labels providers');
+ok(mathRow && mathRow.lane === 'code' && mathRow.providerLabel === 'Code/structured reasoning', 'table labels lanes, not providers');
 const autoRow = table.find((r) => r.intent === 'conversation');
-ok(autoRow && autoRow.provider === '(auto)' && autoRow.providerLabel === 'Automatic failover', 'auto intents labeled');
+ok(autoRow && autoRow.lane === '(auto)' && autoRow.providerLabel === 'Automatic failover', 'auto intents labeled');
 
 console.log(`\nRESULT: ${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

@@ -4,7 +4,8 @@ import path from 'path';
 import { execFileSync, spawnSync } from 'child_process';
 import fetch from 'node-fetch';
 import { YoutubeTranscript } from 'youtube-transcript';
-import { generateContent, resolveKeys } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
+import { canChat } from '../providers/index.js';
 import { isSSRF } from './Security.js';
 
 /**
@@ -291,8 +292,7 @@ export function fmtTime(sec) {
 /* ------------------------------------------------------------------ */
 
 async function describeFrames(frames) {
-  const keys = resolveKeys();
-  if (!keys.groqKey && !keys.geminiKey && !keys.openrouterKey) return [];
+  if (!canChat(['vision'])) return [];
   const observations = [];
   for (const f of frames.slice(0, 5)) {
     try {
@@ -336,8 +336,7 @@ export async function analyzeVideo(url, { sendEvent, maxFrames = 5 } = {}) {
 
   // Stage C — key moments (chunk the transcript with timestamps)
   const chunks = transcript ? chunkSegments(transcript.segments) : [];
-  const keys = resolveKeys();
-  const hasAI = !!(keys.groqKey || keys.geminiKey || keys.openrouterKey || keys.hfKey);
+  const hasAI = canChat(['vision']);
 
   // Stage D — vision pass over the frames
   const observations = frames.length && hasAI ? await describeFrames(frames) : [];

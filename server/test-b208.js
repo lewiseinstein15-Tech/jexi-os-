@@ -21,11 +21,11 @@ import assert from 'node:assert';
 import { Director, dependencyWaves } from './src/services/director/Director.js';
 import { TaskMailbox, message, mailToActivityLine, MESSAGE_TYPES } from './src/services/director/AgentMail.js';
 import { rankEmployees, selectEmployee, loadEmployees, getEmployee, normalizeCap } from './src/services/director/Employees.js';
-import { ModelSession, preferenceOrder, runWithModel, isProviderError } from './src/services/director/ModelRouter.js';
+import { ModelSession, preferenceOrder, runWithModel, isProviderError } from './src/providers/catalog/ModelRouter.js';
 import { DirectorTask, teamEvent, loadTask } from './src/services/director/TaskState.js';
 import { parseEmployeeOutput, assembleBrief, employeeSystemPrompt, runEmployeeSession } from './src/services/director/EmployeeSession.js';
 import { verifyDeliverable, acceptanceGates } from './src/services/director/Verifier.js';
-import { telemetry } from './src/services/director/Telemetry.js';
+import { telemetry } from './src/providers/catalog/Telemetry.js';
 
 let pass = 0, fail = 0;
 const check = (name, cond, extra = '') => {

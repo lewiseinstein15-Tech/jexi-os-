@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { generateContent, resolveKeys } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
+import { canChat } from '../providers/index.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { WORKSPACE_DIR } from '../config.js';
 
@@ -104,9 +105,8 @@ export async function runPerfAgent({ query, sendEvent }) {
     }
   }
 
-  // AI-assisted fix suggestions when a key exists
-  const keys = resolveKeys();
-  if ((keys.groqKey || keys.geminiKey) && report.findings.length > 0) {
+  // AI-assisted fix suggestions when a provider is configured
+  if (canChat() && report.findings.length > 0) {
     try {
       const ai = await generateContent(
         `A static performance scan found these issues in real files:\n${JSON.stringify(report.findings, null, 1)}\n\nFile snippets:\n${files.map((f) => `--- ${f.name} ---\n${f.code.slice(0, 2500)}`).join('\n\n')}\n\nGive the top 2-3 fixes as BEFORE → AFTER code (## FIXES). Then ## RUNTIME CHECK with the exact local command to measure real speed (e.g. lighthouse, time node). Be concrete — no generic advice.`,

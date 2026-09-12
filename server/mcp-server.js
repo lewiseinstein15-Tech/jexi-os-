@@ -32,7 +32,7 @@ import { orchestrator } from './src/services/Orchestrator.js';
 import { loadMemory, getChatHistory, getMemoryStats, topUserFacts, searchKnowledge, getKnowledgeStructure, getKnowledgeStatus } from './src/services/MemoryManager.js';
 import { listBooks } from './src/services/BookLibrary.js';
 import { loadSettings } from './src/services/SettingsManager.js';
-import { providerHealthSnapshot } from './src/services/ProviderRouter.js';
+import { providerHealthSnapshot } from './src/providers/runtime/ProviderRouter.js';
 
 export const MCP_PORT = Number(process.env.MCP_PORT) || 3457;
 

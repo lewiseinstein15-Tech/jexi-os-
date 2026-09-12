@@ -16,7 +16,8 @@
  * the draft passes through untouched — verification never breaks a reply.
  */
 
-import { generateContent, resolveKeys } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
+import { canChat } from '../providers/index.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { buildVerificationPrompt, parseVerificationVerdict, buildRevisionPrompt } from './VerificationPrompt.js';
 
@@ -26,8 +27,7 @@ const SOURCES_LIMIT = 6;
 
 /** True when the answer should be verified (keys exist + long enough). */
 export function shouldVerify(draft, opts = {}) {
-  const keys = resolveKeys();
-  if (!keys.groqKey && !keys.geminiKey && !process.env.OPENROUTER_API_KEY) return false;
+  if (!canChat()) return false;
   if (!draft || String(draft).trim().length < (opts.minLength ?? MIN_LENGTH)) return false;
   return true;
 }

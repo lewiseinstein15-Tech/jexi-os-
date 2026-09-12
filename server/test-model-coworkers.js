@@ -21,8 +21,8 @@ const ok = (name, cond) => {
 /* ══════════════ 1. THE REGISTRY ══════════════ */
 console.log('\n== 1. Registry: every worker-chain model has a people name ==');
 {
-  const { coworkerName, teamRoster } = await import('./src/services/ModelCoworkers.js');
-  const { coworkerChain } = await import('./src/services/WorkerRouter.js');
+  const { coworkerName, teamRoster } = await import('./src/providers/catalog/ModelCoworkers.js');
+  const { coworkerChain } = await import('./src/providers/catalog/WorkerRouter.js');
 
   const chains = ['coder', 'memory', 'researcher', 'fallback'];
   const seen = new Set();
@@ -56,7 +56,7 @@ ok('openai/gpt-oss-120b → Leonardo (B219: live Groq flagship)', coworkerName('
 /* ══════════════ 2. SANITIZER — no raw model ID survives a log line ══════════════ */
 console.log('\n== 2. Sanitizer: raw model IDs never reach the UI ==');
 {
-  const { sanitizeStreamText } = await import('./src/services/ModelCoworkers.js');
+  const { sanitizeStreamText } = await import('./src/providers/catalog/ModelCoworkers.js');
   const samples = [
     'Coworker assigned: Memory (Qwen/Gemini) (memory)',
     'falling back to openrouter / bytedance-seed/seed-2.0-mini after error',
@@ -89,7 +89,7 @@ console.log('\n== 3. Streaming wires ==');
   const al = fs.readFileSync('./src/services/AgentLoop.js', 'utf-8');
   ok('AgentLoop names the writer on deltas', al.includes("coworkerName(meta.provider, meta.model)") && al.includes("✍️ is writing your answer…"));
 
-  const llm = fs.readFileSync('./src/services/LLMClient.js', 'utf-8');
+  const llm = fs.readFileSync('./src/providers/runtime/LLMClient.js', 'utf-8');
   ok('LLMClient deltas carry provider+model meta', llm.includes('onDelta: (t) => onDelta(t, { provider, model: cfg.models[0] })') && llm.includes('onDelta: (t) => opts.onToken(t, { provider, model })'));
 
   const idx = fs.readFileSync('./index.js', 'utf-8');
@@ -99,7 +99,7 @@ console.log('\n== 3. Streaming wires ==');
   // B162b — the UI actually CONSUMES the events the named lines ride on
   ok("engine consumes 'agent.log' (join/writing lines were dropped before)",
     /data\.type === 'log' \|\| data\.type === 'agent\.log'/.test(fs.readFileSync(path.join(ROOT, 'src/hooks/useJexiEngine.js'), 'utf-8')));
-  const llm2 = fs.readFileSync('./src/services/LLMClient.js', 'utf-8');
+  const llm2 = fs.readFileSync('./src/providers/runtime/LLMClient.js', 'utf-8');
   ok('Gemini streams natively with name meta (generateContentStream)', llm2.includes('generateContentStream(parts)') && llm2.includes("opts.onToken(piece, { provider: 'gemini', model: modelName })"));
   ok('non-streaming providers still emit once WITH meta (streamedAny fallback)', llm2.includes('streamedAny') && llm2.includes('opts.onToken(text, { provider, model: opts.model || null })'));
   const hook = fs.readFileSync(path.join(ROOT, 'src/hooks/useJexiEngine.js'), 'utf-8');
@@ -118,7 +118,7 @@ console.log('\n== 3. Streaming wires ==');
 /* ══════════════ 4. LIVE BEHAVIOR (mocked stream meta) ══════════════ */
 console.log('\n== 4. Live behavior ==');
 {
-  const { coworkerName } = await import('./src/services/ModelCoworkers.js');
+  const { coworkerName } = await import('./src/providers/catalog/ModelCoworkers.js');
   // exactly what LLMClient now passes into onToken
   const meta = { provider: 'openrouter', model: 'nvidia/nemotron-3-super-120b-a12b:free' };
   ok(`meta → “${coworkerName(meta.provider, meta.model)}” (Nemo expected)`, coworkerName(meta.provider, meta.model) === 'Nemo');
@@ -127,7 +127,7 @@ console.log('\n== 4. Live behavior ==');
 // B201 — fractions/scores/ratios in log lines are never model IDs: the
 // completeness log printed "pass: Tessa files" because 5/10 was masked.
 {
-  const { sanitizeStreamText: sst } = await import('./src/services/ModelCoworkers.js');
+  const { sanitizeStreamText: sst } = await import('./src/providers/catalog/ModelCoworkers.js');
   ok('5/10 survives masking', sst('completeness pass: 5/10 files') === 'completeness pass: 5/10 files');
   ok('16/9 survives masking', sst('aspect 16/9 ok') === 'aspect 16/9 ok');
   ok('unknown model ids are still masked', sst('vendorx/mystery-model wrote it') !== 'vendorx/mystery-model wrote it');

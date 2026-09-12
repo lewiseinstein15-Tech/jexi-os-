@@ -104,9 +104,9 @@ const orchSrc = fs.readFileSync('./src/services/Orchestrator.js', 'utf-8');
 ok('research node falls back to knowledge when the search team returns the sentinel',
   orchSrc.includes('isNonAnswerText(researchDraft)') && orchSrc.includes('answering from my own knowledge'));
 ok('stale Groq default no longer opens every plain call (discovered model consulted)',
-  fs.readFileSync('./src/services/LLMClient.js', 'utf-8').includes('[groqModelCache || GROQ_TEXT_MODEL]'));
+  fs.readFileSync('./src/providers/runtime/LLMClient.js', 'utf-8').includes('[groqModelCache || GROQ_TEXT_MODEL]'));
 ok('Gemini catalog leads with the current generation',
-  fs.readFileSync('./src/services/LLMClient.js', 'utf-8').includes("DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash'"));
+  fs.readFileSync('./src/providers/runtime/LLMClient.js', 'utf-8').includes("DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash'"));
 
 /* ---------- 7. synthesis context budget (the 14,871-token 413 root cause) ---------- */
 const { budgetSources } = await import('./src/services/SearchAgent.js');

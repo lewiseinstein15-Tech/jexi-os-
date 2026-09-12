@@ -1,4 +1,5 @@
-import { generateContent, resolveKeys } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
+import { canChat } from '../providers/index.js';
 import { rememberUserFact, loadMemory } from './MemoryManager.js';
 import { cosineSimilarity } from './MemoryManager.js';
 
@@ -101,8 +102,7 @@ NEGATIVE EXAMPLES — extract NOTHING from these (they are NOT durable preferenc
 User message: "${String(userQuery).slice(0, 1500)}"`;
 
 async function extractPreferences(userQuery) {
-  const { groqKey, geminiKey } = resolveKeys();
-  if (!groqKey && !geminiKey) return [];
+  if (!canChat()) return [];
   try {
     const raw = await generateContent(
       EXTRACTION_PROMPT(userQuery),
@@ -156,8 +156,7 @@ export async function learnFromExchange(userQuery) {
   if (query.length < MIN_QUERY_LEN) return;
   const now = Date.now();
   if (now - lastExtractionAt < EXTRACTION_INTERVAL_MS) return;
-  const { groqKey, geminiKey } = resolveKeys();
-  if (!groqKey && !geminiKey) return;
+  if (!canChat()) return;
 
   const memories = await extractPreferences(query);
   if (!memories.length) { lastExtractionAt = now; return; }

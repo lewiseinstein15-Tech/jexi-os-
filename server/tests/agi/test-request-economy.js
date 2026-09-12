@@ -141,7 +141,7 @@ test('request identity separates providers, models, prompts, and images', () => 
 /* ═══ 4. integration with the real generateContent wrapper ═════════════ */
 
 test('the economy layer never changes the honest no-keys failure', async () => {
-  const { generateContent } = await import('../../src/services/LLMClient.js');
+  const { generateContent } = await import('../../src/providers/runtime/LLMClient.js');
   // no keys in this environment → the wrapper must still surface the true error
   await assert.rejects(
     generateContent('hello', 'system', null, { cache: true }),

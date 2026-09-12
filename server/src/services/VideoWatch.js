@@ -25,7 +25,7 @@ import { execFile } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { generateContent, resolveKeys } from './LLMClient.js';
+import { generateContent, resolveKeys } from '../providers/runtime/LLMClient.js';
 
 const MAX_FILESIZE = '80M';
 const MAX_DURATION_SEC = 30 * 60;

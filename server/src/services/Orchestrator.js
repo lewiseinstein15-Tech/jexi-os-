@@ -10,7 +10,8 @@ import { analyzeLink } from './Extractor.js';
 import { reasonAndWrite } from './Reasoner.js';
 import { runSearchTeam } from './SearchAgent.js';
 import { learnHowTo } from './Researcher.js';
-import { generateContent, resolveKeys } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
+import { canChat } from '../providers/index.js';
 import { verifyDomainAnswer } from './DomainVerifier.js';
 import { collectSystemStatus, readSourceFile } from './SelfMonitor.js';
 import { studyTopic, recallKnowledge } from './KnowledgeAgent.js';
@@ -223,9 +224,8 @@ export class Orchestrator {
     const items = Array.isArray(kb) ? kb : [kb];
     const context = items.map(k => `📖 From \"${k.title}\":\n${k.content}`).join('\n\n---\n\n').slice(0, 14000);
 
-    // No AI key? Still useful: return the exact passage as a direct quote.
-    const keys = resolveKeys();
-    if (!keys.groqKey && !keys.geminiKey) {
+    // No AI provider? Still useful: return the exact passage as a direct quote.
+    if (!canChat()) {
       const top = items[0];
       return `## ${top.title}\n\n> ${top.content.slice(0, 2500)}`;
     }
@@ -408,10 +408,9 @@ export class Orchestrator {
 
     N.conversation = this.wrapCase('conversation', async ({ results, sendEvent, query, plan }) => {
       const ctx = await conversationContext(query);
-      // No AI key? Still answer identity/origin questions deterministically —
+      // No AI provider? Still answer identity/origin questions deterministically —
       // JEXI must ALWAYS know her own name, creator and origin, key or no key.
-      const keys = resolveKeys();
-      if (!keys.groqKey && !keys.geminiKey) {
+      if (!canChat()) {
         try { addChat('jexi', IDENTITY_ANSWER); } catch (e) {}
         results.summary = `### 🧠 JEXI OS\n\n${IDENTITY_ANSWER}`;
         results.statistics.confidence = 100;
@@ -565,7 +564,7 @@ Try it: say *\"build a weather app\"* and watch Product → Designer → Enginee
         `The user attached an image and asked: \"${query || 'What is this?'}\"\n\nAnalyze the image thoroughly: describe what it shows, read any text/numbers/symbols, and if it is a math problem, solve it with full LaTeX steps.`,
         JEXI_SYSTEM_PROMPT + preferencesBlock(),
         visionImage,
-        { prefer: 'gemini', temperature: 0.4 } // same proven lane as /api/vision — capability-required image lane (the configured vision-capable provider; NOT a business-logic preference)
+        { prefer: 'vision', temperature: 0.4 } // capability lane — the provider layer picks the vision-capable backend
       );
       try { addChat('jexi', reply); } catch (e) {}
       results.summary = `### 👁️ JEXI VISION\n\n${reply}`;
@@ -1050,7 +1049,7 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
         .map(r => `--- FILE: ${r.path} ---\n${r.content.slice(0, 2500)}`)
         .join('\n\n');
 
-      sendEvent('log', { agent: 'SelfDiagnose', message: `📋 Status: ${status.keys.groq || status.keys.gemini ? 'AI keys OK' : 'NO AI KEYS'}, browser ${status.browser.ready ? 'OK' : 'DOWN'}, ${status.errors.count} logged error(s).` });
+      sendEvent('log', { agent: 'SelfDiagnose', message: `📋 Status: ${status.keys.any ? 'AI provider OK' : 'NO AI PROVIDER'}, browser ${status.browser.ready ? 'OK' : 'DOWN'}, ${status.errors.count} logged error(s).` });
       const reply = await generateContent(
         `My live self-diagnosis (JSON):\n${JSON.stringify(status, null, 2)}\n\nSource code I inspected:\n${excerpts || '(none)'}\n\nCRITICAL INSTRUCTION — DO NOT HALLUCINATE BUGS:\n- Only report an issue if you can point to the EXACT buggy line in the code excerpt above (quote it verbatim).\n- Do NOT invent bugs, typos, missing imports, or unused variables. This is a real production system; the code above is live and working.\n- If the code looks correct (or you cannot be sure from the excerpt), write: \"No issues found — system healthy.\"\n- Only report issues from the JSON status (memory, browser, keys, errors, writable dirs) or the exact code you saw.\n\nIf everything is healthy, say so briefly and warmly (I am JEXI OS, created by Lewis Einstein). Use ## HEALTH, ## ISSUES FOUND, ## ROOT CAUSE + FILE, ## FIX. If no issues, put \"None — system healthy\" under ISSUES FOUND.`,
         JEXI_SYSTEM_PROMPT + preferencesBlock(),
@@ -1205,7 +1204,7 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
         sendEvent('log', { agent: 'Ada', message: '⚠ first build pass came back empty — rewriting the brief myself and retrying…' });
         let retried = false;
         try {
-          const { generateContent } = await import('./LLMClient.js');
+          const { generateContent } = await import('../providers/runtime/LLMClient.js');
           const sharper = String(await generateContent(
             `Rewrite this build request into a precise, concrete implementation brief for a coding agent: name the exact files to create, the features, and the tech. Request: "${effQuery}". Output ONLY the brief.`,
             'You write crisp engineering briefs.',

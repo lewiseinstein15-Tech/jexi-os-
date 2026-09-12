@@ -106,7 +106,7 @@ export async function runAgentTask(agentName, brief, { sendEvent = () => {}, sea
     if (seams?.generate) {
       text = await seams.generate({ agent: agentName, brief, skills, prompt: prompt.full, soul: profile.soul });
     } else {
-      const { generateContent } = await import('./LLMClient.js');
+      const { generateContent } = await import('../providers/runtime/LLMClient.js');
       // B185 — MULTI-MODEL: never one brain. The profile's preference leads,
       // then the provider ROUTER walks every healthy provider (each a named
       // coworker — Maya, Leonardo, Wei…) — and each retry for the same task

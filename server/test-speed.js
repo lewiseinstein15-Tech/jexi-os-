@@ -24,7 +24,7 @@ const ok = (name, cond) => {
 /* ══════════════ 1. SPEED-AWARE ROUTING ══════════════ */
 console.log('\n== 1. speed-aware provider routing (dsh delegate-router) ==');
 {
-  const PR = await import('./src/services/ProviderRouter.js');
+  const PR = await import('./src/providers/runtime/ProviderRouter.js');
   PR.resetProviderHealth('groq'); PR.resetProviderHealth('gemini'); PR.resetProviderHealth('openrouter');
 
   // Before any measurements: base order preserved
@@ -85,7 +85,7 @@ console.log('\n== 4. per-turn speed telemetry ==');
 /* ══════════════ 5. LLMClient feeds real latencies ══════════════ */
 console.log('\n== 5. real latencies feed the router ==');
 {
-  const llm = fs.readFileSync('./src/services/LLMClient.js', 'utf-8');
+  const llm = fs.readFileSync('./src/providers/runtime/LLMClient.js', 'utf-8');
   ok('walk loop times each provider attempt', llm.includes('const __t0 = Date.now(); // B172') && llm.includes('recordProviderSuccess(provider, Date.now() - __t0)'));
   ok('stream duration measured', llm.includes('out.tookMs = Date.now() - __st0'));
 }

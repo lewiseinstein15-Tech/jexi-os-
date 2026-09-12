@@ -41,7 +41,7 @@ console.log('\n== 2. agents talk to each other (bounded side-channel) ==');
 console.log('\n== 3. multi-model: lanes rotate, never one brain ==');
 {
   const src = fs.readFileSync('./src/services/AgentGateway.js', 'utf-8');
-  ok('lane table spans 5 different providers + auto', src.includes('LANES') && (src.match(/prefer: '/g) || []).length >= 5);
+  ok('lane rotation cycles the router health order — no hardcoded provider names', src.includes('LANES') && (src.match(/prefer: '[a-z]/g) || []).length === 0);
   ok('empty lead lane → switches coworker with a visible line', src.includes('pickAlternateLane') && src.includes('switching to a different coworker'));
   ok('every retry rotates (laneTick per agent)', src.includes('laneTick'));
 }

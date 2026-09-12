@@ -6,6 +6,7 @@
  * kernel read ONLY through this registry — no names in business logic.
  */
 
+import { readFileSync, accessSync } from 'node:fs';
 import { loadProviderConfig } from './config/loader.js';
 import { OpenAIAdapter } from './adapters/openai.js';
 import { AnthropicAdapter } from './adapters/anthropic.js';
@@ -32,13 +33,35 @@ export const ADAPTER_IDS = Object.keys(FACTORIES);
 
 let instances = null;
 
+/**
+ * Settings.json keys (written by the Settings panel) are layered on top of
+ * process.env so the bridge sees the same configured keys as the runtime's
+ * key resolver — Settings UI keys and env keys both count as configured.
+ */
+function envWithSettings(env = process.env) {
+  const merged = { ...env };
+  try {
+    const settingsPath = joinPath(process.cwd(), 'settings.json');
+    accessSync(settingsPath);
+    const settings = JSON.parse(readFileSync(settingsPath, 'utf-8')) || {};
+    for (const [k, v] of Object.entries(settings)) {
+      if (typeof v === 'string' && v && /(KEY|TOKEN)$/.test(k) && !(k.toUpperCase() in merged)) {
+        merged[k.toUpperCase()] = v;
+      }
+    }
+  } catch { /* no settings.json — env-only */ }
+  return merged;
+}
+function joinPath(...parts) { return parts.filter(Boolean).join('/'); }
+
 export function buildRegistry(env = process.env) {
   const cfg = loadProviderConfig();
+  const mergedEnv = envWithSettings(env);
   const out = [];
   for (const [id, factory] of Object.entries(FACTORIES)) {
     const providerCfg = (cfg.providers ?? {})[id];
     if (providerCfg && providerCfg.enabled === false) continue;
-    const adapter = factory(providerCfg ?? {}, env);
+    const adapter = factory(providerCfg ?? {}, mergedEnv);
     out.push(adapter);
   }
   return out;

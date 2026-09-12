@@ -29,7 +29,7 @@ const {
   resetCache, backfillEmbeddings,
 } = await import('./src/services/MemoryManager.js');
 const { resetProviderHealth, providerInCooldown, markProviderUnavailable } =
-  await import('./src/services/ProviderRouter.js');
+  await import('./src/providers/runtime/ProviderRouter.js');
 
 /* ---------------- 1. vector math ---------------- */
 const v = [0.6, 0.8];
@@ -85,7 +85,7 @@ resetProviderHealth('nvidia');
 ok(!providerInCooldown('nvidia'), 'provider healthy before 402');
 markProviderUnavailable('nvidia', 60);
 ok(providerInCooldown('nvidia'), '402 marks the provider as unavailable');
-const { providerHealthSnapshot } = await import('./src/services/ProviderRouter.js');
+const { providerHealthSnapshot } = await import('./src/providers/runtime/ProviderRouter.js');
 const snap = providerHealthSnapshot().find(p => p.key === 'nvidia');
 ok(snap.cooldownLeftSec >= 3500, `hour-long cooldown applied (${snap.cooldownLeftSec}s left)`);
 

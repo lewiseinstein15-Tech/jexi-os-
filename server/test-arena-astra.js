@@ -62,7 +62,7 @@ const ok = (name) => { passed += 1; console.log(`  ✓ ${name}`); };
 
 // ── OllamaProvider (config only — no network in tests) ───────────────
 {
-  const { ollamaConfig, OllamaProvider } = await import('./src/services/OllamaProvider.js');
+  const { ollamaConfig, OllamaProvider } = await import('./src/providers/runtime/OllamaProvider.js');
   const prev = { ...process.env };
   process.env.MODEL_PROVIDER = 'ollama';
   process.env.OLLAMA_BASE_URL = 'http://127.0.0.1:11434/';

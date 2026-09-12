@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { generateContent } from './LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
 import { applyFix } from './Architect.js';
 import { runFile } from './Runner.js';
 import { DesktopManager, ensureBrowser } from './DesktopManager.js';

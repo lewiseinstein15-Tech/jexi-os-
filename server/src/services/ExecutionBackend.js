@@ -25,7 +25,7 @@
  * payload } | throws on failure. ctx = { run, signal, tools }.
  */
 
-import { runWorker } from './WorkerRouter.js';
+import { runWorker } from '../providers/catalog/WorkerRouter.js';
 
 const backends = new Map();
 
