@@ -125,6 +125,67 @@ export function countTokens(text, providerId = null) {
   return Math.ceil(String(text ?? '').length / 4);
 }
 
+/**
+ * Resolve the LOCAL (keyless, on-machine) provider — the adapter that speaks
+ * the local backend protocol (a.k.a. the Ollama-shaped endpoint). Business
+ * logic must never name a provider; it asks "is there a local backend?" and
+ * uses whatever adapter answers. Returns null when none is registered.
+ */
+export function resolveLocalProvider(env = process.env) {
+  const adapters = registry(env) || [];
+  return adapters.find((p) => p.cfg?.needsKey === false || p.kind === 'local') ?? null;
+}
+
+/** True when the operator has configured a local backend as their preference. */
+export function localProviderPreferred(env = process.env) {
+  const local = resolveLocalProvider(env);
+  if (!local) return false;
+  try {
+    const cfg = typeof local.config === 'function' ? local.config() : null;
+    if (cfg && typeof cfg.preferred === 'boolean') return cfg.preferred;
+  } catch { /* fall through to false */ }
+  if (typeof local.isPreferred === 'function') {
+    try { return !!local.isPreferred(); } catch { /* false */ }
+  }
+  return false;
+}
+
+/**
+ * Capability check: is an OFFLINE (local) reasoning backend available for
+ * the given capability lane? The name of the concrete provider never appears
+ * here — callers ask "can I reason locally?" and get a boolean.
+ */
+export function hasLocalCapability(capability = 'reasoning', env = process.env) {
+  const local = resolveLocalProvider(env);
+  if (!local) return false;
+  try {
+    if (!local.isConfigured || !local.isConfigured()) return false;
+  } catch { return false; }
+  const caps = local.capabilities || {};
+  if (capability === 'reasoning') return true; // a local LLM can reason by default
+  if (capability === 'audio_transcription') return !!caps.audio?.transcription;
+  if (capability === 'vision') return !!caps.vision;
+  if (capability === 'tool_calling') return !!caps.toolCalling;
+  return true;
+}
+
+/**
+ * Keyed (paid-key) search providers, built in the providers layer. The seam
+ * deps ({ keyFor, httpCall, WebError, isGarbageUrl, … }) are injected by the
+ * caller (WebSearch.js) so this module never imports a services/ dependency.
+ * Business logic resolves BY CONFIG KEY, never by provider name.
+ */
+export async function getKeyedSearchProviders(deps) {
+  const { createKeyedSearchProviders } = await import('./search/index.js');
+  return createKeyedSearchProviders(deps);
+}
+
+/** Resolve a keyed search provider by its config env key (e.g. 'EXA_API_KEY'). */
+export async function getSearchProviderByEnvKey(envKey, deps) {
+  const { searchProviderByEnvKey } = await import('./search/index.js');
+  return searchProviderByEnvKey(envKey, deps);
+}
+
 export async function estimateCost(request, opts = {}) {
   const provider = opts.providerId ? getProvider(opts.providerId) : listProviders()[0];
   return provider ? provider.estimateCost(request) : 0;

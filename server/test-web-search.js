@@ -33,7 +33,7 @@ console.log('\n== 1. Seam vocabulary (dsh web/types mirror) ==');
   ok('WebError carries dsh codes', new WebError('WEB_PROVIDER_ERROR').code === 'WEB_PROVIDER_ERROR' && WS.WEB_ERRORS.ABORTED === 'WEB_ABORTED');
   ok('canonical URL strips tracking + trailing slash', WS.canonicalUrl('https://a.com/x/?utm_source=gg&gclid=1') === 'https://a.com/x');
   ok('registry holds the DSH trio + keyless engines', ['deepseek-official', 'exa', 'perplexity', 'ddg-html', 'mojeek', 'searxng', 'wikipedia'].every((id) => WS.SEARCH_PROVIDERS.some((p) => p.id === id)));
-  ok('keyed providers report unconfigured without keys (credential missing path)', !WS.deepseekSearchProvider.configured() || !!process.env.DEEPSEEK_API_KEY);
+  ok('keyed providers report unconfigured without keys (credential missing path)', !WS.SEARCH_PROVIDERS.find((p) => p.envKey === 'DEEPSEEK_API_KEY').configured() || !!process.env.DEEPSEEK_API_KEY);
 }
 
 /* ══════════════ 2. DEEPSEEK-OFFICIAL (dsh web-search-deepseek mirror) ══════════════ */

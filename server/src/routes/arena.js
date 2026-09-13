@@ -23,21 +23,21 @@ export function mountArena(app) {
   // ── kernel status ────────────────────────────────────────────────
   app.get('/api/kernel/status', async (req, res) => {
     try {
-      const [{ schedulerStatus }, { stats }, reasoning, ollama] = await Promise.all([
+      const [{ schedulerStatus }, { stats }, reasoning] = await Promise.all([
         import('../services/Scheduler.js'),
         import('../services/Observer.js'),
         import('../services/ReasoningEngine.js').catch(() => null),
-        import('../providers/runtime/OllamaProvider.js').catch(() => null),
       ]);
       let reasoningHealth = null;
       try { reasoningHealth = await reasoning?.reasoningHealth?.(); } catch { reasoningHealth = { error: 'health probe failed' }; }
+      const { localProviderPreferred } = await import('../providers/index.js');
       res.json({
         ok: true,
         kernel: 'JEXI Executive Kernel',
         observer: stats(),
         scheduler: schedulerStatus(),
         reasoning: reasoningHealth ? { ladder: reasoningHealth.ladder, providers: Object.fromEntries(Object.entries(reasoningHealth.providers || {}).map(([k, v]) => [k, { ok: !!v.ok, ms: v.ms ?? null, error: v.error || null }])) } : null,
-        ollamaPreferred: ollama ? ollama.ollamaConfig().preferred : false,
+        localPreferred: localProviderPreferred(),
         modelProvider: process.env.MODEL_PROVIDER || 'auto',
         at: new Date().toISOString(),
       });

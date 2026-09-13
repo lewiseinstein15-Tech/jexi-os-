@@ -40,7 +40,7 @@ import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import { resolveCredential } from './CredentialStore.js';
 import { loadSettings } from './SettingsManager.js'; // B166b — Settings keys reach the next search
-import { createDeepseekSearchProvider } from '../providers/search/deepseek-search.js'; // provider-layer descriptor (URL + wire header live there)
+import { getKeyedSearchProviders } from '../providers/index.js'; // keyed search providers resolve by config key (provider layer owns the names)
 
 /* ══════════════════ WebError (dsh web WebError mirror) ══════════════════ */
 
@@ -525,63 +525,15 @@ export const openAlexProvider = {
  * Citations (cited_text) are joined to sources by URL.
  */
 /**
- * dsh web-search-deepseek — provider descriptor lives in providers/search/
- * (no provider name/URL/wire-header in business logic). Inject the seam deps.
+ * Keyed (paid-key) search providers — the DSH trio (deepseek-official / exa /
+ * perplexity). Constructed in the providers/ layer by config key; this module
+ * only injects the seam deps and receives provider instances to register.
  */
-export const deepseekSearchProvider = createDeepseekSearchProvider({
+export const keyedSearchProviders = await getKeyedSearchProviders({
   keyFor, httpCall, WebError, isGarbageUrl,
   PROVIDER_ERROR: WEB_ERRORS.PROVIDER_ERROR,
   CREDENTIAL_MISSING: WEB_ERRORS.CREDENTIAL_MISSING,
 });
-export const exaProvider = {
-  id: 'exa', name: 'Exa', keyless: false,
-  envKey: 'EXA_API_KEY',
-  baseURL: () => process.env.EXA_BASE_URL || 'https://api.exa.ai',
-  configured() { return !!keyFor(this.envKey); },
-  async search(req, signal) {
-    const apiKey = keyFor(this.envKey);
-    if (!apiKey) throw new WebError(WEB_ERRORS.CREDENTIAL_MISSING, 'EXA_API_KEY not set');
-    const res = await httpCall(`${this.baseURL()}/search`, {
-      method: 'POST',
-      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-      signal,
-      body: JSON.stringify({ query: req.query, numResults: req.maxResults ?? 8, type: 'auto' }),
-    }).catch((e) => { throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `exa: ${e.message}`); });
-    if (!res.ok) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `exa HTTP ${res.status}`);
-    const data = await res.json().catch(() => { throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'exa: bad json'); });
-    const sources = (data.results || []).map((r) => ({ url: r.url, title: r.title || undefined, snippet: r.text ? String(r.text).slice(0, 300) : undefined, ...(r.publishedDate ? { publishedAt: r.publishedDate } : {}) }));
-    if (!sources.length) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'exa empty');
-    return { sources: sources.filter((s) => !isGarbageUrl(s.url)) };
-  },
-};
-
-/** dsh web-search-perplexity: OpenAI-compatible /chat/completions, model sonar;
- *  citations → sources; the generated answer rides as `content`. */
-export const perplexityProvider = {
-  id: 'perplexity', name: 'Perplexity', keyless: false,
-  envKey: 'PERPLEXITY_API_KEY',
-  baseURL: () => process.env.PERPLEXITY_BASE_URL || 'https://api.perplexity.ai',
-  model: () => process.env.PERPLEXITY_MODEL || 'sonar',
-  configured() { return !!keyFor(this.envKey); },
-  async search(req, signal) {
-    const apiKey = keyFor(this.envKey);
-    if (!apiKey) throw new WebError(WEB_ERRORS.CREDENTIAL_MISSING, 'PERPLEXITY_API_KEY not set');
-    const res = await httpCall(`${this.baseURL()}/chat/completions`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      signal,
-      body: JSON.stringify({ model: this.model(), messages: [{ role: 'user', content: req.query }] }),
-    }).catch((e) => { throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `perplexity: ${e.message}`); });
-    if (!res.ok) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `perplexity HTTP ${res.status}`);
-    const data = await res.json().catch(() => { throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'perplexity: bad json'); });
-    const content = data?.choices?.[0]?.message?.content || undefined;
-    const raw = data?.search_results?.map((r) => ({ url: r.url, title: r.title || undefined }))
-      ?? (data?.citations || []).map((u) => ({ url: u }));
-    const sources = (raw || []).filter((s) => s.url && !isGarbageUrl(s.url));
-    if (!sources.length && !content) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'perplexity empty');
-    return { ...(content ? { content } : {}), sources };
-  },
-};
 
 /* ══════════ KEYLESS PREMIUM MESH (verified live, Sept 2026) ══════════
  * Three premium engines serve ANONYMOUS tiers over plain HTTPS POST in
@@ -799,7 +751,7 @@ export const firecrawlProvider = {
  *  whole-web engines always follow — search works with zero keys. */
 export const SEARCH_PROVIDERS = [
   tavilyProvider, braveProvider, firecrawlProvider,           // free-tier keyed APIs
-  deepseekSearchProvider, exaProvider, perplexityProvider,   // DSH trio (paid keys)
+  ...keyedSearchProviders,                                     // DSH trio (paid keys)
   exaAnonProvider, parallelProvider, anysearchProvider,       // keyless premium mesh
   googleNewsRssProvider, ddgInstantProvider, marginaliaProvider, hnSearchProvider, // datacenter-proof
   ddgHtmlProvider, ddgLiteProvider, mojeekProvider, bingProvider, searxngProvider, // HTML engines

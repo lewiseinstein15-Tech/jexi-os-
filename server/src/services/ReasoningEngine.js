@@ -4,7 +4,7 @@
  * The provider-independent reasoning layer:
  *
  *   ReasoningEngine → ModelRouter → ModelProvider
- *       ├── OllamaProvider (local — Lewis's own machine)
+ *       ├── LocalProvider (keyless on-machine backend — via providers/)
  *       ├── RemoteProvider (the free-tier ladder in LLMClient)
  *       └── FutureProvider (registered at runtime, same interface)
  *
@@ -36,10 +36,31 @@ export function listProviders() {
 
 /** Ensure the built-in providers are registered (lazy, import-cycle safe). */
 async function ensureBuiltins() {
-  if (!providers.has('ollama')) {
+  const { hasLocalCapability, resolveLocalProvider, localProviderPreferred } = await import('../providers/index.js');
+  if (!providers.has('local') && hasLocalCapability('reasoning')) {
     try {
-      const { OllamaProvider } = await import('../providers/runtime/OllamaProvider.js');
-      registerProvider(OllamaProvider);
+      const local = resolveLocalProvider();
+      if (local) {
+        registerProvider({
+          id: 'local',
+          kind: 'local',
+          config: () => ({ preferred: localProviderPreferred() }),
+          generate: async ({ messages, model, signal, timeoutMs }) => {
+            const t0 = Date.now();
+            const r = await local.chat({ messages, model, timeoutMs, signal });
+            const text = r?.content ?? '';
+            return { text, model: model || 'local', ms: Date.now() - t0, provider: 'local' };
+          },
+          health: async () => {
+            try {
+              return local.health ? await local.health({ timeoutMs: 8000 }) : { ok: true };
+            } catch (e) {
+              return { ok: false, error: String(e?.message || e).slice(0, 140) };
+            }
+          },
+          isPreferred: () => localProviderPreferred(),
+        });
+      }
     } catch {}
   }
   if (!providers.has('remote')) {
@@ -66,13 +87,17 @@ async function ensureBuiltins() {
   }
 }
 
-/** Ladder order: MODEL_PROVIDER first, then the rest. */
+/** Ladder order: an operator-preferred provider first, then the rest. */
 function ladderOrder() {
   const preferred = (process.env.MODEL_PROVIDER || '').toLowerCase();
   const ids = [...providers.keys()];
-  ids.sort((a, b) => (a === preferred ? -1 : 0) - (b === preferred ? -1 : 0));
-  // Ollama preferred by default when explicitly selected; otherwise remote first.
-  if (!preferred && providers.has('remote')) {
+  const isPreferred = (id) => {
+    if (preferred && id === preferred) return true;
+    try { return !!(providers.get(id)?.isPreferred && providers.get(id).isPreferred()); } catch { return false; }
+  };
+  ids.sort((a, b) => (isPreferred(a) ? -1 : 0) - (isPreferred(b) ? -1 : 0));
+  // The explicitly-preferred provider goes first; otherwise remote first.
+  if (!preferred && !ids.some((id) => isPreferred(id)) && providers.has('remote')) {
     return ['remote', ...ids.filter((x) => x !== 'remote')];
   }
   return ids;
