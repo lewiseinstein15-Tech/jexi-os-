@@ -1,3 +1,7 @@
+// PHASE-3 TODO (retained, requires Phase 4): HOT-PATH runtime module with no
+// wired replacement — it IS the real browser runtime (BrowserRouter desktop
+// worker, director/ComputerOps, SelfMonitor, Orchestrator, index.js). Do NOT
+// delete; adopt as a permanent runtime module under the layered architecture.
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';

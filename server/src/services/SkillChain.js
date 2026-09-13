@@ -1,3 +1,8 @@
+// PHASE-3 TODO (retained, requires Phase 4): HOT-PATH runtime module with no
+// wired replacement — it IS the skill execution engine (loadSkill/skillMeta +
+// planForBuild/qaWebApp/review/security/critic/shipper/reflector passes) used
+// by Orchestrator, PipelineGraphs, ToolRuntime, SubagentRuntime, Reachability.
+// Do NOT delete until a director-side skill assembly replaces these passes.
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';

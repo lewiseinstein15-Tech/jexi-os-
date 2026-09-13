@@ -1,3 +1,7 @@
+// PHASE-3 TODO (retained, requires Phase 4): HOT-PATH runtime module with no
+// wired replacement — workforce/registry/ is test-only; Planner/ToolRegistry/
+// Orchestrator still call composeTeam/getAgent/rosterStats from here. Do NOT
+// delete until those call sites migrate to workforce/registry/.
 /**
  * JEXI OS — Agent Roster & Skill Registry.
  *

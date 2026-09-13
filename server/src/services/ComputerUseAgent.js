@@ -1,3 +1,7 @@
+// PHASE-3 TODO (retained, requires Phase 4): HOT-PATH runtime module with no
+// wired replacement — Orchestrator constructs ComputerUseAgent directly for
+// link_analysis and computer-use intents; no browser-runtime executeTask
+// exists elsewhere. Do NOT delete until those intents migrate.
 import fs from 'fs';
 import path from 'path';
 import { jsonrepair } from 'jsonrepair';
