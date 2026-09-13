@@ -40,6 +40,7 @@ import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import { resolveCredential } from './CredentialStore.js';
 import { loadSettings } from './SettingsManager.js'; // B166b — Settings keys reach the next search
+import { createDeepseekSearchProvider } from '../providers/search/deepseek-search.js'; // provider-layer descriptor (URL + wire header live there)
 
 /* ══════════════════ WebError (dsh web WebError mirror) ══════════════════ */
 
@@ -523,59 +524,15 @@ export const openAlexProvider = {
  * web_search_tool_result block → WEB_PROVIDER_ERROR (never prose-scrape).
  * Citations (cited_text) are joined to sources by URL.
  */
-export const deepseekSearchProvider = {
-  id: 'deepseek-official', name: 'DeepSeek Search', keyless: false,
-  envKey: 'DEEPSEEK_API_KEY',
-  baseURL: () => process.env.DEEPSEEK_SEARCH_BASE_URL || 'https://api.deepseek.com/anthropic/v1',
-  model: () => process.env.DEEPSEEK_SEARCH_MODEL || 'deepseek-v4-flash',
-  configured() { return !!keyFor(this.envKey); },
-  async search(req, signal) {
-    const apiKey = keyFor(this.envKey);
-    if (!apiKey) throw new WebError(WEB_ERRORS.CREDENTIAL_MISSING, 'DEEPSEEK_API_KEY not set');
-    const res = await httpCall(`${this.baseURL()}/messages`, {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': process.env.DEEPSEEK_SEARCH_API_VERSION || '2023-06-01',
-        'Content-Type': 'application/json',
-      },
-      signal,
-      body: JSON.stringify({
-        model: this.model(),
-        max_tokens: 4096,
-        messages: [{ role: 'user', content: [{ type: 'text', text: req.query }] }],
-        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
-      }),
-    }).catch((e) => { throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `deepseek search: ${e.message}`); });
-    if (!res.ok) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `deepseek search HTTP ${res.status}`);
-    const data = await res.json().catch(() => { throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'deepseek search: bad json'); });
-    // Two-pass mapping (dsh): pass 1 collects result items AND citation
-    // excerpts (blocks may arrive in any order); pass 2 joins them by URL.
-    const byUrl = new Map();
-    const citations = new Map(); // url → cited_text
-    for (const block of data.content || []) {
-      if (block.type === 'web_search_tool_result') {
-        for (const item of block.content || []) {
-          if (item.url && !byUrl.has(item.url)) {
-            byUrl.set(item.url, { url: item.url, title: item.title || undefined, ...(item.page_age ? { publishedAt: item.page_age } : {}) });
-          }
-        }
-      } else if (block.type === 'text') {
-        for (const c of block.citations || []) {
-          if (c.url && c.cited_text && !citations.has(c.url)) citations.set(c.url, String(c.cited_text).slice(0, 300));
-        }
-      }
-    }
-    for (const [url, excerpt] of citations) {
-      const src = byUrl.get(url);
-      if (src && !src.snippet) src.snippet = excerpt;
-    }
-    if (!byUrl.size) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, 'deepseek search: no web_search_tool_result block (strict mode)');
-    return { sources: [...byUrl.values()].filter((s) => !isGarbageUrl(s.url)) };
-  },
-};
-
-/** dsh web-search-exa: POST {base}/search with numResults. */
+/**
+ * dsh web-search-deepseek — provider descriptor lives in providers/search/
+ * (no provider name/URL/wire-header in business logic). Inject the seam deps.
+ */
+export const deepseekSearchProvider = createDeepseekSearchProvider({
+  keyFor, httpCall, WebError,
+  PROVIDER_ERROR: WEB_ERRORS.PROVIDER_ERROR,
+  CREDENTIAL_MISSING: WEB_ERRORS.CREDENTIAL_MISSING,
+});
 export const exaProvider = {
   id: 'exa', name: 'Exa', keyless: false,
   envKey: 'EXA_API_KEY',

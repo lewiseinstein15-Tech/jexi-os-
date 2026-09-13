@@ -37,6 +37,24 @@ export {
 };
 
 /**
+ * Resolve a provider that can transcribe audio (capability-driven).
+ * Returns { providerId, transcribe } or null when none is configured.
+ * Business logic never names a provider — it asks for the capability.
+ */
+export function resolveAudioTranscriber(env = process.env) {
+  const providers = registry(env);
+  for (const p of providers) {
+    if (p.cfg?.needsKey === false) continue; // keyless lanes don't transcribe
+    if (p.isConfigured && !p.isConfigured()) continue;
+    const audio = p.capabilities?.audio;
+    if (!audio?.transcription) continue;
+    if (typeof p.transcribeAudio !== 'function') continue;
+    return { providerId: p.id, transcribe: (task) => p.transcribeAudio(task) };
+  }
+  return null;
+}
+
+/**
  * True when at least one KEYED provider is configured with a key AND has a
  * model satisfying the given capabilities.
  *

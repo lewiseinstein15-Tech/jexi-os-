@@ -5,8 +5,8 @@
  *   1. RESOLVE    URL → yt-dlp download (bounded: ≤80 MB, ≤30 min, ≤720p);
  *                 local path → use as-is
  *   2. TRANSCRIPT captions FIRST (free, yt-dlp auto-subs) → fallback
- *                 Groq whisper-large-v3 (FREE on JEXI's existing Groq key —
- *                 verbose_json gives timestamped segments)
+ *                 audio transcription via the provider layer (capability-
+ *                 driven; verbose_json gives timestamped segments)
  *   3. FRAMES     scene-change extraction (ffmpeg select='gt(scene,0.30)') —
  *                 one frame per detected CUT, not every-N-seconds — plus the
  *                 0–10s HOOK MICROSCOPE at 2 fps (claude-watch's insight:
@@ -25,7 +25,8 @@ import { execFile } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { generateContent, resolveKeys } from '../providers/runtime/LLMClient.js';
+import { generateContent } from '../providers/runtime/LLMClient.js';
+import { resolveAudioTranscriber } from '../providers/index.js';
 
 const MAX_FILESIZE = '80M';
 const MAX_DURATION_SEC = 30 * 60;
@@ -190,31 +191,22 @@ async function captionsTranscript(url, dir) {
   return { ok: true, segments: segs, source: 'captions' };
 }
 
-/** Groq whisper-large-v3 — FREE, rides JEXI's existing GROQ key (claude-watch's preferred backend). */
+/** Audio transcription through the provider layer (capability-driven; no provider name here). */
 async function whisperTranscript(mediaFile, dir, say, __seams = {}) {
-  const groqKey = __seams?.groqKey !== undefined ? __seams.groqKey : resolveKeys().groqKey;
-  if (!groqKey) return { ok: false, error: 'no Groq key for Whisper (captions unavailable for this video)' };
+  const transcriber = __seams?.transcriber !== undefined ? __seams.transcriber : resolveAudioTranscriber();
+  if (!transcriber) return { ok: false, error: 'no audio transcription provider configured (captions unavailable for this video)' };
   const mp3 = path.join(dir, 'audio.mp3');
   const ex = await run('ffmpeg', ['-y', '-i', mediaFile, '-vn', '-ac', '1', '-ar', '16000', '-b:a', '48k', mp3], { timeoutMs: 120000 });
   if (!ex.ok || !fs.existsSync(mp3)) return { ok: false, error: 'audio extraction failed' };
   const stat = fs.statSync(mp3);
   if (stat.size > 24 * 1024 * 1024) return { ok: false, error: 'audio too large for the Whisper tier (>24 MB)' };
-  say('🎙️', 'no captions — transcribing the audio with Whisper…');
-  const form = new FormData();
-  form.append('file', new Blob([fs.readFileSync(mp3)]), 'audio.mp3');
-  form.append('model', 'whisper-large-v3');
-  form.append('response_format', 'verbose_json');
-  form.append('timestamp_granularities[]', 'segment');
+  say('🎙️', 'no captions — transcribing the audio…');
   try {
-    const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-      method: 'POST', headers: { Authorization: `Bearer ${groqKey}` }, body: form, signal: AbortSignal.timeout(180000),
-    });
-    if (!res.ok) return { ok: false, error: `whisper HTTP ${res.status}` };
-    const data = await res.json();
-    const words = String(data.text || '').split(/\s+/).filter(Boolean).length;
-    const segs = (data.segments || []).map((s) => ({ start: Math.round(s.start), text: String(s.text || '').trim() }));
-    if (!segs.length && data.text) segs.push({ start: 0, text: String(data.text).slice(0, 3000) });
-    return segs.length ? { ok: true, segments: segs, source: 'whisper', words } : { ok: false, error: 'whisper returned nothing' };
+    const audioBuffer = fs.readFileSync(mp3);
+    const out = await transcriber.transcribe({ fileBuffer: audioBuffer, filename: 'audio.mp3' });
+    return out.segments?.length
+      ? { ok: true, segments: out.segments, source: 'whisper', words: out.words ?? 0 }
+      : { ok: false, error: 'whisper returned nothing' };
   } catch (e) {
     return { ok: false, error: `whisper: ${e.message}` };
   }
