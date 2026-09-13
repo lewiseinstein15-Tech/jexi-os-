@@ -29,7 +29,11 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // --- setup: bundle the JSX component (idempotent, cheap) ---
-const bundlePath = path.join(ROOT, 'node_modules/.tmp/at.mjs');
+// Bundle into SERVER/node_modules/.tmp so the external `react` import in the
+// bundle resolves to the SAME react instance react-dom uses (server copy).
+// Writing into the repo-root node_modules/.tmp split React into two instances
+// → "Cannot read properties of null (reading 'useState')". (Phase 3 C1 fix.)
+const bundlePath = path.join(ROOT, 'server/node_modules/.tmp/at.mjs');
 fs.mkdirSync(path.dirname(bundlePath), { recursive: true });
 execSync(`npx esbuild src/components/AgentThinking.jsx --bundle --format=esm --outfile="${bundlePath}" --external:react --jsx=automatic --log-level=error`, { cwd: ROOT, stdio: 'pipe' });
 
