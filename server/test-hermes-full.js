@@ -2,6 +2,11 @@
  * B185 — the full Hermes checklist, live-verified: profiles ✓ inter-agent
  * talk ✓ multi-model lanes ✓ self-rephrase (never ask the user) ✓ skill
  * loop ✓ NL scheduling ✓ unattended delivery ✓.
+ *
+ * C2 keyless-safe: this suite runs entirely against in-memory seams / mock
+ * generate() and asserts the HONEST degraded path when providers fail — it
+ * needs NO provider keys, so it never fails on a keyless runner. (Runs every
+ * check; no skip needed.)
  */
 
 import fs from 'fs';

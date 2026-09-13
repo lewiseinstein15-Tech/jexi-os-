@@ -17,6 +17,16 @@ const { getEmployee } = await import('../../src/services/director/Employees.js')
 
 const GOOD_OUTPUT = ['## REPORT', 'Used the live data.', '', '## DELIVERABLE', 'The answer, grounded in the real service output.', '', '## CONFIDENCE', 'high'].join('\n');
 
+/**
+ * Keyless-runner skip (C2): the live weather MCP round-trip needs provider
+ * keys in the runner env. CI and local keyless runners set PROVIDER_KEYS_PRESENT
+ * to a falsey value (or leave it unset) — then this test reports "skipped",
+ * never "failed". Operators with keys set PROVIDER_KEYS_PRESENT=1.
+ */
+function isKeylessEnv() {
+  return !/^(1|true|yes)$/i.test(String(process.env.PROVIDER_KEYS_PRESENT || ''));
+}
+
 function fakeEmployee() {
   const z = getEmployee('zola');
   // D2: the session now carries the employee's MCP grants — this test's fake
@@ -86,6 +96,11 @@ async function probeLiveWeatherCleanup() {
 }
 
 test('a routed mcpCall runs for REAL and lands in the employee context', { timeout: 240_000 }, async (t) => {
+  // C2 keyless skip: no provider keys → report "skipped", never "failed".
+  if (isKeylessEnv()) {
+    t.skip('skipped: no provider keys in env (set PROVIDER_KEYS_PRESENT=1 to run the live weather lane)');
+    return;
+  }
   // Scope C skip: don't hang a runner that can't reach the live weather MCP.
   try {
     await probeLiveWeather();

@@ -9,6 +9,10 @@
  *   typert/protocol                                   → TypingProtocol.js
  *   subagent tool provider routing                    → ToolRuntime 'subagent'
  *   ui-permission-presets (frontend panel)            → src/components/SettingsPanel.jsx
+ *
+ * C2 keyless-safe: external-CLI dialects use a fake-binary fallback and the
+ * remote-agent entry is a mock URL — NO provider keys needed, so this suite
+ * never fails on a keyless runner. (Runs every check; no skip needed.)
  */
 
 import fs from 'fs';
