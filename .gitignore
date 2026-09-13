@@ -17,6 +17,7 @@ task_state.json
 # Runtime data (memory core, knowledge library, generated files)
 server/data/
 server/jexi-workspace/
+.jexi/
 
 # System files
 .DS_Store

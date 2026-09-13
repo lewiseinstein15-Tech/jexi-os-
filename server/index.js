@@ -129,6 +129,9 @@ import { initConfigSnapshot } from './src/services/ConfigReload.js';
 import { openSessionPersistence } from './src/services/SessionPersistenceSqlite.js';
 import { loadPlugins, setActivePluginContext } from './src/services/PluginContext.js';
 import { startSkillWatcher } from './src/services/SkillDiscovery.js';
+import {
+  listGrants, addGrant, removeGrant, resetGrants, recentDenied,
+} from './src/workforce/grant-manager.js';
 
 // If a durable layer is set (TURSO_URL preferred, REDIS_URL legacy), pull JEXI's memory core from it so she remembers
 // everything across restarts/redeploys (non-blocking).
@@ -1205,6 +1208,35 @@ app.get('/api/roster', (req, res) => {
   }
   res.setHeader('Cache-Control', 'public, max-age=30');
   res.type('json').send(rosterCache.json);
+});
+
+// === MCP GRANT MANAGEMENT (Phase 3, Scope D) ===
+// Persisted per-agent MCP grants in <DATA_DIR>/permissions.yaml. The same
+// routes power the CLI, curl, and a future web panel.
+//   GET  /api/mcp/grants          → list every agent + allowedMCP
+//   POST /api/mcp/grants          → {action:'add'|'remove'|'reset', agent, server, [tool]}
+//   GET  /api/mcp/denied          → recent MCP_DENIED audit events
+app.get('/api/mcp/grants', (req, res) => res.json({ agents: listGrants() }));
+
+app.post('/api/mcp/grants', (req, res) => {
+  const { action, agent, server, tool } = req.body || {};
+  let result;
+  if (action === 'reset') {
+    result = resetGrants();
+  } else if (action === 'add') {
+    result = addGrant(agent, server, tool);
+  } else if (action === 'remove') {
+    result = removeGrant(agent, server, tool);
+  } else {
+    return res.status(400).json({ ok: false, error: `unknown action '${action}' (use add|remove|reset)` });
+  }
+  if (!result.ok) return res.status(400).json(result);
+  return res.json({ ok: true, agent: result.agent, agents: listGrants() });
+});
+
+app.get('/api/mcp/denied', (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 25, 200);
+  res.json({ denied: recentDenied(limit) });
 });
 
 // === FIRST-CLASS SKILLS (roadmap stage 13) ===

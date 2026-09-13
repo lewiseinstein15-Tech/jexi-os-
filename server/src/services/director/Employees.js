@@ -46,6 +46,14 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = path.join(DATA_DIR, 'employees.json');
 const HISTORY_DIR = path.join(DATA_DIR, 'director-history');
 
+// Phase 3 Scope D — MCP grant override hook. The grant-manager registers a
+// function that returns per-agent grants from .jexi/permissions.yaml when
+// present. loadEmployees applies it on top of the roster so grant edits take
+// effect on the hot path without a circular import (grant-manager imports
+// loadEmployees, so the hook is one-directional: employees ← grants).
+let _mcpGrantsProvider = null;
+export function setMCPGrantsProvider(fn) { _mcpGrantsProvider = fn; }
+
 /**
  * Capability vocabulary — synonyms collapse to canonical tokens so the
  * interpreter's free-form requirement words ("engineering", "testing")
@@ -199,20 +207,52 @@ const DEFAULT_EMPLOYEES = [
 let _cache = null;
 let _cacheMtime = 0;
 
-/** Load the roster: data/employees.json overrides the defaults (hot-reloaded on mtime). */
+/** Load the roster: data/employees.json overrides the defaults (hot-reloaded on mtime),
+ * plus any MCP grants from .jexi/permissions.yaml overlayed per call (cheap). */
 export function loadEmployees() {
+  let base;
   try {
     const st = fs.statSync(CONFIG_PATH);
-    if (_cache && st.mtimeMs === _cacheMtime) return _cache;
-    const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
-    if (Array.isArray(raw.employees) && raw.employees.length) {
-      _cache = raw.employees.map(normalizeEmployee);
-      _cacheMtime = st.mtimeMs;
-      return _cache;
+    if (_cache && st.mtimeMs === _cacheMtime) {
+      base = _cache;
+    } else {
+      const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+      if (Array.isArray(raw.employees) && raw.employees.length) {
+        _cache = raw.employees.map(normalizeEmployee);
+        _cacheMtime = st.mtimeMs;
+        base = _cache;
+      }
     }
   } catch { /* fall back to defaults */ }
-  _cache = DEFAULT_EMPLOYEES.map(normalizeEmployee);
-  return _cache;
+  if (!base) { _cache = DEFAULT_EMPLOYEES.map(normalizeEmployee); base = _cache; }
+  return applyMCPGrants(base);
+}
+
+/** Merge .jexi/permissions.yaml MCP grants onto the roster (Phase 3 Scope D).
+ * Grant entries for a known agent replace its allowedMCP; brand-new grant
+ * entries (an agent the roster doesn't know) are appended as a fresh,
+ * grants-only employee so an operator can grant a custom agent. */
+function applyMCPGrants(roster) {
+  if (typeof _mcpGrantsProvider !== 'function') return roster;
+  let grants = [];
+  try { grants = _mcpGrantsProvider() || []; } catch { return roster; }
+  if (!Array.isArray(grants) || !grants.length) return roster;
+  const out = roster.map((e) => ({ ...e }));
+  const byName = new Map(out.map((e) => [e.agentId, e]));
+  for (const g of grants) {
+    const name = String(g.name || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+    if (!name) continue;
+    const mcp = Array.isArray(g.allowedMCP) ? g.allowedMCP.map((x) => ({ server: String(x.server), tools: Array.isArray(x.tools) ? x.tools.map(String) : ['*'] })) : [];
+    const existing = byName.get(name);
+    if (existing) {
+      existing.allowedMCP = mcp;
+    } else {
+      const neo = normalizeEmployee({ agentId: name, displayName: name, role: 'Granted Agent', allowedMCP: mcp, permissions: ['READ'], capabilities: ['reasoning'] });
+      out.push(neo);
+      byName.set(name, neo);
+    }
+  }
+  return out;
 }
 
 /** Normalize per-agent MCP grants: [{ server, tools }] — deny-by-default layer.
