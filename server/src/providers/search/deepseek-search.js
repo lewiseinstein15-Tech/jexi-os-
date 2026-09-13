@@ -58,11 +58,21 @@ export function createDeepseekSearchProvider(deps) {
             if (item.url && !byUrl.has(item.url)) {
               byUrl.set(item.url, { url: item.url, title: item.title || undefined, ...(item.page_age ? { publishedAt: item.page_age } : {}) });
             }
-            if (item.cited_text) citations.set(item.url, item.cited_text.replace(/\s+/g, ' ').trim());
+            if (item.cited_text) citations.set(item.url, item.cited_text.replace(/\s+/g, ' ').trim().slice(0, 300));
+          }
+        } else if (block.type === 'text') {
+          for (const c of block.citations || []) {
+            if (c.url && !citations.has(c.url)) citations.set(c.url, String(c.cited_text || '').replace(/\s+/g, ' ').trim().slice(0, 300));
           }
         }
       }
-      const sources = [...byUrl.values()].slice(0, (req.maxResults || 10));
+      if (!byUrl.size) throw new WebError(deps.PROVIDER_ERROR || 'WEB_PROVIDER_ERROR', 'deepseek search: no web_search_tool_result block (strict mode)');
+      for (const [url, src] of byUrl) {
+        const excerpt = citations.get(url);
+        if (excerpt && !src.snippet) src.snippet = excerpt;
+      }
+      let sources = [...byUrl.values()].slice(0, (req.maxResults || 10));
+      if (deps.isGarbageUrl) sources = sources.filter((s) => !deps.isGarbageUrl(s.url));
       return { content: undefined, truncated: (byUrl.size || 0) > (req.maxResults || 10), sources };
     },
   };

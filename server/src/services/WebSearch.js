@@ -529,7 +529,7 @@ export const openAlexProvider = {
  * (no provider name/URL/wire-header in business logic). Inject the seam deps.
  */
 export const deepseekSearchProvider = createDeepseekSearchProvider({
-  keyFor, httpCall, WebError,
+  keyFor, httpCall, WebError, isGarbageUrl,
   PROVIDER_ERROR: WEB_ERRORS.PROVIDER_ERROR,
   CREDENTIAL_MISSING: WEB_ERRORS.CREDENTIAL_MISSING,
 });
