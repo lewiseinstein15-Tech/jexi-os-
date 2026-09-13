@@ -49,11 +49,51 @@ test('assembleBrief carries the interpreter-routed mcpCalls (capped at 3)', () =
 
 /* ═══ live data phase — real weather call, grounded prompt ═════════════════ */
 
-test('a routed mcpCall runs for REAL and lands in the employee context', { timeout: 240_000 }, async () => {
-  // pre-warm: on a cold CI runner the weather server's npx boot can take
-  // over a minute — connect it through the gateway's 150s boot budget first
-  // so the session's own call is warm (mirrors what the prewarm step does in
-  // production images).
+/**
+ * KEYLESS/NETWORK SKIP PROBE (Scope C): this test exercises the REAL weather
+ * MCP, which boots via `npm exec` and needs a clean process table, npm cache,
+ * and network. On a cold/first-run host (CI, restricted sandbox, orphaned
+ * children) that boot can exceed the 120s call budget and wedge the runner.
+ * Probe with a bounded round-trip FIRST so an unreachable weather MCP skips
+ * the live test instead of hanging the suite.
+ *
+ * Orphan discipline: never race the connect (an abandoned connect still spawns
+ * npx → node later and leaks the child). Drive everything through a SINGLE
+ * bounded invokeMcpTool (lazy-connects internally, 160s internal boot budget)
+ * and ALWAYS disconnect in `finally` so the spawned tree is killed even on
+ * failure. `probeLiveWeather()` resolves { ok } fast when the round-trip
+ * succeeds and throws quickly when the service can't be reached.
+ */
+async function probeLiveWeather(timeoutMs = 20_000) {
+  const { invokeMcpTool } = await import('../../src/services/MCPGateway.js');
+  const t0 = Date.now();
+  const call = await Promise.race([
+    invokeMcpTool({ server: 'weather', tool: 'get_weather_summary', args: { city_name: 'Nairobi' }, timeoutMs: Math.min(timeoutMs, 15_000) }),
+    new Promise((_, rej) => setTimeout(() => rej(new Error('weather round-trip timed out')), timeoutMs)),
+  ]);
+  if (!call.ok) throw new Error(`weather round-trip failed: ${call.error}`);
+  return { ok: true, ms: Date.now() - t0 };
+}
+/**
+ * Probe cleanup: run AFTER probeLiveWeather (success OR failure) so a spawned
+ * weather tree is always reaped — the gateway's disconnect kills the tree.
+ */
+async function probeLiveWeatherCleanup() {
+  try {
+    const { disconnectGatewayServer } = await import('../../src/services/MCPGateway.js');
+    await disconnectGatewayServer('weather');
+  } catch { /* best effort */ }
+}
+
+test('a routed mcpCall runs for REAL and lands in the employee context', { timeout: 240_000 }, async (t) => {
+  // Scope C skip: don't hang a runner that can't reach the live weather MCP.
+  try {
+    await probeLiveWeather();
+  } catch (e) {
+    await probeLiveWeatherCleanup();
+    t.skip(`live weather MCP unavailable in this environment (${e.message})`);
+    return;
+  }
   const { connectGatewayServer } = await import('../../src/services/MCPGateway.js');
   const warm = await connectGatewayServer('weather');
   assert.ok(warm.ok, `weather pre-warm failed: ${warm.error}`);
@@ -85,6 +125,7 @@ test('a routed mcpCall runs for REAL and lands in the employee context', { timeo
   assert.match(seenUserPrompt, /\[live data from the "weather" service/);
   // real weather content reached the model (temperature/wind/condition family)
   assert.ok(/temp|wind|condition|weather|°/i.test(seenUserPrompt), 'real weather data expected in the model prompt');
+  await probeLiveWeatherCleanup();
 });
 
 test('an unavailable service fails HONESTLY and the session continues', { timeout: 60_000 }, async () => {
@@ -156,7 +197,7 @@ test('an employee with a weather-only grant: weather passes, other servers denie
   assert.ok(okCall.result.content[0].text.includes('ok 21C'), 'weather call must reach the fake server');
   const denied = await invokeMcpTool({ server: 'git', tool: 'status', mcpGrants: grants });
   assert.equal(denied.ok, false);
-  assert.ok(denied.error.includes("no MCP grant for server 'git'"), denied.error);
+  assert.ok(denied.error.includes("server 'git' is not in the agent's grants"), denied.error);
   __resetGateway();
 });
 /* ═══ cleanup: close the live connection the test opened ═══════════════════ */

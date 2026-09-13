@@ -15,6 +15,16 @@ const ok = (cond, name) => {
   else { failed++; console.log(`  ❌ ${name}`); }
 };
 
+// KEYLESS GUARD — these tests assert the no-token parking/needInfo path, so an
+// ambient GITHUB_TOKEN/GH_TOKEN in the runner env (CI, OpenHands secrets,
+// operator shell) would short-circuit resolveToken and break them. Save any
+// ambient token and clear it for the duration; the resolveToken block sets its
+// own env values and deletes them, and we restore the ambient value at exit.
+const _ambientGhToken = process.env.GITHUB_TOKEN;
+const _ambientGhTokenAlt = process.env.GH_TOKEN;
+delete process.env.GITHUB_TOKEN;
+delete process.env.GH_TOKEN;
+
 function makeAgent({ runOk = true, fixRounds = 0, token = null, repoOk = true } = {}) {
   let runs = 0;
   const agent = new BuilderAgent({
@@ -115,6 +125,12 @@ console.log('\n== No planner → honest failure ==');
   const out = await agent.run({ prompt: 'x' });
   ok(out.success === false && /AI keys/.test(out.summary), 'honest degraded failure');
 }
+
+// Restore the ambient token (if any) so this test is transparent to its caller.
+if (_ambientGhToken !== undefined) process.env.GITHUB_TOKEN = _ambientGhToken;
+else delete process.env.GITHUB_TOKEN;
+if (_ambientGhTokenAlt !== undefined) process.env.GH_TOKEN = _ambientGhTokenAlt;
+else delete process.env.GH_TOKEN;
 
 console.log(`\nRESULT: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

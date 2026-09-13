@@ -206,7 +206,9 @@ console.log('\n== 8. Frontend panel + integration ==');
   const { TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
   ok('registry stable at 207', TOOL_COUNT === 218);
   const { assemblePrompt } = await import('./src/services/PromptAssembly.js');
-  const prompt = await assemblePrompt({ convId: 't-int-b138' });
+  // Pin an env with no TMUX/TMUX_PANE so this assertion doesn't depend on the
+  // runner's ambient shell (the real process may be inside a tmux session).
+  const prompt = await assemblePrompt({ convId: 't-int-b138', env: { TMUX: '', TMUX_PANE: '' } });
   ok('prompt assembles (tmux section no-op outside tmux)', typeof prompt === 'string' && prompt.length > 500 && !prompt.includes('tmux session'));
 }
 

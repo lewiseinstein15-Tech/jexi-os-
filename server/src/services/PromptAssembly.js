@@ -103,6 +103,7 @@ export async function assemblePrompt({
   repoRoot = null, // M4 — workspace root for the bounded repo-map section
   budget = null, // M4 — total budget override { maxChars, maxTokens, perSection }
   stats = null, // M4 — optional object filled with { chars, tokens, trimmed, kept }
+  env = null, // B138 — env lookup for terminal/tmux context (default process.env)
 } = {}) {
   const sections = [];
   const push = (name, content, keep = false) => {
@@ -125,7 +126,7 @@ export async function assemblePrompt({
   // inside a tmux session; empty elsewhere (never injected).
   try {
     const { tmuxContextBlock } = await import('./TmuxContext.js');
-    const tmux = tmuxContextBlock();
+    const tmux = tmuxContextBlock(env || process.env);
     if (tmux) push('tmux', tmux);
   } catch { /* noop */ }
 

@@ -11,6 +11,29 @@ process.env.DATA_DIR = './data/test-agi-capability-router';
 const cr = await import('../../src/services/CapabilityRouter.js');
 const { routeCapabilities, selectMcpToolset, resolveMcpFunction, mcpToolFunctionName, sanitizeJsonSchema, CAPABILITY_SERVERS, INTENT_CAPABILITIES } = cr;
 
+/**
+ * KEYLESS/NETWORK SKIP PROBE (Scope C): the live weather round-trip boots the
+ * REAL `@dangahagan/weather-mcp` via npm exec. On a cold/first-run host (CI,
+ * restricted sandbox, orphaned children from a previously interrupted run) the
+ * boot can exceed the call budget and wedge the runner — and an interrupted
+ * connect leaks an npx → node tree. Probe bounded; never races the connect
+ * (an abandoned connect still spawns a child); always disconnects in cleanup.
+ */
+async function probeLiveWeather(timeoutMs = 20_000) {
+  const { invokeMcpTool } = await import('../../src/services/MCPGateway.js');
+  const call = await Promise.race([
+    invokeMcpTool({ server: 'weather', tool: 'get_weather_summary', args: { city_name: 'Nairobi' }, timeoutMs: Math.min(timeoutMs, 15_000) }),
+    new Promise((_, rej) => setTimeout(() => rej(new Error('weather round-trip timed out')), timeoutMs)),
+  ]);
+  if (!call.ok) throw new Error(`weather round-trip failed: ${call.error}`);
+}
+async function probeLiveWeatherCleanup() {
+  try {
+    const { disconnectGatewayServer } = await import('../../src/services/MCPGateway.js');
+    await disconnectGatewayServer('weather');
+  } catch { /* best effort */ }
+}
+
 /* ═══ 1. intent → capabilities → servers routing ═══════════════════════════ */
 
 test('research intent routes to the research capability servers', () => {
@@ -133,7 +156,15 @@ test('sanitizeJsonSchema degrades junk to string and caps depth', () => {
 
 /* ═══ 4. ToolRuntime dispatch seam (live lazy connect) ═════════════════════ */
 
-test('executeTool dispatches mcp__ names through the gateway (live weather round-trip)', { timeout: 120_000 }, async () => {
+test('executeTool dispatches mcp__ names through the gateway (live weather round-trip)', { timeout: 120_000 }, async (t) => {
+  // Scope C skip: don't hang a runner that can't reach the live weather MCP.
+  try {
+    await probeLiveWeather();
+  } catch (e) {
+    await probeLiveWeatherCleanup();
+    t.skip(`live weather MCP unavailable in this environment (${e.message})`);
+    return;
+  }
   const { executeTool } = await import('../../src/services/ToolRuntime.js');
   const r = await executeTool({ slug: 'mcp__weather__get_weather_summary', args: { city_name: 'Nairobi' } });
   assert.ok(r.ok, `weather round-trip failed: ${r.error}`);
@@ -142,6 +173,7 @@ test('executeTool dispatches mcp__ names through the gateway (live weather round
   assert.ok(r.durationMs > 0);
   const text = JSON.stringify(r.result || {});
   assert.ok(/temp|weather|wind|condition/i.test(text), 'real weather content expected');
+  await probeLiveWeatherCleanup();
 });
 
 test('executeTool refuses MCP names on lightweight intents (B52 spirit)', async () => {
