@@ -261,12 +261,14 @@ to `replanner`.
   every `.js` under `server/` plus repo docs, with a reachability BFS from
   `server/index.js`. Result: only `server/src/services/Coder.js` was truly dead
   (zero importers, superseded by autonomous-coding loops) → quarantined to
-  `server/src/legacy/Coder.js` via `git mv` (history preserved).
+  `server/src/legacy/Coder.js` via `git mv` (history preserved), then
+  **deleted** in the Phase 3 reconstruction (dead both at compile time — the
+  module fails to load — and at runtime; zero importers anywhere).
 - **Deprecated-but-LIVE (NOT moved):** `AgentRoster.js` (18 importers incl.
   Planner/Orchestrator/ToolRegistry), `SkillChain.js` (4), `ComputerUseAgent.js`
   (1), `DesktopManager.js` (6) — all still reachable from the hot path, so they
   stay until Phase 3 migrates consumers. Full table in
-  `server/src/legacy/README.md`.
+  `docs/architecture/reconstruction/scope-b-legacy-audit.md`.
 - **Look-dead-but-live:** a set of files only reached via `await import()` from
   `ToolRuntime.js`, `routes/arena.js`, `routes/surface.js` (BackgroundJobs,
   GoalTools, FileReference, TerminalSessions, OllamaProvider, WorkflowEngine,
