@@ -286,6 +286,7 @@ export const TOOL_OUTPUT_SCHEMAS = {
   'subagent': z.object({ kind: z.literal('subagent'), task: z.string().optional(), report: z.string().optional(), ok: z.boolean().optional(), error: z.string().optional() }).passthrough(),
   'skill-load': z.object({ kind: z.literal('skill').optional(), ok: z.boolean().optional(), slug: z.string().optional(), name: z.string().optional(), description: z.string().optional(), provider: z.string().optional(), source: z.string().optional(), rank: z.number().optional(), resourceBase: z.unknown().optional(), body: z.string().optional() }).passthrough(),
   'skill-search': z.object({ kind: z.literal('skill-search'), query: z.string(), total: z.number().optional(), results: z.array(z.unknown()).optional() }).passthrough(),
+  'skill-execute': z.object({ kind: z.literal('skill-execute').optional(), ok: z.boolean().optional(), slug: z.string().optional(), name: z.string().optional(), root: z.string().optional(), args: z.unknown().optional(), steps: z.array(z.unknown()).optional(), failedStep: z.number().optional(), tool: z.string().optional(), error: z.unknown().optional() }).passthrough(),
   'run_code': z.object({ kind: z.literal('code-run').optional(), description: z.string().optional(), logs: z.array(z.string()).optional(), result: z.unknown().optional(), toolCalls: z.number().optional(), durationMs: z.number().optional(), truncated: z.boolean().optional(), error: z.string().optional(), ok: z.boolean().optional(), subCalls: z.array(z.unknown()).optional() }).passthrough(),
   'spill-read': z.object({ kind: z.literal('spill').optional(), ok: z.boolean().optional(), locator: z.string().optional(), bytes: z.number().optional(), content: z.string().optional(), error: z.string().optional() }).passthrough(),
   'run_in_background': z.object({ kind: z.literal('job').optional(), ok: z.boolean().optional(), id: z.string().optional(), status: z.string().optional(), error: z.string().optional() }).passthrough(),
@@ -808,6 +809,30 @@ async function runEngine(slug, args, opts = {}) {
       const body = loadSkill(slug);
       if (!body) return { ok: false, error: `skill "${slug}" not found` };
       return { kind: 'skill', slug, name: (meta && meta.name) || slug, provider: 'roster', source: 'bundled', rank: 600, body: String(body.md || '').slice(0, 8000) };
+    }
+
+    case 'skill-execute': {
+      // Scope C — an executable skill is invoked through the EXECUTOR, not
+      // read as text. Catalog entry → procedure steps → real tool registry
+      // (domainDispatch) → structured result.
+      const slug = String(args.skill || args.slug || '').trim();
+      const hasTrigger = args.trigger !== undefined && String(args.trigger).trim() !== '';
+      if (!slug && !hasTrigger) return { ok: false, error: 'skill name (or trigger query) required' };
+      const root = String(args.root || '').trim() || process.env.WORKSPACE_DIR || process.cwd();
+      const { executeSkill, findSkillFor } = await import('../skills/executor.js');
+      const targetSlug = hasTrigger && !slug ? await findSkillFor(String(args.trigger)) : null;
+      const runSlug = targetSlug || slug;
+      if (!runSlug) return { ok: false, error: 'no skill matched the trigger' };
+      const events = [];
+      const result = await executeSkill({
+        slug: runSlug,
+        root,
+        args: args.args || {},
+        onEvent: (type, payload) => events.push({ type, payload }),
+      });
+      // Catalog trigger resolution is part of the evidence trail.
+      const resolved = { ...result, triggered: targetSlug || null, requested: slug };
+      return { kind: 'skill-execute', ...resolved, events };
     }
 
     case 'skill-search': {

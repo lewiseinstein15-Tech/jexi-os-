@@ -1,0 +1,10 @@
+{
+  "name": "skill-probe-fixture",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Fixture package for Scope C executable-skills live probe.",
+  "scripts": {
+    "test": "node --test"
+  }
+}

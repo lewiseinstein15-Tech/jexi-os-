@@ -19,6 +19,53 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** Overridable store root (repo pattern: process.env.DATA_DIR). */
 export const SKILLS_STORE = path.resolve(process.env.JEXI_SKILLS_STORE || path.join(__dirname, 'skills'));
 
+/**
+ * Parse the machine-executable `## Steps` procedure block from a SKILL.md
+ * body. Each line is one step:
+ *
+ *   - step: <human description>
+ *     tool: <registry tool slug>
+ *     args: { "<arg>": <value or $prev.<path> template> }
+ *
+ * The `args` must be a JSON object (the step names a REAL tool from the
+ * registry and passes REAL args). Free-form prose is ignored — a step
+ * without a `tool:` line is not executable.
+ */
+export function parseSteps(bodyMarkdown) {
+  const m = String(bodyMarkdown || '').match(/##\s*Steps\s*\n([\s\S]*?)(?=\n##\s|\s*$)/i);
+  if (!m) return [];
+  const steps = [];
+  let cur = null;
+  for (const rawLine of m[1].split('\n')) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (line.startsWith('- step:')) {
+      if (cur) steps.push(cur);
+      cur = { step: line.replace(/^- step:\s*/, '').replace(/["']$/, '').trim() };
+    } else if (cur) {
+      const tool = /^tool:\s*([A-Za-z0-9_:.-]+)/.exec(line);
+      if (tool) { cur.tool = tool[1]; continue; }
+      const args = /^args:\s*(\{.*\})\s*$/.exec(line);
+      if (args) {
+        try { cur.args = JSON.parse(args[1]); } catch { cur.argsParseError = `invalid JSON: ${args[1]}`; }
+        continue;
+      }
+      // continuation of a multi-line args object
+      if (cur.argsText) { cur.argsText += '\n' + line; continue; }
+      if (cur.tool && !cur.args && line.startsWith('{')) { cur.argsText = line; continue; }
+    }
+  }
+  if (cur) steps.push(cur);
+  // Merge multi-line argsText JSON into args.
+  for (const s of steps) {
+    if (!s.args && s.argsText) {
+      try { s.args = JSON.parse(s.argsText); } catch { s.argsParseError = `invalid JSON: ${s.argsText}`; }
+    }
+    delete s.argsText;
+  }
+  return steps;
+}
+
 /** Parse just the YAML frontmatter block of a SKILL.md (no body read). */
 export function parseFrontmatter(md) {
   if (!md.startsWith('---\n')) return { metadata: {}, bodyMarkdown: md };
@@ -58,7 +105,11 @@ export function readMeta(slug) {
   const dir = path.join(SKILLS_STORE, slug);
   const mdPath = path.join(dir, 'SKILL.md');
   if (!fs.existsSync(mdPath)) return null;
-  const { metadata } = parseFrontmatter(fs.readFileSync(mdPath, 'utf8'));
+  const raw = fs.readFileSync(mdPath, 'utf8');
+  const { metadata, bodyMarkdown } = parseFrontmatter(raw);
+  // The catalog advertises executability WITHOUT leaking the body: only the
+  // count of parseable steps (frontmatter + a cheap step scan) is exposed.
+  metadata._stepCount = parseSteps(bodyMarkdown).filter((s) => s.tool).length;
   return metadata;
 }
 
@@ -81,6 +132,8 @@ export async function catalog() {
       description: meta.description ?? '',
       whenToUse: meta.whenToUse ?? '',
       allowedTools: meta.allowedTools ?? [],
+      executable: meta._stepCount > 0,
+      stepCount: meta._stepCount ?? 0,
     };
   }
   return out;
@@ -95,6 +148,8 @@ export async function catalogEntry(slug) {
     description: meta.description ?? '',
     whenToUse: meta.whenToUse ?? '',
     allowedTools: meta.allowedTools ?? [],
+    executable: meta._stepCount > 0,
+    stepCount: meta._stepCount ?? 0,
   };
 }
 

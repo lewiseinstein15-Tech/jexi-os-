@@ -12,7 +12,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { SKILLS_STORE, parseFrontmatter } from './catalog.js';
+import { SKILLS_STORE, parseFrontmatter, parseSteps } from './catalog.js';
 
 function listHelpers(dir) {
   if (!fs.existsSync(dir)) return [];
@@ -28,6 +28,7 @@ export function readSkill(slug) {
   const { metadata, bodyMarkdown } = parseFrontmatter(raw);
   const scriptsDir = path.join(dir, 'scripts');
   const resourcesDir = path.join(dir, 'resources');
+  const steps = parseSteps(bodyMarkdown);
   return {
     slug,
     name: metadata.name ?? slug,
@@ -37,6 +38,10 @@ export function readSkill(slug) {
     /** Full markdown WITHOUT the frontmatter — this is the big body. */
     content: bodyMarkdown,
     raw,
+    /** Machine-executable procedure (parsed from `## Steps`): each step names
+     *  a real registry tool + args. Empty when the skill is prose-only. */
+    steps,
+    executable: steps.some((s) => s.tool),
     scripts: listHelpers(scriptsDir).map((f) => path.join(scriptsDir, f)),
     resources: listHelpers(resourcesDir).map((f) => path.join(resourcesDir, f)),
     progressive: true, // loaded on demand

@@ -14,3 +14,4 @@
 export * from './catalog.js';
 export * from './loader.js';
 export * from './curator.js';
+export * from './executor.js';
