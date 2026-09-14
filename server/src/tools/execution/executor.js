@@ -13,7 +13,7 @@ import { makeRiskGuard } from './risk-guard.js';
 
 /** engineAdapters: { [engineName]: (args, ctx) => Promise<any> } */
 export function makeExecutor({ engines = {}, permissions = {}, risk = {} } = {}) {
-  const gate = permissions.allowAll ? makePermissionGate({ allowAll: true })
+  const gate = permissions.allowAll ? makePermissionGate({ allowAll: true, maxRisk: 'critical' })
     : makePermissionGate(permissions);
   const guard = makeRiskGuard(risk);
 

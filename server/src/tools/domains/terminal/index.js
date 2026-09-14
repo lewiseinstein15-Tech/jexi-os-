@@ -8,6 +8,8 @@
 
 import { defineTool } from '../../interface/ToolDefinition.js';
 import { registerToolBatch } from '../../registry/ToolRegistry.js';
+import { runNativeCommand } from '../../../services/NativeCommand.js';
+import { runPersistentBash, resetShell, listPersistentShells } from '../../../services/BashPersistent.js';
 
 export function registerTerminalTools() {
   const execute = defineTool({
@@ -26,8 +28,38 @@ export function registerTerminalTools() {
   const unreg = registerToolBatch([execute, session]);
 
   const engines = {
-    term_execute: async (args) => ({ ran: true, command: args.command, stdout: '(engine not configured)' }),
-    term_session: async (args) => ({ session: 'unconfigured' }),
+    term_execute: async ({ command, cwd, timeoutMs }, ctx = {}) => {
+      const p = ctx.root ?? process.cwd();
+      const res = await runNativeCommand('bash', ['-lc', String(command || '')], { timeoutMs: Number(timeoutMs) || 30000, cwd: cwd ?? p });
+      return {
+        ran: res.ok,
+        ok: res.ok,
+        command,
+        stdout: res.stdout ?? '',
+        stderr: res.stderr ?? '',
+        output: res.output ?? '',
+        code: res.code ?? null,
+        durationMs: res.durationMs ?? 0,
+        ...(res.error ? { error: res.error } : {}),
+      };
+    },
+    term_session: async ({ action, input }, ctx = {}) => {
+      const owner = ctx.owner ?? 'term-session';
+      const cwd = ctx.root ?? process.cwd();
+      if (action === 'start') {
+        const res = await runPersistentBash({ owner, command: 'echo session-ready && pwd', cwd, reset: true });
+        return { ok: res.ok, session: owner, output: res.output, code: res.code };
+      }
+      if (action === 'send') {
+        const res = await runPersistentBash({ owner, command: String(input || ''), cwd });
+        return { ok: res.ok, session: owner, output: res.output, code: res.code, durationMs: res.durationMs };
+      }
+      if (action === 'end') {
+        resetShell(owner, 'client requested end');
+        return { ok: true, session: owner, ended: true, sessions: listPersistentShells() };
+      }
+      return { ok: false, error: `unknown action "${action}"` };
+    },
   };
   return { unreg, engines };
 }

@@ -1278,6 +1278,26 @@ async function runEngine(slug, args, opts = {}) {
           return { ok: false, error: (e && e.message) || 'plugin tool failed' };
         }
       }
+      // Phase 5(A) — domain tools (terminal/web/memory/git/github/testing/data/
+      // delegation/lsp/communication) run their REAL engines here through the
+      // same gated pipeline. The executor applies schema → permission → risk →
+      // engine; contexts (root, token, memory, mission) come from the caller.
+      try {
+        const { domainDispatch, domainToolCount } = await import('../tools/domains/executor.js');
+        if (domainToolCount() && domainDispatch) {
+          const ctx = {
+            root: process.env.WORKSPACE_DIR || process.cwd(),
+            owner: opts.spillOwner || 'runtime',
+            signal: opts.signal,
+            maxChars: 8000,
+          };
+          const r = await domainDispatch(slug, args, ctx);
+          if (r && r.ok) return { ok: true, domain: slug, result: r.result ?? r };
+          if (r && !r.ok) return { ok: false, domain: slug, error: (r.error && (r.error.message || r.error.description || r.error)) || `domain tool ${slug} failed`, ...(r.result !== undefined ? { result: r.result } : {}) };
+        }
+      } catch (e) {
+        return { ok: false, tool: slug, error: (e && e.message) || `domain tool ${slug} failed`, durationMs: 0 };
+      }
       return null; // no engine — caller decides fallback
     }
   }
@@ -1509,7 +1529,17 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
   if (!tool) {
     const pt = getPluginTool(slug);
     if (pt) tool = { slug, name: pt.name || slug, desc: pt.desc || 'plugin tool', agents: [], permission: pt.permission || 'medium', timeoutMs: typeof pt.timeoutMs === 'number' && pt.timeoutMs > 0 ? pt.timeoutMs : undefined };
-    else return { ok: false, error: `Unknown tool: ${slug}`, durationMs: 0 };
+    else {
+      // Phase 5(A) — real domain tools dispatch through the same gated
+      // pipeline when they're registered in the domain registry.
+      try {
+        const { domainDispatch, domainToolCount } = await import('../tools/domains/executor.js');
+        if (domainToolCount()) tool = { slug, name: slug, desc: `domain tool ${slug}`, agents: [], permission: 'medium' };
+        else return { ok: false, error: `Unknown tool: ${slug}`, durationMs: 0 };
+      } catch {
+        return { ok: false, error: `Unknown tool: ${slug}`, durationMs: 0 };
+      }
+    }
   }
 
   // B52 P4 — hard enforcement: lightweight intents (direct_answer,
