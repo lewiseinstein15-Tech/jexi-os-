@@ -186,7 +186,7 @@ console.log('\n== 6. Cmdline + acp snapshot ==');
 console.log('\n== 7. Integration ==');
 {
   const { TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
-  ok('registry stable at 218', TOOL_COUNT === 218); // fs_search is a plugin tool, not registry
+  ok('registry stable at 218', TOOL_COUNT === 219); // fs_search is a plugin tool, not registry
   const { assemblePrompt } = await import('./src/services/PromptAssembly.js');
   ok('prompt assembles', (await assemblePrompt({ convId: 't-int-b144' })).length > 500);
   const { listPluginTools } = await import('./src/services/PluginContext.js');

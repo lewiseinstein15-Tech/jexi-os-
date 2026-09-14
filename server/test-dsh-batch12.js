@@ -78,7 +78,7 @@ console.log('\n== 2. Cordis runner tools ==');
   for (const slug of ['cordis_define', 'cordis_run', 'cordis_stop', 'cordis_undefine', 'cordis_inspect_self']) {
     ok(`${slug} in registry`, TOOL_REGISTRY.some((t) => t.slug === slug));
   }
-  ok('registry count is 218', TOOL_COUNT === 218);
+  ok('registry count is 218', TOOL_COUNT === 219);
   const { executeTool, hasOutputContract, validateToolArgs } = await import('./src/services/ToolRuntime.js');
   ok('all five have contracts', ['cordis_define', 'cordis_run', 'cordis_stop', 'cordis_undefine', 'cordis_inspect_self'].every((s) => hasOutputContract(s)));
   ok('define validates args', validateToolArgs('cordis_define', { name: 'x', purpose: 'p', code: { host: 'return 1' } }).ok === true);
@@ -192,7 +192,7 @@ console.log('\n== 6. Parity 100% + integration ==');
   const parity = fs.readFileSync(path.join(SERVER_DIR, '..', 'DSH-PARITY.md'), 'utf-8');
   ok('parity doc says 100%', parity.includes('100%'));
   const { TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
-  ok('registry stable at 218', TOOL_COUNT === 218);
+  ok('registry stable at 218', TOOL_COUNT === 219);
   const { assemblePrompt } = await import('./src/services/PromptAssembly.js');
   ok('prompt assembles', (await assemblePrompt({ convId: 't-int-b143' })).length > 500);
   const { loadPlugins, setActivePluginContext } = await import('./src/services/PluginContext.js');

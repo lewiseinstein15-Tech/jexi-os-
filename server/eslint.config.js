@@ -20,6 +20,7 @@ export default [
       'android/**',
       'jexi-agents/**',
       'tests/agi/fixtures/**', // intentional fixtures: deliberately failing/buggy code
+      'tests/agi/skill-probe/**', // Scope C staging dir: deliberately lint-breaking + syntax-error probe files
     ],
   },
   {

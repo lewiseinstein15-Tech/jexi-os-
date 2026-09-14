@@ -208,7 +208,7 @@ console.log('\n== 8. Frontend panel + integration ==');
   const panel = fs.readFileSync(path.join(__dirname_path(), '..', 'src', 'components', 'SettingsPanel.jsx'), 'utf-8');
   ok('SettingsPanel has the permission presets UI', panel.includes('PERMISSION PRESETS') && panel.includes('/api/permissions') && panel.includes('autonomous'));
   const { TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
-  ok('registry stable at 207', TOOL_COUNT === 218);
+  ok('registry stable at 207', TOOL_COUNT === 219);
   const { assemblePrompt } = await import('./src/services/PromptAssembly.js');
   // Pin an env with no TMUX/TMUX_PANE so this assertion doesn't depend on the
   // runner's ambient shell (the real process may be inside a tmux session).

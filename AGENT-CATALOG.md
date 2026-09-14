@@ -1,9 +1,9 @@
 # JEXI OS — Agent & Skill Catalog
 
-**252 specialist agents · 508 skills · 218 tools · 1 orchestrator.** One plain-language request in,
+**252 specialist agents · 508 skills · 219 tools · 1 orchestrator.** One plain-language request in,
 a composed team runs it end-to-end, verifies the answer, and reports back.
 
-> ⚙️ GENERATED FILE — updated 2026-09-09 by `cd server && npm run audit-roster`. Do not edit by hand.
+> ⚙️ GENERATED FILE — updated 2026-09-14 by `cd server && npm run audit-roster`. Do not edit by hand.
 > The audit (`node scripts/audit-roster.js --check`, wired into `npm test`) fails CI if this file drifts from the registries.
 
 ---
@@ -14,8 +14,8 @@ a composed team runs it end-to-end, verifies the answer, and reports back.
 |---|---|
 | Agents | 252 (252 reachable — 100%) |
 | Skills | 508 |
-| Tools | 218 |
-| Intents / teams | 155 |
+| Tools | 219 |
+| Intents / teams | 156 |
 | Orphaned agents | 0 |
 | Orphaned skills | 0 |
 | Orphaned tools | 0 |
@@ -79,6 +79,7 @@ You type:  "Build me a water-intake tracker"
 | `math_solve` | Math Solver → Reasoner → Memory Agent | 0 independent · 3 bundled |
 | `self_check` | Self-Diagnose → Reasoner → Memory Agent → Tool Router → Toolsmith → Agent Builder → Prompt Engineer → Guardrail → Goal Owner | 0 independent · 9 bundled |
 | `code_task` | Product Manager → Designer → Engineer → UX Researcher → Accessibility Auditor → Architect → Coder → Runner → Sandbox Agent → Debugger → QA Lead → Reviewer → Critic → Security Officer → Shipper → Reflector → UI Developer → Frontend Engineer → Landing Page Builder → Email Developer | 13 independent · 7 bundled |
+| `code_fix` | Coder | 1 independent · 0 bundled |
 | `computer_use` | Navigator → Vision Agent → Computer Use Agent → Reasoner → Memory Agent | 0 independent · 5 bundled |
 | `study_topic` | Scholar → Researcher → Historian → Science Explainer → Document Analyst → Memory Agent | 0 independent · 6 bundled |
 | `direct_answer` | JEXI Core → Context Manager | 0 independent · 2 bundled |
@@ -1223,9 +1224,9 @@ This section and every table below are GENERATED from the live registries by `cd
 | `writing` | Technical Writer | Clear, structured prose. |
 
 
-## The 218 tools (grouped by type)
+## The 219 tools (grouped by type)
 
-### Agent (9)
+### Agent (10)
 | Tool | Allowed agents | Engine | What it does |
 |---|---|---|---|
 | `ask_user_question` | Orchestrator, Planner | undefined | Ask the user a concise question when you need confirmation, a choice, or missing information before proceeding. Answers arrive in the next message. |
@@ -1234,6 +1235,7 @@ This section and every table below are GENERATED from the live registries by `cd
 | `ralph` | Orchestrator, Planner | undefined | Iterate toward one immutable objective with a FRESH structured-output child per round and a bounded structured handoff between rounds (dsh tool-ralph). Use only when the user explicitly asks for Ralph / fresh-agent iteration. |
 | `report` | Orchestrator, Planner | undefined | Deliver a self-contained result to the agent that started you. Only callable inside a subagent run; reporting never ends your turn (dsh tool-subagent-report). |
 | `send_message` | Orchestrator, Planner | undefined | Send a message to a background subagent by id — it becomes its next turn (waits if currently working). |
+| `skill-execute` | Planner, Orchestrator, Coder, Engineer | undefined | Run an executable skill: parse its ## Steps procedure and execute each step through the real tool registry (not a text prompt). Returns a structured result. |
 | `skill-load` | Planner, Orchestrator | undefined | Load a skill into context (progressive disclosure) — auto-discovered project/user/bundled skills. |
 | `subagent` | Orchestrator, Planner | undefined | Delegate a sub-task to a child agent with its own context; it reports back. |
 | `workflow` | Orchestrator, Planner | undefined | Write and run a multi-agent workflow script: agent()/parallel()/pipeline()/phase()/log() — for large orchestration the user explicitly asks for. |
