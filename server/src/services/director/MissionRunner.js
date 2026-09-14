@@ -30,6 +30,8 @@ import { analyzeObjective } from './ComplexityAnalyzer.js';
 import { imagine, comparePredictedVsActual } from './ImaginationEngine.js';
 import { recordLesson, retrieveLessons, formatLessonsBlock, lessonCount } from './Lessons.js';
 import { loadWorldState, runtimeCapabilities } from './WorldState.js'; // B215 — real environment record
+import { lspManager } from '../../lsp/manager.js'; // Phase 6 Scope A — real language-server indexing at mission start
+import { WORKSPACE_DIR } from '../../config.js';
 
 /* Final F5 — coerce planner JSON fields that SHOULD be string arrays but a
  * weak model may emit as a bare string, number, or object. Never throws. */
@@ -153,6 +155,12 @@ export class MissionRunner {
         data: { conversationId, objective: mission.objective, budgets: mission.budgets },
       });
     } catch { /* bus mirroring never breaks mission creation */ }
+    // Index the workspace in the LSP manager at mission start so diagnostics
+    // populate before the first agent turn. Best-effort and non-blocking: a
+    // missing language server or an absent workspace never blocks creation.
+    try {
+      lspManager().startMission(WORKSPACE_DIR, { maxFiles: 200 }).catch(() => {});
+    } catch { /* lsp index is best-effort */ }
     this.kick(mission.id);
     return mission;
   }
