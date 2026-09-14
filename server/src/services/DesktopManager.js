@@ -1,7 +1,8 @@
-// PHASE-3 TODO (retained, requires Phase 4): HOT-PATH runtime module with no
-// wired replacement — it IS the real browser runtime (BrowserRouter desktop
-// worker, director/ComputerOps, SelfMonitor, Orchestrator, index.js). Do NOT
-// delete; adopt as a permanent runtime module under the layered architecture.
+// PHASE-4 (Scope E): ADOPTED as the permanent browser runtime. This module IS
+// the real Chromium/Playwright engine behind BrowserRouter's desktop worker,
+// director/ComputerOps, SelfMonitor, Orchestrator, and index.js (the shared
+// browser instance + /api/desktop routes). It is a single, deliberate engine —
+// not legacy, not a stub — and is NOT scheduled for deletion.
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';

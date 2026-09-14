@@ -1,8 +1,12 @@
-// PHASE-3 TODO (retained, requires Phase 4): HOT-PATH runtime module with no
-// wired replacement — it IS the skill execution engine (loadSkill/skillMeta +
-// planForBuild/qaWebApp/review/security/critic/shipper/reflector passes) used
-// by Orchestrator, PipelineGraphs, ToolRuntime, SubagentRuntime, Reachability.
-// Do NOT delete until a director-side skill assembly replaces these passes.
+// PHASE-4 (Scope E) re-audit: KEPT with documented reasons. The named
+// replacement (server/src/skills/, built in Scope B) is a progressive-disclosure
+// catalog/loader/curator ONLY — it has NO execution engines. This module IS
+// the skill execution engine (loadSkill/skillMeta + planForBuild/qaWebApp/
+// qaScripted/runReviewerPass/runSecurityPass/runCriticPass/runShipperPass/
+// runReflectorPass/reviewAndShip/fixFromQA), imported by Orchestrator,
+// PipelineGraphs, ToolRuntime, SubagentRuntime, SkillDiscovery,
+// AutonomousCoding, ToolRegistry, and Reachability. Deleting it removes the
+// only skill-execution path. Per Scope E guard, it stays.
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';

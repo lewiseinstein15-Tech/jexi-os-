@@ -1,7 +1,11 @@
-// PHASE-3 TODO (retained, requires Phase 4): HOT-PATH runtime module with no
-// wired replacement — Orchestrator constructs ComputerUseAgent directly for
-// link_analysis and computer-use intents; no browser-runtime executeTask
-// exists elsewhere. Do NOT delete until those intents migrate.
+// PHASE-4 (Scope E) re-audit: KEPT with documented reasons. The named
+// replacement (director/ComputerOps.js runBrowserRound via UnifiedTools.js) is
+// a LINE-ORIENTED browser-action executor — it is NOT an LLM-driven
+// executeTask(query, sendEvent, {intent}) agent that synthesizes a full answer.
+// Orchestrator constructs this class directly for link_analysis, computer_use,
+// and research intents (3 call sites); test-audit-b48 also verifies this
+// file's observe-act-VERIFY loop is present. No equivalent executeTask exists
+// elsewhere. Per Scope E guard, it stays.
 import fs from 'fs';
 import path from 'path';
 import { jsonrepair } from 'jsonrepair';

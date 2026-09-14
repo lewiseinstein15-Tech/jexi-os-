@@ -1,7 +1,13 @@
-// PHASE-3 TODO (retained, requires Phase 4): HOT-PATH runtime module with no
-// wired replacement — workforce/registry/ is test-only; Planner/ToolRegistry/
-// Orchestrator still call composeTeam/getAgent/rosterStats from here. Do NOT
-// delete until those call sites migrate to workforce/registry/.
+// PHASE-4 (Scope E) re-audit: KEPT with documented reasons. The named
+// replacement (workforce/registry/index.js) is a capability index over
+// director/Employees.js — it exposes NONE of this module's API
+// (AGENT_ROSTER/SKILL_REGISTRY/getAgent/composeTeam/skillsForTeam/rosterStats/
+// getSkill/agentSkills/rosterFor/skillsFor/skillsLine/ROSTER_COUNT/SKILL_COUNT).
+// 11 production modules import this file directly (Planner, ToolRegistry,
+// Orchestrator, TaskManager, PluginRegistry, JexiIdentity, ArchitectureViews,
+// Reachability, ProfileCompleteness, SkillChain, verification AgentVerifier),
+// plus server/index.js (/api/roster + boot). Deleting it breaks server boot.
+// Per Scope E guard ("no replacement ready -> keep and document"), it stays.
 /**
  * JEXI OS — Agent Roster & Skill Registry.
  *

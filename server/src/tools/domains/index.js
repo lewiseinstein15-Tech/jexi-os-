@@ -11,19 +11,22 @@ import { registerFilesystemTools } from './filesystem/index.js';
 import { registerTerminalTools } from './terminal/index.js';
 import { registerWebTools } from './web/index.js';
 import { registerMemTools } from './memory/index.js';
+import { registerBrowserTools } from './browser/index.js';
 
 export function registerAllDomains(extras = {}) {
   const fs = registerFilesystemTools();
   const term = registerTerminalTools();
   const web = registerWebTools();
   const mem = registerMemTools();
+  const browser = registerBrowserTools();
   return {
-    unreg: () => { fs.unreg(); term.unreg(); web.unreg(); mem.unreg(); },
+    unreg: () => { fs.unreg(); term.unreg(); web.unreg(); mem.unreg(); browser.unreg(); },
     engines: {
       ...fs.engines,
       ...term.engines,
       ...web.engines,
       ...mem.engines,
+      ...browser.engines,
       ...extras,
     },
   };
