@@ -8,7 +8,7 @@
  */
 
 /** @returns {import('./WorkNode.js').WorkNode} */
-export function createVerificationNode({ id, objective, dependencies = [], ownerAcbId, verifiesNodeId }) {
+export function createVerificationNode({ id, objective, dependencies = [], ownerAcbId, verifiesNodeId, snapshotId: snapId, acceptanceCriteria }) {
   return {
     id,
     type: 'verification',
@@ -23,5 +23,9 @@ export function createVerificationNode({ id, objective, dependencies = [], owner
     leaseExpiry: undefined,
     /** id of the node this verifies */
     verifiesNodeId,
+    /** Phase 5 Scope B — frozen source snapshot + acceptance criteria the real
+     * verifier runs against. */
+    snapshotId: snapId,
+    acceptanceCriteria,
   };
 }

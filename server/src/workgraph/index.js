@@ -18,6 +18,7 @@ import { classifyFailure, backoffMs, canRetry } from './recovery/classify.js';
 import { replanFromNearestAncestor } from './recovery/replan.js';
 import { createMissionNode, createStrategyNode, createTaskNode, createVerificationNode, createRecoveryNode } from './nodes/WorkNode.js';
 import { BLOCKS_KEY } from './edges/blocks.js';
+import { VerificationRunner } from '../verification/index.js';
 
 /** Re-export constructors + constants for consumers. */
 export {
@@ -249,6 +250,72 @@ export function createWorkGraph({ file } = {}) {
     return { ok: true, node: n };
   }
 
+  /**
+   * Run a REAL verifier from the verification subsystem against a
+   * VerificationNode (Phase 5 Scope B — real wiring).
+   *
+   * This is the production import the Phase 4 audit found missing: the work
+   * graph now calls `VerificationRunner.run` (src/verification) which spawns
+   * a real verifier. On 'pass' the node completes with evidence (the
+   * dependent task may then complete). On 'fail'/'error' it does NOT silently
+   * pass — the verifier result's evidence (real output) is attached to the
+   * node and returned as `injectedFailure` so the caller/agent loop routes it
+   * back as context, and the task stays gated.
+   *
+   * @param {string} nodeId — the VerificationNode id
+   * @param {object} o
+   * @param {string} o.owner — agent (claimant) running this verification node
+   * @param {string} o.verifier — 'TestVerifier' | 'LintVerifier' | ... (default TestVerifier)
+   * @param {object} [o.context] — { snapshotId, snapshot, acceptanceCriteria, claimantAcbId, nodeId }
+   * @param {object} [o.options] — verifier options (command / cwd / acceptedBy...)
+   * @returns {Promise<{ok:boolean, status?:string, reason?:string, result?}>}
+   */
+  async function runVerificationNode(nodeId, { owner, now = Date.now(), verifier = 'TestVerifier', context = {}, options = {} } = {}) {
+    const n = byId(nodeId);
+    if (!n || n.type !== 'verification') return { ok: false, reason: 'not_verification' };
+    const perm = schedulePermitted(n, owner, now);
+    if (!perm.ok) return perm;
+    const target = n.verifiesNodeId ? byId(n.verifiesNodeId) : null;
+
+    const result = await VerificationRunner.run({
+      verifier,
+      nodeId,
+      snapshotId: n.snapshotId ?? context.snapshotId,
+      snapshot: n.snapshot ?? context.snapshot,
+      acceptanceCriteria: context.acceptanceCriteria ?? n.acceptanceCriteria,
+      claimantAcbId: target?.ownerAcbId ?? context.claimantAcbId,
+      verifierAgentId: owner,
+      options,
+    });
+
+    if (result.status === 'pass') {
+      await completeVerification(nodeId, { owner, now, evidence: result.evidence ?? [] });
+      return { ok: true, status: 'pass', result, node: byId(nodeId) };
+    }
+
+    // 'fail' / 'error' — the node stays incomplete and the task stays gated.
+    // Real output is attached and returned so the caller can inject it back
+    // into the agent loop as context (not just a log line).
+    n.evidence.push(...(result.evidence ?? []));
+    n.status = 'failed';
+    releaseLease(n);
+    await checkpoint();
+    recomputeStatuses();
+    return {
+      ok: false,
+      status: result.status,
+      reason: result.reason ?? 'verification failed',
+      result,
+      injectedFailure: {
+        layer: verifier,
+        reason: result.reason ?? 'verification failed',
+        evidence: result.evidence ?? [],
+        nodeId,
+      },
+      node: byId(nodeId),
+    };
+  }
+
   /** Cancel a node (paused / out of scope). */
   async function cancel(nodeId, { owner, now = Date.now() } = {}) {
     const n = byId(nodeId);
@@ -283,6 +350,7 @@ export function createWorkGraph({ file } = {}) {
     complete,
     fail,
     completeVerification,
+    runVerificationNode,
     cancel,
     readyWork,
     get nodes() { return nodes; },

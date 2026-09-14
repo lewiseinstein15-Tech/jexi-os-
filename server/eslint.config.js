@@ -11,7 +11,16 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['node_modules/**', 'dist/**', 'public/**', 'data/**', 'jexi-workspace/**', 'android/**', 'jexi-agents/**'],
+    ignores: [
+      'node_modules/**',
+      'dist/**',
+      'public/**',
+      'data/**',
+      'jexi-workspace/**',
+      'android/**',
+      'jexi-agents/**',
+      'tests/agi/fixtures/**', // intentional fixtures: deliberately failing/buggy code
+    ],
   },
   {
     files: ['**/*.js', '**/*.mjs'],

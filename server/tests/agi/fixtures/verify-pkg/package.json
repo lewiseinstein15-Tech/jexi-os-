@@ -1,0 +1,7 @@
+{
+  "name": "verify-pkg-fixture",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Self-contained fixture package for Phase 5 Scope B real-spawn verification tests."
+}

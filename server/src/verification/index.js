@@ -19,10 +19,10 @@ import { TestVerifier } from './verifiers/TestVerifier.js';
 import { LintVerifier } from './verifiers/LintVerifier.js';
 import { BuildVerifier } from './verifiers/BuildVerifier.js';
 import { FileStateVerifier } from './verifiers/FileStateVerifier.js';
-import { AgentVerifier } from './verifiers/AgentVerifier.js';
+import { AgentVerifier, resolveReviewerAgent, agentReview, spawnReview } from './verifiers/AgentVerifier.js';
 import { acceptCriterion, createFrozenCriteriaStore } from './acceptance/criteria.js';
 import { captureSnapshot, snapshotId } from './acceptance/snapshot.js';
-import { autoVerify, verifyAfterEdit, VERIFY_LAYER_ORDER } from './loop/auto-verify.js';
+import { autoVerify, verifyAfterEdit, realVerifyLayer, VERIFY_LAYER_ORDER } from './loop/auto-verify.js';
 import {
   assertIndependentAgent,
   requireSnapshot,
@@ -91,6 +91,7 @@ export const VerificationRunner = { run: runVerification };
 export {
   TestVerifier, LintVerifier, BuildVerifier, FileStateVerifier, AgentVerifier,
   acceptCriterion, createFrozenCriteriaStore, captureSnapshot, snapshotId,
-  autoVerify, verifyAfterEdit, VERIFY_LAYER_ORDER,
+  autoVerify, verifyAfterEdit, realVerifyLayer, VERIFY_LAYER_ORDER,
   assertIndependentAgent, requireSnapshot, resultIsBlocking,
+  resolveReviewerAgent, agentReview, spawnReview,
 };
