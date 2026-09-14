@@ -8,6 +8,7 @@
  * lazily via dynamic import to avoid a static ESM cycle.
  */
 import { makeExecutor } from '../index.js';
+import { hasTool } from '../registry/ToolRegistry.js';
 import { registerAllDomains } from './index.js';
 
 let _domains = null;
@@ -32,6 +33,11 @@ export function domainDispatch(slug, args, ctx = {}) {
 /** Number of domain tools registered (for diagnostics). */
 export function domainToolCount() {
   return domainExecutor().engines ? Object.keys(domainExecutor().engines).length : 0;
+}
+
+/** True when the slug is an actual registered domain tool. */
+export function hasDomainTool(slug) {
+  return hasTool(slug);
 }
 
 export const _resetDomains = () => { _domains = null; };

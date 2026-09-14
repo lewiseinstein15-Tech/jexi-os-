@@ -1307,9 +1307,12 @@ async function runEngine(slug, args, opts = {}) {
       // delegation/lsp/communication) run their REAL engines here through the
       // same gated pipeline. The executor applies schema → permission → risk →
       // engine; contexts (root, token, memory, mission) come from the caller.
+      // Only actual domain slugs dispatch here — legacy registry tools without
+      // a runtime engine fall through to `return null` so the caller can route
+      // them to their owning agents (B52 two-stage router contract).
       try {
-        const { domainDispatch, domainToolCount } = await import('../tools/domains/executor.js');
-        if (domainToolCount() && domainDispatch) {
+        const { domainDispatch, domainToolCount, hasDomainTool } = await import('../tools/domains/executor.js');
+        if (domainToolCount() && domainDispatch && hasDomainTool(slug)) {
           const ctx = {
             root: process.env.WORKSPACE_DIR || process.cwd(),
             owner: opts.spillOwner || 'runtime',
@@ -1556,10 +1559,11 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
     if (pt) tool = { slug, name: pt.name || slug, desc: pt.desc || 'plugin tool', agents: [], permission: pt.permission || 'medium', timeoutMs: typeof pt.timeoutMs === 'number' && pt.timeoutMs > 0 ? pt.timeoutMs : undefined };
     else {
       // Phase 5(A) — real domain tools dispatch through the same gated
-      // pipeline when they're registered in the domain registry.
+      // pipeline when they're registered in the domain registry. Slugs that
+      // aren't domain tools stay Unknown (B52 contract).
       try {
-        const { domainDispatch, domainToolCount } = await import('../tools/domains/executor.js');
-        if (domainToolCount()) tool = { slug, name: slug, desc: `domain tool ${slug}`, agents: [], permission: 'medium' };
+        const { domainDispatch, domainToolCount, hasDomainTool } = await import('../tools/domains/executor.js');
+        if (domainToolCount() && hasDomainTool(slug)) tool = { slug, name: slug, desc: `domain tool ${slug}`, agents: [], permission: 'medium' };
         else return { ok: false, error: `Unknown tool: ${slug}`, durationMs: 0 };
       } catch {
         return { ok: false, error: `Unknown tool: ${slug}`, durationMs: 0 };
