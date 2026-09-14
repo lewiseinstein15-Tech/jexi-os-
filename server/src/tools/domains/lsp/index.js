@@ -10,6 +10,26 @@ import { registerToolBatch } from '../../registry/ToolRegistry.js';
 import { runNativeCommand } from '../../../services/NativeCommand.js';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dir = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Resolve a CLI binary the same way npm does: node_modules/.bin under the
+ * module's package tree, walking up until found; fall back to PATH.
+ */
+function resolveBin(name) {
+  let dir = path.resolve(__dir, '..');
+  for (;;) {
+    const binPath = path.join(dir, 'node_modules', '.bin', name);
+    if (fs.existsSync(binPath)) return binPath;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return name;
+}
+const ESLINT_BIN = resolveBin('eslint');
 
 /**
  * LSP diagnostics (JS/TS) — real language diagnostics via the ESLint engine
@@ -29,8 +49,13 @@ export function registerLspTools() {
       const root = cwd ?? ctx.root ?? process.cwd();
       const filePath = path.resolve(root, String(file || ''));
       if (!fs.existsSync(filePath)) return { ok: false, error: `file not found: ${file}` };
-      const args = ['--no-color', '--format', 'json', filePath];
-      const res = await runNativeCommand('eslint', args, { cwd: root, timeoutMs: 30000, maxOutputChars: 30000 });
+      const args = ['--no-color', '--format', 'json'];
+      // ESLint 9+ resolves flat config from the linted file's ancestors, not cwd.
+      // Pin the config explicitly so diagnostics work for any caller-supplied path.
+      const eslintConfig = path.join(root, 'eslint.config.js');
+      if (fs.existsSync(eslintConfig)) args.push('--config', eslintConfig);
+      args.push(filePath);
+      const res = await runNativeCommand(ESLINT_BIN, args, { cwd: root, timeoutMs: 30000, maxOutputChars: 30000 });
       // eslint exits 1 on lint errors; parse JSON payload either way.
       let diagnostics = [];
       try {
