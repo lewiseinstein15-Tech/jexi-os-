@@ -18,6 +18,7 @@
  */
 
 import { Director } from './Director.js';
+import { emit as observerEmit } from '../Observer.js'; // D2 — missions/agents/verification reach the runtime bus
 import { DirectorTask, teamEvent } from './TaskState.js';
 import { TaskMailbox } from './AgentMail.js';
 import { selectEmployee, getEmployee } from './Employees.js';
@@ -142,6 +143,16 @@ export class MissionRunner {
       summary: `Mission opened: ${mission.objective.slice(0, 200)}`,
       data: { missionId: mission.id, budgets: mission.budgets },
     });
+    // D2 — mission lifecycle on the runtime bus (mirrors the documented
+    // Observer vocabulary; persisted mission.event stays the source of truth).
+    try {
+      observerEmit('mission.created', {
+        missionId: mission.id,
+        actor: 'JEXI',
+        summary: `mission created: ${mission.objective.slice(0, 200)}`,
+        data: { conversationId, objective: mission.objective, budgets: mission.budgets },
+      });
+    } catch { /* bus mirroring never breaks mission creation */ }
     this.kick(mission.id);
     return mission;
   }
@@ -635,6 +646,22 @@ Output ONLY JSON: {"affectedItemIds":["wi-..."],"newItems":[{"title":"...","deta
       this._publish(mission, { type: 'WORK_FAILED', severity: 'error', title: item.title, summary: `Could not staff "${item.title}" — recorded honestly.`, data: { itemId: item.id } });
       return;
     }
+    // D2 — an employee is staffing a real work item on this mission: emit
+    // agent.spawned on the runtime bus at the ACTUAL selection site.
+    try {
+      observerEmit('agent.spawned', {
+        missionId,
+        taskId: item.id,
+        actor: employee?.agentId || employee?.id || 'echo',
+        summary: `${employee?.displayName || 'employee'} staffed: ${item.title}`,
+        data: {
+          employeeId: employee?.agentId || employee?.id || 'echo',
+          itemId: item.id,
+          capability: item.capability,
+          requirements: item.requirements || [],
+        },
+      });
+    } catch { /* bus mirroring never breaks execution */ }
 
     // per-item DirectorTask record: the full B208-210 audit trail, replayable
     const task = new DirectorTask({
@@ -842,6 +869,18 @@ Output ONLY JSON: {"affectedItemIds":["wi-..."],"newItems":[{"title":"...","deta
     const deliverable = doneItems.map((i) => `## ${i.title}\n${i.result?.content || ''}`).join('\n\n').slice(0, 28000);
     let verifier;
     try { verifier = selectEmployee(['verification'], { fallback: 'vera' }); } catch { verifier = getEmployee('vera'); }
+    // D2 — verification lifecycle on the runtime bus: started fires with the
+    // real criteria/deliverable BEFORE the vendor call; completed fires with
+    // the actual verdict/score immediately after.
+    try {
+      observerEmit('verification.started', {
+        missionId: mission.id,
+        taskId: mission.id,
+        actor: verifier?.agentId || 'vera',
+        summary: `verifying objective against ${mission.successCriteria.length} criteria (${doneItems.length} items)`,
+        data: { criteria: mission.successCriteria, items: doneItems.map((i) => i.id), length: deliverable.length },
+      });
+    } catch { /* bus mirroring never breaks verification */ }
     const duckTask = { id: mission.id, conversationId: mission.conversationId, objective: mission.objective, events: loadMissionEvents(mission.id) };
     const verification = await verifyDeliverable({
       task: duckTask, deliverable, criteria: mission.successCriteria,
@@ -849,6 +888,18 @@ Output ONLY JSON: {"affectedItemIds":["wi-..."],"newItems":[{"title":"...","deta
       hooks: { onEvent: (e) => this._publish(mission, { type: e.type, summary: e.summary, severity: e.severity, data: { ...e.data, agentId: e.agentId, agentName: e.agentName } }) },
     });
     mission.verification = { verdict: verification.verdict, score: verification.score, problems: verification.problems || [], rationale: verification.rationale || '', epistemic: 'KNOWN', how: 'verified' };
+    try {
+      observerEmit('verification.completed', {
+        missionId: mission.id,
+        taskId: mission.id,
+        actor: verifier?.agentId || 'vera',
+        summary: `objective verification: ${verification.verdict} (${verification.score})`,
+        data: {
+          verdict: verification.verdict, score: verification.score,
+          problems: verification.problems || [], rationale: verification.rationale || '',
+        },
+      });
+    } catch { /* bus mirroring never breaks verification */ }
     mission._persist();
     this._publish(mission, {
       type: 'MISSION_VERIFIED', severity: verification.verdict === 'fail' ? 'warn' : 'info',

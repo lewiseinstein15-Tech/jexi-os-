@@ -15,11 +15,19 @@ import { applyFix } from './Architect.js';
 import { runFile } from './Runner.js';
 import { DesktopManager, ensureBrowser } from './DesktopManager.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
-import { WORKSPACE_DIR } from '../config.js';
+import { WORKSPACE_DIR, DATA_DIR } from '../config.js';
 import { getAgent, getSkill } from './AgentRoster.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const SKILLS_DIR = path.resolve(__dirname, '../../skills');
+/**
+ * D3 — synthesized skills never touch the repo working tree.
+ * server/skills is the READ-ONLY bundled library; machine-synthesized
+ * fallbacks are persisted under DATA_DIR/skills (gitignored, the same
+ * user-dsh root SkillDiscovery watches) so a boot re-reads them instead of
+ * re-synthesizing, without ever leaking artifacts into git.
+ */
+export const SYNTHESIZED_SKILLS_DIR = path.join(DATA_DIR, 'skills');
 
 /** Skill slug → agent name shown in the live pipeline. Exported so the roster
  *  audit (Reachability.js) can treat runSkill slugs as a reachability source. */
@@ -63,8 +71,28 @@ const PHASE = {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export function listSkillFiles() {
-  if (!fs.existsSync(SKILLS_DIR)) return [];
-  return fs.readdirSync(SKILLS_DIR).filter((f) => f.endsWith('.md')).sort();
+  const dirs = [
+    fs.existsSync(SKILLS_DIR) ? SKILLS_DIR : null,
+    // D3 — synthesized flat skills live under DATA_DIR/skills; include them
+    // in lookups so a synthesized file is re-read (not re-written) on boot.
+    fs.existsSync(SYNTHESIZED_SKILLS_DIR) ? SYNTHESIZED_SKILLS_DIR : null,
+  ].filter(Boolean);
+  const files = new Set();
+  for (const dir of dirs) {
+    for (const f of fs.readdirSync(dir)) {
+      if (f.endsWith('.md')) files.add(f);
+    }
+  }
+  return [...files].sort();
+}
+
+/** D3 — read a flat skill file from whichever root actually holds it. */
+function readFlatSkill(file) {
+  for (const dir of [SKILLS_DIR, SYNTHESIZED_SKILLS_DIR]) {
+    const p = path.join(dir, file);
+    if (fs.existsSync(p)) return fs.readFileSync(p, 'utf-8');
+  }
+  return null;
 }
 
 /** B50 P1 — progressive-disclosure folders: server/skills/<slug>/{SKILL.md, reference.md}.
@@ -133,7 +161,7 @@ export function skillMeta(slug) {
   }
   const file = listSkillFiles().find((f) => f.toLowerCase().includes(`-${resolveSkillSlug(slug)}.md`));
   if (file) {
-    const fm = parseFrontmatter(fs.readFileSync(path.join(SKILLS_DIR, file), 'utf-8'));
+    const fm = parseFrontmatter(readFlatSkill(file) || '');
     return { slug, name: fm.name || slug, description: fm.description || '', allowedTools: fm['allowed-tools'] || [], context: fm.context || '', full: false };
   }
   const agent = getAgent(resolveSkillSlug(slug));
@@ -172,18 +200,23 @@ export function loadSkill(slug) {
     const summary = skillMeta(slug);
     return { file: path.join(dir, 'SKILL.md'), md: refMd ? `${skillMd}\n\n${refMd}` : skillMd, summary, progressive: true };
   }
-  // 2. Flat .md file (legacy / non-folder skills).
+  // 2. Flat .md file (legacy / non-folder skills). May live in server/skills
+  // (bundled) OR DATA_DIR/skills (synthesized — never the repo tree).
   const file = listSkillFiles().find((f) => f.toLowerCase().includes(`-${resolveSkillSlug(slug)}.md`));
-  if (file) return { file, md: fs.readFileSync(path.join(SKILLS_DIR, file), 'utf-8'), summary: skillMeta(slug), progressive: false };
+  if (file) return { file, md: readFlatSkill(file) || '', summary: skillMeta(slug), progressive: false };
   // 3. Roster synthesis — kept as a LOGGED fallback (never "Skill not found").
   const md = synthesizeSkill(slug);
   if (md) {
-    // Persist the synthesized instructions so future boots read from disk.
+    // D3 — persist synthesized instructions under the gitignored DATA_DIR
+    // store (user-dsh root), NEVER the repo working tree (server/skills ≤
+    // server/skills/<slug>.md used to leak machine-generated artifacts into
+    // git). Future boots read the same file via the synthesized dir below.
+    const relative = `${slug}.md`;
     try {
-      fs.mkdirSync(SKILLS_DIR, { recursive: true });
-      fs.writeFileSync(path.join(SKILLS_DIR, `${slug}.md`), md, 'utf-8');
+      fs.mkdirSync(SYNTHESIZED_SKILLS_DIR, { recursive: true });
+      fs.writeFileSync(path.join(SYNTHESIZED_SKILLS_DIR, relative), md, 'utf-8');
     } catch (e) { /* non-fatal */ }
-    return { file: `${slug}.md`, md, summary: skillMeta(slug), progressive: false, synthesized: true };
+    return { file: relative, md, summary: skillMeta(slug), progressive: false, synthesized: true };
   }
   return null;
 }

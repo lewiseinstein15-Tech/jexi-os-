@@ -18,6 +18,7 @@ import {
 } from './base.js';
 import { NormalizedResponse } from '../interface/NormalizedResponse.js';
 import { ClassifiedError } from '../error/classify.js';
+import { readSSE, openaiChunkToDelta, anthropicDeltaToDelta, openaiUsage, anthropicUsage, finalizeToolCalls } from './sse.js';
 
 export class ChatClientBase {
   constructor({ id, cfg, env = process.env, adapter = 'openai', wire = 'openai' }) {
@@ -47,8 +48,79 @@ export class ChatClientBase {
     return raw instanceof NormalizedResponse ? raw : normalizeFor(this.wire, raw);
   }
 
+  /**
+   * Scope D (part 1) — REAL SSE streaming (replaces the D0 placeholder that
+   * always yielded a single empty chunk).
+   *
+   * Opens a real streaming request to the provider and reads the SSE frames:
+   *   openai    → POST {baseUrl}/chat/completions with stream:true
+   *   anthropic → POST {baseUrl}/messages with stream:true
+   *
+   * Yields normalized ChatChunk records (same contract as the interface):
+   *   { type:'chunk', text, delta:{ content?, reasoning?, tool_calls? } }
+   *   { type:'done',  text, delta:{}, usage, tool_calls }
+   *
+   * Failures are honest: the fetch error (HTTP status / network) is thrown
+   * just like `chat()` throws — the caller decides whether to fall back.
+   */
   async *stream(request) {
-    yield { type: 'chunk', text: '', delta: {} };
+    const base = this.baseUrl.replace(/\/$/, '');
+    const url = this.wire === 'anthropic' ? `${base}/messages` : `${base}/chat/completions`;
+    let body;
+    if (this.wire === 'anthropic') {
+      body = this.toAnthropicRequest(request);
+      body.stream = true;
+    } else {
+      body = toOpenAIRequest(request);
+      body.model = request.model ?? this.defaultModel();
+      body.stream = true;
+    }
+    const headers = { ...this.headers };
+
+    const acc = { toolCalls: [] };
+    let text = '';
+
+    try {
+      for await (const { event, data } of readSSE({ url, headers, body })) {
+        if (event === 'error') {
+          let msg = data;
+          try { msg = JSON.parse(data)?.error?.message || data; } catch { /* keep raw */ }
+          throw new ClassifiedError(`stream failed: ${msg}`, { id: this.id, provider: this.id, status: 502 });
+        }
+        let json;
+        try { json = JSON.parse(data); } catch { continue; }
+        if (this.wire === 'anthropic') {
+          if (json.type === 'message_stop') break;
+          const delta = anthropicDeltaToDelta(json, acc);
+          const usage = json.type === 'message_delta' ? anthropicUsage(json, acc) : null;
+          if (usage && (usage.inputTokens || usage.outputTokens)) acc.usage = usage;
+          if (delta.content) text += delta.content;
+          if (delta.content || delta.reasoning || delta.tool_calls) {
+            yield { type: 'chunk', text, delta };
+          }
+          continue;
+        }
+        const delta = openaiChunkToDelta(json, acc);
+        if (delta.content) text += delta.content;
+        if (json.usage) acc.usage = openaiUsage(json, acc);
+        const finish = json.choices?.[0]?.finish_reason;
+        if (delta.content || delta.reasoning || delta.tool_calls || finish) {
+          yield { type: 'chunk', text, delta: { ...delta, finish_reason: finish } };
+        }
+        if (finish) break;
+      }
+    } catch (e) {
+      if (e instanceof ClassifiedError) throw e;
+      throw new ClassifiedError(`stream failed: ${(e && e.message) || e}`, { id: this.id, provider: this.id, status: e?.status || 502 });
+    }
+
+    yield {
+      type: 'done',
+      text,
+      delta: {},
+      usage: acc.usage || { inputTokens: 0, outputTokens: 0, totalCost: 0, provider_data: {} },
+      tool_calls: finalizeToolCalls(acc.toolCalls),
+    };
   }
 
   countTokens(text) {

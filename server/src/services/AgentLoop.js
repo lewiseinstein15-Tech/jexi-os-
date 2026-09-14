@@ -27,6 +27,7 @@
  */
 
 import { planner } from './Planner.js'; // the singleton instance (the class itself has no statics)
+import { emit as observerEmit } from './Observer.js'; // D2 — chat-path events flow through the bus
 import { getTool } from './ToolRegistry.js';
 import { buildNativeSchemas, executeTool, activeToolProfile, TOOL_PROFILES, isToolDone } from './ToolRuntime.js';
 import { selectMcpToolset } from './CapabilityRouter.js';
@@ -93,7 +94,70 @@ async function safePlan(query, image) {
 export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   const start = Date.now();
   if (typeof sendEvent !== 'function') sendEvent = () => {};
-  const emit = (type, payload) => { try { sendEvent(type, payload); } catch (e) {} };
+  const missionId = opts.missionId || null;
+  const actor = 'JEXI';
+  const emit = (type, payload) => {
+    try { sendEvent(type, payload); } catch (e) {}
+    // D2 — every chat-path stream event is mirrored onto the Observer bus so
+    // the live feed (/api/observer/recent) sees the SAME semantic events as
+    // any mission/task/model/tool/agent flow. Mapping preserves the existing
+    // wire names while giving them canonical bus namespaces.
+    try {
+      switch (type) {
+        case 'agent.plan':
+          observerEmit('agent.called', {
+            missionId,
+            actor,
+            summary: `chat plan: ${payload?.intent || '—'} (team ${(payload?.team || []).join(',') || 'single'})`,
+            data: { query, intent: payload?.intent, team: payload?.team, tools: (payload?.tools || []).map((t) => t.slug), codeMode: !!payload?.codeMode },
+          });
+          break;
+        case 'tool/call':
+          observerEmit('tool.called', {
+            missionId,
+            actor,
+            taskId: payload?.name || null,
+            summary: `tool ${payload?.name}`,
+            data: {
+              callId: payload?.callId,
+              name: payload?.name,
+              arguments: (() => { try { return payload?.arguments ? JSON.parse(payload.arguments) : null; } catch { return payload?.arguments; } })(),
+            },
+          });
+          break;
+        case 'tool/result':
+          observerEmit('tool.completed', {
+            missionId,
+            actor,
+            taskId: payload?.name || null,
+            summary: `tool ${payload?.name} ${payload?.ok ? 'ok' : `error ${payload?.error || ''}`}`,
+            data: { callId: payload?.callId, name: payload?.name, ok: !!payload?.ok, error: payload?.error || null },
+          });
+          break;
+        case 'tool.failed':
+          observerEmit('tool.failed', {
+            missionId,
+            actor,
+            summary: `tool ${payload?.name} failed`,
+            data: { callId: payload?.callId, name: payload?.name, error: payload?.error },
+          });
+          break;
+        case 'agent.done':
+          observerEmit('agent.completed', {
+            missionId,
+            actor,
+            summary: `chat completed (${payload?.stats?.toolCalls ?? 0} tool calls)`,
+            data: {
+              answer: payload?.answer,
+              cancelled: !!payload?.cancelled,
+              stats: payload?.stats,
+            },
+          });
+          break;
+        default: break;
+      }
+    } catch { /* bus mirroring never breaks the loop */ }
+  };
   // Test seam: a caller may inject a deterministic final answer (no LLM keys
   // needed) so isolation/loop behaviour is provable without network calls.
   if (opts.__mockAnswer !== undefined) {

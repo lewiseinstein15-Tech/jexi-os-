@@ -98,6 +98,7 @@ import { activateTaskWorkspace, archiveTaskWorkspace } from './src/services/Work
 import { decide, applyDecision } from './src/services/DecisionEngine.js';
 import { recordDecision, retrieveDecisions, memoryStats as decisionMemoryStats } from './src/services/DecisionMemory.js';
 import { metricsSummary, startTrace, endTrace, emitMetric, scoreProviderHealth } from './src/services/ObservabilityAgent.js';
+import { emit as observerEmit } from './src/services/Observer.js'; // D2 — the chat path flows through the runtime event bus
 import { scanPromptSafety, forceSafeMode, toolAllowed, blockExplanation, isSafeMode } from './src/services/GuardrailAgent.js';
 import { routeDecision, checkLocalBackend } from './src/services/OfflineAgent.js';
 import { voiceStatus } from './src/services/VoiceAgent.js';
@@ -1689,6 +1690,17 @@ app.post('/api/chat', async (req, res) => {
   // Stable per-conversation id for this request (hoisted so the deadline and
   // the result store can use it too).
   const convId = conversationId(req);
+  // D2 — the chat turn lifecycle is an event-bus citizen like every other
+  // runtime flow; started fires once per request, completed fires in done().
+  try {
+    observerEmit('chat.started', {
+      missionId: null,
+      taskId: null,
+      actor: req.headers['x-jexi-user'] || 'user',
+      summary: `chat turn started: ${String(query || 'image message').slice(0, 120)}`,
+      data: { conversationId: convId, hasImage: !!image },
+    });
+  } catch { /* bus mirroring never breaks the chat turn */ }
   // B66 — per-session conversation memory: chat history reads/writes for this
   // request are scoped to this conversation (never the shared global blob).
   setActiveSession(convId);
@@ -1754,6 +1766,24 @@ app.post('/api/chat', async (req, res) => {
       }
     }
     try { const tail = linkSafe.flush(); if (tail) res.write(JSON.stringify({ type: 'stream', text: tail }) + '\n'); } catch (e) { /* never break done */ }
+    // D2 — every chat turn that reaches a terminal done is recorded on the
+    // runtime event bus (same contract as mission/task/model/tool events).
+    try {
+      observerEmit('chat.completed', {
+        missionId: null,
+        taskId: null,
+        actor: 'JEXI',
+        summary: `chat turn done (${payload?.success === false ? 'error' : 'ok'}): ${String((payload && payload.summary) || payload?.error || '—').slice(0, 120)}`,
+        data: {
+          conversationId: convId,
+          success: payload?.success !== false,
+          blocked: !!payload?.blocked,
+          recoverable: !!payload?.recoverable,
+          error: payload?.error || null,
+          statistics: payload?.statistics || null,
+        },
+      });
+    } catch { /* bus mirroring never breaks the chat turn */ }
     sendEvent('done', payload);
     if (payload && payload.summary) rememberTurn('jexi', payload.summary);
   };
