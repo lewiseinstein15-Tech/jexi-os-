@@ -109,6 +109,7 @@ import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/se
 import { mountMcp } from './mcp-server.js';
 import { mountArena } from './src/routes/arena.js'; // ARENA ASTRA — executive architecture observability
 import { mountScheduler } from './src/routes/scheduler.js'; // Phase 6 Scope B — autonomy scheduler
+import { mountContext } from './src/routes/context.js'; // Phase 6 Scope C — context manager
 import { autonomyScheduler } from './src/scheduler/index.js';
 import { taskManager } from './src/services/TaskManager.js';
 import { taskScheduler } from './src/services/TaskScheduler.js';
@@ -400,6 +401,7 @@ app.use(express.json({ limit: '30mb' })); // Room for base64 book uploads + code
 mountMcp(app);
 mountArena(app); // ARENA ASTRA — /api/kernel/* /api/intent /api/observer /api/vault /api/market /api/reasoning /api/scheduler /api/persona /api/improve
 mountScheduler(app); // Phase 6 Scope B — /api/scheduler/jobs (autonomy scheduler)
+mountContext(app); // Phase 6 Scope C — /api/context/* (context manager)
 
 // Every instance has its own id (Render injects RENDER_INSTANCE_ID automatically).
 // A load balancer can see which instance answered, and you can verify stickiness.
