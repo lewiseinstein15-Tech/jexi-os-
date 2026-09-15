@@ -59,21 +59,10 @@ narratives in commits.
 - `DOTENV_CONFIG_QUIET=true` suppresses the `dotenv` tips that pollute stdout.
 - Bespoke HTTP/token rules: token from `.jexi-secrets/git-token`,
   `git config` uses oauth2 user (see git config in repo), push direct to main.
-- PUSH BLOCKER (2026-09-14, Scopes B→6A): the only available tokens
-  (`.jexi-secrets/git-token` = 40-char `ghu_...` GitHub App user token, and
-  `$GITHUB_TOKEN` = also `ghu_...`) are READ-ONLY for this repo: `git push`
-  -> "Permission ... denied (403)" on both `main` and a scratch branch;
-  ref-create API -> "Resource not accessible by integration" (403); the
-  repo API still reports `permissions.push = true`, so the App installation
-  token simply lacks write on contents. API *reads* (contents, /user, repo
-  permissions) work fine. Tried forms that all 403: `https://${TOKEN}@...`,
-  `https://x-access-token:${TOKEN}@...`, `https://oauth2:${TOKEN}@...`,
-  and `$GITHUB_TOKEN`. No credential helpers and no git hooks are involved.
-  - Scope B left remote origin/main at `f0722fb`; later scopes 5C/5D and the
-    Scope E final gate were pushed despite this, so write access was restored
-    at some point; as of Phase 6 Scope A it is denied again.
-  - Phase 6 Scope A commit is staged on local `main` as `1a1c0d6`
-    (parent `67f0c5a`), remote origin/main still at `67f0c5a`.
-  - To unblock: grant the GitHub App `Contents: Read and write` on this repo,
-    or provide a classic PAT with the `repo` scope, then `git push origin main`.
-  - Do NOT create branches/PRs. Commit-only flow, direct to `main`.
+- PUSH — RESOLVED (2026-09-15): `.jexi-secrets/git-token` was replaced with a
+  credential holding Contents: write on this repo; `git push origin main` works
+  again via the `oauth2:<token>` form. Scope A (local `34ca9bb`) is on remote
+  main. The earlier blocker was an App installation token with no Contents
+  write (every form 403 / "Resource not accessible by integration"); no repo or
+  App permission change was needed, only the token file.
+  - Commit-only flow, direct to `main`. Do NOT create branches/PRs.
