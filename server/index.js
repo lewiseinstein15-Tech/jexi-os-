@@ -108,6 +108,8 @@ import { chaosEnabled, listInjections } from './src/services/ChaosAgent.js';
 import { importBookBuffer, importBookUrl, listBooks, deleteBook } from './src/services/BookLibrary.js';
 import { mountMcp } from './mcp-server.js';
 import { mountArena } from './src/routes/arena.js'; // ARENA ASTRA — executive architecture observability
+import { mountScheduler } from './src/routes/scheduler.js'; // Phase 6 Scope B — autonomy scheduler
+import { autonomyScheduler } from './src/scheduler/index.js';
 import { taskManager } from './src/services/TaskManager.js';
 import { taskScheduler } from './src/services/TaskScheduler.js';
 import { PORT, WORKSPACE_DIR, DATA_DIR, SERVER_ROOT } from './src/config.js';
@@ -397,6 +399,7 @@ app.use(express.json({ limit: '30mb' })); // Room for base64 book uploads + code
 // client connect to JEXI's tools and data at /mcp (read-only + ask_jexi only).
 mountMcp(app);
 mountArena(app); // ARENA ASTRA — /api/kernel/* /api/intent /api/observer /api/vault /api/market /api/reasoning /api/scheduler /api/persona /api/improve
+mountScheduler(app); // Phase 6 Scope B — /api/scheduler/jobs (autonomy scheduler)
 
 // Every instance has its own id (Render injects RENDER_INSTANCE_ID automatically).
 // A load balancer can see which instance answered, and you can verify stickiness.
@@ -2808,6 +2811,13 @@ app.listen(PORT, HOST, () => {
   // shortly after the brain is up, sequentially + fail-soft. npx cold starts
   // are slow (a fresh container downloads every package), so a second pass
   // retries whatever missed — failures surface honestly in health either way.
+  // Phase 6 Scope B — autonomy scheduler: arm persisted cron/event/condition
+  // jobs and start its tick loop. Fail-soft: a scheduler problem never blocks
+  // the brain from serving.
+  try {
+    autonomyScheduler().start();
+    console.log('[scheduler] autonomy scheduler started (cron/event/condition).');
+  } catch (e) { console.log(`[scheduler] start failed: ${String(e && e.message || e).slice(0, 160)}`); }
   const mcpBoot = setTimeout(() => {
     connectEnabledMcpServers()
       .then((rows) => {
