@@ -372,4 +372,8 @@ console.log('\n== L. Integration: recovery that WORKS becomes a lesson ==');
 console.log('\n============================================================');
 console.log(`B211 B2 INTELLIGENCE: ${pass} passed, ${fail} failed`);
 console.log('============================================================');
-if (fail > 0) process.exit(1);
+// 8(fix): the summary is the verdict — exit explicitly. A module opened by
+// the MissionRunner/Lessons imports kept a handle alive, so after printing
+// "74 passed" the process slept forever and hung the whole npm-test chain
+// at script 155/206 for 18+ minutes.
+process.exit(fail > 0 ? 1 : 0);
