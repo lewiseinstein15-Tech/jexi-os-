@@ -23,11 +23,26 @@ export function detectTestCommand(root = process.cwd()) {
 }
 
 function parseNodeTestReport(output, exitCode) {
-  const pass = Number((output.match(/# pass (\d+)/) || [])[1] ?? 0);
-  const fail = Number((output.match(/# fail (\d+)/) || [])[1] ?? 0);
-  const skip = Number((output.match(/# skipped (\d+)/) || [])[1] ?? 0);
-  const tests = Number((output.match(/# tests (\d+)/) || [])[1] ?? (pass + fail));
-  return { status: fail > 0 || exitCode !== 0 ? 'fail' : (tests > 0 ? 'pass' : 'error'), exitCode, pass, fail, skip, tests };
+  // node --test ships TWO reporter shapes:
+  //   TAP :  "# pass 3"  / "# fail 0"  / "# tests 3"     (tap reporter)
+  //   spec:  "ℹ pass 3"  / "ℹ fail 0"  / "ℹ tests 3"     (default spec reporter)
+  // The old parser only knew TAP, so a fully PASSING spec run parsed as
+  // pass=0/fail=0/tests=0 -> status "error" — dishonest verification evidence.
+  const num = (re) => {
+    const m = output.match(re);
+    const v = m ? Number(m[1]) : NaN;
+    return Number.isFinite(v) ? v : null;
+  };
+  const pick = (...res) => { for (const re of res) { const v = num(re); if (v !== null) return v; } return 0; };
+  const pass = pick(/#\s*pass (\d+)/, /[ℹ]\s*pass (\d+)/, /\bpass (\d+)/);
+  const fail = pick(/#\s*fail (\d+)/, /[ℹ]\s*fail(?:ed)? (\d+)/, /\bfail(?:ed)? (\d+)/);
+  const skip = pick(/#\s*skipped? (\d+)/, /[ℹ]\s*(?:skip(?:ped)?) (\d+)/);
+  const tests = pick(/#\s*tests (\d+)/, /[ℹ]\s*tests (\d+)/) || (pass + fail);
+  const hasFailureEvidence = /failing tests|✖/.test(output);
+  return {
+    status: fail > 0 || exitCode !== 0 ? 'fail' : (tests > 0 || pass > 0 ? 'pass' : (hasFailureEvidence ? 'fail' : 'error')),
+    exitCode, pass, fail, skip, tests,
+  };
 }
 
 export function registerTestingTools() {
