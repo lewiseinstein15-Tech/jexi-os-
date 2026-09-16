@@ -111,6 +111,25 @@
 .jcx .onekey .dot{width:6px;height:6px;border-radius:50%;background:var(--jcx-up);flex:none}
 .jcx .onekey b{color:var(--jcx-ink);font-weight:600}
 
+/* v0.7 — ServerRow: the brain's address + live status dot. Additive rule
+   block styled 1:1 with .modelrow (same panel, border, radius, type). */
+.jcx .serverrow{display:flex;align-items:center;gap:8px;margin-bottom:8px;
+  background:var(--jcx-panel-2);border:1px solid var(--jcx-line);border-radius:10px;
+  padding:7px 9px;cursor:pointer;transition:border-color 150ms var(--jcx-ease)}
+.jcx .serverrow:hover{border-color:rgba(255,122,61,.45)}
+.jcx .serverrow .srv{min-width:0}
+.jcx .serverrow .m{font-family:var(--jcx-mono);font-size:11px;color:var(--jcx-ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jcx .serverrow .p{font-size:10px;color:var(--jcx-ink-2)}
+.jcx .serverrow .sdot{width:6px;height:6px;border-radius:50%;flex:none}
+.jcx .serverrow .sdot.up{background:var(--jcx-up);box-shadow:0 0 6px var(--jcx-up-dim)}
+.jcx .serverrow .sdot.down{background:var(--jcx-down);box-shadow:0 0 6px var(--jcx-down-dim)}
+.jcx .serverrow .sdot.checking{background:var(--jcx-gold);box-shadow:0 0 6px var(--jcx-gold-dim);
+  animation:jcx-wake 1.2s ease-in-out infinite}
+@keyframes jcx-wake{0%,100%{opacity:1}50%{opacity:.35}}
+.jcx .serverrow input{width:100%;background:transparent;border:0;outline:0;
+  font-family:var(--jcx-mono);font-size:11px;color:var(--jcx-ink)}
+
 /* ═══════════ MAIN COLUMN ═══════════ */
 .jcx .appmain{display:grid;grid-template-rows:auto 1fr 176px;min-width:0;height:100vh;position:relative;z-index:1}
 

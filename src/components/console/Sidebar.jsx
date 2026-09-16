@@ -1,4 +1,5 @@
 import LogoTool from './LogoTool';
+import ServerRow from './ServerRow'; // v0.7 — live brain address + status dot
 import { NavIcon } from './icons';
 import { NAV } from './consoleData';
 
@@ -32,6 +33,7 @@ export default function Sidebar({ route, onNavigate, onHome }) {
       ))}
 
       <div className="sidefoot">
+        <ServerRow />
         <div className="modelrow">
           <NavIcon name="model" />
           <div>

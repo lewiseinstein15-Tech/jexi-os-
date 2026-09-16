@@ -85,9 +85,19 @@ export default function App() {
   // F-build — the console surface: when the URL hash matches a console route
   // (#missions … #scheduler) the React console takes over the shell. The
   // classic app never reads the hash, so this is purely additive.
-  const [consoleRoute, setConsoleRoute] = useState(routeFromHash);
+  // v0.7 — the console is the HOME surface: an EMPTY hash boots straight
+  // into the console (logo + 12 views; replaceState so the phone back
+  // button still exits the app). #classic reaches the classic shell; any
+  // other unknown hash (skip links, in-page anchors) also stays classic.
+  const consoleHome = () => {
+    if (typeof window !== 'undefined' && !window.location.hash) {
+      window.history.replaceState(null, '', '#missions');
+    }
+    return routeFromHash();
+  };
+  const [consoleRoute, setConsoleRoute] = useState(consoleHome);
   useEffect(() => {
-    const h = () => setConsoleRoute(routeFromHash());
+    const h = () => setConsoleRoute(consoleHome());
     window.addEventListener('hashchange', h);
     return () => window.removeEventListener('hashchange', h);
   }, []);
@@ -178,13 +188,14 @@ export default function App() {
     return () => { alive = false; };
   }, []);
 
-  // Native polish: match the phone's status bar to the black theme.
+  // Native polish: match the phone's status bar to the active surface
+  // (console = JEXI Market charcoal, classic = the shell's dark theme).
   useEffect(() => {
     if (window.Capacitor?.isNativePlatform?.()) {
-      StatusBar.setBackgroundColor({ color: '#0f1115' }).catch(() => {});
+      StatusBar.setBackgroundColor({ color: consoleRoute ? '#0c0b09' : '#0f1115' }).catch(() => {});
       StatusBar.setStyle({ style: 'LIGHT' }).catch(() => {});
     }
-  }, []);
+  }, [consoleRoute]);
 
   const navigate = (id) => {
     setView(id);
@@ -219,7 +230,10 @@ export default function App() {
     return <BootSplash status={bootStatus} />;
   }
 
-  if (setupOpen) {
+  // v0.7 — the console is self-sufficient (it carries its own Server row),
+  // so the first-run wizard only gates the classic shell. A fresh install
+  // lands in the console with the logo — no server-address wall.
+  if (setupOpen && !consoleRoute) {
     return (
       <SetupWizard
         initialUrl={getBackendUrl()}
