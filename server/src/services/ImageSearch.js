@@ -8,7 +8,7 @@
 import fetch from 'node-fetch';
 import { generateContent } from '../providers/runtime/LLMClient.js'; // B171 — vision-verified pictures
 
-const UA = 'JEXI-OS/1.0 (image search; research agent)';
+const UA = 'JEXI-OS/1.3 (https://github.com/lewiseinstein15-Tech/jexi-os-; contact: lewiseinstein15@gmail.com) image-search';
 
 function isGarbageImage(title) {
   return /icon|logo|blank|placeholder|disambig/i.test(String(title || ''));

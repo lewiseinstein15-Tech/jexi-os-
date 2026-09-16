@@ -310,7 +310,7 @@ export const wikipediaProvider = {
   configured: () => true,
   async search(req) {
     const url = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(req.query)}&format=json&srlimit=5`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'JEXI-OS/1.0 (research agent)' }, signal: AbortSignal.timeout(8000) });
+    const res = await fetch(url, { headers: { 'User-Agent': 'JEXI-OS/1.3 (https://github.com/lewiseinstein15-Tech/jexi-os-; contact: lewiseinstein15@gmail.com) wikipedia-search' }, signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new WebError(WEB_ERRORS.PROVIDER_ERROR, `wikipedia ${res.status}`);
     const data = await res.json();
     const sources = (data?.query?.search || []).map((r) => ({
