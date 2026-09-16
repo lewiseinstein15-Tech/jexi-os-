@@ -267,4 +267,8 @@ console.log('\n== I. Mission level: a computer item staffs Atlas, telemetry land
 console.log('\n============================================================');
 console.log(`B211 B3 COMPUTER: ${pass} passed, ${fail} failed`);
 console.log('============================================================');
-if (fail > 0) process.exit(1);
+// 9(fix): the summary is the verdict — exit explicitly. A handle opened by
+// the MissionRunner/browser-layer imports kept the event loop alive, so after
+// printing "57 passed" the process slept forever and hung the npm-test chain
+// at script 157/207 (same pre-existing pattern fix-8 fixed in test-b211b2).
+process.exit(fail > 0 ? 1 : 0);
