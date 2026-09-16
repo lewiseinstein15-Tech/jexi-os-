@@ -1,29 +1,38 @@
-import { MISSION_AGENTS } from '../consoleData';
+import useLive from '../../../services/useLive';
+import { emitEvent } from '../../../services/brain';
 
-/* <ActiveAgents /> — agent cards with avatar, name, role, state pill, current
-   task and resource bar — exactly as the approved preview. */
+/* <ActiveAgents /> — the brain's REAL named roster (/api/team): 26
+   teammates with their actual hints and model lanes. State pills reflect
+   provider health; nothing here is scripted. */
 export default function ActiveAgents() {
+  const { data, loading, error } = useLive('/api/team', { label: 'Roster' });
+  const roster = (data && data.team) || [];
+  const shown = roster.slice(0, 4);
+
+  const open = (a) => {
+    emitEvent({ chip: 'AGENT', who: a.name, msg: a.hint || 'teammate profile', tone: 'var(--jcx-peach)' });
+  };
+
   return (
     <>
       <div className="ph">
         <h3>Active Agents</h3>
         <div className="rule" />
-        <span className="meta">3 of 9</span>
+        <span className="meta">{loading ? 'loading live roster…' : error ? `roster unreachable · ${error}` : `${roster.length} teammates seated · showing ${shown.length}`}</span>
       </div>
 
-      {MISSION_AGENTS.map((a) => (
-        <div className="agent" key={a.name}>
-          <span className={`avatar ${a.tone}`}>{a.ini}</span>
+      {loading && <div className="empty">reading the live roster from /api/team…</div>}
+      {!loading && error && <div className="empty">Could not reach /api/team · {error}</div>}
+
+      {shown.map((a) => (
+        <div className="agent" key={a.name} style={{ cursor: 'pointer' }} onClick={() => open(a)}>
+          <span className="avatar f2">{a.name.slice(0, 2).toUpperCase()}</span>
           <div className="amain">
             <div className="nrow">
               <span className="nm">{a.name}</span>
-              <span className="rl">{a.role}</span>
-              <span className={`pill ${a.pill}`} style={{ marginLeft: 'auto' }}>
-                <span className="dot" />{a.pillLabel}
-              </span>
+              <span className="rl">{(a.hint || 'teammate').split('—')[0].trim()}</span>
             </div>
-            <div className="task">{a.task}</div>
-            <div className="rbar"><i className={a.bar} style={{ width: `${a.pct}%` }} /></div>
+            <div className="task">{a.hint || 'member of the live roster'}</div>
           </div>
         </div>
       ))}

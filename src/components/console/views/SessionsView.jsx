@@ -1,51 +1,61 @@
-import { SESSIONS } from '../consoleData';
+import useLive from '../../../services/useLive';
+import { useBrain } from '../ConsoleApp';
+import { fmtUptime } from '../../../services/brain';
 
-/* SessionsView — session list with JSONL child tree + raw JSONL tail,
-   exactly as the approved preview. */
+/* SessionsView — REAL live processes (/api/processes) plus the brain's own
+   instance identity. Empty queue = honest empty state, never invented
+   session trees. */
 export default function SessionsView() {
+  const { data, loading, error } = useLive('/api/processes', { label: 'Sessions' });
+  const { health } = useBrain();
+  const procs = (data && data.processes) || [];
+
   return (
     <div className="pad">
       <div className="ph">
         <h3>Sessions</h3>
         <div className="rule" />
-        <span className="meta">3 roots · JSONL persisted · resume-safe checkpoints</span>
+        <span className="meta">
+          {loading ? 'loading live processes…'
+            : error ? `unreachable · ${error}`
+              : `${procs.length} live process${procs.length === 1 ? '' : 'es'} · stream-capable · resume-safe`}
+        </span>
       </div>
       <div className="grid2">
         <div className="card">
-          <div className="tierhead"><h4>Session tree</h4><span className="cnt">3 roots · 2 children</span></div>
-          {SESSIONS.roots.map((r, ri) => (
-            <div key={ri}>
-              <div className="rowline">
-                <span className="sdot s" style={{ background: r.dot }} />
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontWeight: 600 }}>{r.title}</div>
-                  <div className="mono" style={{ fontSize: '9.5px', color: 'var(--jcx-ink-3)' }}>{r.meta}</div>
-                </div>
-                <span className={`pill ${r.pill[0]}`}><span className="dot" />{r.pill[1]}</span>
+          <div className="tierhead"><h4>Live processes</h4><span className="cnt">{loading ? '…' : `${procs.length} running`}</span></div>
+          {loading && <div className="empty">reading /api/processes…</div>}
+          {!loading && error && <div className="empty">Could not reach /api/processes · {error}</div>}
+          {!loading && !error && procs.length === 0 && (
+            <div className="empty">
+              No live processes right now — sessions appear here the moment an agent spawns.
+              <span className="sub">start one from Chat; long-running work will stream its logs into this view</span>
+            </div>
+          )}
+          {procs.map((p, i) => (
+            <div className="rowline" key={p.id || i}>
+              <span className="sdot s" style={{ background: 'var(--jcx-up)' }} />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontWeight: 600 }}>{p.name || p.id || `process ${i + 1}`}</div>
+                <div className="mono" style={{ fontSize: '9.5px', color: 'var(--jcx-ink-3)' }}>{p.status || 'running'}{p.startedAt ? ` · since ${p.startedAt}` : ''}</div>
               </div>
-              {r.children && (
-                <div className="tree-line">
-                  {r.children.map((c, ci) => (
-                    <div className="rowline" key={ci}>
-                      <span className="sdot s" style={{ background: c.dot }} />
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontWeight: 600 }}>{c.title}</div>
-                        <div className="mono" style={{ fontSize: '9.5px', color: 'var(--jcx-ink-3)' }}>{c.meta}</div>
-                      </div>
-                      <span className={`pill ${c.pill[0]}`}><span className="dot" />{c.pill[1]}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <span className="pill run"><span className="dot" />Live</span>
             </div>
           ))}
         </div>
 
         <div className="card">
-          <div className="tierhead"><h4>JSONL tail — sess_01H9XK4</h4><span className="cnt">line 2,182 → 2,184</span></div>
+          <div className="tierhead"><h4>Brain instance</h4><span className="cnt">/api/health</span></div>
           <div className="pad" style={{ padding: '10px 12px' }}>
-            <pre className="mono" style={{ fontSize: 10, lineHeight: 1.6, color: 'var(--jcx-ink-2)', whiteSpace: 'pre-wrap', margin: 0 }}>
-              {SESSIONS.jsonl.join('\n')}
+            <pre className="mono" style={{ fontSize: 10, lineHeight: 1.7, color: 'var(--jcx-ink-2)', whiteSpace: 'pre-wrap', margin: 0 }}>
+{health ? [
+  `instance    ${health.instanceId || '—'}`,
+  `version     v${health.version || '—'}`,
+  `uptime      ${fmtUptime(health.uptime)}`,
+  `redis       ${health.redis ? 'connected' : 'not attached'}`,
+  `durable     ${health.durable ? (health.durable.backend || 'none') : 'none'}`,
+  `port        ${health.port || '—'}`,
+].join('\n') : 'health snapshot not loaded yet — the boot screen or heartbeat will fill this in'}
             </pre>
           </div>
         </div>

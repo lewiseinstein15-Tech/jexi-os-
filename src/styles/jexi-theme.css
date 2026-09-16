@@ -412,3 +412,34 @@
 .jcx .grantchip{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;
   font-family:var(--jcx-mono);color:var(--jcx-ink-2);background:var(--jcx-panel-2);
   border:1px solid var(--jcx-line);border-radius:5px;padding:1px 6px;margin:2px 3px 2px 0}
+
+/* ── v0.9 additions: boot screen, honest empty states, live search rows ── */
+.jcx .empty{display:flex;flex-direction:column;gap:4px;padding:18px 14px;font-size:11.5px;
+  color:var(--jcx-ink-2);border:1px dashed var(--jcx-line);border-radius:10px;
+  background:rgba(255,255,255,.012);text-align:left}
+.jcx .empty .sub{font-size:10px;color:var(--jcx-ink-3);font-family:var(--jcx-mono)}
+.bootscreen{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(1200px 700px at 50% 30%,#191510 0%,#0c0a07 58%,#080706 100%)}
+.bootscreen .bs-glow{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(600px 300px at 50% 26%,rgba(255,122,61,.09),transparent 70%)}
+.bootscreen .bs-card{position:relative;width:min(560px,92vw);max-height:86vh;display:flex;flex-direction:column;gap:14px;
+  background:rgba(20,17,12,.86);border:1px solid var(--jcx-line);border-radius:16px;padding:22px;
+  box-shadow:0 30px 80px rgba(0,0,0,.55)}
+.bootscreen .bs-brand{display:flex;align-items:center;gap:12px}
+.bootscreen .bs-brand .mark{display:grid;place-items:center}
+.bootscreen .bs-word{font-size:22px;letter-spacing:.02em;color:var(--jcx-ink)}
+.bootscreen .bs-word b{font-weight:800;color:var(--jcx-ember)}
+.bootscreen .bs-word i{font-style:normal;color:var(--jcx-ink-2);font-size:14px;margin-left:6px;letter-spacing:.14em}
+.bootscreen .bs-sub{font-size:10.5px;color:var(--jcx-ink-3);font-family:var(--jcx-mono);margin-top:2px}
+.bootscreen .bs-log{flex:1;min-height:220px;max-height:44vh;overflow-y:auto;background:#0b0a08;
+  border:1px solid var(--jcx-line);border-radius:10px;padding:12px 14px;
+  font-family:var(--jcx-mono);font-size:11px;line-height:1.75}
+.bootscreen .bs-line{white-space:pre-wrap;word-break:break-word}
+.bootscreen .bs-cursor{color:var(--jcx-ember);animation:bsblink 1s steps(2) infinite}
+@keyframes bsblink{50%{opacity:0}}
+.bootscreen .bs-bar{height:3px;border-radius:2px;background:var(--jcx-panel-2);overflow:hidden}
+.bootscreen .bs-bar i{display:block;height:100%;width:38%;border-radius:2px;
+  background:linear-gradient(90deg,var(--jcx-ember),var(--jcx-peach));
+  animation:bsslide 1.6s ease-in-out infinite}
+@keyframes bsslide{0%{transform:translateX(-110%)}100%{transform:translateX(290%)}}
+.bootscreen .bs-card .send{align-self:flex-end}

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavIcon } from './icons';
 import { getBackendUrl } from '../../utils/helpers';
+import { consumeAutoTest, emitEvent, AUTO_TEST_QUESTION } from '../../services/brain';
 
-/* <ChatView /> — v0.8: LIVE. Wired to the brain's POST /api/chat (NDJSON).
+/* <ChatView /> — v0.9: LIVE + boot-armed. Wired to the brain's POST /api/chat (NDJSON).
    Design language unchanged from the approved preview:
    - JEXI (Director) as the distinct ember voice
    - timestamps left, avatar + name + role rows
@@ -56,6 +57,19 @@ export default function ChatView() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [msgs]);
 
+  /* boot self-test handshake: <BootScreen /> armed a live replay of the
+     automatic test question — run it for real, in full view, right here */
+  const armedRef = useRef(false);
+  useEffect(() => {
+    if (armedRef.current) return;
+    armedRef.current = true;
+    if (consumeAutoTest()) {
+      emitEvent({ chip: 'SYS', who: 'Chat', msg: `boot self-test replay: “${AUTO_TEST_QUESTION}”`, tone: 'var(--jcx-ember)' });
+      runSend(AUTO_TEST_QUESTION);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const patchLast = (fn) => setMsgs((ms) => {
     if (!ms.length) return ms;
     const next = ms.slice();
@@ -63,10 +77,8 @@ export default function ChatView() {
     return next;
   });
 
-  async function send() {
-    const q = draft.trim();
+  async function runSend(q) {
     if (!q || busy) return;
-    setDraft('');
     setBusy(true);
     const stamp = ts();
     setMsgs((ms) => [
@@ -76,6 +88,7 @@ export default function ChatView() {
     ]);
     try {
       if (!brain) throw new Error('No brain configured — set the Server address in the sidebar.');
+      emitEvent({ chip: 'AGENT', who: 'JEXI', msg: `dispatched to /api/chat · “${q.slice(0, 60)}${q.length > 60 ? '…' : ''}”`, tone: 'var(--jcx-ember)' });
       const res = await fetch(`${brain}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -95,7 +108,9 @@ export default function ChatView() {
           if (!line.trim()) continue;
           let ev; try { ev = JSON.parse(line); } catch { continue; }
           if (ev.type === 'log' && ev.message) {
-            patchLast((m) => ({ ...m, logs: [...(m.logs || []), `${ev.agent ? `${ev.agent}: ` : ''}${ev.message}`] }));
+            const msg = `${ev.agent ? `${ev.agent}: ` : ''}${ev.message}`;
+            patchLast((m) => ({ ...m, logs: [...(m.logs || []), msg] }));
+            emitEvent({ chip: 'TOOL', who: ev.agent || 'Pipeline', msg: ev.message, tone: 'var(--jcx-ink-2)' });
           } else if (ev.type === 'stream' && ev.text) {
             patchLast((m) => ({ ...m, text: m.text + ev.text }));
           } else if (ev.type === 'done') {
@@ -109,12 +124,21 @@ export default function ChatView() {
         }
       }
       patchLast((m) => ({ ...m, streaming: false, success: m.success !== false && !!m.text }));
+      emitEvent({ chip: 'OK', who: 'Chat', msg: 'answer complete · stream closed', tone: 'var(--jcx-up)' });
     } catch (e) {
       patchLast((m) => ({ ...m, streaming: false, error: (e && e.message) || 'The brain could not be reached.' }));
+      emitEvent({ chip: 'WARN', who: 'Chat', msg: `chat failed · ${(e && e.message) || 'error'}`, tone: 'var(--jcx-down)' });
     } finally {
       setBusy(false);
     }
   }
+
+  const send = () => {
+    const q = draft.trim();
+    if (!q || busy) return;
+    setDraft('');
+    runSend(q);
+  };
 
   return (
     <div className="chatwrap">
