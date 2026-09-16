@@ -16,6 +16,12 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'arena-br-'));
 process.env.DATA_DIR = TMP; // isolate the audit log
 
 const { browserRouter, registerDesktopWorker } = await import('../../src/services/BrowserRouter.js');
+// 11(fix): teardown path — on hosts WITH Chromium the honest-registration test
+// spawns a REAL browser worker; its live CDP/Chromium handles kept the
+// node --test child alive after every assertion had passed ("Promise
+// resolution is still pending"), hanging the npm-test chain (pre-existing,
+// same class as fix-8/9/10).
+const dm = await import('../../src/services/DesktopManager.js');
 
 function cleanup() {
   for (const w of browserRouter.listWorkers()) browserRouter.unregisterWorker(w.id);
@@ -138,4 +144,8 @@ test('desktop worker registration is HONEST on a host with no browser', async ()
   }
 });
 
-test.after?.(() => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch { /* best effort */ } });
+test.after?.(async () => {
+  cleanup();
+  try { await dm.resetBrowser(); } catch { /* best effort */ }
+  try { fs.rmSync(TMP, { recursive: true, force: true }); } catch { /* best effort */ }
+});

@@ -46,7 +46,7 @@ function isAlive() {
   }
 }
 
-async function resetBrowser() {
+export async function resetBrowser() {
   try { await page?.close(); } catch {}
   try { await browser?.close(); } catch {}
   page = null;
