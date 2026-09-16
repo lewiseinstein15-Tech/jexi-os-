@@ -31,7 +31,7 @@ import { preferencesBlock, recallPreferences } from './PreferenceLearner.js';
 import { verifyAnswer } from './VerificationLoop.js';
 import { sanitizeFinalAnswer } from './AnswerSanitizer.js'; // B51 P1/P7 — no process narration reaches the user
 import { finalizeAnswer } from './Finalizer.js'; // B52 P5 — single completion gate for every user-facing answer
-import { rosterStats } from './AgentRoster.js';
+import { rosterStats } from '../workforce/registry/index.js';
 import {
   addChat, getChatHistory, clearMemory, updateUserProfile, loadMemory, topUserFacts,
   searchInternetKnowledge, searchFreshInternetKnowledge, searchCodingKnowledge,

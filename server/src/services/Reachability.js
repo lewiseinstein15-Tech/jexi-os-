@@ -18,7 +18,7 @@
  * it reports are what AGENT-CATALOG.md is generated from, so the docs can
  * never drift from reality again.
  */
-import { AGENT_ROSTER, SKILL_REGISTRY, getAgent, composeTeam } from './AgentRoster.js';
+import { AGENT_ROSTER, SKILL_REGISTRY, getAgent, composeTeam } from '../workforce/registry/index.js';
 import { TOOL_REGISTRY } from './ToolRegistry.js';
 import { TEAM_PLAN, COMPOUND_DETECT } from './Planner.js';
 import { SKILL_META, SLUG_ALIASES, resolveSkillSlug } from './SkillChain.js';

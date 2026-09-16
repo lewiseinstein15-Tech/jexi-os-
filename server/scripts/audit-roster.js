@@ -21,7 +21,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { AGENT_ROSTER, SKILL_REGISTRY, getAgent, getSkill } from '../src/services/AgentRoster.js';
+import { AGENT_ROSTER, SKILL_REGISTRY, getAgent, getSkill } from '../src/workforce/registry/index.js';
 import { TOOL_REGISTRY } from '../src/services/ToolRegistry.js';
 import { TEAM_PLAN, COMPOUND_DETECT } from '../src/services/Planner.js';
 import { analyze, executionModel, reachabilitySummary } from '../src/services/Reachability.js';

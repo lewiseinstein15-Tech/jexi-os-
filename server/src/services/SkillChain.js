@@ -16,7 +16,7 @@ import { runFile } from './Runner.js';
 import { DesktopManager, ensureBrowser } from './DesktopManager.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { WORKSPACE_DIR, DATA_DIR } from '../config.js';
-import { getAgent, getSkill } from './AgentRoster.js';
+import { getAgent, getSkill } from '../workforce/registry/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const SKILLS_DIR = path.resolve(__dirname, '../../skills');

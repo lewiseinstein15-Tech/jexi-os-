@@ -46,7 +46,7 @@ import {
 } from './src/services/SelfMonitor.js';
 import { loadSettings, saveSettings } from './src/services/SettingsManager.js';
 import { providerHealthSnapshot } from './src/providers/runtime/ProviderRouter.js';
-import { AGENT_ROSTER, SKILL_REGISTRY, ROSTER_COUNT, SKILL_COUNT, getAgent } from './src/services/AgentRoster.js';
+import { AGENT_ROSTER, SKILL_REGISTRY, ROSTER_COUNT, SKILL_COUNT, getAgent } from './src/workforce/registry/index.js';
 import { executionModel } from './src/services/Reachability.js';
 import { DesktopManager, ensureBrowser, browserStatus, restartBrowser } from './src/services/DesktopManager.js';
 import {

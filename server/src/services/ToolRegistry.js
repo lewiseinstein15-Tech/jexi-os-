@@ -19,7 +19,7 @@
  *     whole catalog — which keeps prompts small and decisions reliable.
  */
 
-import { composeTeam } from './AgentRoster.js';
+import { composeTeam } from '../workforce/registry/index.js';
 import { getPluginTool } from './PluginContext.js'; // B105 — plugin tools bypass the intent allowlist (still permission-gated)
 
 /**

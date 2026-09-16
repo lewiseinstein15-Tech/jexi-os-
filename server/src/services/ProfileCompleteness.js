@@ -20,7 +20,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { DATA_DIR } from '../config.js';
 import { loadProfile, listProfiles, parseSimpleYaml } from './AgentProfiles.js';
-import { AGENT_ROSTER } from './AgentRoster.js';
+import { AGENT_ROSTER } from '../workforce/registry/index.js';
 import { preferredLaneForRole } from '../providers/catalog/CapabilityLanes.js';
 
 const NAMED_DIR = path.join(process.cwd(), 'agents', 'profiles');

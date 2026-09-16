@@ -30,10 +30,10 @@ import { DATA_DIR } from '../../config.js';
  * This module (the Director's stable employees, data-overridable via
  * `data/employees.json`) is THE live roster the Director actually uses on the
  * hot path: capability-driven discovery. The legacy specialist catalog
- * (AgentRoster.js / AGENT_ROSTER — surfaced at
- * `/api/roster` and by the UI's RosterPanel)is ARCHIVAL/compat data, marked
- * @deprecated, NOT the hot-path roster — see its own top-file deprecation.
-
+ * (AGENT_ROSTER — surfaced at `/api/roster` and by the UI's RosterPanel) is
+ * ARCHIVAL/compat data, NOT the hot-path roster. Since phase-6 Scope E it
+ * lives in `workforce/registry/catalog.js` behind the single roster API
+ * surface `workforce/registry/index.js` (services/AgentRoster.js deleted).
  *
  * Do NOT treat AGENT_ROSTER as "the roster" in any kernel/Director logic;
  * kernel teams compose from THE roster (this registry) only.

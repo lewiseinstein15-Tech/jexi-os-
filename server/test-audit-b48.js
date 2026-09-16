@@ -8,7 +8,7 @@ import fs from 'fs';
 import { buildIdentityPrompt, buildCapabilityLines, buildLimitationLines, IDENTITY_ANSWER, JEXI_IDENTITY } from './src/services/JexiIdentity.js';
 import { JEXI_SYSTEM_PROMPT, JEXI_SYNTHESIS_PROMPT } from './src/services/JexiPrompt.js';
 import { conversationContext, orchestrator } from './src/services/Orchestrator.js';
-import { ROSTER_COUNT, SKILL_COUNT } from './src/services/AgentRoster.js';
+import { ROSTER_COUNT, SKILL_COUNT } from './src/workforce/registry/index.js';
 import { saveResult, loadResult, clearResult, clearAllSessions, sessionCounts, recordRecoveryEvent, recoveryStats } from './src/services/SessionStore.js';
 import { groundednessCheck, confabulationStats, resetConfabulationStats, VOICE_RULES } from './src/services/Groundedness.js';
 import { analyzeMessage } from './src/services/ConversationManager.js';

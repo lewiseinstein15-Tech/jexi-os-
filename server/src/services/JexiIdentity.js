@@ -22,7 +22,7 @@
  * /guard workspace scope, and the sources-and-honesty rules), not invented.
  */
 
-import { AGENT_ROSTER, SKILL_REGISTRY, ROSTER_COUNT, SKILL_COUNT } from './AgentRoster.js';
+import { AGENT_ROSTER, SKILL_REGISTRY, ROSTER_COUNT, SKILL_COUNT } from '../workforce/registry/index.js';
 import { TOOL_REGISTRY } from './ToolRegistry.js';
 import { classifyRisk } from './RiskGuard.js';
 

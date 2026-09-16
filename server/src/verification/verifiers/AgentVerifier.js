@@ -18,7 +18,7 @@
  */
 
 import { assertIndependentAgent } from '../interface/Verifier.js';
-import { getAgent } from '../../services/AgentRoster.js';
+import { getAgent } from '../../workforce/registry/index.js';
 import { getByAgentId } from '../../workforce/registry/index.js';
 import { resolveAgent } from '../../workforce/registry/router.js';
 import { runIsolatedSubagent } from '../../services/SubagentRuntime.js';

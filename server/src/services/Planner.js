@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { searchKnowledge } from './MemoryManager.js';
-import { AGENT_ROSTER, getAgent, skillsForTeam, rosterStats } from './AgentRoster.js';
+import { AGENT_ROSTER, getAgent, skillsForTeam, rosterStats } from '../workforce/registry/index.js';
 import { toolsForTeam } from './ToolRegistry.js';
 import { generateContent } from '../providers/runtime/LLMClient.js';
 import { canChat } from '../providers/index.js';

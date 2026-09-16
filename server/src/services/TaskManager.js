@@ -3,7 +3,7 @@ import path from 'path';
 import { planner } from './Planner.js';
 import { orchestrator } from './Orchestrator.js';
 import { recordError } from './SelfMonitor.js';
-import { AGENT_ROSTER, SKILL_REGISTRY } from './AgentRoster.js';
+import { AGENT_ROSTER, SKILL_REGISTRY } from '../workforce/registry/index.js';
 import { DATA_DIR } from '../config.js';
 
 /**

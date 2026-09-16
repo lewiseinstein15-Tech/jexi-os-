@@ -12,7 +12,7 @@
 import fs from 'fs';
 import path from 'path';
 import { DATA_DIR } from '../config.js';
-import { AGENT_ROSTER, SKILL_REGISTRY } from './AgentRoster.js';
+import { AGENT_ROSTER, SKILL_REGISTRY } from '../workforce/registry/index.js';
 import { TOOL_REGISTRY } from './ToolRegistry.js';
 
 const STATE_FILE = path.join(DATA_DIR, 'plugins.json');

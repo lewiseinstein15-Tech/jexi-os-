@@ -2,7 +2,7 @@
 // Planner include/exclude (small teams), tool routing, and service unit tests
 // for Observability / Sandbox / Offline / Guardrail / Concurrency / Voice /
 // Plugin / Chaos agents.
-import { AGENT_ROSTER, SKILL_REGISTRY, composeTeam, rosterStats, getAgent, getSkill } from './src/services/AgentRoster.js';
+import { AGENT_ROSTER, SKILL_REGISTRY, composeTeam, rosterStats, getAgent, getSkill } from './src/workforce/registry/index.js';
 import { TOOL_REGISTRY, toolsForIntent, getTool } from './src/services/ToolRegistry.js';
 import { planner } from './src/services/Planner.js';
 import { startTrace, endTrace, emitMetric, metricsSummary, scoreProviderHealth, resetObservability } from './src/services/ObservabilityAgent.js';

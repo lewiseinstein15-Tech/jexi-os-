@@ -5,7 +5,7 @@
 //   - code_task QA/Reviewer/Security/Critic gates are own graph nodes
 //   - SkillChain security-officer alias resolves
 //   - AGENT-CATALOG.md matches the live registries
-import { AGENT_ROSTER, SKILL_REGISTRY, composeTeam, getAgent } from './src/services/AgentRoster.js';
+import { AGENT_ROSTER, SKILL_REGISTRY, composeTeam, getAgent } from './src/workforce/registry/index.js';
 import { TEAM_PLAN } from './src/services/Planner.js';
 import { TOOL_REGISTRY } from './src/services/ToolRegistry.js';
 import { analyze, executionModel, resolveDisplayName } from './src/services/Reachability.js';

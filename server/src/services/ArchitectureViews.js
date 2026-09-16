@@ -12,7 +12,7 @@
  * duplicated state lives nowhere: these are live snapshots, not caches.
  * Surface for observability (§20) — no new UI buttons (Lewis's rule).
  */
-import { AGENT_ROSTER, SKILL_REGISTRY, rosterFor } from './AgentRoster.js';
+import { AGENT_ROSTER, SKILL_REGISTRY, rosterFor } from '../workforce/registry/index.js';
 import { TOOL_REGISTRY, TOOL_INTENT_ALLOWLIST } from './ToolRegistry.js';
 import { mcpServerHealth, loadToolDirectory } from './MCPGateway.js';
 import { pluginInventory } from './PluginInventory.js';
