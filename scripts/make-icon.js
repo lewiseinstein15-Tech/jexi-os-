@@ -26,7 +26,11 @@ const RES = join(ROOT, 'android', 'app', 'src', 'main', 'res');
 /* ---------------- PNG encoder ---------------- */
 const CRC_TABLE = new Int32Array(256).map((_, n) => {
   let c = n;
-  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 8;
+  // B164 — was `c >>> 8` here (typo): produced a garbage CRC table, so EVERY
+  // PNG this script ever wrote (icons + splash) carried corrupt CRCs. Strict
+  // decoders (phone launchers, PIL) reject or degrade such files — the
+  // launcher icon silently fell back to the stock template. Must be >>> 1.
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
   return c;
 });
 function crc32(buf) {
@@ -282,7 +286,7 @@ function emitAssets() {
 /* Overwrite the android res launcher icons + every existing splash.png
    (same file paths, same pixel dimensions as the current resources). */
 function emitRes() {
-  const DENS = { 'mipmap-mdpi': 48, 'mipmap-hdpi': 72, 'mipmap-xhdpi': 96, 'mipmap-xxhdpi': 144, 'mipmap-xxxhdpi': 192 };
+  const DENS = { 'mipmap-ldpi': 36, 'mipmap-mdpi': 48, 'mipmap-hdpi': 72, 'mipmap-xhdpi': 96, 'mipmap-xxhdpi': 144, 'mipmap-xxxhdpi': 192 };
   for (const [dir, S] of Object.entries(DENS)) {
     const d = join(RES, dir);
     if (!statSafe(d)) continue;
