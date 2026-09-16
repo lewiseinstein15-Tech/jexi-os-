@@ -64,6 +64,7 @@ export default function ConsoleApp({ route }) {
   const [health, setHealth] = useState(null);
   const [fleet, setFleet] = useState(null);
   const [elapsed, setElapsed] = useState('00:00:00'); // REAL clock — starts at open
+  const [menu, setMenu] = useState(false); // v0.10 — phone drawer (off-canvas sidebar)
   const openedAt = useRef(Date.now());
 
   const finishBoot = (f, h) => {
@@ -120,13 +121,20 @@ export default function ConsoleApp({ route }) {
     <BrainCtx.Provider value={{ fleet, health, online: !!health }}>
       <div className="jcx">
         <div className="jcx-glow" />
+        <div
+          className={`jcx-drawerback${menu ? ' show' : ''}`}
+          onClick={() => setMenu(false)}
+          aria-hidden="true"
+        />
         <Sidebar
           route={route}
-          onNavigate={(id) => { window.location.hash = '#' + id; }}
-          onHome={() => { window.location.hash = ''; }}
+          mobileOpen={menu}
+          onClose={() => setMenu(false)}
+          onNavigate={(id) => { window.location.hash = '#' + id; setMenu(false); }}
+          onHome={() => { window.location.hash = ''; setMenu(false); }}
         />
         <main className="appmain">
-          <TopBar elapsed={elapsed} />
+          <TopBar elapsed={elapsed} onMenu={() => setMenu((o) => !o)} />
           <div className="views">
             <section key={route} className="vw active" data-view={route}>
               <Active />

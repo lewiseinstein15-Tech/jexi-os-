@@ -20,6 +20,8 @@ const AUTO_TEST_KEY = 'jexi_autotest_pending';
    chip: SYS | AGENT | TOOL | NET | OK | WARN  (maps to the .chip styles). */
 const listeners = new Set();
 let seq = 0;
+const history = []; // ring buffer — late subscribers (EventStream mounts after boot) seed from it
+const HISTORY_MAX = 80;
 
 export function subscribeBus(fn) {
   listeners.add(fn);
@@ -34,9 +36,13 @@ export function emitEvent({ chip = 'SYS', who = 'Console', msg = '', tone = '' }
     ts: `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`,
     chip, who, msg, tone,
   };
+  history.push(evt);
+  if (history.length > HISTORY_MAX) history.shift();
   listeners.forEach((fn) => { try { fn(evt); } catch { /* never break a view */ } });
   return evt;
 }
+
+export const busHistory = () => history.slice();
 
 export const busCount = () => seq;
 

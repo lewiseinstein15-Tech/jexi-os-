@@ -87,11 +87,18 @@ export default function App() {
   // classic app never reads the hash, so this is purely additive.
   // v0.7 — the console is the HOME surface: an EMPTY hash boots straight
   // into the console (logo + 12 views; replaceState so the phone back
-  // button still exits the app). #classic reaches the classic shell; any
-  // other unknown hash (skip links, in-page anchors) also stays classic.
+  // button still exits the app). #classic reaches the classic shell.
+  // v0.10 — PHONE SANITY: a stale or unknown hash (restored WebView state,
+  // old classic anchors like #jx-composer, skip links) used to dump the
+  // owner into the classic shell — or the first-run wizard — out of
+  // nowhere. Now only a DELIBERATE #classic opens the classic shell;
+  // every other unknown/empty hash normalizes to the console home.
   const consoleHome = () => {
-    if (typeof window !== 'undefined' && !window.location.hash) {
-      window.history.replaceState(null, '', '#missions');
+    if (typeof window !== 'undefined') {
+      const h = window.location.hash;
+      if (h !== '#classic' && routeFromHash() === '') {
+        window.history.replaceState(null, '', '#missions');
+      }
     }
     return routeFromHash();
   };
@@ -154,7 +161,12 @@ export default function App() {
       finally { clearTimeout(t); }
     };
     const minDelay = new Promise((r) => setTimeout(r, 1400));
-    const health = (async () => {
+    // v0.10 — when the landing surface is the console, do NOT blind-wait on
+    // a health ping: the console's own BootScreen wakes the brain with a
+    // visible retry terminal, so the splash only needs the shell painted.
+    // (The old 15s blind wait on a cold brain read as "stuck".)
+    const consoleLanding = !!consoleRoute;
+    const health = consoleLanding ? Promise.resolve() : (async () => {
       const baked = import.meta.env.VITE_JEXI_BACKEND_URL || '';
       const stored = localStorage.getItem('jexi_backend_url') || '';
       let ok = await ping(getBackendUrl(), 12000);
@@ -183,7 +195,7 @@ export default function App() {
     })();
     Promise.race([
       Promise.all([minDelay, health]),
-      new Promise((r) => setTimeout(r, 15000)),
+      new Promise((r) => setTimeout(r, consoleLanding ? 4000 : 15000)),
     ]).then(finish);
     return () => { alive = false; };
   }, []);

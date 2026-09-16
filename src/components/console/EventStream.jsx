@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { subscribeBus } from '../../services/brain';
+import { subscribeBus, busHistory } from '../../services/brain';
 
 /* <EventStream /> — the LIVE event feed docked to the bottom, always
    visible, same design as the approved preview — but 100% real now.
@@ -24,6 +24,7 @@ export default function EventStream() {
   const bodyRef = useRef(null);
 
   useEffect(() => {
+    setRows(busHistory()); // seed with boot-time events emitted before this mounted
     const unsub = subscribeBus((e) => {
       setRows((rs) => [...rs.slice(-60), e]);
     });

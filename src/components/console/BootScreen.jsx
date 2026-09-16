@@ -37,14 +37,17 @@ export default function BootScreen({ onDone }) {
       emitEvent({ chip: 'SYS', who: 'Boot', msg: `boot sequence initiated · target ${hostOf}` });
 
       setState('wake');
+      const t0 = Date.now();
       line('waking the brain — Render cold start can take ~50s…', 'var(--jcx-gold)');
       let lastEmit = 0;
       const health = await wakeBrain({
+        attempts: 12,
         onAttempt: (i) => {
-          line(`  attempt ${i} · no response yet — retrying…`, 'var(--jcx-ink-3)');
+          const s = Math.round((Date.now() - t0) / 1000);
+          line(`  ${s}s · no answer yet — still waking (attempt ${i})…`, 'var(--jcx-ink-3)');
           if (Date.now() - lastEmit > 15000) {
             lastEmit = Date.now();
-            emitEvent({ chip: 'NET', who: 'Boot', msg: `waking brain · attempt ${i} — still cold`, tone: 'var(--jcx-gold)' });
+            emitEvent({ chip: 'NET', who: 'Boot', msg: `waking brain · ${s}s elapsed — still cold`, tone: 'var(--jcx-gold)' });
           }
         },
       });

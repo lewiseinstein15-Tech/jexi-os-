@@ -9,7 +9,7 @@ import { fmtUptime } from '../../services/brain';
    providers/tool-calls = health counters · agents = real contracts
    todos = real context tasks · queue = real scheduler jobs.
    Stats with no real source (cost/tokens/risk guesses) are simply gone. */
-export default function TopBar({ elapsed }) {
+export default function TopBar({ elapsed, onMenu }) {
   const { fleet, health, online } = useBrain();
 
   const tasks = fleet?.context?.tasks || [];
@@ -26,6 +26,10 @@ export default function TopBar({ elapsed }) {
 
   return (
     <header className="hud">
+      {/* v0.10 — phone only (CSS): opens the off-canvas nav drawer */}
+      <button type="button" className="hudburger" aria-label="Menu" onClick={onMenu}>
+        <i /><i /><i />
+      </button>
       <div className="title">{title}</div>
       <span className={`pill ${status[0]}`}><span className="dot" />{status[1]}</span>
       <div className="sep" />

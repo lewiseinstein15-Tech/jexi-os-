@@ -45,7 +45,7 @@ android {
         // Local builds therefore can NEVER outrank a CI build again.
         def buildNumber = System.getenv('APK_BUILD_NUMBER')
         if (buildNumber == null || buildNumber.trim().isEmpty()) {
-            def hoursSince2026 = (System.currentTimeMillis() / 3600000L) - 561796L  // 2026-01-01T00:00Z in epoch hours
+            def hoursSince2026 = (System.currentTimeMillis() / 3600000L) - 490896L  // 2026-01-01T00:00Z in epoch hours (v0.10: was 561796 — wrong by ~71k hours → versionCode stuck at 1)
             buildNumber = Math.max(1, (int) hoursSince2026) as int
         } else if ((buildNumber.trim() as int) < 1000000) {
             // A raw run number from CI → lift it into the CI range.
@@ -53,6 +53,11 @@ android {
         } else {
             buildNumber = buildNumber.trim() as int
         }
+        // v0.10 FIX — the 2026 epoch constant was wrong (561796 ≈ year 2084),
+        // so every local build computed a NEGATIVE hours-since-2026 and clamped
+        // to versionCode 1 — Android silently refused same-code updates and the
+        // phone kept running the old APK. 2026-01-01T00:00Z = 1,767,225,600s
+        // = 490,896 epoch hours.
         versionCode buildNumber
         versionName "1.0.${buildNumber}"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"

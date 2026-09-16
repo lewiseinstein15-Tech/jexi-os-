@@ -333,21 +333,65 @@
 .jcx .composer .send.live{cursor:pointer;opacity:1}
 .jcx .composer .send.live:disabled{cursor:progress;opacity:.45}
 
-/* v0.8 — phone guard: the console is the app's home on Android, so below
-   760px the sidebar compresses to an icon rail and the event dock gets out
-   of the way. Same tokens, same components — pure layout compression. */
-@media (max-width:760px){
-  .jcx{grid-template-columns:96px 1fr}
-  .jcx .navitem{font-size:0;gap:0;justify-content:center;padding-left:0;padding-right:0}
-  .jcx .navitem .new,.jcx .navitem .count{font-size:8.5px;margin-left:0;position:absolute;transform:translate(22px,-14px)}
-  .jcx .navitem{position:relative}
-  .jcx .sidefoot{padding:8px 6px 8px}
-  .jcx .serverrow .srv,.jcx .modelrow>div{min-width:0;flex:1}
-  .jcx .serverrow .p,.jcx .modelrow .p{display:none}
-  .jcx .serverrow .m,.jcx .modelrow .m{font-size:9px}
-  .jcx .modelrow .chev,.jcx .onekey span:last-child{display:none}
-  .jcx .appmain{grid-template-rows:auto 1fr}
+/* ── v0.10 — hamburger (desktop-hidden) + drawer backdrop base ── */
+.jcx .hudburger{display:none;align-items:center;justify-content:center;flex-direction:column;
+  gap:3.5px;width:30px;height:30px;padding:6px 5px;flex:none;
+  background:var(--jcx-panel-2);border:1px solid var(--jcx-line);border-radius:8px;cursor:pointer}
+.jcx .hudburger i{display:block;width:100%;height:2px;border-radius:1px;background:var(--jcx-ink-2)}
+.jcx .jcx-drawerback{display:none}
+
+/* v0.10 — REAL phone layout: the console becomes a phone app.
+   ≤920px the sidebar turns into an off-canvas drawer behind a hamburger
+   in the HUD, every two-column grid stacks, the HUD scrolls horizontally,
+   and the work-graph canvas pans sideways. Same tokens, same components. */
+@media (max-width:920px){
+  .jcx{grid-template-columns:1fr}
+  .jcx .jcx-drawerback{display:block;position:fixed;inset:0;z-index:65;
+    background:rgba(5,4,3,.62);opacity:0;pointer-events:none;transition:opacity .25s var(--jcx-ease)}
+  .jcx .jcx-drawerback.show{opacity:1;pointer-events:auto}
+
+  /* sidebar → off-canvas drawer with FULL labels (not an icon rail) */
+  .jcx aside{position:fixed;left:0;top:0;bottom:0;width:min(270px,84vw);z-index:70;
+    transform:translateX(-105%);transition:transform .28s var(--jcx-ease);
+    box-shadow:0 0 70px rgba(0,0,0,.6);overflow-y:auto}
+  .jcx aside.open{transform:none}
+  .jcx .hudburger{display:inline-flex}
+
+  /* HUD: compact + horizontally scrollable so every real stat stays reachable */
+  .jcx .hud{gap:10px;padding:8px 10px;overflow-x:auto;scrollbar-width:none}
+  .jcx .hud::-webkit-scrollbar{display:none}
+  .jcx .hud .title{font-size:11.5px;max-width:38vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .jcx .hud .sep{display:none}
+  .jcx .hud .stat label{font-size:8.5px}
+  .jcx .hud .stat b{font-size:10px}
+  .jcx .hud .controls{display:none}
+
+  /* main column fills the phone; views scroll natively; the event dock
+     gives its 176px back to content (the chat pipeline block shows the
+     same live lines inline) */
+  .jcx .appmain{height:100dvh;grid-template-rows:auto 1fr}
+  .jcx .views{overflow-y:auto}
   .jcx .stream{display:none}
+
+  /* grids stack: missions, memory, sessions, knowledge… */
+  .jcx .missions-body{grid-template-columns:1fr;height:auto}
+  .jcx .missions-body .col+.col{border-left:none;border-top:1px solid var(--jcx-line)}
+  .jcx .grid2{grid-template-columns:1fr}
+
+  /* work-graph canvas pans sideways instead of clipping */
+  .jcx .canvas{overflow-x:auto}
+
+  /* boot card already shrinks (min(560px,92vw)) — tighten paddings */
+  .bootscreen .bs-card{padding:16px;gap:10px}
+  .bootscreen .bs-log{min-height:180px;max-height:52vh}
+}
+
+/* ≤560px — small phones: drawer a touch narrower, chat log breathing room */
+@media (max-width:560px){
+  .jcx aside{width:min(250px,86vw)}
+  .jcx .chatlog{padding:12px 12px 6px}
+  .jcx .composer{padding:8px 10px}
+  .jcx .pad{padding:12px 12px}
 }
 
 /* ═══════════ FULL GRAPH CANVAS (workgraph view) ═══════════ */

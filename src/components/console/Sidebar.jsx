@@ -8,7 +8,7 @@ import { useBrain } from './ConsoleApp';
    logo, server row + model footer. Counts are REAL now: every number comes
    from the live fleet snapshot (agents, plugins, mcp, scheduler…), and the
    model row shows the brain's actual active provider + model. */
-export default function Sidebar({ route, onNavigate, onHome }) {
+export default function Sidebar({ route, onNavigate, onHome, mobileOpen, onClose }) {
   const { fleet, health, online } = useBrain();
 
   const agentCount = fleet?.agents?.count;
@@ -34,7 +34,7 @@ export default function Sidebar({ route, onNavigate, onHome }) {
   const provConfigured = (health?.providers || []).filter((p) => p.configured) || [];
 
   return (
-    <aside>
+    <aside className={mobileOpen ? 'open' : ''}>
       <LogoTool onHome={onHome} />
 
       {NAV.map((g) => (
