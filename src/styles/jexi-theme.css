@@ -324,6 +324,32 @@
   border:none;user-select:none}
 .jcx .composer .note{font-size:10px;color:var(--jcx-ink-3);white-space:nowrap}
 
+/* v0.8 — live composer: the same .hin/.send styling, now interactive.
+   Additive rules only — the preview's disabled look stays the default. */
+.jcx .composer input.hin{font-family:var(--jcx-sans);color:var(--jcx-ink)}
+.jcx .composer input.hin::placeholder{color:var(--jcx-ink-3)}
+.jcx .composer input.hin:focus{border-color:rgba(255,122,61,.45);outline:0}
+.jcx .composer input.hin:disabled{opacity:.6}
+.jcx .composer .send.live{cursor:pointer;opacity:1}
+.jcx .composer .send.live:disabled{cursor:progress;opacity:.45}
+
+/* v0.8 — phone guard: the console is the app's home on Android, so below
+   760px the sidebar compresses to an icon rail and the event dock gets out
+   of the way. Same tokens, same components — pure layout compression. */
+@media (max-width:760px){
+  .jcx{grid-template-columns:96px 1fr}
+  .jcx .navitem{font-size:0;gap:0;justify-content:center;padding-left:0;padding-right:0}
+  .jcx .navitem .new,.jcx .navitem .count{font-size:8.5px;margin-left:0;position:absolute;transform:translate(22px,-14px)}
+  .jcx .navitem{position:relative}
+  .jcx .sidefoot{padding:8px 6px 8px}
+  .jcx .serverrow .srv,.jcx .modelrow>div{min-width:0;flex:1}
+  .jcx .serverrow .p,.jcx .modelrow .p{display:none}
+  .jcx .serverrow .m,.jcx .modelrow .m{font-size:9px}
+  .jcx .modelrow .chev,.jcx .onekey span:last-child{display:none}
+  .jcx .appmain{grid-template-rows:auto 1fr}
+  .jcx .stream{display:none}
+}
+
 /* ═══════════ FULL GRAPH CANVAS (workgraph view) ═══════════ */
 .jcx .canvas{position:relative;background:var(--jcx-panel);border:1px solid var(--jcx-line);
   border-radius:var(--jcx-radius);overflow:hidden;
