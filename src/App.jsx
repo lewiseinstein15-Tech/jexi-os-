@@ -23,8 +23,8 @@ import { SidebarBrandMark, SidebarBrandName } from './brand/official'; // B160 �
 /* FINAL — OrbCore presence orb retired from the main view. */
 import MissionPanel from './components/MissionPanel'; // ARENA ASTRA — desktop right mission rail
 import { SidebarLockup } from './components/JexiBrand'; // reference: bolt + wordmark lockup
-/* FINAL — WidgetCards glass widgets retired from the main view. */
 import ErrorBoundary from './components/ErrorBoundary';
+import ConsoleApp, { routeFromHash } from './components/console/ConsoleApp'; // F-build — console surface (hash-routed)
 
 // ARENA REBUILD (spec Part 26): the nav is Lewis's spec — Home / Missions /
 // Agents / Memory / Tools / Files / Settings. The conversation is the hero
@@ -81,6 +81,16 @@ export default function App() {
   const [bootStatus, setBootStatus] = useState('Connecting to JEXI\u2019s brain…');
   const engine = useJexiEngine();
   usePhoneNotifications();
+
+  // F-build — the console surface: when the URL hash matches a console route
+  // (#missions … #scheduler) the React console takes over the shell. The
+  // classic app never reads the hash, so this is purely additive.
+  const [consoleRoute, setConsoleRoute] = useState(routeFromHash);
+  useEffect(() => {
+    const h = () => setConsoleRoute(routeFromHash());
+    window.addEventListener('hashchange', h);
+    return () => window.removeEventListener('hashchange', h);
+  }, []);
 
   // One-time key card: paste -> memory-only session key -> auto-continue.
   const [secretBusy, setSecretBusy] = useState(false);
@@ -223,6 +233,15 @@ export default function App() {
           setSetupOpen(false);
         }}
       />
+    );
+  }
+
+  // F-build — console takeover for #missions … #scheduler routes.
+  if (consoleRoute) {
+    return (
+      <ErrorBoundary>
+        <ConsoleApp route={consoleRoute} />
+      </ErrorBoundary>
     );
   }
 
