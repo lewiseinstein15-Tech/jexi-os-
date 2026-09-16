@@ -12,7 +12,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { SKILLS_STORE, parseFrontmatter, parseSteps } from './catalog.js';
+import { SKILLS_STORE, parseFrontmatter, parseSteps, skillMdPath } from './catalog.js';
 
 function listHelpers(dir) {
   if (!fs.existsSync(dir)) return [];
@@ -21,9 +21,12 @@ function listHelpers(dir) {
 
 /** Full skill content for a slug, or null. */
 export function readSkill(slug) {
-  const dir = path.join(SKILLS_STORE, slug);
-  const mdPath = path.join(dir, 'SKILL.md');
-  if (!fs.existsSync(mdPath)) return null;
+  // Builtin store first, then enabled plugin packages (6d fix): a plugin
+  // skill is loadable exactly like a builtin one — before this, plugin
+  // skills were counted in the catalog but could never be loaded or run.
+  const mdPath = skillMdPath(slug);
+  if (!mdPath) return null;
+  const dir = path.dirname(mdPath);
   const raw = fs.readFileSync(mdPath, 'utf8');
   const { metadata, bodyMarkdown } = parseFrontmatter(raw);
   const scriptsDir = path.join(dir, 'scripts');

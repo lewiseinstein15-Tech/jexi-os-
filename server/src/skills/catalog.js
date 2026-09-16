@@ -102,9 +102,8 @@ export function slugify(name) {
  * Returns null for a missing skill — never throws for missing dirs.
  */
 export function readMeta(slug) {
-  const dir = path.join(SKILLS_STORE, slug);
-  const mdPath = path.join(dir, 'SKILL.md');
-  if (!fs.existsSync(mdPath)) return null;
+  const mdPath = skillMdPath(slug);
+  if (!mdPath) return null;
   const raw = fs.readFileSync(mdPath, 'utf8');
   const { metadata, bodyMarkdown } = parseFrontmatter(raw);
   // The catalog advertises executability WITHOUT leaking the body: only the
@@ -113,29 +112,78 @@ export function readMeta(slug) {
   return metadata;
 }
 
+/**
+ * PLUGIN SKILLS — on-disk plugin packages can contribute executable skills
+ * via `<pluginDir>/<skillsDir>/<slug>/SKILL.md`. Before this seam existed,
+ * plugins only contributed a COUNT to the catalog UI while the loader and
+ * executor could never actually load or run those skills (6d probe finding).
+ *
+ * @returns {{ pluginId: string, dir: string }[]} one entry per packaged skill
+ */
+export function pluginSkillDirs() {
+  const out = [];
+  try {
+    // Lazy require-style import to avoid a module cycle at load time.
+    const { discoverPlugins, isPluginEnabled } = globalThis.__jexiPluginRegistry
+      ? globalThis.__jexiPluginRegistry
+      : {}; // eslint-disable-line no-undef
+    if (!discoverPlugins || !isPluginEnabled) return out;
+    for (const p of discoverPlugins()) {
+      if (!isPluginEnabled(p.id)) continue;
+      const base = p.packageDir && p.contributes?.skillsDir
+        ? path.join(p.packageDir, p.contributes.skillsDir)
+        : null;
+      if (!base || !fs.existsSync(base)) continue;
+      for (const ent of fs.readdirSync(base, { withFileTypes: true })) {
+        if (ent.isDirectory() && fs.existsSync(path.join(base, ent.name, 'SKILL.md'))) {
+          out.push({ pluginId: p.id, dir: path.join(base, ent.name) });
+        }
+      }
+    }
+  } catch { /* plugin discovery is fail-soft */ }
+  return out;
+}
+
+/** Locate the SKILL.md for a slug: builtin store first, then enabled plugins. */
+export function skillMdPath(slug) {
+  const builtin = path.join(SKILLS_STORE, slug, 'SKILL.md');
+  if (fs.existsSync(builtin)) return builtin;
+  for (const p of pluginSkillDirs()) {
+    const md = path.join(p.dir, 'SKILL.md');
+    if (path.basename(p.dir) === slug && fs.existsSync(md)) return md;
+  }
+  return null;
+}
+
 /** Full catalog index (metadata only, keyed by slug). Loads each frontmatter only. */
 export async function catalog() {
   let entries;
   try {
     entries = fs.readdirSync(SKILLS_STORE, { withFileTypes: true });
   } catch {
-    return {};
+    entries = [];
   }
   const out = {};
-  for (const ent of entries) {
-    if (!ent.isDirectory()) continue;
-    const meta = readMeta(ent.name);
-    if (!meta) continue;
-    out[ent.name] = {
-      slug: ent.name,
-      name: meta.name ?? ent.name,
+  const consider = (slug, dir) => {
+    if (out[slug]) return;
+    const meta = readMeta(slug);
+    if (!meta) return;
+    out[slug] = {
+      slug,
+      name: meta.name ?? slug,
       description: meta.description ?? '',
       whenToUse: meta.whenToUse ?? '',
       allowedTools: meta.allowedTools ?? [],
       executable: meta._stepCount > 0,
       stepCount: meta._stepCount ?? 0,
     };
+  };
+  for (const ent of entries) {
+    if (ent.isDirectory()) consider(ent.name, path.join(SKILLS_STORE, ent.name));
   }
+  // Plugin-contributed skills join the same catalog (6d fix) — they are
+  // loadable and executable exactly like builtin skills.
+  for (const p of pluginSkillDirs()) consider(path.basename(p.dir), p.dir);
   return out;
 }
 

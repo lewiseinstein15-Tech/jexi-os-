@@ -1,0 +1,10 @@
+{
+  "id": "onekey-probe",
+  "name": "One-Key Probe Pack",
+  "version": "1.0.0",
+  "description": "Probe plugin: contributes one executable skill that runs real registry tools.",
+  "contributes": {
+    "skills": ["echo-health"],
+    "skillsDir": "skills"
+  }
+}

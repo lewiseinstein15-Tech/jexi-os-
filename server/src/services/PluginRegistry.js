@@ -193,3 +193,8 @@ export function enabledPluginAgents() {
   }
   return set;
 }
+
+// Catalog bridge (6d fix): skills/catalog.js reads this handle to discover
+// on-disk plugin skill packages without a static import cycle
+// (PluginRegistry -> AgentRoster -> ... would close a loop through catalog).
+globalThis.__jexiPluginRegistry = { discoverPlugins, isPluginEnabled };
