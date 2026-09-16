@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import axios from 'axios';
 
 import v8 from 'v8';
@@ -319,7 +319,10 @@ const clientIpKey = (req) => {
   if (typeof cf === 'string' && cf.trim()) return `cf:${cf.trim().slice(0, 64)}`;
   const xff = req.headers['x-forwarded-for'];
   if (typeof xff === 'string' && xff.trim()) return `xff:${xff.split(',')[0].trim().slice(0, 64)}`;
-  return `ip:${String(req.ip || 'unknown').slice(0, 64)}`;
+  // B-erl: express-rate-limit v8 requires IPv6 keys to pass through the
+  // ipKeyGenerator helper (a raw /128 IPv6 address would explode the bucket
+  // count and bypass the intended shared-subnet bucketing).
+  return `ip:${ipKeyGenerator(String(req.ip || 'unknown')).slice(0, 64)}`;
 };
 // Session-first buckets: every real client sends a stable x-jexi-session,
 // so each user gets their OWN budget even behind carrier-grade NAT (one
