@@ -1,61 +1,198 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavIcon } from './icons';
 import { getBackendUrl } from '../../utils/helpers';
-import { consumeAutoTest, emitEvent, AUTO_TEST_QUESTION } from '../../services/brain';
+import { brainGet, consumeAutoTest, emitEvent, AUTO_TEST_QUESTION } from '../../services/brain';
 
-/* <ChatView /> — v0.9: LIVE + boot-armed. Wired to the brain's POST /api/chat (NDJSON).
-   Design language unchanged from the approved preview:
-   - JEXI (Director) as the distinct ember voice
-   - timestamps left, avatar + name + role rows
-   - live pipeline log lines in the same terminal-block styling
-   - auto-scroll to bottom on every append
-   The preview's mock transcript is replaced by a real conversation with the
-   brain (JEXI_MODEL_PROVIDER on Render — Groq). Stream events:
-   {type:'log',agent,message} · {type:'stream',text} · {type:'done',summary,success} */
-
-function TermBlock({ title, lines }) {
-  return (
-    <div className="term">
-      <div className="thead">
-        <span className="tt">{title}</span>
-        <span className="tc">/api/chat</span>
-        <span className="tm">live</span>
-      </div>
-      <pre>{lines.slice(-6).join('\n')}</pre>
-    </div>
-  );
-}
-
-function DiffBlock({ d }) {
-  return (
-    <div className="diff">
-      <div className="dhead">
-        <span className="df">{d.file}</span>
-        <span className="dh">{d.hunk}</span>
-        <span className="dh" style={{ marginLeft: 'auto' }}>{d.stat}</span>
-      </div>
-      <div className="dlines">
-        {d.lines.map((l, i) => <span key={i} className={`dl ${l[0]}`}>{l[1]}</span>)}
-      </div>
-    </div>
-  );
-}
+/* <ChatView /> — v0.12: the agent-run timeline (FreeBuff / Codebuff / Arena /
+   opencode pattern, JEXI colors untouched). One JEXI reply is a RUN:
+     BRAIN TASKS strip — the brain's real task list (/api/context), pinned
+     PLAN card        — the brain's plan steps as a todo checklist (+ roster)
+     thinking card    — chain-of-thought from `think` deltas, expandable
+     tool cards       — every pipeline `log` line, collapsed, tap to expand
+     narration        — the brain's spoken progress as paragraphs
+     answer           — streamed text with inline `code` chips
+     sources          — hostnames the run touched (done.sources)
+   Status pill times the run for real: THINKING → WORKING → ANSWERED · Ns.
+   Stream events (probe-verified shapes):
+   {type:'log',agent,message} · {type:'team',event} · {type:'narration',text}
+   {type:'plan',steps[],roster[],complexity} · {type:'think',text,by} deltas
+   {type:'stream',text} · {type:'done',success,summary,sources[]} */
 
 const ts = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 
+/* the brain sometimes ships structured payloads (team event objects, task
+   updates) inside fields the UI renders as text — coerce EVERYTHING to a
+   string before it touches a React child (React error #31 guard) */
+const str = (v) => {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') {
+    const s = v.message || v.text || v.summary || v.title || v.event || v.state || v.type;
+    return typeof s === 'string' ? s : JSON.stringify(v);
+  }
+  return String(v);
+};
+
+const hostOf = (s) => {
+  try { return new URL(String(s)).host; } catch { return String(s).slice(0, 42); }
+};
+
+/* ── BRAIN TASKS strip — the brain's real task ledger, never faked ── */
+function TaskStrip({ tasks }) {
+  if (!tasks || !tasks.length) return null;
+  const active = tasks.filter((t) => str(t.status).toLowerCase() === 'active').length;
+  return (
+    <div className="taskstrip" data-probe="taskstrip">
+      <div className="tshead">BRAIN TASKS · {active} active / {tasks.length} total</div>
+      {tasks.slice(0, 5).map((t, i) => {
+        const s = (str(t.status) || 'pending').toLowerCase();
+        const cls = s === 'completed' || s === 'done' ? 'ok' : (s === 'active' || s === 'running') ? 'run' : 'idle';
+        return (
+          <div className="trow" key={i}>
+            <span className={`tbadge ${cls}`}>{s.toUpperCase()}</span>
+            <span className="ttitle">{str(t.title || t.name || t.description) || 'untitled task'}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── thinking card — one expandable chain-of-thought per run ── */
+function ThinkCard({ think, live }) {
+  if (!think || !think.text) return null;
+  const prev = `${String(think.text).replace(/\s+/g, ' ').trim().slice(0, 44)}`;
+  return (
+    <details className="thinkbar" open data-probe="think">
+      <summary>
+        <span className="tico"><NavIcon name="bolt" /></span>
+        <span className="tt1">thinking · {think.by || 'JEXI'}</span>
+        <span className="tprev">{prev}{think.text.length > 44 ? '…' : ''}</span>
+        <span className="tchev"><NavIcon name="chevdown" /></span>
+      </summary>
+      <div className="tbody">{think.text}{live ? ' ▊' : ''}</div>
+    </details>
+  );
+}
+
+/* ── PLAN card — the brain's plan as a todo checklist ── */
+function PlanCard({ plan }) {
+  if (!plan) return null;
+  const steps = (plan.steps && plan.steps.length ? plan.steps : plan.roster) || [];
+  if (!steps.length) return null;
+  const roster = plan.roster || [];
+  const sub = roster.length
+    ? `${steps.length} step${steps.length === 1 ? '' : 's'} · ${roster.join(', ')}`
+    : `${steps.length} step${steps.length === 1 ? '' : 's'}`;
+  return (
+    <div className="plancard" data-probe="plan">
+      <div className="phead">
+        <span className="pt">PLAN</span>
+        <span className="psub">{sub}</span>
+        <span className={`pill ${plan.done ? 'ok' : 'run'} ppill`}><span className="dot" />{plan.done ? 'DONE' : 'RUNNING'}</span>
+      </div>
+      {steps.map((s, i) => {
+        const txt = typeof s === 'string' ? s : (s && (s.description || s.title || s.name || s.step)) || JSON.stringify(s);
+        return (
+          <div className="prow" key={i}>
+            <span className={`pdot ${plan.done ? 'done' : i === 0 ? 'live' : ''}`} />
+            <span className="ptxt">{txt}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── tool card — one collapsed pipeline log line, tap to expand ── */
+function ToolCard({ t }) {
+  return (
+    <details className="tcard" data-probe="toolcard">
+      <summary>
+        <span className="tico"><NavIcon name="terminal" /></span>
+        <span className="tn">{str(t.agent) || 'JEXI'}</span>
+        <span className="tm">{t.msg}</span>
+        <span className="tchev"><NavIcon name="chevdown" /></span>
+      </summary>
+      <div className="tbody">{`${t.agent ? `${t.agent}: ` : ''}${t.msg}`}</div>
+    </details>
+  );
+}
+
+/* answer text with inline `code` chips */
+function AnswerText({ text }) {
+  const parts = String(text || '').split(/(`[^`]+`)/g);
+  return (
+    <>
+      {parts.map((p, i) => (p.length > 1 && p.startsWith('`') && p.endsWith('`')
+        ? <code key={i}>{p.slice(1, -1)}</code>
+        : <span key={i}>{p}</span>))}
+    </>
+  );
+}
+
+/* status pill: THINKING → WORKING → ANSWERED · Ns (all real time) */
+function StatusPill({ m, now }) {
+  if (m.phase === 'error') return <span className="pill err"><span className="dot" />FAILED</span>;
+  if (m.phase === 'done') {
+    const s = Math.max(1, Math.round(((m.endedAt || m.startedAt) - m.startedAt) / 1000));
+    return <span className="pill ok"><span className="dot" />ANSWERED · {s}S</span>;
+  }
+  const s = Math.max(0, Math.round((now - m.startedAt) / 1000));
+  return (
+    <span className="pill run">
+      <span className="dot" />
+      {m.stage === 'thinking' ? 'THINKING' : 'WORKING'}
+      <span className="wave"><i /><i /><i /></span>
+      · {s}S
+    </span>
+  );
+}
+
 export default function ChatView() {
   const logRef = useRef(null);
+  const stickRef = useRef(true);
   const [msgs, setMsgs] = useState([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  const [tasks, setTasks] = useState([]);
+  const [now, setNow] = useState(Date.now());
   const brain = getBackendUrl();
   const brainHost = (() => { try { return brain ? new URL(brain).host : 'no brain configured'; } catch { return brain; } })();
 
-  /* auto-scroll on every change (live feed behavior) */
+  /* live seconds ticker while a run is streaming */
+  useEffect(() => {
+    if (!busy) return undefined;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [busy]);
+
+  /* smart stick-to-bottom: follow the stream until the owner scrolls up */
   useEffect(() => {
     const el = logRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [msgs]);
+    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
+  }, [msgs, now, tasks]);
+
+  const onScroll = () => {
+    const el = logRef.current;
+    if (el) stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 90;
+  };
+
+  /* real brain task strip — seeded on mount, refreshed after every run */
+  const refreshTasks = async () => {
+    try {
+      const c = await brainGet('/api/context', 15000);
+      setTasks((c && c.tasks) || []);
+    } catch { /* keep the last known tasks — never fake them */ }
+  };
+  useEffect(() => { refreshTasks(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  const patchLast = (fn) => setMsgs((ms) => {
+    if (!ms.length) return ms;
+    const next = ms.slice();
+    next[next.length - 1] = fn({ ...next[next.length - 1] });
+    return next;
+  });
 
   /* boot self-test handshake: <BootScreen /> armed a live replay of the
      automatic test question — run it for real, in full view, right here */
@@ -70,21 +207,21 @@ export default function ChatView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const patchLast = (fn) => setMsgs((ms) => {
-    if (!ms.length) return ms;
-    const next = ms.slice();
-    next[next.length - 1] = fn({ ...next[next.length - 1] });
-    return next;
-  });
-
   async function runSend(q) {
     if (!q || busy) return;
     setBusy(true);
+    stickRef.current = true;
     const stamp = ts();
+    const startedAt = Date.now();
     setMsgs((ms) => [
       ...ms,
-      { id: `u${Date.now()}`, ts: stamp, voice: 'user', text: q },
-      { id: `j${Date.now()}`, ts: stamp, voice: 'jexi', text: '', logs: [], streaming: true, error: '' },
+      { id: `u${startedAt}`, ts: stamp, voice: 'user', text: q },
+      {
+        id: `j${startedAt}`, ts: stamp, voice: 'jexi', text: '',
+        phase: 'run', stage: 'thinking', startedAt,
+        tools: [], think: null, plan: null, narr: [], sources: [],
+        success: false, error: '',
+      },
     ]);
     try {
       if (!brain) throw new Error('No brain configured — set the Server address in the sidebar.');
@@ -108,28 +245,55 @@ export default function ChatView() {
           if (!line.trim()) continue;
           let ev; try { ev = JSON.parse(line); } catch { continue; }
           if (ev.type === 'log' && ev.message) {
-            const msg = `${ev.agent ? `${ev.agent}: ` : ''}${ev.message}`;
-            patchLast((m) => ({ ...m, logs: [...(m.logs || []), msg] }));
-            emitEvent({ chip: 'TOOL', who: ev.agent || 'Pipeline', msg: ev.message, tone: 'var(--jcx-ink-2)' });
+            const who = str(ev.agent) || 'JEXI';
+            const msg2 = str(ev.message);
+            patchLast((m) => ({ ...m, tools: [...m.tools, { agent: who, msg: msg2 }] }));
+            emitEvent({ chip: 'TOOL', who, msg: msg2, tone: 'var(--jcx-ink-2)' });
+          } else if (ev.type === 'think' && ev.text) {
+            patchLast((m) => ({
+              ...m,
+              stage: 'thinking',
+              think: { by: str(ev.by) || (m.think && m.think.by) || '', text: ((m.think && m.think.text) || '') + str(ev.text) },
+            }));
+          } else if (ev.type === 'plan' && (ev.steps || ev.roster)) {
+            const n = (ev.steps || ev.roster || []).length;
+            patchLast((m) => ({ ...m, plan: { steps: ev.steps || [], roster: ev.roster || [], done: false } }));
+            emitEvent({ chip: 'PLAN', who: 'JEXI', msg: `plan · ${n} step${n === 1 ? '' : 's'}${ev.complexity ? ` · ${str(ev.complexity)}` : ''}`, tone: 'var(--jcx-gold)' });
+          } else if (ev.type === 'narration' && ev.text) {
+            patchLast((m) => ({ ...m, narr: [...m.narr, str(ev.text)] }));
+          } else if (ev.type === 'team' && (ev.event || ev.message)) {
+            /* team events are structured brain telemetry — they feed the live
+               event stream (bus); the log lines already carry the same text */
+            const t0 = ev.event && typeof ev.event === 'object' ? ev.event : {};
+            const who = str(t0.agentName || t0.agentId || ev.agent) || 'JEXI';
+            const msg2 = str(t0.summary || t0.title || t0.type || ev.event || ev.message);
+            if (msg2) emitEvent({ chip: 'TOOL', who, msg: msg2, tone: 'var(--jcx-ink-2)' });
           } else if (ev.type === 'stream' && ev.text) {
-            patchLast((m) => ({ ...m, text: m.text + ev.text }));
+            patchLast((m) => ({ ...m, stage: 'working', text: m.text + ev.text }));
           } else if (ev.type === 'done') {
             patchLast((m) => ({
               ...m,
-              streaming: false,
               text: (ev.summary && ev.summary.length >= m.text.length) ? ev.summary : m.text,
+              sources: Array.isArray(ev.sources) ? ev.sources.map(str) : (m.sources || []),
               success: ev.success !== false,
+              plan: m.plan ? { ...m.plan, done: true } : m.plan,
             }));
           }
         }
       }
-      patchLast((m) => ({ ...m, streaming: false, success: m.success !== false && !!m.text }));
+      patchLast((m) => ({
+        ...m,
+        phase: 'done',
+        endedAt: Date.now(),
+        success: m.success !== false && !!m.text,
+      }));
       emitEvent({ chip: 'OK', who: 'Chat', msg: 'answer complete · stream closed', tone: 'var(--jcx-up)' });
     } catch (e) {
-      patchLast((m) => ({ ...m, streaming: false, error: (e && e.message) || 'The brain could not be reached.' }));
+      patchLast((m) => ({ ...m, phase: 'error', endedAt: Date.now(), error: (e && e.message) || 'The brain could not be reached.' }));
       emitEvent({ chip: 'WARN', who: 'Chat', msg: `chat failed · ${(e && e.message) || 'error'}`, tone: 'var(--jcx-down)' });
     } finally {
       setBusy(false);
+      refreshTasks(); // the run may have created / finished real brain tasks
     }
   }
 
@@ -142,7 +306,8 @@ export default function ChatView() {
 
   return (
     <div className="chatwrap">
-      <div className="chatlog" ref={logRef}>
+      <div className="chatlog" ref={logRef} onScroll={onScroll}>
+        <TaskStrip tasks={tasks} />
         {msgs.length === 0 && (
           <div className="cmsg">
             <span className="ts">{ts()}</span>
@@ -154,7 +319,7 @@ export default function ChatView() {
               </div>
               <div className="cbubble director">
                 <div className="ctext">
-                  Executive console online. Ask me anything — I run live on {brainHost}. Mission views stay on the approved board data; this chat is the real brain.
+                  Executive console online. Ask me anything — I run live on {brainHost}. Every reply shows the real plan, the thinking, and each pipeline step as it happens.
                 </div>
               </div>
             </div>
@@ -170,22 +335,34 @@ export default function ChatView() {
               <div className="chead">
                 <span className={`cname${m.voice === 'jexi' ? ' director' : ''}`}>{m.voice === 'jexi' ? 'JEXI' : 'Lewis'}</span>
                 <span className="crole">{m.voice === 'jexi' ? 'Director' : 'owner & creator'}</span>
-                {m.voice === 'jexi' && m.streaming && <span className="pill warn" style={{ marginLeft: 6 }}><span className="dot" />running…</span>}
-                {m.voice === 'jexi' && !m.streaming && !m.error && m.text && <span className="pill ok" style={{ marginLeft: 6 }}><span className="dot" />answered</span>}
-                {m.voice === 'jexi' && m.error && <span className="pill err" style={{ marginLeft: 6 }}><span className="dot" />error</span>}
+                {m.voice === 'jexi' && <StatusPill m={m} now={now} />}
               </div>
-              {m.error
-                ? <div className="cbubble director"><div className="ctext" style={{ color: 'var(--jcx-down)' }}>{m.error}</div></div>
-                : (m.text || m.streaming) && (
-                  <div className={`cbubble${m.voice === 'jexi' ? ' director' : ''}`}>
-                    <div className="ctext">
-                      {m.text}
-                      {m.streaming && !m.text && <span className="status" style={{ color: 'var(--jcx-gold)' }}>thinking…</span>}
-                    </div>
+              {m.voice === 'jexi' && (
+                <>
+                  <ThinkCard think={m.think} live={m.phase === 'run' && m.stage === 'thinking'} />
+                  <PlanCard plan={m.plan} />
+                  {(m.tools || []).map((t, i) => <ToolCard t={t} key={`${m.id}-t${i}`} />)}
+                  {(m.narr || []).map((n, i) => <div className="cnarr" key={`${m.id}-n${i}`}>{n}</div>)}
+                </>
+              )}
+              {m.error ? (
+                <div className="cbubble director"><div className="ctext" style={{ color: 'var(--jcx-down)' }}>{m.error}</div></div>
+              ) : ((m.text || (m.voice === 'jexi' && m.phase === 'run')) && (
+                <div className={`cbubble${m.voice === 'jexi' ? ' director' : ''}`}>
+                  <div className="ctext">
+                    {m.voice === 'jexi' ? <AnswerText text={m.text} /> : m.text}
+                    {m.voice === 'jexi' && m.phase === 'run' && !m.text && (
+                      <span className="status" style={{ color: 'var(--jcx-gold)' }}>listening to the pipeline…</span>
+                    )}
                   </div>
-                )}
-              {m.voice === 'jexi' && m.logs && m.logs.length > 0 && (
-                <TermBlock title="LIVE PIPELINE" lines={m.logs} />
+                </div>
+              ))}
+              {m.voice === 'jexi' && m.sources && m.sources.length > 0 && (
+                <div className="srcc">
+                  {m.sources.map((s, i) => (
+                    <span className="sc" key={i}>{hostOf(s)}</span>
+                  ))}
+                </div>
               )}
             </div>
           </div>

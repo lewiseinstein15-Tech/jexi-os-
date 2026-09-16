@@ -487,3 +487,121 @@
   animation:bsslide 1.6s ease-in-out infinite}
 @keyframes bsslide{0%{transform:translateX(-110%)}100%{transform:translateX(290%)}}
 .bootscreen .bs-card .send{align-self:flex-end}
+
+/* ═══════════ v0.12 — AGENT-RUN TIMELINE ═══════════
+   FreeBuff / Codebuff / Arena / opencode pattern, JEXI tokens only:
+   BRAIN TASKS strip · PLAN card · thinking card · tool cards ·
+   narration · code chips · source chips · pill timing wave. */
+
+/* ── BRAIN TASKS strip (real /api/context tasks, pinned above the feed) ── */
+.jcx .taskstrip{border:1px solid var(--jcx-line);background:var(--jcx-panel);
+  border-radius:12px;padding:10px 12px 8px;margin:0 0 14px;max-width:76ch}
+.jcx .taskstrip .tshead{font-family:var(--jcx-mono);font-size:9.5px;font-weight:700;
+  letter-spacing:.12em;color:var(--jcx-ink-3);margin-bottom:7px}
+.jcx .taskstrip .trow{display:flex;align-items:center;gap:8px;padding:3px 0;min-width:0}
+.jcx .taskstrip .tbadge{font-family:var(--jcx-mono);font-size:8.5px;font-weight:700;
+  letter-spacing:.08em;padding:2px 7px;border-radius:5px;flex:none}
+.jcx .taskstrip .tbadge.ok{color:var(--jcx-up);background:var(--jcx-up-dim)}
+.jcx .taskstrip .tbadge.run{color:var(--jcx-ember);background:var(--jcx-ember-dim)}
+.jcx .taskstrip .tbadge.idle{color:var(--jcx-ink-3);background:var(--jcx-panel-2)}
+.jcx .taskstrip .ttitle{font-size:11.5px;color:var(--jcx-ink);min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── thinking card: bolt · "thinking · agent" · preview · expandable body ── */
+.jcx .thinkbar{border:1px solid var(--jcx-line-soft);background:var(--jcx-panel-2);
+  border-radius:12px;margin:8px 0 2px;max-width:76ch;overflow:hidden}
+.jcx .thinkbar summary{display:flex;align-items:center;gap:9px;padding:9px 11px;
+  cursor:pointer;list-style:none;user-select:none}
+.jcx .thinkbar summary::-webkit-details-marker{display:none}
+.jcx .thinkbar summary:hover{background:var(--jcx-panel-3)}
+.jcx .thinkbar .tico{width:22px;height:22px;border-radius:7px;background:var(--jcx-ember-dim);
+  color:var(--jcx-ember);display:grid;place-items:center;flex:none}
+.jcx .thinkbar .tico svg{width:12px;height:12px}
+.jcx .thinkbar .tt1{font-size:11.5px;font-weight:600;color:var(--jcx-ink);flex:none}
+.jcx .thinkbar .tprev{font-family:var(--jcx-mono);font-size:10px;color:var(--jcx-ink-3);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.jcx .thinkbar .tchev{margin-left:auto;flex:none;display:inline-flex;
+  transition:transform 150ms var(--jcx-ease)}
+.jcx .thinkbar[open] summary .tchev{transform:rotate(180deg)}
+.jcx .thinkbar .tbody{border-top:1px solid var(--jcx-line-soft);padding:10px 12px;
+  font-family:var(--jcx-mono);font-size:10.5px;line-height:1.65;color:var(--jcx-ink-2);
+  white-space:pre-wrap;word-break:break-word;max-height:340px;overflow-y:auto}
+
+/* ── PLAN card: the brain's plan as a todo checklist ── */
+.jcx .plancard{border:1px solid rgba(255,122,61,.4);background:rgba(255,122,61,.045);
+  border-radius:12px;padding:11px 12px 9px;margin:8px 0 2px;max-width:76ch}
+.jcx .plancard .phead{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.jcx .plancard .pt{font-family:var(--jcx-mono);font-size:9.5px;font-weight:700;
+  letter-spacing:.14em;color:var(--jcx-ember)}
+.jcx .plancard .psub{font-size:10px;color:var(--jcx-ink-3);min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jcx .plancard .ppill{margin-left:auto;flex:none}
+.jcx .plancard .prow{display:flex;align-items:center;gap:9px;padding:4px 0;min-width:0}
+.jcx .plancard .pdot{width:9px;height:9px;border-radius:50%;flex:none;
+  border:2px solid var(--jcx-ink-3);background:transparent}
+.jcx .plancard .pdot.done{background:var(--jcx-up);border-color:var(--jcx-up)}
+.jcx .plancard .pdot.live{border-color:var(--jcx-ember);animation:jcx-pulse 1.4s ease-in-out infinite}
+.jcx .plancard .ptxt{font-size:11.5px;color:var(--jcx-ink);min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── tool cards: one collapsed pipeline log line each, tap to expand ── */
+.jcx .tcard{border:1px solid var(--jcx-line-soft);background:var(--jcx-panel-2);
+  border-radius:10px;margin:6px 0 0;max-width:76ch;overflow:hidden}
+.jcx .tcard summary{display:flex;align-items:center;gap:9px;padding:8px 10px;
+  cursor:pointer;list-style:none;user-select:none}
+.jcx .tcard summary::-webkit-details-marker{display:none}
+.jcx .tcard summary:hover{background:var(--jcx-panel-3)}
+.jcx .tcard .tico{width:22px;height:22px;border-radius:7px;background:var(--jcx-panel-3);
+  color:var(--jcx-ember);display:grid;place-items:center;flex:none;border:1px solid var(--jcx-line)}
+.jcx .tcard .tico svg{width:11px;height:11px}
+.jcx .tcard .tn{font-weight:700;font-size:11px;color:var(--jcx-ink);flex:none}
+.jcx .tcard .tm{font-family:var(--jcx-mono);font-size:10px;color:var(--jcx-ink-2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.jcx .tcard .tchev{margin-left:auto;flex:none;display:inline-flex;
+  transform:rotate(-90deg);transition:transform 150ms var(--jcx-ease)}
+.jcx .tcard[open] summary .tchev{transform:none}
+.jcx .tcard .tbody{border-top:1px solid var(--jcx-line-soft);padding:9px 11px;
+  font-family:var(--jcx-mono);font-size:10.5px;line-height:1.6;color:var(--jcx-ink-2);
+  white-space:pre-wrap;word-break:break-word;max-height:300px;overflow-y:auto}
+
+/* ── narration + answer text + chips ── */
+.jcx .cnarr{font-size:12px;line-height:1.65;color:var(--jcx-ink-2);
+  margin:8px 0 0;max-width:76ch}
+.jcx .cmsg .ctext{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}
+.jcx .cmsg .ctext code{font-family:var(--jcx-mono);font-size:.92em;color:var(--jcx-peach);
+  background:var(--jcx-panel-2);border:1px solid var(--jcx-line-soft);
+  border-radius:5px;padding:0 5px}
+.jcx .srcc{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.jcx .srcc .sc{font-family:var(--jcx-mono);font-size:9px;color:var(--jcx-ink-2);
+  background:var(--jcx-panel-2);border:1px solid var(--jcx-line);border-radius:999px;
+  padding:2px 8px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── live seconds wave inside the THINKING/WORKING pill ── */
+.jcx .pill .wave{display:inline-flex;align-items:center;margin:0 1px 0 2px}
+.jcx .pill .wave i{display:inline-block;width:3px;height:3px;border-radius:50%;
+  background:currentColor;margin-right:2px;animation:jwave 1.2s ease-in-out infinite}
+.jcx .pill .wave i:nth-child(2){animation-delay:.15s}
+.jcx .pill .wave i:nth-child(3){animation-delay:.3s}
+@keyframes jwave{0%,60%,100%{opacity:.25}30%{opacity:1}}
+
+/* ── v0.12 phone pass: the timeline must FIT, not just load ── */
+@media (max-width:920px){
+  .jcx .cbubble,.jcx .term,.jcx .diff,.jcx .thinkbar,.jcx .plancard,
+  .jcx .tcard,.jcx .taskstrip,.jcx .cnarr{max-width:100%}
+  .jcx .cmsg{grid-template-columns:40px 24px minmax(0,1fr);gap:8px}
+  .jcx .cmsg .ts{font-size:9px}
+  .jcx .thinkbar .tbody{max-height:260px}
+}
+@media (max-width:560px){
+  .jcx .chatlog{padding:10px 10px 6px}
+  .jcx .cmsg{grid-template-columns:32px 22px minmax(0,1fr);gap:7px;margin-bottom:12px}
+  .jcx .cmsg .cav{width:21px;height:21px;font-size:8px}
+  .jcx .composer{padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px))}
+  .jcx .composer .note{display:none}
+  .jcx .composer .send{padding:0 12px}
+  .jcx .taskstrip{padding:9px 10px 6px}
+  .jcx .taskstrip .ttitle{white-space:normal;line-height:1.4}
+  .jcx .thinkbar .tprev{display:none}
+  .jcx .tcard .tm{font-size:9.5px}
+  .jcx .plancard .ptxt{white-space:normal;line-height:1.45}
+}

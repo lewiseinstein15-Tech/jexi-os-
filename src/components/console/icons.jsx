@@ -45,6 +45,10 @@ export function NavIcon({ name }) {
       return <svg {...common} strokeWidth="2.2"><rect x="6" y="6" width="12" height="12" rx="1.5" /></svg>;
     case 'chevdown':
       return <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#7a7163" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>;
+    case 'terminal': // v0.12 — tool cards (>_ prompt glyph)
+      return <svg {...common}><path d="M4 17l6-5-6-5" /><path d="M12 19h8" /></svg>;
+    case 'bolt': // v0.12 — thinking card
+      return <svg {...common}><path d="M13 2L4.5 13.5H11L9.5 22 19 9.5h-6.5L13 2z" /></svg>;
     default:
       return <svg {...common}><circle cx="12" cy="12" r="9" /></svg>;
   }
