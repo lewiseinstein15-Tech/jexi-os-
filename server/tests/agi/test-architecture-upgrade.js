@@ -15,6 +15,11 @@ const { JexiNativeBackend, registerBackend, getBackend, listBackends } = eb;
 const xp = await import('../../src/services/ExternalProviders.js');
 const { registerProvider, callProvider, listProviders, externalProviderStats, registerDefaults } = xp;
 const av = await import('../../src/services/ArchitectureViews.js');
+// E6(fix): derive the expected plugin count from the SAME inventory source the
+// snapshot indexes — a hardcoded 51 went stale when phase-6 fix-6 shipped the
+// onekey-probe sample plugin (52nd). The honest claim is "indexes every
+// packaged plugin", which must hold as plugins come and go.
+const pi = await import('../../src/services/PluginInventory.js');
 
 clearRuns();
 
@@ -212,7 +217,7 @@ test('the architecture snapshot indexes every registry with metadata + health', 
   assert.ok(snap.registries.agents.total > 100, 'agent roster indexed');
   assert.ok(snap.registries.tools.total > 100, 'tool registry indexed');
   assert.equal(snap.registries.mcp.total, 42, 'all 42 MCP servers indexed');
-  assert.equal(snap.registries.plugins.total, 51, 'all 51 plugins indexed');
+  assert.equal(snap.registries.plugins.total, pi.pluginInventory().plugins.length, 'snapshot indexes every packaged plugin');
   for (const m of snap.registries.mcp.items) {
     assert.ok(['disabled', 'ready', 'connected', 'error', 'cooldown'].includes(m.status));
     assert.ok(['open', 'closed'].includes(m.circuit));

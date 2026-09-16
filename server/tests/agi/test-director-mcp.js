@@ -219,23 +219,25 @@ test('an employee with a weather-only grant: weather passes, other servers denie
 
 /* ═══ D2 — the 9 Director employees' grants resolve against the shipped registry ═══ */
 
-test('all 9 Director employees: every declared grant names a real, ENABLED server', async () => {
+test('all 9 Director employees: every declared grant names a real registry server (no fabricated grants)', async () => {
   const MCPG = await import('../../src/services/MCPGateway.js');
   const reg = MCPG.loadRegistry();
-  const enabled = new Set();
-  for (const s of reg.servers) {
-    if (s.enabled === true) enabled.add(s.name);
-  }
+  // fix-2 posture: every server ships enabled:false and is force-enabled by
+  // an admin; the RUNTIME gate (MCPGateway call path, `is not enabled in the
+  // registry`) refuses disabled servers regardless of grants — so the roster
+  // invariant is "grants name REAL servers only", enablement is runtime-gated.
+  const known = new Set();
+  for (const s of reg.servers) known.add(s.name);
   const EMP = await import('../../src/services/director/Employees.js');
   const employees = EMP.loadEmployees();
   assert.equal(employees.length, 9);
   for (const e of employees) {
     assert.ok(Array.isArray(e.allowedMCP));
     for (const g of e.allowedMCP) {
-      const okServer = enabled.has(g.server);
+      const realServer = known.has(g.server);
       const okTools = Array.isArray(g.tools);
       assert.ok(typeof g.server === 'string');
-      assert.ok(okServer);
+      assert.ok(realServer, `employee ${e.agentId} grants unknown server '${g.server}'`);
       assert.ok(okTools);
       assert.ok(g.tools.length > 0);
     }
