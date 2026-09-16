@@ -57,6 +57,15 @@ export function createWorkGraph({ file } = {}) {
 
   function addNode(node) {
     if (byId(node.id)) throw new Error(`duplicate node id ${node.id}`);
+    // Normalize at the API boundary: complete()/fail()/checkpoint() assume
+    // these fields exist. A caller that omits them used to crash later with
+    // "Cannot read properties of undefined (reading 'push')" mid-mission.
+    if (!Array.isArray(node.evidence)) node.evidence = [];
+    if (!Array.isArray(node.artifacts)) node.artifacts = [];
+    if (!Array.isArray(node.dependencies)) node.dependencies = [];
+    if (!Array.isArray(node.blocks)) node.blocks = [];
+    if (typeof node.retryCount !== 'number') node.retryCount = 0;
+    if (!node.status) node.status = 'pending';
     nodes.push(node);
     return node;
   }
