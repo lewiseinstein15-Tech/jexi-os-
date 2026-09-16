@@ -187,4 +187,7 @@ console.log('\n== 6. Lessons from failures reach the NEXT plan ==');
 console.log('\n============================================================');
 console.log(`B211 B4 FAILURE-INJECTION: ${pass} passed, ${fail} failed`);
 console.log('============================================================');
-if (fail > 0) process.exit(1);
+// 10(fix): the summary is the verdict — exit explicitly. Handles opened by
+// the MissionRunner/director imports kept the event loop alive after the
+// verdict, hanging the npm-test chain (pre-existing, same class as fix-8/9).
+process.exit(fail > 0 ? 1 : 0);
