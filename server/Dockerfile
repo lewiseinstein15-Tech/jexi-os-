@@ -1,30 +1,25 @@
-# JEXI OS Backend — Docker image (for Render "Docker" runtime, or any VPS)
-# Build: docker build -f server/Dockerfile -t jexi-os-brain server
-FROM node:22-slim
+# JEXI OS brain — server/ runtime image (Suga, node 22)
+# Replicates the Render buildCommand/startCommand 1:1.
+FROM node:22-bookworm-slim
 
-# Chromium system dependencies (playwright)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
-    libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 \
-    libasound2 libpango-1.0-0 libcairo2 libglib2.0-0 libx11-6 libx11-xcb1 \
-    libxext6 libxi6 libxtst6 libxrender1 libxss1 \
-    ca-certificates fonts-liberation \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -qq \
+  && (apt-get install -y -qq ffmpeg ca-certificates curl || echo "apt ffmpeg/curl failed — /watch degrades to captions-only") \
+  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install Node deps first (better layer caching)
-COPY package*.json ./
-# Browsers inside node_modules so they survive to runtime (PLAYWRIGHT_BROWSERS_PATH=0)
-RUN npm ci && PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium
+COPY package.json package-lock.json ./
+RUN npm ci
+
 ENV PLAYWRIGHT_BROWSERS_PATH=0
+RUN (npx playwright install --with-deps chromium || npx playwright install chromium || echo "playwright chromium install failed — browser mode degrades")
 
-# Copy the backend source
-COPY index.js ./
-COPY src ./src
+COPY . .
 
-ENV NODE_ENV=production
-# Render injects PORT (default 10000); server falls back to 3002 locally
-EXPOSE 10000
+RUN mkdir -p bin \
+  && (curl -fsSL --fail -o bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux \
+      && chmod +x bin/yt-dlp || echo "yt-dlp download failed — /watch URL mode degrades")
+ENV PATH="/app/bin:${PATH}"
 
-CMD ["node", "index.js"]
+EXPOSE 3002
+CMD ["npm", "start"]
