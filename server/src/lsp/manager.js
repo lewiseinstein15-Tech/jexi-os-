@@ -32,6 +32,8 @@ export class LspManager {
     this.documents = new Map();
     /** uri → diagnostic[] */
     this.diagnostics = new Map();
+    /** uri → number of publishDiagnostics pushes (cold-start settle logic) */
+    this._publishCount = new Map();
     this.index = null;
     /** default workspace root, set lazily by tools that need a project root */
     this.root = null;
@@ -55,6 +57,9 @@ export class LspManager {
       cwd: root,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: process.env,
+      // Own process group (POSIX) so dispose can kill the whole tree —
+      // language-server wrappers spawn grandchildren (tsserver).
+      detached: process.platform !== 'win32',
     });
     const client = new LspClient({ proc, requestTimeoutMs: this.requestTimeoutMs });
 
@@ -62,7 +67,10 @@ export class LspManager {
     client.on('notification', (msg) => {
       if (msg.method === 'textDocument/publishDiagnostics') {
         const uri = msg.params?.uri;
-        if (uri) this.diagnostics.set(uri, msg.params?.diagnostics ?? []);
+        if (uri) {
+          this._publishCount.set(uri, (this._publishCount.get(uri) || 0) + 1);
+          this.diagnostics.set(uri, msg.params?.diagnostics ?? []);
+        }
       }
     });
 
@@ -114,17 +122,29 @@ export class LspManager {
     const res = await this.clientFor(file);
     if (!res.available) return { available: false, reason: res.reason, diagnostics: [] };
     const uri = await this.openDocument(res.client, file);
-    const settle = await this._waitForPublish(uri);
+    const base = this._publishCount.get(uri) || 0;
+    const settle = await this._waitForPublish(uri, base);
     return { available: true, server: res.server, uri, diagnostics: this.diagnostics.get(uri) ?? [], settled: settle };
   }
 
-  /** Poll the diagnostics map until the uri is published or we hit the cap. */
-  _waitForPublish(uri, maxMs = this.settleMs) {
-    if (this.diagnostics.has(uri)) return Promise.resolve(true);
+  /** Poll the diagnostics map until the uri is published AND the publish
+   * stream goes quiet or non-empty. Resolving on the FIRST publish is wrong
+   * on a cold start: tsserver publishes an EMPTY set promptly (project not
+   * yet analyzed) and the real errors arrive in a follow-up publish — that
+   * race is the A3 flake. Quiet window: quietMs without a new publish. */
+  _waitForPublish(uri, base = 0, maxMs = this.settleMs, quietMs = 2500) {
+    const seen = () => (this._publishCount.get(uri) || 0) - base;
+    if (seen() > 0 && (this.diagnostics.get(uri) || []).length > 0) return Promise.resolve(true);
     return new Promise((resolve) => {
       const started = Date.now();
+      let lastCount = seen();
+      let lastChange = Date.now();
       const timer = setInterval(() => {
-        if (this.diagnostics.has(uri)) { clearInterval(timer); resolve(true); }
+        const n = seen();
+        if (n !== lastCount) { lastCount = n; lastChange = Date.now(); }
+        const diags = this.diagnostics.get(uri) || [];
+        if (n > 0 && diags.length > 0) { clearInterval(timer); resolve(true); }
+        else if (n > 0 && Date.now() - lastChange >= quietMs) { clearInterval(timer); resolve(false); }
         else if (Date.now() - started > maxMs) { clearInterval(timer); resolve(false); }
       }, 50);
       if (timer.unref) timer.unref();
@@ -194,10 +214,13 @@ export class LspManager {
       const s = this.servers.get(id);
       try { await s.client.shutdown(); } catch { /* best effort */ }
       try { await s.client.dispose(); } catch { /* best effort */ }
+      // Belt and suspenders — never leave a language-server tree behind.
+      try { process.kill(-s.proc.pid, 'SIGKILL'); } catch { try { s.proc.kill('SIGKILL'); } catch { /* already gone */ } }
     }
     this.servers.clear();
     this.documents.clear();
     this.diagnostics.clear();
+    this._publishCount.clear();
     this.index = null;
     return { stopped: ids };
   }

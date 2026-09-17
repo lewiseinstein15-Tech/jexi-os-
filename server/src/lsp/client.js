@@ -201,7 +201,7 @@ export class LspClient extends EventEmitter {
 
   /** Terminate the child process, escalating if it ignores `exit`. */
   async dispose({ graceMs = 1500 } = {}) {
-    if (this._closed) return;
+    if (this._closed) { this._destroyStreams(); return; }
     try { this.proc.stdin.end(); } catch { /* already closed */ }
     const exited = await new Promise((resolve) => {
       const timer = setTimeout(() => resolve(false), graceMs);
@@ -210,7 +210,20 @@ export class LspClient extends EventEmitter {
       this.proc.once('exit', () => { clearTimeout(timer); resolve(true); });
     });
     if (!exited) {
-      try { this.proc.kill('SIGKILL'); } catch { /* already gone */ }
+      // Kill the whole process GROUP: typescript-language-server spawns a
+      // tsserver grandchild — killing only the wrapper orphans it, and the
+      // surviving stdio pipes keep the parent's event loop alive forever.
+      try { process.kill(-this.proc.pid, 'SIGKILL'); } catch { try { this.proc.kill('SIGKILL'); } catch { /* already gone */ } }
     }
+    this._destroyStreams();
+  }
+
+  /** Deterministically release the child's stdio pipes — open pipes are
+   * event-loop refs even after the child exits, and they keep node --test
+   * from ever exiting. */
+  _destroyStreams() {
+    try { this.proc.stdout.destroy(); } catch { /* gone */ }
+    try { this.proc.stderr.destroy(); } catch { /* gone */ }
+    try { this.proc.stdin.destroy(); } catch { /* gone */ }
   }
 }
