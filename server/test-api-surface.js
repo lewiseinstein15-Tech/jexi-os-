@@ -29,7 +29,7 @@ const ok = (cond, name, extra = '') => {
 console.log('\n== API surface: frontend calls ↔ server routes ==');
 /* ------------------------------------------------------------------ */
 const srcDir = path.join(ROOT, 'src');
-const _routeFiles = ['index.js', 'src/routes/surface.js', 'src/routes/arena.js', 'src/routes/missionStream.js', 'src/routes/hud.js'];
+const _routeFiles = ['index.js', 'src/routes/surface.js', 'src/routes/arena.js', 'src/routes/missionStream.js', 'src/routes/hud.js', 'src/routes/scheduler.js', 'src/routes/context.js'];
 const serverFile = _routeFiles
   .map((f) => { try { return fs.readFileSync(path.join(ROOT, 'server', f), 'utf-8'); } catch (e) { return ''; } })
   .join('\n');
@@ -52,6 +52,9 @@ for (const file of frontendFiles) {
   while ((m = re.exec(text))) {
     const call = '/' + m[1]
       .replace(/\$\{[^}]*\}/g, ':id')
+      // comment/doc literals use named params too — normalize any ':name'
+      // segment to ':id' so shape-matching works the same as ${} templates
+      .replace(/:[a-zA-Z]+/g, ':id')
       .split('?')[0]
       .replace(/\/$/, '')
       .replace(/[.,;:)\]]+$/g, '');

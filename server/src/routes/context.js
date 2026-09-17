@@ -3,6 +3,9 @@
  *
  *   GET  /api/context/sources           → registered context sources
  *   GET  /api/context/pressure          → pressure for given used/budget tokens
+ *   GET  /api/context/taskStats         → task-registry counters (the console
+ *                                          MemoryView advertises this exact
+ *                                          path as the counters source)
  *   POST /api/context/build             → build a budgeted request (returns
  *                                          messages + usage + kept/clipped/dropped)
  *   POST /api/context/pack              → greedy item packing under a token cap
@@ -19,6 +22,7 @@ import {
   contextPressure,
   listSources,
 } from '../context/index.js';
+import { taskStats } from './TaskRegistry.js';
 
 function ok(res, body) { res.json({ ok: true, ...body }); }
 function fail(res, e, code = 500) { res.status(code).json({ ok: false, error: String(e?.message || e).slice(0, 300) }); }
@@ -33,6 +37,13 @@ export function mountContext(app) {
     try {
       ok(res, { pressure: contextPressure(Number(req.query.used) || 0, Number(req.query.budget) || 8000) });
     } catch (e) { fail(res, e); }
+  });
+
+  // The console MemoryView renders this path as the source of its task
+  // counters — serve it instead of 404ing on the advertised contract.
+  app.get('/api/context/taskStats', (req, res) => {
+    try { ok(res, { taskStats: taskStats() }); }
+    catch (e) { fail(res, e); }
   });
 
   app.post('/api/context/build', async (req, res) => {
