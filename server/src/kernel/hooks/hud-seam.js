@@ -19,16 +19,17 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url)); // server/src/kernel/hooks
-const HUD_URL = pathToFileURL(path.resolve(MODULE_DIR, '..', '..', '..', '..', 'events', 'hud', 'index.js')).href;
+// Dev: <root>/server/src/kernel/hooks → <root>/events/hud · Container (context=server → /app): /app/src/kernel/hooks → /app/events/hud
+const HUD_CANDIDATES = [
+  path.resolve(MODULE_DIR, '..', '..', '..', '..', 'events', 'hud', 'index.js'),
+  path.resolve(MODULE_DIR, '..', '..', '..', 'events', 'hud', 'index.js'),
+];
 
 let _hud = null;
 let _failed = false;
 
-try {
-  _hud = await import(HUD_URL);
-} catch {
-  _hud = null;
-  _failed = true;
+for (const c of HUD_CANDIDATES) {
+  try { _hud = await import(pathToFileURL(c).href); _failed = false; break; } catch { _hud = null; _failed = true; }
 }
 
 /** PreToolUse — HUD marks the call as pending (stale tracking starts). */

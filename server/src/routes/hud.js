@@ -7,26 +7,51 @@
  * producer publishes. Same SSE discipline as missionStream.js (B224):
  * native Last-Event-ID reconnect, heartbeat so proxies never idle out,
  * and cleanup on close.
+ *
+ * The events/hud/ subsystem lives at the REPO ROOT (ECC reference layout).
+ * It is imported DYNAMICALLY (fail-soft, like the learning seam): a
+ * container built without events/hud must still boot — the HUD routes
+ * then answer 503 honestly instead of taking the brain down. The image
+ * pipeline ships events/hud into the build context (docker-image.yml).
  */
 
-import { wireHud, currentPayload, subscribe, bindProducer, hudInfo, consume, snapshot as hudSnapshot } from '../../../events/hud/index.js';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url)); // server/src/routes
+// Dev: <root>/server/src/routes → <root>/events/hud · Container (context=server → /app): /app/src/routes → /app/events/hud
+const HUD_CANDIDATES = [
+  path.resolve(MODULE_DIR, '..', '..', '..', 'events', 'hud', 'index.js'),
+  path.resolve(MODULE_DIR, '..', '..', 'events', 'hud', 'index.js'),
+];
+
+let hud = null;
+for (const c of HUD_CANDIDATES) {
+  try { hud = await import(pathToFileURL(c).href); break; } catch { hud = null; }
+} // missing events/hud → honest 503s, boot survives
 
 const HEARTBEAT_MS = Number(process.env.HUD_SSE_HEARTBEAT_MS || 15000);
 
 let bound = false;
 
 export function mountHud(app) {
-  if (!bound) { bindProducer(); bound = true; } // producer → consumer fan-out, once
-  wireHud().catch(() => { /* cold boot without subsystems — GET retries */ });
+  if (!hud) {
+    // events/hud not shipped in this runtime — boot survives, HUD degrades.
+    app.get('/api/hud', (req, res) => res.status(503).json({ ok: false, error: 'hud subsystem unavailable in this runtime' }));
+    app.get('/api/hud/stream', (req, res) => res.status(503).json({ ok: false, error: 'hud subsystem unavailable in this runtime' }));
+    return;
+  }
+  if (!bound) { hud.bindProducer(); bound = true; } // producer → consumer fan-out, once
+  hud.wireHud().catch(() => { /* cold boot without subsystems — GET retries */ });
 
   // GET /api/hud — the ONE state endpoint the console reads.
   app.get('/api/hud', async (req, res) => {
     try {
-      const payload = await currentPayload();
+      const payload = await hud.currentPayload();
       // Consumer-side gate: refuse anything that fails the contract (P10).
-      consume(payload);
+      hud.consume(payload);
       res.setHeader('Cache-Control', 'no-store');
-      const info = hudInfo();
+      const info = hud.hudInfo();
       res.json({ ok: true, revision: info.revision, publishedAt: info.publishedAt, hud: payload });
     } catch (err) {
       const refused = err && err.code === 'HUD_REFUSED';
@@ -41,8 +66,8 @@ export function mountHud(app) {
   // GET /api/hud/stream — SSE: the current payload, then one push per change.
   app.get('/api/hud/stream', async (req, res) => {
     try {
-      const payload = await currentPayload();
-      consume(payload); // same refusal rule on the stream path
+      const payload = await hud.currentPayload();
+      hud.consume(payload); // same refusal rule on the stream path
     } catch (err) {
       res.status(409).json({ ok: false, error: 'hud payload refused by contract', code: err && err.code });
       return;
@@ -61,15 +86,15 @@ export function mountHud(app) {
       res.write(`id: ${revision}\nevent: hud\ndata: ${JSON.stringify(payload)}\n\n`);
     };
 
-    const info = hudInfo();
+    const info = hud.hudInfo();
     res.write(`event: ready\ndata: ${JSON.stringify({ version: info.version, revision: info.revision, subscribers: info.subscribers })}\n\n`);
     // replay the current payload when the client is fresh or behind
     if (info.revision > lastRevision) {
-      const current = hudSnapshot().payload;
+      const current = hud.hudSnapshot().payload;
       if (current) send(info.revision, current);
     }
 
-    const unsub = subscribe((revision, payload) => {
+    const unsub = hud.subscribe((revision, payload) => {
       try { if (revision > lastRevision) send(revision, payload); } catch { /* closed */ }
     });
     const hb = setInterval(() => { try { res.write(': ping\n\n'); } catch { /* closed */ } }, HEARTBEAT_MS);
