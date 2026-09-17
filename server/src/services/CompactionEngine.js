@@ -24,6 +24,7 @@ import { DATA_DIR } from '../config.js';
 import { conversationFilePath, loadConversationEvents } from './SessionConversations.js';
 import { generateContent } from '../providers/runtime/LLMClient.js';
 import { appendEvent } from './EventLog.js'; // B102 — compaction is a first-class durable event
+import { runLifecycleHook } from '../kernel/hooks/runner.js'; // Phase 7(B) — PreCompact hook
 
 /** Auto-compaction pressure: total chat characters before we compact. */
 export const AUTO_COMPACT_THRESHOLD_CHARS = 45000;
@@ -228,6 +229,10 @@ export async function maybeCompact(convId, { force = false, signal, summarizer }
   const events = loadConversationEvents(convId, 2000);
   const cut = pickCut(events, p.chars);
   if (!cut) return null;
+
+  // Phase 7(B): PreCompact hook — fires only when compaction will proceed
+  // (pressure exceeded/forced AND a cut exists) — fires pre-compact/save-checkpoint.js.
+  runLifecycleHook('PreCompact', { sessionId: convId, conversationId: convId, force: Boolean(force) });
 
   if (!acquireLock(convId)) return { compacted: false, error: 'compaction already in progress' };
   try {

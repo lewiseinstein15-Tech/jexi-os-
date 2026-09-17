@@ -4,7 +4,12 @@
  * Deny-by-default. A call is executed only when the active permission context
  * grants BOTH the tool name AND the risk level. Mimics the Hermes permission
  * model without importing it.
+ *
+ * Phase 7(B): this gate is the kernel PreToolUse hook point — hooks run
+ * BEFORE the permission check (server/src/kernel/hooks/runner.js).
  */
+
+import { runPreToolUseHook } from '../../kernel/hooks/runner.js';
 
 const DEFAULT_GRANTS = {
   tools: new Set(),       // tool names
@@ -20,12 +25,20 @@ export function makePermissionGate({ allowedTools = [], maxRisk = 'low', allowAl
   return {
     allowedTools: tools,
     maxRisk,
-    check(call) {
-      if (allowAll) return { allowed: true };
-      if (!tools.has(call.name)) {
-        return { allowed: false, reason: `permission denied: tool "${call.name}" is not granted (deny-by-default)` };
+    check(call, ctx = {}) {
+      // Phase 7(B): PreToolUse hooks run BEFORE the permission check — a
+      // blocking hook (nonzero exit, exitBehavior:'block') short-circuits
+      // the gate and the tool call is denied with the hook's reason.
+      const hook = runPreToolUseHook(call, ctx);
+      const hookOut = hook.logs.length ? { hookLogs: hook.logs } : {};
+      if (hook.blocked) {
+        return { allowed: false, reason: `blocked by hook ${hook.blocked.id} (exit ${hook.blocked.code}): ${hook.blocked.reason}`, ...hookOut };
       }
-      return { allowed: true };
+      if (allowAll) return { allowed: true, ...hookOut };
+      if (!tools.has(call.name)) {
+        return { allowed: false, reason: `permission denied: tool "${call.name}" is not granted (deny-by-default)`, ...hookOut };
+      }
+      return { allowed: true, ...hookOut };
     },
     checkRisk(definition) {
       const defRisk = definition?.riskLevel ?? 'medium';

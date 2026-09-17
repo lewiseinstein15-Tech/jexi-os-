@@ -31,3 +31,4 @@ __pycache__/
 *.pyc
 .jexi-secrets/
 scripts/apkinspect/
+hooks/state/

@@ -10,6 +10,7 @@ import path from 'path';
 import { planner } from './src/services/Planner.js';
 import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B158 — user/message lifecycle event
 import { sanitizeStreamText, teamRoster } from './src/providers/catalog/ModelCoworkers.js'; // B162 — named model coworkers in every log line
+import { runLifecycleHook } from './src/kernel/hooks/runner.js'; // Phase 7(B) — SessionStart/SessionEnd lifecycle hooks
 import { createMathStreamBuffer, normalizeMathDelimiters } from './src/services/Formatting.js';
 import { sanitizeOutgoingLinks, createLinkSafeStream } from './src/services/Formatting.js'; // B187 — never send localhost links // B174 — math-safe streaming + B174c delimiter normalization
 import { tryExecuteCommand, helpText, registerCommand } from './src/services/CommandRegistry.js'; // B167 — /watch + friends
@@ -187,6 +188,14 @@ backfillEmbeddings().catch((e) => { recordError('memory', (e && e.message) || St
 recordBoot();
 process.on('uncaughtException', (e) => { recordError('process', e.message, e.stack); console.error('[FATAL]', e); process.exit(1); });
 process.on('unhandledRejection', (e) => { recordError('process', (e && e.message) || String(e)); });
+
+// Phase 7(B): SessionEnd lifecycle hook on graceful shutdown (SIGTERM/SIGINT).
+for (const _sig of ['SIGTERM', 'SIGINT']) {
+  process.on(_sig, () => {
+    try { runLifecycleHook('SessionEnd', { sessionId: `boot-${process.pid}`, agentId: 'jexi-brain', reason: _sig }); } catch { /* hooks fail open */ }
+    process.exit(0);
+  });
+}
 
 // B56 — register every connector (github / email) from saved
 // config + env. Agents reach them through the gated `connector-call`
@@ -2793,6 +2802,8 @@ app.get('/api/browser/status', (req, res) => {
 const HOST = process.env.HOST || '0.0.0.0'; // CLI sets HOST=127.0.0.1 for a laptop-only brain
 app.listen(PORT, HOST, () => {
   console.log(`🧠 JEXI OS BRAIN running on http://${HOST}:${PORT}`);
+  // Phase 7(B): SessionStart lifecycle hook — the brain's session begins.
+  try { runLifecycleHook('SessionStart', { sessionId: `boot-${process.pid}`, agentId: 'jexi-brain', pid: process.pid }); } catch { /* hooks fail open */ }
   // PERMANENT drop fix: visible proof the heap cap is active (OOM-kill was
   // dropping mid-task streams on 512MB hosts — see NODE_OPTIONS).
   try { console.log(`[boot] v8 heap cap: ${Math.round(v8.getHeapStatistics().heap_size_limit / 1048576)}MB (rss ${Math.round(process.memoryUsage().rss / 1048576)}MB)`); } catch (e) {}

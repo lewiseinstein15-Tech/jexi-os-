@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "description": "JEXI OS Phase 7(B) hook registrations — ECC reference pattern. Each hook is an external script receiving a JSON context on stdin; a nonzero exit blocks the tool call when exitBehavior is 'block' (warn-level hooks log only).",
+  "hooks": [
+    {
+      "id": "pre.dev-server-blocker",
+      "event": "PreToolUse",
+      "matcher": "terminal.execute",
+      "command": "node hooks/scripts/pre-tool-use/dev-server-blocker.js",
+      "exitBehavior": "block",
+      "timeout": 5000,
+      "enabled": true
+    },
+    {
+      "id": "pre.tmux-reminder",
+      "event": "PreToolUse",
+      "matcher": "terminal.execute",
+      "command": "node hooks/scripts/pre-tool-use/tmux-reminder.js",
+      "exitBehavior": "warn",
+      "timeout": 5000,
+      "enabled": true
+    },
+    {
+      "id": "pre.git-push-reminder",
+      "event": "PreToolUse",
+      "matcher": "terminal.execute",
+      "command": "node hooks/scripts/pre-tool-use/git-push-reminder.js",
+      "exitBehavior": "warn",
+      "timeout": 5000,
+      "enabled": true
+    },
+    {
+      "id": "pre.pre-commit-quality",
+      "event": "PreToolUse",
+      "matcher": "terminal.execute",
+      "command": "node hooks/scripts/pre-tool-use/pre-commit-quality.js",
+      "exitBehavior": "block",
+      "timeout": 30000,
+      "enabled": true
+    },
+    {
+      "id": "stop.evaluate-session",
+      "event": "Stop",
+      "matcher": null,
+      "command": "node hooks/scripts/stop/evaluate-session.js",
+      "exitBehavior": "warn",
+      "timeout": 5000,
+      "enabled": true
+    },
+    {
+      "id": "session-start.restore-memory",
+      "event": "SessionStart",
+      "matcher": null,
+      "command": "node hooks/scripts/session-start/restore-memory.js",
+      "exitBehavior": "warn",
+      "timeout": 5000,
+      "enabled": true
+    },
+    {
+      "id": "pre-compact.save-checkpoint",
+      "event": "PreCompact",
+      "matcher": null,
+      "command": "node hooks/scripts/pre-compact/save-checkpoint.js",
+      "exitBehavior": "warn",
+      "timeout": 5000,
+      "enabled": true
+    },
+    {
+      "id": "session-end.persist-memory",
+      "event": "SessionEnd",
+      "matcher": null,
+      "command": "node hooks/scripts/session-end/persist-memory.js",
+      "exitBehavior": "warn",
+      "timeout": 5000,
+      "enabled": true
+    }
+  ]
+}

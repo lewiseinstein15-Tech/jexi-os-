@@ -10,6 +10,7 @@ import { ToolResult } from '../interface/ToolResult.js';
 import { validateCall } from '../registry/ToolRegistry.js';
 import { makePermissionGate, denyByDefault } from './permission-gate.js';
 import { makeRiskGuard } from './risk-guard.js';
+import { runPostToolUseHook } from '../../kernel/hooks/runner.js'; // Phase 7(B) — PostToolUse hook point
 
 /** engineAdapters: { [engineName]: (args, ctx) => Promise<any> } */
 export function makeExecutor({ engines = {}, permissions = {}, risk = {} } = {}) {
@@ -27,9 +28,12 @@ export function makeExecutor({ engines = {}, permissions = {}, risk = {} } = {})
       if (!v.valid) return fail(new Error(`schema: ${v.errors.join('; ')}`));
       const def = v.definition;
 
-      // 2. Permission gate (deny-by-default)
-      const p = gate.check(call);
-      if (!p.allowed) return fail(new Error(p.reason));
+      // 2. Permission gate (deny-by-default) — Phase 7(B): PreToolUse hooks
+      //    run inside the gate, BEFORE the permission check.
+      const p = gate.check(call, ctx);
+      const _hookLogs = Array.isArray(p.hookLogs) ? p.hookLogs : [];
+      const withHooks = (r) => { if (_hookLogs.length) r.hookLogs = _hookLogs; return r; };
+      if (!p.allowed) return withHooks(fail(new Error(p.reason)));
       const rp = gate.checkRisk(def);
       if (!rp.allowed) return fail(new Error(rp.reason));
 
@@ -43,9 +47,15 @@ export function makeExecutor({ engines = {}, permissions = {}, risk = {} } = {})
       if (!handler) return fail(new Error(`no execution engine for tool "${call.name}"`));
       try {
         const result = await handler(call.arguments, { ...ctx, definition: def });
-        return ToolResult.ok(call.id, call.name, result, { durationMs: Date.now() - started });
+        const okResult = ToolResult.ok(call.id, call.name, result, { durationMs: Date.now() - started });
+        // Phase 7(B): PostToolUse hook — fires after execution with the result.
+        runPostToolUseHook(call, okResult, ctx);
+        return withHooks(okResult);
       } catch (err) {
-        return fail(err);
+        const failResult = fail(err);
+        // Phase 7(B): PostToolUse hook — also fires on execution failure.
+        runPostToolUseHook(call, failResult, ctx);
+        return withHooks(failResult);
       }
     },
     gate,

@@ -18,6 +18,7 @@
  */
 
 import { Director } from './Director.js';
+import { runLifecycleHook } from '../../kernel/hooks/runner.js'; // Phase 7(B) — Stop hook at mission end
 import { emit as observerEmit } from '../Observer.js'; // D2 — missions/agents/verification reach the runtime bus
 import { DirectorTask, teamEvent } from './TaskState.js';
 import { TaskMailbox } from './AgentMail.js';
@@ -982,6 +983,8 @@ Output ONLY JSON: {"affectedItemIds":["wi-..."],"newItems":[{"title":"...","deta
       summary: mission.state === 'COMPLETED' ? 'Mission complete — every item has a real record.' : `Mission ${mission.state.toLowerCase()} — the record shows exactly what did and did not happen.`,
       data: { stats },
     });
+    // Phase 7(B): Stop hook — turn/mission end (fires stop/evaluate-session.js).
+    runLifecycleHook('Stop', { sessionId: mission.id, agentId: 'mission-runner', state: mission.state, objective: mission.objective });
   }
 
   /* ── user controls (API) ──────────────────────────────────────────── */

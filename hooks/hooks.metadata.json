@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "description": "JEXI OS Phase 7(B) hook metadata \u2014 id, human description, and content fingerprint (sha256 of the script file, first 16 hex). A fingerprint change means the hook's bytes changed.",
+  "hooks": [
+    {
+      "id": "pre.dev-server-blocker",
+      "description": "Blocks `npm run dev` and equivalent dev-server launches outside tmux (exit 2 \u2192 tool call denied). Allow path: inside tmux / TMUX set.",
+      "fingerprint": "d6fecc96ab8f1e1d"
+    },
+    {
+      "id": "pre.tmux-reminder",
+      "description": "Warn-only reminder for long-running commands (sleep/watch/tail -f/dev servers): suggests tmux so the process survives disconnects.",
+      "fingerprint": "f6902bf5f9307186"
+    },
+    {
+      "id": "pre.git-push-reminder",
+      "description": "Warn-only reminder before `git push`: review staged diff, outgoing commits, and working tree before shipping.",
+      "fingerprint": "f9d9e162cbde5227"
+    },
+    {
+      "id": "pre.pre-commit-quality",
+      "description": "Blocks `git commit` when staged .js files fail node --check or repo ESLint error rules (server/eslint.config.js). Warn/fail-open on lint tooling failure.",
+      "fingerprint": "18d5c1f92b81029b"
+    },
+    {
+      "id": "stop.evaluate-session",
+      "description": "Stop event (turn/mission end): appends a JSONL evaluation verdict to hooks/state/session-evals.jsonl.",
+      "fingerprint": "1249e3d74f3551d9"
+    },
+    {
+      "id": "session-start.restore-memory",
+      "description": "SessionStart: restores prior session memory from hooks/state/<sid>.memory.json when present; announces fresh session otherwise.",
+      "fingerprint": "fc3b94ea79ba110f"
+    },
+    {
+      "id": "pre-compact.save-checkpoint",
+      "description": "PreCompact: writes hooks/state/<sid>.checkpoint.json recording the conversation about to be compacted.",
+      "fingerprint": "f7dbc4ba3c129be4"
+    },
+    {
+      "id": "session-end.persist-memory",
+      "description": "SessionEnd: persists hooks/state/<sid>.memory.json so a later SessionStart can restore context.",
+      "fingerprint": "c6c12970d5930ec4"
+    }
+  ]
+}
