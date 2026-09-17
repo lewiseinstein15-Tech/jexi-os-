@@ -42,7 +42,10 @@ check('knowledge-load tool registered', !!tool);
 check('knowledge-load lists real agents', !!tool && tool.agents.length > 0);
 
 // 6. B50 P7 — lean system prompt: procedural content moved out, prompt shrank.
-check('P7: prompt is leaner than the pre-B50 baseline (12,429 chars)', JEXI_SYSTEM_PROMPT.length < 12429);
+// phase-7(A): the ACTIVE RULES block (stack-detected rules/, budget 12,000 chars)
+// is now part of the always-on prompt BY DESIGN. Lean-prompt baseline raised from
+// 12,429 (B50) to 24,529 (12,429 pre-rules + 12,100 rules budget incl. headers).
+check('P7+7A: prompt stays lean (pre-rules 12,429 + rules budget 12,100)', JEXI_SYSTEM_PROMPT.length < 24529);
 check('P7: math output template moved out (## FINAL ANSWER gone)', !JEXI_SYSTEM_PROMPT.includes('## FINAL ANSWER'));
 check('P7: per-intent template moved out (## POSSIBLE IMPROVEMENTS gone)', !JEXI_SYSTEM_PROMPT.includes('## POSSIBLE IMPROVEMENTS'));
 check('P7: formatting folder exists with the moved content', !!knowledgeLoad('formatting') && knowledgeLoad('formatting').md.includes('ANSWER REFRAMING METHOD'));

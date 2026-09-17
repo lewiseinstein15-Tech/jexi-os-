@@ -1,6 +1,7 @@
 import { buildIdentityPrompt, JEXI_IDENTITY } from './JexiIdentity.js';
 import { VOICE_RULES } from './Groundedness.js'; // B48 P2b/P7.3 — single source of the voice rules
 import { loadProjectKnowledge } from './KnowledgeBase.js'; // B50 P2 — always-on project knowledge (JEXI.md)
+import { rulesBlockForProject } from '../../../rules/loader.js'; // Phase 7A — stack-detected rules loaded into the agent's context
 
 /**
  * B50 P7 — LEAN SYSTEM PROMPT.
@@ -68,6 +69,8 @@ ${VOICE_RULES}
 
 # PROJECT KNOWLEDGE (always-on — B50 P2)
 ${loadProjectKnowledge()}
+
+${rulesBlockForProject()}
 `;
 
 // Shorter variant used for quick synthesis steps
