@@ -74,7 +74,11 @@ console.log('\n== 3. Prompt assembly — DSH ordered sections ==');
 appendConversationEvent('other-lifecycle', { role: 'user', text: 'the moon landing archives', kind: 'chat' });
 const { createUserSkill } = await import('./src/services/SkillDiscovery.js');
 createUserSkill({ name: 'test-skill', description: 'A test skill for the assembly suite with enough length.', body: '# Test Skill\n\nInstructions for the test skill body with plenty of words.' });
-const assembled = await assemblePrompt({ convId: CONV, codeMode: true, codeTools: [{ slug: 'todo', name: 'Todo', desc: 'todo list' }], presetFlavor: 'CREATOR FLAVOR', planMode: true });
+// B119 asserts the FULL ordered-section contract, so give the assembly an
+// explicit budget: the M4 default (24k chars, 13e7ca6) sits below the grown
+// persona and would drop time/sessions/skills/flavor — the trimming behavior
+// itself is covered by the M4 budget tests, not here.
+const assembled = await assemblePrompt({ convId: CONV, codeMode: true, codeTools: [{ slug: 'todo', name: 'Todo', desc: 'todo list' }], presetFlavor: 'CREATOR FLAVOR', planMode: true, budget: { maxChars: 48000, maxTokens: 16000 } });
 ok(assembled.includes('You are **JEXI OS**'), 'persona/identity section present');
 ok(assembled.includes('Current date and time:'), 'time-context section present');
 ok(/Earlier sessions/.test(assembled), 'session-references section present (other conversations listed)');
