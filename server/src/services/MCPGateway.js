@@ -28,8 +28,8 @@ import path from 'node:path';
 import os from 'node:os';
 import * as mcpGrantGate from '../workforce/mcp-gate.js';
 
-const DEFAULT_REGISTRY_PATH = () => new URL('../../../mcp/registry.json', import.meta.url).pathname;
-const DIRECTORY_PATH = () => new URL('../../../mcp/tool-directory.json', import.meta.url).pathname;
+const DEFAULT_REGISTRY_PATH = () => new URL('../../mcp/registry.json', import.meta.url).pathname;
+const DIRECTORY_PATH = () => new URL('../../mcp/tool-directory.json', import.meta.url).pathname;
 const STATE_FILE = () => path.join(process.env.DATA_DIR || './data', 'mcp-registry-state.json');
 const AUDIT_FILE = () => path.join(process.env.DATA_DIR || './data', 'mcp-audit.jsonl');
 
