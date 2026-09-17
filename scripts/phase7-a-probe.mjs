@@ -46,7 +46,7 @@ fixture(PY, {
 });
 
 const { detectStack, loadRules, renderRulesBlock, rulesStatus } =
-  await import(url.pathToFileURL(path.join(REPO, 'rules', 'loader.js')).href);
+  await import(url.pathToFileURL(path.join(REPO, 'server', 'rules', 'loader.js')).href);
 
 console.log('== P1: package.json (JS/TS) project → common + typescript ==');
 {
@@ -101,7 +101,7 @@ console.log('\n== P3: rules appear in the REAL agent context (JEXI_SYSTEM_PROMPT
     return out ? JSON.parse(out.replace('PROMPTCHECKS ', '')) : null;
   };
 
-  const repoCtx = run('default root = this repo', null);
+  const repoCtx = run('explicit root = repo root', REPO); // rules/ moved into server/ (deploy self-containment) — repo-root stack detection stays explicit
   ok(!!repoCtx && repoCtx.header, 'REAL prompt carries the ACTIVE RULES header');
   ok(!!repoCtx && repoCtx.cs1, 'REAL prompt contains common rule string', 'CS-1');
   ok(!!repoCtx && repoCtx.rc1, 'REAL prompt contains react rule string (repo self-detects react)', 'RC-1');
