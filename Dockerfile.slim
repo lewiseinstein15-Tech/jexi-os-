@@ -25,7 +25,8 @@ WORKDIR /app
 
 # Pre-warm the npx/uvx MCP package caches: the first connect on Render must
 # never pay the cold PyPI/npm download (it can exceed the 60s connect window).
-COPY mcp/registry.json ./mcp/registry.json
+# mcp/ lives INSIDE server/ since the f5659d0 layout move — copy it there.
+COPY server/mcp/registry.json ./server/mcp/registry.json
 COPY server/scripts/mcp-prewarm.mjs ./server/scripts/mcp-prewarm.mjs
 RUN cd server && node scripts/mcp-prewarm.mjs 300
 
@@ -35,8 +36,9 @@ RUN cd server && npm ci --no-audit --no-fund
 
 COPY server ./server
 
-# AGI Phase 2 — the MCP server registry ships with the brain (mcp/registry.json)
-COPY mcp ./mcp
+# AGI Phase 2 — the MCP server registry ships with the brain (server/mcp/,
+# where MCPGateway resolves ../../mcp/registry.json from src/services).
+COPY server/mcp ./server/mcp
 
 # Frontend build → served by Express from server/public
 COPY package*.json index.html vite.config.js tailwind.config.js postcss.config.js ./

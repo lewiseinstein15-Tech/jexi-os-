@@ -31,7 +31,9 @@ WORKDIR /app
 COPY server/package*.json ./server/
 RUN cd server && npm ci --no-audit --no-fund && PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
 COPY server ./server
-COPY mcp ./mcp
+# mcp/ lives INSIDE server/ since the f5659d0 layout move (shipped by the
+# COPY server line above; kept explicit here so the registry is never lost).
+COPY server/mcp ./server/mcp
 ENV PLAYWRIGHT_BROWSERS_PATH=0
 
 # Frontend build -> served from server/public by Express

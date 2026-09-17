@@ -23,7 +23,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const registryPath = path.resolve(here, '../../mcp/registry.json');
+// mcp/ lives INSIDE server/ since the f5659d0 layout move — resolve from the
+// server root (server/scripts → ../mcp), matching MCPGateway's resolution.
+const registryPath = path.resolve(here, '../mcp/registry.json');
 const perServerTimeout = Number(process.argv[2] || 90) * 1000;
 
 const registry = JSON.parse(readFileSync(registryPath, 'utf8'));
