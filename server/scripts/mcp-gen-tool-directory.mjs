@@ -16,10 +16,12 @@ import { fileURLToPath } from 'url';
 import { connectGatewayServer, disconnectGatewayServer } from '../src/services/MCPGateway.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const outPath = path.resolve(here, '../../mcp/tool-directory.json');
+// mcp/ lives INSIDE server/ since the f5659d0 layout move — resolve from the
+// server root (server/scripts → ../mcp), matching MCPGateway at runtime.
+const outPath = path.resolve(here, '../mcp/tool-directory.json');
 const perServerTimeout = Number(process.argv[3] || process.argv[2] || 90_000);
 
-const registryPath = path.resolve(here, '../../mcp/registry.json');
+const registryPath = path.resolve(here, '../mcp/registry.json');
 const registry = JSON.parse((await import('fs')).readFileSync(registryPath, 'utf8'));
 const enabled = registry.servers.filter((s) => s.enabled !== false);
 

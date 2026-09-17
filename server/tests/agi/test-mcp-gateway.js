@@ -16,7 +16,9 @@ const {
   __setConnector, __resetGateway,
 } = await import('../../src/services/MCPGateway.js');
 
-const REGISTRY = new URL('../../../mcp/registry.json', import.meta.url).pathname;
+// mcp/ lives INSIDE server/ since the f5659d0 layout move — resolve from the
+// server root (server/tests/agi → ../../mcp), matching MCPGateway at runtime.
+const REGISTRY = new URL('../../mcp/registry.json', import.meta.url).pathname;
 
 /* A fake MCP server used via the injectable connector. */
 function fakeServer(tools, behavior = {}) {
