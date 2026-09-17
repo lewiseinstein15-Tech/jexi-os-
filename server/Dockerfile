@@ -22,6 +22,15 @@ RUN mkdir -p bin \
 ENV PATH="/app/bin:${PATH}"
 
 EXPOSE 3002
+
+# 256Mi hobby-pool survival (Suga): the app boots at ~199MB RSS and dies the
+# moment (a) registerDesktopWorker() launches Chromium (+150-250MB) or (b) MCP
+# boot-connect spawns stdio children (~40-90MB each). Both are the app's own
+# designed small-host degradations — they wake lazily (or not at all) and can
+# be re-enabled by removing these flags on a bigger plan.
+ENV JEXI_NO_BROWSER=1 \
+    JEXI_MCP_MINIMAL=1
+
 # Run node DIRECTLY — `npm start` keeps the npm process resident (~60-80MB RSS)
 # for the container's whole lifetime, which alone blows the 256Mi hobby pool.
 # package.json "start" is exactly `node index.js`, so this is 1:1 minus npm.
