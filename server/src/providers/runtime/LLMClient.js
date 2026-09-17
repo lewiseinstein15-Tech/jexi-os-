@@ -846,7 +846,7 @@ async function __generateWalk(prompt, systemInstruction, imageBase64, opts) {
         hudNoteSpend(provider, opts.model || null, { inChars: String(prompt || '').length + String(system || '').length, outChars: String(text || '').length }, Boolean(text)); // Phase 7(F): HUD cost
       } catch (e) {
         __meterNote(provider, opts.model || null, Date.now() - __t0, false); // ARENA meter
-        hudNoteSpend(provider, opts.model || null, { inChars: 0, outChars: 0 }, false); // Phase 7(F): model failure signal
+        if (configuredProviders().includes(provider)) hudNoteSpend(provider, opts.model || null, { inChars: 0, outChars: 0 }, false); // Phase 7(F): model failure signal — CONFIGURED rungs only (ARENA meter rule)
         throw e;
       }
       if (text) {
@@ -1090,7 +1090,7 @@ async function chatWithToolsOnce(provider, cfg, model, messages, tools, opts) {
     return __out;
   } catch (e) {
     __meterNote(provider, model, Date.now() - __mt0, false);
-    hudNoteSpend(provider, model, { inChars: 0, outChars: 0 }, false); // Phase 7(F): model failure signal
+    if (configuredProviders().includes(provider)) hudNoteSpend(provider, model, { inChars: 0, outChars: 0 }, false); // Phase 7(F): model failure signal — CONFIGURED rungs only
     throw e;
   }
 }

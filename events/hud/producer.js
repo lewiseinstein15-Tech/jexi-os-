@@ -174,6 +174,7 @@ export function noteRisk(kind, severity = 'warning') {
 }
 
 function pushSignal(kind, severity) {
+  if (process.env.JEXI_HUD_DEBUG) console.error(`[hud-signal] ${kind} ${severity}\n${new Error().stack.split('\n').slice(1, 4).join('\n')}`);
   state.signals.push({ t: Date.now(), kind, severity });
   if (state.signals.length > SIGNAL_MAX) state.signals.splice(0, state.signals.length - SIGNAL_MAX);
 }
@@ -312,6 +313,7 @@ function buildRisk(out) {
   let attention = 'normal';
   if (criticals.length > 0 || warnings.length >= 3) attention = 'critical';
   else if (warnings.length > 0 || stale > 0) attention = 'warning';
+  if (process.env.JEXI_HUD_DEBUG && attention !== 'normal') console.error(`[hud-risk] ${attention} criticals=${JSON.stringify(criticals)} warnings=${JSON.stringify(warnings)} stale=${stale}`);
   let conflictPressure = 0;
   out.risk = { attention, conflictPressure, staleCalls: stale };
   return (async () => {
