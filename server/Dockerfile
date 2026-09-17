@@ -22,4 +22,7 @@ RUN mkdir -p bin \
 ENV PATH="/app/bin:${PATH}"
 
 EXPOSE 3002
-CMD ["npm", "start"]
+# Run node DIRECTLY — `npm start` keeps the npm process resident (~60-80MB RSS)
+# for the container's whole lifetime, which alone blows the 256Mi hobby pool.
+# package.json "start" is exactly `node index.js`, so this is 1:1 minus npm.
+CMD ["node", "index.js"]
