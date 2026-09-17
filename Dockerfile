@@ -40,7 +40,10 @@ ENV PLAYWRIGHT_BROWSERS_PATH=0
 COPY package*.json index.html vite.config.js tailwind.config.js postcss.config.js ./
 COPY public ./public
 COPY src ./src
-RUN npm ci --no-audit --no-fund && npm run build && mkdir -p server/public && cp -r dist/* server/public/
+RUN npm ci --no-audit --no-fund && npm run build
+# server/public is a git symlink to ../dist — vite writes the bundle
+# straight through it, so the old `cp -r dist/* server/public/` copied
+# dist onto ITSELF and failed with "are the same file".
 
 ENV NODE_ENV=production
 # Hugging Face injects PORT=7860; this is the default everywhere else too.

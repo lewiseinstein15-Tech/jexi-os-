@@ -44,7 +44,10 @@ COPY server/mcp ./server/mcp
 COPY package*.json index.html vite.config.js tailwind.config.js postcss.config.js ./
 COPY public ./public
 COPY src ./src
-RUN npm ci --no-audit --no-fund && npm run build && mkdir -p server/public && cp -r dist/* server/public/
+RUN npm ci --no-audit --no-fund && npm run build
+# server/public is a git symlink to ../dist — vite writes the bundle
+# straight through it, so the old `cp -r dist/* server/public/` copied
+# dist onto ITSELF and failed with "are the same file".
 
 ENV NODE_ENV=production
 # PERMANENT drop fix #1: Node's default heap (~2GB+) lets the brain grow past
