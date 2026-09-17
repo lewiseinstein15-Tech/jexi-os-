@@ -143,6 +143,7 @@ export function recordToolCall(call, result, ctx = {}) {
 /** Model call spend note — real sizes from the provider walk (see header). */
 export function noteSpend({ provider = 'unknown', model = null, inChars = 0, outChars = 0, ok = true } = {}) {
   try {
+    if (process.env.JEXI_HUD_DEBUG) console.error(`[hud-spend] ${provider} ${model || ''} ok=${ok}`);
     if (!ok) { pushSignal('model.failed', 'warning'); schedulePublish('model-call'); return null; }
     const price = PRICE_PER_MTOK[String(model || '').toLowerCase()] || PRICE_PER_MTOK[provider] || DEFAULT_PRICE;
     const inTok = Math.ceil(Number(inChars || 0) / CHARS_PER_TOKEN);
@@ -174,7 +175,7 @@ export function noteRisk(kind, severity = 'warning') {
 }
 
 function pushSignal(kind, severity) {
-  if (process.env.JEXI_HUD_DEBUG) console.error(`[hud-signal] ${kind} ${severity}\n${new Error().stack.split('\n').slice(1, 4).join('\n')}`);
+  if (process.env.JEXI_HUD_DEBUG) console.error(`[hud-signal] ${kind} ${severity}\n${new Error().stack.split('\n').slice(1, 7).join('\n')}`);
   state.signals.push({ t: Date.now(), kind, severity });
   if (state.signals.length > SIGNAL_MAX) state.signals.splice(0, state.signals.length - SIGNAL_MAX);
 }

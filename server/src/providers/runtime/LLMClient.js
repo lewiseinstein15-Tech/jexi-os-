@@ -843,7 +843,7 @@ async function __generateWalk(prompt, systemInstruction, imageBase64, opts) {
       try {
         text = await call(prompt, system, imageBase64, opts, errors);
         __meterNote(provider, opts.model || null, Date.now() - __t0, Boolean(text)); // ARENA meter — a null answer is a failed call
-        hudNoteSpend(provider, opts.model || null, { inChars: String(prompt || '').length + String(system || '').length, outChars: String(text || '').length }, Boolean(text)); // Phase 7(F): HUD cost
+        if (configuredProviders().includes(provider)) hudNoteSpend(provider, opts.model || null, { inChars: String(prompt || '').length + String(system || '').length, outChars: String(text || '').length }, Boolean(text)); // Phase 7(F): HUD cost — configured rungs only (ARENA meter rule)
       } catch (e) {
         __meterNote(provider, opts.model || null, Date.now() - __t0, false); // ARENA meter
         if (configuredProviders().includes(provider)) hudNoteSpend(provider, opts.model || null, { inChars: 0, outChars: 0 }, false); // Phase 7(F): model failure signal — CONFIGURED rungs only (ARENA meter rule)
@@ -1086,7 +1086,7 @@ async function chatWithToolsOnce(provider, cfg, model, messages, tools, opts) {
   try {
     const __out = await __chatWithToolsOnce(provider, cfg, model, messages, tools, opts);
     __meterNote(provider, model, Date.now() - __mt0, true);
-    hudNoteSpend(provider, model, { inChars: JSON.stringify(messages || []).length, outChars: String(__out?.text || '').length }, true); // Phase 7(F): HUD cost
+    if (configuredProviders().includes(provider)) hudNoteSpend(provider, model, { inChars: JSON.stringify(messages || []).length, outChars: String(__out?.text || '').length }, true); // Phase 7(F): HUD cost — configured rungs only
     return __out;
   } catch (e) {
     __meterNote(provider, model, Date.now() - __mt0, false);
