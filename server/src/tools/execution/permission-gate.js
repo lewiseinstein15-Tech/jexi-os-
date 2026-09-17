@@ -10,6 +10,7 @@
  */
 
 import { runPreToolUseHook } from '../../kernel/hooks/runner.js';
+import { observePreToolUse } from '../../kernel/hooks/learning-seam.js'; // Phase 7(C) — observer journal
 
 const DEFAULT_GRANTS = {
   tools: new Set(),       // tool names
@@ -30,6 +31,7 @@ export function makePermissionGate({ allowedTools = [], maxRisk = 'low', allowAl
       // blocking hook (nonzero exit, exitBehavior:'block') short-circuits
       // the gate and the tool call is denied with the hook's reason.
       const hook = runPreToolUseHook(call, ctx);
+      observePreToolUse(call, hook, ctx); // Phase 7(C): observer records every gated call (fail-soft)
       const hookOut = hook.logs.length ? { hookLogs: hook.logs } : {};
       if (hook.blocked) {
         return { allowed: false, reason: `blocked by hook ${hook.blocked.id} (exit ${hook.blocked.code}): ${hook.blocked.reason}`, ...hookOut };

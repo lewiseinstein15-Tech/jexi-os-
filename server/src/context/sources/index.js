@@ -95,6 +95,23 @@ registerSource('tools', {
   },
 });
 
+// Phase 7(C): INSTINCTS recall — continuous learning feeds the prompt. The
+// learning subsystem lives at the repo root (learning/, like hooks/) and is
+// imported DYNAMICALLY and fail-soft: absent or broken learning/ yields an
+// empty section, never a crash. Scoped: project instincts load when they
+// match the current task; global instincts are always available.
+registerSource('instincts', {
+  priority: 22, weight: 2, order: 4,
+  produce: async (input) => {
+    try {
+      const learning = await import('../../../../learning/index.js');
+      return await learning.instinctsSection(input);
+    } catch {
+      return '';
+    }
+  },
+});
+
 registerSource('instruction', {
   priority: 100, weight: 4, keep: true, order: 9,
   produce: (input) => input.instruction || '',

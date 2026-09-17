@@ -11,6 +11,7 @@ import { validateCall } from '../registry/ToolRegistry.js';
 import { makePermissionGate, denyByDefault } from './permission-gate.js';
 import { makeRiskGuard } from './risk-guard.js';
 import { runPostToolUseHook } from '../../kernel/hooks/runner.js'; // Phase 7(B) — PostToolUse hook point
+import { observePostToolUse } from '../../kernel/hooks/learning-seam.js'; // Phase 7(C) — observer journal
 
 /** engineAdapters: { [engineName]: (args, ctx) => Promise<any> } */
 export function makeExecutor({ engines = {}, permissions = {}, risk = {} } = {}) {
@@ -50,11 +51,13 @@ export function makeExecutor({ engines = {}, permissions = {}, risk = {} } = {})
         const okResult = ToolResult.ok(call.id, call.name, result, { durationMs: Date.now() - started });
         // Phase 7(B): PostToolUse hook — fires after execution with the result.
         runPostToolUseHook(call, okResult, ctx);
+        observePostToolUse(call, okResult, ctx); // Phase 7(C): observer records the result (fail-soft)
         return withHooks(okResult);
       } catch (err) {
         const failResult = fail(err);
         // Phase 7(B): PostToolUse hook — also fires on execution failure.
         runPostToolUseHook(call, failResult, ctx);
+        observePostToolUse(call, failResult, ctx); // Phase 7(C): observer records the failure (fail-soft)
         return withHooks(failResult);
       }
     },

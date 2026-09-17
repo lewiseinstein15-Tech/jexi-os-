@@ -19,6 +19,7 @@
 
 import { Director } from './Director.js';
 import { runLifecycleHook } from '../../kernel/hooks/runner.js'; // Phase 7(B) — Stop hook at mission end
+import { runStopAnalysis } from '../../kernel/hooks/learning-seam.js'; // Phase 7(C) — learning analyzer at Stop
 import { emit as observerEmit } from '../Observer.js'; // D2 — missions/agents/verification reach the runtime bus
 import { DirectorTask, teamEvent } from './TaskState.js';
 import { TaskMailbox } from './AgentMail.js';
@@ -985,6 +986,8 @@ Output ONLY JSON: {"affectedItemIds":["wi-..."],"newItems":[{"title":"...","deta
     });
     // Phase 7(B): Stop hook — turn/mission end (fires stop/evaluate-session.js).
     runLifecycleHook('Stop', { sessionId: mission.id, agentId: 'mission-runner', state: mission.state, objective: mission.objective });
+    // Phase 7(C): continuous learning — analyze this session's observer journal at Stop.
+    runStopAnalysis({ sessionId: mission.id, agentId: 'mission-runner', state: mission.state, objective: mission.objective });
   }
 
   /* ── user controls (API) ──────────────────────────────────────────── */
