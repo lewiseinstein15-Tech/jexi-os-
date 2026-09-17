@@ -17,6 +17,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Prompt Defense Baseline lint
+        working-directory: .
+        run: bash scripts/lint-agent-baseline.sh
       - name: Install
         run: npm ci
       - name: Install root deps (rich-render test needs react/react-markdown/esbuild)
