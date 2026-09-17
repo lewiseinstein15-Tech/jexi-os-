@@ -62,11 +62,30 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Trigger Render image deploy (pulls the fresh image)
-        run: |
-          curl -sS -m 60 -X POST "$RENDER_IMAGE_DEPLOY_HOOK" -H "Accept: application/json" || echo "hook not set - enable Auto-Deploy on the Render service"
+      - name: Trigger Render deploy via API (pulls the fresh image)
         env:
-          RENDER_IMAGE_DEPLOY_HOOK: ${{ secrets.RENDER_IMAGE_DEPLOY_HOOK }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: |
+          if [ -z "$RENDER_API_KEY" ] || [ -z "$RENDER_SERVICE_ID" ]; then
+            echo "::warning::RENDER_API_KEY / RENDER_SERVICE_ID not set — auto-deploy disabled."
+            exit 0
+          fi
+          # The old RENDER_IMAGE_DEPLOY_HOOK / RENDER_DEPLOY_HOOK secrets held
+          # deploy-hook URLs of RETIRED Render services — the pings silently
+          # hit 404s (curl without -f exits 0) so nothing ever deployed.
+          # Trigger through the Render API against the LIVE service instead.
+          HTTP=$(curl -sS -m 60 -o deploy.json -w '%{http_code}' -X POST \
+            "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -d '{"clearCache":"do_not_clear"}')
+          cat deploy.json; echo
+          if [ "$HTTP" != "201" ]; then echo "::error::Render deploy trigger failed (HTTP $HTTP)"; exit 1; fi
+          DEPLOY_ID=$(jq -r '.deploy.id' deploy.json)
+          echo "RENDER_DEPLOY_ID=$DEPLOY_ID" >> "$GITHUB_ENV"
+          echo "Render deploy $DEPLOY_ID triggered — watching it."
 
       - name: Summary
         run: |
@@ -76,16 +95,27 @@ jobs:
           ```' >> $GITHUB_STEP_SUMMARY
           echo "Point Render (Deploy an existing image) at this URL — free plan, zero build minutes." >> $GITHUB_STEP_SUMMARY
 
-      # B214 — ping the Render deploy hook ONLY after :latest is actually
-      # pushed (the old separate render-deploy workflow raced this one and
-      # could deploy a stale image).
-      - name: Ping Render deploy hook (image is live on ghcr now)
+      # B214 — deploy watching ONLY makes sense after :latest is actually
+      # pushed. The old "ping a deploy-hook URL" step is replaced by an API
+      # trigger + status watch: a stale hook URL silently 404'd for months.
+      - name: Watch the Render deploy until it is live
         env:
-          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
         run: |
-          if [ -z "$HOOK" ]; then
-            echo "::warning::RENDER_DEPLOY_HOOK secret is not set — add it in repo Settings → Secrets to enable auto-deploy to Render."
+          if [ -z "$RENDER_DEPLOY_ID" ]; then
+            echo "::warning::no deploy was triggered this run — nothing to watch."
             exit 0
           fi
-          echo "Pinging Render deploy hook..."
-          curl -sS -m 60 -X POST "$HOOK" -H "Accept: application/json" -w "\nHTTP %{http_code}\n"
+          for i in $(seq 1 40); do
+            sleep 15
+            ST=$(curl -sS -m 30 -H "Authorization: Bearer $RENDER_API_KEY" \
+              "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys/$RENDER_DEPLOY_ID" \
+              | jq -r '.deploy.status // "unknown"')
+            echo "attempt $i: $ST"
+            if [ "$ST" = "live" ]; then echo "Render deploy is LIVE."; exit 0; fi
+            if [ "$ST" = "update_failed" ] || [ "$ST" = "build_failed" ] || [ "$ST" = "canceled" ] || [ "$ST" = "deactivated" ]; then
+              echo "::error::Render deploy ended with status: $ST"; exit 1
+            fi
+          done
+          echo "::error::Render deploy did not go live within 10 minutes"; exit 1

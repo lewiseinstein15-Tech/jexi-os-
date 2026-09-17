@@ -18,43 +18,66 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping the Render deploy hook (pulls the latest image)
+      - name: Trigger Render deploy via API (pulls the latest image)
         env:
-          HOOK: ${{ secrets.RENDER_IMAGE_DEPLOY_HOOK }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
         run: |
-          if [ -z "$HOOK" ]; then
-            echo "::warning::RENDER_IMAGE_DEPLOY_HOOK secret is empty — add it (Render → jexi-brain-image → Settings → Deploy Hook → create, then repo Settings → Secrets → Actions)."
+          if [ -z "$RENDER_API_KEY" ] || [ -z "$RENDER_SERVICE_ID" ]; then
+            echo "::warning::RENDER_API_KEY / RENDER_SERVICE_ID not set — monthly refill disabled."
             exit 0
           fi
+          # The old RENDER_IMAGE_DEPLOY_HOOK URL belonged to a RETIRED Render
+          # service (jexi-brain-image) — the ping 404'd and the verify step
+          # polled the same dead host, so this cron failed every month.
+          # Trigger through the Render API against the LIVE service instead.
           for attempt in 1 2 3; do
             echo "--- deploy attempt $attempt ---"
-            if curl -sS -m 90 -X POST "$HOOK" -H "Accept: application/json" -w "\nHTTP %{http_code}\n"; then
+            HTTP=$(curl -sS -m 90 -o deploy.json -w '%{http_code}' -X POST \
+              "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
+              -H "Authorization: Bearer $RENDER_API_KEY" \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json" \
+              -d '{"clearCache":"do_not_clear"}')
+            cat deploy.json; echo
+            if [ "$HTTP" = "201" ]; then
               echo "Deploy triggered. Render pulls the image and restarts (2-4 min)."
+              DEPLOY_ID=$(jq -r '.deploy.id' deploy.json)
+              echo "RENDER_DEPLOY_ID=$DEPLOY_ID" >> "$GITHUB_ENV"
               exit 0
             fi
             sleep 30
           done
-          echo "Render did not accept the deploy after 3 attempts (minutes may not be refilled yet, or the service is busy)."
+          echo "Render did not accept the deploy after 3 attempts."
           exit 1
 
-      - name: Verify the new build went live (version marker)
-        # B198c — a step-level `if: ${{ secrets.… }}` is INVALID in GitHub
-        # Actions (the secrets context is not allowed in if-conditionals —
-        # "Unrecognized named-value: 'secrets'"), which made this whole
-        # workflow fail validation on every push since B181 and the monthly
-        # refill cron never fire. Guard inside the script instead, exactly
-        # like the deploy step above.
+      - name: Watch the deploy, then verify the live health endpoint
         env:
-          HOOK: ${{ secrets.RENDER_IMAGE_DEPLOY_HOOK }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
         run: |
-          if [ -z "$HOOK" ]; then
-            echo "::warning::RENDER_IMAGE_DEPLOY_HOOK secret is empty — skipping verification."
+          if [ -z "$RENDER_DEPLOY_ID" ]; then
+            echo "::warning::no deploy was triggered — skipping verification."
             exit 0
           fi
-          sleep 240
+          for i in $(seq 1 40); do
+            sleep 15
+            ST=$(curl -sS -m 30 -H "Authorization: Bearer $RENDER_API_KEY" \
+              "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys/$RENDER_DEPLOY_ID" \
+              | jq -r '.deploy.status // "unknown"')
+            echo "attempt $i: $ST"
+            if [ "$ST" = "live" ]; then break; fi
+            if [ "$ST" = "update_failed" ] || [ "$ST" = "build_failed" ] || [ "$ST" = "canceled" ] || [ "$ST" = "deactivated" ]; then
+              echo "::error::Render deploy ended with status: $ST"; exit 1
+            fi
+          done
+          if [ "$ST" != "live" ]; then echo "::error::deploy never went live"; exit 1; fi
+          # Verify against the LIVE service (the old step polled the retired
+          # jexi-brain-image.onrender.com host, which never answered).
           for i in 1 2 3 4 5 6; do
-            V=$(curl -s -m 20 https://jexi-brain-image.onrender.com/api/health | grep -oE '"version":"[^"]+"' | head -1 || true)
-            echo "attempt $i: $V"
-            [ -n "$V" ] && break
+            V=$(curl -s -m 20 https://jexi-os-brain.onrender.com/api/health | jq -r '.version // empty' 2>/dev/null || true)
+            echo "attempt $i: version=$V"
+            [ -n "$V" ] && exit 0
             sleep 60
           done
+          echo "::error::health endpoint never reported a version"; exit 1
