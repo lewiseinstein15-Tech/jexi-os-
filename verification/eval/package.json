@@ -1,0 +1,7 @@
+{
+  "name": "jexi-eval-harness",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "Phase 7 Scope E - eval harness (envelope, capsule, gate, replay, receipt, canaries). CommonJS scope pin."
+}
