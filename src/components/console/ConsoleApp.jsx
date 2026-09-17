@@ -17,6 +17,7 @@ import PluginsView from './views/PluginsView';
 import McpView from './views/McpView';
 import SchedulerView from './views/SchedulerView';
 import { subscribeBus, emitEvent, brainGet, fmtUptime } from '../../services/brain';
+import { useHudStream } from '../../services/hud';
 
 /* ConsoleApp — the approved preview (ui/preview/console.html) as a real
    React surface. Hash-routed (#missions … #scheduler) so the URL matches
@@ -59,6 +60,13 @@ const VIEWS = {
 const BrainCtx = createContext({ fleet: null, health: null, online: false });
 export const useBrain = () => useContext(BrainCtx);
 
+/* Phase 7(F) — the HUD status contract context. ONE payload from
+   GET /api/hud + SSE /api/hud/stream feeds every operational panel.
+   Panels read state ONLY from here — a section missing from the payload
+   renders as "no data", never fabricated. */
+const HudCtx = createContext({ hud: null, revision: 0, connected: false, error: '' });
+export const useHud = () => useContext(HudCtx);
+
 export default function ConsoleApp({ route }) {
   const [boot, setBoot] = useState(null); // null = booting, {fleet, health} = live
   const [health, setHealth] = useState(null);
@@ -66,6 +74,7 @@ export default function ConsoleApp({ route }) {
   const [elapsed, setElapsed] = useState('00:00:00'); // REAL clock — starts at open
   const [menu, setMenu] = useState(false); // v0.10 — phone drawer (off-canvas sidebar)
   const openedAt = useRef(Date.now());
+  const hudState = useHudStream(); // Phase 7(F) — one stream, one truth
 
   const finishBoot = (f, h) => {
     setFleet(f);
@@ -118,7 +127,8 @@ export default function ConsoleApp({ route }) {
   }
 
   return (
-    <BrainCtx.Provider value={{ fleet, health, online: !!health }}>
+    <HudCtx.Provider value={hudState}>
+      <BrainCtx.Provider value={{ fleet, health, online: hudState.connected || !!health }}>
       <div className="jcx">
         <div className="jcx-glow" />
         <div
@@ -143,7 +153,8 @@ export default function ConsoleApp({ route }) {
           <EventStream />
         </main>
       </div>
-    </BrainCtx.Provider>
+      </BrainCtx.Provider>
+    </HudCtx.Provider>
   );
 }
 

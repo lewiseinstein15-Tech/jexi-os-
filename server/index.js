@@ -111,6 +111,8 @@ import { mountMcp } from './mcp-server.js';
 import { mountArena } from './src/routes/arena.js'; // ARENA ASTRA — executive architecture observability
 import { mountScheduler } from './src/routes/scheduler.js'; // Phase 6 Scope B — autonomy scheduler
 import { mountContext } from './src/routes/context.js'; // Phase 6 Scope C — context manager
+import { mountHud } from './src/routes/hud.js'; // Phase 7(F) — HUD status contract (GET /api/hud + SSE /api/hud/stream)
+import { hudNoteCheck } from './src/kernel/hooks/hud-seam.js'; // Phase 7(F) — self-ping feeds checks.remote
 import { autonomyScheduler } from './src/scheduler/index.js';
 import { taskManager } from './src/services/TaskManager.js';
 import { taskScheduler } from './src/services/TaskScheduler.js';
@@ -152,9 +154,9 @@ hydrateFromRedis().catch((e) => { recordError('memory', (e && e.message) || Stri
 if (String(process.env.JEXI_SELF_PING || '') === '1') {
   const selfUrl = process.env.RENDER_EXTERNAL_URL || process.env.JEXI_PUBLIC_URL || '';
   if (selfUrl) {
-    const ping = () => fetch(`${selfUrl}/api/health`, { headers: { 'x-jexi-self-ping': '1' } })
-      .then((r) => { if (!r.ok) recordError('selfping', `self-ping HTTP ${r.status}`); })
-      .catch((e) => recordError('selfping', e.message));
+    const ping = () => { hudNoteCheck('remote', 'running'); return fetch(`${selfUrl}/api/health`, { headers: { 'x-jexi-self-ping': '1' } })
+      .then((r) => { hudNoteCheck('remote', r.ok ? 'pass' : 'fail'); if (!r.ok) recordError('selfping', `self-ping HTTP ${r.status}`); })
+      .catch((e) => { hudNoteCheck('remote', 'fail'); recordError('selfping', e.message); }); };
     const everyMs = 9 * 60 * 1000;
     const jitter = () => Math.floor(Math.random() * 60 * 1000); // never align with the clock
     const loop = () => { ping(); setTimeout(loop, everyMs + jitter()); };
@@ -414,6 +416,7 @@ mountMcp(app);
 mountArena(app); // ARENA ASTRA — /api/kernel/* /api/intent /api/observer /api/vault /api/market /api/reasoning /api/scheduler /api/persona /api/improve
 mountScheduler(app); // Phase 6 Scope B — /api/scheduler/jobs (autonomy scheduler)
 mountContext(app); // Phase 6 Scope C — /api/context/* (context manager)
+mountHud(app); // Phase 7(F) — /api/hud + /api/hud/stream (the console's single source of truth)
 
 // Every instance has its own id (Render injects RENDER_INSTANCE_ID automatically).
 // A load balancer can see which instance answered, and you can verify stickiness.

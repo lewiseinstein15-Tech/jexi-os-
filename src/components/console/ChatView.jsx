@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavIcon } from './icons';
 import { getBackendUrl } from '../../utils/helpers';
-import { brainGet, consumeAutoTest, emitEvent, AUTO_TEST_QUESTION } from '../../services/brain';
+import { consumeAutoTest, emitEvent, AUTO_TEST_QUESTION } from '../../services/brain';
+import { useHud } from './ConsoleApp';
 
 /* <ChatView /> — v0.12: the agent-run timeline (FreeBuff / Codebuff / Arena /
    opencode pattern, JEXI colors untouched). One JEXI reply is a RUN:
-     BRAIN TASKS strip — the brain's real task list (/api/context), pinned
+     BRAIN TASKS strip — the brain's real task list (hud.todos), pinned
      PLAN card        — the brain's plan steps as a todo checklist (+ roster)
      thinking card    — chain-of-thought from `think` deltas, expandable
      tool cards       — every pipeline `log` line, collapsed, tap to expand
@@ -155,7 +156,6 @@ export default function ChatView() {
   const [msgs, setMsgs] = useState([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
-  const [tasks, setTasks] = useState([]);
   const [now, setNow] = useState(Date.now());
   const brain = getBackendUrl();
   const brainHost = (() => { try { return brain ? new URL(brain).host : 'no brain configured'; } catch { return brain; } })();
@@ -171,21 +171,17 @@ export default function ChatView() {
   useEffect(() => {
     const el = logRef.current;
     if (el && stickRef.current) el.scrollTop = el.scrollHeight;
-  }, [msgs, now, tasks]);
+  }, [msgs, now]);
 
   const onScroll = () => {
     const el = logRef.current;
     if (el) stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 90;
   };
 
-  /* real brain task strip — seeded on mount, refreshed after every run */
-  const refreshTasks = async () => {
-    try {
-      const c = await brainGet('/api/context', 15000);
-      setTasks((c && c.tasks) || []);
-    } catch { /* keep the last known tasks — never fake them */ }
-  };
-  useEffect(() => { refreshTasks(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  /* real brain task strip — Phase 7(F): fed by hud.todos (the contract),
+   which updates live over SSE after every run. Never faked. */
+  const { hud } = useHud();
+  const tasks = (hud?.todos || []).map((t) => ({ id: t.id, title: t.text, status: t.status, owner: t.owner }));
 
   const patchLast = (fn) => setMsgs((ms) => {
     if (!ms.length) return ms;
@@ -293,7 +289,7 @@ export default function ChatView() {
       emitEvent({ chip: 'WARN', who: 'Chat', msg: `chat failed · ${(e && e.message) || 'error'}`, tone: 'var(--jcx-down)' });
     } finally {
       setBusy(false);
-      refreshTasks(); // the run may have created / finished real brain tasks
+      // the run's task changes surface through the HUD stream (hud.todos)
     }
   }
 

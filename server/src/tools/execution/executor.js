@@ -12,6 +12,7 @@ import { makePermissionGate, denyByDefault } from './permission-gate.js';
 import { makeRiskGuard } from './risk-guard.js';
 import { runPostToolUseHook } from '../../kernel/hooks/runner.js'; // Phase 7(B) — PostToolUse hook point
 import { observePostToolUse } from '../../kernel/hooks/learning-seam.js'; // Phase 7(C) — observer journal
+import { hudObservePostToolUse } from '../../kernel/hooks/hud-seam.js'; // Phase 7(F) — HUD toolCalls feed
 
 /** engineAdapters: { [engineName]: (args, ctx) => Promise<any> } */
 export function makeExecutor({ engines = {}, permissions = {}, risk = {} } = {}) {
@@ -52,12 +53,14 @@ export function makeExecutor({ engines = {}, permissions = {}, risk = {} } = {})
         // Phase 7(B): PostToolUse hook — fires after execution with the result.
         runPostToolUseHook(call, okResult, ctx);
         observePostToolUse(call, okResult, ctx); // Phase 7(C): observer records the result (fail-soft)
+        hudObservePostToolUse(call, okResult, ctx); // Phase 7(F): HUD records the resolved call (fail-soft)
         return withHooks(okResult);
       } catch (err) {
         const failResult = fail(err);
         // Phase 7(B): PostToolUse hook — also fires on execution failure.
         runPostToolUseHook(call, failResult, ctx);
         observePostToolUse(call, failResult, ctx); // Phase 7(C): observer records the failure (fail-soft)
+        hudObservePostToolUse(call, failResult, ctx); // Phase 7(F): HUD records the failure (fail-soft)
         return withHooks(failResult);
       }
     },

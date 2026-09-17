@@ -2,36 +2,42 @@ import LogoTool from './LogoTool';
 import ServerRow from './ServerRow'; // v0.7 — live brain address + status dot
 import { NavIcon } from './icons';
 import { NAV } from './consoleData';
-import { useBrain } from './ConsoleApp';
+import { useBrain, useHud } from './ConsoleApp';
 
 /* <Sidebar /> — nav groups (Executive / Resources / Extensions), JEXI Market
-   logo, server row + model footer. Counts are REAL now: every number comes
-   from the live fleet snapshot (agents, plugins, mcp, scheduler…), and the
-   model row shows the brain's actual active provider + model. */
-export default function Sidebar({ route, onNavigate, onHome, mobileOpen, onClose }) {
-  const { fleet, health, online } = useBrain();
+   logo, server row + model footer.
 
-  const agentCount = fleet?.agents?.count;
-  const sessCount = fleet?.processes?.processes?.length;
+   Phase 7(F): operational counts come from the HUD payload (agents seated,
+   tasks, queue depth); management-domain counts (skills / plugins / mcp)
+   stay on their own subsystem endpoints — they are not HUD contract state.
+   The model row reads hud.context.model/provider — the contract's model
+   selector surface. */
+export default function Sidebar({ route, onNavigate, onHome, mobileOpen, onClose }) {
+  const { fleet } = useBrain();
+  const { hud } = useHud();
+
+  const agents = hud?.activeAgents;
+  const todos = hud?.todos;
+  const queue = hud?.queueState;
+  const ctx = hud?.context;
+
   const skillTotal = (fleet?.plugins?.plugins || []).reduce((a, p) => a + ((p.live && p.live.skills) || (p.contributes && p.contributes.tools) || 0), 0);
   const plugCount = fleet?.plugins?.plugins?.length;
   const mcpOn = (fleet?.mcpServers?.servers || []).filter((s) => s.enabled).length;
   const mcpTotal = (fleet?.mcpServers?.servers || []).length;
-  const jobCount = fleet?.scheduler?.counts?.jobs;
   const counts = {
-    agents: agentCount != null ? String(agentCount) : '…',
-    sessions: sessCount != null ? String(sessCount) : '…',
+    agents: agents ? String(agents.length) : '…',
+    sessions: agents ? String(agents.filter((a) => a.state === 'working').length) : '…',
     skills: skillTotal ? String(skillTotal) : '…',
     plugins: plugCount != null ? String(plugCount) : '…',
     mcp: mcpTotal != null ? `${mcpOn}/${mcpTotal}` : '…',
-    scheduler: jobCount != null ? String(jobCount) : '…',
-    missions: String(fleet?.context?.taskStats?.total ?? 0),
+    scheduler: queue ? String(queue.missionsQueued) : '…',
+    missions: todos ? String(todos.length) : '…',
   };
 
-  const active = fleet?.active?.active;
-  const modelLabel = active ? active.model : (online ? 'resolving…' : 'offline');
-  const provLabel = active ? active.provider : '';
-  const provConfigured = (health?.providers || []).filter((p) => p.configured) || [];
+  const modelLabel = ctx ? (ctx.model || 'unresolved') : (hud ? 'no data' : 'offline');
+  const provLabel = ctx ? (ctx.provider || '') : '';
+  const pressure = ctx ? Math.round((Number(ctx.contextPressure) || 0) * 100) : null;
 
   return (
     <aside className={mobileOpen ? 'open' : ''}>
@@ -69,10 +75,10 @@ export default function Sidebar({ route, onNavigate, onHome, mobileOpen, onClose
           <span className="chev"><NavIcon name="chevdown" /></span>
         </div>
         <div className="onekey">
-          <span className="dot" style={{ background: provConfigured.length ? 'var(--jcx-up)' : 'var(--jcx-down)' }} />
+          <span className="dot" style={{ background: hud ? (hud.risk?.attention === 'normal' ? 'var(--jcx-up)' : hud.risk?.attention === 'warning' ? 'var(--jcx-gold)' : 'var(--jcx-down)') : 'var(--jcx-down)' }} />
           <span>
-            <b>{provConfigured.length || 0} provider{provConfigured.length === 1 ? '' : 's'} configured</b>
-            {provConfigured.length ? ` · ${provConfigured.map((p) => p.key).join(', ')}` : ' · set keys on the brain'}
+            <b>{hud ? `hud · rev live` : 'hud · no data'}</b>
+            {pressure != null ? ` · context ${pressure}%` : ' · waiting for the first payload'}
           </span>
         </div>
       </div>

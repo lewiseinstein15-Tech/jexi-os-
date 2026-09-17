@@ -23,6 +23,7 @@
  */
 
 import { TOOL_REGISTRY, getTool, enforceToolAllowlist } from './ToolRegistry.js';
+import { hudObservePreToolUse, hudObservePostToolUse } from '../kernel/hooks/hud-seam.js'; // Phase 7(F) — HUD toolCalls feed
 import { invokeMcpTool } from './MCPGateway.js';
 import { resolveMcpFunction } from './CapabilityRouter.js';
 import { WORKSPACE_DIR as CFG_WORKSPACE_DIR, PUBLIC_URL as CFG_PUBLIC_URL, MANAGER_URL as CFG_MANAGER_URL } from '../config.js'; // B127 — real workspace path + public base for URL sanitizing
@@ -1478,6 +1479,7 @@ function githubTraceDetail(args, result) {
  */
 export async function executeTool(params) {
   const { slug, args = {} } = params || {};
+  hudObservePreToolUse({ id: `rt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, name: slug }, params); // Phase 7(F): HUD pending marker
   // LIVE TRACE: running event FIRST so the row appears the moment work starts.
   const __tSend = params && typeof params.sendEvent === 'function' ? params.sendEvent : null;
   const __tKind = toolTraceKind(slug, args);
@@ -1499,12 +1501,14 @@ export async function executeTool(params) {
   try {
     result = await executeToolInner(params);
   } catch (e) {
+    hudObservePostToolUse({ name: slug }, { ok: false, durationMs: Date.now() - __t0, error: (e && e.message) || String(e) }, params); // Phase 7(F): HUD records the failure
     // A thrown tool must still close its trace row (red X, not a spinner forever).
     if (__tSend) {
       try { __tSend('tool_use', { id: __tId, tool: __tKind, slug, status: 'error', duration_ms: Date.now() - __t0, summary: __tSummary, detail: toolTraceDetail(slug, args, { ok: false, error: (e && e.message) || String(e) }) }); } catch (e2) {}
     }
     throw e;
   }
+  hudObservePostToolUse({ name: slug }, { ok: !!result.ok, blocked: !!result.blocked, declined: !!result.declined, durationMs: result.durationMs || (Date.now() - __t0), error: result.error }, params); // Phase 7(F): HUD records the resolved call
   try {
     appendEvent('tool_result', {
       tool: slug,

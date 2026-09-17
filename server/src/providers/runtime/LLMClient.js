@@ -11,6 +11,7 @@ import { cacheKey, cacheGet, cacheSet } from '../../services/ResponseCache.js'; 
 import { dedupeInflight, requestIdentity } from '../../services/RequestDedup.js'; // AGI Phase 1 — concurrent identical calls share one request
 import { noteMeterModelCall } from '../../services/RequestMeter.js'; // ARENA — every model call in a turn is metered automatically
 import { tryUnified, unifiedToolConfig, unifiedAnthropicToolRound, configForCall } from '../../services/providers/unified.js'; // UNIFIED — one-secret model leg (provider + key + model + baseURL)
+import { hudNoteSpend } from '../../kernel/hooks/hud-seam.js'; // Phase 7(F) — HUD cost feed (real call sizes)
 
 /* ARENA meter rule: a rung only counts as a model call when the provider was
    actually CONFIGURED (key present / local endpoint enabled). A keyless rung
@@ -842,8 +843,10 @@ async function __generateWalk(prompt, systemInstruction, imageBase64, opts) {
       try {
         text = await call(prompt, system, imageBase64, opts, errors);
         __meterNote(provider, opts.model || null, Date.now() - __t0, Boolean(text)); // ARENA meter — a null answer is a failed call
+        hudNoteSpend(provider, opts.model || null, { inChars: String(prompt || '').length + String(system || '').length, outChars: String(text || '').length }, Boolean(text)); // Phase 7(F): HUD cost
       } catch (e) {
         __meterNote(provider, opts.model || null, Date.now() - __t0, false); // ARENA meter
+        hudNoteSpend(provider, opts.model || null, { inChars: 0, outChars: 0 }, false); // Phase 7(F): model failure signal
         throw e;
       }
       if (text) {
@@ -1083,9 +1086,11 @@ async function chatWithToolsOnce(provider, cfg, model, messages, tools, opts) {
   try {
     const __out = await __chatWithToolsOnce(provider, cfg, model, messages, tools, opts);
     __meterNote(provider, model, Date.now() - __mt0, true);
+    hudNoteSpend(provider, model, { inChars: JSON.stringify(messages || []).length, outChars: String(__out?.text || '').length }, true); // Phase 7(F): HUD cost
     return __out;
   } catch (e) {
     __meterNote(provider, model, Date.now() - __mt0, false);
+    hudNoteSpend(provider, model, { inChars: 0, outChars: 0 }, false); // Phase 7(F): model failure signal
     throw e;
   }
 }

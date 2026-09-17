@@ -1,38 +1,48 @@
-import { useEffect, useState } from 'react';
-import { subscribeBus, busCount } from '../../../services/brain';
+import { useHud } from '../ConsoleApp';
 
-/* <ToolCalls /> — recent activity from the REAL event bus. Every row is a
-   live event that actually happened in this session: boot lines, health
-   checks, fleet loads, chat pipeline logs, self-test verdicts. When the
-   session is young, the panel honestly says so. */
+/* <ToolCalls /> — Phase 7(F): renders ONLY hud.toolCalls — the real
+   recorded calls (name, status, durationMs, at) from the kernel executor
+   seam, plus pending/stale counters. No local-bus echo anymore: the HUD
+   is the single source of truth. Absent section = honest "no data". */
 export default function ToolCalls() {
-  const [rows, setRows] = useState([]);
+  const { hud } = useHud();
+  const toolCalls = hud?.toolCalls ?? null;
 
-  useEffect(() => subscribeBus((e) => {
-    setRows((rs) => [e, ...rs].slice(0, 8));
-  }), []);
+  if (!toolCalls) {
+    return (
+      <>
+        <div className="ph" style={{ marginTop: 16 }}>
+          <h3>Recent Tool Calls</h3>
+          <div className="rule" />
+          <span className="meta">hud.toolCalls</span>
+        </div>
+        <div style={{ border: '1px solid var(--jcx-line)', borderRadius: 10, background: 'var(--jcx-panel)', overflow: 'hidden' }}>
+          <div className="empty" style={{ margin: 10 }}>no data — the payload carries no toolCalls section</div>
+        </div>
+      </>
+    );
+  }
 
-  const total = busCount();
-
-  const tone = { 'var(--jcx-up)': 'var(--jcx-up)', 'var(--jcx-down)': 'var(--jcx-down)', 'var(--jcx-gold)': 'var(--jcx-gold)', 'var(--jcx-ember)': 'var(--jcx-ember)' };
+  const statusTone = { ok: 'var(--jcx-up)', fail: 'var(--jcx-down)', blocked: 'var(--jcx-gold)' };
+  const rows = toolCalls.recent || [];
 
   return (
     <>
       <div className="ph" style={{ marginTop: 16 }}>
-        <h3>Live Activity</h3>
+        <h3>Recent Tool Calls</h3>
         <div className="rule" />
-        <span className="meta">{total} event{total === 1 ? '' : 's'} this session · newest first</span>
+        <span className="meta">{rows.length} recorded · {toolCalls.pending} pending · {toolCalls.stale} stale</span>
       </div>
       <div style={{ border: '1px solid var(--jcx-line)', borderRadius: 10, background: 'var(--jcx-panel)', overflow: 'hidden' }}>
         {rows.length === 0 && (
-          <div className="empty" style={{ margin: 10 }}>no events yet — they appear the moment the brain or you act</div>
+          <div className="empty" style={{ margin: 10 }}>no tool calls recorded yet — they appear the moment the kernel executes one</div>
         )}
-        {rows.map((e) => (
-          <div className="tool" key={e.id}>
-            <span className="sdot s" style={{ background: tone[e.tone] || 'var(--jcx-ink-3)' }} />
-            <span className="tn">{e.who}</span>
-            <span className="ta">{e.msg}</span>
-            <span className="td">{e.ts}</span>
+        {rows.map((c, i) => (
+          <div className="tool" key={`${c.at}-${c.name}-${i}`}>
+            <span className="sdot s" style={{ background: statusTone[c.status] || 'var(--jcx-ink-3)' }} />
+            <span className="tn">{c.name}</span>
+            <span className="ta">{c.status} · {c.durationMs}ms</span>
+            <span className="td">{String(c.at || '').slice(11, 19)}</span>
           </div>
         ))}
       </div>
