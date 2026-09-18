@@ -14,6 +14,7 @@
 
 import * as store from '../orchestration/checkpoint.js';
 import { pipelineGraph } from '../../../knowledge/index.js';
+import { gatePhase } from '../../engagements/validator.js'; // Phase 8(D): RoE gate
 
 const REMEDIATION = {
   'A01:2021 Broken Access Control': 'Enforce server-side authorization on every privileged route; canonicalize and jail all filesystem paths (path.normalize + allowlist base dir).',
@@ -30,6 +31,7 @@ export const phase = {
   outputs: ['artifacts/report.json', 'artifacts/report.md'],
 
   async *run(ctx) {
+    yield* gatePhase(ctx, 'report'); // Phase 8(D): validate this action vs the engagement RoE — refusal HALTS
     const explo = store.readArtifact(ctx.stateRoot, ctx.engagementId, 'exploitation.json');
     const vuln = store.readArtifact(ctx.stateRoot, ctx.engagementId, 'vulnerabilities.json');
     if (!explo || !vuln) throw new Error('reporting: upstream artifacts missing');

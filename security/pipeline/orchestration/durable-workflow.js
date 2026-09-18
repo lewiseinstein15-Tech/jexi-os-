@@ -30,6 +30,7 @@
  */
 
 import * as store from './checkpoint.js';
+import { validateEngagementLiveness, EngagementViolationError, normalizeTarget } from '../../engagements/validator.js';
 
 export const PHASE_EVENT_TYPES = ['log', 'progress', 'finding', 'artifact', 'error'];
 
@@ -44,8 +45,13 @@ export class DurableWorkflow {
    * @param {Array}    opts.phases        ordered phase modules (contract above)
    * @param {string}   opts.stateRoot     root dir holding .state/
    * @param {object}   opts.ctx           base ctx handed to every phase
+   * @param {object}   [opts.engagement]  Phase 8(D): engagement bundle — when
+   *                                      present, EVERY phase transition is
+   *                                      gated on the engagement still being
+   *                                      valid (scope + time window)
+   * @param {object}   [opts.engagementStore] durable engagement.audit sink
    */
-  constructor({ engagementId, phases, stateRoot, ctx }) {
+  constructor({ engagementId, phases, stateRoot, ctx, engagement = null, engagementStore = null }) {
     if (!engagementId) throw new Error('DurableWorkflow: engagementId required');
     if (!Array.isArray(phases) || phases.length === 0) throw new Error('DurableWorkflow: phases required');
     for (const p of phases) {
@@ -61,6 +67,8 @@ export class DurableWorkflow {
     this.phases = phases;
     this.stateRoot = stateRoot;
     this.baseCtx = ctx || {};
+    this.engagement = engagement;
+    this.engagementStore = engagementStore;
   }
 
   /** Primary entry. Yields PhaseEvents; set `resume` to continue a dead run. */
@@ -87,6 +95,35 @@ export class DurableWorkflow {
     }
 
     for (const phase of this.phases) {
+      // Phase 8(D): every phase transition checks the engagement is still
+      // valid (time window, scope). If not → engagement.violation event +
+      // abort with the specific reason. The gate is additive: without an
+      // engagement the pipeline behaves exactly as before.
+      if (this.engagement) {
+        const target = normalizeTarget(this.baseCtx.baseUrl || '');
+        const live = validateEngagementLiveness(this.engagement, { target, at: new Date() });
+        if (this.engagementStore) {
+          this.engagementStore.audit(engagementId, {
+            kind: 'transition-check', action: null, target,
+            allowed: live.allowed, rule: live.rule, reason: live.reason,
+          });
+        }
+        if (live.allowed) {
+          yield ev('engagement.audit', phase.id, {
+            message: `transition check passed — ${live.reason}`,
+            kind: 'transition-check', target, rule: null, reason: live.reason,
+          });
+        } else {
+          const violation = ev('engagement.violation', phase.id, {
+            message: `engagement no longer valid — aborting: ${live.reason}`,
+            kind: 'transition-check', target, rule: live.rule, reason: live.reason,
+          });
+          store.appendEvents(stateRoot, engagementId, [violation]);
+          yield violation;
+          throw new EngagementViolationError(live, { action: null, target, phaseId: phase.id });
+        }
+      }
+
       if (done.has(phase.id)) {
         yield ev('log', phase.id, {
           message: `phase already complete on disk — skipping (artifact reused)`,
@@ -112,6 +149,8 @@ export class DurableWorkflow {
         checkpoint: cp,
         prior,
         diedMidPhase,
+        engagement: this.engagement,
+        engagementStore: this.engagementStore,
       };
 
       yield ev('log', phase.id, {

@@ -54,7 +54,7 @@ export function createStateRoot(explicit) {
   return explicit ? path.resolve(explicit) : path.resolve(MODULE_DIR); // .state/ lives beside the pipeline by default
 }
 
-export function createWorkflow({ engagementId, sourceRoot, baseUrl, stateRoot }) {
+export function createWorkflow({ engagementId, sourceRoot, baseUrl, stateRoot, engagement = null, engagementsStore = null }) {
   return new DurableWorkflow({
     engagementId,
     phases: PHASES,
@@ -64,6 +64,12 @@ export function createWorkflow({ engagementId, sourceRoot, baseUrl, stateRoot })
       baseUrl,
       targetName: 'planted-vuln-app',
     },
+    // Phase 8(D): when an engagement bundle is provided, every phase
+    // transition is gated on the engagement (scope + time window) and every
+    // phase validates its action against the RoE before run(). Additive:
+    // undefined keeps the ungated Scope A behavior.
+    engagement,
+    engagementStore: engagementsStore,
   });
 }
 

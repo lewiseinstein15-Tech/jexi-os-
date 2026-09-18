@@ -15,6 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as store from '../orchestration/checkpoint.js';
+import { gatePhase } from '../../engagements/validator.js'; // Phase 8(D): RoE gate
 
 export const phase = {
   id: 'pre-recon',
@@ -22,6 +23,7 @@ export const phase = {
   outputs: ['artifacts/pre-recon.json', 'artifacts/pre-recon.md'],
 
   async *run(ctx) {
+    yield* gatePhase(ctx, 'scan'); // Phase 8(D): validate this action vs the engagement RoE — refusal HALTS
     const { sourceRoot } = ctx;
     if (!sourceRoot || !fs.existsSync(sourceRoot)) {
       throw new Error(`pre-recon: source root not found: ${sourceRoot}`);

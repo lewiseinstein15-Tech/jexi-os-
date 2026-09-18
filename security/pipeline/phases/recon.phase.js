@@ -14,6 +14,7 @@
 
 import * as store from '../orchestration/checkpoint.js';
 import { pipelineGraph, recordTarget } from '../../../knowledge/index.js';
+import { gatePhase } from '../../engagements/validator.js'; // Phase 8(D): RoE gate
 
 const MAX_PAGES = 16;
 const TIMEOUT_MS = 4000;
@@ -24,6 +25,7 @@ export const phase = {
   outputs: ['artifacts/recon.json', 'artifacts/recon.md'],
 
   async *run(ctx) {
+    yield* gatePhase(ctx, 'scan'); // Phase 8(D): validate this action vs the engagement RoE — refusal HALTS
     const baseUrl = String(ctx.baseUrl || '').replace(/\/$/, '');
     if (!/^https?:\/\//.test(baseUrl)) throw new Error(`recon: baseUrl must be http(s): ${ctx.baseUrl}`);
 
