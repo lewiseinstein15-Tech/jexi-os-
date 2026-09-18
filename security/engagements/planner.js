@@ -103,6 +103,14 @@ export function planDraft(input) {
     throw new EngagementValidationError('maxSeverity', `maxSeverity must be one of low|medium|high|critical — got ${JSON.stringify(maxSeverity)}`);
   }
 
+  // Phase 8(E): networkMode — 'single' (default, unchanged behavior) or
+  // 'dual' (the pipeline runs on the dual-network sandbox; phases dispatch
+  // through the exec-bridge). Part of the signed plan, not a runtime whim.
+  const networkMode = input.networkMode === undefined || input.networkMode === null ? 'single' : input.networkMode;
+  if (!['single', 'dual'].includes(networkMode)) {
+    throw new EngagementValidationError('networkMode', `networkMode must be 'single' or 'dual' — got ${JSON.stringify(networkMode)}`);
+  }
+
   const contacts = (input.contacts === undefined || input.contacts === null) ? [] : input.contacts.map((c) => {
     const cName = str(c && c.name, 'contacts[].name', { required: true });
     const cRole = str(c && c.role, 'contacts[].role', { required: true });
@@ -155,6 +163,7 @@ export function planDraft(input) {
     targets,
     forbidden,
     networks,
+    networkMode,
     allowedActions,
     forbiddenActions,
     requiresApproval,

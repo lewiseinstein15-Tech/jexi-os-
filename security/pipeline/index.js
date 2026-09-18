@@ -54,7 +54,8 @@ export function createStateRoot(explicit) {
   return explicit ? path.resolve(explicit) : path.resolve(MODULE_DIR); // .state/ lives beside the pipeline by default
 }
 
-export function createWorkflow({ engagementId, sourceRoot, baseUrl, stateRoot, engagement = null, engagementsStore = null }) {
+export function createWorkflow({ engagementId, sourceRoot, baseUrl, stateRoot, engagement = null, engagementsStore = null, dualNetwork = null, execBridge = null }) {
+  const store_ = engagementsStore;
   return new DurableWorkflow({
     engagementId,
     phases: PHASES,
@@ -69,7 +70,13 @@ export function createWorkflow({ engagementId, sourceRoot, baseUrl, stateRoot, e
     // phase validates its action against the RoE before run(). Additive:
     // undefined keeps the ungated Scope A behavior.
     engagement,
-    engagementStore: engagementsStore,
+    engagementStore: store_,
+    // Phase 8(E): security.dualNetwork — default false (single-network).
+    // When true, phases dispatch through the exec-bridge; engagementDb lets
+    // the sandbox-side RoE gates reopen the same SQLite store.
+    dualNetwork,
+    execBridge,
+    engagementDb: store_ ? store_.dbPath : null,
   });
 }
 

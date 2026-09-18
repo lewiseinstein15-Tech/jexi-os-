@@ -1,0 +1,76 @@
+# JEXI OS — Phase 8 Scope E — dual-network topology (Docker path).
+#
+# Two --internal networks, zero routes between them, no published ports.
+# The exec-bridge is the ONLY service attached to both — the single
+# controlled crossing (authenticated, allowlisted, audited).
+#
+# This file is the Docker-deployment definition. In the current sandbox
+# Docker is unavailable, so the runtime operates in process mode
+# (runtimes/sandbox/dual-network.js) with the same policy surface and a
+# documented, weaker enforcement plane. Nothing here is simulated.
+
+networks:
+  jexi-net:
+    driver: bridge
+    internal: true          # no gateway, no external route, no internet
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+  sandbox-net:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24
+
+services:
+  # ---- jexi-net (management) --------------------------------------------
+  jexi-core:
+    # kernel / providers / memory / workgraph / HUD producer / scheduler /
+    # knowledge graph / pipeline ORCHESTRATION
+    image: node:24-alpine
+    working_dir: /jexi
+    volumes:
+      - ./:/jexi:ro                 # code provisioned read-only
+      - jexi-workspace:/workspace   # rw workspace shared ONLY via bridge ops
+    networks: [jexi-net]            # single-homed: cannot see sandbox-net
+    command: ["node", "server/index.js"]
+    depends_on: [exec-bridge]
+
+  # ---- the controlled crossing ------------------------------------------
+  exec-bridge:
+    # The ONLY dual-homed service. jexi-net reaches it on :8471; it executes
+    # allowlisted ops on sandbox-net. HMAC-signed requests; every call
+    # logged to /state/bridge-audit.jsonl.
+    image: node:24-alpine
+    working_dir: /jexi
+    volumes:
+      - ./:/jexi:ro
+      - jexi-workspace:/workspace
+      - bridge-state:/state
+    networks: [jexi-net, sandbox-net]   # dual-homed by design — the bridge
+    environment:
+      JEXI_SANDBOX_WORKSPACE: /workspace
+      JEXI_BRIDGE_STATE: /state
+    command: ["node", "security/exec-bridge/index.js", "serve", "--port=8471", "--mount=/workspace", "--state-dir=/state"]
+    # no ports: section — nothing is published to the host or across networks
+
+  # ---- sandbox-net (execution) -------------------------------------------
+  sandbox-exec:
+    # tools (browser, terminal, fs, git) / security pipeline execution /
+    # security agents' execution sandbox / offensive MCP servers
+    image: node:24-alpine
+    working_dir: /workspace
+    volumes:
+      - jexi-workspace:/workspace   # the workspace mount — its only fs area
+    networks: [sandbox-net]         # single-homed: cannot see jexi-net
+    environment:
+      SANDBOX_NET: sandbox-net
+      JEXI_SANDBOX_WORKSPACE: /workspace
+      # NOTE: no credentials here — secrets live on jexi-net only and cross
+      # exclusively inside signed, allowlisted, audited bridge requests.
+    command: ["sleep", "infinity"]
+
+volumes:
+  jexi-workspace:
+  bridge-state:

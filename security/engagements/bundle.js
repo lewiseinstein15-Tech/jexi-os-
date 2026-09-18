@@ -36,6 +36,9 @@ export function assembleBundle(draft) {
     id: `eng-${randomUUID()}`,
     name: draft.name,
     createdAt: nowIso(),
+    // Phase 8(E): networkMode travels inside the signed bundle — 'dual'
+    // makes the pipeline dispatch phases through the exec-bridge.
+    networkMode: draft.networkMode === undefined || draft.networkMode === null ? 'single' : draft.networkMode,
     ...roe.build(draft),
     ...conops.build(draft),
     ...deconfliction.build(draft),
@@ -68,6 +71,7 @@ export function renderOpplan(engagement) {
     `# OPPLAN — ${engagement.name}`,
     `engagement: ${engagement.id}`,
     `created: ${engagement.createdAt}`,
+    `network mode: ${engagement.networkMode || 'single'}`,
     `content hash: sha256:${signatures.bundleHash(engagement)}`,
     '',
   ];
