@@ -13,6 +13,7 @@
  */
 
 import * as store from '../orchestration/checkpoint.js';
+import { pipelineGraph, recordTarget } from '../../../knowledge/index.js';
 
 const MAX_PAGES = 16;
 const TIMEOUT_MS = 4000;
@@ -88,6 +89,28 @@ export const phase = {
 
     const jsonPath = store.writeArtifact(ctx.stateRoot, ctx.engagementId, 'recon.json', artifact);
     const mdPath = store.writeArtifact(ctx.stateRoot, ctx.engagementId, 'recon.md', renderMd(artifact));
+
+    // Phase 8(C): findings persist to the KNOWLEDGE GRAPH — the crawled target
+    // becomes Host + Service + connects-to edge (idempotent; the ids feed
+    // exploitation's graph writes). The artifact flow above is untouched:
+    // the graph is an additional persistence layer running in parallel.
+    let graphRefs = null;
+    try {
+      const graph = pipelineGraph(ctx);
+      try {
+        const t = recordTarget(graph, { url: baseUrl, banner: firstHeaders ? firstHeaders.get('server') : null });
+        graphRefs = { hostId: t.host.id, serviceId: t.service.id };
+        yield { type: 'log', data: { message: `knowledge graph: host ${t.host.id} + service ${t.service.id} persisted (connects-to)` } };
+      } finally {
+        graph.close();
+      }
+    } catch (err) {
+      yield { type: 'log', data: { message: `knowledge graph unavailable (artifact flow unaffected): ${err.message}` } };
+    }
+    if (ctx.checkpoint && graphRefs) {
+      ctx.checkpoint.partial = { ...(ctx.checkpoint.partial || {}), graphRefs };
+      store.saveCheckpoint(ctx.stateRoot, ctx.engagementId, ctx.checkpoint);
+    }
 
     yield { type: 'progress', data: { message: `map complete: ${pages.length} pages, ${forms.length} forms, tech=[${technologies.join(', ')}]` } };
     yield { type: 'artifact', data: { path: jsonPath, kind: 'live-app-map' } };

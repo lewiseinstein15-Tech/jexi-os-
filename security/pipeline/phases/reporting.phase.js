@@ -13,6 +13,7 @@
  */
 
 import * as store from '../orchestration/checkpoint.js';
+import { pipelineGraph } from '../../../knowledge/index.js';
 
 const REMEDIATION = {
   'A01:2021 Broken Access Control': 'Enforce server-side authorization on every privileged route; canonicalize and jail all filesystem paths (path.normalize + allowlist base dir).',
@@ -46,6 +47,40 @@ export const phase = {
       yield { type: 'log', data: { message: `dropped: ${d.findingId} (${d.status}) — no exploit, no report` } };
     }
 
+    // Phase 8(C): the knowledge graph is the source of truth for exploitation
+    // status — every verified finding is cross-checked against its persisted
+    // exploit row; a verdict that contradicts the graph is dropped. Graph
+    // absent (legacy state) → artifact flow remains authoritative.
+    let knowledge = null;
+    try {
+      const graph = pipelineGraph(ctx);
+      try {
+        const kept = [];
+        for (const v of verified) {
+          const ex = v.graph && v.graph.exploitId ? graph.exploit.get(v.graph.exploitId) : null;
+          if (v.graph && ex && !ex.succeeded) {
+            dropped.push(v);
+            yield { type: 'log', data: { message: `graph override: ${v.findingId} exploit not succeeded in knowledge graph — dropped` } };
+          } else {
+            if (v.graph && ex) v.knowledgeGraph = { vulnerabilityId: v.graph.vulnerabilityId, exploitId: v.graph.exploitId, succeeded: ex.succeeded, verified: ex.verified };
+            kept.push(v);
+          }
+        }
+        verified.length = 0;
+        verified.push(...kept);
+        const cov = graph.coverage();
+        knowledge = {
+          persistedFindings: cov.known.vulnerabilitiesFound,
+          persistedExploits: cov.known.exploitsAttempted,
+          validatedExploits: cov.known.exploitsValidated,
+        };
+      } finally {
+        graph.close();
+      }
+    } catch {
+      knowledge = null;
+    }
+
     verified.sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
     const counts = verified.reduce((acc, r) => { acc[r.severity] = (acc[r.severity] || 0) + 1; return acc; }, {});
 
@@ -57,6 +92,7 @@ export const phase = {
       generatedAt: new Date().toISOString(),
       target: vuln.target,
       pipeline: { phases: ['pre-recon', 'recon', 'vulnerability', 'exploitation', 'reporting'], gate: 'no exploit, no report' },
+      knowledge,
       executiveSummary: {
         verifiedFindings: verified.length,
         droppedUnverified: dropped.length,
