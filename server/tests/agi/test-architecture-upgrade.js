@@ -20,6 +20,11 @@ const av = await import('../../src/services/ArchitectureViews.js');
 // onekey-probe sample plugin (52nd). The honest claim is "indexes every
 // packaged plugin", which must hold as plugins come and go.
 const pi = await import('../../src/services/PluginInventory.js');
+// Phase 8 Scope F: same rule for the MCP registry — derive the expected count
+// from the SAME source the snapshot indexes (the shipped registry), never a
+// hardcoded number. The registry grew 42→51 when the security servers were
+// registered and must be allowed to grow further.
+const MCPG = await import('../../src/services/MCPGateway.js');
 
 clearRuns();
 
@@ -216,7 +221,7 @@ test('the architecture snapshot indexes every registry with metadata + health', 
   const snap = av.architectureSnapshot();
   assert.ok(snap.registries.agents.total > 100, 'agent roster indexed');
   assert.ok(snap.registries.tools.total > 100, 'tool registry indexed');
-  assert.equal(snap.registries.mcp.total, 42, 'all 42 MCP servers indexed');
+  assert.equal(snap.registries.mcp.total, MCPG.loadRegistry().servers.length, 'snapshot indexes every MCP server in the shipped registry');
   assert.equal(snap.registries.plugins.total, pi.pluginInventory().plugins.length, 'snapshot indexes every packaged plugin');
   for (const m of snap.registries.mcp.items) {
     assert.ok(['disabled', 'ready', 'connected', 'error', 'cooldown'].includes(m.status));
