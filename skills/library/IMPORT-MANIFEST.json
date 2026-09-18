@@ -1,0 +1,936 @@
+{
+  "kind": "jexi.library.import-manifest",
+  "version": 1,
+  "generatedAt": "2026-09-18T22:31:46.961Z",
+  "threshold": 0.85,
+  "baselineSize": 14,
+  "staged": 149,
+  "importedCount": 144,
+  "skippedCount": 5,
+  "mergeCandidates": [
+    {
+      "id": "supabase-postgres-best-practices",
+      "vs": "postgres-best-practices",
+      "similarity": 1,
+      "threshold": 0.85,
+      "reason": "description 100% similar to 'postgres-best-practices'",
+      "sourceGroup": "aas"
+    },
+    {
+      "id": "code-documentation-doc-generate",
+      "vs": "documentation-generation-doc-generate",
+      "similarity": 1,
+      "threshold": 0.85,
+      "reason": "description 100% similar to 'documentation-generation-doc-generate'",
+      "sourceGroup": "aas"
+    }
+  ],
+  "imported": [
+    {
+      "id": "ask-matt",
+      "to": "skills/library/engineering/ask-matt",
+      "sourceGroup": "matt",
+      "bytes": 16228
+    },
+    {
+      "id": "code-review",
+      "to": "skills/library/engineering/code-review",
+      "sourceGroup": "matt",
+      "bytes": 7117
+    },
+    {
+      "id": "codebase-design",
+      "to": "skills/library/engineering/codebase-design",
+      "sourceGroup": "matt",
+      "bytes": 12197
+    },
+    {
+      "id": "diagnosing-bugs",
+      "to": "skills/library/engineering/diagnosing-bugs",
+      "sourceGroup": "matt",
+      "bytes": 10380
+    },
+    {
+      "id": "domain-modeling",
+      "to": "skills/library/engineering/domain-modeling",
+      "sourceGroup": "matt",
+      "bytes": 8887
+    },
+    {
+      "id": "git-guardrails-claude-code",
+      "to": "skills/library/engineering/git-guardrails-claude-code",
+      "sourceGroup": "matt",
+      "bytes": 3368
+    },
+    {
+      "id": "grilling",
+      "to": "skills/library/engineering/grilling",
+      "sourceGroup": "matt",
+      "bytes": 2526
+    },
+    {
+      "id": "handoff",
+      "to": "skills/library/engineering/handoff",
+      "sourceGroup": "matt",
+      "bytes": 1460
+    },
+    {
+      "id": "implement",
+      "to": "skills/library/engineering/implement",
+      "sourceGroup": "matt",
+      "bytes": 998
+    },
+    {
+      "id": "improve-codebase-architecture",
+      "to": "skills/library/engineering/improve-codebase-architecture",
+      "sourceGroup": "matt",
+      "bytes": 13246
+    },
+    {
+      "id": "migrate-to-shoehorn",
+      "to": "skills/library/engineering/migrate-to-shoehorn",
+      "sourceGroup": "matt",
+      "bytes": 3334
+    },
+    {
+      "id": "prototype",
+      "to": "skills/library/engineering/prototype",
+      "sourceGroup": "matt",
+      "bytes": 16406
+    },
+    {
+      "id": "research",
+      "to": "skills/library/engineering/research",
+      "sourceGroup": "matt",
+      "bytes": 1313
+    },
+    {
+      "id": "resolving-merge-conflicts",
+      "to": "skills/library/engineering/resolving-merge-conflicts",
+      "sourceGroup": "matt",
+      "bytes": 1557
+    },
+    {
+      "id": "scaffold-exercises",
+      "to": "skills/library/engineering/scaffold-exercises",
+      "sourceGroup": "matt",
+      "bytes": 4125
+    },
+    {
+      "id": "setup-matt-pocock-skills",
+      "to": "skills/library/engineering/setup-matt-pocock-skills",
+      "sourceGroup": "matt",
+      "bytes": 19862
+    },
+    {
+      "id": "setup-pre-commit",
+      "to": "skills/library/engineering/setup-pre-commit",
+      "sourceGroup": "matt",
+      "bytes": 2783
+    },
+    {
+      "id": "tdd",
+      "to": "skills/library/engineering/tdd",
+      "sourceGroup": "matt",
+      "bytes": 7751
+    },
+    {
+      "id": "teach",
+      "to": "skills/library/engineering/teach",
+      "sourceGroup": "matt",
+      "bytes": 18401
+    },
+    {
+      "id": "to-questionnaire",
+      "to": "skills/library/engineering/to-questionnaire",
+      "sourceGroup": "matt",
+      "bytes": 3504
+    },
+    {
+      "id": "to-tickets",
+      "to": "skills/library/engineering/to-tickets",
+      "sourceGroup": "matt",
+      "bytes": 6244
+    },
+    {
+      "id": "triage",
+      "to": "skills/library/engineering/triage",
+      "sourceGroup": "matt",
+      "bytes": 19724
+    },
+    {
+      "id": "wait-what",
+      "to": "skills/library/engineering/wait-what",
+      "sourceGroup": "matt",
+      "bytes": 979
+    },
+    {
+      "id": "wayfinder",
+      "to": "skills/library/engineering/wayfinder",
+      "sourceGroup": "matt",
+      "bytes": 12478
+    },
+    {
+      "id": "wizard",
+      "to": "skills/library/engineering/wizard",
+      "sourceGroup": "matt",
+      "bytes": 13209
+    },
+    {
+      "id": "writing-for-agents",
+      "to": "skills/library/engineering/writing-for-agents",
+      "sourceGroup": "matt",
+      "bytes": 14053
+    },
+    {
+      "id": "dep",
+      "to": "skills/library/aas/agent-squad/dep/dep",
+      "sourceGroup": "aas",
+      "bytes": 7705
+    },
+    {
+      "id": "agentic-actions-auditor",
+      "to": "skills/library/aas/ai-ml/agentic-actions-auditor/agentic-actions-auditor",
+      "sourceGroup": "aas",
+      "bytes": 21517
+    },
+    {
+      "id": "2slides-ppt-generator",
+      "to": "skills/library/aas/api-integration/2slides-ppt-generator/2slides-ppt-generator",
+      "sourceGroup": "aas",
+      "bytes": 52656
+    },
+    {
+      "id": "openapi-spec-generation",
+      "to": "skills/library/aas/api-integration/openapi-spec-generation/openapi-spec-generation",
+      "sourceGroup": "aas",
+      "bytes": 2114
+    },
+    {
+      "id": "pakistan-payments-stack",
+      "to": "skills/library/aas/api-integration/pakistan-payments-stack/pakistan-payments-stack",
+      "sourceGroup": "aas",
+      "bytes": 8601
+    },
+    {
+      "id": "architecture-patterns",
+      "to": "skills/library/aas/architecture/architecture-patterns/architecture-patterns",
+      "sourceGroup": "aas",
+      "bytes": 2834
+    },
+    {
+      "id": "docs-architect",
+      "to": "skills/library/aas/architecture/docs-architect/docs-architect",
+      "sourceGroup": "aas",
+      "bytes": 5180
+    },
+    {
+      "id": "monopoly",
+      "to": "skills/library/aas/architecture/monopoly/monopoly",
+      "sourceGroup": "aas",
+      "bytes": 16186
+    },
+    {
+      "id": "flowhunt-skill",
+      "to": "skills/library/aas/automation/flowhunt-skill/flowhunt-skill",
+      "sourceGroup": "aas",
+      "bytes": 5996
+    },
+    {
+      "id": "api-and-interface-design",
+      "to": "skills/library/aas/backend/api-and-interface-design/api-and-interface-design",
+      "sourceGroup": "aas",
+      "bytes": 11600
+    },
+    {
+      "id": "api-design-principles",
+      "to": "skills/library/aas/backend/api-design-principles/api-design-principles",
+      "sourceGroup": "aas",
+      "bytes": 18940
+    },
+    {
+      "id": "api-designer",
+      "to": "skills/library/aas/backend/api-designer/api-designer",
+      "sourceGroup": "aas",
+      "bytes": 6867
+    },
+    {
+      "id": "api-integration",
+      "to": "skills/library/aas/backend/api-integration/api-integration",
+      "sourceGroup": "aas",
+      "bytes": 5975
+    },
+    {
+      "id": "appdeploy",
+      "to": "skills/library/aas/backend/appdeploy/appdeploy",
+      "sourceGroup": "aas",
+      "bytes": 9837
+    },
+    {
+      "id": "backend-architect",
+      "to": "skills/library/aas/backend/backend-architect/backend-architect",
+      "sourceGroup": "aas",
+      "bytes": 19470
+    },
+    {
+      "id": "comfyui-gateway",
+      "to": "skills/library/aas/backend/comfyui-gateway/comfyui-gateway",
+      "sourceGroup": "aas",
+      "bytes": 94729
+    },
+    {
+      "id": "uniprot-database",
+      "to": "skills/library/aas/backend/uniprot-database/uniprot-database",
+      "sourceGroup": "aas",
+      "bytes": 7669
+    },
+    {
+      "id": "backtesting-frameworks",
+      "to": "skills/library/aas/business/backtesting-frameworks/backtesting-frameworks",
+      "sourceGroup": "aas",
+      "bytes": 2268
+    },
+    {
+      "id": "odoo-automated-tests",
+      "to": "skills/library/aas/business/odoo-automated-tests/odoo-automated-tests",
+      "sourceGroup": "aas",
+      "bytes": 5738
+    },
+    {
+      "id": "odoo-backup-strategy",
+      "to": "skills/library/aas/business/odoo-backup-strategy/odoo-backup-strategy",
+      "sourceGroup": "aas",
+      "bytes": 4795
+    },
+    {
+      "id": "odoo-docker-deployment",
+      "to": "skills/library/aas/business/odoo-docker-deployment/odoo-docker-deployment",
+      "sourceGroup": "aas",
+      "bytes": 5575
+    },
+    {
+      "id": "odoo-rpc-api",
+      "to": "skills/library/aas/business/odoo-rpc-api/odoo-rpc-api",
+      "sourceGroup": "aas",
+      "bytes": 4634
+    },
+    {
+      "id": "pricing-strategy",
+      "to": "skills/library/aas/business/pricing-strategy/pricing-strategy",
+      "sourceGroup": "aas",
+      "bytes": 7980
+    },
+    {
+      "id": "product-design",
+      "to": "skills/library/aas/business/product-design/product-design",
+      "sourceGroup": "aas",
+      "bytes": 11656
+    },
+    {
+      "id": "product-inventor",
+      "to": "skills/library/aas/business/product-inventor/product-inventor",
+      "sourceGroup": "aas",
+      "bytes": 25246
+    },
+    {
+      "id": "documentation-generation-doc-generate",
+      "to": "skills/library/aas/content/documentation-generation-doc-generate/documentation-generation-doc-generate",
+      "sourceGroup": "aas",
+      "bytes": 3753
+    },
+    {
+      "id": "documentation-templates",
+      "to": "skills/library/aas/content/documentation-templates/documentation-templates",
+      "sourceGroup": "aas",
+      "bytes": 4231
+    },
+    {
+      "id": "analytics-product",
+      "to": "skills/library/aas/data/analytics-product/analytics-product",
+      "sourceGroup": "aas",
+      "bytes": 12043
+    },
+    {
+      "id": "dbt-transformation-patterns",
+      "to": "skills/library/aas/data/dbt-transformation-patterns/dbt-transformation-patterns",
+      "sourceGroup": "aas",
+      "bytes": 2208
+    },
+    {
+      "id": "monte-carlo-monitor-creation",
+      "to": "skills/library/aas/data/monte-carlo-monitor-creation/monte-carlo-monitor-creation",
+      "sourceGroup": "aas",
+      "bytes": 74570
+    },
+    {
+      "id": "snowflake-development",
+      "to": "skills/library/aas/data-engineering/snowflake-development/snowflake-development",
+      "sourceGroup": "aas",
+      "bytes": 8976
+    },
+    {
+      "id": "drizzle-orm-expert",
+      "to": "skills/library/aas/database/drizzle-orm-expert/drizzle-orm-expert",
+      "sourceGroup": "aas",
+      "bytes": 11337
+    },
+    {
+      "id": "postgres-best-practices",
+      "to": "skills/library/aas/database/postgres-best-practices/postgres-best-practices",
+      "sourceGroup": "aas",
+      "bytes": 2810
+    },
+    {
+      "id": "saas-multi-tenant",
+      "to": "skills/library/aas/database/saas-multi-tenant/saas-multi-tenant",
+      "sourceGroup": "aas",
+      "bytes": 13549
+    },
+    {
+      "id": "database-architect",
+      "to": "skills/library/aas/database-processing/database-architect/database-architect",
+      "sourceGroup": "aas",
+      "bytes": 17926
+    },
+    {
+      "id": "database-design",
+      "to": "skills/library/aas/database-processing/database-design/database-design",
+      "sourceGroup": "aas",
+      "bytes": 2480
+    },
+    {
+      "id": "accessibility-compliance-accessibility-audit",
+      "to": "skills/library/aas/design/accessibility-compliance-accessibility-audit/accessibility-compliance-accessibility-audit",
+      "sourceGroup": "aas",
+      "bytes": 2890
+    },
+    {
+      "id": "antigravity-design-expert",
+      "to": "skills/library/aas/design/antigravity-design-expert/antigravity-design-expert",
+      "sourceGroup": "aas",
+      "bytes": 4131
+    },
+    {
+      "id": "ui-visual-validator",
+      "to": "skills/library/aas/design/ui-visual-validator/ui-visual-validator",
+      "sourceGroup": "aas",
+      "bytes": 10704
+    },
+    {
+      "id": "uxui-principles",
+      "to": "skills/library/aas/design/uxui-principles/uxui-principles",
+      "sourceGroup": "aas",
+      "bytes": 2764
+    },
+    {
+      "id": "ai-native-ui",
+      "to": "skills/library/aas/design-it/ai-native-ui/ai-native-ui",
+      "sourceGroup": "aas",
+      "bytes": 11288
+    },
+    {
+      "id": "bento-ui",
+      "to": "skills/library/aas/design-it/bento-ui/bento-ui",
+      "sourceGroup": "aas",
+      "bytes": 11376
+    },
+    {
+      "id": "command-center-ui",
+      "to": "skills/library/aas/design-it/command-center-ui/command-center-ui",
+      "sourceGroup": "aas",
+      "bytes": 13046
+    },
+    {
+      "id": "dashboard-design",
+      "to": "skills/library/aas/design-it/dashboard-design/dashboard-design",
+      "sourceGroup": "aas",
+      "bytes": 12553
+    },
+    {
+      "id": "editorial-design",
+      "to": "skills/library/aas/design-it/editorial-design/editorial-design",
+      "sourceGroup": "aas",
+      "bytes": 12126
+    },
+    {
+      "id": "typography-first",
+      "to": "skills/library/aas/design-it/typography-first/typography-first",
+      "sourceGroup": "aas",
+      "bytes": 9138
+    },
+    {
+      "id": "mcp-tool-developer",
+      "to": "skills/library/aas/developer-tools/mcp-tool-developer/mcp-tool-developer",
+      "sourceGroup": "aas",
+      "bytes": 5447
+    },
+    {
+      "id": "api-endpoint-builder",
+      "to": "skills/library/aas/development/api-endpoint-builder/api-endpoint-builder",
+      "sourceGroup": "aas",
+      "bytes": 8001
+    },
+    {
+      "id": "bash-defensive-patterns",
+      "to": "skills/library/aas/development/bash-defensive-patterns/bash-defensive-patterns",
+      "sourceGroup": "aas",
+      "bytes": 2608
+    },
+    {
+      "id": "code-audit",
+      "to": "skills/library/aas/development/code-audit/code-audit",
+      "sourceGroup": "aas",
+      "bytes": 3450
+    },
+    {
+      "id": "codebase-audit-pre-push",
+      "to": "skills/library/aas/development/codebase-audit-pre-push/codebase-audit-pre-push",
+      "sourceGroup": "aas",
+      "bytes": 9080
+    },
+    {
+      "id": "performance-optimizer",
+      "to": "skills/library/aas/development/performance-optimizer/performance-optimizer",
+      "sourceGroup": "aas",
+      "bytes": 9402
+    },
+    {
+      "id": "python-testing-patterns",
+      "to": "skills/library/aas/development/python-testing-patterns/python-testing-patterns",
+      "sourceGroup": "aas",
+      "bytes": 2309
+    },
+    {
+      "id": "squirrel",
+      "to": "skills/library/aas/development/squirrel/squirrel",
+      "sourceGroup": "aas",
+      "bytes": 4765
+    },
+    {
+      "id": "openclaw-github-repo-commander",
+      "to": "skills/library/aas/development-and-testing/openclaw-github-repo-commander/openclaw-github-repo-commander",
+      "sourceGroup": "aas",
+      "bytes": 4712
+    },
+    {
+      "id": "aegisops-ai",
+      "to": "skills/library/aas/devops/aegisops-ai/aegisops-ai",
+      "sourceGroup": "aas",
+      "bytes": 5949
+    },
+    {
+      "id": "github-actions-advanced",
+      "to": "skills/library/aas/devops/github-actions-advanced/github-actions-advanced",
+      "sourceGroup": "aas",
+      "bytes": 33252
+    },
+    {
+      "id": "github-actions-debugger",
+      "to": "skills/library/aas/devops/github-actions-debugger/github-actions-debugger",
+      "sourceGroup": "aas",
+      "bytes": 6155
+    },
+    {
+      "id": "mise-configurator",
+      "to": "skills/library/aas/devops/mise-configurator/mise-configurator",
+      "sourceGroup": "aas",
+      "bytes": 4610
+    },
+    {
+      "id": "production-runtime-certification",
+      "to": "skills/library/aas/devops/production-runtime-certification/production-runtime-certification",
+      "sourceGroup": "aas",
+      "bytes": 9931
+    },
+    {
+      "id": "vibecode-production-qa-validator",
+      "to": "skills/library/aas/devops/vibecode-production-qa-validator/vibecode-production-qa-validator",
+      "sourceGroup": "aas",
+      "bytes": 18520
+    },
+    {
+      "id": "convex",
+      "to": "skills/library/aas/framework/convex/convex",
+      "sourceGroup": "aas",
+      "bytes": 26855
+    },
+    {
+      "id": "anti-ui-slop",
+      "to": "skills/library/aas/frontend/anti-ui-slop/anti-ui-slop",
+      "sourceGroup": "aas",
+      "bytes": 3914
+    },
+    {
+      "id": "frontend-api-integration-patterns",
+      "to": "skills/library/aas/frontend/frontend-api-integration-patterns/frontend-api-integration-patterns",
+      "sourceGroup": "aas",
+      "bytes": 8353
+    },
+    {
+      "id": "minimalist-ui",
+      "to": "skills/library/aas/frontend/minimalist-ui/minimalist-ui",
+      "sourceGroup": "aas",
+      "bytes": 9746
+    },
+    {
+      "id": "stitch-design-taste",
+      "to": "skills/library/aas/frontend/stitch-design-taste/stitch-design-taste",
+      "sourceGroup": "aas",
+      "bytes": 13403
+    },
+    {
+      "id": "api-security-testing",
+      "to": "skills/library/aas/granular-workflow-bundle/api-security-testing/api-security-testing",
+      "sourceGroup": "aas",
+      "bytes": 4454
+    },
+    {
+      "id": "bash-scripting",
+      "to": "skills/library/aas/granular-workflow-bundle/bash-scripting/bash-scripting",
+      "sourceGroup": "aas",
+      "bytes": 4767
+    },
+    {
+      "id": "e2e-testing",
+      "to": "skills/library/aas/granular-workflow-bundle/e2e-testing/e2e-testing",
+      "sourceGroup": "aas",
+      "bytes": 4287
+    },
+    {
+      "id": "kubernetes-deployment",
+      "to": "skills/library/aas/granular-workflow-bundle/kubernetes-deployment/kubernetes-deployment",
+      "sourceGroup": "aas",
+      "bytes": 4192
+    },
+    {
+      "id": "postgresql-optimization",
+      "to": "skills/library/aas/granular-workflow-bundle/postgresql-optimization/postgresql-optimization",
+      "sourceGroup": "aas",
+      "bytes": 4654
+    },
+    {
+      "id": "python-fastapi-development",
+      "to": "skills/library/aas/granular-workflow-bundle/python-fastapi-development/python-fastapi-development",
+      "sourceGroup": "aas",
+      "bytes": 5706
+    },
+    {
+      "id": "web-security-testing",
+      "to": "skills/library/aas/granular-workflow-bundle/web-security-testing/web-security-testing",
+      "sourceGroup": "aas",
+      "bytes": 4847
+    },
+    {
+      "id": "wordpress-plugin-development",
+      "to": "skills/library/aas/granular-workflow-bundle/wordpress-plugin-development/wordpress-plugin-development",
+      "sourceGroup": "aas",
+      "bytes": 14472
+    },
+    {
+      "id": "imagen",
+      "to": "skills/library/aas/graphics-processing/imagen/imagen",
+      "sourceGroup": "aas",
+      "bytes": 3422
+    },
+    {
+      "id": "brand-guidelines",
+      "to": "skills/library/aas/marketing/brand-guidelines/brand-guidelines",
+      "sourceGroup": "aas",
+      "bytes": 6464
+    },
+    {
+      "id": "wechat-official-account-strategist",
+      "to": "skills/library/aas/marketing/wechat-official-account-strategist/wechat-official-account-strategist",
+      "sourceGroup": "aas",
+      "bytes": 5760
+    },
+    {
+      "id": "idea-os",
+      "to": "skills/library/aas/product-management/idea-os/idea-os",
+      "sourceGroup": "aas",
+      "bytes": 6670
+    },
+    {
+      "id": "papers-skill",
+      "to": "skills/library/aas/research/papers-skill/papers-skill",
+      "sourceGroup": "aas",
+      "bytes": 9035
+    },
+    {
+      "id": "client-secret-exposure-audit",
+      "to": "skills/library/aas/security/client-secret-exposure-audit/client-secret-exposure-audit",
+      "sourceGroup": "aas",
+      "bytes": 19186
+    },
+    {
+      "id": "container-security-hardening",
+      "to": "skills/library/aas/security/container-security-hardening/container-security-hardening",
+      "sourceGroup": "aas",
+      "bytes": 63623
+    },
+    {
+      "id": "fsi-compliance-checker",
+      "to": "skills/library/aas/security/fsi-compliance-checker/fsi-compliance-checker",
+      "sourceGroup": "aas",
+      "bytes": 7873
+    },
+    {
+      "id": "marketplace-rbac-audit",
+      "to": "skills/library/aas/security/marketplace-rbac-audit/marketplace-rbac-audit",
+      "sourceGroup": "aas",
+      "bytes": 13185
+    },
+    {
+      "id": "skill-security-audit",
+      "to": "skills/library/aas/security/skill-security-audit/skill-security-audit",
+      "sourceGroup": "aas",
+      "bytes": 6144
+    },
+    {
+      "id": "supply-chain-security",
+      "to": "skills/library/aas/security/supply-chain-security/supply-chain-security",
+      "sourceGroup": "aas",
+      "bytes": 12165
+    },
+    {
+      "id": "tools-page-seo-optimizer",
+      "to": "skills/library/aas/seo/tools-page-seo-optimizer/tools-page-seo-optimizer",
+      "sourceGroup": "aas",
+      "bytes": 23904
+    },
+    {
+      "id": "android_ui_verification",
+      "to": "skills/library/aas/test-automation/android_ui_verification/android_ui_verification",
+      "sourceGroup": "aas",
+      "bytes": 3771
+    },
+    {
+      "id": "e2e-testing-patterns",
+      "to": "skills/library/aas/test-automation/e2e-testing-patterns/e2e-testing-patterns",
+      "sourceGroup": "aas",
+      "bytes": 3150
+    },
+    {
+      "id": "playwright-java",
+      "to": "skills/library/aas/test-automation/playwright-java/playwright-java",
+      "sourceGroup": "aas",
+      "bytes": 14567
+    },
+    {
+      "id": "agent-qa-result-triage",
+      "to": "skills/library/aas/testing/agent-qa-result-triage/agent-qa-result-triage",
+      "sourceGroup": "aas",
+      "bytes": 5100
+    },
+    {
+      "id": "k6-load-testing",
+      "to": "skills/library/aas/testing/k6-load-testing/k6-load-testing",
+      "sourceGroup": "aas",
+      "bytes": 15793
+    },
+    {
+      "id": "lambdatest-agent-skills",
+      "to": "skills/library/aas/testing/lambdatest-agent-skills/lambdatest-agent-skills",
+      "sourceGroup": "aas",
+      "bytes": 12846
+    },
+    {
+      "id": "akf-trust-metadata",
+      "to": "skills/library/aas/uncategorized/akf-trust-metadata/akf-trust-metadata",
+      "sourceGroup": "aas",
+      "bytes": 2498
+    },
+    {
+      "id": "andrej-karpathy",
+      "to": "skills/library/aas/uncategorized/andrej-karpathy/andrej-karpathy",
+      "sourceGroup": "aas",
+      "bytes": 4734
+    },
+    {
+      "id": "audit-agent-run-evidence",
+      "to": "skills/library/aas/uncategorized/audit-agent-run-evidence/audit-agent-run-evidence",
+      "sourceGroup": "aas",
+      "bytes": 9065
+    },
+    {
+      "id": "diagram-generator",
+      "to": "skills/library/aas/uncategorized/diagram-generator/diagram-generator",
+      "sourceGroup": "aas",
+      "bytes": 15203
+    },
+    {
+      "id": "event-staffing-ordering",
+      "to": "skills/library/aas/uncategorized/event-staffing-ordering/event-staffing-ordering",
+      "sourceGroup": "aas",
+      "bytes": 6747
+    },
+    {
+      "id": "nerdzao-elite",
+      "to": "skills/library/aas/uncategorized/nerdzao-elite/nerdzao-elite",
+      "sourceGroup": "aas",
+      "bytes": 2446
+    },
+    {
+      "id": "review-swarm",
+      "to": "skills/library/aas/uncategorized/review-swarm/review-swarm",
+      "sourceGroup": "aas",
+      "bytes": 8147
+    },
+    {
+      "id": "ui-review",
+      "to": "skills/library/aas/uncategorized/ui-review/ui-review",
+      "sourceGroup": "aas",
+      "bytes": 6002
+    },
+    {
+      "id": "xvary-stock-research",
+      "to": "skills/library/aas/uncategorized/xvary-stock-research/xvary-stock-research",
+      "sourceGroup": "aas",
+      "bytes": 16269
+    },
+    {
+      "id": "audio-transcriber",
+      "to": "skills/library/aas/voice-agents/audio-transcriber/audio-transcriber",
+      "sourceGroup": "aas",
+      "bytes": 24965
+    },
+    {
+      "id": "accesslint-audit",
+      "to": "skills/library/aas/web-development/accesslint-audit/accesslint-audit",
+      "sourceGroup": "aas",
+      "bytes": 8103
+    },
+    {
+      "id": "angular-best-practices",
+      "to": "skills/library/aas/web-development/angular-best-practices/angular-best-practices",
+      "sourceGroup": "aas",
+      "bytes": 14538
+    },
+    {
+      "id": "ckw-design",
+      "to": "skills/library/aas/web-development/ckw-design/ckw-design",
+      "sourceGroup": "aas",
+      "bytes": 10233
+    },
+    {
+      "id": "senior-frontend",
+      "to": "skills/library/aas/web-development/senior-frontend/senior-frontend",
+      "sourceGroup": "aas",
+      "bytes": 65385
+    },
+    {
+      "id": "tailwind-design-system",
+      "to": "skills/library/aas/web-development/tailwind-design-system/tailwind-design-system",
+      "sourceGroup": "aas",
+      "bytes": 2093
+    },
+    {
+      "id": "acceptance-orchestrator",
+      "to": "skills/library/aas/workflow/acceptance-orchestrator/acceptance-orchestrator",
+      "sourceGroup": "aas",
+      "bytes": 4431
+    },
+    {
+      "id": "airflow-dag-patterns",
+      "to": "skills/library/aas/workflow/airflow-dag-patterns/airflow-dag-patterns",
+      "sourceGroup": "aas",
+      "bytes": 2383
+    },
+    {
+      "id": "antigravity-workflows",
+      "to": "skills/library/aas/workflow/antigravity-workflows/antigravity-workflows",
+      "sourceGroup": "aas",
+      "bytes": 8989
+    },
+    {
+      "id": "git-hooks-automation",
+      "to": "skills/library/aas/workflow/git-hooks-automation/git-hooks-automation",
+      "sourceGroup": "aas",
+      "bytes": 12531
+    },
+    {
+      "id": "ai-ml",
+      "to": "skills/library/aas/workflow-bundle/ai-ml/ai-ml",
+      "sourceGroup": "aas",
+      "bytes": 6471
+    },
+    {
+      "id": "cloud-devops",
+      "to": "skills/library/aas/workflow-bundle/cloud-devops/cloud-devops",
+      "sourceGroup": "aas",
+      "bytes": 6285
+    },
+    {
+      "id": "database",
+      "to": "skills/library/aas/workflow-bundle/database/database",
+      "sourceGroup": "aas",
+      "bytes": 5248
+    },
+    {
+      "id": "documentation",
+      "to": "skills/library/aas/workflow-bundle/documentation/documentation",
+      "sourceGroup": "aas",
+      "bytes": 6178
+    },
+    {
+      "id": "security-audit",
+      "to": "skills/library/aas/workflow-bundle/security-audit/security-audit",
+      "sourceGroup": "aas",
+      "bytes": 6028
+    },
+    {
+      "id": "testing-qa",
+      "to": "skills/library/aas/workflow-bundle/testing-qa/testing-qa",
+      "sourceGroup": "aas",
+      "bytes": 5699
+    },
+    {
+      "id": "wordpress",
+      "to": "skills/library/aas/workflow-bundle/wordpress/wordpress",
+      "sourceGroup": "aas",
+      "bytes": 18459
+    }
+  ],
+  "skipped": [
+    {
+      "id": "grill-me",
+      "vs": "existing id 'grill-me'",
+      "similarity": 1,
+      "threshold": 0.85,
+      "reason": "duplicate id of an existing JEXI skill",
+      "sourceGroup": "matt"
+    },
+    {
+      "id": "grill-with-docs",
+      "vs": "existing id 'grill-with-docs'",
+      "similarity": 1,
+      "threshold": 0.85,
+      "reason": "duplicate id of an existing JEXI skill",
+      "sourceGroup": "matt"
+    },
+    {
+      "id": "to-spec",
+      "vs": "existing id 'to-spec'",
+      "similarity": 1,
+      "threshold": 0.85,
+      "reason": "duplicate id of an existing JEXI skill",
+      "sourceGroup": "matt"
+    },
+    {
+      "id": "supabase-postgres-best-practices",
+      "vs": "postgres-best-practices",
+      "similarity": 1,
+      "threshold": 0.85,
+      "reason": "description 100% similar to 'postgres-best-practices'",
+      "sourceGroup": "aas"
+    },
+    {
+      "id": "code-documentation-doc-generate",
+      "vs": "documentation-generation-doc-generate",
+      "similarity": 1,
+      "threshold": 0.85,
+      "reason": "description 100% similar to 'documentation-generation-doc-generate'",
+      "sourceGroup": "aas"
+    }
+  ]
+}
