@@ -45,3 +45,23 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
+
+  cross-harness:
+    name: Cross-harness convert + install check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Convert all harnesses (strict — canonical errors fail CI)
+        run: bash scripts/convert-harnesses.sh --strict
+      - name: Install dry-run (detection + skip-cleanly check)
+        run: bash scripts/install-harnesses.sh --dry-run
+      - name: Idempotency check (install twice into a test root, second run must be 0 writes)
+        run: |
+          bash scripts/install-harnesses.sh --root /tmp/jexi-ci-harness --force > /tmp/run1.txt
+          bash scripts/install-harnesses.sh --root /tmp/jexi-ci-harness --force > /tmp/run2.txt
+          SECOND_WRITES=$(grep -oE '[0-9]+ created, [0-9]+ changed' /tmp/run2.txt | tail -1)
+          echo "second-run writes: ${SECOND_WRITES}"
+          test "${SECOND_WRITES}" = "0 created, 0 changed"
