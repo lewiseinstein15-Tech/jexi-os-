@@ -83,7 +83,8 @@ jobs:
             -d '{"clearCache":"do_not_clear"}')
           cat deploy.json; echo
           if [ "$HTTP" != "201" ]; then echo "::error::Render deploy trigger failed (HTTP $HTTP)"; exit 1; fi
-          DEPLOY_ID=$(jq -r '.deploy.id' deploy.json)
+          DEPLOY_ID=$(jq -r '.deploy.id // .id' deploy.json)
+          if [ -z "$DEPLOY_ID" ] || [ "$DEPLOY_ID" = "null" ]; then echo "::error::could not read deploy id from Render response"; cat deploy.json; exit 1; fi
           echo "RENDER_DEPLOY_ID=$DEPLOY_ID" >> "$GITHUB_ENV"
           echo "Render deploy $DEPLOY_ID triggered — watching it."
 
@@ -109,9 +110,11 @@ jobs:
           fi
           for i in $(seq 1 40); do
             sleep 15
-            ST=$(curl -sS -m 30 -H "Authorization: Bearer $RENDER_API_KEY" \
-              "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys/$RENDER_DEPLOY_ID" \
-              | jq -r '.status // .deploy.status // "unknown"')
+            RESP=$(curl -sS -m 30 -w '\n%{http_code}' -H "Authorization: Bearer $RENDER_API_KEY" \
+              "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys/$RENDER_DEPLOY_ID")
+            CODE=$(echo "$RESP" | tail -1)
+            ST=$(echo "$RESP" | sed '$d' | jq -r '.status // .deploy.status // "unknown"')
+            if [ "$CODE" = "404" ]; then echo "::error::deploy id $RENDER_DEPLOY_ID not found (HTTP 404)"; exit 1; fi
             echo "attempt $i: $ST"
             if [ "$ST" = "live" ]; then echo "Render deploy is LIVE."; exit 0; fi
             if [ "$ST" = "update_failed" ] || [ "$ST" = "build_failed" ] || [ "$ST" = "canceled" ] || [ "$ST" = "deactivated" ]; then
