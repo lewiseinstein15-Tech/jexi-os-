@@ -44,6 +44,9 @@ COPY server/mcp ./server/mcp
 COPY package*.json index.html vite.config.js tailwind.config.js postcss.config.js ./
 COPY public ./public
 COPY src ./src
+# Phase 7(G) — the commands subsystem lives at the repo root (ECC layout);
+# the container resolves /app/commands (dual-depth seam: /app/commands).
+COPY commands ./commands
 RUN npm ci --no-audit --no-fund && npm run build
 # server/public is a git symlink to ../dist — vite writes the bundle
 # straight through it, so the old `cp -r dist/* server/public/` copied

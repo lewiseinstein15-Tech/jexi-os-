@@ -139,6 +139,29 @@ if (!query) {
   process.exit(2);
 }
 
+// Phase 7(G) — slash commands run through the SAME dispatcher as the web
+// chat (commands/ subsystem, fail-soft): node cli.js "/checkpoint".
+// A mistyped /command is answered with the clean unknown-command error —
+// it is NOT forwarded to the model (a slash-prefixed input is never prose).
+try {
+  const seam = await import('./src/commands-seam.js');
+  if (query.startsWith('/') && seam.commandsAvailable()) {
+    const g = await seam.dispatchCommandStrict(query, { agent: { name: 'cli' }, session: { id: conv || undefined } });
+    if (g.reason === 'unknown-command') {
+      console.error(`jexi: ${g.error}`);
+      process.exit(2);
+    }
+    if (g.handled) {
+      const payload = { ok: g.ok, command: g.name, summary: g.result?.summary || g.summary || null, error: g.error || g.result?.error || null, result: g.ok ? (g.result || {}) : undefined, durationMs: g.durationMs };
+      if (json) console.log(JSON.stringify(payload, null, 2));
+      else if (g.ok) console.log(payload.summary || payload.result?.summary || `/${g.name} done.`);
+      else console.error(`jexi: ${payload.error || `/${g.name} failed`}`);
+      process.exit(g.ok ? 0 : 1);
+    }
+    // not-a-command (shouldn't happen for a /-prefixed query) → model path
+  }
+} catch { /* commands subsystem unavailable — fall through to the model pipeline */ }
+
 try {
   const out = await runTurn(query, { conv });
   if (json) {

@@ -113,6 +113,7 @@ import { mountScheduler } from './src/routes/scheduler.js'; // Phase 6 Scope B �
 import { mountContext } from './src/routes/context.js'; // Phase 6 Scope C — context manager
 import { mountHud } from './src/routes/hud.js'; // Phase 7(F) — HUD status contract (GET /api/hud + SSE /api/hud/stream)
 import { hudNoteCheck } from './src/kernel/hooks/hud-seam.js'; // Phase 7(F) — self-ping feeds checks.remote
+import { dispatchCommand, commandsAvailable } from './src/commands-seam.js'; // Phase 7(G) — commands subsystem (fail-soft)
 import { autonomyScheduler } from './src/scheduler/index.js';
 import { taskManager } from './src/services/TaskManager.js';
 import { taskScheduler } from './src/services/TaskScheduler.js';
@@ -1835,6 +1836,32 @@ app.post('/api/chat', async (req, res) => {
     const raw = String(query || '').trim();
     if (raw) {
       rememberTurn('user', raw);
+      // Phase 7(G) — the commands subsystem dispatches BEFORE the model and
+      // BEFORE the legacy B133 registry: /checkpoint /code-review /cost-report
+      // /build-fix /learn /refine /handoff /catchup /intel /doctor /status
+      // /export (+ /cp /cr /cost). Fail-soft: no commands/ in this runtime →
+      // dispatchCommand returns null and the legacy path proceeds unchanged.
+      if (raw.startsWith('/') && commandsAvailable()) {
+        const g = await dispatchCommand(raw, {
+          sendEvent,
+          log: (msg) => { try { sendEvent('log', { agent: 'Commands', message: msg }); } catch { /* stream closed */ } },
+          session: { id: convId || undefined },
+          agent: { name: 'chat' },
+        });
+        if (g) {
+          if (g.ok) {
+            const summary = (g.result && g.result.summary) || g.summary || `/${g.name} done.`;
+            sendEvent('log', { agent: 'Commands', message: `✓ /${g.name} finished.` });
+            done({ success: true, summary });
+          } else {
+            const error = g.error || (g.result && g.result.summary) || `/${g.name} failed`;
+            sendEvent('log', { agent: 'Commands', message: `✗ ${error}` });
+            done({ success: false, error, summary: `⚠️ ${error}` });
+          }
+          finish();
+          return;
+        }
+      }
       // B167 — slash commands run BEFORE the model sees the message
       // (/watch <video> [question] and friends, dsh interaction/commands).
       if (raw.startsWith('/')) {

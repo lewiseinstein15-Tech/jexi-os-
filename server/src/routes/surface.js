@@ -33,6 +33,7 @@ import { subagentProviderStatus } from '../services/SubagentProviders.js';
 import { workerBootstrapSelfCheck } from '../services/CodeRuntimeBootstrap.js';
 import { anonymousUserId } from '../services/AnonymousId.js';
 import { listCommands } from '../services/CommandRegistry.js';
+import { registryForApi } from '../commands-seam.js'; // Phase 7(G) — commands dispatcher registry (fail-soft)
 import { invariantStatus, checkConversationInvariants } from '../services/SessionInvariants.js';
 import { telemetryStats, readTelemetry } from '../services/Telemetry.js';
 import { listSessionCheckpoints } from '../services/SessionCheckpoints.js';
@@ -175,7 +176,13 @@ export function mountSurface(app, ctx = {}) {
   app.get('/api/report/channels', (req, res) => jsonOk(res, { ok: true, channels: ['in-app', 'email', 'push'] }));
   app.get('/api/subagent/providers', (req, res) => jsonOk(res, { ok: true, ...subagentProviderStatus() }));
   app.get('/api/code-runtime/bootstrap', (req, res) => jsonOk(res, { ok: true, checks: workerBootstrapSelfCheck() }));
-  app.get('/api/commands', (req, res) => jsonOk(res, { ok: true, commands: listCommands() }));
+  app.get('/api/commands', (req, res) => {
+    // Phase 7(G) — the dispatcher registry rides along (fail-soft when the
+    // commands subsystem is not shipped in this runtime).
+    let dispatcher = null;
+    try { dispatcher = registryForApi(); } catch { dispatcher = null; }
+    jsonOk(res, { ok: true, commands: listCommands(), dispatcher });
+  });
   app.get('/api/invariants', (req, res) => {
     const conv = req.query.conv || req.headers['x-jexi-session'];
     jsonOk(res, conv ? checkConversationInvariants(conv) : invariantStatus());
