@@ -183,6 +183,8 @@ export function makeAgentAdapter(def) {
       for (const ag of input.agents) {
         const meta = { name: ag.name, description: ag.description };
         if (ag.models?.length) meta.models = ag.models.join(', ');
+        if (ag.tools?.length) meta.tools = ag.tools.join(', ');
+        if (ag.division) meta.division = ag.division;
         files.push({ kind: 'agent', path: `${def.agentsDir || 'agents'}/${slugify(ag.name)}.md`, content: frontMatter(meta, ag.body) });
       }
       if (def.supports.rules && input.rules.length) {

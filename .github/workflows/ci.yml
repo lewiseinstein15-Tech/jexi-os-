@@ -20,6 +20,9 @@ jobs:
       - name: Prompt Defense Baseline lint
         working-directory: .
         run: bash scripts/lint-agent-baseline.sh
+      - name: Agent files lint (Phase 7 I canonical format, 68 specialists)
+        working-directory: .
+        run: bash scripts/lint-agent-baseline.sh agents/
       - name: Install
         run: npm ci
       - name: Install root deps (rich-render test needs react/react-markdown/esbuild)

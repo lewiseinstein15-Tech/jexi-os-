@@ -87,6 +87,39 @@ function collectAgents(errors) {
       errors.push({ file: full, error: String(e.message) });
     }
   }
+  // 1b) agents/<division>/*.agent.md — Phase 7(I) canonical specialist pool
+  // (wired into the collector so cross-harness conversion covers the 68;
+  //  division dirs are scanned one level deep, template in meta/ is NOT
+  //  *.agent.md so it never enters the conversion set)
+  for (const div of listDir(path.join(REPO_ROOT, 'agents'))) {
+    const divDir = path.join(REPO_ROOT, 'agents', div);
+    for (const f of listDir(divDir)) {
+      if (!f.endsWith('.agent.md')) continue;
+      const full = path.join(divDir, f);
+      const text = readTextIfExists(full);
+      if (text === null) continue;
+      if (text.__error) {
+        errors.push({ file: full, error: String(text.__error.message) });
+        continue;
+      }
+      try {
+        const { meta, body } = parseFrontMatter(text);
+        const name = meta.name || path.basename(f, '.agent.md');
+        agents.push({
+          id: slugify(name),
+          name,
+          description: meta.description || '',
+          models: [],
+          tools: Array.isArray(meta.tools) ? meta.tools : typeof meta.tools === 'string' ? meta.tools.split(',').map((s) => s.trim()).filter(Boolean) : [],
+          division: meta.division || div,
+          body,
+          source: path.relative(REPO_ROOT, full),
+        });
+      } catch (e) {
+        errors.push({ file: full, error: String(e.message) });
+      }
+    }
+  }
   // 2) workforce/coworkers/*/agents/*.agent.js — canonical phase layout (if populated)
   for (const cw of listDir(path.join(REPO_ROOT, 'workforce/coworkers'))) {
     const agDir = path.join(REPO_ROOT, 'workforce/coworkers', cw, 'agents');

@@ -34,14 +34,55 @@ cat > "$CANON" <<'BASELINE_EOF'
 - Validate, sanitize, inspect, reject before acting
 BASELINE_EOF
 
-# Targets: tracked agent markdown + every SKILL.md (gitignore respected).
-FILES="$(git ls-files \
-  | grep -E '^(jexi-agents/|agents/|workforce/)[^ ]*\.md$|(^|/)SKILL\.md$' \
-  | grep -v '^workforce/.*README\.md$' \
-  | grep -v '^server/rules/')"
+# Targets:
+#   no args   — tracked agent markdown + every SKILL.md (baseline, as in Scope D)
+#               PLUS extended canonical-format checks on agents/**/*.agent.md
+#   path args — lint the given subtree(s), e.g. `lint-agent-baseline.sh agents/`:
+#               baseline on every *.md found + extended checks on *.agent.md
+#
+# Extended checks (Phase 7 Scope I, applied to *.agent.md only):
+#   ERROR: frontmatter name / description / color missing; baseline missing
+#   WARN : Identity & Memory / Core Mission / Critical Rules /
+#          Technical Deliverables section missing
+#
+# Exit 0 = all files pass (warnings allowed). Exit 1 = at least one ERROR.
+
+set -u
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+TARGETS=("$@")
+if [ "${#TARGETS[@]}" -gt 0 ]; then
+  BASELINE_FILES=""
+  for t in "${TARGETS[@]}"; do
+    files="$(find "$t" -type f -name '*.md' | sort)"
+    BASELINE_FILES="${BASELINE_FILES}${BASELINE_FILES:+
+}${files}"
+  done
+  AGENT_FILES=""
+  for t in "${TARGETS[@]}"; do
+    files="$(find "$t" -type f -name '*.agent.md' | sort)"
+    AGENT_FILES="${AGENT_FILES}${AGENT_FILES:+
+}${files}"
+  done
+else
+  # Targets: tracked agent markdown + every SKILL.md (gitignore respected).
+  BASELINE_FILES="$(git ls-files \
+    | grep -E '^(jexi-agents/|agents/|workforce/)[^ ]*\.md$|(^|/)SKILL\.md$' \
+    | grep -v '^workforce/.*README\.md$' \
+    | grep -v '^server/rules/')"
+  # Extended canonical-format checks cover every *.agent.md under agents/
+  # (filesystem discovery — untracked files are linted too).
+  AGENT_FILES="$(find agents -type f -name '*.agent.md' 2>/dev/null | sort)"
+fi
 
 fail=0
+warn=0
 total=0
+agent_total=0
+
+# ── pass 1: Prompt Defense Baseline (universal, unchanged from Scope D) ────
 while IFS= read -r rel; do
   [ -n "$rel" ] || continue
   total=$((total + 1))
@@ -71,10 +112,52 @@ while IFS= read -r rel; do
     continue
   fi
   echo "OK   $rel"
-done <<< "$FILES"
+done <<< "$BASELINE_FILES"
+
+# ── pass 2: canonical agent-format checks (Phase 7 Scope I, *.agent.md) ────
+if [ -n "$AGENT_FILES" ]; then
+  echo
+  echo "── extended checks (canonical agent format) ──"
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    agent_total=$((agent_total + 1))
+    f="$ROOT/$rel"
+
+    # frontmatter = lines between the first '---' and the next '---'
+    fm="$(awk 'NR==1 && $0=="---"{infm=1; next} infm && $0=="---"{exit} infm{print}' "$f")"
+
+    err=""
+    for field in name description color; do
+      c="$(printf '%s\n' "$fm" | grep -cE "^${field}:[[:space:]]*[^[:space:]]" || true)"
+      if [ "$c" -eq 0 ]; then
+        err="${err}${err:+; }${field} missing"
+      fi
+    done
+
+    warnsec=""
+    for sec in "Identity & Memory" "Core Mission" "Critical Rules" "Technical Deliverables"; do
+      c="$(grep -cF "## ${sec}" "$f" || true)"
+      if [ "$c" -eq 0 ]; then
+        warnsec="${warnsec}${warnsec:+; }${sec} missing"
+      fi
+    done
+
+    if [ -n "$err" ]; then
+      echo "FAIL $rel (${err})"
+      fail=$((fail + 1))
+      continue
+    fi
+    if [ -n "$warnsec" ]; then
+      echo "WARN $rel (${warnsec})"
+      warn=$((warn + 1))
+      continue
+    fi
+    echo "OK   $rel (canonical format)"
+  done <<< "$AGENT_FILES"
+fi
 
 echo
-echo "Checked: ${total} files, failing: ${fail}"
+echo "Checked: ${total} files (baseline), ${agent_total} agent-format files, failing: ${fail}, warnings: ${warn}"
 if [ "$fail" -gt 0 ]; then
   echo "Prompt Defense Baseline lint: FAIL"
   exit 1
