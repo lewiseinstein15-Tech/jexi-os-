@@ -1,0 +1,156 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-09-18T05:39:22Z",
+  "divisions": [
+    {
+      "id": "automation",
+      "label": "Automation",
+      "icon": "Workflow",
+      "color": "#F59E0B",
+      "description": "Triggers, schedules, pipelines, hands-free runs",
+      "agentCount": 1
+    },
+    {
+      "id": "business",
+      "label": "Business",
+      "icon": "Briefcase",
+      "color": "#0EA5E9",
+      "description": "Strategy, finance, growth, market analysis",
+      "agentCount": 1
+    },
+    {
+      "id": "content",
+      "label": "Content",
+      "icon": "PenLine",
+      "color": "#EC4899",
+      "description": "Writing, editing, publishing, storytelling",
+      "agentCount": 1
+    },
+    {
+      "id": "data",
+      "label": "Data",
+      "icon": "Database",
+      "color": "#8B5CF6",
+      "description": "Pipelines, analysis, quality, datasets",
+      "agentCount": 6
+    },
+    {
+      "id": "design",
+      "label": "Design",
+      "icon": "Palette",
+      "color": "#F43F5E",
+      "description": "UI, UX, brand, visual systems",
+      "agentCount": 5
+    },
+    {
+      "id": "engineering",
+      "label": "Engineering",
+      "icon": "Code",
+      "color": "#3B82F6",
+      "description": "Coding, architecture, testing, review",
+      "agentCount": 23
+    },
+    {
+      "id": "integration",
+      "label": "Integration",
+      "icon": "Plug",
+      "color": "#14B8A6",
+      "description": "APIs, webhooks, third-party wiring",
+      "agentCount": 1
+    },
+    {
+      "id": "learning",
+      "label": "Learning",
+      "icon": "GraduationCap",
+      "color": "#84CC16",
+      "description": "Curricula, tutorials, skill building",
+      "agentCount": 1
+    },
+    {
+      "id": "legal",
+      "label": "Legal",
+      "icon": "Scale",
+      "color": "#64748B",
+      "description": "Contracts, compliance, policy review",
+      "agentCount": 1
+    },
+    {
+      "id": "localization",
+      "label": "Localization",
+      "icon": "Languages",
+      "color": "#06B6D4",
+      "description": "Translation, i18n, cultural adaptation",
+      "agentCount": 1
+    },
+    {
+      "id": "meta",
+      "label": "Meta",
+      "icon": "Bot",
+      "color": "#94A3B8",
+      "description": "Holds the canonical agent template",
+      "agentCount": 0,
+      "template": true
+    },
+    {
+      "id": "ops",
+      "label": "Ops",
+      "icon": "ServerCog",
+      "color": "#6366F1",
+      "description": "Deployment, monitoring, incident response",
+      "agentCount": 4
+    },
+    {
+      "id": "product",
+      "label": "Product",
+      "icon": "Compass",
+      "color": "#10B981",
+      "description": "Discovery, PRDs, roadmaps, prioritization",
+      "agentCount": 3
+    },
+    {
+      "id": "research",
+      "label": "Research",
+      "icon": "Microscope",
+      "color": "#A855F7",
+      "description": "Deep investigation, sources, synthesis",
+      "agentCount": 6
+    },
+    {
+      "id": "security",
+      "label": "Security",
+      "icon": "ShieldCheck",
+      "color": "#EF4444",
+      "description": "Threat modeling, audits, prompt defense",
+      "agentCount": 8
+    },
+    {
+      "id": "testing",
+      "label": "Testing",
+      "icon": "Bug",
+      "color": "#EAB308",
+      "description": "Test design, automation, coverage, QA",
+      "agentCount": 4
+    },
+    {
+      "id": "visualization",
+      "label": "Visualization",
+      "icon": "BarChart3",
+      "color": "#F97316",
+      "description": "Charts, diagrams, dashboards, visual explainers",
+      "agentCount": 1
+    },
+    {
+      "id": "voice",
+      "label": "Voice",
+      "icon": "Mic",
+      "color": "#D946EF",
+      "description": "Speech, narration, audio experiences",
+      "agentCount": 1
+    }
+  ],
+  "totals": {
+    "divisions": 18,
+    "agents": 68,
+    "templateFiles": 1
+  }
+}

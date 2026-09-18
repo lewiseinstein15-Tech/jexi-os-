@@ -1,14 +1,19 @@
 /**
- * JEXI OS — WORKFORCE REGISTRY — facade (Phase 7 I).
+ * JEXI OS — WORKFORCE REGISTRY — facade (Phase 7 I + J).
  *
  *   node -e "console.log(require('./workforce/registry').loadAgentFile('planner'))"
+ *   node -e "console.log(require('./workforce/registry').listDivisions().length)"
  *
  * The canonical agent files (agents/**\/*.agent.md) are the source of truth
  * for the specialist pool; the runtime registry (Phase 2D Director roster)
- * remains the hot path. This module:
+ * remains the hot path. The division registry (workforce/divisions.json,
+ * Phase 7 J) is the committed, CI-validated view of the agents/ tree. This module:
  *
  *   loadAgentFile(id)      — read + parse one canonical agent file by id
  *   list() / divisions()   — the indexed catalog
+ *   listDivisions()        — division registry entries (divisions.json)
+ *   getDivision(id)        — one division registry entry by id
+ *   agentsInDivision(id)   — all canonical agents in that division
  *   resolveTwoStage(query) — runtime-first, canonical-fallback resolution
  *   mergedRoster()         — runtime + canonical in one list
  */
@@ -63,6 +68,44 @@ export function catalogSummary() {
   return indexSummary();
 }
 
+const DIVISIONS_JSON = path.join(REG_DIR, '..', 'divisions.json');
+
+/** Division registry (Phase 7 J): all entries from workforce/divisions.json —
+ *  the committed, CI-validated view of the agents/ tree. Lets the console,
+ *  the router, and any tool enumerate divisions without scanning the
+ *  filesystem. Returns [{ id, label, icon, color, description, agentCount,
+ *  template? }] (empty array if the registry file has not been generated). */
+export function listDivisions() {
+  let raw;
+  try {
+    raw = fs.readFileSync(DIVISIONS_JSON, 'utf8');
+  } catch {
+    return []; // registry not generated yet — tolerant, like the catalog
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed.divisions) ? parsed.divisions : [];
+  } catch {
+    return []; // corrupt registry — never crash callers
+  }
+}
+
+/** One division registry entry by id (Phase 7 J), or null if unknown. */
+export function getDivision(id) {
+  const wanted = String(id || '').toLowerCase();
+  return listDivisions().find((d) => d && d.id === wanted) || null;
+}
+
+/** All canonical agents in a division (Phase 7 J), resolved through the
+ *  indexed catalog (Scope I) — same data the registry's agentCount is
+ *  computed from. Unknown division → empty array. */
+export function agentsInDivision(id) {
+  const wanted = String(id || '').toLowerCase();
+  const { byId, divisions } = buildIndex();
+  const ids = divisions.get(wanted) || [];
+  return ids.map((aid) => byId.get(aid)).filter(Boolean);
+}
+
 export { resolveTwoStage, mergedRoster, buildIndex, indexSummary, parseFrontmatter };
 
-export default { loadAgentFile, list, divisions, catalogSummary, resolveTwoStage, mergedRoster, buildIndex, indexSummary, parseFrontmatter };
+export default { loadAgentFile, list, divisions, catalogSummary, listDivisions, getDivision, agentsInDivision, resolveTwoStage, mergedRoster, buildIndex, indexSummary, parseFrontmatter };

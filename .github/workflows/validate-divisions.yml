@@ -1,0 +1,36 @@
+name: validate-divisions
+
+# Phase 7 J — the division registry (workforce/divisions.json) must always
+# match the agents/ tree. The generator runs in --check mode: any drift
+# between the committed registry and the disk state fails CI with the
+# specific diff, so it is caught before it lands.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'agents/**'
+      - 'workforce/divisions.json'
+      - 'scripts/generate-divisions.js'
+      - '.github/workflows/validate-divisions.yml'
+  pull_request:
+    paths:
+      - 'agents/**'
+      - 'workforce/divisions.json'
+      - 'scripts/generate-divisions.js'
+      - '.github/workflows/validate-divisions.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-divisions:
+    name: Division registry drift check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate divisions registry (generate + compare)
+        run: node scripts/generate-divisions.js --check
