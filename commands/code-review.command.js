@@ -70,8 +70,13 @@ export default {
 
     // ── spawn a fresh reviewer agent (isolated context) when a provider is live
     const subagents = await serverMod('src/services/SubagentRuntime.js');
+    const LLMmod = await serverMod('src/providers/runtime/LLMClient.js');
     const providers = await serverMod('src/providers/index.js');
-    const canLLM = !!(providers && typeof providers.canChat === 'function' && providers.canChat());
+    // a key on ANY provider is enough — the agent loop talks through
+    // LLMClient.generateContent (resolveKeys), which is more permissive than
+    // the capability registry's canChat() gate.
+    const anyKey = !!(LLMmod?.resolveKeys && Object.values(LLMmod.resolveKeys()).some(Boolean));
+    const canLLM = anyKey || !!(providers && typeof providers.canChat === 'function' && providers.canChat());
 
     if (canLLM && subagents && typeof subagents.runIsolatedSubagent === 'function') {
       ctx.log('spawning reviewer agent (isolated subagent, code-reviewer)…');

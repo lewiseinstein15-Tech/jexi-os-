@@ -62,7 +62,9 @@ function busEvents(prefix) {
     '}',
     '',
   ].join('\n'));
+  execFileSync('git', ['add', '-N', path.relative(REPO_ROOT, scratch)], { cwd: REPO_ROOT }); // intent-to-add: the small real diff IS the diff
   const r = await C.dispatch('/code-review', { agent: { name: 'probe' } });
+  execFileSync('git', ['reset', '-q', 'HEAD', '--', path.relative(REPO_ROOT, scratch)], { cwd: REPO_ROOT });
   fs.unlinkSync(scratch);
   rec(2, '/code-review', {
     ok: r.ok,

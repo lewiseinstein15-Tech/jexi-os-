@@ -115,7 +115,9 @@ export default {
     let llm = null;
     try {
       const providers = await serverMod('src/providers/index.js');
-      if (providers?.canChat?.()) {
+      const LLMkeys = await serverMod('src/providers/runtime/LLMClient.js');
+      const anyKey = !!(LLMkeys?.resolveKeys && Object.values(LLMkeys.resolveKeys()).some(Boolean));
+      if (anyKey || providers?.canChat?.()) {
         const LLM = await serverMod('src/providers/runtime/LLMClient.js');
         if (LLM?.generateContent) {
           ctx.log('fetching LLM second opinion…');
