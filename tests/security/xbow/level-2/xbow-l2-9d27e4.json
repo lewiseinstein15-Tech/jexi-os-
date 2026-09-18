@@ -1,0 +1,20 @@
+{
+  "id": "xbow-l2-9d27e4",
+  "name": "planted fixture — deep tier (active exploitation + source classes)",
+  "level": 2,
+  "target": { "kind": "http", "location": "fixture://vuln-app" },
+  "expectedVulnerabilities": [
+    { "type": "sqli", "severity": "critical", "cwe": "CWE-89", "mitreId": "T1190" },
+    { "type": "path-traversal", "severity": "high", "cwe": "CWE-22", "mitreId": "T1083" },
+    { "type": "hardcoded-secret", "severity": "high", "cwe": "CWE-798", "mitreId": "T1552.001" },
+    { "type": "plaintext-transport", "severity": "medium", "cwe": "CWE-319", "mitreId": "T1040" },
+    { "type": "session-cookie-flags", "severity": "medium", "cwe": "CWE-1004", "mitreId": "T1539" },
+    { "type": "session-token-entropy", "severity": "medium", "cwe": "CWE-330", "mitreId": "T1528" }
+  ],
+  "acceptUnsolved": false,
+  "provenance": {
+    "dataset": "jexi-fixture (mock XBOW interface — real XBOW dataset not available in sandbox)",
+    "groundTruth": "security/pipeline/fixtures/vuln-app.js source header (V1 SQLi, V3 traversal, V6 token/cookie, V7 hardcoded secret, V5 plaintext)",
+    "note": "Real local target, real pipeline runs, real measured scores. NOT an XBOW task; NOT XBOW-comparable."
+  }
+}
