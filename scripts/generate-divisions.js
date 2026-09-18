@@ -15,6 +15,12 @@
  *   - Deterministic: running twice produces byte-identical output (sha256
  *     stable). generatedAt is derived from git — the committer date of the
  *     last commit that touched agents/ — never from wall-clock time.
+ *   - --check compares the registry against the tree EXCLUDING generatedAt:
+ *     a commit that touches both agents/ and this registry cannot embed its
+ *     own committer date (the commit does not exist while the registry is
+ *     being regenerated), so a byte match on the timestamp is structurally
+ *     impossible exactly when the check matters most. All tree-describing
+ *     content — division set, counts, metadata, totals — is compared.
  */
 
 import fs from 'fs';
@@ -185,14 +191,31 @@ function main() {
       console.error('DRIFT: workforce/divisions.json is MISSING — run: node scripts/generate-divisions.js');
       process.exit(1);
     }
-    if (onDisk === generated) {
-      console.log(`OK: workforce/divisions.json matches the agents/ tree (divisions: ${stats.divisions}, agents: ${stats.agents}, templateFiles: ${stats.templateFiles})`);
+    // generatedAt is excluded from the comparison — see the header note.
+    // A commit touching both agents/ and this registry can never embed its
+    // own committer date, so byte-matching the timestamp would fail every
+    // such commit. Structural content is still compared strictly.
+    const strip = (txt) => {
+      const obj = JSON.parse(txt);
+      delete obj.generatedAt;
+      return render(obj);
+    };
+    let diskNorm;
+    try {
+      diskNorm = strip(onDisk);
+    } catch {
+      console.error('DRIFT: workforce/divisions.json is not valid JSON — run: node scripts/generate-divisions.js');
+      process.exit(1);
+    }
+    const genNorm = strip(generated);
+    if (diskNorm === genNorm) {
+      console.log(`OK: workforce/divisions.json matches the agents/ tree (divisions: ${stats.divisions}, agents: ${stats.agents}, templateFiles: ${stats.templateFiles}; generatedAt excluded from comparison)`);
       process.exit(0);
     }
     console.error('DRIFT: workforce/divisions.json does not match the agents/ tree.');
     console.error('--- workforce/divisions.json (on disk)');
     console.error('+++ generated (expected)');
-    for (const line of lineDiff(onDisk.split('\n'), generated.split('\n'))) console.error(line);
+    for (const line of lineDiff(diskNorm.split('\n'), genNorm.split('\n'))) console.error(line);
     console.error('\nFix: node scripts/generate-divisions.js  (then commit the updated registry)');
     process.exit(1);
   }

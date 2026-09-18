@@ -48,7 +48,7 @@
       "icon": "Code",
       "color": "#3B82F6",
       "description": "Coding, architecture, testing, review",
-      "agentCount": 23
+      "agentCount": 24
     },
     {
       "id": "integration",
@@ -113,7 +113,7 @@
       "icon": "Microscope",
       "color": "#A855F7",
       "description": "Deep investigation, sources, synthesis",
-      "agentCount": 6
+      "agentCount": 7
     },
     {
       "id": "security",
@@ -121,7 +121,7 @@
       "icon": "ShieldCheck",
       "color": "#EF4444",
       "description": "Threat modeling, audits, prompt defense",
-      "agentCount": 8
+      "agentCount": 24
     },
     {
       "id": "testing",
@@ -129,7 +129,7 @@
       "icon": "Bug",
       "color": "#EAB308",
       "description": "Test design, automation, coverage, QA",
-      "agentCount": 4
+      "agentCount": 6
     },
     {
       "id": "visualization",
@@ -150,7 +150,7 @@
   ],
   "totals": {
     "divisions": 18,
-    "agents": 68,
+    "agents": 88,
     "templateFiles": 1
   }
 }
