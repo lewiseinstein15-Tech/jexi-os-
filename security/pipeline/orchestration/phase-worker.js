@@ -32,6 +32,7 @@ import * as preRecon from '../phases/pre-recon.phase.js';
 import * as recon from '../phases/recon.phase.js';
 import * as vulnerability from '../phases/vulnerability.phase.js';
 import * as exploitation from '../phases/exploitation.phase.js';
+import * as verification from '../phases/verification.phase.js'; // Phase 8(G)
 import * as reporting from '../phases/reporting.phase.js';
 
 const PHASES = {
@@ -39,6 +40,7 @@ const PHASES = {
   'recon': recon.phase,
   'vulnerability': vulnerability.phase,
   'exploitation': exploitation.phase,
+  'verification': verification.phase,
   'reporting': reporting.phase,
 };
 

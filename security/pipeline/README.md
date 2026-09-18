@@ -1,8 +1,8 @@
 # JEXI OS — Phase 8 Scope A: Pentest Pipeline
 
-Shannon-pattern five-phase security pipeline. One phase per Shannon stage,
-every phase produces real artifacts, and the run is durable — it survives
-`kill -9` at any instant.
+Shannon-pattern security pipeline (six phases since Phase 8G). One phase per
+Shannon stage plus an independent verification gate, every phase produces
+real artifacts, and the run is durable — it survives `kill -9` at any instant.
 
 ```
 security/pipeline/
@@ -12,13 +12,22 @@ security/pipeline/
 │   ├── durable-workflow.js     Temporal-equivalent driver (skip/resume semantics)
 │   └── checkpoint.js           durable state I/O — atomic writes, append-only events
 ├── phases/
-│   ├── pre-recon.phase.js      1/5  source analysis → hypotheses
-│   ├── recon.phase.js          2/5  live crawl → app map (pages, forms, headers)
-│   ├── vulnerability.phase.js  3/5  5 parallel OWASP agents (A01 A02 A03 A05 A07)
-│   ├── exploitation.phase.js   4/5  PoC validation; ≥2 methods for critical/high
-│   └── reporting.phase.js      5/5  "no exploit, no report" deliverable
+│   ├── pre-recon.phase.js      1/6  source analysis → hypotheses
+│   ├── recon.phase.js          2/6  live crawl → app map (pages, forms, headers)
+│   ├── vulnerability.phase.js  3/6  5 parallel OWASP agents (A01 A02 A03 A05 A07)
+│   ├── exploitation.phase.js   4/6  PoC validation (the DOER'S claims); ≥2 methods for critical/high
+│   ├── verification.phase.js   5/6  independent re-execution — VERIFIED / REJECTED / INVALIDATED (Phase 8G)
+│   └── reporting.phase.js      6/6  "no exploit, no report" deliverable
 └── fixtures/vuln-app.js        deliberately vulnerable LOCAL target (127.0.0.1 only)
 ```
+
+The verification phase (Phase 8G) is the independent gate between
+exploitation and reporting: the exploit agent's EXPLOITED claim is never
+trusted — the verifier re-executes with its own methods and markers, demands
+≥2 independent observations for CRITICAL/HIGH, commits an immutable evidence
+snapshot to the knowledge graph, and refuses to verify its own doer
+(`verifier ≠ doer`) or anything outside the engagement RoE. Post-verification
+tampering invalidates the evidence hash. See `verification/verifiers/README.md`.
 
 ## Phase contract
 
@@ -68,4 +77,6 @@ for await (const ev of createWorkflow({...}).execute()) console.log(ev);
 The pipeline probes ONLY the planted sandbox fixture (`fixtures/vuln-app.js`,
 bound to 127.0.0.1). No third-party target, no real offensive tooling is
 invoked, and no tool output is simulated anywhere. The exploit gate is
-absolute: findings without a reproducible PoC never reach the report.
+absolute — and since Phase 8G it is double-locked: the doer's PoC AND an
+independent verification (VERIFIED status + intact evidence snapshot) are
+both required; findings without that never reach the report.

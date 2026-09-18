@@ -255,6 +255,10 @@ export class DurableWorkflow {
       diedMidPhase: ctx.diedMidPhase,
       engagement: ctx.engagement,
       engagementDb: this.engagementDb,
+      // Phase 8(G): verifier/doer identities travel with the phase — the
+      // verifier ≠ doer rule must hold on sandbox-net too.
+      verifiedBy: ctx.verifiedBy,
+      exploitedBy: ctx.exploitedBy,
     };
   }
 

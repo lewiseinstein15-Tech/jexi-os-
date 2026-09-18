@@ -17,6 +17,7 @@ import { ServiceEntity } from './entities/service.entity.js';
 import { VulnerabilityEntity } from './entities/vulnerability.entity.js';
 import { ExploitEntity } from './entities/exploit.entity.js';
 import { CredentialEntity } from './entities/credential.entity.js';
+import { VerificationEntity } from './entities/verification.entity.js'; // Phase 8(G)
 import { ConnectsToEdge } from './edges/connects-to.edge.js';
 import { ExploitsEdge } from './edges/exploits.edge.js';
 import { EscalatesToEdge } from './edges/escalates-to.edge.js';
@@ -35,6 +36,7 @@ export class KnowledgeGraph {
     this.vulnerability = new VulnerabilityEntity(this.store);
     this.exploit = new ExploitEntity(this.store);
     this.credential = new CredentialEntity(this.store);
+    this.verification = new VerificationEntity(this.store); // Phase 8(G): finding_verifications
     this.connectsTo = new ConnectsToEdge(this.store);
     this.exploits = new ExploitsEdge(this.store);
     this.escalatesTo = new EscalatesToEdge(this.store);

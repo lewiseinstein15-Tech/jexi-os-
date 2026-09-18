@@ -247,7 +247,9 @@ async function P9() {
     targets: ['127.0.0.1'],
     networks: [{ cidr: '127.0.0.0/8', allowed: true }],
     networkMode: 'dual',
-    allowedActions: ['scan', 'exploit', 'report'],
+    // Phase 8(G): the pipeline's verification phase re-executes exploits —
+    // 'verify' must be an authorized action for the run to complete.
+    allowedActions: ['scan', 'exploit', 'verify', 'report'],
     forbiddenActions: ['exfiltrate-data'],
     requiresApproval: ['exploit'],
     maxSeverity: 'high',
@@ -283,12 +285,12 @@ async function P9() {
   show('audit trace (workflow callers, per phase)', wfAudit.map((e) => ({ caller: e.caller, op: e.op, decision: e.decision.status })));
 
   const ok = runJson.status === 'complete'
-    && completions.length === 5
-    && dispatches.length === 10   // dispatched + complete per phase × 5
+    && completions.length === 6
+    && dispatches.length === 12   // dispatched + complete per phase × 6 (Phase 8G: verification is the 6th phase)
     && violations.length === 0
     && artifacts.length > 0
-    && wfAudit.length >= 15;      // ctx write + run + spool read per phase
-  (ok ? pass : fail)('P9', `5/5 phases through the bridge, ${wfAudit.length} audited crossings`);
+    && wfAudit.length >= 18;      // ctx write + run + spool read per phase
+  (ok ? pass : fail)('P9', `6/6 phases through the bridge, ${wfAudit.length} audited crossings`);
 }
 
 /* ================= P10 — bridge tamper detection ========================= */
