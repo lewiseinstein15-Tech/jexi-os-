@@ -1,0 +1,2 @@
+notes.txt: benign fixture file for /download
+Do not put secrets here.
