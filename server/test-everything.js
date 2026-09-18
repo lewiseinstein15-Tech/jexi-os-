@@ -19,9 +19,50 @@
 
 import fs from 'fs';
 import path from 'path';
+import net from 'net';
 import { spawn } from 'child_process';
 import { setTimeout as sleep } from 'timers/promises';
 import os from 'os';
+
+/** Grab a free ephemeral port — a fixed 3996/3997 breaks the whole section
+ * forever if any earlier chain test leaks a listener on it. */
+function freePort() {
+  return new Promise((resolve) => {
+    const srv = net.createServer();
+    srv.listen(0, '127.0.0.1', () => {
+      const p = srv.address().port;
+      srv.close(() => resolve(p));
+    });
+  });
+}
+
+/** Boot the real brain on `port` with a 60s window (a cold 2-core CI runner
+ * AFTER ~20 minutes of preceding chain load needs more than the old 20s),
+ * capturing its output so a boot failure is diagnosable instead of silent. */
+async function bootBrain(port) {
+  const child = spawn(process.execPath, ['index.js'], {
+    cwd: SERVER_DIR,
+    env: { ...process.env, PORT: String(port), REDIS_URL: '' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let out = '';
+  child.stdout.on('data', (d) => { out += d; if (out.length > 20000) out = out.slice(-20000); });
+  child.stderr.on('data', (d) => { out += d; if (out.length > 20000) out = out.slice(-20000); });
+  let booted = false;
+  for (let i = 0; i < 120; i += 1) {
+    await sleep(500);
+    try {
+      const r = await fetch(`http://127.0.0.1:${port}/api/health`, { signal: AbortSignal.timeout(3000) });
+      if (r.ok) { booted = true; break; }
+    } catch { /* keep waiting */ }
+  }
+  return { child, booted, out };
+}
+
+function killBrain(child) {
+  try { child.kill('SIGTERM'); } catch { /* already gone */ }
+  setTimeout(() => { try { if (child.exitCode === null) child.kill('SIGKILL'); } catch { /* gone */ } }, 2000).unref?.();
+}
 import { pathToFileURL } from 'url';
 
 /* B158 — node:sqlite (Node ≥ 22.5) gates the sqlite session mirror; the JSON
@@ -600,21 +641,13 @@ section('H. LIFECYCLE & PERSISTENCE');
 /* ═══════════════════════ I. API SURFACE (live server) ═══════════════════════ */
 section('I. API SURFACE — live server boot');
 {
-  const PORT = 3996;
-  const child = spawn(process.execPath, ['index.js'], {
-    cwd: SERVER_DIR,
-    env: { ...process.env, PORT: String(PORT), REDIS_URL: '' },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  let booted = false;
-  for (let i = 0; i < 40; i += 1) {
-    await sleep(500);
-    try {
-      const r = await fetch(`http://127.0.0.1:${PORT}/api/health`, { signal: AbortSignal.timeout(3000) });
-      if (r.ok) { booted = true; break; }
-    } catch { /* keep waiting */ }
-  }
+  const PORT = await freePort();
+  const { child, booted, out } = await bootBrain(PORT);
   ok('server boots', booted === true);
+  if (!booted) {
+    console.log('   server output tail (last 12 lines):');
+    console.log(out.split('\n').slice(-12).map((l) => `     ${l}`).join('\n'));
+  }
   if (booted) {
     const eps = [
       '/api/health', '/api/brand', '/api/retention', '/api/web/providers', '/api/bundles',
@@ -660,7 +693,7 @@ section('I. API SURFACE — live server boot');
       console.log(`⏭ chat round-trip SKIPPED — the server booted but no provider answered within 60s (${String(e && e.name || e)}). The NDJSON contract is unchanged by provider weather.`);
     }
   }
-  child.kill('SIGTERM');
+  killBrain(child);
 }
 
 /* ═══════════════════════ J. HEADLESS + SDK ═══════════════════════ */
@@ -677,15 +710,9 @@ section('J. HEADLESS CLI + SDK');
   ok('cli self-test reports ok:true', cli.out.includes('"ok": true') || cli.out.includes('"ok":true'));
 
   const { JexiClient } = await import('./sdk/client.js');
-  const client = new JexiClient({ baseUrl: 'http://127.0.0.1:3996' });
-  // SDK against a booted server
-  const PORT = 3997;
-  const child = spawn(process.execPath, ['index.js'], { cwd: SERVER_DIR, env: { ...process.env, PORT: String(PORT), REDIS_URL: '' }, stdio: 'ignore' });
-  let booted = false;
-  for (let i = 0; i < 40; i += 1) {
-    await sleep(500);
-    try { const r = await fetch(`http://127.0.0.1:${PORT}/api/health`, { signal: AbortSignal.timeout(3000) }); if (r.ok) { booted = true; break; } } catch { /* noop */ }
-  }
+  // SDK against a booted server (ephemeral port — no fixed-port collisions)
+  const PORT = await freePort();
+  const { child, booted, out } = await bootBrain(PORT);
   if (booted) {
     const sdkClient = new JexiClient({ baseUrl: `http://127.0.0.1:${PORT}` });
     const health = await sdkClient.health();
@@ -696,8 +723,10 @@ section('J. HEADLESS CLI + SDK');
     ok('sdk conversations list', Array.isArray(convs) || (convs && Array.isArray(convs.conversations)));
   } else {
     ok('sdk server booted for client test', false);
+    console.log('   server output tail (last 12 lines):');
+    console.log(out.split('\n').slice(-12).map((l) => `     ${l}`).join('\n'));
   }
-  child.kill('SIGTERM');
+  killBrain(child);
 }
 
 /* ──────────────────────── FINAL ──────────────────────── */

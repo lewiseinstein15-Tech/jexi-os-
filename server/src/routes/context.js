@@ -22,7 +22,7 @@ import {
   contextPressure,
   listSources,
 } from '../context/index.js';
-import { taskStats } from './TaskRegistry.js';
+import { taskStats } from '../services/TaskRegistry.js';
 
 function ok(res, body) { res.json({ ok: true, ...body }); }
 function fail(res, e, code = 500) { res.status(code).json({ ok: false, error: String(e?.message || e).slice(0, 300) }); }
