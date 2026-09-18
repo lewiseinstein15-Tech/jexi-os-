@@ -51,7 +51,7 @@ screens had zero importers (dead since a shell refactor). The spec's C/D/F now l
 - All **9 views PASS**: scrollWidth=390, zero overflowing elements, zero console errors, each view
   render-proofed by waiting for its content (burger → menu → label → proof text).
 - Desktop 1280 spot-check: Memory/Books/App/Missions OK, 0 console errors.
-- Screenshots in `b221-shots/` (uncommitted, workspace-only).
+- Screenshots in `docs/assets/b221-shots/` (moved from repo root; now committed).
 - Full server chain: **EXIT=0, 0 ❌, 497s** (`/tmp/chain-b221.log` pattern).
 
 ## Honest limits

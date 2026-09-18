@@ -91,5 +91,5 @@
   feed already exist and were untouched; the operational-timeline treatment
   of the chat lane is future polish.
 - **SSE/WebSocket**: still adaptive polling (spec-permitted existing fabric).
-- The screenshot artifact of the drive lives at `b216-mission-detail.png`
+- The screenshot artifact of the drive lives at `docs/assets/b216-mission-detail.png`
   (workspace evidence, not shipped in the repo).
