@@ -84,7 +84,7 @@ try {
 
   // ── the console UI: pin backend, type /checkpoint, screenshot ──────────
   const { chromium } = await import(pathToFileURL(path.join(REPO_ROOT, 'node_modules', 'playwright', 'index.mjs')).href);
-  const browser = await chromium.launch({ headless: true, executablePath: '/home/z/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome', args: ['--no-sandbox'] });
+  const browser = await chromium.launch({ headless: true, executablePath: '/home/z/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome', args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process'] });
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   await page.addInitScript(([url]) => { try { localStorage.setItem('jexi_backend_url', url); } catch {} }, [`http://127.0.0.1:${PORT}`]);
   await page.goto(`http://127.0.0.1:${UI_PORT}/`, { waitUntil: 'networkidle', timeout: 45000 });
@@ -95,16 +95,23 @@ try {
   // route to #chat where ChatView's input lives.
   let appeared = false;
   let input = null;
+  page.on('pageerror', (e) => console.log('PAGE EXCEPTION:', String(e).slice(0, 160)));
   for (let i = 0; i < 60; i++) {
     await wait(2000);
     const body = await page.locator('body').innerText().catch(() => '');
+    if (i % 10 === 5) console.log(`boot poll t+${i * 2}s:`, JSON.stringify(body.slice(0, 110)));
     if (body.includes('EXECUTIVE') || body.includes('Message JEXI')) {
       await page.evaluate(() => { window.location.hash = '#chat'; }).catch(() => {});
       input = page.locator('input[placeholder*="Message JEXI"]').first();
       try { await input.waitFor({ timeout: 8000 }); break; } catch { input = null; }
     }
   }
-  if (!input) throw new Error('console chat input never appeared after boot');
+  if (!input) {
+    await page.screenshot({ path: path.join(OUT, 'p15-failure-debug.png'), fullPage: false }).catch(() => {});
+    const bodyTxt = await page.locator('body').innerText().catch(() => '(no body)');
+    fs.writeFileSync(path.join(OUT, 'p15-failure-body.txt'), bodyTxt.slice(0, 800));
+    throw new Error('console chat input never appeared after boot');
+  }
   await input.click();
   await input.fill('/checkpoint --label p15-console');
   await page.screenshot({ path: path.join(OUT, 'p15-before-send.png'), fullPage: false });
