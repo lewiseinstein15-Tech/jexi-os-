@@ -11,6 +11,7 @@ import { cacheKey, cacheGet, cacheSet } from '../../services/ResponseCache.js'; 
 import { dedupeInflight, requestIdentity } from '../../services/RequestDedup.js'; // AGI Phase 1 — concurrent identical calls share one request
 import { noteMeterModelCall } from '../../services/RequestMeter.js'; // ARENA — every model call in a turn is metered automatically
 import { tryUnified, unifiedToolConfig, unifiedAnthropicToolRound, configForCall } from '../../services/providers/unified.js'; // UNIFIED — one-secret model leg (provider + key + model + baseURL)
+import { OllamaAdapter } from '../adapters/ollama.js'; // ZONE-OWNER 2-COMPLETION — canonical Ollama exposure guard (item 2) for the runtime leg
 import { hudNoteSpend } from '../../kernel/hooks/hud-seam.js'; // Phase 7(F) — HUD cost feed (real call sizes)
 // ZONE-OWNER ITEM 5 (Phase 9 E seam): cost caps are consulted on the LIVE
 // model-call path. providers/cost/caps.js README: "check({ spendUsd }) … is
@@ -668,6 +669,15 @@ async function tryOllama(prompt, system, imageBase64, opts, errors) {
   const model = opts.model || process.env.MODEL_NAME || process.env.OLLAMA_MODEL || 'qwen3';
   const outer = opts && opts.signal; // outside try: the catch must read it (caller-abort != leg failure)
   try {
+    // ZONE-OWNER 2-COMPLETION (Step 2 discovery b) — BYPASS CLOSED: the
+    // runtime leg consults the CANONICAL OllamaAdapter exposure guard
+    // (item 2 → security/shield/inference-exposure.js#checkBind via
+    // adapters/ollama.js#init) BEFORE any HTTP is issued. Exposed bind
+    // without ALLOW_OLLAMA_EXPOSED=1 → OllamaExposureError (E_OLLAMA_EXPOSED)
+    // → the leg refuses honestly (errors + provider health record it) and the
+    // ladder slides to the remote rungs; with the flag → WARNING then proceed;
+    // loopback → silent. ONE refusal point — no duplicated guard logic here.
+    new OllamaAdapter({ baseUrl: base }, process.env).init();
     const controller = new AbortController();
     // Final F5 — local inference is SLOW (CPU, ~11 tok/s): the shared 90s
     // budget killed working non-streamed turns (observed: a 107s plan turn
