@@ -38,6 +38,39 @@ allows") unnecessary for the hosted brain.
 | `index.js` | facade: availability probe, runtime, Playwright connect |
 | `compose.yaml` | Docker deployment (loopback-published port) |
 | `../../scripts/phase17-a-probe.mjs` | live probe P1–P6 |
+| `cdp.js` | raw CDP client — flattened sessions, no npm dependency |
+| `dom-service.js` | DOM → indexed element list with stable durable keys |
+| `actions/` | 59 browser actions behind a permissioned registry |
+| `agent-loop.js` | observe → think → act cycle |
+| `../../scripts/phase17-b-probe.mjs` | live probe P1–P7 |
+
+## Scope B — actions and the agent loop
+
+`actions/` holds **59 actions** in eight groups (navigation 8, interaction 12,
+forms 6, tabs 7, dialogs 5, extraction 7, dom_mutation 9, files 5). Every action
+declares a JSON Schema for its input and output, a risk level, the permissions it
+needs, a timeout, and its retry policy; `dispatch()` validates the input and the
+handler's result against those schemas, so a malformed call fails as an
+`ActionValidationError` instead of reaching the page.
+
+`agent-loop.js` runs observe → think → act. `think` calls an injected `decide`
+function, so a scripted planner drives the identical code path a model would —
+which is what makes the probe reproducible without mocking the browser.
+
+### Engine behaviour the actions have to absorb
+
+Both of these were found by the Scope B probe and are handled in code:
+
+- **Static inline elements report a 0×0 box.** Obscura returns
+  `width: 0, height: 0` from `getBoundingClientRect()` for a rendered static
+  inline element such as a bare `<a>`. Treating a zero-size box as hidden drops
+  real links from the snapshot, so `dom-service.js` decides visibility from the
+  ancestor chain instead. A side effect is correct handling of a child whose
+  parent is `display:none`: the child's own computed `display` still reads
+  `inline`, so only the ancestor walk catches it.
+- **A click on a zero-box element**. `performClick` falls back to a DOM
+  `el.click()` when the target has no clickable box, and reports
+  `method: "dom-click"` with a note. The probe prints which path each click took.
 
 ## Install
 
