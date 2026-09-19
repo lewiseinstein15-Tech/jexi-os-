@@ -21,6 +21,7 @@ const SKIP_DIRS = new Set([
   '__pycache__', '.next', '.cache', 'target', '.turbo', '.pytest_cache',
 ]);
 const MAX_FILE_BYTES = 512 * 1024;
+const MANIFEST_BASENAMES = /^(Dockerfile.*|docker-compose[^/]*\.ya?ml)$/;
 // Member-style method names: a bare-name call with one of these only ever
 // resolves to a same-file definition (they overwhelmingly come from `x.name(`
 // receiver calls whose receiver the bare scan cannot see).
@@ -72,8 +73,9 @@ export async function indexRepository({ root, store, project = 'jexi-os', fresh 
     let st;
     try { st = fs.statSync(abs); } catch { continue; }
     if (!st.isFile() || st.size > MAX_FILE_BYTES) continue;
-    if (isIndexableSource(rel) && !/\.(ya?ml|json|md|txt|html|css|wasm)$/.test(rel)) sources.push(rel);
-    else if (/^(Dockerfile.*|docker-compose[^/]*\.ya?ml)$/.test(rel.split('/').pop())) manifests.push(rel);
+    const base = rel.split('/').pop();
+    if (isIndexableSource(rel) && !MANIFEST_BASENAMES.test(base) && !/\.(ya?ml|json|md|txt|html|css|wasm)$/.test(rel)) sources.push(rel);
+    else if (/^(Dockerfile.*|docker-compose[^/]*\.ya?ml)$/.test(base)) manifests.push(rel);
     else if (/\.(ya?ml)$/.test(rel)) manifests.push(rel);
   }
 
