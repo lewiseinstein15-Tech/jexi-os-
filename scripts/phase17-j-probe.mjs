@@ -13,7 +13,10 @@ import assert from 'node:assert/strict';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 import { checkBind, startupNotice, isExposureAllowed } from '../security/shield/inference-exposure.js';
-import { OllamaProvider, OllamaExposureError } from '../providers/adapters/ollama.provider.js';
+// ZONE-OWNER ITEM 2 consolidation: the standalone duplicate
+// providers/adapters/ollama.provider.js was REMOVED — the canonical
+// exposure-guarded provider is the runtime adapter itself.
+import { OllamaAdapter as OllamaProvider, OllamaExposureError } from '../server/src/providers/adapters/ollama.js';
 
 const results = [];
 const verdict = (id, name, ok, evidence, status) => {
@@ -168,12 +171,14 @@ const close = (srv) => new Promise((r) => srv.close(() => r()));
 
 // ── P10 — integration point ──────────────────────────────────────────────────
 {
-  const grep = execFileSync('grep', ['-n', 'checkBind\\|isExposureAllowed\\|OllamaExposureError\\|127.0.0.1', path.join(ROOT, 'providers/adapters/ollama.provider.js')], { encoding: 'utf8' });
+  // ZONE-OWNER ITEM 2: canonical enforcement moved into the runtime adapter;
+  // the standalone providers/adapters/ollama.provider.js was removed.
+  const grep = execFileSync('grep', ['-n', 'checkBind\\|isExposureAllowed\\|OllamaExposureError\\|127.0.0.1', path.join(ROOT, 'server/src/providers/adapters/ollama.js')], { encoding: 'utf8' });
   const wiring = [
-    'IN-ZONE (this scope): providers/adapters/ollama.provider.js — init() calls checkBind via this.exposure() (see grep lines above).',
-    'ZONE-OWNER TASKS (recorded, NOT actioned — server/** is out of zone):',
-    '  1. server/src/providers/adapters/ollama.js — delegate host validation to security/shield/inference-exposure.js#checkBind so OLLAMA_HOST=0.0.0.0 hits the same refusal.',
-    '  2. server/index.js — if Ollama is spawned by the server, run OllamaProvider#init()/checkBind before spawn and handle E_OLLAMA_EXPOSED.',
+    'CANONICAL (ZONE-OWNER item 2): server/src/providers/adapters/ollama.js — init() calls checkBind via this.exposure(); chat()/stream() enforce lazily (see grep lines above).',
+    'The standalone duplicate providers/adapters/ollama.provider.js was REMOVED — this probe now imports the canonical adapter.',
+    'ZONE-OWNER TASK (recorded, NOT actioned):',
+    '  1. server/index.js — if Ollama is spawned by the server, run OllamaAdapter#init()/checkBind before spawn and handle E_OLLAMA_EXPOSED.',
     'Note: security/shield/ssrf.js / dns-guard.js / tls-pin.js (Phase 9) do NOT exist on phase-17-arena at b75bd4f — no coordination conflict possible from this scope.',
   ];
   verdict(10, 'integration point cited (file:line) + zone-owner tasks recorded', !!grep, grep + '\n\n' + wiring.join('\n'));
