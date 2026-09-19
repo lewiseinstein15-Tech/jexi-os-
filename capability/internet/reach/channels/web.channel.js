@@ -41,31 +41,45 @@ export function isAntibotPage(body) {
   return (jinaCaptcha && challengeStructure) || cloudflareBlock;
 }
 
-/** GET (with redirects) — resolve({status, headers, body, truncated}) | reject(Error). */
+/** GET (with redirects) — resolve({status, headers, body, truncated}) | reject(Error). ALWAYS settles. */
 export function httpGet(url, { timeoutMs = 15000, maxBytes = 5 * 1024 * 1024, headers = {}, fetchImpl = null } = {}) {
   if (fetchImpl) return fetchImpl(url, { timeoutMs, maxBytes, headers });
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const done = (fn, v) => { if (!settled) { settled = true; fn(v); } };
     const req = (/^http:/.test(url) ? http : https).get(url, {
       headers: { 'User-Agent': UA, Accept: 'text/plain, text/markdown, */*', ...headers },
       timeout: timeoutMs,
     }, (res) => {
       if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
         res.resume();
-        const next = new URL(res.headers.location, url).toString();
-        return resolve(httpGet(next, { timeoutMs, maxBytes, headers, fetchImpl }));
+        let next;
+        try {
+          next = new URL(res.headers.location, url).toString();
+        } catch (err) {
+          return done(reject, new Error(`bad redirect location "${res.headers.location}" from ${url}`));
+        }
+        return httpGet(next, { timeoutMs, maxBytes, headers, fetchImpl }).then((v) => done(resolve, v), (e) => done(reject, e));
       }
       const chunks = [];
       let total = 0;
+      let overLimit = false;
       res.on('data', (c) => {
         total += c.length;
         if (total <= maxBytes) chunks.push(c);
-        else res.destroy();
+        else {
+          overLimit = true;
+          res.destroy(); // 'close' below settles the promise (truncated)
+        }
       });
-      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString('utf8'), truncated: total > maxBytes }));
-      res.on('error', reject);
+      res.on('end', () => done(resolve, { status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString('utf8'), truncated: overLimit }));
+      res.on('error', (e) => done(reject, overLimit ? { status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString('utf8'), truncated: true } : e));
+      res.on('close', () => {
+        if (!settled) done(resolve, { status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString('utf8'), truncated: overLimit });
+      });
     });
     req.on('timeout', () => { req.destroy(new Error(`timeout after ${timeoutMs}ms`)); });
-    req.on('error', reject);
+    req.on('error', (e) => done(reject, e));
   });
 }
 
