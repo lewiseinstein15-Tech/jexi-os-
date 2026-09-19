@@ -1,0 +1,53 @@
+{
+  "title": "Ledger schema",
+  "tables": [
+    {
+      "name": "accounts",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "owner",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "entries",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "account_id",
+          "type": "uuid",
+          "fk": "accounts"
+        },
+        {
+          "name": "amount",
+          "type": "bigint"
+        }
+      ]
+    },
+    {
+      "name": "transfers",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "entry_id",
+          "type": "uuid",
+          "fk": "entries"
+        }
+      ]
+    }
+  ]
+}

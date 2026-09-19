@@ -1,0 +1,27 @@
+{
+  "title": "Token budget bridge",
+  "items": [
+    {
+      "label": "start",
+      "value": 8000,
+      "total": true
+    },
+    {
+      "label": "memory",
+      "value": 900
+    },
+    {
+      "label": "history",
+      "value": -1400
+    },
+    {
+      "label": "tools",
+      "value": 600
+    },
+    {
+      "label": "end",
+      "value": 8100,
+      "total": true
+    }
+  ]
+}

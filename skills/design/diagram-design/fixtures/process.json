@@ -1,0 +1,21 @@
+{
+  "title": "Scope delivery",
+  "steps": [
+    {
+      "label": "build",
+      "actor": "arena"
+    },
+    {
+      "label": "probe",
+      "actor": "arena"
+    },
+    {
+      "label": "cross-check",
+      "actor": "glm"
+    },
+    {
+      "label": "merge",
+      "actor": "owner"
+    }
+  ]
+}

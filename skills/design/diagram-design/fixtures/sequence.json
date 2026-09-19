@@ -1,0 +1,32 @@
+{
+  "title": "Checkout handshake",
+  "actors": [
+    "Browser",
+    "API",
+    "Ledger"
+  ],
+  "messages": [
+    {
+      "from": 0,
+      "to": 1,
+      "label": "POST /checkout"
+    },
+    {
+      "from": 1,
+      "to": 2,
+      "label": "reserve(amount)"
+    },
+    {
+      "from": 2,
+      "to": 1,
+      "label": "reserved(id)",
+      "dashed": true
+    },
+    {
+      "from": 1,
+      "to": 0,
+      "label": "201 session",
+      "dashed": true
+    }
+  ]
+}

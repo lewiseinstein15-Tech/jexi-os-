@@ -1,0 +1,18 @@
+{
+  "title": "Console data platform",
+  "sources": [
+    "git",
+    "probes",
+    "sessions"
+  ],
+  "core": [
+    "normalize",
+    "index",
+    "enrich"
+  ],
+  "consumers": [
+    "hud",
+    "reports",
+    "agents"
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "title": "Checkout MVP",
+  "activities": [
+    {
+      "name": "browse",
+      "stories": [
+        {
+          "label": "list items",
+          "release": 0
+        },
+        {
+          "label": "filters",
+          "release": 1
+        }
+      ]
+    },
+    {
+      "name": "cart",
+      "stories": [
+        {
+          "label": "add item",
+          "release": 0
+        },
+        {
+          "label": "save cart",
+          "release": 2
+        }
+      ]
+    },
+    {
+      "name": "pay",
+      "stories": [
+        {
+          "label": "card form",
+          "release": 0
+        },
+        {
+          "label": "wallets",
+          "release": 1
+        }
+      ]
+    }
+  ],
+  "releases": [
+    "release 1",
+    "release 2",
+    "release 3"
+  ]
+}

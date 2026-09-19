@@ -1,0 +1,50 @@
+{
+  "title": "Order lifecycle",
+  "initial": "draft",
+  "states": [
+    {
+      "id": "draft",
+      "label": "Draft"
+    },
+    {
+      "id": "placed",
+      "label": "Placed"
+    },
+    {
+      "id": "shipped",
+      "label": "Shipped"
+    },
+    {
+      "id": "done",
+      "label": "Done",
+      "terminal": true
+    },
+    {
+      "id": "void",
+      "label": "Void",
+      "terminal": true
+    }
+  ],
+  "transitions": [
+    {
+      "from": "draft",
+      "to": "placed",
+      "guard": "pay()"
+    },
+    {
+      "from": "placed",
+      "to": "shipped",
+      "guard": "stock>0"
+    },
+    {
+      "from": "shipped",
+      "to": "done",
+      "guard": "delivered"
+    },
+    {
+      "from": "placed",
+      "to": "void",
+      "guard": "cancel"
+    }
+  ]
+}

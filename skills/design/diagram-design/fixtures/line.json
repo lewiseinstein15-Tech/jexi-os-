@@ -1,0 +1,23 @@
+{
+  "title": "Probe pass rate",
+  "xLabels": [
+    "C",
+    "D",
+    "E",
+    "F",
+    "G"
+  ],
+  "series": [
+    {
+      "name": "pass %",
+      "values": [
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "focal": true
+    }
+  ]
+}

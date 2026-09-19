@@ -1,0 +1,39 @@
+{
+  "title": "Monorepo packages",
+  "nodes": [
+    {
+      "id": 0,
+      "label": "jexi"
+    },
+    {
+      "id": 1,
+      "label": "server",
+      "parent": 0
+    },
+    {
+      "id": 2,
+      "label": "web",
+      "parent": 0
+    },
+    {
+      "id": 3,
+      "label": "skills",
+      "parent": 0
+    },
+    {
+      "id": 4,
+      "label": "memory",
+      "parent": 1
+    },
+    {
+      "id": 5,
+      "label": "context",
+      "parent": 1
+    },
+    {
+      "id": 6,
+      "label": "console",
+      "parent": 2
+    }
+  ]
+}

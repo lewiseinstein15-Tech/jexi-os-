@@ -1,0 +1,21 @@
+{
+  "title": "Repo weight",
+  "items": [
+    {
+      "label": "security",
+      "value": 818
+    },
+    {
+      "label": "scientific",
+      "value": 166
+    },
+    {
+      "label": "server",
+      "value": 90
+    },
+    {
+      "label": "web",
+      "value": 60
+    }
+  ]
+}
