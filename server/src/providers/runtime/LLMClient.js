@@ -12,6 +12,40 @@ import { dedupeInflight, requestIdentity } from '../../services/RequestDedup.js'
 import { noteMeterModelCall } from '../../services/RequestMeter.js'; // ARENA — every model call in a turn is metered automatically
 import { tryUnified, unifiedToolConfig, unifiedAnthropicToolRound, configForCall } from '../../services/providers/unified.js'; // UNIFIED — one-secret model leg (provider + key + model + baseURL)
 import { hudNoteSpend } from '../../kernel/hooks/hud-seam.js'; // Phase 7(F) — HUD cost feed (real call sizes)
+// ZONE-OWNER ITEM 5 (Phase 9 E seam): cost caps are consulted on the LIVE
+// model-call path. providers/cost/caps.js README: "check({ spendUsd }) … is
+// the pre-call gate a provider bridge uses BEFORE a model call."
+import { caps as costCaps, CapsError } from '../../../../providers/cost/caps.js';
+
+/**
+ * Pre-call cost-cap gate (budget-gate precedent, generateContent @791 style).
+ * Session: opts.costSessionId → opts.sessionId → JEXI_COST_SESSION → 'jexi-default'.
+ * Budget: opts.costBudgetUsd → JEXI_COST_BUDGET_USD → ledger cache.
+ * With NO budget known anywhere, caps are not configured for this deployment:
+ * E_NO_BUDGET passes through silently (never guess, never block by accident).
+ * A capped session throws CapsError E_SESSION_CAPPED — TERMINAL: callers must
+ * not slide the ladder past a cap.
+ */
+function costGate(opts, providerId = null) {
+  const sessionId = String(opts?.costSessionId ?? opts?.sessionId ?? process.env.JEXI_COST_SESSION ?? 'jexi-default');
+  const envBudget = process.env.JEXI_COST_BUDGET_USD;
+  const budgetUsd = opts?.costBudgetUsd ?? (envBudget != null && envBudget !== '' ? Number(envBudget) : undefined);
+  let verdict;
+  try {
+    verdict = costCaps.check({ sessionId, providerId, ...(budgetUsd !== undefined ? { budgetUsd } : {}) });
+  } catch (e) {
+    if (e instanceof CapsError && e.code === 'E_NO_BUDGET') return null; // caps not configured — no behavior change
+    throw e;
+  }
+  if (verdict.state === 'cap') {
+    throw new CapsError('E_SESSION_CAPPED', `cost cap: session "${sessionId}" is terminated — ${verdict.reason}`);
+  }
+  if (verdict.warnEmitted) console.warn(`[cost-caps] WARNING: session "${sessionId}" — ${verdict.reason}`);
+  return verdict;
+}
+
+/** Terminal-cap detection for catch blocks that would otherwise slide the ladder. */
+const isSessionCapped = (e) => e instanceof CapsError && e.code === 'E_SESSION_CAPPED';
 
 /* ARENA meter rule: a rung only counts as a model call when the provider was
    actually CONFIGURED (key present / local endpoint enabled). A keyless rung
@@ -735,6 +769,7 @@ async function streamPlainText(prompt, system, opts, onDelta) {
     const base = cfg.baseUrl || (provider === 'groq' ? 'https://api.groq.com/openai/v1' : null);
     if (!base) continue;
     if (skipForNow(provider)) { errors.push(`${provider}: skipped (health: ${providerState(provider).state})`); continue; } // Phase 1 — sticky auth/cooldown skip
+    costGate(opts, provider); // ZONE-OWNER ITEM 5 — cap refusal BEFORE the model call; terminal, propagates (no ladder slide)
     const slot = await takeSlot(provider);
     if (!slot.ok) { errors.push(`${provider}: ${slot.reason} (rate limiter)`); continue; }
     try {
@@ -792,6 +827,9 @@ export async function generateContent(prompt, systemInstruction = '', imageBase6
     const gate = opts.budget.canSpend();
     if (!gate.ok) throw new Error(`Budget exhausted (${opts.budget.label}): ${gate.why}`);
   }
+  // ZONE-OWNER ITEM 5 — cost caps consulted beside the budget-gate precedent
+  // (entry gate; the per-model-call gates live in the walk loops below).
+  costGate(opts);
   const streamable = typeof opts.onToken === 'function';
   const identity = () => requestIdentity({ prompt, system: systemInstruction, imageBase64, provider: opts.provider || null, model: opts.model || null, temperature: opts.temperature ?? null });
   if (opts.cache === true && !streamable) {
@@ -830,6 +868,7 @@ async function __generateWalk(prompt, systemInstruction, imageBase64, opts) {
     const call = PROVIDER_CALLS[provider];
     if (!call) continue;
     if (skipForNow(provider)) { errors.push(`${provider}: skipped (health: ${providerState(provider).state})`); continue; } // Phase 1 — sticky auth/cooldown skip
+    costGate(opts, provider); // ZONE-OWNER ITEM 5 — cap refusal BEFORE the model call; terminal, propagates (no ladder slide)
     // Free-tier pacing: wait for the provider's rate slot (bounded). When
     // throttled for too long, slide to the next healthy provider.
     const slot = await takeSlot(provider);
@@ -1168,6 +1207,7 @@ async function runToolLoopForProvider(provider, messages, tools, opts, errors) {
 
   for (let i = 0; i < maxIter; i++) {
     if (opts.signal && opts.signal.aborted) break;
+    costGate(opts, provider); // ZONE-OWNER ITEM 5 — every tool-loop round is a model call
     iterations++;
     // First round picks the first working model; later rounds pin it so the
     // loop doesn't hop mid-conversation (tool results stay coherent).
@@ -1285,6 +1325,7 @@ export async function generateWithToolsLoop(prompt, systemInstruction = '', tool
   const messages = [{ role: 'system', content: system }, { role: 'user', content: prompt }];
   for (const provider of order) {
     if (!TOOL_CAPABLE.has(provider)) continue;
+    costGate(opts, provider); // ZONE-OWNER ITEM 5 — cap refusal BEFORE the model call; terminal
     // Free-tier pacing (same as generateContent).
     const slot = await takeSlot(provider);
     if (!slot.ok) {
@@ -1299,6 +1340,7 @@ export async function generateWithToolsLoop(prompt, systemInstruction = '', tool
         return { ok: true, provider, model: res.model || null, text: res.text, toolCalls: res.toolCalls, iterations: res.iterations };
       }
     } catch (e) {
+      if (isSessionCapped(e)) { releaseSlot(); throw e; } // ZONE-OWNER ITEM 5 — a cap is terminal, never a ladder slide
       errors.push(`${provider}: ${e.message}`);
     }
     noteProviderFailure(provider); // B220 — retry-after aware
@@ -1314,6 +1356,7 @@ export async function generateWithToolsLoop(prompt, systemInstruction = '', tool
     for (const provider of order) {
       const call = PROVIDER_CALLS[provider];
       if (!call) continue;
+      costGate(opts, provider); // ZONE-OWNER ITEM 5 — the fallback leg is a model call too
       const slot = await takeSlot(provider);
       if (!slot.ok) { fallbackErrors.push(`${provider}: ${slot.reason} (rate limiter)`); continue; }
       try {
@@ -1326,6 +1369,7 @@ export async function generateWithToolsLoop(prompt, systemInstruction = '', tool
           return { ok: true, provider, model: null, text: String(text).trim(), toolCalls: [], iterations: 1, fallback: 'plain-text' };
         }
       } catch (e) {
+        if (isSessionCapped(e)) { releaseSlot(); throw e; } // ZONE-OWNER ITEM 5 — terminal
         fallbackErrors.push(`${provider}: ${e.message}`);
       }
       noteProviderFailure(provider); // B220 — retry-after aware
