@@ -107,6 +107,24 @@ export class FileGraphStore {
     return (this._byName.get(name) || []).filter((n) => !project || n.project === project);
   }
 
+  getByQualname(qualname, project) {
+    const n = this._byQual.get(qualname);
+    return n && (!project || n.project === project) ? n : null;
+  }
+
+  listProjects() {
+    const acc = new Map();
+    for (const n of this.data.nodes) {
+      if (!acc.has(n.project)) acc.set(n.project, { project: n.project, nodes: 0, edges: 0 });
+      acc.get(n.project).nodes++;
+    }
+    for (const e of this.data.edges) {
+      if (!acc.has(e.project)) acc.set(e.project, { project: e.project, nodes: 0, edges: 0 });
+      acc.get(e.project).edges++;
+    }
+    return [...acc.values()];
+  }
+
   getNode(id) {
     return this.data.nodes.find((n) => n.id === id) || null;
   }

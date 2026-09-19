@@ -138,6 +138,26 @@ export class SqliteGraphStore {
     return this._stmt.byName.all(project, name).map(this._rowToNode);
   }
 
+  getByQualname(qualname, project = this.project) {
+    if (!this._stmt.byQual) this._stmt.byQual = this.db.prepare('SELECT * FROM nodes WHERE project = ? AND qualname = ?');
+    const r = this._stmt.byQual.get(project, qualname);
+    return r ? this._rowToNode(r) : null;
+  }
+
+  listProjects() {
+    if (!this._stmt.projNodes) {
+      this._stmt.projNodes = this.db.prepare('SELECT project, COUNT(*) AS n FROM nodes GROUP BY project');
+      this._stmt.projEdges = this.db.prepare('SELECT project, COUNT(*) AS n FROM edges GROUP BY project');
+    }
+    const acc = new Map();
+    for (const r of this._stmt.projNodes.all()) acc.set(r.project, { project: r.project, nodes: Number(r.n), edges: 0 });
+    for (const r of this._stmt.projEdges.all()) {
+      if (!acc.has(r.project)) acc.set(r.project, { project: r.project, nodes: 0, edges: 0 });
+      acc.get(r.project).edges = Number(r.n);
+    }
+    return [...acc.values()];
+  }
+
   getNode(id) {
     const r = this._stmt.nodeById.get(id);
     return r ? this._rowToNode(r) : null;
