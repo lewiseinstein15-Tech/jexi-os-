@@ -390,7 +390,10 @@ async function p9() {
     ok: refused.ok, error: refused.error, provenance: refused.provenance ?? null,
   });
   eq(refused.ok, false, 'unregistered host refused by the trust pipeline');
-  eq(refused.provenance, undefined, 'refused fetch carries NO provenance (no data, no label)');
+  // ZONE-OWNER ITEM 4: broker.js now assigns the label in-zone; refusals carry
+  // an explicit `provenance: null` (no data, no label) instead of the old
+  // wrapper-era `undefined`.
+  eq(refused.provenance, null, 'refused fetch carries NO provenance (provenance: null — no data, no label)');
 
   // Per-record inheritance: a record extracted from a labeled result.
   if (okResults.length > 0) {
