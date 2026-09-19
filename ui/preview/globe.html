@@ -1,0 +1,1443 @@
+<!doctype html>
+<!--
+  ════════════════════════════════════════════════════════════════════
+  JEXI OS — Phase 9 Scope J — OSINT Globe preview
+  ──────────────────────────────────────────────────────────────────
+  A self-contained 3D globe that renders the 13 OSINT spatial layers
+  (Phase 9 Scope I) as toggleable overlays.
+
+  ARCHITECTURE HONESTY (read before auditing):
+    • This file is a UI PREVIEW. It performs browser-side fetch() calls
+      to the SAME endpoints the Scope I layers serve, but a browser page
+      cannot run the Node trust-pipeline broker — so browser fetches are
+      NOT brokered. The real enforcement lives server-side in
+      intelligence/trust-pipeline/ (Scope A); this page MIRRORS the
+      registered-endpoint table as static data (REGISTRY below) and
+      pre-flights every layer against it before any network call.
+      Endpoints without a registration are reported 'unregistered'
+      WITHOUT a fetch — the same honest status Scope I reports.
+    • Provenance labels follow the Scope G envelope exactly:
+      { label, source, method, confidence?, timestamp, notes? } with
+      the engine's fixed key order. Browser-fetched points are labeled
+      'observed' with a method string that discloses the non-brokered
+      browser path. Injected points (window.JEXI_GLOBE_BOOT, used by
+      scripts/phase9-j-probe.mjs to feed REAL Scope I broker output)
+      carry their engine-frozen provenance untouched.
+    • Layer status pills reuse Scope I's taxonomy:
+      ok / unavailable / unregistered / unauthorized
+      (+ 'idle' / 'loading' as pure UI states — disclosed here).
+    • No data is ever fabricated. A layer that cannot fetch shows its
+      specific status + reason and nothing is drawn for it.
+
+  THEME: tokens below are inlined VERBATIM from src/styles/jexi-theme.css
+  (JEXI Market design tokens v2). They are NOT fetched — this file must
+  work offline. Fonts are local-first stacks; no CDN, no external
+  scripts, no external stylesheets, no external images.
+
+  RENDERING: WebGL (custom minimal renderer — no libraries). When WebGL
+  is unavailable the page falls back to a 2D orthographic Canvas
+  renderer with identical camera semantics (drag = rotate, wheel = zoom).
+  ════════════════════════════════════════════════════════════════════
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>JEXI OS — OSINT Globe (Phase 9 Scope J)</title>
+<style>
+/* ════════════════════════════════════════════════════════════════
+   JEXI MARKET design tokens v2 — inlined VERBATIM from
+   src/styles/jexi-theme.css (do not fetch; see header note).
+   ════════════════════════════════════════════════════════════════ */
+:root{
+  --jcx-bg:#0c0b09; --jcx-panel:#15130f; --jcx-panel-2:#1c1915; --jcx-panel-3:#241f19;
+  --jcx-line:#282318; --jcx-line-soft:#201c15;
+  --jcx-ink:#f3eee6; --jcx-ink-2:#a99f90; --jcx-ink-3:#7a7163;
+  --jcx-ember:#ff7a3d; --jcx-coral:#ff6b5e; --jcx-peach:#ffb88c; --jcx-sand:#e8d9c4; --jcx-gold:#e5b567;
+  --jcx-up:#4cc38a; --jcx-down:#ff5d5d;
+  --jcx-ember-dim:rgba(255,122,61,.14);
+  --jcx-up-dim:rgba(76,195,138,.14);
+  --jcx-down-dim:rgba(255,93,93,.14);
+  --jcx-gold-dim:rgba(229,181,103,.16);
+  --jcx-peach-dim:rgba(255,184,140,.12);
+  --jcx-radius:14px;
+  --jcx-ease:cubic-bezier(.22,.61,.36,1);
+  --jcx-sans:'Inter',-apple-system,'Segoe UI',system-ui,Roboto,sans-serif;
+  --jcx-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace;
+  --jcx-display:'Fraunces',Georgia,'Times New Roman',serif;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--jcx-bg); color:var(--jcx-ink);
+  font-family:var(--jcx-sans); font-size:12px; line-height:1.45;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  overflow:hidden;
+}
+.mono{font-family:var(--jcx-mono)}
+::selection{background:rgba(255,122,61,.32)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--jcx-line);border-radius:4px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* page glow — one per view, never over data (JEXI Market .jexi-glow) */
+.glow{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(900px 420px at 70% -10%, rgba(255,122,61,.07), transparent 70%),
+    radial-gradient(700px 380px at 10% 110%, rgba(255,107,94,.04), transparent 70%)}
+
+/* ── layout ─────────────────────────────────────────────────── */
+#app{position:fixed;inset:0;z-index:1;display:grid;grid-template-columns:336px 1fr}
+
+/* ── sidebar ────────────────────────────────────────────────── */
+#side{background:var(--jcx-panel);border-right:1px solid var(--jcx-line);
+  display:flex;flex-direction:column;min-height:0;overflow:hidden}
+#side header{padding:18px 18px 12px;border-bottom:1px solid var(--jcx-line-soft)}
+#side .brand{font-family:var(--jcx-display);font-size:19px;font-weight:600;letter-spacing:.01em}
+#side .brand em{font-style:normal;color:var(--jcx-ember)}
+#side .sub{margin-top:3px;color:var(--jcx-ink-3);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase}
+#bootline{margin-top:10px;padding:7px 9px;border:1px solid var(--jcx-line-soft);border-radius:8px;
+  background:var(--jcx-panel-2);color:var(--jcx-ink-2);font-size:10.5px;line-height:1.5;word-break:break-word}
+
+#layers{flex:1;overflow-y:auto;padding:8px 10px 12px}
+.lrow{display:flex;align-items:center;gap:9px;padding:8px 8px;border-radius:10px;
+  border:1px solid transparent;cursor:pointer;user-select:none;transition:background .15s var(--jcx-ease),border-color .15s var(--jcx-ease)}
+.lrow:hover{background:var(--jcx-panel-2)}
+.lrow[data-state="on"]{background:var(--jcx-panel-2);border-color:var(--jcx-line)}
+.tgl{flex:none;width:26px;height:16px;border-radius:999px;background:var(--jcx-panel-3);
+  border:1px solid var(--jcx-line);position:relative;transition:background .15s var(--jcx-ease)}
+.tgl::after{content:"";position:absolute;top:1.5px;left:2px;width:11px;height:11px;border-radius:50%;
+  background:var(--jcx-ink-3);transition:transform .15s var(--jcx-ease),background .15s var(--jcx-ease)}
+.lrow[data-state="on"] .tgl{background:var(--jcx-ember-dim);border-color:rgba(255,122,61,.4)}
+.lrow[data-state="on"] .tgl::after{transform:translateX(9px);background:var(--jcx-ember)}
+.ldot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--lc,#888);opacity:.45}
+.lrow[data-state="on"] .ldot{opacity:1;box-shadow:0 0 6px var(--lc,#888)}
+.lmeta{flex:1;min-width:0}
+.ltop{display:flex;align-items:center;gap:6px}
+.lname{font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{flex:none;padding:0 5px;border-radius:5px;font-size:9px;font-weight:700;letter-spacing:.06em;
+  color:var(--jcx-ink-3);border:1px solid var(--jcx-line);text-transform:uppercase}
+.chip.k{color:var(--jcx-up);border-color:rgba(76,195,138,.3)}
+.chip.kk{color:var(--jcx-down);border-color:rgba(255,93,93,.3)}
+.lstat{margin-top:2px;display:flex;align-items:center;gap:6px;min-width:0}
+.lmsg{color:var(--jcx-ink-3);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.lcount{flex:none;font-family:var(--jcx-mono);font-size:10.5px;color:var(--jcx-ink-2);min-width:26px;text-align:right}
+
+/* ── pills: status = small text on tinted bg, never a saturated block ── */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:1px 8px;
+  border-radius:999px;font-size:10px;font-weight:600;letter-spacing:.04em;
+  text-transform:uppercase;border:1px solid transparent;white-space:nowrap;flex:none}
+.pill .dot{width:6px;height:6px;border-radius:50%;flex:none}
+.pill.st-ok{color:var(--jcx-up);background:var(--jcx-up-dim);border-color:rgba(76,195,138,.25)}
+.pill.st-ok .dot{background:var(--jcx-up)}
+.pill.st-unavailable{color:var(--jcx-down);background:var(--jcx-down-dim);border-color:rgba(255,93,93,.25)}
+.pill.st-unavailable .dot{background:var(--jcx-down)}
+.pill.st-unregistered{color:var(--jcx-gold);background:var(--jcx-gold-dim);border-color:rgba(229,181,103,.28)}
+.pill.st-unregistered .dot{background:var(--jcx-gold)}
+.pill.st-unauthorized{color:var(--jcx-coral);background:rgba(255,107,94,.14);border-color:rgba(255,107,94,.28)}
+.pill.st-unauthorized .dot{background:var(--jcx-coral)}
+.pill.st-loading{color:var(--jcx-peach);background:var(--jcx-peach-dim);border-color:rgba(255,184,140,.25)}
+.pill.st-loading .dot{background:var(--jcx-peach)}
+.pill.st-idle{color:var(--jcx-ink-3);background:var(--jcx-panel-3);border-color:var(--jcx-line)}
+.pill.st-idle .dot{background:var(--jcx-ink-3)}
+
+#side footer{padding:10px 18px 14px;border-top:1px solid var(--jcx-line-soft);color:var(--jcx-ink-3);font-size:10px;line-height:1.6}
+#side footer b{color:var(--jcx-ink-2);font-weight:600}
+
+/* ── stage ──────────────────────────────────────────────────── */
+#stage{position:relative;min-width:0;min-height:0;overflow:hidden}
+#globe{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab}
+#globe.dragging{cursor:grabbing}
+#modebar{position:absolute;top:14px;right:16px;display:flex;gap:8px;align-items:center;z-index:3}
+#hint{position:absolute;left:16px;bottom:12px;color:var(--jcx-ink-3);font-size:10.5px;z-index:3;
+  background:rgba(12,11,9,.55);padding:4px 9px;border-radius:8px;backdrop-filter:blur(4px)}
+#legend{position:absolute;right:16px;bottom:12px;z-index:3;display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+#legend .lg{display:flex;align-items:center;gap:6px;color:var(--jcx-ink-2);font-size:10.5px}
+#legend .lg .ldot{opacity:1}
+
+/* tooltip */
+#tooltip{position:absolute;z-index:6;max-width:330px;pointer-events:none;
+  background:rgba(21,19,15,.96);border:1px solid var(--jcx-line);border-radius:12px;
+  box-shadow:0 12px 34px rgba(0,0,0,.5);padding:10px 12px;display:none}
+#tooltip .tt-head{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+#tooltip .tt-title{font-weight:600;font-size:12px}
+#tooltip .tt-layer{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--jcx-ink-3)}
+#tooltip .tt-kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:10.5px;margin-bottom:7px}
+#tooltip .tt-kv .k{color:var(--jcx-ink-3);white-space:nowrap}
+#tooltip .tt-kv .v{color:var(--jcx-ink);word-break:break-word;font-family:var(--jcx-mono);font-size:10px}
+#tooltip .tt-prov{border-top:1px solid var(--jcx-line-soft);padding-top:7px;margin-top:2px}
+#tooltip .tt-prov .tt-kv{margin-bottom:0}
+#tooltip .provlabel{display:inline-block;padding:0 7px;border-radius:999px;font-size:9.5px;font-weight:700;
+  letter-spacing:.07em;text-transform:uppercase;margin-bottom:5px;border:1px solid transparent}
+.provlabel.observed{color:var(--jcx-up);background:var(--jcx-up-dim);border-color:rgba(76,195,138,.25)}
+.provlabel.estimated{color:var(--jcx-gold);background:var(--jcx-gold-dim);border-color:rgba(229,181,103,.28)}
+.provlabel.simulated{color:var(--jcx-ink-2);background:var(--jcx-panel-3);border-color:var(--jcx-line)}
+.provlabel.reconstructed{color:var(--jcx-peach);background:var(--jcx-peach-dim);border-color:rgba(255,184,140,.25)}
+</style>
+</head>
+<body>
+<div class="glow"></div>
+<div id="app">
+  <aside id="side">
+    <header>
+      <div class="brand">JEXI <em>OS</em></div>
+      <div class="sub">OSINT Globe · Phase 9 · Scope J</div>
+      <div id="bootline" class="mono">booting…</div>
+    </header>
+    <!-- 13 layer rows — STATIC (probe-greppable via data-layer), hydrated by JS.
+         ids/tiers/keyless mirror intelligence/layers/index.js (Scope I). -->
+    <div id="layers">
+      <div class="lrow" data-layer="flights" data-state="off">
+        <span class="tgl"></span><span class="ldot" style="--lc:#ff7a3d"></span>
+        <div class="lmeta"><div class="ltop"><span class="lname">Flights</span><span class="chip">t0</span><span class="chip k">keyless</span></div>
+        <div class="lstat"><span class="pill st-idle"><span class="dot"></span><span class="ptxt">idle</span></span><span class="lmsg">click to attempt a live fetch</span></div></div>
+        <span class="lcount"></span>
+      </div>
+      <div class="lrow" data-layer="ships" data-state="off">
+        <span class="tgl"></span><span class="ldot" style="--lc:#ff6b5e"></span>
+        <div class="lmeta"><div class="ltop"><span class="lname">Ships (AIS)</span><span class="chip">t1</span><span class="chip kk">key</span></div>
+        <div class="lstat"><span class="pill st-idle"><span class="dot"></span><span class="ptxt">idle</span></span><span class="lmsg">click to attempt a live fetch</span></div></div>
+        <span class="lcount"></span>
+      </div>
+      <div class="lrow" data-layer="satellites" data-state="off">
+        <span class="tgl"></span><span class="ldot" style="--lc:#e5b567"></span>
+        <div class="lmeta"><div class="ltop"><span class="lname">Satellites</span><span class="chip">t0</span><span class="chip k">keyless</span></div>
+        <div class="lstat"><span class="pill st-idle"><span class="dot"></span><span class="ptxt">idle</span></span><span class="lmsg">click to attempt a live fetch</span></div></div>
+        <span class="lcount"></span>
+      </div>
+      <div class="lrow" data-layer="earthquakes" data-state="off">
+        <span class="tgl"></span><span class="ldot" style="--lc:#ff5d5d"></span>
+        <div class="lmeta"><div class="ltop"><span class="lname">Earthquakes</span><span class="chip">t0</span><span class="chip k">keyless</span></div>
+        <div class="lstat"><span class="pill st-idle"><span class="dot"></span><span class="ptxt">idle</span></span><span class="lmsg">click to attempt a live fetch</span></div></div>
+        <span class="lcount"></span>
+      </div>
+      <div class="lrow" data-layer="fires" data-state="off">
+        <span class="tgl"></span><span class="ldot" style="--lc:#ff9a3d"></span>
+        <div class="lmeta"><div class="ltop"><span class="lname">Fire Detections</span><span class="chip">t0</span><span class="chip k">keyless</span></div>
+        <div class="lstat"><span class="pill st-idle"><span class="dot"></span><span class="ptxt">idle</span></span><span class="lmsg">click to attempt a live fetch</span></div></div>
+        <span class="lcount"></span>
+      </div>
+      <div class="lrow" data-layer="cameras" data-state="off">
+        <span class="tgl"></span><span class="ldot" style="--lc:#e8d9c4"></span>
+        <div class="lmeta"><div class="ltop"><span class="lname">Public Cameras</span><span class="chip">t0</span><span class="chip k">keyless</span></div>
+        <div class="lstat"><span class="pill st-idle"><span class="dot"></span><span class="ptxt">idle</span></span><span class="lmsg">click to attempt a live fetch</span></div></div>
+        <span class="lcount"></span>
+      </div>
+      <div class="lrow" data-layer="radio" data-state="off">
+        <span class="tgl"></span><span class="ldot" style="--lc:#ffb88c"></span>
+        <div class="lmeta"><div class="ltop"><span class="lname">Radio Stations</span><span class="chip">t0</span><span class="chip k">keyless</span></div>
+        <div class="lstat"><span class="pill st-idle"><span class="dot"></span><span class="ptxt">idle</span></span><span class="lmsg">click to attempt a live fetch</span></div></div>
+        <span class="lcount"></span>
+      </div>
+      <div class="lrow" data-layer="launches" data-state="off">
+        <span class="tgl"></span><span class="ldot" style="--lc:#f3eee6"></span>
+        <div class="lmeta"><div class="ltop"><span class="lname">Launches</span><span class="chip">t0</span><span class="chip k">keyless</span></div>
+        <div class="lstat"><span class="pill st-idle"><span class="dot"></span><span class="ptxt">idle</span></span><span class="lmsg">click to attempt a live fetch</span></div></div>
+        <span class="lcount"></span>
+      </div>
+      <div class="lrow" data-layer="traffic" data-state="off">
+        <span class="tgl"></span><span class="ldot" style="--lc:#a99f90"></span>
+        <div class="lmeta"><div class="ltop"><span class="lname">Traffic Infrastructure</span><span class="chip">t0</span><span class="chip k">keyless</span></div>
+        <div class="lstat"><span class="pill st-idle"><span class="dot"></span><span class="ptxt">idle</span></span><span class="lmsg">click to attempt a live fetch</span></div></div>
+        <span class="lcount"></span>
+      </div>
+      <div class="lrow" data-layer="weather" data-state="off">
+        <span class="tgl"></span><span class="ldot" style="--lc:#d9c9b0"></span>
+        <div class="lmeta"><div class="ltop"><span class="lname">Weather</span><span class="chip">t0</span><span class="chip k">keyless</span></div>
+        <div class="lstat"><span class="pill st-idle"><span class="dot"></span><span class="ptxt">idle</span></span><span class="lmsg">click to attempt a live fetch</span></div></div>
+        <span class="lcount"></span>
+      </div>
+      <div class="lrow" data-layer="astronomy" data-state="off">
+        <span class="tgl"></span><span class="ldot" style="--lc:#ffd9a8"></span>
+        <div class="lmeta"><div class="ltop"><span class="lname">Astronomy</span><span class="chip">t0</span><span class="chip k">keyless</span></div>
+        <div class="lstat"><span class="pill st-idle"><span class="dot"></span><span class="ptxt">idle</span></span><span class="lmsg">click to attempt a live fetch</span></div></div>
+        <span class="lcount"></span>
+      </div>
+      <div class="lrow" data-layer="marine" data-state="off">
+        <span class="tgl"></span><span class="ldot" style="--lc:#9fb4b0"></span>
+        <div class="lmeta"><div class="ltop"><span class="lname">Marine / Tides</span><span class="chip">t0</span><span class="chip k">keyless</span></div>
+        <div class="lstat"><span class="pill st-idle"><span class="dot"></span><span class="ptxt">idle</span></span><span class="lmsg">click to attempt a live fetch</span></div></div>
+        <span class="lcount"></span>
+      </div>
+      <div class="lrow" data-layer="bikeshare" data-state="off">
+        <span class="tgl"></span><span class="ldot" style="--lc:#d4c48a"></span>
+        <div class="lmeta"><div class="ltop"><span class="lname">Bikeshare Systems</span><span class="chip">t0</span><span class="chip k">keyless</span></div>
+        <div class="lstat"><span class="pill st-idle"><span class="dot"></span><span class="ptxt">idle</span></span><span class="lmsg">click to attempt a live fetch</span></div></div>
+        <span class="lcount"></span>
+      </div>
+    </div>
+    <footer>
+      <b>Status taxonomy (Scope I):</b> ok · unavailable · unregistered · unauthorized<br>
+      <b>Provenance labels (Scope G):</b> observed · estimated · simulated · reconstructed<br>
+      Browser fetches are un-brokered (page preview); endpoint registry mirrored
+      from intelligence/trust-pipeline/registered-urls.js. No fabricated data.
+    </footer>
+  </aside>
+  <main id="stage">
+    <canvas id="globe"></canvas>
+    <div id="modebar"></div>
+    <div id="legend"></div>
+    <div id="hint">drag — rotate · wheel — zoom · hover a point — record + provenance</div>
+    <div id="tooltip"></div>
+  </main>
+</div>
+<script>
+'use strict';
+/* ════════════════════════════════════════════════════════════════════
+   §0 BOOT SEAM — real Scope I data can be injected before load.
+   window.JEXI_GLOBE_BOOT = { layers: [{ layerId, via, status, message,
+   fetchedAt, points: [{ lat, lon, ..., provenance }] }] }
+   Points injected by scripts/phase9-j-probe.mjs carry REAL Scope I
+   broker output (engine-frozen provenance). Without injection the page
+   boots with zero network activity (console stays clean) and fetches
+   on layer toggle.
+   ════════════════════════════════════════════════════════════════════ */
+const BOOT = window.JEXI_GLOBE_BOOT || null;
+
+/* ════════════════════════════════════════════════════════════════════
+   §1 REGISTRY — static mirror of the 13 registrations in
+   intelligence/trust-pipeline/registered-urls.js (Scope A). Used ONLY
+   for client-side pre-flight classification ('unregistered' without a
+   network round-trip, mirroring probeSource semantics). This is data,
+   not enforcement: the real allowlist lives server-side.
+   ════════════════════════════════════════════════════════════════════ */
+const REGISTRY = [
+  { id: 'opensky-states',      host: 'opensky-network.org',              pathPrefixes: null,              layer: 'flights' },
+  { id: 'adsb-lol',            host: 'api.adsb.lol',                     pathPrefixes: null,              layer: 'flights' },
+  { id: 'celestrak-gp',        host: 'celestrak.org',                    pathPrefixes: null,              layer: 'satellites' },
+  { id: 'usgs-summary',        host: 'earthquake.usgs.gov',              pathPrefixes: null,              layer: 'earthquakes' },
+  { id: 'nasa-firms',          host: 'firms.modaps.eosdis.nasa.gov',     pathPrefixes: null,              layer: 'fires' },
+  { id: 'radio-browser-servers', host: 'all.api.radio-browser.info',     pathPrefixes: ['/json/servers'], layer: 'radio' },
+  { id: 'radio-browser-de1',   host: 'de1.api.radio-browser.info',       pathPrefixes: ['/json/stations', '/json/url'], layer: 'radio' },
+  { id: 'radio-browser-de2',   host: 'de2.api.radio-browser.info',       pathPrefixes: ['/json/stations', '/json/url'], layer: 'radio' },
+  { id: 'gbfs-systems',        host: 'gbfs.github.io',                   pathPrefixes: ['/gbfs/'],        layer: 'bikeshare' },
+  { id: 'launch-library-2',    host: 'll.thespacedevs.com',              pathPrefixes: null,              layer: 'launches' },
+  { id: 'overpass-api',        host: 'overpass-api.de',                  pathPrefixes: null,              layer: 'traffic' },
+  { id: 'tomtom-traffic',      host: 'api.tomtom.com',                   pathPrefixes: ['/traffic/', '/routing/', '/search/'], layer: 'traffic' },
+  { id: 'google-map-tiles',    host: 'tile.googleapis.com',              pathPrefixes: null,              layer: 'map-stack' },
+];
+
+/** Pre-flight: find the registration serving a URL (mirror of checkAllowed). */
+function findRegistration(url) {
+  let host, path;
+  try { const u = new URL(url); host = u.hostname; path = u.pathname; }
+  catch { return null; }
+  return REGISTRY.find((r) => r.host === host &&
+    (!r.pathPrefixes || r.pathPrefixes.some((p) => path.startsWith(p)))) || null;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   §2 SCOPE G MIRROR — provenance envelope with the engine's fixed key
+   order { label, source, method, confidence?, timestamp, notes? }.
+   Validation mirrors makeProvenance rules (label enum, confidence
+   required for estimated/reconstructed, [0,1] range).
+   ════════════════════════════════════════════════════════════════════ */
+const PROV_LABELS = ['observed', 'estimated', 'simulated', 'reconstructed'];
+function makeProvenance({ label, source, method, confidence, notes }) {
+  if (!PROV_LABELS.includes(label)) {
+    throw new Error(`provenance: label must be one of ${PROV_LABELS.join(' | ')}; got ${JSON.stringify(label)}`);
+  }
+  if (typeof source !== 'string' || source.trim() === '') throw new Error('provenance: source required');
+  if (typeof method !== 'string' || method.trim() === '') throw new Error('provenance: method required');
+  if ((label === 'estimated' || label === 'reconstructed') && typeof confidence !== 'number') {
+    throw new Error(`provenance: confidence is required for label '${label}'`);
+  }
+  if (confidence !== undefined && (typeof confidence !== 'number' || !Number.isFinite(confidence) || confidence < 0 || confidence > 1)) {
+    throw new Error('provenance: confidence must be a finite number in [0.0, 1.0]');
+  }
+  const prov = { label, source, method };
+  if (confidence !== undefined) prov.confidence = confidence;
+  prov.timestamp = new Date().toISOString();
+  if (notes !== undefined) prov.notes = notes;
+  return Object.freeze(prov);
+}
+
+/* WGS84 normalization — mirrors _shared.js: lat refused when out of
+   [-90, 90] (never bent), lon wrapped into [-180, 180]. */
+function normalizeLat(v) {
+  const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : v;
+  if (typeof n !== 'number' || !Number.isFinite(n) || n < -90 || n > 90) return null;
+  return n;
+}
+function normalizeLon(v) {
+  const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : v;
+  if (typeof n !== 'number' || !Number.isFinite(n)) return null;
+  return ((n + 540) % 360) - 180;
+}
+
+/* Minimal CSV reader — mirrors _shared.parseCsvRows: quoted fields are
+   refused rather than silently mis-parsed. */
+function parseCsvRows(text) {
+  const lines = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter((l) => l !== '');
+  return lines.map((line) => {
+    if (line.includes('"')) throw new Error('CSV contains quoted fields — minimal parser refuses rather than mis-parse');
+    return line.split(',').map((c) => c.trim());
+  });
+}
+
+/* fetch with wall-clock budget (mirrors the broker's 25s timeout). */
+async function fetchText(url, { maxBytes = 4_000_000, timeoutMs = 25_000 } = {}) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    let res;
+    try {
+      res = await fetch(url, { signal: ctrl.signal });
+    } catch (err) {
+      if (ctrl.signal.aborted) throw new Error(`wall-clock budget (${timeoutMs / 1000}s) exceeded — request aborted`, { cause: err });
+      throw err;
+    }
+    if (res.status === 401 || res.status === 403) {
+      const e = new Error(`upstream answered HTTP ${res.status} — credentials demanded`); e.httpStatus = res.status; throw e;
+    }
+    if (!res.ok) { const e = new Error(`upstream answered HTTP ${res.status}`); e.httpStatus = res.status; throw e; }
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength > maxBytes) throw new Error(`body ${buf.byteLength} bytes exceeds the ${maxBytes}-byte cap`);
+    return { status: res.status, text: new TextDecoder('utf-8').decode(buf), bytes: buf.byteLength };
+  } finally { clearTimeout(timer); }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   §3 THE 13 LAYERS — ids/labels/tiers/keyless mirror the Scope I
+   registry (intelligence/layers/index.js). Each fetch strategy mirrors
+   the KEYLESS path of its layer file. Colors: theme tokens + documented
+   derived shades (for per-layer disambiguation only).
+   ════════════════════════════════════════════════════════════════════ */
+const BROWSER_METHOD = 'browser fetch (CORS, NOT brokered — page preview)';
+const DERIVED_METHOD_NOTE = 'computed in the page from real inputs; endpoint status reported separately';
+
+const LAYER_DEFS = [
+  {
+    id: 'flights', label: 'Flights', tier: 0, keyless: true, color: '#ff7a3d', // ember
+    source: { name: 'OpenSky Network / adsb.lol', url: 'https://opensky-network.org/', license: 'OpenSky data CC BY-SA 4.0; adsb.lol ODbL' },
+    endpoint: 'https://opensky-network.org/api/states/all',
+    endpointNote: 'primary opensky-states; fallback adsb-lol (both registered)',
+    async fetch() {
+      const attempts = [];
+      try {
+        const { text } = await fetchText('https://opensky-network.org/api/states/all', { maxBytes: 9_000_000 });
+        const body = JSON.parse(text);
+        if (!Array.isArray(body?.states)) throw new Error('OpenSky response has no states[] array');
+        const pts = [];
+        for (const s of body.states) {
+          if (pts.length >= 300) break;
+          const lat = normalizeLat(s[6]); const lon = normalizeLon(s[5]);
+          if (lat === null || lon === null) continue;
+          pts.push({ lat, lon, icao24: s[0] ?? null, callsign: String(s[1] ?? '').trim() || null,
+            originCountry: s[2] ?? null, baroAltM: typeof s[7] === 'number' ? s[7] : null,
+            trueTrackDeg: typeof s[10] === 'number' ? s[10] : null,
+            provenance: makeProvenance({ label: 'observed', source: 'OpenSky Network',
+              method: `${BROWSER_METHOD} — anonymous /api/states/all (mirror of flights.layer.js primary path)`,
+              notes: 'mirror of registration opensky-states (layer: flights)' }) });
+        }
+        if (pts.length === 0) throw new Error('OpenSky states parsed but no positioned aircraft');
+        return pts;
+      } catch (err) { attempts.push(`opensky: ${err.message}`); }
+      // keyless fallback — adsb.lol point query (mirror of flights.layer.js)
+      const lat = 51.47, lon = -0.45; // London Heathrow sample point, as the layer documents
+      try {
+        const { text } = await fetchText(`https://api.adsb.lol/v2/point/${lat}/${lon}`, { maxBytes: 2_000_000 });
+        const body = JSON.parse(text);
+        const ac = Array.isArray(body?.ac) ? body.ac : [];
+        const pts = [];
+        for (const a of ac) {
+          const alat = normalizeLat(a.lat); const alon = normalizeLon(a.lon);
+          if (alat === null || alon === null) continue;
+          pts.push({ lat: alat, lon: alon, icao24: a.hex ?? null, callsign: a.flight ? String(a.flight).trim() : null,
+            originCountry: a.r ?? null, baroAltM: a.alt_baro ?? null,
+            provenance: makeProvenance({ label: 'observed', source: 'adsb.lol',
+              method: `${BROWSER_METHOD} — /v2/point/${lat}/${lon} fallback (mirror of flights.layer.js fallback path)`,
+              notes: 'mirror of registration adsb-lol (layer: flights)' }) });
+        }
+        if (pts.length === 0) throw new Error('adsb.lol parsed but no positioned aircraft near the sample point');
+        return pts;
+      } catch (err) { attempts.push(`adsb.lol: ${err.message}`); }
+      throw new Error(`all flights paths failed — ${attempts.join(' | ')}`);
+    },
+  },
+  {
+    id: 'ships', label: 'Ships (AIS)', tier: 1, keyless: false, color: '#ff6b5e', // coral
+    source: { name: 'AISStream.io (global AIS vessel positions, WSS stream)', url: 'https://www.aisstream.io/', license: 'AISStream — free API key required, CC BY 4.0 attribution' },
+    endpoint: 'wss://stream.aisstream.io/v0/stream',
+    endpointNote: 'WSS stream outside the HTTP trust pipeline; API key required (AISSTREAM_API_KEY)',
+    // Mirror of ships.check(): tier-1 layer, no key in a browser page →
+    // honest 'unauthorized' BEFORE any network attempt. Nothing fetched.
+    async fetch() {
+      const regNote = 'AISStream is deliberately NOT registered in the HTTP trust pipeline (registered-urls.js "marine (AIS)" note) — a WSS stream is outside the brokered HTTPS transport, and the refusal is correct';
+      const err = new Error(`E_MISSING_KEY: AISSTREAM_API_KEY not set — AISStream requires an API key for its wss:// stream. ${regNote}. No vessel data can be fetched here, and none is fabricated.`);
+      err.httpStatus = 401;
+      throw err;
+    },
+  },
+  {
+    id: 'satellites', label: 'Satellites', tier: 0, keyless: true, color: '#e5b567', // gold
+    source: { name: 'CelesTrak (GP element sets)', url: 'https://celestrak.org/', license: 'CelesTrak GP data — public, courtesy attribution' },
+    endpoint: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=json',
+    endpointNote: 'registration celestrak-gp; subpoints propagated client-side (estimated)',
+    async fetch() {
+      const { text } = await fetchText('https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=json', { maxBytes: 8_000_000 });
+      const body = JSON.parse(text);
+      if (!Array.isArray(body)) throw new Error('CelesTrak GP response is not a JSON array');
+      const nowMs = Date.now();
+      const pts = [];
+      for (const gp of body) {
+        if (pts.length >= 12) break;
+        if (!gp?.OBJECT_NAME || !gp?.NORAD_CAT_ID || !gp?.EPOCH) continue;
+        let sub;
+        try { sub = propagateSubpoint(gp, nowMs); } catch { continue; }
+        pts.push({ lat: sub.latDeg, lon: sub.lonDeg, name: gp.OBJECT_NAME, noradId: gp.NORAD_CAT_ID,
+          epoch: gp.EPOCH, altKm: Math.round(sub.altKm * 10) / 10, objectType: gp.OBJECT_TYPE ?? null,
+          provenance: makeProvenance({ label: 'estimated',
+            source: 'CelesTrak (GP element sets)',
+            method: `circular-orbit subpoint propagation over GP element set (NORAD ${gp.NORAD_CAT_ID}); J2/drag ignored, IAU-82 GMST — ${DERIVED_METHOD_NOTE}`,
+            confidence: 0.6,
+            notes: `derived from the observed element set for ${gp.OBJECT_NAME} — the subpoint is computed, not directly measured` }) });
+      }
+      if (pts.length === 0) throw new Error('no usable GP records in group stations');
+      return pts;
+    },
+  },
+  {
+    id: 'earthquakes', label: 'Earthquakes', tier: 0, keyless: true, color: '#ff5d5d', // down
+    source: { name: 'USGS Earthquake Hazards Program', url: 'https://earthquake.usgs.gov/', license: 'USGS — public domain (U.S. Government work, no usage restrictions)' },
+    endpoint: 'https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=50',
+    endpointNote: 'registration usgs-summary',
+    async fetch() {
+      const { text } = await fetchText('https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=50', { maxBytes: 4_000_000 });
+      const body = JSON.parse(text);
+      if (!Array.isArray(body?.features)) throw new Error('USGS geojson has no features[] array');
+      const pts = [];
+      for (const f of body.features) {
+        const coords = f?.geometry?.coordinates;
+        if (!Array.isArray(coords) || coords.length < 2) continue;
+        const lon = normalizeLon(coords[0]); const lat = normalizeLat(coords[1]);
+        if (lat === null || lon === null) continue;
+        pts.push({ lat, lon, eventId: f.id ?? null, mag: f.properties?.mag ?? null,
+          place: f.properties?.place ?? null,
+          time: typeof f.properties?.time === 'number' ? new Date(f.properties.time).toISOString() : null,
+          depthKm: coords[2] ?? null, eventUrl: f.properties?.url ?? null,
+          provenance: makeProvenance({ label: 'observed', source: 'USGS Earthquake Hazards Program',
+            method: `${BROWSER_METHOD} — USGS FDSN event query (format=geojson)`,
+            notes: 'mirror of registration usgs-summary (layer: earthquakes)' }) });
+      }
+      if (pts.length === 0) throw new Error('USGS geojson parsed but contained no positioned events');
+      return pts;
+    },
+  },
+  {
+    id: 'fires', label: 'Fire Detections', tier: 0, keyless: true, color: '#ff9a3d', // derived ember-bright
+    source: { name: 'NASA FIRMS (Fire Information for Resource Management System)', url: 'https://firms.modaps.eosdis.nasa.gov/', license: 'NASA Earth science data — open, attribution requested (FIRMS use policy)' },
+    endpoint: 'https://firms.modaps.eosdis.nasa.gov/data/active_fire/suomi-npp-viirs-c2/csv/SUOMI_VIIRS_C2_Global_24h.csv',
+    endpointNote: 'registration nasa-firms; keyless global 24h archive CSV',
+    async fetch() {
+      const { text } = await fetchText('https://firms.modaps.eosdis.nasa.gov/data/active_fire/suomi-npp-viirs-c2/csv/SUOMI_VIIRS_C2_Global_24h.csv', { maxBytes: 12_000_000 });
+      const rows = parseCsvRows(text);
+      if (rows.length < 2) throw new Error('FIRMS archive CSV has no data rows');
+      const header = rows[0].map((h) => h.toLowerCase());
+      const latIdx = header.indexOf('latitude'); const lonIdx = header.indexOf('longitude');
+      const dateIdx = header.indexOf('acq_date'); const timeIdx = header.indexOf('acq_time');
+      const confIdx = header.indexOf('confidence'); const satIdx = header.indexOf('satellite');
+      const dayIdx = header.indexOf('daynight');
+      if (latIdx === -1 || lonIdx === -1) throw new Error('FIRMS archive CSV lacks latitude/longitude columns');
+      const pts = [];
+      for (const row of rows.slice(1)) {
+        if (pts.length >= 400) break;
+        const lat = normalizeLat(row[latIdx]); const lon = normalizeLon(row[lonIdx]);
+        if (lat === null || lon === null) continue;
+        const acqTime = String(row[timeIdx] ?? '').padStart(4, '0');
+        pts.push({ lat, lon,
+          acquisitionAt: row[dateIdx] && row[dateIdx] !== '' ? `${row[dateIdx]}T${acqTime.slice(0, 2)}:${acqTime.slice(2)}:00Z` : null,
+          confidence: row[confIdx] ?? null, satellite: row[satIdx] ?? null, dayNight: row[dayIdx] ?? null,
+          product: 'suomi-npp-viirs-c2',
+          provenance: makeProvenance({ label: 'observed', source: 'NASA FIRMS (Fire Information for Resource Management System)',
+            method: `${BROWSER_METHOD} — keyless FIRMS static archive CSV (active-fire detections)`,
+            notes: 'mirror of registration nasa-firms (layer: fires) — keyless /data/active_fire/ archive path' }) });
+      }
+      if (pts.length === 0) throw new Error('FIRMS archive CSV parsed but contained no positioned detections');
+      return pts;
+    },
+  },
+  {
+    id: 'cameras', label: 'Public Cameras', tier: 0, keyless: true, color: '#e8d9c4', // sand
+    source: { name: 'Transport for London — JamCams (public traffic cameras)', url: 'https://api.tfl.gov.uk/', license: 'TfL Open Data — Crown copyright, OGL v3' },
+    endpoint: 'https://api.tfl.gov.uk/Place/Type/JamCam',
+    endpointNote: 'implemented in Scope I but its host has NO trust-pipeline registration',
+    async fetch() {
+      const err = new Error('E_UNREGISTERED_HOST: api.tfl.gov.uk is not registered in registered-urls.js — cameras layer is implemented but its host has no trust-pipeline registration; zone-owner task: register api.tfl.gov.uk (/Place/Type/JamCam) for layer \'cameras\'. Mirrored pre-flight: no fetch attempted.');
+      err.unregistered = true;
+      throw err;
+    },
+  },
+  {
+    id: 'radio', label: 'Radio Stations', tier: 0, keyless: true, color: '#ffb88c', // peach
+    source: { name: 'Radio Browser (community radio station directory)', url: 'https://www.radio-browser.info/', license: 'Radio Browser — ODbL, community-contributed' },
+    endpoint: 'https://de1.api.radio-browser.info/json/stations/search?has_geo_info=true&limit=60&order=clickcount&reverse=true',
+    endpointNote: 'registrations radio-browser-de1/de2 (/json/stations); de2 fallback',
+    async fetch() {
+      const attempts = [];
+      for (const mirror of ['de1', 'de2']) {
+        try {
+          const { text } = await fetchText(`https://${mirror}.api.radio-browser.info/json/stations/search?has_geo_info=true&limit=60&order=clickcount&reverse=true`, { maxBytes: 4_000_000 });
+          const body = JSON.parse(text);
+          if (!Array.isArray(body)) throw new Error('stations response is not a JSON array');
+          const pts = [];
+          for (const st of body) {
+            const lat = normalizeLat(st.geo_lat); const lon = normalizeLon(st.geo_long);
+            if (lat === null || lon === null) continue;
+            pts.push({ lat, lon, name: st.name ?? null, country: st.country ?? null, state: st.state ?? null,
+              codec: st.codec ?? null, bitrateKbps: st.bitrate ?? null, tags: st.tags ?? null, homepage: st.homepage ?? null,
+              provenance: makeProvenance({ label: 'observed', source: 'Radio Browser (community radio station directory)',
+                method: `${BROWSER_METHOD} — /json/stations/search (mirror of radio.layer.js mirror chain)`,
+                notes: `mirror of registration radio-browser-${mirror} (layer: radio)` }) });
+          }
+          if (pts.length === 0) throw new Error('stations parsed but none carry usable geo_lat/geo_long');
+          return pts;
+        } catch (err) { attempts.push(`${mirror}: ${err.message}`); }
+      }
+      throw new Error(`all radio mirrors failed — ${attempts.join(' | ')}`);
+    },
+  },
+  {
+    id: 'launches', label: 'Launches', tier: 0, keyless: true, color: '#f3eee6', // ink
+    source: { name: 'Launch Library 2 (The Space Devs)', url: 'https://ll.thespacedevs.com/', license: 'LL2 — CC BY-SA 4.0' },
+    endpoint: 'https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=25',
+    endpointNote: 'registration launch-library-2; pad coordinates from the launch record',
+    async fetch() {
+      const { text } = await fetchText('https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=25', { maxBytes: 6_000_000 });
+      const body = JSON.parse(text);
+      if (!Array.isArray(body?.results)) throw new Error('Launch Library 2 response has no results[] array');
+      const pts = [];
+      for (const r of body.results) {
+        const lat = typeof r?.pad?.latitude === 'number' ? r.pad.latitude : Number(r?.pad?.latitude);
+        const lon = typeof r?.pad?.longitude === 'number' ? r.pad.longitude : Number(r?.pad?.longitude);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+        pts.push({ lat, lon, launchId: r.id ?? null, name: r.name ?? null, net: r.net ?? null,
+          status: r?.status?.abbrev ?? null, provider: r?.launch_service_provider?.name ?? null,
+          pad: r?.pad?.name ?? null, location: r?.pad?.location?.name ?? null, slug: r.slug ?? null,
+          provenance: makeProvenance({ label: 'observed', source: 'Launch Library 2 (The Space Devs)',
+            method: `${BROWSER_METHOD} — LL2 /2.2.0/launch/upcoming/ (pad coordinates from the launch record)`,
+            notes: 'mirror of registration launch-library-2 (layer: launches)' }) });
+      }
+      if (pts.length === 0) throw new Error('LL2 parsed but no launch record carries a usable pad position');
+      return pts;
+    },
+  },
+  {
+    id: 'traffic', label: 'Traffic Infrastructure', tier: 0, keyless: true, color: '#a99f90', // ink-2
+    source: { name: 'OpenStreetMap (Overpass API)', url: 'https://wiki.openstreetmap.org/wiki/Overpass_API', license: 'OSM — ODbL, © OpenStreetMap contributors' },
+    endpoint: 'https://overpass-api.de/api/interpreter',
+    endpointNote: 'registration overpass-api; central London sample bbox (as the layer documents)',
+    async fetch() {
+      const bbox = '51.505,-0.09,51.515,-0.07';
+      const q = `[out:json][timeout:25];node["highway"="traffic_signals"](${bbox});out 20;`;
+      const { text } = await fetchText(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`, { maxBytes: 4_000_000 });
+      const body = JSON.parse(text);
+      if (!Array.isArray(body?.elements)) throw new Error('Overpass response has no elements[] array');
+      const pts = [];
+      for (const el of body.elements) {
+        const lat = normalizeLat(el.lat); const lon = normalizeLon(el.lon);
+        if (lat === null || lon === null) continue;
+        pts.push({ lat, lon, osmId: el.id ?? null, kind: el.tags?.highway ?? 'traffic_signals',
+          provenance: makeProvenance({ label: 'observed', source: 'OpenStreetMap (Overpass API)',
+            method: `${BROWSER_METHOD} — Overpass QL node["highway"="traffic_signals"] in bbox ${bbox}`,
+            notes: 'mirror of registration overpass-api (layer: traffic)' }) });
+      }
+      if (pts.length === 0) throw new Error('Overpass parsed but the sample bbox held no matching nodes');
+      return pts;
+    },
+  },
+  {
+    id: 'weather', label: 'Weather', tier: 0, keyless: true, color: '#d9c9b0', // derived sand-dim
+    source: { name: 'Open-Meteo (open-source weather API, no key required)', url: 'https://open-meteo.com/', license: 'Open-Meteo — CC BY 4.0' },
+    endpoint: 'https://api.open-meteo.com/v1/forecast',
+    endpointNote: 'implemented in Scope I but its host has NO trust-pipeline registration',
+    async fetch() {
+      const err = new Error('E_UNREGISTERED_HOST: api.open-meteo.com is not registered in registered-urls.js — weather layer is implemented but its host has no trust-pipeline registration; zone-owner task: register api.open-meteo.com (/v1/forecast) for layer \'weather\'. Mirrored pre-flight: no fetch attempted.');
+      err.unregistered = true;
+      throw err;
+    },
+  },
+  {
+    id: 'astronomy', label: 'Astronomy', tier: 0, keyless: true, color: '#ffd9a8', // derived peach-bright
+    source: { name: 'NASA APOD + derived solar geometry', url: 'https://apod.nasa.gov/', license: 'NASA APOD media rights vary per image; solar geometry is public-domain math' },
+    endpoint: 'https://api.nasa.gov/planetary/apod',
+    endpointNote: 'APOD host unregistered; the offline subsolar derivation needs NOTHING — it runs regardless',
+    async fetch() {
+      // Mirror of astronomy.layer.js: fetch() derives the subsolar point
+      // from the real system clock (no network). The APOD endpoint's
+      // unregistered status is reported separately on the layer pill.
+      const nowMs = Date.now();
+      const d = new Date(nowMs);
+      const startOfYear = Date.UTC(d.getUTCFullYear(), 0, 1);
+      const dayOfYear = (nowMs - startOfYear) / 86400000;
+      const gamma = (2 * Math.PI / 365) * (dayOfYear - 1 + (d.getUTCHours() - 12) / 24);
+      const eqTimeMin = 229.18 * (0.000075 + 0.001868 * Math.cos(gamma) - 0.032077 * Math.sin(gamma)
+        - 0.014615 * Math.cos(2 * gamma) - 0.040849 * Math.sin(2 * gamma));
+      const declRad = 0.006918 - 0.399912 * Math.cos(gamma) + 0.070257 * Math.sin(gamma)
+        - 0.006758 * Math.cos(2 * gamma) + 0.000907 * Math.sin(2 * gamma)
+        - 0.002697 * Math.cos(3 * gamma) + 0.00148 * Math.sin(3 * gamma);
+      const declinationDeg = declRad * (180 / Math.PI);
+      const utcMinutes = d.getUTCHours() * 60 + d.getUTCMinutes() + d.getUTCSeconds() / 60;
+      let lonDeg = (720 - eqTimeMin - utcMinutes) / 4;
+      lonDeg = ((lonDeg + 540) % 360) - 180;
+      return [{ lat: declinationDeg, lon: lonDeg, kind: 'subsolar', at: new Date(nowMs).toISOString(),
+        declinationDeg: Math.round(declinationDeg * 1000) / 1000, eqOfTimeMin: Math.round(eqTimeMin * 1000) / 1000,
+        provenance: makeProvenance({ label: 'estimated',
+          source: 'JEXI astronomy math (NOAA solar calculator formulas) over the real system clock',
+          method: `subsolar point from NOAA solar geometry (fractional-year declination + equation of time) — ${DERIVED_METHOD_NOTE}`,
+          confidence: 0.9,
+          notes: 'derived from the real system clock — solar position is computed, not measured by a remote source' }) }];
+    },
+  },
+  {
+    id: 'marine', label: 'Marine / Tides', tier: 0, keyless: true, color: '#9fb4b0', // derived neutral
+    source: { name: 'NOAA Tides & Currents (CO-OPS Metadata API)', url: 'https://api.tidesandcurrents.noaa.gov/', license: 'NOAA — public domain (U.S. Government work)' },
+    endpoint: 'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=waterlevels',
+    endpointNote: 'implemented in Scope I but its host has NO trust-pipeline registration',
+    async fetch() {
+      const err = new Error('E_UNREGISTERED_HOST: api.tidesandcurrents.noaa.gov is not registered in registered-urls.js — marine layer is implemented but its host has no trust-pipeline registration; zone-owner task: register api.tidesandcurrents.noaa.gov (/mdapi/prod/webapi/) for layer \'marine\'. Mirrored pre-flight: no fetch attempted.');
+      err.unregistered = true;
+      throw err;
+    },
+  },
+  {
+    id: 'bikeshare', label: 'Bikeshare Systems', tier: 0, keyless: true, color: '#d4c48a', // derived straw
+    source: { name: 'GBFS (General Bikeshare Feed Specification, NABSA)', url: 'https://github.com/NABSA/gbfs', license: 'GBFS systems.csv — see per-operator feed licenses' },
+    endpoint: 'https://gbfs.github.io/gbfs/systems.csv',
+    endpointNote: 'registration gbfs-systems; operator-declared system locations',
+    async fetch() {
+      const { text } = await fetchText('https://gbfs.github.io/gbfs/systems.csv', { maxBytes: 2_000_000 });
+      const rows = parseCsvRows(text);
+      if (rows.length < 2) throw new Error('GBFS systems.csv has no data rows');
+      const header = rows[0].map((h) => h.toLowerCase());
+      const nameIdx = header.indexOf('name'); const countryIdx = header.indexOf('country');
+      const cityIdx = header.indexOf('city');
+      const locIdx = header.findIndex((h) => h === 'location' || h === 'location (lat, lon)');
+      if (locIdx === -1) throw new Error('GBFS systems.csv lacks a location column');
+      const pts = [];
+      for (const row of rows.slice(1)) {
+        const loc = String(row[locIdx] ?? '').split(';').map((s) => s.trim()).filter(Boolean);
+        for (const pair of loc) {
+          if (pts.length >= 200) break;
+          const m = pair.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
+          if (!m) continue;
+          const lat = normalizeLat(m[1]); const lon = normalizeLon(m[2]);
+          if (lat === null || lon === null) continue;
+          pts.push({ lat, lon, name: row[nameIdx] ?? null, country: row[countryIdx] ?? null, city: row[cityIdx] ?? null,
+            provenance: makeProvenance({ label: 'observed', source: 'GBFS (General Bikeshare Feed Specification, NABSA)',
+              method: `${BROWSER_METHOD} — systems.csv operator-declared locations`,
+              notes: 'mirror of registration gbfs-systems (layer: bikeshare)' }) });
+        }
+        if (pts.length >= 200) break;
+      }
+      if (pts.length === 0) throw new Error('GBFS systems.csv parsed but no row carried a usable location');
+      return pts;
+    },
+  },
+];
+/* ════════════════════════════════════════════════════════════════════
+   §4 SATELLITE SUBPOINT PROPAGATION — compact mirror of
+   satellites.layer.js propagateSubpoint (same math: Kepler Newton-
+   Raphson + GMST). Constants identical to the layer file.
+   ════════════════════════════════════════════════════════════════════ */
+const TWO_PI = Math.PI * 2;
+const MU_KM3_S2 = 398600.4418;
+const EARTH_RADIUS_KM = 6371.0088;
+const toRad = (d) => (d * Math.PI) / 180;
+function propagateSubpoint(gp, nowMs) {
+  const epochMs = Date.parse(gp.EPOCH);
+  const n0 = Number(gp.MEAN_MOTION);
+  const e = Number(gp.ECCENTRICITY);
+  const inc = toRad(Number(gp.INCLINATION));
+  const raan = toRad(Number(gp.RA_OF_ASC_NODE));
+  const argp = toRad(Number(gp.ARG_OF_PERICENTER));
+  const m0 = toRad(Number(gp.MEAN_ANOMALY));
+  if (![epochMs, n0, e, inc, raan, argp, m0].every(Number.isFinite)) {
+    throw new Error(`GP record for NORAD ${gp.NORAD_CAT_ID} has a non-numeric orbital element`);
+  }
+  const nRadSec = (n0 * TWO_PI) / 86400;
+  let M = (m0 + nRadSec * ((nowMs - epochMs) / 1000)) % TWO_PI;
+  if (M < 0) M += TWO_PI;
+  let E = M;
+  for (let k = 0; k < 8; k += 1) E -= (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+  const nu = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
+  const u = argp + nu;
+  const latRad = Math.asin(Math.sin(inc) * Math.sin(u));
+  const lonEcef = Math.atan2(Math.sin(u) * Math.cos(inc), Math.cos(u));
+  const jd = nowMs / 86400000 + 2440587.5;
+  const d = jd - 2451545.0;
+  const gmstRad = toRad((280.46061837 + 360.98564736629 * d) % 360);
+  const lonRad = raan + lonEcef - gmstRad;
+  const aKm = Math.cbrt(MU_KM3_S2 / (nRadSec * nRadSec));
+  const altKm = aKm * (1 - e * Math.cos(E)) - EARTH_RADIUS_KM;
+  return {
+    latDeg: (latRad * 180) / Math.PI,
+    lonDeg: (((lonRad * 180) / Math.PI) + 540) % 360 - 180,
+    altKm,
+  };
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   §5 STATE + CAMERA + ORTHOGRAPHIC PROJECTION
+   Camera: rotLon (view meridian, deg), rotLat (view latitude, deg,
+   clamped ±85), zoom (0.55..3.0 of base radius). Identical semantics
+   in the WebGL and 2D paths.
+   ════════════════════════════════════════════════════════════════════ */
+const state = {
+  rotLon: -20, rotLat: 15, zoom: 1,
+  mode: 'boot',            // 'webgl' | '2d'
+  selected: null,          // hovered point { layerId, index }
+  time: null,              // boot ISO
+};
+const ZOOM_MIN = 0.55, ZOOM_MAX = 3.0;
+
+const canvas = document.getElementById('globe');
+const stage = document.getElementById('stage');
+
+function view() {
+  const r = stage.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(50, Math.round(r.width)), h = Math.max(50, Math.round(r.height));
+  const base = Math.min(w, h) * 0.42;
+  return { w, h, dpr, cx: w / 2, cy: h / 2, R: base * state.zoom };
+}
+
+/** Orthographic projection (view center = camera). Mirrors the GPU math. */
+function projectPoint(lat, lon, v) {
+  const phi = toRad(lat), lam = toRad(lon);
+  const phi0 = toRad(state.rotLat), lam0 = toRad(state.rotLon);
+  const cosc = Math.sin(phi0) * Math.sin(phi) + Math.cos(phi0) * Math.cos(phi) * Math.cos(lam - lam0);
+  const x = v.R * Math.cos(phi) * Math.sin(lam - lam0);
+  const y = v.R * (Math.cos(phi0) * Math.sin(phi) - Math.sin(phi0) * Math.cos(phi) * Math.cos(lam - lam0));
+  return { x: v.cx + x, y: v.cy - y, cosc, visible: cosc >= 0 };
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   §6 WEBGL RENDERER — minimal custom pipeline:
+     sphereProg : full-screen quad, disk + interior shading + limb glow
+     lineProg   : graticule segments (screen-space vertices)
+     pointProg  : per-layer GL_POINTS with per-vertex hemisphere fade
+   ════════════════════════════════════════════════════════════════════ */
+let GL = null, glProgs = null, glBuffers = null;
+
+function compile(gl, type, src) {
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src); gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(`shader: ${gl.getShaderInfoLog(sh)}`);
+  return sh;
+}
+function makeProgram(gl, vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl, gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, compile(gl, gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(`link: ${gl.getProgramInfoLog(p)}`);
+  return p;
+}
+
+function initGL() {
+  let gl = null;
+  try { gl = canvas.getContext('webgl2', { antialias: true, alpha: true }); } catch { /* keep null */ }
+  if (!gl) { try { gl = canvas.getContext('webgl', { antialias: true, alpha: true }); } catch { /* keep null */ } }
+  if (!gl) return null;
+
+  const sphereProg = makeProgram(gl,
+    `attribute vec2 a_pos; void main(){ gl_Position = vec4(a_pos, 0.0, 1.0); }`,
+    `precision mediump float;
+     uniform vec2 u_res; uniform vec2 u_center; uniform float u_radius;
+     uniform vec3 u_inner; uniform vec3 u_edge; uniform vec3 u_glow;
+     void main(){
+       vec2 p = vec2(gl_FragCoord.x, u_res.y - gl_FragCoord.y) - u_center;
+       float d = length(p);
+       float inDisk = 1.0 - step(u_radius, d);
+       float t = clamp(d / u_radius, 0.0, 1.0);
+       vec3 col = mix(u_inner, u_edge, t);
+       /* interior warm tint toward the rim + limb glow band outside it */
+       float rimTint = 1.0 - smoothstep(u_radius * 0.94, u_radius, d);
+       float band = 1.0 - smoothstep(u_radius, u_radius + 9.0, d);
+       float glowMix = rimTint * 0.22 + band * (1.0 - inDisk) * 0.5;
+       float a = inDisk * 0.97 + band * (1.0 - inDisk) * 0.16;
+       gl_FragColor = vec4(mix(col, u_glow, glowMix), a);
+     }`);
+  const lineProg = makeProgram(gl,
+    `attribute vec2 a_xy;
+     uniform vec2 u_res;
+     void main(){ gl_Position = vec4(
+       a_xy.x / (u_res.x * 0.5) - 1.0, 1.0 - a_xy.y / (u_res.y * 0.5), 0.0, 1.0); }`,
+    `precision mediump float; uniform vec4 u_color;
+     void main(){ gl_FragColor = u_color; }`);
+  const pointProg = makeProgram(gl,
+    `attribute vec2 a_lonlat;
+     uniform vec2 u_res; uniform float u_radius;
+     uniform vec2 u_rot; uniform float u_size;
+     varying float v_alpha;
+     void main(){
+       float phi = radians(a_lonlat.y), lam = radians(a_lonlat.x);
+       float phi0 = radians(u_rot.y), lam0 = radians(u_rot.x);
+       float cosc = sin(phi0) * sin(phi) + cos(phi0) * cos(phi) * cos(lam - lam0);
+       float x = u_radius * cos(phi) * sin(lam - lam0);
+       float y = u_radius * (cos(phi0) * sin(phi) - sin(phi0) * cos(phi) * cos(lam - lam0));
+       float px = u_res.x * 0.5 + x;
+       float py = u_res.y * 0.5 - y;
+       gl_Position = vec4(px / (u_res.x * 0.5) - 1.0, 1.0 - py / (u_res.y * 0.5), 0.0, 1.0);
+       gl_PointSize = u_size * (0.75 + 0.5 * cosc);
+       v_alpha = smoothstep(0.0, 0.03, cosc);
+     }`,
+    `precision mediump float; uniform vec4 u_color; varying float v_alpha;
+     void main(){
+       vec2 c = gl_PointCoord - vec2(0.5);
+       float d = length(c);
+       if (d > 0.5) discard;
+       float edge = smoothstep(0.5, 0.32, d);
+       gl_FragColor = vec4(u_color.rgb, u_color.a * v_alpha * edge);
+     }`);
+  const quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  const lines = gl.createBuffer();
+  const points = gl.createBuffer();
+  gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  GL = gl;
+  glProgs = {
+    sphere: {
+      prog: sphereProg,
+      a: { pos: gl.getAttribLocation(sphereProg, 'a_pos') },
+      u: {
+        res: gl.getUniformLocation(sphereProg, 'u_res'), center: gl.getUniformLocation(sphereProg, 'u_center'),
+        radius: gl.getUniformLocation(sphereProg, 'u_radius'), inner: gl.getUniformLocation(sphereProg, 'u_inner'),
+        edge: gl.getUniformLocation(sphereProg, 'u_edge'), glow: gl.getUniformLocation(sphereProg, 'u_glow'),
+      },
+    },
+    line: {
+      prog: lineProg,
+      a: { xy: gl.getAttribLocation(lineProg, 'a_xy') },
+      u: { res: gl.getUniformLocation(lineProg, 'u_res'), color: gl.getUniformLocation(lineProg, 'u_color') },
+    },
+    point: {
+      prog: pointProg,
+      a: { lonlat: gl.getAttribLocation(pointProg, 'a_lonlat') },
+      u: {
+        res: gl.getUniformLocation(pointProg, 'u_res'), radius: gl.getUniformLocation(pointProg, 'u_radius'),
+        rot: gl.getUniformLocation(pointProg, 'u_rot'), size: gl.getUniformLocation(pointProg, 'u_size'),
+        color: gl.getUniformLocation(pointProg, 'u_color'),
+      },
+    },
+  };
+  glBuffers = { quad, lines, points, lineCount: 0 };
+  return gl;
+}
+
+/* hex → [r, g, b] 0..1 */
+function hexRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+}
+
+function buildGraticule(v) {
+  const segs = [];
+  const push = (p1, p2) => { if (p1.visible && p2.visible) segs.push(p1.x, p1.y, p2.x, p2.y); };
+  for (let lon = -180; lon < 180; lon += 30) {
+    let prev = null;
+    for (let lat = -90; lat <= 90; lat += 3) {
+      const p = projectPoint(lat, lon, v);
+      if (prev !== null) push(prev, p);
+      prev = p;
+    }
+  }
+  for (let lat = -60; lat <= 60; lat += 30) {
+    let prev = null;
+    for (let lon = -180; lon <= 180; lon += 3) {
+      const p = projectPoint(lat, lon, v);
+      if (prev !== null) push(prev, p);
+      prev = p;
+    }
+  }
+  return new Float32Array(segs);
+}
+
+function renderGL(v) {
+  const gl = GL;
+  gl.viewport(0, 0, v.w * v.dpr, v.h * v.dpr);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+
+  /* sphere disk + glow */
+  const S = glProgs.sphere;
+  gl.useProgram(S.prog);
+  gl.bindBuffer(gl.ARRAY_BUFFER, glBuffers.quad);
+  gl.enableVertexAttribArray(S.a.pos);
+  gl.vertexAttribPointer(S.a.pos, 2, gl.FLOAT, false, 0, 0);
+  const cxDpr = v.cx * v.dpr, cyDpr = v.cy * v.dpr, RDpr = v.R * v.dpr;
+  gl.uniform2f(S.u.res, v.w * v.dpr, v.h * v.dpr);
+  gl.uniform2f(S.u.center, cxDpr, cyDpr);
+  gl.uniform1f(S.u.radius, RDpr);
+  const inner = hexRgb('#15130f'), edge = hexRgb('#1c1915'), glow = hexRgb('#ff7a3d');
+  gl.uniform3f(S.u.inner, ...inner); gl.uniform3f(S.u.edge, ...edge); gl.uniform3f(S.u.glow, ...glow);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+  /* graticule */
+  const lines = buildGraticule(v);
+  glBuffers.lineCount = lines.length / 2;
+  const L = glProgs.line;
+  gl.useProgram(L.prog);
+  gl.bindBuffer(gl.ARRAY_BUFFER, glBuffers.lines);
+  gl.bufferData(gl.ARRAY_BUFFER, lines, gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(L.a.xy);
+  gl.vertexAttribPointer(L.a.xy, 2, gl.FLOAT, false, 0, 0);
+  gl.uniform2f(L.u.res, v.w * v.dpr, v.h * v.dpr);
+  gl.uniform4f(L.u.color, 0.157, 0.137, 0.094, 0.9); // #282318
+  gl.drawArrays(gl.LINES, 0, glBuffers.lineCount);
+
+  /* limb ring (screen-space circle) */
+  const ring = [];
+  for (let a = 0; a <= 360; a += 2) {
+    const rad = (a * Math.PI) / 180;
+    ring.push(v.cx + Math.cos(rad) * v.R, v.cy + Math.sin(rad) * v.R);
+  }
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(ring), gl.DYNAMIC_DRAW);
+  gl.uniform4f(L.u.color, 1.0, 0.478, 0.239, 0.28); // ember rim
+  gl.drawArrays(gl.LINE_STRIP, 0, ring.length / 2);
+
+  /* layer points */
+  const P = glProgs.point;
+  gl.useProgram(P.prog);
+  for (const layer of layers) {
+    if (!layer.on || !layer.points || layer.points.length === 0) continue;
+    const buf = new Float32Array(layer.points.length * 2);
+    for (let i = 0; i < layer.points.length; i += 1) {
+      buf[i * 2] = layer.points[i].lon; buf[i * 2 + 1] = layer.points[i].lat;
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, glBuffers.points);
+    gl.bufferData(gl.ARRAY_BUFFER, buf, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(P.a.lonlat);
+    gl.vertexAttribPointer(P.a.lonlat, 2, gl.FLOAT, false, 0, 0);
+    gl.uniform2f(P.u.res, v.w * v.dpr, v.h * v.dpr);
+    gl.uniform1f(P.u.radius, v.R * v.dpr);
+    gl.uniform2f(P.u.rot, state.rotLon, state.rotLat);
+    const hovered = state.selected && state.selected.layerId === layer.id ? state.selected.index : -1;
+    const baseSize = 9 * Math.min(1.6, state.zoom) * v.dpr;
+    gl.uniform1f(P.u.size, hovered >= 0 ? baseSize * 1.35 : baseSize);
+    const c = hexRgb(layer.def.color);
+    gl.uniform4f(P.u.color, ...c, 0.92);
+    gl.drawArrays(gl.POINTS, 0, layer.points.length);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   §7 2D ORTHOGRAPHIC FALLBACK — Canvas2D path with identical camera
+   semantics. Used when WebGL is unavailable (feature-detected, or
+   forced off via browser flags — probe P7).
+   ════════════════════════════════════════════════════════════════════ */
+function render2D(v) {
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.scale(v.dpr, v.dpr);
+  ctx.clearRect(0, 0, v.w, v.h);
+
+  /* disk + limb glow */
+  const grad = ctx.createRadialGradient(v.cx - v.R * 0.25, v.cy - v.R * 0.3, v.R * 0.1, v.cx, v.cy, v.R);
+  grad.addColorStop(0, '#191510'); grad.addColorStop(0.75, '#15130f'); grad.addColorStop(1, '#1c1915');
+  ctx.beginPath(); ctx.arc(v.cx, v.cy, v.R, 0, Math.PI * 2);
+  ctx.fillStyle = grad; ctx.fill();
+  ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,122,61,0.35)'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(v.cx, v.cy, v.R + 4, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,122,61,0.10)'; ctx.stroke();
+
+  /* graticule (clipped to the disk) */
+  ctx.save();
+  ctx.beginPath(); ctx.arc(v.cx, v.cy, v.R, 0, Math.PI * 2); ctx.clip();
+  ctx.strokeStyle = 'rgba(40,35,24,0.95)'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  const seg = (p1, p2) => { if (p1.visible && p2.visible) { ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); } };
+  for (let lon = -180; lon < 180; lon += 30) {
+    let prev = null;
+    for (let lat = -90; lat <= 90; lat += 3) { const p = projectPoint(lat, lon, v); if (prev) seg(prev, p); prev = p; }
+  }
+  for (let lat = -60; lat <= 60; lat += 30) {
+    let prev = null;
+    for (let lon = -180; lon <= 180; lon += 3) { const p = projectPoint(lat, lon, v); if (prev) seg(prev, p); prev = p; }
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  /* points */
+  for (const layer of layers) {
+    if (!layer.on || !layer.points || layer.points.length === 0) continue;
+    ctx.fillStyle = layer.def.color;
+    const baseR = 3.4 * Math.min(1.6, state.zoom);
+    for (let i = 0; i < layer.points.length; i += 1) {
+      const p = projectPoint(layer.points[i].lat, layer.points[i].lon, v);
+      if (!p.visible) continue;
+      ctx.globalAlpha = Math.min(1, 0.25 + p.cosc * 1.2);
+      ctx.beginPath(); ctx.arc(p.x, p.y, baseR, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+function render() {
+  const v = view();
+  if (canvas.width !== v.w * v.dpr || canvas.height !== v.h * v.dpr) {
+    canvas.width = v.w * v.dpr; canvas.height = v.h * v.dpr;
+  }
+  if (state.mode === 'webgl' && GL) renderGL(v); else render2D(v);
+  updateLegend();
+}
+/* ════════════════════════════════════════════════════════════════════
+   §8 LAYER RUNTIME STATE + STATUS TAXONOMY
+   status: 'idle' | 'loading' (UI states) and
+           'ok' | 'unavailable' | 'unregistered' | 'unauthorized'
+           (Scope I taxonomy — the four honest endpoint verdicts).
+   ════════════════════════════════════════════════════════════════════ */
+const layers = LAYER_DEFS.map((def) => ({
+  def, on: false, status: 'idle', message: '', points: null, via: null, fetchedAt: null,
+}));
+
+const STATUS_PILL = {
+  ok: 'st-ok', unavailable: 'st-unavailable', unregistered: 'st-unregistered',
+  unauthorized: 'st-unauthorized', loading: 'st-loading', idle: 'st-idle',
+};
+
+const layersBox = document.getElementById('layers');
+const modebar = document.getElementById('modebar');
+const legendBox = document.getElementById('legend');
+const bootline = document.getElementById('bootline');
+const tooltip = document.getElementById('tooltip');
+
+/* hydrate the 13 STATIC rows (one [data-layer] each — see HTML):
+   attach click handlers, sync chips/colors with LAYER_DEFS */
+function buildSidebar() {
+  for (const layer of layers) {
+    const row = rowFor(layer.def.id);
+    if (!row) throw new Error(`sidebar row missing for layer '${layer.def.id}'`);
+    row.addEventListener('click', () => toggleLayer(layer.def.id));
+    const chips = row.querySelectorAll('.chip');
+    const tierChip = chips[0], keyChip = chips[1];
+    if (tierChip) {
+      tierChip.textContent = `t${layer.def.tier}`;
+      tierChip.title = `tier ${layer.def.tier} — ${layer.def.tier === 0 ? 'keyless' : layer.def.tier === 1 ? 'needs key' : 'login'}`;
+    }
+    if (keyChip) {
+      keyChip.textContent = layer.def.keyless ? 'keyless' : 'key';
+      keyChip.className = `chip ${layer.def.keyless ? 'k' : 'kk'}`;
+    }
+    const dot = row.querySelector('.ldot');
+    if (dot) dot.style.setProperty('--lc', layer.def.color);
+    const name = row.querySelector('.lname');
+    if (name) name.textContent = layer.def.label;
+  }
+}
+
+function rowFor(id) {
+  // .lrow + dataset lookup (keeps the row attribute count at exactly 13)
+  const el = [...layersBox.querySelectorAll('.lrow')].find((r) => r.dataset.layer === id);
+  return el || null;
+}
+
+function renderRow(layer) {
+  const row = rowFor(layer.def.id);
+  if (!row) return;
+  row.dataset.state = layer.on ? 'on' : 'off';
+  const pill = row.querySelector('.pill');
+  pill.className = `pill ${STATUS_PILL[layer.status] || 'st-idle'}`;
+  pill.querySelector('.ptxt').textContent = layer.status;
+  row.querySelector('.lmsg').textContent = layer.message ||
+    (layer.status === 'idle' ? 'click to attempt a live fetch' : '');
+  row.querySelector('.lmsg').title = layer.message || '';
+  const count = row.querySelector('.lcount');
+  count.textContent = layer.points ? (layer.on ? String(layer.points.length) : `${layer.points.length}·off`) : '';
+}
+
+function updateLegend() {
+  legendBox.textContent = '';
+  const shown = layers.filter((l) => l.on && l.points && l.points.length > 0);
+  for (const layer of shown) {
+    const lg = document.createElement('div'); lg.className = 'lg';
+    const dot = document.createElement('span'); dot.className = 'ldot'; dot.style.setProperty('--lc', layer.def.color);
+    lg.append(dot, document.createTextNode(`${layer.def.label} — ${layer.points.length}`));
+    legendBox.append(lg);
+  }
+}
+
+function updateModebar() {
+  modebar.textContent = '';
+  const mode = document.createElement('span');
+  mode.className = 'pill ' + (state.mode === 'webgl' ? 'st-ok' : 'st-loading');
+  mode.id = 'modepill'; mode.dataset.mode = state.mode;
+  mode.innerHTML = `<span class="dot"></span><span class="ptxt">${state.mode === 'webgl' ? 'webgl' : '2d fallback — webgl unavailable'}</span>`;
+  const zoom = document.createElement('span');
+  zoom.className = 'pill st-idle'; zoom.id = 'zoompill';
+  zoom.innerHTML = `<span class="ptxt mono">zoom ${state.zoom.toFixed(2)}×</span>`;
+  modebar.append(mode, zoom);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   §9 FETCH FLOW — pre-flight registry check, then live fetch, then
+   honest status. Toggle ON with no data yet → fetch. Toggle OFF → hide.
+   ════════════════════════════════════════════════════════════════════ */
+function classifyFetchError(err) {
+  if (err && err.unregistered) return 'unregistered';
+  if (err && (err.httpStatus === 401 || err.httpStatus === 403)) return 'unauthorized';
+  return 'unavailable';
+}
+
+/* Layers whose fetch() already encodes the full honest refusal (faithful
+   mirror of each layer file's own flow) — the generic pre-flight below
+   would mask their specific status, so they bypass it:
+     ships    → check() returns 'unauthorized' (key gate before host talk)
+     cameras/weather/marine → throw E_UNREGISTERED_HOST zone-owner messages
+     astronomy → fetch() succeeds offline (subsolar); endpoint verdict mixed */
+const PREFLIGHT_SKIP = new Set(['ships', 'cameras', 'weather', 'marine', 'astronomy']);
+
+async function ensureData(layer) {
+  if (layer.points) return;
+  if (layer.status === 'loading') return;
+  layer.status = 'loading';
+  layer.message = 'attempting live fetch…';
+  renderRow(layer);
+
+  // 1. pre-flight — mirror of the Scope A allowlist check (static data)
+  const reg = findRegistration(layer.def.endpoint);
+  if (!PREFLIGHT_SKIP.has(layer.def.id)) {
+    if (!reg) {
+      layer.status = 'unregistered';
+      layer.message = `endpoint not registered in the trust-pipeline registry (mirror) — pre-flight refused, no fetch`;
+      layer.points = null; layer.via = 'pre-flight';
+      renderRow(layer); render();
+      return;
+    }
+    if (reg.layer !== layer.def.id) {
+      layer.status = 'unregistered';
+      layer.message = `registration ${reg.id} serves layer '${reg.layer}' — MISMATCH with '${layer.def.id}'`;
+      layer.points = null; layer.via = 'pre-flight';
+      renderRow(layer); render();
+      return;
+    }
+  }
+
+  // 2. live fetch (browser fetch — NOT brokered; disclosed in method strings)
+  try {
+    const points = await layer.def.fetch();
+    layer.points = points;
+    layer.status = 'ok';
+    layer.via = 'browser-fetch';
+    layer.fetchedAt = new Date().toISOString();
+    layer.message = reg ? `via registration ${reg.id} — ${layer.def.endpointNote}` : `${layer.def.endpointNote}`;
+    if (layer.def.id === 'astronomy') {
+      // honest mixed state: APOD endpoint unregistered, offline derivation plotted
+      layer.status = 'unregistered';
+      layer.message = 'APOD host unregistered (zone-owner task) — offline subsolar derivation plotted instead';
+    }
+    if (layer.def.id === 'ships') {
+      // ships never reaches here (fetch always refuses) — belt and braces
+      layer.status = 'unauthorized';
+      layer.points = null;
+    }
+  } catch (err) {
+    layer.status = classifyFetchError(err);
+    layer.message = err && err.message ? err.message : String(err);
+    layer.points = null; layer.via = 'fetch-failure';
+  }
+  renderRow(layer); render();
+}
+
+async function toggleLayer(id) {
+  const layer = layers.find((l) => l.def.id === id);
+  if (!layer) return;
+  layer.on = !layer.on;
+  if (layer.on && !layer.points) await ensureData(layer);
+  renderRow(layer); render();
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   §10 TOOLTIP — record fields + the Scope G provenance envelope.
+   Key order: label → source → method → confidence? → timestamp → notes?
+   ════════════════════════════════════════════════════════════════════ */
+function primaryField(point) {
+  const keys = ['name', 'place', 'callsign', 'eventId', 'city', 'kind'];
+  for (const k of keys) if (typeof point[k] === 'string' && point[k]) return point[k];
+  return null;
+}
+
+function fmtVal(v) {
+  if (v === null || v === undefined) return '—';
+  if (typeof v === 'number') return Number.isInteger(v) ? String(v) : v.toFixed(4);
+  if (typeof v === 'string') return v.length > 90 ? `${v.slice(0, 87)}…` : v;
+  return JSON.stringify(v);
+}
+
+function showTooltip(layer, point, x, y) {
+  tooltip.innerHTML = '';
+  const head = document.createElement('div'); head.className = 'tt-head';
+  const dot = document.createElement('span'); dot.className = 'ldot'; dot.style.setProperty('--lc', layer.def.color);
+  const wrap = document.createElement('div');
+  const title = document.createElement('div'); title.className = 'tt-title'; title.textContent = primaryField(point) || layer.def.label;
+  const sub = document.createElement('div'); sub.className = 'tt-layer'; sub.textContent = layer.def.label;
+  wrap.append(title, sub); head.append(dot, wrap);
+  tooltip.append(head);
+
+  const kv = document.createElement('div'); kv.className = 'tt-kv';
+  const skip = new Set(['provenance']);
+  for (const [k, v] of Object.entries(point)) {
+    if (skip.has(k)) continue;
+    const kk = document.createElement('span'); kk.className = 'k'; kk.textContent = k;
+    const vv = document.createElement('span'); vv.className = 'v'; vv.textContent = fmtVal(v);
+    kv.append(kk, vv);
+  }
+  tooltip.append(kv);
+
+  if (point.provenance && typeof point.provenance === 'object') {
+    const prov = document.createElement('div'); prov.className = 'tt-prov';
+    const chip = document.createElement('div');
+    chip.className = `provlabel ${PROV_LABELS.includes(point.provenance.label) ? point.provenance.label : 'simulated'}`;
+    chip.textContent = `provenance: ${point.provenance.label}`;
+    prov.append(chip);
+    const pkv = document.createElement('div'); pkv.className = 'tt-kv';
+    for (const [k, v] of Object.entries(point.provenance)) {
+      if (k === 'label') continue;
+      const kk = document.createElement('span'); kk.className = 'k'; kk.textContent = k;
+      const vv = document.createElement('span'); vv.className = 'v'; vv.textContent = fmtVal(v);
+      pkv.append(kk, vv);
+    }
+    prov.append(pkv);
+    tooltip.append(prov);
+  }
+  tooltip.style.display = 'block';
+  const r = stage.getBoundingClientRect();
+  const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+  tooltip.style.left = `${Math.min(x + 14, r.width - tw - 10)}px`;
+  tooltip.style.top = `${Math.max(8, Math.min(y + 12, r.height - th - 10))}px`;
+}
+
+function hideTooltip() { tooltip.style.display = 'none'; state.selected = null; }
+
+function hoverAt(mx, my) {
+  const v = view();
+  let best = null;
+  for (const layer of layers) {
+    if (!layer.on || !layer.points) continue;
+    for (let i = 0; i < layer.points.length; i += 1) {
+      const p = projectPoint(layer.points[i].lat, layer.points[i].lon, v);
+      if (!p.visible) continue;
+      const d2 = (p.x - mx) * (p.x - mx) + (p.y - my) * (p.y - my);
+      if (d2 <= 14 * 14 && (!best || d2 < best.d2)) best = { layer, point: layer.points[i], index: i, x: p.x, y: p.y, d2 };
+    }
+  }
+  if (best) {
+    state.selected = { layerId: best.layer.def.id, index: best.index };
+    showTooltip(best.layer, best.point, best.x, best.y);
+  } else hideTooltip();
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   §11 INTERACTION — drag rotates (3D + 2D), wheel zooms, hover probes.
+   ════════════════════════════════════════════════════════════════════ */
+let dragging = false, lastX = 0, lastY = 0, dirty = false;
+canvas.addEventListener('mousedown', (e) => {
+  dragging = true; lastX = e.clientX; lastY = e.clientY;
+  canvas.classList.add('dragging');
+});
+window.addEventListener('mouseup', () => { dragging = false; canvas.classList.remove('dragging'); });
+window.addEventListener('mousemove', (e) => {
+  const r = stage.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  if (dragging) {
+    const v = view();
+    state.rotLon = ((state.rotLon + (e.clientX - lastX) * 0.25) + 540) % 360 - 180;
+    state.rotLat = Math.max(-85, Math.min(85, state.rotLat - (e.clientY - lastY) * 0.25));
+    lastX = e.clientX; lastY = e.clientY;
+    dirty = true;
+    hideTooltip();
+    void v;
+  } else if (mx >= 0 && my >= 0 && mx <= r.width && my <= r.height) {
+    hoverAt(mx, my);
+  }
+});
+canvas.addEventListener('mouseleave', () => hideTooltip());
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  state.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, state.zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
+  dirty = true;
+  updateModebar();
+}, { passive: false });
+window.addEventListener('resize', () => { dirty = true; });
+(function loop() {
+  if (dirty) { render(); dirty = false; }
+  requestAnimationFrame(loop);
+})();
+
+/* ════════════════════════════════════════════════════════════════════
+   §12 BOOT — zero network activity. Injected layers (window.JEXI_GLOBE_
+   BOOT, real Scope I broker output from the probe) plot immediately;
+   everything else waits for a user toggle. Debug seam for probes at
+   window.__JEXI_DEBUG__ (projection helper + plotted counts).
+   ════════════════════════════════════════════════════════════════════ */
+function applyBoot() {
+  if (!BOOT || !Array.isArray(BOOT.layers)) return 0;
+  let n = 0;
+  for (const inj of BOOT.layers) {
+    const layer = layers.find((l) => l.def.id === inj.layerId);
+    if (!layer || !Array.isArray(inj.points)) continue;
+    layer.points = inj.points;
+    layer.on = true;
+    layer.status = inj.status || 'ok';
+    layer.via = inj.via || 'probe-injection';
+    layer.fetchedAt = inj.fetchedAt || new Date().toISOString();
+    layer.message = inj.message || `injected at boot via ${layer.via}`;
+    n += 1;
+    renderRow(layer);
+  }
+  return n;
+}
+
+function boot() {
+  state.time = new Date().toISOString();
+  buildSidebar();
+  let gl;
+  try { gl = initGL(); } catch { gl = null; } // any GL failure → honest 2D fallback
+  state.mode = gl ? 'webgl' : '2d';
+  const injected = applyBoot();
+  updateModebar();
+  for (const layer of layers) renderRow(layer);
+  render();
+  bootline.innerHTML = '';
+  const bits = [
+    `boot ${state.time}`,
+    `mode ${state.mode === 'webgl' ? 'WEBGL' : '2D ORTHOGRAPHIC FALLBACK'}`,
+    `layers ${layers.length} (keyless ${layers.filter((l) => l.def.keyless).length})`,
+    `injected ${injected}`,
+    'theme tokens inlined from src/styles/jexi-theme.css',
+    'no network at boot — toggles fetch live',
+  ];
+  bits.forEach((b, i) => {
+    if (i) bootline.append(document.createElement('br'));
+    bootline.append(document.createTextNode(b));
+  });
+}
+
+/* probe seam (disclosed): projection + plotted counts for P7/P8/P9. */
+window.__JEXI_DEBUG__ = {
+  get mode() { return state.mode; },
+  get camera() { return { rotLon: state.rotLon, rotLat: state.rotLat, zoom: state.zoom }; },
+  plotted() {
+    const out = {};
+    for (const l of layers) out[l.def.id] = (l.on && l.points) ? l.points.length : 0;
+    return out;
+  },
+  layerStatus(id) {
+    const l = layers.find((x) => x.def.id === id);
+    return l ? { id, status: l.status, message: l.message, via: l.via, points: l.points ? l.points.length : 0, on: l.on } : null;
+  },
+  project(lat, lon) {
+    const p = projectPoint(lat, lon, view());
+    return { x: p.x, y: p.y, visible: p.visible };
+  },
+  toggle(id) { return toggleLayer(id); },
+};
+
+boot();
+</script>
+</body>
+</html>
