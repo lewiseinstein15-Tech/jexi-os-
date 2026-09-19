@@ -13423,6 +13423,501 @@
    ],
    "launch": "npx -y worldbank-mcp",
    "verifiedAt": "2026-09-06T07:12:14.492Z"
+  },
+  "codegraph-mcp": {
+    "tools": [
+      {
+        "name": "index-repository",
+        "description": "Index a repository into the persistent code knowledge graph (nodes + edges) and return index statistics.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string",
+              "description": "Absolute repository path (defaults to this repo)."
+            },
+            "project": {
+              "type": "string",
+              "description": "Project name to index under (defaults to the repo basename)."
+            },
+            "fresh": {
+              "type": "boolean",
+              "description": "Wipe the project graph before indexing (default true)."
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list-projects",
+        "description": "List every indexed project in the graph store with node and edge counts and last-index time.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "delete-project",
+        "description": "Permanently remove a project and all of its graph nodes/edges from the store (destructive, requires confirm).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string",
+              "description": "Project name to delete."
+            },
+            "confirm": {
+              "type": "boolean",
+              "description": "Must be exactly true \u2014 safety confirmation."
+            }
+          },
+          "required": [
+            "project",
+            "confirm"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "index-status",
+        "description": "Report indexing status for a project: backend, freshness timestamp, node/edge totals and label/type breakdown.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string",
+              "description": "Project name (defaults to this repo)."
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "check-index-coverage",
+        "description": "Compute real index coverage: indexed source files vs all source files on disk, with the missing list.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string"
+            },
+            "project": {
+              "type": "string"
+            },
+            "showMissing": {
+              "type": "boolean",
+              "description": "Include up to 15 missing file paths in the result (default true)."
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "search-graph",
+        "description": "Search graph nodes by name (case-insensitive regex) with optional label filter \u2014 the structural search entry point.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name pattern (case-insensitive regex)."
+            },
+            "label": {
+              "type": "string",
+              "enum": [
+                "Function",
+                "Class",
+                "File",
+                "Route",
+                "Resource",
+                "Module"
+              ]
+            },
+            "limit": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "offset": {
+              "type": "number",
+              "minimum": 0
+            },
+            "project": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "search-code",
+        "description": "Grep-like literal/regex text search across the repository source files, returning file:line matches with snippets.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Text or regex to find."
+            },
+            "regex": {
+              "type": "boolean",
+              "description": "Treat query as a regex (default false = literal)."
+            },
+            "maxResults": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "root": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "trace-path",
+        "description": "BFS traversal over CALLS edges: who calls a function and what it calls, to a depth of 1-5.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Function/class name to trace from (exact name; use search-graph to discover)."
+            },
+            "direction": {
+              "type": "string",
+              "enum": [
+                "in",
+                "out",
+                "both"
+              ]
+            },
+            "depth": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "limit": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "project": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "query-graph",
+        "description": "Execute a read-only Cypher-like query: MATCH (a:Label)-[:TYPE]->(b) [WHERE \u2026] RETURN props [LIMIT n].",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "MATCH (n:Function)-[:CALLS]->(m) WHERE n.name = 'X' RETURN n.name, m.name LIMIT 20"
+            },
+            "project": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get-graph-schema",
+        "description": "Return the graph schema: node labels with property definitions, edge types, counts, and observed relationship patterns.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get-code-snippet",
+        "description": "Read the real source lines of a graph symbol by qualified name (<file>::<name>), with optional context lines.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "qualname": {
+              "type": "string",
+              "description": "Exact qualified name, e.g. capability/code/graph/store.js::openGraphStore"
+            },
+            "contextLines": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 20
+            },
+            "project": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "qualname"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get-architecture",
+        "description": "Codebase overview from the graph: languages, packages (top-level dirs), routes, hotspot symbols, service clusters, ADR count.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "manage-adr",
+        "description": "Create, read, and section-edit Architecture Decision Records persisted alongside the graph (modes: create/get/set_sections/sections/list).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "create",
+                "get",
+                "set_sections",
+                "sections",
+                "list"
+              ]
+            },
+            "project": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string",
+              "description": "ADR id (get/set_sections/sections); auto-assigned on create."
+            },
+            "title": {
+              "type": "string",
+              "description": "Title (create)."
+            },
+            "body": {
+              "type": "string",
+              "description": "Full document body (create)."
+            },
+            "sections": {
+              "type": "object",
+              "description": "{ \"## Heading\": \"replacement text\" } (set_sections) \u2014 other bytes preserved."
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "ingest-traces",
+        "description": "Ingest runtime trace observations to validate existing HTTP_CALLS edges \u2014 overlay only, never mutates static graph edges.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string"
+            },
+            "traces": {
+              "type": "array",
+              "description": "Observations: [{ caller, endpoint, method?, status? }] \u2014 caller is a symbol name, endpoint a URL or /api path.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "caller": {
+                    "type": "string"
+                  },
+                  "endpoint": {
+                    "type": "string"
+                  },
+                  "method": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "caller",
+                  "endpoint"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "traces"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "detect-changes",
+        "description": "Map a git diff (ref vs worktree or ref range) to affected graph symbols with fan-in/fan-out blast radius and risk class.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "ref": {
+              "type": "string",
+              "description": "Git ref to diff against (default 'HEAD')."
+            },
+            "project": {
+              "type": "string"
+            },
+            "root": {
+              "type": "string"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      }
+    ]
+  },
+  "reach-mcp": {
+    "tools": [
+      {
+        "name": "reach_read",
+        "description": "Read a URL through the 16-channel reach layer. Routes to the first matching channel (web is the last-resort fallback); ordered backend chain with first-success-wins. Fails honestly (AUTH_REQUIRED / BACKEND_UNAVAILABLE / RUNTIME_MISSING) \u2014 never placeholder content.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Absolute http(s) URL to read."
+            },
+            "backend_override": {
+              "type": "string",
+              "description": "Optional <channel>_backend override applied for THIS call (moved to front of the chain; unknown names are tried first honestly)."
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "reach_search",
+        "description": "Search across every channel that implements search (github keyless repo search, reddit public search, web DuckDuckGo/Jina). Per-channel failure isolates and is reported honestly.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "reach_route",
+        "description": "Which channel would handle a URL, and why (first can_handle match; specific channels before the generic web fallback). No fetch happens.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "reach_channels",
+        "description": "The full channel registry: all 16 channels with tier (0 zero-config / 1 key-or-CLI / 2 login-gated) and ordered backend chains. Web is always LAST.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "reach_check",
+        "description": "Real health probe of reach channels (each check() does a real network probe and classifies ok/warn/off/error). Pass a channel name for one, or omit for all 16 \u2014 per-channel failure isolates.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string",
+              "description": "Optional single channel name."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "reach_doctor",
+        "description": "Full reach doctor report (machine-readable): per-channel status/message/tier plus the human-readable formatted report.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "reach_config",
+        "description": "Effective reach configuration with provenance: every key with its resolved value and source layer (env > config file > default / unset).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "reach_explain",
+        "description": "Explain the full routing + backend-chain decision for a URL WITHOUT fetching: matching channels, the winner, and each matching channel's ordered backend chain (default order).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      }
+    ]
   }
  }
 }
