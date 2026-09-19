@@ -17,7 +17,10 @@ export async function read(url, { config = null, channels = ALL_CHANNELS, fetchI
     throw err;
   }
   const channel = decision.channel;
-  const result = await channel.read(url, fetchImpl !== undefined ? { ...cfg, fetchImpl } : cfg);
+  // Keep cfg's prototype (channelBackend/get/sourceOf) — a bare {...cfg}
+  // spread would silently drop override resolution when fetchImpl is injected.
+  const readCfg = fetchImpl !== undefined ? Object.assign(Object.create(Object.getPrototypeOf(cfg)), cfg, { fetchImpl }) : cfg;
+  const result = await channel.read(url, readCfg);
   return {
     ...result,
     routing: { url: String(url), channel: channel.name, backend: channel.active_backend, reason: decision.reason },

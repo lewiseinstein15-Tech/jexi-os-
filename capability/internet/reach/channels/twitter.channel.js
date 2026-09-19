@@ -46,7 +46,18 @@ export class TwitterChannel extends Channel {
         return { ok: true, channel: this.name, url, content: { id, raw: res.body.slice(0, 4000) } };
       },
       'Jina Reader': async () => {
-        const r = await web.read(url, cfg);
+        let r;
+        try {
+          r = await web.read(url, cfg);
+        } catch (e) {
+          // x.com answers anonymous renderers with HTTP 401/403 and NO content —
+          // that IS the login wall; refuse as AUTH_REQUIRED, never mask it as a
+          // generic backend failure.
+          if (/HTTP 40[13]\b/.test(String(e.message))) {
+            throw new AuthRequiredError('twitter/x', 'fallback render refused (HTTP 401/403) — x.com gates anonymous reads');
+          }
+          throw e;
+        }
         if (isAntibotPage(r.content) || /log (in|into)|sign (up|in) (now )?to (see|view)/i.test(r.content.slice(0, 1500))) {
           throw new AuthRequiredError('twitter/x', 'wall markers in fallback render — refusing to return it as content');
         }
