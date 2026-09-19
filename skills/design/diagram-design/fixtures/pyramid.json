@@ -1,0 +1,19 @@
+{
+  "title": "Support tiers",
+  "tiers": [
+    {
+      "name": "self-serve",
+      "value": "80% tickets"
+    },
+    {
+      "name": "community"
+    },
+    {
+      "name": "staffed"
+    },
+    {
+      "name": "escalation",
+      "value": "24/7"
+    }
+  ]
+}

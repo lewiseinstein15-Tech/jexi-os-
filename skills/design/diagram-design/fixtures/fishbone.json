@@ -1,0 +1,31 @@
+{
+  "title": "p95 latency regression",
+  "effect": "p95 +220ms",
+  "categories": [
+    {
+      "name": "code",
+      "causes": [
+        "new serializer",
+        "N+1 query"
+      ]
+    },
+    {
+      "name": "infra",
+      "causes": [
+        "noisy neighbor"
+      ]
+    },
+    {
+      "name": "data",
+      "causes": [
+        "index bloat"
+      ]
+    },
+    {
+      "name": "process",
+      "causes": [
+        "skipped load test"
+      ]
+    }
+  ]
+}

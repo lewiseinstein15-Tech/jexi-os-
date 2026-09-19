@@ -1,0 +1,17 @@
+{
+  "title": "Skills overlap",
+  "sets": [
+    {
+      "name": "scientific",
+      "count": 166
+    },
+    {
+      "name": "security",
+      "count": 818
+    }
+  ],
+  "overlap": {
+    "label": "both audited",
+    "count": 31
+  }
+}

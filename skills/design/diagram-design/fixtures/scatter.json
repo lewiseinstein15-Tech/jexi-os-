@@ -1,0 +1,22 @@
+{
+  "title": "Skills: size vs probes",
+  "xLabel": "skills",
+  "yLabel": "probes",
+  "points": [
+    {
+      "x": 166,
+      "y": 10,
+      "label": "F"
+    },
+    {
+      "x": 818,
+      "y": 8,
+      "label": "G"
+    },
+    {
+      "x": 40,
+      "y": 12,
+      "label": "C"
+    }
+  ]
+}

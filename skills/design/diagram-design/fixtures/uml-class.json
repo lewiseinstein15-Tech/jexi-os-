@@ -1,0 +1,45 @@
+{
+  "title": "Repository pattern",
+  "classes": [
+    {
+      "name": "Repo",
+      "fields": [],
+      "methods": [
+        "get(id)",
+        "put(item)"
+      ]
+    },
+    {
+      "name": "SqlRepo",
+      "fields": [
+        "pool"
+      ],
+      "methods": [
+        "get(id)",
+        "put(item)"
+      ]
+    },
+    {
+      "name": "CacheRepo",
+      "fields": [
+        "inner",
+        "ttl"
+      ],
+      "methods": [
+        "get(id)"
+      ]
+    }
+  ],
+  "inheritance": [
+    {
+      "from": 1,
+      "to": 0
+    }
+  ],
+  "composition": [
+    {
+      "from": 2,
+      "to": 1
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "title": "JEXI platform",
+  "container": "jexi-os",
+  "stages": [
+    {
+      "name": "capture",
+      "items": [
+        "browser runtime",
+        "sessions"
+      ]
+    },
+    {
+      "name": "retain",
+      "items": [
+        "memory",
+        "context fs"
+      ]
+    },
+    {
+      "name": "serve",
+      "items": [
+        "skills",
+        "console"
+      ]
+    }
+  ]
+}

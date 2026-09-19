@@ -1,0 +1,43 @@
+{
+  "title": "Where the token budget goes",
+  "nodes": [
+    {
+      "id": "prompt",
+      "stage": 0
+    },
+    {
+      "id": "tools",
+      "stage": 1
+    },
+    {
+      "id": "history",
+      "stage": 1
+    },
+    {
+      "id": "window",
+      "stage": 2
+    }
+  ],
+  "flows": [
+    {
+      "from": "prompt",
+      "to": "tools",
+      "value": 30
+    },
+    {
+      "from": "prompt",
+      "to": "history",
+      "value": 45
+    },
+    {
+      "from": "tools",
+      "to": "window",
+      "value": 30
+    },
+    {
+      "from": "history",
+      "to": "window",
+      "value": 45
+    }
+  ]
+}

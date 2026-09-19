@@ -1,0 +1,31 @@
+{
+  "title": "Auth position",
+  "components": [
+    {
+      "label": "login UI",
+      "evolution": 0.2,
+      "visibility": 0.9
+    },
+    {
+      "label": "session store",
+      "evolution": 0.55,
+      "visibility": 0.5
+    },
+    {
+      "label": "password hash",
+      "evolution": 0.85,
+      "visibility": 0.2,
+      "moving": true
+    }
+  ],
+  "links": [
+    {
+      "from": 0,
+      "to": 1
+    },
+    {
+      "from": 1,
+      "to": 2
+    }
+  ]
+}

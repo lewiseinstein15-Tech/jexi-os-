@@ -1,0 +1,30 @@
+{
+  "title": "Refund across teams",
+  "lanes": [
+    "Support",
+    "Finance",
+    "Warehouse"
+  ],
+  "steps": [
+    {
+      "lane": 0,
+      "label": "Open request",
+      "col": 0
+    },
+    {
+      "lane": 1,
+      "label": "Approve refund",
+      "col": 1
+    },
+    {
+      "lane": 2,
+      "label": "Restock item",
+      "col": 2
+    },
+    {
+      "lane": 1,
+      "label": "Settle ledger",
+      "col": 3
+    }
+  ]
+}

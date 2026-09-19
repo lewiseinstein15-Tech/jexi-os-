@@ -1,0 +1,18 @@
+{
+  "title": "JEXI capability stack",
+  "layers": [
+    {
+      "name": "agents & skills",
+      "note": "owned here"
+    },
+    {
+      "name": "capability layer"
+    },
+    {
+      "name": "memory & context"
+    },
+    {
+      "name": "kernel"
+    }
+  ]
+}

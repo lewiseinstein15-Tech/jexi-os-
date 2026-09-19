@@ -1,0 +1,25 @@
+{
+  "title": "First-run experience",
+  "stages": [
+    {
+      "name": "signup",
+      "emotion": 0.7,
+      "touchpoint": "email link"
+    },
+    {
+      "name": "onboard",
+      "emotion": 0.5,
+      "touchpoint": "checklist"
+    },
+    {
+      "name": "first value",
+      "emotion": 0.9,
+      "touchpoint": "dashboard"
+    },
+    {
+      "name": "paywall",
+      "emotion": 0.25,
+      "touchpoint": "upgrade modal"
+    }
+  ]
+}

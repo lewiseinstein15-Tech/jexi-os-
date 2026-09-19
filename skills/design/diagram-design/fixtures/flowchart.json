@@ -1,0 +1,49 @@
+{
+  "title": "Deploy or roll back?",
+  "subtitle": "Release gate logic",
+  "nodes": [
+    {
+      "id": "build",
+      "label": "Build artifacts"
+    },
+    {
+      "id": "test",
+      "label": "CI green?",
+      "kind": "decision"
+    },
+    {
+      "id": "canary",
+      "label": "Ship canary"
+    },
+    {
+      "id": "rollback",
+      "label": "Roll back"
+    },
+    {
+      "id": "promote",
+      "label": "Promote to 100%"
+    }
+  ],
+  "edges": [
+    {
+      "from": "build",
+      "to": "test"
+    },
+    {
+      "from": "test",
+      "to": "canary",
+      "label": "yes"
+    },
+    {
+      "from": "test",
+      "to": "rollback",
+      "label": "no"
+    },
+    {
+      "from": "canary",
+      "to": "promote",
+      "label": "stable"
+    }
+  ],
+  "focal": "promote"
+}

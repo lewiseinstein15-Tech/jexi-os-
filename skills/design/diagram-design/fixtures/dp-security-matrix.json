@@ -1,0 +1,45 @@
+{
+  "title": "Console access",
+  "roles": [
+    "arena",
+    "glm",
+    "owner"
+  ],
+  "components": [
+    "repo",
+    "secrets",
+    "deploy"
+  ],
+  "grants": [
+    {
+      "role": 0,
+      "component": 0,
+      "access": "write"
+    },
+    {
+      "role": 0,
+      "component": 1,
+      "access": "read"
+    },
+    {
+      "role": 1,
+      "component": 0,
+      "access": "read"
+    },
+    {
+      "role": 2,
+      "component": 0,
+      "access": "write"
+    },
+    {
+      "role": 2,
+      "component": 1,
+      "access": "write"
+    },
+    {
+      "role": 2,
+      "component": 2,
+      "access": "write"
+    }
+  ]
+}

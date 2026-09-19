@@ -1,0 +1,19 @@
+{
+  "title": "Isolation scopes",
+  "levels": [
+    {
+      "name": "fleet",
+      "note": "all regions"
+    },
+    {
+      "name": "region"
+    },
+    {
+      "name": "mission",
+      "note": "isolation door"
+    },
+    {
+      "name": "session"
+    }
+  ]
+}

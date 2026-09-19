@@ -1,0 +1,28 @@
+{
+  "title": "Phase 17 plan",
+  "tasks": [
+    {
+      "label": "scopes C-E",
+      "start": 0,
+      "dur": 3
+    },
+    {
+      "label": "scopes F-G",
+      "start": 3,
+      "dur": 2
+    },
+    {
+      "label": "H-I",
+      "start": 4,
+      "dur": 2,
+      "milestone": false
+    },
+    {
+      "label": "gate K",
+      "start": 6,
+      "dur": 1,
+      "milestone": true
+    }
+  ],
+  "units": 7
+}

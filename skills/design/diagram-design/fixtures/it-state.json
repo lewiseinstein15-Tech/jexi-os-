@@ -1,0 +1,47 @@
+{
+  "title": "Console as-is",
+  "departments": [
+    {
+      "name": "frontend",
+      "systems": [
+        {
+          "name": "classic shell",
+          "phase": "run"
+        },
+        {
+          "name": "console preview",
+          "phase": "grow",
+          "target": true
+        }
+      ]
+    },
+    {
+      "name": "skills",
+      "systems": [
+        {
+          "name": "engineering",
+          "phase": "run"
+        },
+        {
+          "name": "library",
+          "phase": "grow",
+          "target": true
+        }
+      ]
+    },
+    {
+      "name": "ops",
+      "systems": [
+        {
+          "name": "cron",
+          "phase": "lift"
+        },
+        {
+          "name": "ci",
+          "phase": "run",
+          "target": true
+        }
+      ]
+    }
+  ]
+}

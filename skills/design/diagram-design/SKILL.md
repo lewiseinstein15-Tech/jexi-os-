@@ -1,10 +1,10 @@
 ---
 name: diagram-design
-description: Create editorial-quality diagrams as standalone SVG — flowchart, sequence, state machine, timeline, swimlane, pyramid, Venn, quadrant rendered by the bundled script, plus a 40-type selection catalog (architecture, ER, Gantt, Sankey, Wardley, org chart, tree, treemap, radar and more) with per-type layout guidance. Use when a reader learns more from a visual than from prose.
+description: Create editorial-quality diagrams as standalone SVG — all 40 types (flowchart, sequence, state machine, swimlane, ER, Gantt, Sankey, Wardley, org chart, treemap, radar and more) render deterministically from a JSON spec via the bundled registry, themed from the live JEXI jexi-theme.css tokens. Use when a reader learns more from a visual than from prose.
 version: 1
-whenToUse: Use when explaining structure, flow, state, comparison or hierarchy that would be clearer as a diagram — before drawing, verify the reader would not be better served by a well-written paragraph.
-allowedTools: [code-write, code-run]
-origin: ported from cathrynlavery/diagram-design (MIT, © 2025 Cathryn Lavery) — philosophy, 40-type catalog, editorial token system; per-type layout references shipped verbatim in references/; bundled scripts/render-diagram.mjs is a new dependency-free deterministic SVG renderer for the 8 core types
+whentouse: Use when explaining structure, flow, state, comparison or hierarchy that would be clearer as a diagram — before drawing, verify the reader would not be better served by a well-written paragraph.
+allowedtools: [code-write, code-run]
+origin: ported from cathrynlavery/diagram-design (MIT, © 2025 Cathryn Lavery) — philosophy, 40-type catalog, editorial token system; per-type layout references shipped verbatim in references/; phase-12 v1 rendered 8 core types; phase-17 Scope H v2: all 40 types as types/<name>.type.js registry modules (inputSchema + deterministic render) behind the same CLI, brand.js matching src/styles/jexi-theme.css --jcx-* tokens with the upstream cool-editorial defaults as fallback
 ---
 
 # Diagram Design
@@ -53,30 +53,32 @@ node "<this-skill-dir>/scripts/render-diagram.mjs" --list-types
 node "<this-skill-dir>/scripts/render-diagram.mjs" --type flowchart --spec spec.json --out diagram.svg
 ```
 
-- **Scripted renderers (8):** `flowchart`, `sequence`, `state`, `timeline`, `swimlane`, `pyramid`, `venn`, `quadrant` — each produces real standalone SVG from a JSON spec (spec shapes documented by `--help` per type; deterministic layout, same input → same output).
-- **Catalog-only types (32):** the full 40-type catalog below. For these, the script exits with an honest `RENDERER_NOT_IMPLEMENTED` and the correct `references/type-<type>.md` to follow — render them with the reference's layout grammar (or export via Mermaid/draw.io), never by improvising a new visual language.
-- Always `--list-types` first if unsure which side a type falls on.
+- **All 40 types render** (phase-17 Scope H): each lives in `types/<name>.type.js` — `name`, `label`, `description`, `whenToUse`, `inputSchema` (JSON Schema), and a deterministic `render(spec)` producing real standalone SVG (same spec → same bytes; explicit polygon arrowheads, no `<marker>`).
+- Canonical names: `state-machine`, `user-journey`, `dependency-graph`, `database-schema` (v1 aliases `state`, `journey`, `dependency`, `db-schema` still accepted).
+- **brand.js** reads `src/styles/jexi-theme.css` `--jcx-*` tokens at render time (JEXI Market dark: bg `#0c0b09`, ink `#f3eee6`, ember `#ff7a3d`); if the stylesheet is missing it falls back to the upstream cool-editorial defaults in the table below. No env/PATH dependence — same spec, same bytes, same repo → same output.
+- The page scaffold (kicker, display-serif title, hairlines, legend strip), stroke scale 0.8/1/1.2, radii ≤ 6, 40px margins, 60px legend band, and accent-≤2 rule are enforced by `render.js`/`kit.js`, not by each type.
+- Always `--list-types` first if unsure; unknown names exit `E_UNKNOWN_TYPE` with the valid list.
 
 ## Selection: 40 visual types
 
 | Trigger | Type |
 |---|---|
-| Decision flow, branching logic, pass/fail traces | `flowchart` ▸ |
-| Service-to-service call order, async boundaries | `sequence` ▸ |
-| Lifecycle phases, waits, retries, terminal outcomes | `state` ▸ |
-| Ordered events over time | `timeline` ▸ |
-| Steps that cross owners/phases | `swimlane` ▸ |
-| Narrowing hierarchy of importance | `pyramid` ▸ |
-| Set overlap | `venn` ▸ |
-| Two-axis positioning of items | `quadrant` ▸ |
+| Decision flow, branching logic, pass/fail traces | `flowchart` |
+| Service-to-service call order, async boundaries | `sequence` |
+| Lifecycle phases, waits, retries, terminal outcomes | `state-machine` |
+| Ordered events over time | `timeline` |
+| Steps that cross owners/phases | `swimlane` |
+| Narrowing hierarchy of importance | `pyramid` |
+| Set overlap | `venn` |
+| Two-axis positioning of items | `quadrant` |
 | Systems with sub-components and interfaces | `architecture`, `layers`, `high-level`, `nested` |
-| Data lineage / transformation chains | `data-flow`, `medallion`, `db-schema`, `er` |
-| Who owns what | `org-chart`, `tree`, `dependency`, `story-map`, `kanban` |
+| Data lineage / transformation chains | `data-flow`, `medallion`, `database-schema`, `er` |
+| Who owns what | `org-chart`, `tree`, `dependency-graph`, `story-map`, `kanban` |
 | Release / schedule / capacity | `gantt`, `deployment`, `waterfall`, `bar`, `line`, `scatter`, `polar`, `radar` |
 | Security / governance | `dp-security-matrix`, `dp-integration`, `it-state` |
-| Strategy / funnel / overlap | `wardley`, `fishbone`, `sankey`, `journey`, `loop`, `process`, `treemap`, `uml-class` |
+| Strategy / funnel / overlap | `wardley`, `fishbone`, `sankey`, `user-journey`, `loop`, `process`, `treemap`, `uml-class` |
 
-▸ = scripted renderer in the bundled script. Full layout grammar for every type: `references/type-<type>.md`.
+Full layout grammar for every type: `references/type-<type>.md` (verbatim upstream prose; `state-machine` → `type-state.md`, `user-journey` → `type-journey.md`, `dependency-graph` → `type-dependency.md`, `database-schema` → `type-db-schema.md`).
 
 ## Quality gates (check before delivering)
 
@@ -91,7 +93,7 @@ node "<this-skill-dir>/scripts/render-diagram.mjs" --type flowchart --spec spec.
 
 - step: confirm a diagram beats prose for this content; if not, write the paragraph instead
   tool: code-write
-- step: select the type via the trigger table; load references/type-<type>.md for catalog-only types
+- step: select the type via the trigger table; load references/type-<type>.md for the type's layout grammar
   tool: code-write
 - step: draft the content and DELETE one thing (a node, an edge, a label) — then check density ≤ 9
   tool: code-write

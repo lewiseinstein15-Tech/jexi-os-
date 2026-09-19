@@ -1,0 +1,48 @@
+{
+  "title": "Platform board",
+  "columns": [
+    {
+      "name": "todo",
+      "cards": [
+        {
+          "label": "rotate keys"
+        },
+        {
+          "label": "audit logs"
+        }
+      ]
+    },
+    {
+      "name": "doing",
+      "wipLimit": 2,
+      "cards": [
+        {
+          "label": "cache layer"
+        },
+        {
+          "label": "retry budget",
+          "blocked": true
+        }
+      ]
+    },
+    {
+      "name": "review",
+      "cards": [
+        {
+          "label": "rate limits"
+        }
+      ]
+    },
+    {
+      "name": "done",
+      "cards": [
+        {
+          "label": "dark launch"
+        },
+        {
+          "label": "runbook"
+        }
+      ]
+    }
+  ]
+}

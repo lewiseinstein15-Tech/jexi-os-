@@ -1,0 +1,25 @@
+{
+  "title": "Probe counts by scope",
+  "items": [
+    {
+      "label": "scope C",
+      "value": 12
+    },
+    {
+      "label": "scope D",
+      "value": 14
+    },
+    {
+      "label": "scope E",
+      "value": 12
+    },
+    {
+      "label": "scope F",
+      "value": 10
+    },
+    {
+      "label": "scope G",
+      "value": 8
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "title": "Phase 17 at a glance",
+  "events": [
+    {
+      "date": "2026-09-19",
+      "label": "Browser runtime",
+      "milestone": true
+    },
+    {
+      "date": "2026-09-19",
+      "label": "Memory upgrade"
+    },
+    {
+      "date": "2026-09-19",
+      "label": "Context FS"
+    },
+    {
+      "date": "2026-09-19",
+      "label": "Skills x2"
+    },
+    {
+      "date": "2026-09-19",
+      "label": "Diagrams",
+      "milestone": true
+    }
+  ]
+}

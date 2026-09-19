@@ -1,0 +1,43 @@
+# JEXI OS — Phase 17 Scope A — Obscura browser engine (Docker path).
+#
+# Obscura replaces Chromium as the browser engine: ~30 MB RSS vs 200+ MB, ~70
+# MiB binary vs 300+ MB, CDP-compatible, so Playwright's connectOverCDP and
+# browser-use's CDP transport attach unchanged.
+#
+# Port publishing is bound to 127.0.0.1 ONLY. The image itself is built on
+# distroless/cc:nonroot and runs as uid 65532 — it has no shell and no package
+# manager, so an operator cannot exec into it. Any mounted --storage-dir must
+# be writable by uid 65532.
+#
+# The engine's SSRF guard blocks loopback / RFC1918 / link-local targets by
+# default, including the cloud-metadata address 169.254.169.254, and validates
+# at DNS-resolution time (rebinding-safe). Do NOT set
+# OBSCURA_ALLOW_PRIVATE_NETWORK here: with a published CDP port it would let a
+# CDP client reach the host's own private network. Enable it only for a
+# deliberate local-target test, per-engine, never in this file.
+
+services:
+  obscura:
+    image: h4ckf0r0day/obscura:latest
+    container_name: jexi-obscura
+    restart: unless-stopped
+    command: ["serve", "--port", "9222", "--host", "0.0.0.0", "--stealth", "--quiet"]
+    ports:
+      - "127.0.0.1:9222:9222"
+    environment:
+      # Identity surfaces must agree with each other; a mismatch is itself a
+      # fingerprint. Rotation stays OFF while a region is pinned.
+      OBSCURA_TIMEZONE: "Europe/Berlin"
+      OBSCURA_ROTATE_PROFILE: "0"
+      RUST_LOG: "obscura=info"
+    volumes:
+      # uid 65532 must be able to write here (persistent cookies/localStorage).
+      - obscura-storage:/storage
+    # distroless has no shell, so a shell-based healthcheck cannot run.
+    # Probe CDP from the host instead:
+    #   curl -s http://127.0.0.1:9222/json/version
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  obscura-storage:

@@ -1,0 +1,34 @@
+{
+  "title": "Prod topology",
+  "zones": [
+    {
+      "name": "edge",
+      "hosts": [
+        {
+          "name": "edge-01",
+          "artifacts": [
+            "envoy:8443"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "app",
+      "hosts": [
+        {
+          "name": "app-01",
+          "artifacts": [
+            "api:8080",
+            "worker:-"
+          ]
+        },
+        {
+          "name": "app-02",
+          "artifacts": [
+            "api:8080"
+          ]
+        }
+      ]
+    }
+  ]
+}

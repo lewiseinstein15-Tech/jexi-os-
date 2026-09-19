@@ -1,0 +1,51 @@
+{
+  "title": "Billing model",
+  "entities": [
+    {
+      "name": "customer",
+      "fields": [
+        "id uuid",
+        "email citext"
+      ]
+    },
+    {
+      "name": "invoice",
+      "fields": [
+        "id uuid",
+        "customer_id uuid",
+        "total_cents int"
+      ]
+    },
+    {
+      "name": "payment",
+      "fields": [
+        "id uuid",
+        "invoice_id uuid"
+      ]
+    },
+    {
+      "name": "refund",
+      "fields": [
+        "id uuid",
+        "payment_id uuid"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "customer",
+      "to": "invoice",
+      "card": "1:N"
+    },
+    {
+      "from": "invoice",
+      "to": "payment",
+      "card": "1:N"
+    },
+    {
+      "from": "payment",
+      "to": "refund",
+      "card": "1:N"
+    }
+  ]
+}

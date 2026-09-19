@@ -1,0 +1,38 @@
+{
+  "title": "Console edge",
+  "zones": [
+    {
+      "name": "public",
+      "components": [
+        "cdn",
+        "waf"
+      ]
+    },
+    {
+      "name": "private",
+      "components": [
+        "gateway",
+        "console api"
+      ]
+    },
+    {
+      "name": "data",
+      "components": [
+        "postgres"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "gateway",
+      "to": "console api",
+      "label": "mTLS"
+    },
+    {
+      "from": "console api",
+      "to": "postgres",
+      "label": "pooler"
+    }
+  ],
+  "critical": "console api"
+}

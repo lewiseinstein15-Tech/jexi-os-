@@ -1,0 +1,18 @@
+{
+  "title": "Ingest under load",
+  "sources": [
+    "webhooks",
+    "partners",
+    "batch"
+  ],
+  "pipeline": [
+    "ingress queue",
+    "parser",
+    "dedupe store"
+  ],
+  "sinks": [
+    "lake",
+    "search"
+  ],
+  "capacity": "max 5k rps"
+}

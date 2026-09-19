@@ -1,0 +1,24 @@
+{
+  "title": "Platform org",
+  "people": [
+    {
+      "name": "Z User",
+      "title": "orchestrator"
+    },
+    {
+      "name": "A Runner",
+      "title": "build",
+      "reportsTo": 0
+    },
+    {
+      "name": "G Verifier",
+      "title": "verify",
+      "reportsTo": 0
+    },
+    {
+      "name": "S Owner",
+      "title": "security",
+      "reportsTo": 2
+    }
+  ]
+}
