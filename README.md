@@ -176,4 +176,13 @@ local rung) and bounded per turn (1500/600 tokens), so weak brains terminate ins
 
 ---
 
+## License
+
+Code is licensed **MIT** — see [LICENSE](LICENSE). Data obtained from external
+providers is **NOT** covered by MIT: every external data source carries its own
+license and terms, documented per source in [DATA_SOURCES.md](DATA_SOURCES.md).
+Dependency licenses are aggregated in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+---
+
 *Built by Lewis & the JEXI agent · MIT · 100% free-tier infrastructure, no credit card, ever.*
