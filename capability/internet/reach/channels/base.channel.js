@@ -43,7 +43,8 @@ export class Channel {
     const candidates = [...this.backends];
     const override = cfg && typeof cfg.channelBackend === 'function' ? cfg.channelBackend(this.name) : null;
     if (!override) return { list: candidates, override: null, applied: false };
-    const idx = candidates.findIndex((b) => b === override || b.startsWith(override));
+    const ov = String(override).toLowerCase();
+    const idx = candidates.findIndex((b) => b === override || b.toLowerCase() === ov || b.toLowerCase().startsWith(ov));
     if (idx > 0) {
       candidates.unshift(candidates.splice(idx, 1)[0]);
       return { list: candidates, override, applied: true };
