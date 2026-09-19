@@ -71,7 +71,7 @@ export function runCommand(argv, { cwd, env = {}, timeoutMs = null } = {}) {
 //     id, status, crashed
 //   }>
 // config: { id, experimentDir, candidateFile, command(argv), env, mutate(candidatePath),
-//           previousBest, onKeep(result), onDiscard(result) }
+//           previousBest, timeoutMs, onKeep(result), onDiscard(result) }
 export async function runExperiment(config) {
   const {
     id = 'experiment',
@@ -81,6 +81,7 @@ export async function runExperiment(config) {
     env = {},
     mutate = null,
     previousBest = null,
+    timeoutMs = null,
     onKeep = null,
     onDiscard = null,
   } = config;
@@ -90,7 +91,7 @@ export async function runExperiment(config) {
 
   if (mutate) await mutate(candidatePath);
 
-  const run = await runCommand(command, { cwd: experimentDir, env });
+  const run = await runCommand(command, { cwd: experimentDir, env, timeoutMs });
   const metric = run.timedOut ? null : parseMetric(run.stdout);
   const crashed = run.timedOut || run.exitCode !== 0 || metric === null;
   const kept = !crashed && (previousBest === null || metric < previousBest);
@@ -98,11 +99,11 @@ export async function runExperiment(config) {
   const evidence = { stdout: run.stdout, exitCode: run.exitCode, durationMs: run.durationMs };
 
   if (kept) {
-    if (onKeep) await onKeep({ id, metric, evidence });
+    if (onKeep) await onKeep({ id, metric, previousBest, evidence, kept, crashed });
   } else {
     // Discard: the mutation did not improve the frontier — restore the snapshot.
     await writeFile(candidatePath, snapshot, 'utf8');
-    if (onDiscard) await onDiscard({ id, metric, evidence });
+    if (onDiscard) await onDiscard({ id, metric, previousBest, evidence, kept, crashed });
   }
 
   return {
