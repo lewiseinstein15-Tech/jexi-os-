@@ -112,6 +112,7 @@ import { mountArena } from './src/routes/arena.js'; // ARENA ASTRA — executive
 import { mountScheduler } from './src/routes/scheduler.js'; // Phase 6 Scope B — autonomy scheduler
 import { mountContext } from './src/routes/context.js'; // Phase 6 Scope C — context manager
 import { mountHud } from './src/routes/hud.js'; // Phase 7(F) — HUD status contract (GET /api/hud + SSE /api/hud/stream)
+import { mountTokens } from './src/routes/tokens.js'; // ZONE-OWNER ITEM 6 (Phase 9 D) — ephemeral token mint/verify
 import { hudNoteCheck } from './src/kernel/hooks/hud-seam.js'; // Phase 7(F) — self-ping feeds checks.remote
 import { dispatchCommand, commandsAvailable } from './src/commands-seam.js'; // Phase 7(G) — commands subsystem (fail-soft)
 import { autonomyScheduler } from './src/scheduler/index.js';
@@ -418,6 +419,7 @@ mountArena(app); // ARENA ASTRA — /api/kernel/* /api/intent /api/observer /api
 mountScheduler(app); // Phase 6 Scope B — /api/scheduler/jobs (autonomy scheduler)
 mountContext(app); // Phase 6 Scope C — /api/context/* (context manager)
 mountHud(app); // Phase 7(F) — /api/hud + /api/hud/stream (the console's single source of truth)
+mountTokens(app); // ZONE-OWNER ITEM 6 (Phase 9 D) — /api/tokens/mint + /api/tokens/verify (ephemeral capability tokens)
 
 // Every instance has its own id (Render injects RENDER_INSTANCE_ID automatically).
 // A load balancer can see which instance answered, and you can verify stickiness.
