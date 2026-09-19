@@ -254,5 +254,48 @@ export function createAgent(session, decide, o = {}) {
   return new BrowserAgent({ session, decide, ...o });
 }
 
+
+/**
+ * Phase 17 Scope C — compose deciders with explicit priority WITHOUT touching
+ * the OpenHands loop or its DOM decider semantics. The first decider that
+ * resolves to a plan wins; a decider contributes a "cannot decide" by
+ * returning null/undefined or throwing.
+ *
+ *   const decide = chainDeciders([domDecider, visionDecider]);
+ *   const agent = createAgent(session, decide);
+ *
+ * The chained plan is annotated with `decided_by` (index/position) and, if the
+ * losing decider explained its refusal, `alternatives` — so a run log shows
+ * WHY vision took over a step.
+ */
+export function chainDeciders(deciders) {
+  if (!Array.isArray(deciders) || deciders.length === 0) {
+    throw new Error('chainDeciders: at least one decider is required');
+  }
+  return async function chained(ctx) {
+    const attempts = [];
+    for (let i = 0; i < deciders.length; i++) {
+      const d = deciders[i];
+      let plan = null, err = null;
+      try { plan = await d(ctx); } catch (e) { err = e; }
+      if (plan) {
+        return {
+          ...plan,
+          decided_by: plan.decided_by ?? (d.name || `decider[${i}]`),
+          alternatives: attempts.length ? attempts : undefined,
+        };
+      }
+      attempts.push({
+        decider: d.name || `decider[${i}]`,
+        refused: err ? String(err.code || err.message) : 'no plan',
+      });
+    }
+    const e = new Error(`no decider produced a plan (attempted ${deciders.length}); refusals: ${attempts.map((a) => `${a.decider}=${a.refused}`).join(', ')}`);
+    e.code = 'E_NO_DECISION';
+    e.attempts = attempts;
+    throw e;
+  };
+}
+
 export { DomService, formatSnapshot, createActionRegistry, installDialogShim };
-export default { BrowserAgent, createAgent, ScriptedDecider, DomService, createActionRegistry };
+export default { BrowserAgent, createAgent, ScriptedDecider, DomService, createActionRegistry, chainDeciders };
