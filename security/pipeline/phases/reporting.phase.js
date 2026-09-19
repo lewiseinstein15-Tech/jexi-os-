@@ -1,10 +1,21 @@
 /**
- * JEXI OS — Phase 8 Scope A: PHASE 5/5 — REPORTING (deliverable generation).
+ * JEXI OS — Phase 8 Scope A: PHASE 6/6 — REPORTING (deliverable generation).
  *
  * Shannon phase 5. The gate is absolute: findings whose exploitation status
  * is not EXPLOITED NEVER reach the report. "No exploit, no report."
  * Unverified findings are dropped and the drop is logged — silently for the
  * report, transparently in the event stream.
+ *
+ * Phase 8(G): the doer's EXPLOITED claim is NO LONGER sufficient. The
+ * verification layer's verdict is: a finding reaches the report only when
+ *   - a verification record exists for it (verification.json + graph),
+ *   - the record's status is VERIFIED (REJECTED / INCONCLUSIVE / REFUSED /
+ *     INVALIDATED all drop), and
+ *   - the evidence snapshot hash still matches the graph state (post-
+ *     verification tampering INVALIDATES the verification).
+ * A legacy flow with no verification artifact (never ran the verification
+ * phase) keeps the Scope A behavior — the 6-phase pipeline always produces
+ * the artifact, so the full gate is the default path.
  *
  * Contract:
  *   id:      'reporting'
@@ -15,6 +26,7 @@
 import * as store from '../orchestration/checkpoint.js';
 import { pipelineGraph } from '../../../knowledge/index.js';
 import { gatePhase } from '../../engagements/validator.js'; // Phase 8(D): RoE gate
+import { ExploitVerifier } from '../../../verification/verifiers/index.js'; // Phase 8(G)
 
 const REMEDIATION = {
   'A01:2021 Broken Access Control': 'Enforce server-side authorization on every privileged route; canonicalize and jail all filesystem paths (path.normalize + allowlist base dir).',
@@ -83,6 +95,58 @@ export const phase = {
       knowledge = null;
     }
 
+    // Phase 8(G): THE VERIFICATION GATE. Exploited ≠ reported — the
+    // independent verifier must have said VERIFIED and the immutable
+    // evidence snapshot must still match the graph. Anything else drops.
+    let verification = null;
+    const verificationArtifact = store.readArtifact(ctx.stateRoot, ctx.engagementId, 'verification.json');
+    if (verificationArtifact) {
+      const graph = pipelineGraph(ctx);
+      try {
+        // integrity checks never re-execute anything; the identity here is
+        // only the constructor contract — verification records decide.
+        const gate = new ExploitVerifier({ graph, agent: 'reporting:verification-gate' });
+        const kept = [];
+        for (const v of verified) {
+          const rec = gate.verificationStatus({ findingId: v.findingId });
+          if (!rec) {
+            dropped.push(v);
+            yield { type: 'log', data: { message: `verification gate: ${v.findingId} NEVER VERIFIED — no exploit, no report` } };
+            continue;
+          }
+          if (rec.status !== 'VERIFIED') {
+            dropped.push(v);
+            yield { type: 'log', data: { message: `verification gate: ${v.findingId} ${rec.status}${rec.refusalRule ? ` [${rec.refusalRule}]` : ''} — no exploit, no report` } };
+            continue;
+          }
+          const integrity = gate.integrityCheck({ findingId: v.findingId });
+          if (!integrity.intact) {
+            dropped.push(v);
+            yield { type: 'log', data: { message: `verification gate: ${v.findingId} INVALIDATED (evidence hash mismatch — modified after verification) — no exploit, no report` } };
+            continue;
+          }
+          v.verification = {
+            status: rec.status,
+            verifierAgent: rec.verifierAgent,
+            methodsSucceeded: rec.methodsSucceeded,
+            methodsRequired: rec.methodsRequired,
+            evidenceHash: rec.evidenceHash,
+          };
+          kept.push(v);
+        }
+        verified.length = 0;
+        verified.push(...kept);
+        verification = {
+          gate: 'independent verification — VERIFIED + snapshot intact only',
+          verifier: verificationArtifact.verifier,
+          counts: verificationArtifact.counts,
+          doerClaimsOverturned: verificationArtifact.doerClaimsOverturned,
+        };
+      } finally {
+        graph.close();
+      }
+    }
+
     verified.sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
     const counts = verified.reduce((acc, r) => { acc[r.severity] = (acc[r.severity] || 0) + 1; return acc; }, {});
 
@@ -93,8 +157,9 @@ export const phase = {
       engagementId: ctx.engagementId,
       generatedAt: new Date().toISOString(),
       target: vuln.target,
-      pipeline: { phases: ['pre-recon', 'recon', 'vulnerability', 'exploitation', 'reporting'], gate: 'no exploit, no report' },
+      pipeline: { phases: ['pre-recon', 'recon', 'vulnerability', 'exploitation', 'verification', 'reporting'], gate: 'no exploit, no report' },
       knowledge,
+      verification,
       executiveSummary: {
         verifiedFindings: verified.length,
         droppedUnverified: dropped.length,
@@ -143,6 +208,9 @@ function renderMd(r) {
     lines.push(`- OWASP: ${f.finding ? f.finding.owasp : '(n/a)'}`);
     lines.push(`- Location: ${f.finding && f.finding.location ? JSON.stringify(f.finding.location) : '(n/a)'}`);
     lines.push(`- Exploitation: ${f.methodsSucceeded}/${f.methodsRequired} method(s) succeeded → ${f.status}`);
+    if (f.verification) {
+      lines.push(`- Verification: ${f.verification.status} by ${f.verification.verifierAgent} (${f.verification.methodsSucceeded}/${f.verification.methodsRequired} independent method(s) re-executed) — snapshot sha256:${String(f.verification.evidenceHash).slice(0, 16)}…`);
+    }
     for (const m of f.methods.filter((m) => m.success)) {
       lines.push(`  - Method \`${m.name}\`: ${m.request}`);
       lines.push(`    - Response: ${m.responseExcerpt.replace(/\n/g, ' ').slice(0, 160)}`);

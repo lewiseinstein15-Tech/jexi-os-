@@ -1,6 +1,6 @@
 {
-  "_comment": "JEXI MCP server registry v3 (Sept 2026 — Lewis: connect them directly, no switches). Every server here was REALLY connected and tool-called by the live test (scripts/mcp-live-test.js, multiple rounds). No paid keys anywhere. uvx servers need Python+uv on the host; npx needs node; streamable-http needs only network. A memory-guarded few wake at boot; the rest connect lazily on first use — mcp/tool-directory.json lets the planner see every tool without holding 35 child processes.",
-  "version": 3.2,
+  "_comment": "JEXI MCP server registry v3 (Sept 2026 — Lewis: connect them directly, no switches). Every server here was REALLY connected and tool-called by the live test (scripts/mcp-live-test.js, multiple rounds). No paid keys anywhere. uvx servers need Python+uv on the host; npx needs node; streamable-http needs only network. A memory-guarded few wake at boot; the rest connect lazily on first use — mcp/tool-directory.json lets the planner see every tool without holding 35 child processes. Phase 8 Scope F (Sept 2026): the 9 `category: security` additions (plus the security-marked `playwright`) are registered DECLARATIVELY from verified upstream sources — mcp-nmap and semgrep-mcp verified as published PyPI packages, the rest verified upstream GitHub repos. They are enabled:false (keyless where marked is a property of the tool, not an install claim) and were NOT live-verified in the build sandbox — enable only on a host that has provisioned the underlying tool.",
+  "version": 3.3,
   "servers": [
     {
       "name": "filesystem",
@@ -489,7 +489,12 @@
         "NETWORK",
         "EXECUTION"
       ],
-      "notes": "Needs browser binaries on the host; wakes with an honest error where none exist (JEXI's native browser covers that). Needs a browser with system deps on the host. Connect+list verified here; full navigation needs the host browser. JEXI native browser control covers browsing where this cannot run. We WILL find a way to give these a browser — see docs/BROWSER-PLAN.md (free hosted browser / full image on a 2GB machine / plan upgrade / phone-browser idea)."
+      "notes": "Needs browser binaries on the host; wakes with an honest error where none exist (JEXI's native browser covers that). Needs a browser with system deps on the host. Connect+list verified here; full navigation needs the host browser. JEXI native browser control covers browsing where this cannot run. We WILL find a way to give these a browser — see docs/BROWSER-PLAN.md (free hosted browser / full image on a 2GB machine / plan upgrade / phone-browser idea). [security] keyless=true; already registered and live-connected by scripts/mcp-live-test.js (pre-Phase-8)",
+      "category": "security",
+      "keyless": true,
+      "keylessNote": "no API key; needs browser binaries on the host",
+      "upstream": "https://github.com/microsoft/playwright-mcp",
+      "sandboxNote": "already registered and live-connected by scripts/mcp-live-test.js (pre-Phase-8)"
     },
     {
       "name": "chrome-devtools",
@@ -680,6 +685,182 @@
         "READ_ONLY"
       ],
       "notes": "World Bank open data, keyless."
+    },
+    {
+      "name": "nmap",
+      "description": "Nmap MCP — network discovery, port scanning and service/version detection via the mcp-nmap wrapper (python-nmap).",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-nmap"
+      ],
+      "enabled": false,
+      "trustLevel": "curated",
+      "category": "security",
+      "keyless": true,
+      "keylessNote": "no API key or license; needs the nmap binary on the host",
+      "permissions": [
+        "NETWORK",
+        "EXECUTION"
+      ],
+      "upstream": "https://pypi.org/project/mcp-nmap/",
+      "verifiedFromSource": false,
+      "notes": "[security] declared, NOT live-verified — keyless=true; wrapper package verified on PyPI (0.1.0); nmap binary absent in the build sandbox — NOT live-verified, enabled:false until the host provisions nmap"
+    },
+    {
+      "name": "subfinder",
+      "description": "Subfinder MCP — fast passive subdomain enumeration (ProjectDiscovery subfinder) for authorized reconnaissance.",
+      "transport": "stdio",
+      "command": "node",
+      "args": [
+        "<host path to the cloned schwarztim/sec-subfinder-mcp server entry>"
+      ],
+      "enabled": false,
+      "trustLevel": "curated",
+      "category": "security",
+      "keyless": true,
+      "keylessNote": "passive sources work without keys (optional keys only widen coverage); needs the subfinder binary on the host",
+      "permissions": [
+        "NETWORK"
+      ],
+      "upstream": "https://github.com/schwarztim/sec-subfinder-mcp",
+      "verifiedFromSource": false,
+      "notes": "[security] declared, NOT live-verified — keyless=true; upstream repo verified on GitHub; no published package — NOT live-verified, enabled:false until the host clones and wires the bridge"
+    },
+    {
+      "name": "whatweb",
+      "description": "WhatWeb MCP — web fingerprinting (server, framework, CMS, JS libraries) through the WhatWeb scanner for authorized recon.",
+      "transport": "stdio",
+      "command": "node",
+      "args": [
+        "<host path to a WhatWeb MCP bridge, e.g. via the openbashok/pentest-mcp suite>"
+      ],
+      "enabled": false,
+      "trustLevel": "curated",
+      "category": "security",
+      "keyless": true,
+      "keylessNote": "no API key or license; needs WhatWeb (Ruby) on the host",
+      "permissions": [
+        "NETWORK"
+      ],
+      "upstream": "https://github.com/openbashok/pentest-mcp",
+      "verifiedFromSource": false,
+      "notes": "[security] declared, NOT live-verified — keyless=true; no dedicated WhatWeb MCP wrapper found (verified by search Sept 2026); multi-tool suite cited — NOT live-verified, enabled:false"
+    },
+    {
+      "name": "ghidra",
+      "description": "Ghidra MCP — AI-driven reverse engineering of binaries through the Ghidra bridge (decompile, list functions/strings, rename, xrefs).",
+      "transport": "stdio",
+      "command": "python",
+      "args": [
+        "/ABSOLUTE_PATH_TO/bridge_mcp_ghidra.py"
+      ],
+      "enabled": false,
+      "trustLevel": "curated",
+      "category": "security",
+      "keyless": true,
+      "keylessNote": "no API key or license; needs Ghidra + the GhidraMCP plugin on the host (arg placeholder mirrors upstream README wording)",
+      "permissions": [
+        "READ_ONLY",
+        "EXECUTION"
+      ],
+      "upstream": "https://github.com/LaurieWired/GhidraMCP",
+      "verifiedFromSource": false,
+      "notes": "[security] declared, NOT live-verified — keyless=true; upstream verified on GitHub (10.1k stars); launcher quoted from upstream README — NOT live-verified, enabled:false"
+    },
+    {
+      "name": "semgrep",
+      "description": "Semgrep MCP (official) — SAST: semantic code search, taint analysis, autofix across 30+ languages with the Semgrep OSS engine.",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "semgrep-mcp"
+      ],
+      "enabled": false,
+      "trustLevel": "curated",
+      "category": "security",
+      "keyless": true,
+      "keylessNote": "OSS engine + community rules need no key (registry Pro features aside)",
+      "permissions": [
+        "READ_ONLY"
+      ],
+      "upstream": "https://pypi.org/project/semgrep-mcp/",
+      "verifiedFromSource": false,
+      "notes": "[security] declared, NOT live-verified — keyless=true; official package verified on PyPI (0.9.0); engine not installed in the build sandbox — NOT live-verified, enabled:false"
+    },
+    {
+      "name": "bandit",
+      "description": "Bandit MCP — python SAST: common security issues in Python code (injection, unsafe deserialization, hardcoded creds) via a Bandit bridge.",
+      "transport": "stdio",
+      "enabled": false,
+      "trustLevel": "curated",
+      "category": "security",
+      "keyless": true,
+      "keylessNote": "no API key or license; needs Bandit (pip) on the host",
+      "permissions": [
+        "READ_ONLY"
+      ],
+      "upstream": "https://bandit.readthedocs.io/",
+      "verifiedFromSource": false,
+      "notes": "[security] declared, NOT live-verified — keyless=true; no dedicated MCP wrapper verified from source (search Sept 2026) — launcher intentionally omitted so a force-enable fails validation (fail-closed); host must provide a bridge"
+    },
+    {
+      "name": "gitleaks",
+      "description": "Gitleaks MCP — secret scanning of git repos, diffs and paths (keys, tokens, passwords) via a Gitleaks bridge.",
+      "transport": "stdio",
+      "enabled": false,
+      "trustLevel": "curated",
+      "category": "security",
+      "keyless": true,
+      "keylessNote": "no API key or license; needs the gitleaks binary on the host",
+      "permissions": [
+        "READ_ONLY"
+      ],
+      "upstream": "https://github.com/gitleaks/gitleaks",
+      "verifiedFromSource": false,
+      "notes": "[security] declared, NOT live-verified — keyless=true; gitleaks itself verified upstream; no dedicated MCP wrapper verified from source (search Sept 2026) — launcher intentionally omitted so a force-enable fails validation (fail-closed)"
+    },
+    {
+      "name": "sliver-c2",
+      "description": "Sliver C2 MCP — adversary-emulation console control (sessions, beacons, command execution on authorized implants) via sliver-py.",
+      "transport": "stdio",
+      "command": "python",
+      "args": [
+        "<host path to the cloned schwarztim/sec-sliver-c2-mcp server entry>"
+      ],
+      "enabled": false,
+      "trustLevel": "curated",
+      "category": "security",
+      "keyless": false,
+      "keylessNote": "requires a Sliver operator config generated in the C2 console (new-operator) — by design not keyless",
+      "permissions": [
+        "NETWORK",
+        "EXECUTION"
+      ],
+      "upstream": "https://github.com/schwarztim/sec-sliver-c2-mcp",
+      "verifiedFromSource": false,
+      "notes": "[security] declared, NOT live-verified — keyless=false; upstream verified on GitHub; requires a live Sliver server — NOT live-verified, enabled:false"
+    },
+    {
+      "name": "bloodhound-ce",
+      "description": "BloodHound CE MCP — Active Directory / Azure attack-path analysis through the BloodHound Community Edition API.",
+      "transport": "stdio",
+      "command": "python",
+      "args": [
+        "<host path to the cloned MorDavid/BloodHound-MCP-AI server entry>"
+      ],
+      "enabled": false,
+      "trustLevel": "curated",
+      "category": "security",
+      "keyless": false,
+      "keylessNote": "requires BloodHound CE API credentials — by design not keyless",
+      "permissions": [
+        "READ_ONLY",
+        "NETWORK"
+      ],
+      "upstream": "https://github.com/MorDavid/BloodHound-MCP-AI",
+      "verifiedFromSource": false,
+      "notes": "[security] declared, NOT live-verified — keyless=false; upstream verified on GitHub (376 stars); requires a reachable BloodHound CE instance — NOT live-verified, enabled:false"
     }
   ]
 }

@@ -37,7 +37,7 @@ function fakeServer(tools, behavior = {}) {
 
 /* ═══ 1. the shipped registry ═══════════════════════════════════════════ */
 
-test('the shipped registry v3 is valid — every server verified live, none ships destructive grants', () => {
+test('the shipped registry v3 is valid — live-verified servers proved by the tool directory, declared security servers shipped disabled', () => {
   const reg = loadRegistry(REGISTRY);
   assert.ok(reg.servers.length >= 30, `expected a big verified registry, got ${reg.servers.length}`);
   const directory = loadToolDirectory();
@@ -45,11 +45,21 @@ test('the shipped registry v3 is valid — every server verified live, none ship
     // Policy (phase-1 D1 order): curated servers ship enabled; 9 community NETWORK/GIT servers ship enabled:false.
     // Every entry carries a permission boundary, honest notes, and a live-verified
     // tool directory entry proving it was REALLY connected and tool-called.
+    // Phase 8 Scope F exception: "[security] declared" entries are registered
+    // from verified upstream sources but were NOT live-connected in the build
+    // sandbox (no host binaries/bridges) — they ship enabled:false and are
+    // exempt from the tool-directory proof; the directory stays a
+    // live-verification proof only, never a place for claimed tools.
+    const declared = String(s.notes || '').startsWith('[security] declared');
     assert.ok(s.permissions.length, `${s.name} needs an explicit permission boundary`);
     assert.ok(!s.permissions.includes('DESTRUCTIVE'), `${s.name} must not ship DESTRUCTIVE`);
     assert.ok(!s.permissions.includes('DEPLOYMENT'), `${s.name} must not ship DEPLOYMENT`);
     assert.ok(['curated', 'community'].includes(s.trustLevel));
     assert.ok(s.notes && s.notes.length > 10, `${s.name} needs honest notes`);
+    if (declared) {
+      assert.ok(s.enabled === false, `${s.name} is declared-not-live and must ship enabled:false`);
+      continue;
+    }
     assert.ok(directory[s.name] && Array.isArray(directory[s.name].tools) && directory[s.name].tools.length > 0, `${s.name} missing from the live-verified tool directory`);
   }
 });

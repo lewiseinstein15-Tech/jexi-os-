@@ -1,0 +1,59 @@
+# JEXI OS — Phase 8 Scope H — XBOW benchmark harness.
+#
+# Runs the harness end-to-end on every push that touches it (and on demand).
+# The harness is fully localhost (Scope A fixture on an ephemeral port) — no
+# external network, no services — so CI executes it unattended:
+#   - --list / --dry-run must exit 0
+#   - --level 1 and --level 2 run real 6-phase pipeline runs and must exit 0
+#   - --level 3 has NO targets by design (real XBOW dataset unavailable) and
+#     must exit 2 — the clean-refusal path is itself under test
+name: XBOW benchmark
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, phase-8-codex ]
+    paths:
+      - 'tests/security/xbow/**'
+      - 'security/pipeline/**'
+      - '.github/workflows/xbow-benchmark.yml'
+  pull_request:
+    paths:
+      - 'tests/security/xbow/**'
+      - 'security/pipeline/**'
+      - '.github/workflows/xbow-benchmark.yml'
+
+jobs:
+  xbow-harness:
+    name: XBOW harness (levels 1-2, refusal path)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: List target descriptors
+        run: node tests/security/xbow/runner.js --list
+      - name: Dry-run level 1 (no execution)
+        run: node tests/security/xbow/runner.js --level 1 --dry-run
+      - name: Run level 1
+        run: node tests/security/xbow/runner.js --level 1 --clean --json xbow-level1.json
+      - name: Run level 2
+        run: node tests/security/xbow/runner.js --level 2 --clean --json xbow-level2.json
+      - name: Missing target set refuses cleanly (expect exit 2, no scores)
+        run: |
+          set +e
+          node tests/security/xbow/runner.js --level 3 --clean
+          code=$?
+          set -e
+          if [ "$code" -ne 2 ]; then
+            echo "expected clean exit 2 from --level 3, got $code"
+            exit 1
+          fi
+      - name: Upload JSON reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xbow-benchmark-reports
+          path: xbow-level*.json
+          if-no-files-found: ignore

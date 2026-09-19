@@ -3,7 +3,7 @@ const { chromium } = require('playwright');
 
 const BASE = 'http://localhost:4173';
 const BACKEND = 'https://jexi-brain-image.onrender.com';
-const SHOT_DIR = '/home/user/jexi-os/b221-shots';
+const SHOT_DIR = 'docs/assets/b221-shots'; // GAP 3: moved from repo root
 const VIEWS = [
   ['chat', 'Chat', 'JEXI'], ['history', 'Chat history', 'Chat history'], ['agents', 'Team', 'AGENT TIMELINE'],
   ['missions', 'Missions', 'Missions'], ['workshop', 'Workshop', 'Workshop'],

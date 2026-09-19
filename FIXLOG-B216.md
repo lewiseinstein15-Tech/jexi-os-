@@ -67,7 +67,7 @@ at the real backend:
 - `src/index.css` (+motion keyframes, graph tier ladder, reduced-motion
   kill-switch), `index.html` (+Space Grotesk), `tailwind.config.js`
   (+display font family)
-- Workspace evidence (untracked): `b216-mission-detail.png` drive screenshot
+- Workspace evidence (untracked): `docs/assets/b216-mission-detail.png` drive screenshot (moved from repo root)
 
 ## Honest limits (not converted to DONE)
 
@@ -95,7 +95,7 @@ at the real backend:
    hibernated (keepalive cron last ran 13:33 — GitHub Actions queue pressure starved
    the schedule for 3h+) and woke with a fresh ephemeral disk — the fibonacci mission
    record used for the live UI drive vanished. All B216 verification evidence was
-   captured BEFORE the wipe (drive logs + `b216-mission-detail.png` + this fixlog).
+   captured BEFORE the wipe (drive logs + `docs/assets/b216-mission-detail.png` + this fixlog).
    The B215 audit's mission-persistence row has been corrected (process restarts:
    yes; container replacement: no — externalize missions/world to Redis, future
    build).

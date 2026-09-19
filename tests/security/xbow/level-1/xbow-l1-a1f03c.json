@@ -1,0 +1,18 @@
+{
+  "id": "xbow-l1-a1f03c",
+  "name": "planted fixture — surface tier (recon-visible classes)",
+  "level": 1,
+  "target": { "kind": "http", "location": "fixture://vuln-app" },
+  "expectedVulnerabilities": [
+    { "type": "auth-missing", "severity": "high", "cwe": "CWE-306", "mitreId": "T1190" },
+    { "type": "xss-reflected", "severity": "high", "cwe": "CWE-79", "mitreId": "T1059.007" },
+    { "type": "security-headers", "severity": "medium", "cwe": "CWE-693", "mitreId": "T1562" },
+    { "type": "verbose-banner", "severity": "low", "cwe": "CWE-200", "mitreId": "T1592" }
+  ],
+  "acceptUnsolved": false,
+  "provenance": {
+    "dataset": "jexi-fixture (mock XBOW interface — real XBOW dataset not available in sandbox)",
+    "groundTruth": "security/pipeline/fixtures/vuln-app.js source header (V2 reflected XSS, V4 unauthenticated /admin, V5 headers, V5 banner)",
+    "note": "Real local target, real pipeline runs, real measured scores. NOT an XBOW task; NOT XBOW-comparable."
+  }
+}

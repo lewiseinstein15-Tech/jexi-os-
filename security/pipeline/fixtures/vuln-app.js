@@ -16,6 +16,11 @@
  *   V6  GET /login           — session cookie without HttpOnly/Secure,
  *                              predictable token literal
  *   V7  source               — hardcoded APP_SECRET credential
+ *   V8  GET /announce?msg=.. — TRAP (Phase 8G): msg IS echoed into HTML
+ *                              but server-side escaped — LOOKS like XSS
+ *                              to a naive substring check, ISN'T. Planted
+ *                              so the verifier has a false positive to
+ *                              reject (P2: input escaped server-side).
  *
  * Run directly:   node vuln-app.js            (VULN_PORT env, default 4488)
  * Or as a module: import { startVulnApp } — returns { server, port, close }.
@@ -56,10 +61,22 @@ function renderTemplate(res, title, bodyHtml) {
 <nav>
   <a href="/">home</a> | <a href="/item?id=1">item</a> |
   <a href="/search?q=test">search</a> | <a href="/download?file=notes.txt">download</a> |
-  <a href="/admin">admin</a> | <a href="/login">login</a>
+  <a href="/announce?msg=hi">announce</a> | <a href="/admin">admin</a> | <a href="/login">login</a>
 </nav>
 ${bodyHtml}
 </body></html>`);
+}
+
+function escapeHtml(s) {
+  // V8 trap: proper server-side escaping — & first, then the angle brackets
+  // and quotes. A naive agent grepping for marker FRAGMENTS ("onerror=…")
+  // still matches the escaped echo; only a verbatim raw-tag check is honest.
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 export function startVulnApp({ port = Number(process.env.VULN_PORT || 4488) } = {}) {
@@ -99,6 +116,13 @@ export function startVulnApp({ port = Number(process.env.VULN_PORT || 4488) } = 
         res.writeHead(404, { Server: 'VulnApp/1.0 (debug)' });
         res.end('not found');
       }
+      return;
+    }
+
+    if (url.pathname === '/announce') {
+      // V8 trap: reflects msg into the page — but ESCAPED server-side.
+      const msg = url.searchParams.get('msg') || '';
+      renderTemplate(res, 'announce', `<h2>Announcement: ${escapeHtml(msg)}</h2><p>nothing else</p>`);
       return;
     }
 

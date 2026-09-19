@@ -136,8 +136,8 @@ if (mode === 'p1') {
   const port = Number(values.port);
   const now = Date.now();
   const input = mode === 'p6'
-    ? { ...p1Input(now), name: 'pipeline-allowed', allowedActions: ['scan', 'exploit', 'report'] }
-    : { ...p1Input(now), name: 'pipeline-forbidden-target', targets: ['10.0.0.1'], forbidden: ['127.0.0.1'], allowedActions: ['scan', 'exploit', 'report'] };
+    ? { ...p1Input(now), name: 'pipeline-allowed', allowedActions: ['scan', 'exploit', 'verify', 'report'] } // Phase 8(G): verification re-executes exploits — the RoE must authorize it
+    : { ...p1Input(now), name: 'pipeline-forbidden-target', targets: ['10.0.0.1'], forbidden: ['127.0.0.1'], allowedActions: ['scan', 'exploit', 'verify', 'report'] };
   const e = eng.plan(input);
   console.log(`[${mode}] engagement ${e.id} planned (targets=${JSON.stringify(e.scope.targets)} forbidden=${JSON.stringify(e.scope.forbidden)})`);
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -170,7 +170,7 @@ if (mode === 'p1') {
   const e = eng.plan({
     ...p1Input(now),
     name: 'pipeline-approval-required',
-    allowedActions: ['scan', 'exploit', 'report'],
+    allowedActions: ['scan', 'exploit', 'verify', 'report'], // Phase 8(G): verify authorizes the verification phase's re-execution
     requiresApproval: ['exploit'],
   });
   console.log(`[p8-create] engagement ${e.id} planned — requiresApproval=${JSON.stringify(e.roe.requiresApproval)}`);
