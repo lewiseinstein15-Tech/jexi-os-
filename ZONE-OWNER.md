@@ -37,7 +37,7 @@ Statuses: `OPEN` · `DONE` · `BLOCKED-FOR-DECISION` (owner call required) ·
 
 | ID | Status | Source | Pri | Files | Why it matters |
 |---|---|---|---|---|---|
-| 1 | OPEN | Ph 17 H cross-verify | P0 | `server/src/services/SkillLoop.js:59`, `skills/design/diagram-design/SKILL.md` | `readSkillMeta` regex `^([a-z_]+):` silently DROPS camelCase frontmatter keys (`whenToUse`, `allowedTools`) across 818 security + 166 scientific + 144 library + Phase 12 skills. Fix to `[a-zA-Z_]+`; then optionally revert the H scope's lowercase workaround. |
+| 1 | DONE | Ph 17 H cross-verify | P0 | `server/src/services/SkillLoop.js:59`, `skills/design/diagram-design/SKILL.md` | `readSkillMeta` regex `^([a-z_]+):` silently DROPS camelCase frontmatter keys (`whenToUse`, `allowedTools`) across 818 security + 166 scientific + 144 library + Phase 12 skills. Fix to `[a-zA-Z_]+`; then optionally revert the H scope's lowercase workaround. — **DONE @ probe scripts/zone-owner-item1-probe.mjs (10/10; 323/1142 SKILL.md files were affected); lowercase workaround still loads; diagram-design revert left as optional follow-up.** |
 | 7 | OPEN | Ph 11 | P1 | `server/test-hud.js` (producer/assert) | "first publish bumps revision to 1" — the suite's one standing failure; fix assert or producer. |
 | 8 | OPEN | Ph 11 merge | P1 | `server/test-b211.js` | Lease TTL 5ms race — flaky under load; widen the margin. |
 | 9 | OPEN | Ph 12 merge | P1 | `scripts/lint-agent-baseline.sh` | Baseline lint checks PRESENCE, not verbatim bytes — drift passes lint. Check byte-equal after header. |
