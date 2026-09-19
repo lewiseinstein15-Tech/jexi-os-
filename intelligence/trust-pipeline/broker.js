@@ -7,12 +7,14 @@
  * Pipeline per request:
  *   1. URL shape checks (https, no userinfo, no ports)          [allowlist]
  *   2. Registry match — host exact + path prefix                [allowlist]
- *   3. fetch with redirect: 'manual' — ANY 3xx is refused
- *      (Scope B adds per-hop revalidation for explicitly
- *      redirect-tolerant registrations; the default is refuse)
- *   4. hard wall-clock timeout via AbortController
- *   5. body read under a hard byte cap (stream cancelled on breach)
- *   6. non-2xx → sanitized upstream error; all errors sanitized
+ *   3. SSRF shield (Scope B — DEFAULT transport): DNS resolved ONCE and
+ *      every address verified public (private/loopback/link-local/metadata
+ *      refused), connection pinned to the verified IP (no re-resolve),
+ *      certificate verified against the original hostname, TLS pinning
+ *   4. fetch with redirect: 'manual' — ANY 3xx is refused
+ *   5. hard wall-clock timeout via AbortController
+ *   6. body read under a hard byte cap (stream cancelled on breach)
+ *   7. non-2xx → sanitized upstream error; all errors sanitized
  *
  * Everything the model sees is either sanitized data or a stable error code.
  * Richer diagnostics go to the broker's local audit log (this process only).
@@ -24,6 +26,7 @@
  */
 
 import { resolveAllowed, AllowlistRefusedError } from './allowlist.js';
+import { createPinnedFetchImpl } from '../../security/shield/ssrf.js';
 import {
   readBodyCapped,
   sanitizeError,
@@ -35,7 +38,10 @@ import {
 export function createBroker({
   maxBytes = DEFAULT_MAX_BYTES,
   timeoutMs = DEFAULT_TIMEOUT_MS,
-  fetchImpl = (...args) => fetch(...args),
+  // Scope B wiring: the SSRF shield IS the default transport — DNS verified
+  // once, connection pinned to a verified IP, cert verified against the
+  // original hostname, redirects refused. Injectable for labeled doubles.
+  fetchImpl = createPinnedFetchImpl({ timeoutMs }),
   userAgent = 'jexi-os-phase9-trust-pipeline/1.0',
 } = {}) {
   if (!(Number.isInteger(maxBytes) && maxBytes > 0)) {
@@ -129,6 +135,7 @@ export function createBroker({
       return {
         ok: false, status: response.status, url: url.toString(), registration,
         text: '', bytes: 0, tooLarge: false, warnings,
+        meta: response.meta || null,
         error: { code: 'E_REDIRECT_REFUSED', message: 'request blocked: upstream attempted a redirect' },
       };
     }
@@ -176,6 +183,7 @@ export function createBroker({
       bytes: body.bytes,
       tooLarge: false,
       warnings,
+      meta: response.meta || null,
       json() {
         return JSON.parse(body.text);
       },

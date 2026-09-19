@@ -72,6 +72,25 @@ export const BROKER_ERROR_CODES = [
   'E_TOO_LARGE',            // response body crossed the byte cap
   'E_UPSTREAM_STATUS',      // non-2xx upstream status
   'E_NETWORK',              // socket/DNS/TLS-level failure
+  // ── Scope B — SSRF shield codes (surfaced through the pinned transport) ──
+  'E_PRIVATE_IP_REFUSED',       // resolution contains an RFC1918/ULA address
+  'E_LOOPBACK_REFUSED',         // 127/8, ::1
+  'E_LINK_LOCAL_REFUSED',       // 169.254/16, fe80::/10
+  'E_METADATA_ENDPOINT_REFUSED',// cloud metadata (169.254.169.254 et al.)
+  'E_MULTICAST_REFUSED',        // 224/4, ff00::/8
+  'E_NON_PUBLIC_IP_REFUSED',    // reserved/CGNAT/TEST-NET/transition prefixes
+  'E_REDIRECT_TO_PRIVATE_IP',   // redirect target is not public
+  'E_REDIRECT_SCHEME_DOWNGRADE',// redirect https → http
+  'E_REDIRECT_BAD_SCHEME',      // redirect target scheme not allowed
+  'E_REDIRECT_LOOP',            // redirect loop
+  'E_DNS_REBINDING_REFUSED',    // resolution diverged from the verified set
+  'E_DNS_NO_ADDRESS',           // no A/AAAA records
+  'E_TLS_PIN_MISMATCH',         // cert fingerprint not in the pin set
+  'E_CERT_HOSTNAME_MISMATCH',   // cert does not cover the requested host
+  'E_CERT_EXPIRED',             // cert expired
+  'E_CERT_NOT_YET_VALID',       // cert not yet valid
+  'E_TLS_NO_CERT',              // no certificate presented
+  'E_PINNED_HOST_MISMATCH',     // socket tried to resolve a different host
 ];
 
 const TEMPLATED = {
@@ -86,6 +105,25 @@ const TEMPLATED = {
   E_TOO_LARGE: 'request blocked: response exceeded the size cap',
   E_UPSTREAM_STATUS: 'request failed: upstream returned an error status',
   E_NETWORK: 'request failed: network error',
+  // ── Scope B — SSRF shield (templated, no internal details) ──
+  E_PRIVATE_IP_REFUSED: 'request blocked: host resolves to a private address',
+  E_LOOPBACK_REFUSED: 'request blocked: host resolves to a loopback address',
+  E_LINK_LOCAL_REFUSED: 'request blocked: host resolves to a link-local address',
+  E_METADATA_ENDPOINT_REFUSED: 'request blocked: host resolves to a cloud metadata endpoint',
+  E_MULTICAST_REFUSED: 'request blocked: host resolves to a multicast address',
+  E_NON_PUBLIC_IP_REFUSED: 'request blocked: host resolves to a non-public address',
+  E_REDIRECT_TO_PRIVATE_IP: 'request blocked: redirect target is not public',
+  E_REDIRECT_SCHEME_DOWNGRADE: 'request blocked: redirect would downgrade to plaintext',
+  E_REDIRECT_BAD_SCHEME: 'request blocked: redirect target scheme is not allowed',
+  E_REDIRECT_LOOP: 'request blocked: redirect loop detected',
+  E_DNS_REBINDING_REFUSED: 'request blocked: DNS rebinding detected',
+  E_DNS_NO_ADDRESS: 'request failed: host has no address records',
+  E_TLS_PIN_MISMATCH: 'request blocked: certificate does not match the pinned key',
+  E_CERT_HOSTNAME_MISMATCH: 'request blocked: certificate does not match the requested host',
+  E_CERT_EXPIRED: 'request blocked: certificate is expired',
+  E_CERT_NOT_YET_VALID: 'request blocked: certificate is not yet valid',
+  E_TLS_NO_CERT: 'request blocked: no certificate presented',
+  E_PINNED_HOST_MISMATCH: 'request blocked: connection attempted to resolve a different host',
 };
 
 /**
