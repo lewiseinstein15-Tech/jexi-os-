@@ -382,6 +382,13 @@ export async function build() {
 
 /** Force a build + publish right now (bypasses the debounce). */
 export async function publish(reason = 'manual') {
+  // ZONE-OWNER ITEM 7 — an explicit publish IS the coalescing point: cancel
+  // any pending debounced publish first. Without this, the 120ms debounce
+  // timer fired DURING this call's `await build()` (build can exceed 120ms —
+  // observed 1.4s on cold subsystem scans), two publishes interleaved and the
+  // first manual publish returned revision 2 instead of 1 (the test-hud.js
+  // standing failure). One burst → one payload → one revision.
+  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
   const payload = await build();
   const v = validateHud(payload);
   if (!v.valid) {
@@ -440,6 +447,9 @@ export function onPublish(fn) {
 
 /** Test/diagnostic reset (never call in production). */
 export function _reset() {
+  // ZONE-OWNER ITEM 7 — a stale debounce timer must not survive a reset and
+  // fire into the next test's fresh state.
+  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
   state.recent = [];
   state.pending.clear();
   state.spend = [];
