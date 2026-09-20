@@ -104,9 +104,14 @@ console.log('\n== A. WorkGraph: relations, ready-work, leases ==');
   check('dependent becomes ready after its blocker completes', ready.some((i) => i.id === b.id));
 
   // lease expiry → reclaim (a PENDING item claimed with a short TTL)
-  g.claim(c.id, 'worker-1', 5);
+  // ZONE-OWNER ITEM 8 — margins widened: the old 5ms TTL meant the "still
+  // leased" assert had to win a 5ms race against the wall clock (flaky under
+  // load: a GC pause or busy CI expired the lease before the assert ran).
+  // 250ms TTL keeps the semantics identical with 50× headroom; sleep(350)
+  // still proves real expiry (100ms past the deadline).
+  g.claim(c.id, 'worker-1', 250);
   check('short-TTL claim takes the item out of ready', !g.readyWork().some((i) => i.id === c.id));
-  await sleep(15);
+  await sleep(350);
   check('expired lease is reclaimable', g.readyWork().some((i) => i.id === c.id));
   g.claim(b.id, 'worker-1', 60000);
   g.complete(b.id, { content: 'the report' });
