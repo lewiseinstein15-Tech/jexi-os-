@@ -85,3 +85,33 @@ Covered by #10 and #11 (Bugs). No additional items.
 - **37** → MERGED→#22 (suite requires root `npm install` — esbuild — Step 2 discovery c).
 
 *Snapshot at creation: `pre-cleanup-zone-owner` @ `8a748a4a78e576cccec38f60b08f65f3ea71dabe`.*
+
+## Cleanup Policy
+Phases build. ZONE-OWNER.md grows. Cleanup runs
+ONCE at the end — after all phases land, before
+the benchmark phase. No interleaved cleanup passes.
+Every phase is expected to leave ZONE-OWNER items
+even if its own work is complete.
+
+## Phase 10 carry-forward — Scope A
+
+- **P10-A-01 OPEN — runtime integration:** `rlm/kernel/` is independently usable;
+  it is not registered in the server, command registry or existing kernel.
+  Coordinate any out-of-zone wiring after in-zone daemon/subagent scopes.
+- **P10-A-02 OPEN — snapshot breadth:** A uses validated deterministic synchronous
+  replay, not arbitrary heap serialization. Hidden nondeterminism, external I/O,
+  async continuations and resource handles are not restorable by this format.
+  Resolve before advertising unrestricted REPL recovery; details in
+  `rlm/kernel/README.md`. Scope D/E durability must not silently replay effects.
+- **P10-A-03 OPEN — containment:** Node VM contexts isolate ordinary session
+  namespaces, not malicious code. OS-level worker containment and host-call
+  capabilities remain integration work; never advertise VM as a security sandbox.
+
+## Phase 10 carry-forward — Scope C
+
+- **P10-C-01 OPEN — /checkpoint sandbox failure:** `/checkpoint` fails in the
+  current sandbox with the ORIGINAL Phase 7 G `/refine` handler restored.
+  Pre-existing in this environment, not caused by Scope C. Source: Phase 10 C
+  test-contract discovery. Original-handler test-commands.js run: 25/26, with
+  `/refine` passing and `/checkpoint` failing. Investigate the environment and
+  checkpoint path in the end-of-phases cleanup; do not fix in Scope C.

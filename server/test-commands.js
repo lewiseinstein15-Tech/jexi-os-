@@ -45,8 +45,8 @@ const registry = C.registry;
 
 /* ── 1. registry contract ─────────────────────────────────────────────── */
 
-check('registry: 12 commands registered', () => {
-  assert.equal(C.list().length, 12, `got ${C.list().length}: ${C.list().map((c) => c.name).join(',')}`);
+check('registry: 15 commands registered', () => {
+  assert.equal(C.list().length, 15, `got ${C.list().length}: ${C.list().map((c) => c.name).join(',')}`);
 });
 
 check('registry: contract fields present on every command', () => {
@@ -195,9 +195,22 @@ await checkAsync('/learn reports honestly with no journal', async () => {
 
 await checkAsync('/refine says "no refinement" or proposes with evidence', async () => {
   const r = await C.dispatch('/refine');
-  assert.equal(r.ok, true, r.error || 'refine failed');
-  if (r.result.proposal) assert.ok(r.result.proposal.evidenceRef, 'proposal must cite evidence');
-  else assert.match(r.summary, /no refinement/);
+  assert.ok(r.result, r.error || 'refine must return a result, not throw');
+  if (r.result.proposal) {
+    assert.equal(r.ok, true);
+    assert.equal(r.result.ok, true);
+    assert.equal(typeof r.result.proposal.evidence.source, 'string');
+    assert.ok(r.result.proposal.evidence.source.length, 'proposal must cite its source');
+    assert.equal(typeof r.result.proposal.evidence.detail, 'string');
+    assert.ok(r.result.proposal.evidence.detail.length, 'proposal must cite an observation');
+  } else {
+    assert.equal(r.ok, false);
+    assert.deepEqual(r.result, {
+      ok: false,
+      reason: 'no-evidence',
+      message: 'No refinement: no evidence in trajectory',
+    });
+  }
 });
 
 await checkAsync('/intel triages against the plan with provenance', async () => {
@@ -239,12 +252,12 @@ check('seam: chat + CLI share the same dispatcher module', async () => {
   assert.ok(cli.includes('dispatchCommand'), 'cli.js dispatches commands');
 });
 
-await checkAsync('seam: commands-seam loads and lists 12', async () => {
+await checkAsync('seam: commands-seam loads and lists 15', async () => {
   const seam = await import(path.join(SERVER_ROOT, 'src', 'commands-seam.js'));
   assert.equal(seam.commandsAvailable(), true);
-  assert.equal(seam.commandsStatus().count, 12);
+  assert.equal(seam.commandsStatus().count, 15);
   const api = seam.registryForApi();
-  assert.equal(api.count, 12);
+  assert.equal(api.count, 15);
   assert.ok(api.commands[0].name && api.commands[0].category);
 });
 
@@ -254,7 +267,7 @@ await checkAsync('surface: GET /api/commands exposes the dispatcher registry', a
   // value that route embeds.
   const seam = await import(path.join(SERVER_ROOT, 'src', 'commands-seam.js'));
   const api = seam.registryForApi();
-  assert.ok(api && api.count >= 12);
+  assert.ok(api && api.count >= 15);
 });
 
 check('docker: workflows ship commands/ into the brain image', () => {

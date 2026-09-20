@@ -26,6 +26,9 @@ const MODULES = [
   './doctor.command.js',
   './status.command.js',
   './export.command.js',
+  './goal.command.js',
+  './heartbeat.command.js',
+  './autonomous.command.js',
 ];
 
 /** Register every shipped command. Returns the registry (for chaining). */
