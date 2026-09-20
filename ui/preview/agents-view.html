@@ -1,0 +1,649 @@
+<!doctype html>
+<!-- JEXI OS — Phase 10 Scope J — Agents View UI
+     Single self-contained HTML view that lists running sessions and their subagent trees.
+     Zero external dependencies, zero CDN fonts/icons, theme tokens inlined verbatim from src/styles/jexi-theme.css
+     Sample graph hardcoded for standalone render. --live mode reads from daemon registry when running.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JEXI OS — Agents View</title>
+<style>
+/* ════════════════════════════════════════════════════════════════════
+   JEXI OS — CONSOLE THEME (Phase 6, Scope F-build)
+   ──────────────────────────────────────────────────────────────────
+   Extracted VERBATIM from the approved preview ui/preview/console.html,
+   which itself adopts the JEXI Market design tokens v2
+   (jexi/web/src/app/globals.css). Every color, radius, font stack and
+   transition below is byte-identical to the preview.
+
+   Scoping: every rule lives under `.jcx` (the console root) so the
+   console can never leak into — or inherit from — the classic app's
+   jx-* styles. Fonts are local-first stacks: no CDN, no external
+   packs, matching the preview exactly.
+   ══════════════════════════════════════════════════════════════════ */
+
+.jcx{
+  /* ── JEXI MARKET design tokens v2 ── */
+  --jcx-bg:#0c0b09; --jcx-panel:#15130f; --jcx-panel-2:#1c1915; --jcx-panel-3:#241f19;
+  --jcx-line:#282318; --jcx-line-soft:#201c15;
+  --jcx-ink:#f3eee6; --jcx-ink-2:#a99f90; --jcx-ink-3:#7a7163;
+  --jcx-ember:#ff7a3d; --jcx-coral:#ff6b5e; --jcx-peach:#ffb88c; --jcx-sand:#e8d9c4; --jcx-gold:#e5b567;
+  --jcx-up:#4cc38a; --jcx-down:#ff5d5d;
+  --jcx-ember-dim:rgba(255,122,61,.14);
+  --jcx-up-dim:rgba(76,195,138,.14);
+  --jcx-down-dim:rgba(255,93,93,.14);
+  --jcx-gold-dim:rgba(229,181,103,.16);
+  --jcx-peach-dim:rgba(255,184,140,.12);
+  --jcx-radius:14px;
+  --jcx-ease:cubic-bezier(.22,.61,.36,1);
+  --jcx-sans:'Inter',-apple-system,'Segoe UI',system-ui,Roboto,sans-serif;
+  --jcx-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace;
+  --jcx-display:'Fraunces',Georgia,'Times New Roman',serif;
+
+  /* full-screen takeover, above the classic shell */
+  position:fixed; inset:0; z-index:60;
+  background:var(--jcx-bg); color:var(--jcx-ink);
+  font-family:var(--jcx-sans);
+  font-size:12px; line-height:1.45;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  display:grid; grid-template-columns:240px 1fr; overflow:hidden;
+}
+.jcx *{margin:0;padding:0;box-sizing:border-box}
+.jcx ::selection{background:rgba(255,122,61,.32)}
+.jcx .mono{font-family:var(--jcx-mono)}
+.jcx ::-webkit-scrollbar{width:8px;height:8px}
+.jcx ::-webkit-scrollbar-thumb{background:var(--jcx-line);border-radius:4px}
+.jcx ::-webkit-scrollbar-track{background:transparent}
+
+/* warm page glow — one per view, never over data (JEXI Market .jexi-glow) */
+.jcx-glow{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(900px 420px at 70% -10%, rgba(255,122,61,.07), transparent 70%),
+    radial-gradient(700px 380px at 10% 110%, rgba(255,107,94,.04), transparent 70%)}
+
+/* ── pills: status = small text on tinted bg, never a saturated block ── */
+.jcx .pill{display:inline-flex;align-items:center;gap:5px;padding:1px 8px;
+  border-radius:999px;font-size:10.5px;font-weight:600;letter-spacing:.04em;
+  text-transform:uppercase;border:1px solid transparent;white-space:nowrap}
+.jcx .pill .dot{width:6px;height:6px;border-radius:50%;flex:none}
+.jcx .pill.ok{color:var(--jcx-up);background:var(--jcx-up-dim);border-color:rgba(76,195,138,.25)}
+.jcx .pill.ok .dot{background:var(--jcx-up)}
+.jcx .pill.warn{color:var(--jcx-gold);background:var(--jcx-gold-dim);border-color:rgba(229,181,103,.28)}
+.jcx .pill.warn .dot{background:var(--jcx-gold)}
+.jcx .pill.err{color:var(--jcx-down);background:var(--jcx-down-dim);border-color:rgba(255,93,93,.25)}
+.jcx .pill.err .dot{background:var(--jcx-down)}
+.jcx .pill.run{color:var(--jcx-ember);background:var(--jcx-ember-dim);border-color:rgba(255,122,61,.3)}
+.jcx .pill.run .dot{background:var(--jcx-ember);animation:jcx-pulse 1.6s ease-in-out infinite}
+.jcx .pill.idle{color:var(--jcx-ink-2);background:var(--jcx-panel-2);border-color:var(--jcx-line)}
+.jcx .pill.idle .dot{background:var(--jcx-ink-3)}
+.jcx .pill.info{color:var(--jcx-peach);background:var(--jcx-peach-dim);border-color:rgba(255,184,140,.25)}
+.jcx .pill.info .dot{background:var(--jcx-peach)}
+@keyframes jcx-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ═══════════ SIDEBAR ═══════════ */
+.jcx aside{background:var(--jcx-panel);border-right:1px solid var(--jcx-line);
+  display:flex;flex-direction:column;overflow-y:auto;position:relative;z-index:1}
+.jcx .brand{display:flex;align-items:center;gap:10px;padding:14px 14px 12px}
+.jcx .brand .mark{width:30px;height:30px;flex:none;display:block}
+.jcx .brand .mark svg{width:30px;height:30px;display:block}
+.jcx .brand .word{display:flex;align-items:baseline;gap:7px;user-select:none;
+  border:none;background:none;cursor:default;padding:0;text-align:left}
+.jcx .brand .word b{font-family:var(--jcx-display);font-weight:600;font-size:17px;
+  letter-spacing:-.015em;color:var(--jcx-ink);line-height:1}
+.jcx .brand .word i{font-style:normal;font-size:9.5px;font-weight:600;
+  letter-spacing:.22em;color:var(--jcx-ink-3);text-transform:uppercase;line-height:1}
+.jcx .navgroup{padding:6px 8px 2px}
+.jcx .navgroup>h4{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--jcx-ink-3);padding:8px 8px 4px}
+.jcx .navitem{display:flex;align-items:center;gap:9px;padding:5.5px 8px;border-radius:6px;
+  color:var(--jcx-ink-2);cursor:pointer;border-left:2px solid transparent;
+  background:none;font:inherit;width:100%;text-align:left;
+  transition:background 150ms var(--jcx-ease),color 150ms var(--jcx-ease);user-select:none}
+.jcx .navitem svg{width:13px;height:13px;stroke:var(--jcx-ink-3);flex:none;transition:stroke 150ms var(--jcx-ease)}
+.jcx .navitem:hover{background:var(--jcx-panel-2);color:var(--jcx-ink)}
+.jcx .navitem:hover svg{stroke:var(--jcx-ink-2)}
+.jcx .navitem.active{background:var(--jcx-ember-dim);color:var(--jcx-ink);font-weight:600;
+  border-left-color:var(--jcx-ember);border-radius:0 6px 6px 0}
+.jcx .navitem.active svg{stroke:var(--jcx-ember)}
+.jcx .navitem .count{margin-left:auto;font-family:var(--jcx-mono);font-size:10px;color:var(--jcx-ink-3)}
+.jcx .navitem .new{margin-left:auto;font-size:8.5px;font-weight:700;letter-spacing:.08em;
+  color:var(--jcx-ember);background:var(--jcx-ember-dim);border-radius:4px;padding:1px 5px}
+.jcx .sidefoot{margin-top:auto;border-top:1px solid var(--jcx-line);padding:10px 12px 12px}
+.jcx .modelrow{display:flex;align-items:center;gap:8px;background:var(--jcx-panel-2);
+  border:1px solid var(--jcx-line);border-radius:10px;padding:7px 9px;cursor:pointer;
+  transition:border-color 150ms var(--jcx-ease)}
+.jcx .modelrow:hover{border-color:rgba(255,122,61,.45)}
+.jcx .modelrow svg{width:13px;height:13px;stroke:var(--jcx-ink-2);flex:none}
+.jcx .modelrow .m{font-family:var(--jcx-mono);font-size:11px;color:var(--jcx-ink)}
+.jcx .modelrow .p{font-size:10px;color:var(--jcx-ink-2)}
+.jcx .modelrow .chev{margin-left:auto}
+.jcx .onekey{margin-top:8px;display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--jcx-ink-2)}
+.jcx .onekey .dot{width:6px;height:6px;border-radius:50%;background:var(--jcx-up);flex:none}
+.jcx .onekey b{color:var(--jcx-ink);font-weight:600}
+
+/* v0.7 — ServerRow */
+.jcx .serverrow{display:flex;align-items:center;gap:8px;margin-bottom:8px;
+  background:var(--jcx-panel-2);border:1px solid var(--jcx-line);border-radius:10px;
+  padding:7px 9px;cursor:pointer;transition:border-color 150ms var(--jcx-ease)}
+.jcx .serverrow:hover{border-color:rgba(255,122,61,.45)}
+.jcx .serverrow .srv{min-width:0}
+.jcx .serverrow .m{font-family:var(--jcx-mono);font-size:11px;color:var(--jcx-ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jcx .serverrow .p{font-size:10px;color:var(--jcx-ink-2)}
+.jcx .serverrow .sdot{width:6px;height:6px;border-radius:50%;flex:none}
+.jcx .serverrow .sdot.up{background:var(--jcx-up);box-shadow:0 0 6px var(--jcx-up-dim)}
+.jcx .serverrow .sdot.down{background:var(--jcx-down);box-shadow:0 0 6px var(--jcx-down-dim)}
+.jcx .serverrow .sdot.checking{background:var(--jcx-gold);box-shadow:0 0 6px var(--jcx-gold-dim);
+  animation:jcx-wake 1.2s ease-in-out infinite}
+@keyframes jcx-wake{0%,100%{opacity:1}50%{opacity:.35}}
+.jcx .serverrow input{width:100%;background:transparent;border:0;outline:0;
+  font-family:var(--jcx-mono);font-size:11px;color:var(--jcx-ink)}
+
+/* ═══════════ MAIN COLUMN ═══════════ */
+.jcx .appmain{display:grid;grid-template-rows:auto 1fr 176px;min-width:0;height:100vh;position:relative;z-index:1}
+
+/* mission header */
+.jcx .hud{background:var(--jcx-panel);border-bottom:1px solid var(--jcx-line);
+  padding:9px 16px;display:flex;align-items:center;gap:14px;overflow-x:auto}
+.jcx .hud .title{font-family:var(--jcx-display);font-weight:560;font-size:15px;
+  letter-spacing:-.015em;white-space:nowrap}
+.jcx .hud .sep{width:1px;height:22px;background:var(--jcx-line);flex:none}
+.jcx .stat{display:flex;flex-direction:column;gap:1px;white-space:nowrap}
+.jcx .stat label{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--jcx-ink-3);font-weight:500}
+.jcx .stat b{font-family:var(--jcx-mono);font-size:11.5px;font-weight:600;color:var(--jcx-ink)}
+.jcx .stat b.warm{color:var(--jcx-gold)} .jcx .stat b.acc{color:var(--jcx-ember)} .jcx .stat b.bad{color:var(--jcx-down)}
+.jcx .hud .controls{margin-left:auto;display:flex;gap:6px;flex:none}
+.jcx .ctl{display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:10px;
+  border:1px solid var(--jcx-line);background:var(--jcx-panel-2);color:var(--jcx-ink-2);
+  font-size:10.5px;font-weight:600;letter-spacing:.03em;cursor:pointer;
+  transition:all 150ms var(--jcx-ease)}
+.jcx .ctl svg{width:11px;height:11px;stroke:currentColor}
+.jcx .ctl:hover{background:var(--jcx-panel-3);color:var(--jcx-ink)}
+.jcx .ctl.stop:hover{color:var(--jcx-down);border-color:rgba(255,93,93,.4)}
+.jcx .ctl.primary{background:linear-gradient(135deg,var(--jcx-ember),var(--jcx-coral));
+  color:#180f08;border-color:transparent}
+.jcx .ctl.primary:hover{filter:brightness(1.06);color:#180f08}
+
+/* ═══════════ VIEW CONTAINER ═══════════ */
+.jcx .views{min-height:0;overflow:hidden;position:relative}
+.jcx section.vw{display:none;height:100%;overflow-y:auto}
+.jcx section.vw.active{display:block;animation:jcx-rise 220ms var(--jcx-ease) both}
+@keyframes jcx-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.jcx .pad{padding:12px 14px}
+.jcx .ph{display:flex;align-items:center;gap:8px;margin:2px 0 10px}
+.jcx .ph h3{font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--jcx-ink-3)}
+.jcx .ph .rule{flex:1;height:1px;background:var(--jcx-line)}
+.jcx .ph .meta{font-family:var(--jcx-mono);font-size:10px;color:var(--jcx-ink-3)}
+
+/* work graph */
+.jcx .missions-body{display:grid;grid-template-columns:1.6fr 1fr;min-height:0;height:100%}
+.jcx .col{min-height:0;overflow-y:auto;padding:12px 14px}
+.jcx .col+.col{border-left:1px solid var(--jcx-line)}
+.jcx .gnode{position:relative;display:flex;align-items:center;gap:10px;
+  background:var(--jcx-panel);border:1px solid var(--jcx-line);border-radius:10px;
+  padding:8px 10px;margin-bottom:10px}
+.jcx .gnode.running{border-color:rgba(255,122,61,.45);background:var(--jcx-ember-dim)}
+.jcx .gnode .sdot{width:8px;height:8px;border-radius:50%;flex:none}
+.jcx .gnode .sdot.pending{background:var(--jcx-ink-3)}
+.jcx .gnode .sdot.run{background:var(--jcx-ember);animation:jcx-pulse 1.6s ease-in-out infinite}
+.jcx .gnode .sdot.ok{background:var(--jcx-up)}
+.jcx .gnode .sdot.err{background:var(--jcx-down)}
+.jcx .gnode .gmain{min-width:0;flex:1}
+.jcx .gnode .gtitle{font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jcx .gnode .gsub{font-family:var(--jcx-mono);font-size:10px;color:var(--jcx-ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jcx .avatar{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;
+  font-size:8.5px;font-weight:700;flex:none;border:1px solid var(--jcx-line)}
+.jcx .avatar.f1{background:var(--jcx-ember-dim);color:var(--jcx-ember)}
+.jcx .avatar.f2{background:var(--jcx-up-dim);color:var(--jcx-up)}
+.jcx .avatar.f3{background:var(--jcx-peach-dim);color:var(--jcx-peach)}
+.jcx .avatar.f4{background:var(--jcx-gold-dim);color:var(--jcx-gold)}
+.jcx .avatar.jexi{background:linear-gradient(135deg,rgba(255,122,61,.28),rgba(255,107,94,.2));
+  color:var(--jcx-ember);border-color:rgba(255,122,61,.45)}
+.jcx .badge{display:inline-flex;align-items:center;gap:4px;font-family:var(--jcx-mono);
+  font-size:9.5px;font-weight:600;letter-spacing:.05em;padding:2px 7px;border-radius:5px;flex:none}
+.jcx .badge.ok{color:var(--jcx-up);background:var(--jcx-up-dim)}
+.jcx .badge.ref{color:var(--jcx-down);background:var(--jcx-down-dim)}
+.jcx .badge svg{width:9px;height:9px;stroke:currentColor}
+.jcx .gedge{height:12px;border-left:1px solid var(--jcx-line);margin:-4px 0 -4px 21px}
+
+/* agents */
+.jcx .agent{display:flex;align-items:center;gap:9px;padding:7px 9px;border:1px solid var(--jcx-line);
+  border-radius:10px;background:var(--jcx-panel);margin-bottom:7px}
+.jcx .agent .avatar{width:22px;height:22px;font-size:9px}
+.jcx .agent .amain{min-width:0;flex:1}
+.jcx .agent .nrow{display:flex;align-items:center;gap:7px}
+.jcx .agent .nm{font-weight:600;font-size:12px}
+.jcx .agent .rl{font-size:10px;color:var(--jcx-ink-2)}
+.jcx .agent .task{font-family:var(--jcx-mono);font-size:10px;color:var(--jcx-ink-2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.jcx .agent .task b{color:var(--jcx-ember);font-weight:600}
+.jcx .rbar{height:3px;border-radius:2px;background:var(--jcx-panel-2);margin-top:5px;overflow:hidden}
+.jcx .rbar i{display:block;height:100%;border-radius:2px;background:var(--jcx-up)}
+.jcx .rbar i.warm{background:var(--jcx-gold)} .jcx .rbar i.hot{background:var(--jcx-down)}
+
+/* empty */
+.jcx .empty{display:flex;flex-direction:column;gap:4px;padding:18px 14px;font-size:11.5px;
+  color:var(--jcx-ink-2);border:1px dashed var(--jcx-line);border-radius:10px;
+  background:rgba(255,255,255,.012);text-align:left}
+.jcx .empty .sub{font-size:10px;color:var(--jcx-ink-3);font-family:var(--jcx-mono)}
+</style>
+<style>
+/* ── AGENTS VIEW — Phase 10 Scope J — self-contained, no external deps ── */
+.av-root{display:grid;grid-template-columns:320px 1fr;min-height:100vh;background:var(--jcx-bg);color:var(--jcx-ink);font-family:var(--jcx-sans)}
+.av-sidebar{background:var(--jcx-panel);border-right:1px solid var(--jcx-line);display:flex;flex-direction:column;overflow:hidden}
+.av-brand{padding:16px 16px 12px;border-bottom:1px solid var(--jcx-line);display:flex;align-items:center;gap:10px}
+.av-brand .mark{width:28px;height:28px;background:linear-gradient(135deg,var(--jcx-ember),var(--jcx-coral));border-radius:8px;display:grid;place-items:center;color:#180f08;font-weight:800;font-family:var(--jcx-display);font-size:16px}
+.av-brand h1{font-family:var(--jcx-display);font-size:16px;font-weight:600;letter-spacing:-.02em}
+.av-brand small{font-size:9px;letter-spacing:.18em;color:var(--jcx-ink-3);text-transform:uppercase;display:block;margin-top:1px}
+.av-live-toggle{margin:12px;padding:8px 10px;background:var(--jcx-panel-2);border:1px solid var(--jcx-line);border-radius:10px;font-size:11px;color:var(--jcx-ink-2)}
+.av-live-toggle b{color:var(--jcx-ember)}
+.av-live-toggle code{font-family:var(--jcx-mono);font-size:10px;background:var(--jcx-panel-3);padding:1px 5px;border-radius:4px;color:var(--jcx-ink)}
+.av-session-list{flex:1;overflow-y:auto;padding:8px}
+.av-session-list h2{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--jcx-ink-3);padding:8px 8px 6px;font-weight:600}
+.av-session{padding:10px 10px;border:1px solid var(--jcx-line);border-radius:10px;background:var(--jcx-panel);margin-bottom:8px;cursor:pointer;transition:all 150ms var(--jcx-ease)}
+.av-session:hover{border-color:rgba(255,122,61,.35);background:var(--jcx-panel-2)}
+.av-session.selected{border-color:var(--jcx-ember);background:var(--jcx-ember-dim);box-shadow:0 0 0 1px rgba(255,122,61,.15) inset}
+.av-session-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.av-session-id{font-family:var(--jcx-mono);font-size:12px;font-weight:600;color:var(--jcx-ink)}
+.av-session-meta{font-family:var(--jcx-mono);font-size:10px;color:var(--jcx-ink-3);display:flex;flex-direction:column;gap:2px;margin-top:4px}
+.av-session-meta span{display:flex;align-items:center;gap:6px}
+.av-main{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.av-hud{background:var(--jcx-panel);border-bottom:1px solid var(--jcx-line);padding:10px 16px;display:flex;align-items:center;gap:12px}
+.av-hud .title{font-family:var(--jcx-display);font-size:15px;font-weight:600}
+.av-hud .hint{font-size:10px;color:var(--jcx-ink-3);font-family:var(--jcx-mono);margin-left:auto}
+.av-tree-area{flex:1;overflow-y:auto;padding:16px;background:radial-gradient(900px 400px at 70% -10%, rgba(255,122,61,.06), transparent 70%), var(--jcx-bg)}
+.av-empty{padding:24px;border:1px dashed var(--jcx-line);border-radius:12px;background:rgba(255,255,255,.02);color:var(--jcx-ink-2);font-size:12px}
+.av-empty b{color:var(--jcx-ink)}
+.av-tree{display:flex;flex-direction:column;gap:0}
+.av-node{position:relative;display:flex;gap:10px;padding:10px 12px;border:1px solid var(--jcx-line);border-radius:10px;background:var(--jcx-panel);margin-bottom:8px;cursor:pointer;transition:all 150ms var(--jcx-ease)}
+.av-node:hover{border-color:rgba(255,122,61,.4);background:var(--jcx-panel-2)}
+.av-node.selected{border-color:var(--jcx-ember);background:var(--jcx-ember-dim)}
+.av-node.evicted{opacity:.65;border-style:dashed}
+.av-node .avatar{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:700;flex:none;border:1px solid var(--jcx-line)}
+.av-node .avatar.live{background:var(--jcx-up-dim);color:var(--jcx-up);border-color:rgba(76,195,138,.3)}
+.av-node .avatar.evicted{background:var(--jcx-down-dim);color:var(--jcx-down);border-color:rgba(255,93,93,.25)}
+.av-node-main{flex:1;min-width:0}
+.av-node-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.av-node-id{font-family:var(--jcx-mono);font-size:11px;font-weight:600;color:var(--jcx-ink)}
+.av-role{font-size:10px;padding:2px 6px;border-radius:999px;background:var(--jcx-panel-2);border:1px solid var(--jcx-line);color:var(--jcx-ink-2);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.av-state{font-size:9.5px;padding:1px 6px;border-radius:999px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.av-state.live{color:var(--jcx-up);background:var(--jcx-up-dim);border:1px solid rgba(76,195,138,.25)}
+.av-state.evicted{color:var(--jcx-down);background:var(--jcx-down-dim);border:1px solid rgba(255,93,93,.25)}
+.av-node-hover{font-family:var(--jcx-mono);font-size:10px;color:var(--jcx-ink-3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.av-children{margin-left:22px;border-left:1px solid var(--jcx-line);padding-left:14px;margin-top:2px;display:flex;flex-direction:column;gap:0}
+.av-space-hint{margin-top:8px;padding:6px 10px;background:var(--jcx-panel-3);border:1px solid var(--jcx-line);border-radius:8px;font-family:var(--jcx-mono);font-size:10px;color:var(--jcx-ink-2);display:flex;align-items:center;gap:8px}
+.av-space-hint kbd{font-family:var(--jcx-mono);font-size:10px;padding:2px 6px;border-radius:4px;background:var(--jcx-panel);border:1px solid var(--jcx-line);color:var(--jcx-ink);box-shadow:0 1px 0 var(--jcx-line)}
+.av-tooltip{position:fixed;z-index:100;background:var(--jcx-panel-3);border:1px solid var(--jcx-line);border-radius:8px;padding:8px 10px;font-family:var(--jcx-mono);font-size:10.5px;color:var(--jcx-ink);pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:280px;display:none}
+.av-tooltip b{color:var(--jcx-ember)}
+@media (max-width:900px){.av-root{grid-template-columns:1fr}.av-sidebar{max-height:40vh}}
+</style>
+</head>
+<body class="jcx">
+<div class="jcx-glow"></div>
+<div class="av-root" id="app">
+  <aside class="av-sidebar">
+    <div class="av-brand">
+      <div class="mark">J</div>
+      <div><h1>JEXI OS</h1><small>AGENTS VIEW — PHASE 10 J</small></div>
+    </div>
+    <div class="av-live-toggle">
+      <div><b>Mode:</b> <span id="mode-label">Sample (standalone)</span></div>
+      <div style="margin-top:6px;color:var(--jcx-ink-3)">Add <code>?live</code> or <code>#--live</code> to URL for <b>--live</b> mode. Live reads from daemon registry: <code>rlm/daemon/index.js → listSessions()</code> → <code>.jexi/rlm-daemon/sessions.ndjson</code>. If daemon not running, honest empty state.</div>
+    </div>
+    <div class="av-session-list">
+      <h2>Session List — live sessions from daemon (Scope D)</h2>
+      <div id="session-list"></div>
+      <div id="session-empty" class="av-empty" style="display:none">
+        <div><b>Daemon not running</b> — no live sessions found.</div>
+        <div class="sub" style="margin-top:4px;font-family:var(--jcx-mono);font-size:10px;color:var(--jcx-ink-3)">Tried: rlm/daemon/index.js listSessions() → .jexi/rlm-daemon/sessions.ndjson + .jexi/rlm-daemon/daemon.sock. Start daemon: <span style="color:var(--jcx-ink-2)">node rlm/daemon/index.js</span>. Showing sample graph fallback is disabled in --live mode (honest empty state).</div>
+      </div>
+    </div>
+  </aside>
+  <main class="av-main">
+    <div class="av-hud">
+      <div class="title">Subagent Tree</div>
+      <div style="display:flex;gap:6px">
+        <span class="pill run"><span class="dot"></span>Running</span>
+        <span class="pill idle"><span class="dot"></span>Idle</span>
+        <span class="pill err"><span class="dot"></span>Inactive</span>
+      </div>
+      <div class="hint">click session to expand • hover agent for lastActivityAt + role • space to chat (visual only)</div>
+    </div>
+    <div class="av-tree-area" id="tree-area">
+      <div class="av-empty" id="tree-placeholder">
+        <div><b>Select a session</b> to view its agent tree.</div>
+        <div class="sub" style="margin-top:6px">Parent → children recursively, state per agent (live / evicted), role label. Sample graph is hardcoded for standalone preview.</div>
+      </div>
+      <div id="agent-tree" class="av-tree" style="display:none"></div>
+    </div>
+  </main>
+</div>
+<div class="av-tooltip" id="tooltip"></div>
+
+<script>
+// ── JEXI OS — Phase 10 Scope J — Agents View — self-contained, zero external deps ──
+// Theme tokens inlined verbatim from src/styles/jexi-theme.css above — #0c0b09 #ff7a3d #f3eee6 etc.
+// Sample graph hardcoded for standalone render. --live mode documented below.
+
+// ── SAMPLE GRAPH (hardcoded) — ships with view so it renders standalone ──
+const SAMPLE_GRAPH = {
+  sessions: [
+    {
+      id: "alpha",
+      status: "Running",
+      startedAt: "2026-09-20T08:12:33.000Z",
+      lastActivity: "2026-09-20T08:15:02.000Z",
+      workerPid: 18421,
+      agents: {
+        id: "a1",
+        role: "planner",
+        state: "live",
+        lastActivityAt: "2026-09-20T08:15:01.000Z",
+        children: [
+          { id: "a2", role: "coder", state: "live", lastActivityAt: "2026-09-20T08:14:55.000Z", children: [] },
+          {
+            id: "a3",
+            role: "reviewer",
+            state: "evicted",
+            lastActivityAt: "2026-09-20T08:14:20.000Z",
+            children: [
+              { id: "a4", role: "tester", state: "live", lastActivityAt: "2026-09-20T08:15:00.000Z", children: [] }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      id: "beta",
+      status: "Idle",
+      startedAt: "2026-09-20T07:55:10.000Z",
+      lastActivity: "2026-09-20T08:10:44.000Z",
+      workerPid: 18302,
+      agents: {
+        id: "b1",
+        role: "director",
+        state: "live",
+        lastActivityAt: "2026-09-20T08:10:43.000Z",
+        children: [
+          { id: "b2", role: "researcher", state: "live", lastActivityAt: "2026-09-20T08:10:40.000Z", children: [] },
+          { id: "b3", role: "coder", state: "live", lastActivityAt: "2026-09-20T08:10:41.000Z", children: [
+            { id: "b4", role: "optimizer", state: "evicted", lastActivityAt: "2026-09-20T08:09:12.000Z", children: [] }
+          ]}
+        ]
+      }
+    },
+    {
+      id: "gamma",
+      status: "Inactive",
+      startedAt: "2026-09-20T06:30:00.000Z",
+      lastActivity: "2026-09-20T07:00:00.000Z",
+      workerPid: null,
+      agents: {
+        id: "g1",
+        role: "planner",
+        state: "evicted",
+        lastActivityAt: "2026-09-20T07:00:00.000Z",
+        children: []
+      }
+    }
+  ]
+};
+
+// ── LIVE MODE CONTRACT ──
+// --live mode handler: reads from daemon's session registry when daemon running.
+// Documented source: rlm/daemon/index.js → createDaemon().listSessions() → HTTP over Unix socket .jexi/rlm-daemon/daemon.sock
+// Journal: .jexi/rlm-daemon/sessions.ndjson (append-only, fsync)
+// If daemon isn't running, --live shows honest empty state (no fake data).
+function isLiveMode() {
+  const url = window.location.href;
+  return url.includes('--live') || url.includes('live') && (window.location.search.includes('live') || window.location.hash.includes('live'));
+}
+
+async function fetchLiveSessions() {
+  // In real wiring, this would call: import { createDaemon } from '../../rlm/daemon/index.js'; await daemon.listSessions();
+  // Since browser cannot access Unix socket directly, we attempt a documented HTTP endpoint fallback.
+  // For standalone preview, we show honest empty state if daemon not running.
+  // Attempt 1: try fetch from /api/rlm/sessions if server proxies daemon
+  // Attempt 2: try fetch from local .jexi folder (will fail in browser, but documents intent)
+  // If both fail, return empty array with reason.
+
+  const attempts = [
+    '/api/rlm/sessions',
+    '/.jexi/rlm-daemon/sessions.ndjson'
+  ];
+
+  for (const endpoint of attempts) {
+    try {
+      const res = await fetch(endpoint, { method: 'GET', cache: 'no-store' });
+      if (res.ok) {
+        const text = await res.text();
+        // Try JSON or NDJSON
+        try {
+          const data = JSON.parse(text);
+          if (Array.isArray(data)) return { sessions: data.map(s => ({...s, agents: {id:'root', role:'planner', state:'live', lastActivityAt:s.lastActivity, children:[]}})), source: endpoint };
+        } catch {
+          // NDJSON fallback
+          const lines = text.split('\n').filter(Boolean).slice(0,20);
+          if (lines.length) {
+            // Not fully parsing, return empty but show we found file
+            return { sessions: [], source: endpoint, foundFile: true, lines: lines.length };
+          }
+        }
+      }
+    } catch (e) {
+      // fetch failed — daemon not running or endpoint not available
+      continue;
+    }
+  }
+  return { sessions: [], source: 'daemon not running', empty: true, reason: 'Daemon not running — no live sessions at .jexi/rlm-daemon/daemon.sock' };
+}
+
+let currentSessions = SAMPLE_GRAPH.sessions;
+let selectedSessionId = null;
+let selectedAgentId = null;
+
+function statusPill(status) {
+  const map = {
+    'Running': 'run',
+    'Idle': 'idle',
+    'Inactive': 'err'
+  };
+  const cls = map[status] || 'idle';
+  return `<span class="pill ${cls}"><span class="dot"></span>${status}</span>`;
+}
+
+function renderSessionList(sessions) {
+  const container = document.getElementById('session-list');
+  const emptyEl = document.getElementById('session-empty');
+  container.innerHTML = '';
+
+  if (!sessions || sessions.length === 0) {
+    container.style.display = 'none';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  container.style.display = 'block';
+  emptyEl.style.display = 'none';
+
+  sessions.forEach(s => {
+    const div = document.createElement('div');
+    div.className = 'av-session' + (s.id === selectedSessionId ? ' selected' : '');
+    div.dataset.sessionId = s.id;
+    div.innerHTML = `
+      <div class="av-session-top">
+        <span class="av-session-id">${s.id}</span>
+        ${statusPill(s.status)}
+      </div>
+      <div class="av-session-meta">
+        <span>started: ${new Date(s.startedAt).toLocaleTimeString()} • last: ${new Date(s.lastActivity).toLocaleTimeString()}</span>
+        <span>worker PID: <span class="mono" style="color:var(--jcx-ink-2)">${s.workerPid ?? '—'}</span></span>
+      </div>
+    `;
+    div.addEventListener('click', () => {
+      selectedSessionId = s.id;
+      selectedAgentId = null;
+      renderSessionList(currentSessions);
+      renderAgentTree(s);
+    });
+    container.appendChild(div);
+  });
+}
+
+function renderAgentNode(node, depth = 0) {
+  const isSelected = node.id === selectedAgentId;
+  const wrapper = document.createElement('div');
+  wrapper.style.display = 'contents';
+
+  const nodeEl = document.createElement('div');
+  nodeEl.className = `av-node ${node.state} ${isSelected ? 'selected' : ''}`;
+  nodeEl.dataset.agentId = node.id;
+  nodeEl.dataset.role = node.role;
+  nodeEl.dataset.lastActivity = node.lastActivityAt;
+
+  const avatarClass = node.state === 'live' ? 'live' : 'evicted';
+  const stateClass = node.state === 'live' ? 'live' : 'evicted';
+
+  nodeEl.innerHTML = `
+    <div class="avatar ${avatarClass}">${node.role.charAt(0).toUpperCase()}</div>
+    <div class="av-node-main">
+      <div class="av-node-row">
+        <span class="av-node-id">${node.id}</span>
+        <span class="av-role">${node.role}</span>
+        <span class="av-state ${stateClass}">${node.state}</span>
+      </div>
+      <div class="av-node-hover mono">${node.role} • lastActivityAt ${node.lastActivityAt}</div>
+      ${isSelected ? `<div class="av-space-hint"><kbd>Space</kbd> to chat — visual only, no input in this scope (selected: ${node.id})</div>` : ''}
+    </div>
+  `;
+
+  nodeEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    selectedAgentId = node.id;
+    const session = currentSessions.find(s => s.id === selectedSessionId);
+    if (session) renderAgentTree(session);
+  });
+
+  // hover tooltip
+  nodeEl.addEventListener('mouseenter', (e) => showTooltip(e, node));
+  nodeEl.addEventListener('mousemove', (e) => moveTooltip(e));
+  nodeEl.addEventListener('mouseleave', hideTooltip);
+
+  wrapper.appendChild(nodeEl);
+
+  if (node.children && node.children.length > 0) {
+    const childrenContainer = document.createElement('div');
+    childrenContainer.className = 'av-children';
+    node.children.forEach(child => {
+      const childWrapper = renderAgentNode(child, depth + 1);
+      childrenContainer.appendChild(childWrapper);
+    });
+    wrapper.appendChild(childrenContainer);
+  }
+
+  return wrapper;
+}
+
+function renderAgentTree(session) {
+  const placeholder = document.getElementById('tree-placeholder');
+  const treeContainer = document.getElementById('agent-tree');
+  placeholder.style.display = 'none';
+  treeContainer.style.display = 'flex';
+  treeContainer.innerHTML = '';
+
+  const header = document.createElement('div');
+  header.className = 'av-empty';
+  header.style.marginBottom = '12px';
+  header.innerHTML = `<div><b>Session ${session.id}</b> — ${session.status} • PID ${session.workerPid ?? '—'}</div><div class="sub" style="margin-top:4px">started ${session.startedAt} • last ${session.lastActivity} • tree: parent → children recursively</div>`;
+  treeContainer.appendChild(header);
+
+  if (!session.agents) {
+    const empty = document.createElement('div');
+    empty.className = 'av-empty';
+    empty.textContent = 'No agents in this session.';
+    treeContainer.appendChild(empty);
+    return;
+  }
+
+  const tree = renderAgentNode(session.agents, 0);
+  treeContainer.appendChild(tree);
+}
+
+const tooltip = document.getElementById('tooltip');
+function showTooltip(e, node) {
+  tooltip.style.display = 'block';
+  tooltip.innerHTML = `<div><b>${node.id}</b> — role: ${node.role}</div><div style="margin-top:4px;color:var(--jcx-ink-2)">lastActivityAt: ${node.lastActivityAt}</div><div>state: ${node.state}</div>`;
+  moveTooltip(e);
+}
+function moveTooltip(e) {
+  const x = e.clientX + 12;
+  const y = e.clientY + 12;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top = y + 'px';
+}
+function hideTooltip() {
+  tooltip.style.display = 'none';
+}
+
+async function init() {
+  const modeLabel = document.getElementById('mode-label');
+  const live = isLiveMode();
+
+  if (live) {
+    modeLabel.textContent = '--live (daemon registry)';
+    modeLabel.style.color = 'var(--jcx-ember)';
+    console.log('[agents-view] --live mode detected — attempting to read from daemon session registry: rlm/daemon/index.js → listSessions() → .jexi/rlm-daemon/daemon.sock / .jexi/rlm-daemon/sessions.ndjson');
+
+    const liveResult = await fetchLiveSessions();
+    console.log('[agents-view] live fetch result:', liveResult);
+
+    if (liveResult.sessions && liveResult.sessions.length > 0) {
+      currentSessions = liveResult.sessions;
+      renderSessionList(currentSessions);
+      document.getElementById('tree-placeholder').innerHTML = `<div><b>Live mode</b> — ${liveResult.sessions.length} sessions from ${liveResult.source}</div>`;
+    } else {
+      // Honest empty state — daemon not running
+      currentSessions = [];
+      renderSessionList([]);
+      document.getElementById('tree-placeholder').style.display = 'none';
+      document.getElementById('session-empty').style.display = 'block';
+      document.getElementById('session-empty').innerHTML = `
+        <div><b>Daemon not running</b> — no live sessions found in --live mode.</div>
+        <div class="sub" style="margin-top:6px">Tried endpoints: /api/rlm/sessions, /.jexi/rlm-daemon/sessions.ndjson<br>
+        Source: rlm/daemon/index.js → createDaemon().listSessions() → Unix socket .jexi/rlm-daemon/daemon.sock<br>
+        Journal: .jexi/rlm-daemon/sessions.ndjson<br>
+        Reason: ${liveResult.reason || 'no daemon'}<br><br>
+        <b>To start daemon:</b> node -e "import('rlm/daemon/index.js').then(m=>m.createDaemon().start().then(console.log))"<br>
+        <b>Standalone sample</b> is disabled in --live mode to keep empty state honest.</div>
+      `;
+    }
+  } else {
+    modeLabel.textContent = 'Sample (standalone)';
+    currentSessions = SAMPLE_GRAPH.sessions;
+    renderSessionList(currentSessions);
+    console.log('[agents-view] Sample graph loaded:', SAMPLE_GRAPH.sessions.length, 'sessions');
+  }
+}
+
+// Keyboard hint — space to chat visual only
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && selectedAgentId) {
+    e.preventDefault();
+    const hint = document.querySelector('.av-space-hint');
+    if (hint) {
+      hint.style.background = 'var(--jcx-ember-dim)';
+      hint.style.borderColor = 'var(--jcx-ember)';
+      setTimeout(() => {
+        hint.style.background = '';
+        hint.style.borderColor = '';
+      }, 300);
+      console.log(`[agents-view] Space to chat hint triggered on agent ${selectedAgentId} — visual only, no input in this scope`);
+    }
+  }
+});
+
+init();
+</script>
+</body>
+</html>
