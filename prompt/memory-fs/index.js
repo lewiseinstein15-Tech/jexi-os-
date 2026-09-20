@@ -1,5 +1,6 @@
 // prompt/memory-fs/index.js
-// Phase 25 — Scope E. Public surface of the memory filesystem.
+// Phase 25 — Scope E (+ Scope F epistemic gate). Public surface of the
+// memory filesystem.
 //
 // Contract spellings:
 //   tree.resolve(path)                    -> { absolute, parent, kind, valid, error? }
@@ -10,6 +11,9 @@
 //   memoryFs.write(path, content, writer, ctx)
 //                                         -> { written, absolutePath?, errorCode? }
 //   memoryFs.read(path, ctx)              -> { content: string|null, exists }
+//   epistemic.tag(content, source, opts)  -> { tagged, writable, tag, reason?, errorCode? }
+//   epistemic.detectTag(content)          -> { tag: 'stated'|'inferred'|null, cleanContent }
+//   epistemic.assertWritable(taggedEntry) -> { ok, tag, errorCode? }
 //
 // Rules implemented (see module headers for detail):
 //   RULE 1  traversal refused                -> E_PATH_TRAVERSAL
@@ -25,15 +29,24 @@
 //
 // Persistence: REAL fs reads/writes under <projectRoot>/.jexi/memory-fs/
 // (gitignored via the .jexi/ rule). No simulation, no in-memory shim.
+//
+// Scope F — EPISTEMOLOGICAL TAGGING: memoryFs.write() now gates every
+// entry through epistemic.assertWritable() BEFORE touching disk and
+// BEFORE the Scope E rules: untagged -> E_UNTAGGED, [inferred] ->
+// E_INFERRED_NOT_WRITABLE (never written), [stated] -> proceed with the
+// Scope E rules. Reads stay tag-agnostic — reading is allowed for both
+// tags, only writing is restricted (Scope F RULE 4).
 
 import fs from 'node:fs';
 import nodePath from 'node:path';
 import * as tree from './tree.js';
 import * as writeRules from './write-rules.js';
 import * as readRules from './read-rules.js';
+import * as epistemic from './epistemic.js';
 
-export { tree, writeRules, readRules };
+export { tree, writeRules, readRules, epistemic };
 export const CODES = tree.CODES;
+export const EPISTEMIC_CODES = epistemic.EPISTEMIC_CODES;
 export const LAYOUT = tree.LAYOUT;
 export const storeRoot = tree.storeRoot;
 export const PROJECT_ROOT = tree.PROJECT_ROOT;
@@ -52,24 +65,34 @@ export const memoryFs = {
    * memoryFs.write(path, content, writer, ctx)
    *   -> { written, absolutePath?, reason?, errorCode? }
    *
-   * Order of enforcement:
-   *   1. writeRules.canWrite  (traversal / reserved / directory shape / role)
-   *   2. content type check   (string only)
-   *   3. UPDATE? -> readRules.requiresPriorRead (RULE 6)
-   *   4. real disk write; auto-create IMMEDIATE parent only (RULE 4)
+   * Order of enforcement (Scope F integration — epistemic gate BEFORE
+   * touching disk and BEFORE the Scope E rules):
+   *   1. content type check      (string only)
+   *   2. epistemic.assertWritable (tag required; [inferred] NEVER written;
+   *      untagged -> E_UNTAGGED; double tag -> E_DOUBLE_TAG)
+   *   3. writeRules.canWrite     (traversal / reserved / directory shape / role)
+   *   4. UPDATE? -> readRules.requiresPriorRead (Scope E RULE 6)
+   *   5. real disk write; auto-create IMMEDIATE parent only (Scope E RULE 4)
    */
   write(path, content, writer, ctx) {
-    const cw = writeRules.canWrite(path, writer, ctx);
-    if (!cw.allowed) {
-      return { written: false, reason: cw.reason, errorCode: cw.errorCode };
-    }
-
     if (typeof content !== 'string') {
       return {
         written: false,
         reason: 'content must be a string',
         errorCode: CODES.INVALID_CONTENT,
       };
+    }
+
+    // Scope F — epistemic gate. If [inferred] -> refuse, no file write.
+    // If [stated] -> proceed with the Scope E rules.
+    const aw = epistemic.assertWritable(content);
+    if (!aw.ok) {
+      return { written: false, reason: aw.reason, errorCode: aw.errorCode };
+    }
+
+    const cw = writeRules.canWrite(path, writer, ctx);
+    if (!cw.allowed) {
+      return { written: false, reason: cw.reason, errorCode: cw.errorCode };
     }
 
     const r = tree.resolve(path); // valid — canWrite already passed
@@ -107,12 +130,14 @@ export const memoryFs = {
   /**
    * memoryFs.read(path, ctx) -> { content: string|null, exists: boolean }
    *
-   * RULE 5: a missing path is NOT an error — { content: null, exists: false }
-   * and the caller decides. Reserved namespaces are never backed by this
-   * store (reads report not-found; nothing is read from their disk paths).
-   * Successful file reads are recorded into ctx.session.reads (RULE 6).
-   * Invalid (traversal/malformed) inputs additionally carry errorCode so
-   * refusals stay visible without throwing.
+   * RULE 5 (Scope E): a missing path is NOT an error — { content: null,
+   * exists: false } and the caller decides. Reserved namespaces are never
+   * backed by this store (reads report not-found; nothing is read from
+   * their disk paths). Successful file reads are recorded into
+   * ctx.session.reads (Scope E RULE 6). Reads are TAG-AGNOSTIC (Scope F
+   * RULE 4): both [stated] and [inferred] content is returned; callers
+   * split via epistemic.detectTag(). Invalid (traversal/malformed) inputs
+   * additionally carry errorCode so refusals stay visible without throwing.
    */
   read(path, ctx) {
     const r = tree.resolve(path);
