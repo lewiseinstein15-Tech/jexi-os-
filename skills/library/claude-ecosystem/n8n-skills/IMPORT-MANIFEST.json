@@ -1,0 +1,269 @@
+{
+  "kind": "jexi.library.import-manifest",
+  "version": 1,
+  "generatedAt": "2026-09-20T00:00:00.000Z",
+  "origin": "czlonkowski/n8n-skills",
+  "upstreamCommit": "19cd793f4789e3ef9c657ccf26e097f641a77df0",
+  "upstreamRelease": "1.35.0",
+  "license": "MIT",
+  "destination": "skills/library/claude-ecosystem/n8n-skills",
+  "counts": {
+    "skills": 15,
+    "specialist": 14,
+    "router": 1,
+    "auxFilesNotVendored": 70
+  },
+  "liveDemo": "NOT VERIFIED - no n8n instance in sandbox",
+  "skills": [
+    {
+      "name": "n8n-expression-syntax",
+      "slug": "n8n-expression-syntax",
+      "router": false,
+      "to": "skills/library/claude-ecosystem/n8n-skills/n8n-expression-syntax/SKILL.md",
+      "bytes": 23049,
+      "sha256": "45e07bbf40de5ae59f12e12753863a155d08553f258fd26cfe7253f9cb54393d",
+      "upstreamPath": "skills/n8n-expression-syntax/SKILL.md",
+      "auxFiles": [
+        "COMMON_MISTAKES.md",
+        "EXAMPLES.md",
+        "README.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "n8n-mcp-tools-expert",
+      "slug": "n8n-mcp-tools-expert",
+      "router": false,
+      "to": "skills/library/claude-ecosystem/n8n-skills/n8n-mcp-tools-expert/SKILL.md",
+      "bytes": 32776,
+      "sha256": "e48bc3f3f6f370be188f3b56bab9244fdf3f76acd9db5561cdb123c1531b5c55",
+      "upstreamPath": "skills/n8n-mcp-tools-expert/SKILL.md",
+      "auxFiles": [
+        "OPERATIONS_GUIDE.md",
+        "README.md",
+        "SEARCH_GUIDE.md",
+        "VALIDATION_GUIDE.md",
+        "WORKFLOW_GUIDE.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "n8n-workflow-patterns",
+      "slug": "n8n-workflow-patterns",
+      "router": false,
+      "to": "skills/library/claude-ecosystem/n8n-skills/n8n-workflow-patterns/SKILL.md",
+      "bytes": 23118,
+      "sha256": "d7af51ad0d357a8be3d4bb0334c16db92e698da404c0f11f232c40a326f415f4",
+      "upstreamPath": "skills/n8n-workflow-patterns/SKILL.md",
+      "auxFiles": [
+        "README.md",
+        "ai_agent_workflow.md",
+        "database_operations.md",
+        "http_api_integration.md",
+        "scheduled_tasks.md",
+        "webhook_processing.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "n8n-validation-expert",
+      "slug": "n8n-validation-expert",
+      "router": false,
+      "to": "skills/library/claude-ecosystem/n8n-skills/n8n-validation-expert/SKILL.md",
+      "bytes": 25142,
+      "sha256": "050d6cb32b9f0dd011dac9ef7b4a3fd3a38466edc7c46b6ce702fc6b79bb5353",
+      "upstreamPath": "skills/n8n-validation-expert/SKILL.md",
+      "auxFiles": [
+        "ERROR_CATALOG.md",
+        "FALSE_POSITIVES.md",
+        "README.md",
+        "REVIEW_CHECKLIST.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "n8n-node-configuration",
+      "slug": "n8n-node-configuration",
+      "router": false,
+      "to": "skills/library/claude-ecosystem/n8n-skills/n8n-node-configuration/SKILL.md",
+      "bytes": 20134,
+      "sha256": "a9bbc2ea02493061fa5b7da3a5ebeea483d308406e5bb1d57b08ac55daeb7c25",
+      "upstreamPath": "skills/n8n-node-configuration/SKILL.md",
+      "auxFiles": [
+        "DEPENDENCIES.md",
+        "NODE_FAMILY_GOTCHAS.md",
+        "OPERATION_PATTERNS.md",
+        "README.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "n8n-code-javascript",
+      "slug": "n8n-code-javascript",
+      "router": false,
+      "to": "skills/library/claude-ecosystem/n8n-skills/n8n-code-javascript/SKILL.md",
+      "bytes": 22427,
+      "sha256": "beb5f32899ec134f38ecc35cf2dab6bfdc80747bd822db43759aba9a4b7a44f0",
+      "upstreamPath": "skills/n8n-code-javascript/SKILL.md",
+      "auxFiles": [
+        "BUILTIN_FUNCTIONS.md",
+        "COMMON_PATTERNS.md",
+        "DATA_ACCESS.md",
+        "ERROR_PATTERNS.md",
+        "README.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "n8n-code-python",
+      "slug": "n8n-code-python",
+      "router": false,
+      "to": "skills/library/claude-ecosystem/n8n-skills/n8n-code-python/SKILL.md",
+      "bytes": 13622,
+      "sha256": "d59889db2130b5ad570f3e36e419ae92bf8a7e6f45de56feca59c4a8ef24f2cb",
+      "upstreamPath": "skills/n8n-code-python/SKILL.md",
+      "auxFiles": [
+        "COMMON_PATTERNS.md",
+        "README.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "n8n-code-tool",
+      "slug": "n8n-code-tool",
+      "router": false,
+      "to": "skills/library/claude-ecosystem/n8n-skills/n8n-code-tool/SKILL.md",
+      "bytes": 18844,
+      "sha256": "bc820323bd108e97d370e3db126147f3e755e79de2b644869f8fcdc8889df216",
+      "upstreamPath": "skills/n8n-code-tool/SKILL.md",
+      "auxFiles": [
+        "ERROR_PATTERNS.md",
+        "INPUT_SCHEMA.md",
+        "README.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "n8n-error-handling",
+      "slug": "n8n-error-handling",
+      "router": false,
+      "to": "skills/library/claude-ecosystem/n8n-skills/n8n-error-handling/SKILL.md",
+      "bytes": 22813,
+      "sha256": "5b98ee5d3b5804acf5226bd515a239a7d7d97965df1bbe8b8005988c7739085c",
+      "upstreamPath": "skills/n8n-error-handling/SKILL.md",
+      "auxFiles": [
+        "API_WORKFLOWS.md",
+        "ERROR_WORKFLOWS.md",
+        "NODE_ERROR_OUTPUTS.md",
+        "README.md",
+        "RESPONSE_SHAPES.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "n8n-binary-and-data",
+      "slug": "n8n-binary-and-data",
+      "router": false,
+      "to": "skills/library/claude-ecosystem/n8n-skills/n8n-binary-and-data/SKILL.md",
+      "bytes": 17853,
+      "sha256": "9335c0e1ac92e227b68c968048d142e1adc59a6b4a33cc1a2aaa2b448239e135",
+      "upstreamPath": "skills/n8n-binary-and-data/SKILL.md",
+      "auxFiles": [
+        "AGENT_TOOL_BINARY.md",
+        "BINARY_BASICS.md",
+        "CDN_REQUIREMENT.md",
+        "MERGE_FOR_CONTEXT.md",
+        "README.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "n8n-subworkflows",
+      "slug": "n8n-subworkflows",
+      "router": false,
+      "to": "skills/library/claude-ecosystem/n8n-skills/n8n-subworkflows/SKILL.md",
+      "bytes": 22432,
+      "sha256": "8a672ef4be28f1b81d8e7db1827dfa4ca618dd356bc96bfaa430690691a19cfa",
+      "upstreamPath": "skills/n8n-subworkflows/SKILL.md",
+      "auxFiles": [
+        "NAMING_AND_DISCOVERY.md",
+        "README.md",
+        "SUBWORKFLOW_PATTERNS.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "n8n-agents",
+      "slug": "n8n-agents",
+      "router": false,
+      "to": "skills/library/claude-ecosystem/n8n-skills/n8n-agents/SKILL.md",
+      "bytes": 29580,
+      "sha256": "36a0d22282e8bc31475ab2c98423864fc45e5c54b4b2be8830399a3070059d8c",
+      "upstreamPath": "skills/n8n-agents/SKILL.md",
+      "auxFiles": [
+        "CHAT_AGENT_PATTERNS.md",
+        "EXAMPLES.md",
+        "HUMAN_REVIEW.md",
+        "MEMORY.md",
+        "RAG.md",
+        "README.md",
+        "STRUCTURED_OUTPUT.md",
+        "SUBWORKFLOW_AS_TOOL.md",
+        "SYSTEM_PROMPT.md",
+        "TOOLS.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "n8n-multi-instance",
+      "slug": "n8n-multi-instance",
+      "router": false,
+      "to": "skills/library/claude-ecosystem/n8n-skills/n8n-multi-instance/SKILL.md",
+      "bytes": 15287,
+      "sha256": "13a396f6b9c3849e867c68aa726ec3cdf173581b3ad6020ac333699898ba2666",
+      "upstreamPath": "skills/n8n-multi-instance/SKILL.md",
+      "auxFiles": [
+        "README.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "n8n-self-hosting",
+      "slug": "n8n-self-hosting",
+      "router": false,
+      "to": "skills/library/claude-ecosystem/n8n-skills/n8n-self-hosting/SKILL.md",
+      "bytes": 16715,
+      "sha256": "0e224de09b266930d9917801968196197c0aaf05d4a4cd74bbc63424e4870176",
+      "upstreamPath": "skills/n8n-self-hosting/SKILL.md",
+      "auxFiles": [
+        "CREDENTIAL_OVERWRITES.md",
+        "DAY2.md",
+        "QUEUE_MODE.md",
+        "README.md",
+        "SECURITY.md",
+        "SINGLE_MODE.md",
+        "TASK_RUNNERS.md",
+        "assets/.env.queue.example",
+        "assets/.env.single.example",
+        "assets/Caddyfile",
+        "assets/docker-compose.queue.yml",
+        "assets/docker-compose.single.yml",
+        "assets/init-data.sh"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "using-n8n-mcp-skills",
+      "slug": "using-n8n-mcp-skills",
+      "router": true,
+      "to": "skills/library/claude-ecosystem/n8n-skills/using-n8n-mcp-skills/SKILL.md",
+      "bytes": 19783,
+      "sha256": "6bd6b273857008abc63947beca9a239eac04c350bbfe4861ed7b15a519883c6d",
+      "upstreamPath": "skills/using-n8n-mcp-skills/SKILL.md",
+      "auxFiles": [
+        "README.md"
+      ],
+      "auxFilesVendored": false
+    }
+  ]
+}
