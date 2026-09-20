@@ -106,3 +106,12 @@ even if its own work is complete.
 - **P10-A-03 OPEN — containment:** Node VM contexts isolate ordinary session
   namespaces, not malicious code. OS-level worker containment and host-call
   capabilities remain integration work; never advertise VM as a security sandbox.
+
+## Phase 10 carry-forward — Scope C
+
+- **P10-C-01 OPEN — /checkpoint sandbox failure:** `/checkpoint` fails in the
+  current sandbox with the ORIGINAL Phase 7 G `/refine` handler restored.
+  Pre-existing in this environment, not caused by Scope C. Source: Phase 10 C
+  test-contract discovery. Original-handler test-commands.js run: 25/26, with
+  `/refine` passing and `/checkpoint` failing. Investigate the environment and
+  checkpoint path in the end-of-phases cleanup; do not fix in Scope C.

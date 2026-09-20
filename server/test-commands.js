@@ -195,9 +195,22 @@ await checkAsync('/learn reports honestly with no journal', async () => {
 
 await checkAsync('/refine says "no refinement" or proposes with evidence', async () => {
   const r = await C.dispatch('/refine');
-  assert.equal(r.ok, true, r.error || 'refine failed');
-  if (r.result.proposal) assert.ok(r.result.proposal.evidenceRef, 'proposal must cite evidence');
-  else assert.match(r.summary, /no refinement/);
+  assert.ok(r.result, r.error || 'refine must return a result, not throw');
+  if (r.result.proposal) {
+    assert.equal(r.ok, true);
+    assert.equal(r.result.ok, true);
+    assert.equal(typeof r.result.proposal.evidence.source, 'string');
+    assert.ok(r.result.proposal.evidence.source.length, 'proposal must cite its source');
+    assert.equal(typeof r.result.proposal.evidence.detail, 'string');
+    assert.ok(r.result.proposal.evidence.detail.length, 'proposal must cite an observation');
+  } else {
+    assert.equal(r.ok, false);
+    assert.deepEqual(r.result, {
+      ok: false,
+      reason: 'no-evidence',
+      message: 'No refinement: no evidence in trajectory',
+    });
+  }
 });
 
 await checkAsync('/intel triages against the plan with provenance', async () => {
