@@ -93,28 +93,49 @@ target's `false_positive` — every such entry is labeled
 `matchedElsewhere: [targetId]` in JSON. The report also emits a
 **deduplicated union view** (each finding scored once against the union of
 all executed keys); for the shipped partition it reads
-`resolved=8 missed=2 false_positive=0` — i.e. the scanner produced no genuine
+`resolved=10 missed=0 false_positive=0` — i.e. the scanner produced no genuine
 hallucinations; the per-level FPs are partitioning artifacts, not lies.
 
-## Measured baseline (this sandbox, 2026-09-18, harness 1.0.0)
+## Measured baseline (this sandbox, 2026-09-20, harness 1.0.0, post ZONE-OWNER item 12)
 
 | level | target        | expected | resolved | missed | false_positive | passed |
 |-------|---------------|----------|----------|--------|----------------|--------|
-| 1     | xbow-l1-a1f03c | 4        | 4        | 0      | 4 (all cross-key) | yes |
-| 2     | xbow-l2-9d27e4 | 6        | 4        | 2      | 4 (all cross-key) | no  |
+| 1     | xbow-l1-a1f03c | 4        | 4        | 0      | 6 (all cross-key) | yes |
+| 2     | xbow-l2-9d27e4 | 6        | 6        | 0      | 4 (all cross-key) | yes |
 
-Aggregate (per-level keys): resolved 8 · missed 2 · false_positive 8.
-The two **real misses** are measurements, not harness defects:
+Aggregate (per-level keys): resolved 10 · missed 0 · false_positive 10 (all
+cross-key partition artifacts). Union view: resolved=10 missed=0 fp=0.
+passRate 2/2. (Previous baseline, 2026-09-18 pre-fix: resolved 8 · missed 2 ·
+false_positive 8, passRate 1/2, union 8/2/0.)
 
-- `path-traversal` — the fixture jail is traversable, but the pipeline's
-  payload (`../../package.json`) resolves to `security/package.json` from the
-  fixture directory instead of the repo-root file, so the A01 agent never
-  confirms it. A pipeline probe-depth issue, surfaced by the benchmark.
-- `hardcoded-secret` — a source-only class; the doer cannot produce HTTP PoC
-  methods, so verification ends `INCONCLUSIVE` and the 8G gate drops it.
+The 2026-09-18 baseline carried two **real misses** — honest measurements of
+pipeline defects, deliberately NOT fixed inside the harness. ZONE-OWNER
+item 12 fixed them in the pipeline, where they belonged
+(probe: `scripts/zone-owner-item12-probe.mjs`, 13/13):
 
-Both are exactly the class of honest negative result this harness exists to
-measure. Do not "fix" them inside the harness; they belong to the pipeline.
+- `path-traversal` (F-002 never emitted) — the A01 probe, the doer PoC and
+  the verifier re-execution all used a FIXED `../../package.json` payload,
+  which from the fixture's 3-level-deep jail resolves to the nonexistent
+  `security/package.json` (404); the second method (`....//` filter evasion)
+  assumed a stripping filter the target does not have. Fix: depth-iterating
+  payloads (1..6) in `security/pipeline/phases/vulnerability.phase.js`,
+  `security/pipeline/phases/exploitation.phase.js` and
+  `verification/verifiers/exploit.verifier.js`, plus a genuinely distinct
+  second vector (percent-encoded `%2e%2e%2f` traversal) for the ≥2-methods
+  HIGH bar. Now VERIFIED 2/2 and resolved.
+- `hardcoded-secret` (F-005 stuck INCONCLUSIVE) — a source-only class: the
+  verifier's static branch produced exactly ONE method (targeted literal
+  read), so a HIGH finding could never reach the ≥2 independent-methods bar
+  and the 8G gate dropped it forever. Fix: a second independent static
+  observation — a BLIND source-tree rescan that must re-discover the
+  reported file from raw source (doer side mirrored in
+  `exploitation.phase.js`). Values stay redacted on both sides. Now
+  VERIFIED 2/2 and resolved.
+
+The F-011 escape-trap (server-side-escaped announce echo) is STILL rejected
+by the gate in every run — the fixes add observation depth, not leniency.
+`phase8-e`/`phase8-g` probes re-run green (32/32 on 8G, incl. F-011
+rejection + tamper invalidation).
 
 ## Target descriptor schema
 
