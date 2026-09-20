@@ -282,27 +282,48 @@ async function p11() {
   done('P11');
 }
 
-/* P12 — Zone compliance (run AFTER the commit). */
+/* P12 — Zone compliance (run AFTER the commit).
+ * ZONE-OWNER ITEM 11: parametrized for post-merge life. The shape assertions
+ * now run against THE PHASE GATE COMMIT — discovered from history (the commit
+ * that added this probe) or given via --commit=<sha> / JEXI_PHASE_COMMIT —
+ * instead of a hardcoded HEAD. The gate-time session state is retired:
+ *   - `git status` clean-tree check  → session state, meaningless post-merge
+ *   - `branch === 'phase-9-glm'`     → branch deleted at merge; replaced by
+ *     the durable containment fact: the phase commit is an ancestor of HEAD. */
 async function p12() {
   const { execFileSync } = await import('node:child_process');
   const git = (args) => execFileSync('git', args, { encoding: 'utf8', cwd: new URL('..', import.meta.url).pathname });
-  const status = git(['status', '--short']).trim();
-  raw('P12 git status --short', status === '' ? '(clean tree)' : status);
-  const allowedUntracked = new Set(['?? scripts/.chunked-state.json']); // pre-existing house exception, never committed
-  const offenders = status.split('\n').filter(Boolean).filter((line) => !allowedUntracked.has(line));
-  eq(offenders.length, 0, 'working tree clean apart from the documented untracked house-exception file');
-  const stat = git(['show', '--name-only', '--format=%h %s', 'HEAD']).trim();
-  raw('P12 HEAD commit (message + files)', stat);
+
+  const argCommit = (process.argv.find((a) => a.startsWith('--commit=')) || '').slice('--commit='.length);
+  const override = argCommit || process.env.JEXI_PHASE_COMMIT || '';
+  let commit = override;
+  if (!commit) {
+    const found = git(['log', '--format=%H', '--diff-filter=A', '--', 'scripts/phase9-i-probe.mjs'])
+      .trim().split('\n').filter(Boolean);
+    eq(found.length, 1, `exactly one commit ADDED scripts/phase9-i-probe.mjs (found ${found.length})`);
+    commit = found[0];
+  }
+  if (!commit || !/^[0-9a-f]{7,40}$/.test(commit)) {
+    ok(false, `phase commit could not be resolved (got ${JSON.stringify(commit || null)})`);
+    done('P12');
+  }
+  console.log(`PHASE COMMIT: ${commit}${override ? ' (override)' : ' (discovered: the commit that added this probe)'}`);
+
+  const branch = git(['branch', '--show-current']).trim();
+  raw('P12 current branch (reported, not asserted — gate-time branch name retired)', branch);
+  const stat = git(['show', '--name-only', '--format=%h %s', commit]).trim();
+  raw('P12 phase commit (message + files)', stat);
   const lines = stat.split('\n');
-  console.log(`HEAD: ${lines[0]}`);
+  console.log(`COMMIT: ${lines[0]}`);
   const files = lines.slice(1).filter(Boolean);
-  eq(files.length, 16, 'commit touches exactly 16 files (15 layer modules + 1 probe)');
+  eq(files.length, 16, 'phase commit touches exactly 16 files (15 layer modules + 1 probe)');
   ok(files.every((f) => f.startsWith('intelligence/layers/') || f === 'scripts/phase9-i-probe.mjs'),
     'every committed file is inside intelligence/layers/** or scripts/phase9-i-probe.mjs');
   ok(files.includes('intelligence/layers/index.js') && files.includes('intelligence/layers/_shared.js'),
     'registry + shared infrastructure committed');
-  const branch = git(['branch', '--show-current']).trim();
-  eq(branch, 'phase-9-glm', 'work is on phase-9-glm (no main)');
+  let ancestor = true;
+  try { git(['merge-base', '--is-ancestor', commit, 'HEAD']); } catch { ancestor = false; }
+  eq(ancestor, true, 'phase commit is contained in current history (gate-time: it WAS HEAD; post-merge: ancestor of HEAD)');
   done('P12');
 }
 

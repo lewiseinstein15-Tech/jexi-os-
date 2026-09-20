@@ -5,11 +5,14 @@
  * One subcommand per probe case, self-contained, raw output, exit 1 on
  * any failed assertion.
  *
- * BROWSER HONESTY: this sandbox HAS a real headless Chromium (downloaded
- * for playwright at ~/.cache/ms-playwright/chromium-*) — the harness
- * detects and uses it (flavor reported everywhere). Puppeteer is NOT
- * installed and is NOT faked. The skip path (P7/P9) is exercised via
- * JEXI_VISUAL_NO_BROWSER=1 — the exact same code path as real absence.
+ * BROWSER HONESTY: when a real headless browser exists (e.g. playwright's
+ * chromium at ~/.cache/ms-playwright/chromium-*) the harness detects and
+ * uses it (flavor reported everywhere); nothing is ever faked. When one is
+ * absent — really absent or forced via JEXI_VISUAL_NO_BROWSER=1 (the exact
+ * same code path) — the browser-requiring cases CLEAN-SKIP (ZONE-OWNER
+ * ITEM 10): `SKIP: <case> — BROWSER_UNAVAILABLE`, exit 2 (exit 0 with
+ * --skip-ok), matching the runner CLI's own contract. P7/P11 and P9
+ * cases 3–4 run everywhere.
  *
  * Diff/determinism probes render LOCAL fixture pages (scratch/*.html)
  * to keep the logic under test free of network flakiness; the network
@@ -53,9 +56,23 @@ function raw(label, obj) {
   console.log(`--- ${label} (raw) ---`);
   console.log(typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2));
 }
-function done(name) {
-  console.log(`[${name}] ${pass} PASS / ${fail} FAIL`);
+function done(name, skip = 0) {
+  console.log(`[${name}] ${pass} PASS / ${fail} FAIL${skip ? ` / ${skip} SKIP` : ''}`);
   process.exit(fail === 0 ? 0 : 1);
+}
+/* ZONE-OWNER ITEM 10: clean-skip gate for browser-requiring cases — matches
+ * the runner's own BROWSER_UNAVAILABLE contract ({ ok:false,
+ * reason:'BROWSER_UNAVAILABLE' }; CLI exits 2, or 0 with --skip-ok). Before
+ * this gate, a browserless environment crashed with TypeError
+ * (decodePng(null) / compare(null,null)) or false-FAILed detection asserts. */
+function browserSkipGate(name) {
+  const det = detectBrowser();
+  if (det.available === true) return det;
+  const skipOk = process.argv.includes('--skip-ok');
+  console.log(`SKIP: ${name} — BROWSER_UNAVAILABLE (${det.detail})`);
+  console.log(`[${name}] SKIPPED — clean skip, same contract as puppeteer-runner CLI ` +
+    `(reason BROWSER_UNAVAILABLE → exit ${skipOk ? 0 : 2}${skipOk ? ' with --skip-ok' : ''})`);
+  process.exit(skipOk ? 0 : 2);
 }
 function pngMagic(buf) {
   return buf.subarray(0, 8).toString('hex') === '89504e470d0a1a0a';
@@ -77,7 +94,7 @@ function writeFixtures() {
 
 /* P1 — runner boots: real capture of https://example.com at 1440x900. */
 async function p1() {
-  const det = detectBrowser();
+  const det = browserSkipGate('P1'); // item 10: clean-skip when no browser
   raw('P1 browser detection', det);
   ok(det.available === true, 'a real browser flavor is available (no faking needed)');
   ok(det.flavor === 'playwright-core' || det.flavor === 'puppeteer', `flavor is real (${det.flavor})`);
@@ -96,6 +113,7 @@ async function p1() {
 
 /* P2 — screenshot captured: buffer size, format, duration. */
 async function p2() {
+  browserSkipGate('P2'); // item 10: clean-skip when no browser
   const runner = createRunner();
   const t0 = Date.now();
   const r = await runner.capture(EXAMPLE_COM, { viewport: { width: 1440, height: 900 } });
@@ -119,6 +137,7 @@ async function p2() {
 
 /* P3 — two real captures of the same page → identical. */
 async function p3() {
+  browserSkipGate('P3'); // item 10: clean-skip when no browser
   writeFixtures();
   const runner = createRunner();
   const a = await runner.capture(URL_A);
@@ -138,6 +157,7 @@ async function p3() {
 
 /* P4 — two different pages → real regression detected. */
 async function p4() {
+  browserSkipGate('P4'); // item 10: clean-skip when no browser
   writeFixtures();
   const runner = createRunner();
   const a = await runner.capture(URL_A);
@@ -160,6 +180,7 @@ async function p4() {
 
 /* P5 — threshold accepts a small real diff. */
 async function p5() {
+  browserSkipGate('P5'); // item 10: clean-skip when no browser
   writeFixtures();
   const runner = createRunner();
   const a = await runner.capture(URL_A);
@@ -182,6 +203,7 @@ async function p5() {
 
 /* P6 — diff image produced on disk. */
 async function p6() {
+  browserSkipGate('P6'); // item 10: clean-skip when no browser
   writeFixtures();
   const runner = createRunner();
   const a = await runner.capture(URL_A);
@@ -250,6 +272,7 @@ async function p7() {
 
 /* P8 — scene check on a known static page (real browser). */
 async function p8() {
+  browserSkipGate('P8'); // item 10: clean-skip when no browser
   raw('P8 scene spec schema (SCENE_SPEC_EXAMPLE)', SCENE_SPEC_EXAMPLE);
   const qa = createSceneQA();
   const result = await qa.check(EXAMPLE_COM, {
@@ -270,23 +293,36 @@ async function p8() {
 
 /* P9 — CI-safe exit codes via the CLI. */
 async function p9() {
+  // ZONE-OWNER ITEM 10: cases 1–2 need a real browser; cases 3–4 prove the
+  // CLI skip exit codes, which work precisely when no browser exists — run
+  // those everywhere and clean-skip 1–2 (reported as SKIP, not FAIL/crash).
+  const det = detectBrowser();
+  const hasBrowser = det.available === true;
+  let skip = 0;
   writeFixtures();
   const node = process.execPath;
   const run = (args, env) => spawnSync(node, [RUNNER_CLI, ...args], {
     encoding: 'utf8', timeout: 120000, env: { ...process.env, ...(env || {}) },
   });
 
-  let r = run(['capture', URL_A, '--out', CLI_A]);
-  raw('P9 case 1 — capture success (exit 0)', { stdout: r.stdout.trim(), stderr: r.stderr.trim(), exitCode: r.status });
-  eq(r.status, 0, 'success → exit 0');
-  ok(existsSync(CLI_A), 'screenshot written by CLI');
+  let r;
+  if (hasBrowser) {
+    r = run(['capture', URL_A, '--out', CLI_A]);
+    raw('P9 case 1 — capture success (exit 0)', { stdout: r.stdout.trim(), stderr: r.stderr.trim(), exitCode: r.status });
+    eq(r.status, 0, 'success → exit 0');
+    ok(existsSync(CLI_A), 'screenshot written by CLI');
 
-  r = run(['capture', URL_B, '--out', CLI_B]);
-  eq(r.status, 0, 'second capture ok (for the regression case)');
+    r = run(['capture', URL_B, '--out', CLI_B]);
+    eq(r.status, 0, 'second capture ok (for the regression case)');
 
-  r = run(['compare', CLI_A, CLI_B, '--diff-out', DIFF_OUT]);
-  raw('P9 case 2 — compare regression (exit 1)', { stdout: r.stdout.trim(), exitCode: r.status });
-  eq(r.status, 1, 'real regression → exit 1');
+    r = run(['compare', CLI_A, CLI_B, '--diff-out', DIFF_OUT]);
+    raw('P9 case 2 — compare regression (exit 1)', { stdout: r.stdout.trim(), exitCode: r.status });
+    eq(r.status, 1, 'real regression → exit 1');
+  } else {
+    console.log(`SKIP: P9 case 1 — capture success (BROWSER_UNAVAILABLE: ${det.detail})`);
+    console.log('SKIP: P9 case 2 — compare regression (BROWSER_UNAVAILABLE)');
+    skip = 2;
+  }
 
   r = run(['capture', EXAMPLE_COM, '--skip-ok'], { JEXI_VISUAL_NO_BROWSER: '1' });
   raw('P9 case 3 — skip with --skip-ok (exit 0)', { stdout: r.stdout.trim(), exitCode: r.status });
@@ -295,11 +331,12 @@ async function p9() {
   r = run(['capture', EXAMPLE_COM], { JEXI_VISUAL_NO_BROWSER: '1' });
   raw('P9 case 4 — skip without --skip-ok (exit 2)', { stdout: r.stdout.trim(), exitCode: r.status });
   eq(r.status, 2, 'skip without --skip-ok → exit 2');
-  done('P9');
+  done('P9', skip);
 }
 
 /* P10 — determinism: same page twice. */
 async function p10() {
+  browserSkipGate('P10'); // item 10: clean-skip when no browser
   writeFixtures();
   const runner = createRunner();
   const a = await runner.capture(URL_A);
