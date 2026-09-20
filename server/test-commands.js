@@ -45,8 +45,8 @@ const registry = C.registry;
 
 /* ── 1. registry contract ─────────────────────────────────────────────── */
 
-check('registry: 12 commands registered', () => {
-  assert.equal(C.list().length, 12, `got ${C.list().length}: ${C.list().map((c) => c.name).join(',')}`);
+check('registry: 15 commands registered', () => {
+  assert.equal(C.list().length, 15, `got ${C.list().length}: ${C.list().map((c) => c.name).join(',')}`);
 });
 
 check('registry: contract fields present on every command', () => {
@@ -252,12 +252,12 @@ check('seam: chat + CLI share the same dispatcher module', async () => {
   assert.ok(cli.includes('dispatchCommand'), 'cli.js dispatches commands');
 });
 
-await checkAsync('seam: commands-seam loads and lists 12', async () => {
+await checkAsync('seam: commands-seam loads and lists 15', async () => {
   const seam = await import(path.join(SERVER_ROOT, 'src', 'commands-seam.js'));
   assert.equal(seam.commandsAvailable(), true);
-  assert.equal(seam.commandsStatus().count, 12);
+  assert.equal(seam.commandsStatus().count, 15);
   const api = seam.registryForApi();
-  assert.equal(api.count, 12);
+  assert.equal(api.count, 15);
   assert.ok(api.commands[0].name && api.commands[0].category);
 });
 
@@ -267,7 +267,7 @@ await checkAsync('surface: GET /api/commands exposes the dispatcher registry', a
   // value that route embeds.
   const seam = await import(path.join(SERVER_ROOT, 'src', 'commands-seam.js'));
   const api = seam.registryForApi();
-  assert.ok(api && api.count >= 12);
+  assert.ok(api && api.count >= 15);
 });
 
 check('docker: workflows ship commands/ into the brain image', () => {
