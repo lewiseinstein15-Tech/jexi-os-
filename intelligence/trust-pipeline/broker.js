@@ -34,6 +34,10 @@ import {
   DEFAULT_MAX_BYTES,
   DEFAULT_TIMEOUT_MS,
 } from './sanitize.js';
+// ZONE-OWNER ITEM 4 (Phase 9 G seam): provenance labels on successful fetches.
+// Public engine API only — makeProvenance is internal, attach() builds the
+// identical frozen fixed-key-order provenance object.
+import { attach, isValidLabel, ProvenanceError } from '../../events/provenance/label.js';
 
 export function createBroker({
   maxBytes = DEFAULT_MAX_BYTES,
@@ -67,9 +71,12 @@ export function createBroker({
    * @returns {Promise<{
    *   ok: boolean, status: number, url: string, registration: object,
    *   text: string, bytes: number, tooLarge: boolean, warnings: object[],
+   *   provenance: object|null,
    *   json: () => unknown,
    * }>}
-   * On refusal/failure: { ok: false, error: { code, message }, warnings }
+   * On success: `provenance` is the frozen Phase 9 G label object (label from
+   * the registration's declared provenance, default 'observed').
+   * On refusal/failure: { ok: false, provenance: null, error: { code, message }, warnings }
    */
   async function fetchThroughBroker(rawUrl, opts = {}) {
     const warnings = [];
@@ -92,6 +99,7 @@ export function createBroker({
         bytes: 0,
         tooLarge: false,
         warnings,
+        provenance: null, // no data → no label
         error: { code, message: sanitizeError(err).message },
       };
     }
@@ -121,6 +129,7 @@ export function createBroker({
       return {
         ok: false, status: 0, url: url.toString(), registration,
         text: '', bytes: 0, tooLarge: false, warnings,
+        provenance: null, // no data → no label
         error: sanitized,
       };
     }
@@ -135,6 +144,7 @@ export function createBroker({
       return {
         ok: false, status: response.status, url: url.toString(), registration,
         text: '', bytes: 0, tooLarge: false, warnings,
+        provenance: null, // no data → no label
         meta: response.meta || null,
         error: { code: 'E_REDIRECT_REFUSED', message: 'request blocked: upstream attempted a redirect' },
       };
@@ -162,6 +172,7 @@ export function createBroker({
       return {
         ok: false, status: response.status, url: url.toString(), registration,
         text: '', bytes: body.bytes, tooLarge: body.tooLarge, warnings,
+        provenance: null, // no data → no label
         error: { code: 'E_UPSTREAM_STATUS', message: `request failed: upstream returned an error status` },
       };
     }
@@ -170,9 +181,28 @@ export function createBroker({
       return {
         ok: false, status: response.status, url: url.toString(), registration,
         text: '', bytes: body.bytes, tooLarge: true, warnings,
+        provenance: null, // no data → no label
         error: { code: 'E_TOO_LARGE', message: 'request blocked: response exceeded the size cap' },
       };
     }
+
+    // ZONE-OWNER ITEM 4 — the permanent Phase 9 G seam insert (the ok:true
+    // return). Parity with events/provenance/label.js#wrapBroker: the label
+    // comes from the registration's declared provenance (default 'observed');
+    // an invalid declared label is a hard ProvenanceError (stable code), never
+    // a silent drop. Refused/failed fetches produce NO data → provenance: null.
+    if (registration.provenance !== undefined && !isValidLabel(registration.provenance)) {
+      throw new ProvenanceError(
+        'E_INVALID_LABEL',
+        `broker: registration '${registration.id || registration.host}' declares invalid provenance ${JSON.stringify(registration.provenance)}`,
+      );
+    }
+    const provenance = attach(body.text, {
+      label: registration.provenance || 'observed',
+      source: registration.provider || registration.host || 'unknown-source',
+      method: 'trust-pipeline broker fetch',
+      notes: registration.id ? `registration ${registration.id} (layer: ${registration.layer || 'none'})` : undefined,
+    }).provenance;
 
     return {
       ok: true,
@@ -183,6 +213,7 @@ export function createBroker({
       bytes: body.bytes,
       tooLarge: false,
       warnings,
+      provenance,
       meta: response.meta || null,
       json() {
         return JSON.parse(body.text);

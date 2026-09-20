@@ -1,0 +1,20 @@
+[
+  {
+    "provider": "ollama",
+    "requests": 3,
+    "successes": 3,
+    "failures": 0,
+    "rateLimited": 0,
+    "timeouts": 0,
+    "consecutiveFails": 0,
+    "successRateEwma": 1,
+    "latencyEwmaMs": 29,
+    "lastSuccessAt": "2026-09-19T22:32:51.281Z",
+    "lastFailureAt": null,
+    "lastErrorKind": null,
+    "lastError": null,
+    "cooldownUntil": 0,
+    "cooldownReason": null,
+    "disabled": false
+  }
+]

@@ -58,7 +58,7 @@ export function readSkillMeta(file) {
     if (!m) return null;
     const meta = {};
     for (const line of m[1].split('\n')) {
-      const kv = line.match(/^([a-z_]+):\s*(.*)$/);
+      const kv = line.match(/^([a-zA-Z_]+):\s*(.*)$/);
       if (kv) meta[kv[1]] = kv[2].replace(/^["']|["']$/g, '');
     }
     return { ...meta, body: m[2].trim(), file };
