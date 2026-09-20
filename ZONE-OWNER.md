@@ -115,3 +115,9 @@ even if its own work is complete.
   test-contract discovery. Original-handler test-commands.js run: 25/26, with
   `/refine` passing and `/checkpoint` failing. Investigate the environment and
   checkpoint path in the end-of-phases cleanup; do not fix in Scope C.
+
+## Phase 25
+
+| ID | Status | Source | Pri | Files | Why it matters |
+|---|---|---|---|---|---|
+| P25-H-01 | OPEN | G disclosure | P2 | `scripts/phase25-scope-f.mjs` (P5) | Scope F probe P5 asserts write-level E_UNTAGGED for untagged content. Scope G's pipeline (excise -> tag -> assert -> disk) now auto-tags user content as `[stated]` before assertWritable runs. P5 should be updated at Scope N (final gate) to reflect the new pipeline — either assert the auto-tag or assert the pipeline outcome instead of the pre-G refusal. |
