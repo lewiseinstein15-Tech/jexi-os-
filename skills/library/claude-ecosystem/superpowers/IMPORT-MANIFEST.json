@@ -1,0 +1,252 @@
+{
+  "kind": "jexi.library.import-manifest",
+  "version": 1,
+  "generatedAt": "2026-09-20T00:00:00.000Z",
+  "origin": "obra/superpowers",
+  "upstreamCommit": "5bf4e78011075bcfc0dc295f0724994cd123ee71",
+  "license": "MIT",
+  "destination": "skills/library/claude-ecosystem/superpowers",
+  "counts": {
+    "skills": 15,
+    "hooksLayerFiles": 4,
+    "auxFilesNotVendored": 60
+  },
+  "skills": [
+    {
+      "name": "brainstorming",
+      "slug": "brainstorming",
+      "to": "skills/library/claude-ecosystem/superpowers/skills/brainstorming/SKILL.md",
+      "bytes": 19226,
+      "sha256": "c3d63d2fa027592a3aef72aa6e5220fc7d5360da9b9efd61a21c16136d0456ee",
+      "upstreamPath": "skills/brainstorming/SKILL.md",
+      "auxFiles": [
+        "scripts/frame-template.html",
+        "scripts/helper.js",
+        "scripts/server.cjs",
+        "scripts/start-server.sh",
+        "scripts/stop-server.sh",
+        "spec-document-reviewer-prompt.md",
+        "visual-companion.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "diagnosing-superpowers",
+      "slug": "diagnosing-superpowers",
+      "to": "skills/library/claude-ecosystem/superpowers/skills/diagnosing-superpowers/SKILL.md",
+      "bytes": 8810,
+      "sha256": "93881b000c6b8f17dcb5b33cb482a2656d09e6615b91a7539c225093ee90e885",
+      "upstreamPath": "skills/diagnosing-superpowers/SKILL.md",
+      "auxFiles": [
+        "prompts/analyst-common.md",
+        "prompts/cost-and-time.md",
+        "prompts/plan-adherence.md",
+        "prompts/quality-evidence.md",
+        "prompts/repeated-work.md",
+        "prompts/request-conflicts.md",
+        "prompts/scrub-audit.md",
+        "prompts/scrub.md",
+        "prompts/similar-session.md",
+        "prompts/skill-timeline.md",
+        "prompts/stumbles.md",
+        "references/context-safety.md",
+        "references/github-issues.md",
+        "references/redaction-policy.md",
+        "references/session-discovery.md",
+        "templates/bundle-README.md",
+        "templates/case.md",
+        "templates/issue.md",
+        "templates/report.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "dispatching-parallel-agents",
+      "slug": "dispatching-parallel-agents",
+      "to": "skills/library/claude-ecosystem/superpowers/skills/dispatching-parallel-agents/SKILL.md",
+      "bytes": 7535,
+      "sha256": "da6b21d646dc1d7022675a8c2b8c56d9fd71849690fbdb5f55c6abf2e8f76ee6",
+      "upstreamPath": "skills/dispatching-parallel-agents/SKILL.md",
+      "auxFiles": [],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "executing-plans",
+      "slug": "executing-plans",
+      "to": "skills/library/claude-ecosystem/superpowers/skills/executing-plans/SKILL.md",
+      "bytes": 21946,
+      "sha256": "90e2d3fafcc848987b313a47c9cf75ccab3831eb7391f1bd546727939347153a",
+      "upstreamPath": "skills/executing-plans/SKILL.md",
+      "auxFiles": [
+        "scripts/task-done",
+        "scripts/task-start"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "finishing-a-development-branch",
+      "slug": "finishing-a-development-branch",
+      "to": "skills/library/claude-ecosystem/superpowers/skills/finishing-a-development-branch/SKILL.md",
+      "bytes": 9239,
+      "sha256": "b2e6cd89f75d8d91f5c7e67c8e1b6e770c3accfaea6557bee9f89ed835725b92",
+      "upstreamPath": "skills/finishing-a-development-branch/SKILL.md",
+      "auxFiles": [],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "receiving-code-review",
+      "slug": "receiving-code-review",
+      "to": "skills/library/claude-ecosystem/superpowers/skills/receiving-code-review/SKILL.md",
+      "bytes": 7776,
+      "sha256": "cfa4a4613d4df5f0915f513f736c75d7dee84b846dc8e8ba0445ab669704ca36",
+      "upstreamPath": "skills/receiving-code-review/SKILL.md",
+      "auxFiles": [],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "requesting-code-review",
+      "slug": "requesting-code-review",
+      "to": "skills/library/claude-ecosystem/superpowers/skills/requesting-code-review/SKILL.md",
+      "bytes": 4446,
+      "sha256": "70c82592133ad6cbae10e903174251cfe59bfe0977f3f932d19739f6c64a005c",
+      "upstreamPath": "skills/requesting-code-review/SKILL.md",
+      "auxFiles": [
+        "code-reviewer.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "subagent-driven-development",
+      "slug": "subagent-driven-development",
+      "to": "skills/library/claude-ecosystem/superpowers/skills/subagent-driven-development/SKILL.md",
+      "bytes": 34152,
+      "sha256": "d468b5ab06e1775efb989ebf15469ae16f0af9637e9eaa83b7f9ad529e17f7cc",
+      "upstreamPath": "skills/subagent-driven-development/SKILL.md",
+      "auxFiles": [
+        "implementer-prompt.md",
+        "re-review-prompt.md",
+        "scripts/review-package",
+        "scripts/sdd-workspace",
+        "scripts/task-brief",
+        "task-reviewer-prompt.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "systematic-debugging",
+      "slug": "systematic-debugging",
+      "to": "skills/library/claude-ecosystem/superpowers/skills/systematic-debugging/SKILL.md",
+      "bytes": 11045,
+      "sha256": "0fa33808ab7b9b5863692f7353d54e6968bd6d112329932ced5d2f2628632f32",
+      "upstreamPath": "skills/systematic-debugging/SKILL.md",
+      "auxFiles": [
+        "CREATION-LOG.md",
+        "condition-based-waiting-example.ts",
+        "condition-based-waiting.md",
+        "defense-in-depth.md",
+        "find-polluter.sh",
+        "root-cause-tracing.md",
+        "test-academic.md",
+        "test-pressure-1.md",
+        "test-pressure-2.md",
+        "test-pressure-3.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "test-driven-development",
+      "slug": "test-driven-development",
+      "to": "skills/library/claude-ecosystem/superpowers/skills/test-driven-development/SKILL.md",
+      "bytes": 11026,
+      "sha256": "5c2a31cebf229330def503b5f120f04b0b948e8aee3713acb693a812797d4273",
+      "upstreamPath": "skills/test-driven-development/SKILL.md",
+      "auxFiles": [
+        "writing-good-tests.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "using-git-worktrees",
+      "slug": "using-git-worktrees",
+      "to": "skills/library/claude-ecosystem/superpowers/skills/using-git-worktrees/SKILL.md",
+      "bytes": 8344,
+      "sha256": "fa5adbd5cdbab18a2b81f7bf54a50717865ebb2689fa6e56c24dcfe4a8d322c0",
+      "upstreamPath": "skills/using-git-worktrees/SKILL.md",
+      "auxFiles": [],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "using-superpowers",
+      "slug": "using-superpowers",
+      "to": "skills/library/claude-ecosystem/superpowers/skills/using-superpowers/SKILL.md",
+      "bytes": 4860,
+      "sha256": "6c0e8bf84a16c021730f2f5fe8d1c7b7113b390dbad30211ec77780af6b582f4",
+      "upstreamPath": "skills/using-superpowers/SKILL.md",
+      "auxFiles": [
+        "references/antigravity-tools.md",
+        "references/claude-code-tools.md",
+        "references/codex-tools.md",
+        "references/gemini-tools.md",
+        "references/hermes-tools.md",
+        "references/muse-tools.md",
+        "references/pi-tools.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "verification-before-completion",
+      "slug": "verification-before-completion",
+      "to": "skills/library/claude-ecosystem/superpowers/skills/verification-before-completion/SKILL.md",
+      "bytes": 5228,
+      "sha256": "b511b52c2939da106ec2fd647cf27ca11b4408d413e5c4d526d01b3423759bb9",
+      "upstreamPath": "skills/verification-before-completion/SKILL.md",
+      "auxFiles": [],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "writing-plans",
+      "slug": "writing-plans",
+      "to": "skills/library/claude-ecosystem/superpowers/skills/writing-plans/SKILL.md",
+      "bytes": 10536,
+      "sha256": "2b3eae34b1888eadc5e7d62066ee6f9d91d898b25f91c3d07e64d0e2ac6aa2a4",
+      "upstreamPath": "skills/writing-plans/SKILL.md",
+      "auxFiles": [
+        "plan-document-reviewer-prompt.md"
+      ],
+      "auxFilesVendored": false
+    },
+    {
+      "name": "writing-skills",
+      "slug": "writing-skills",
+      "to": "skills/library/claude-ecosystem/superpowers/skills/writing-skills/SKILL.md",
+      "bytes": 28212,
+      "sha256": "9fa4f0c3196293551ba53b4d3554c02b22ba0888ea05f357dc7f84ee878b7fab",
+      "upstreamPath": "skills/writing-skills/SKILL.md",
+      "auxFiles": [
+        "anthropic-best-practices.md",
+        "examples/CLAUDE_MD_TESTING.md",
+        "graphviz-conventions.dot",
+        "persuasion-principles.md",
+        "render-graphs.js",
+        "testing-skills-with-subagents.md"
+      ],
+      "auxFilesVendored": false
+    }
+  ],
+  "hooksLayer": {
+    "portedFrom": "hooks/",
+    "files": [
+      "hooks.json",
+      "hooks-cursor.json",
+      "run-hook.cmd",
+      "session-start"
+    ],
+    "authoredFiles": [
+      "hooks/README.md",
+      "hooks/run-hook.sh",
+      "hooks/session-start.sh"
+    ],
+    "registeredInJexiHookTable": false,
+    "note": "bundled library artifact; ships for future wiring, not run by the kernel"
+  }
+}
