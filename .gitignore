@@ -20,6 +20,10 @@ server/data/
 # CWD as ./data; ZONE-OWNER item 39). Root-anchored on purpose: agents/data/
 # and skills/**/data/ hold TRACKED content and must not be ignored.
 /data/
+# Evaluation run log — every `node evaluation/run.js` (and thus every full
+# suite run) rewrites its dated row; run.js recreates the file from scratch
+# when absent (ZONE-OWNER item 40). run.js/tasks.js stay tracked.
+server/evaluation/RESULTS.md
 server/jexi-workspace/
 .jexi/
 
