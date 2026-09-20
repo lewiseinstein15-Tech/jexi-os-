@@ -16,6 +16,10 @@ task_state.json
 
 # Runtime data (memory core, knowledge library, generated files)
 server/data/
+# Root runtime data dir (ProviderHealth ledger etc. — written relative to
+# CWD as ./data; ZONE-OWNER item 39). Root-anchored on purpose: agents/data/
+# and skills/**/data/ hold TRACKED content and must not be ignored.
+/data/
 server/jexi-workspace/
 .jexi/
 
