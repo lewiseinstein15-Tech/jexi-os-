@@ -85,3 +85,9 @@ Covered by #10 and #11 (Bugs). No additional items.
 - **37** → MERGED→#22 (suite requires root `npm install` — esbuild — Step 2 discovery c).
 
 *Snapshot at creation: `pre-cleanup-zone-owner` @ `8a748a4a78e576cccec38f60b08f65f3ea71dabe`.*
+
+## Phase 25
+
+| ID | Status | Source | Pri | Files | Why it matters |
+|---|---|---|---|---|---|
+| P25-H-01 | OPEN | G disclosure | P2 | `scripts/phase25-scope-f.mjs` (P5) | Scope F probe P5 asserts write-level E_UNTAGGED for untagged content. Scope G's pipeline (excise -> tag -> assert -> disk) now auto-tags user content as `[stated]` before assertWritable runs. P5 should be updated at Scope N (final gate) to reflect the new pipeline — either assert the auto-tag or assert the pipeline outcome instead of the pre-G refusal. |
