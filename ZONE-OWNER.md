@@ -92,3 +92,17 @@ ONCE at the end — after all phases land, before
 the benchmark phase. No interleaved cleanup passes.
 Every phase is expected to leave ZONE-OWNER items
 even if its own work is complete.
+
+## Phase 10 carry-forward — Scope A
+
+- **P10-A-01 OPEN — runtime integration:** `rlm/kernel/` is independently usable;
+  it is not registered in the server, command registry or existing kernel.
+  Coordinate any out-of-zone wiring after in-zone daemon/subagent scopes.
+- **P10-A-02 OPEN — snapshot breadth:** A uses validated deterministic synchronous
+  replay, not arbitrary heap serialization. Hidden nondeterminism, external I/O,
+  async continuations and resource handles are not restorable by this format.
+  Resolve before advertising unrestricted REPL recovery; details in
+  `rlm/kernel/README.md`. Scope D/E durability must not silently replay effects.
+- **P10-A-03 OPEN — containment:** Node VM contexts isolate ordinary session
+  namespaces, not malicious code. OS-level worker containment and host-call
+  capabilities remain integration work; never advertise VM as a security sandbox.
