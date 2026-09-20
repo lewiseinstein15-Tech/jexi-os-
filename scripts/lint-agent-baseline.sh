@@ -3,6 +3,9 @@
 #
 # Verifies every agent file carries the canonical "## Prompt Defense Baseline"
 # block verbatim (no missing blocks, no drifted wording, no duplicates):
+# the WHOLE block — header through first blank line / next heading / EOF —
+# is byte-compared after \r + trailing-whitespace normalization, so appended
+# or injected lines inside the block fail lint too (ZONE-OWNER item 9).
 #   - jexi-agents tree (ORCHESTRATOR + coworkers)
 #   - agents tree      (Phase 7 Scope I will add 68 — rule established here)
 #   - workforce tree   (README.md excluded)
@@ -92,7 +95,10 @@ while IFS= read -r rel; do
     fail=$((fail + 1))
     continue
   fi
-  headers="$(grep -n -F '## Prompt Defense Baseline' "$f" | cut -d: -f1)"
+  # ZONE-OWNER ITEM 9: anchored header match — '## Prompt Defense Baseline'
+  # must be the whole line (trailing whitespace tolerated). An unanchored
+  # grep also matched the header inside prose/code-fence text.
+  headers="$(grep -n -E '^## Prompt Defense Baseline[[:space:]]*$' "$f" | cut -d: -f1)"
   count="$(printf '%s\n' "$headers" | grep -c . || true)"
   if [ "$count" -eq 0 ]; then
     echo "FAIL $rel (Prompt Defense Baseline missing)"
@@ -105,9 +111,20 @@ while IFS= read -r rel; do
     continue
   fi
   h="$(printf '%s' "$headers")"
-  sed -n "${h},$((h + 7))p" "$f" | sed 's/\r$//; s/[[:space:]]*$//' > "$EXTRACT"
+  # ZONE-OWNER ITEM 9: byte-compare the ENTIRE baseline block after
+  # normalization — header through the first blank line / next markdown
+  # heading / EOF — not a fixed 8-line window. The old window only proved
+  # the canonical 8 lines were PRESENT at the top of the block: any line
+  # appended inside the block (drift, or injected instructions) passed lint.
+  awk -v start="$h" '
+    NR <  start      { next }
+    NR == start      { print; next }
+    /^[[:space:]]*$/ { exit }
+    /^#/             { exit }
+    { print }
+  ' "$f" | sed 's/\r$//; s/[[:space:]]*$//' > "$EXTRACT"
   if ! diff -q "$CANON" "$EXTRACT" >/dev/null 2>&1; then
-    echo "FAIL $rel (baseline does not match canonical text verbatim — line ${h})"
+    echo "FAIL $rel (baseline block does not match canonical text verbatim — line ${h})"
     fail=$((fail + 1))
     continue
   fi
