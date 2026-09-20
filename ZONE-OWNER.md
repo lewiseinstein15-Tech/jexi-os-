@@ -85,3 +85,10 @@ Covered by #10 and #11 (Bugs). No additional items.
 - **37** → MERGED→#22 (suite requires root `npm install` — esbuild — Step 2 discovery c).
 
 *Snapshot at creation: `pre-cleanup-zone-owner` @ `8a748a4a78e576cccec38f60b08f65f3ea71dabe`.*
+
+## Cleanup Policy
+Phases build. ZONE-OWNER.md grows. Cleanup runs
+ONCE at the end — after all phases land, before
+the benchmark phase. No interleaved cleanup passes.
+Every phase is expected to leave ZONE-OWNER items
+even if its own work is complete.
