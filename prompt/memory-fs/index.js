@@ -1,6 +1,6 @@
 // prompt/memory-fs/index.js
-// Phase 25 — Scope E (+ Scope F epistemic gate). Public surface of the
-// memory filesystem.
+// Phase 25 — Scope E (+ Scope F epistemic gate + Scope G privacy
+// blacklist). Public surface of the memory filesystem.
 //
 // Contract spellings:
 //   tree.resolve(path)                    -> { absolute, parent, kind, valid, error? }
@@ -14,6 +14,8 @@
 //   epistemic.tag(content, source, opts)  -> { tagged, writable, tag, reason?, errorCode? }
 //   epistemic.detectTag(content)          -> { tag: 'stated'|'inferred'|null, cleanContent }
 //   epistemic.assertWritable(taggedEntry) -> { ok, tag, errorCode? }
+//   blacklist.classify(content)           -> { allowed, matched[], excised, reason, method }
+//   blacklist.excise(content)             -> { excised, removed[], log[], untouched }
 //
 // Rules implemented (see module headers for detail):
 //   RULE 1  traversal refused                -> E_PATH_TRAVERSAL
@@ -30,12 +32,25 @@
 // Persistence: REAL fs reads/writes under <projectRoot>/.jexi/memory-fs/
 // (gitignored via the .jexi/ rule). No simulation, no in-memory shim.
 //
-// Scope F — EPISTEMOLOGICAL TAGGING: memoryFs.write() now gates every
-// entry through epistemic.assertWritable() BEFORE touching disk and
-// BEFORE the Scope E rules: untagged -> E_UNTAGGED, [inferred] ->
-// E_INFERRED_NOT_WRITABLE (never written), [stated] -> proceed with the
-// Scope E rules. Reads stay tag-agnostic — reading is allowed for both
-// tags, only writing is restricted (Scope F RULE 4).
+// Scope F — EPISTEMOLOGICAL TAGGING: every entry carries its epistemic
+// tag. Reads stay tag-agnostic — reading is allowed for both tags, only
+// writing is restricted (Scope F RULE 4).
+//
+// Scope G — PRIVACY BLACKLIST: memoryFs.write() surgically excises
+// blacklisted categories (clinical / mental / personality / financial /
+// identity / biometric) from the content BEFORE anything else, then tags
+// the EXCISED content. Order: excise -> tag -> assertWritable -> Scope E
+// rules -> disk. If nothing survives excision the write is refused with
+// E_ALL_EXCISED and NOTHING touches disk (not even store-root creation).
+// Pre-tagged content passes through the tag step unchanged (no double-
+// tagging); untagged content is auto-tagged from the writer's epistemic
+// source (see EPISTEMIC_SOURCE_BY_ROLE below).
+//
+// ctx.audit: when ctx.audit is an array, write() appends one record per
+// COMPLETED stage ({stage:'excise'|'tag'|'assert'|'disk', ...}) so callers
+// can prove the enforcement order. Refused writes record the stages that
+// ran before the refusal (e.g. E_ALL_EXCISED leaves exactly one 'excise'
+// record).
 
 import fs from 'node:fs';
 import nodePath from 'node:path';
@@ -43,13 +58,46 @@ import * as tree from './tree.js';
 import * as writeRules from './write-rules.js';
 import * as readRules from './read-rules.js';
 import * as epistemic from './epistemic.js';
+import * as blacklist from './privacy-blacklist.js';
 
-export { tree, writeRules, readRules, epistemic };
+export { tree, writeRules, readRules, epistemic, blacklist };
 export const CODES = tree.CODES;
 export const EPISTEMIC_CODES = epistemic.EPISTEMIC_CODES;
+export const BLACKLIST_CODES = blacklist.BLACKLIST_CODES;
 export const LAYOUT = tree.LAYOUT;
 export const storeRoot = tree.storeRoot;
 export const PROJECT_ROOT = tree.PROJECT_ROOT;
+
+/**
+ * Writer role -> epistemic source (Scope G integration mapping), used ONLY
+ * when content arrives without a leading tag and must be auto-tagged:
+ *   user   -> 'user'    (auto [stated])
+ *   agent  -> 'model'   (the agent IS the model: untagged agent text is an
+ *                        inference -> [inferred] -> never written)
+ *   kernel -> 'system'  (platform ground truth, still gated by
+ *                        opts.systemWritable — pass ctx.systemWritable:true)
+ *   system -> 'system'
+ * Unknown roles pass through unchanged -> epistemic.tag refuses with
+ * E_UNKNOWN_SOURCE. Pre-tagged content never consults this mapping.
+ */
+const EPISTEMIC_SOURCE_BY_ROLE = Object.freeze({
+  user: 'user',
+  model: 'model',
+  agent: 'model',
+  kernel: 'system',
+  system: 'system',
+});
+
+function epistemicSourceOf(writer) {
+  let role = writer;
+  if (writer !== null && typeof writer === 'object' && typeof writer.role === 'string') {
+    role = writer.role;
+  }
+  if (role === undefined || role === null) role = 'agent'; // default actor
+  return Object.prototype.hasOwnProperty.call(EPISTEMIC_SOURCE_BY_ROLE, role)
+    ? EPISTEMIC_SOURCE_BY_ROLE[role]
+    : role;
+}
 
 /** Record a successful file read into ctx.session.reads (RULE 6 tracking). */
 function recordRead(ctx, absolute) {
@@ -65,14 +113,19 @@ export const memoryFs = {
    * memoryFs.write(path, content, writer, ctx)
    *   -> { written, absolutePath?, reason?, errorCode? }
    *
-   * Order of enforcement (Scope F integration — epistemic gate BEFORE
-   * touching disk and BEFORE the Scope E rules):
+   * Order of enforcement (Scope G integration — excise -> tag ->
+   * assertWritable -> Scope E rules -> disk):
    *   1. content type check      (string only)
-   *   2. epistemic.assertWritable (tag required; [inferred] NEVER written;
-   *      untagged -> E_UNTAGGED; double tag -> E_DOUBLE_TAG)
-   *   3. writeRules.canWrite     (traversal / reserved / directory shape / role)
-   *   4. UPDATE? -> readRules.requiresPriorRead (Scope E RULE 6)
-   *   5. real disk write; auto-create IMMEDIATE parent only (Scope E RULE 4)
+   *   2. blacklist.excise        (blacklisted categories surgically removed;
+   *                               nothing left -> E_ALL_EXCISED, no disk touch)
+   *   3. epistemic.tag           (pre-tagged content passes through; untagged
+   *      content is auto-tagged from the writer's epistemic source)
+   *   4. epistemic.assertWritable (final gate: tag present, [inferred] NEVER
+   *      written, double tag refused)
+   *   5. writeRules.canWrite     (traversal / reserved / directory shape / role)
+   *   6. UPDATE? -> readRules.requiresPriorRead (Scope E RULE 6)
+   *   7. real disk write of the TAGGED, EXCISED content; auto-create
+   *      IMMEDIATE parent only (Scope E RULE 4)
    */
   write(path, content, writer, ctx) {
     if (typeof content !== 'string') {
@@ -83,11 +136,67 @@ export const memoryFs = {
       };
     }
 
-    // Scope F — epistemic gate. If [inferred] -> refuse, no file write.
-    // If [stated] -> proceed with the Scope E rules.
-    const aw = epistemic.assertWritable(content);
+    const audit =
+      ctx && typeof ctx === 'object' && Array.isArray(ctx.audit) ? ctx.audit : null;
+
+    // Scope G — STEP 1: excise blacklisted categories BEFORE anything else.
+    const ex = blacklist.excise(content);
+    if (audit) {
+      audit.push({
+        stage: 'excise',
+        beforeBytes: content.length,
+        afterBytes: ex.excised.length,
+        removed: ex.removed.map((r) => r.category),
+      });
+    }
+
+    // Scope G RULE 2 — no payload survived excision -> no file write.
+    // Tag-prefix-aware: "[stated] user is diabetic" excises down to a bare
+    // tag remnant (with or without its closing bracket), which is just as
+    // unwritable as an empty string.
+    const detected = epistemic.detectTag(ex.excised);
+    const residualPayload = detected.tag !== null ? detected.cleanContent : ex.excised;
+    const residualTrimmed = residualPayload.trim();
+    if (residualTrimmed === '' || /^\[(stated|inferred)\]?$/.test(residualTrimmed)) {
+      return {
+        written: false,
+        reason: 'every blacklisted span was excised — no content remains to write (RULE 2)',
+        errorCode: blacklist.BLACKLIST_CODES.ALL_EXCISED,
+      };
+    }
+
+    // STEP 2 (Scope F): tag the EXCISED content. Pre-tagged content passes
+    // through unchanged; untagged content is auto-tagged from the writer's
+    // epistemic source (refusals: E_INFERRED_NOT_WRITABLE /
+    // E_SYSTEM_WRITE_REFUSED / E_UNKNOWN_SOURCE).
+    let tagged;
+    let tagUsed;
+    if (detected.tag !== null) {
+      tagged = ex.excised;
+      tagUsed = detected.tag;
+    } else {
+      const t = epistemic.tag(
+        ex.excised,
+        epistemicSourceOf(writer),
+        ctx && typeof ctx === 'object' ? ctx : {},
+      );
+      if (!t.writable) {
+        return { written: false, reason: t.reason, errorCode: t.errorCode };
+      }
+      tagged = t.tagged;
+      tagUsed = t.tag;
+    }
+    if (audit) {
+      audit.push({ stage: 'tag', tag: tagUsed, bytes: tagged.length, onExcisedBytes: ex.excised.length });
+    }
+
+    // STEP 3 (Scope F): final epistemic gate on the tagged entry.
+    const aw = epistemic.assertWritable(tagged);
     if (!aw.ok) {
       return { written: false, reason: aw.reason, errorCode: aw.errorCode };
+    }
+    if (audit) {
+      audit.push({ stage: 'assert', ok: true, tag: aw.tag });
     }
 
     const cw = writeRules.canWrite(path, writer, ctx);
@@ -123,7 +232,11 @@ export const memoryFs = {
       }
     }
 
-    fs.writeFileSync(nodePath.join(root, r.absolute), content, 'utf8');
+    // Scope G — the disk sees the TAGGED, EXCISED content. Nothing else.
+    fs.writeFileSync(nodePath.join(root, r.absolute), tagged, 'utf8');
+    if (audit) {
+      audit.push({ stage: 'disk', bytes: tagged.length, absolutePath: r.absolute });
+    }
     return { written: true, absolutePath: r.absolute };
   },
 
