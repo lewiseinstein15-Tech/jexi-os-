@@ -36,6 +36,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'node:url';
 import { toDid, isDid, agentIdFromDid, asDid, DID_PREFIX, DID_ERRORS, DidError } from './did.js';
+import { StrategyError } from '../nexus/strategy.js';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(MODULE_DIR, '../..');
@@ -58,17 +59,13 @@ export const ERRORS = {
 };
 
 /**
- * Refusal raised by the identity graph. Same shape as SpecError / DivisionError /
- * StrategyError: a stable `code` plus the detail the caller needs.
+ * Refusal raised by the identity graph. The class is the NEXUS layer's
+ * StrategyError (Phase 13's one-class-per-layer pattern — the same class
+ * SpecError/DivisionError/StrategyError consumers already branch on), carrying
+ * a stable `code` plus the detail the caller needs. Identity-specific error
+ * codes are declared in ERRORS above; only the class is shared, no new error
+ * class is introduced.
  */
-export class IdentityError extends Error {
-  constructor(code, message, detail = {}) {
-    super(message);
-    this.name = 'IdentityError';
-    this.code = code;
-    Object.assign(this, detail);
-  }
-}
 
 function isBlank(v) {
   return v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
@@ -133,7 +130,7 @@ export function createIdentityGraph(options = {}) {
     const seen = new Set();
     while (cur.mergedInto) {
       if (seen.has(cur.did)) {
-        throw new IdentityError(ERRORS.CYCLE, `merge chain contains a cycle at ${cur.did}`, { did: cur.did, chain: [...seen] });
+        throw new StrategyError(ERRORS.CYCLE, `merge chain contains a cycle at ${cur.did}`, { did: cur.did, chain: [...seen] });
       }
       seen.add(cur.did);
       const next = nodes.get(cur.mergedInto);
@@ -185,7 +182,7 @@ export function createIdentityGraph(options = {}) {
     try {
       data = JSON.parse(fs.readFileSync(gPath, 'utf8'));
     } catch (err) {
-      throw new IdentityError(ERRORS.INVALID_AGENT, `identity graph is not valid JSON: ${gPath}`, { path: gPath, cause: err.message });
+      throw new StrategyError(ERRORS.INVALID_AGENT, `identity graph is not valid JSON: ${gPath}`, { path: gPath, cause: err.message });
     }
     for (const n of (data.nodes || [])) {
       nodes.set(n.did, { did: n.did, agentId: n.agentId, aliases: [...(n.aliases || [])], seq: n.seq, mergedInto: n.mergedInto || null });
@@ -225,17 +222,17 @@ export function createIdentityGraph(options = {}) {
     }
     const agentId = spec.id || spec.agentId;
     if (isBlank(agentId)) {
-      throw new IdentityError(ERRORS.INVALID_AGENT, 'agent must carry a non-blank id', { agentId });
+      throw new StrategyError(ERRORS.INVALID_AGENT, 'agent must carry a non-blank id', { agentId });
     }
     let did;
     try {
       did = toDid(agentId);
     } catch (err) {
-      if (err instanceof DidError) throw new IdentityError(ERRORS.INVALID_AGENT, err.message, { agentId });
+      if (err instanceof DidError) throw new StrategyError(ERRORS.INVALID_AGENT, err.message, { agentId });
       throw err;
     }
     if (nodes.has(did)) {
-      throw new IdentityError(ERRORS.DUPLICATE_AGENT, `agent "${agentId}" already has identity ${did}`, { did, agentId });
+      throw new StrategyError(ERRORS.DUPLICATE_AGENT, `agent "${agentId}" already has identity ${did}`, { did, agentId });
     }
     const aliases = [];
     if (!isBlank(spec.name)) aliases.push(String(spec.name));
@@ -261,14 +258,14 @@ export function createIdentityGraph(options = {}) {
   function resolve(nameOrAlias) {
     const raw = typeof nameOrAlias === 'string' ? nameOrAlias.trim() : nameOrAlias;
     if (isBlank(raw)) {
-      throw new IdentityError(ERRORS.UNKNOWN_IDENTITY, 'cannot resolve a blank name', { name: nameOrAlias });
+      throw new StrategyError(ERRORS.UNKNOWN_IDENTITY, 'cannot resolve a blank name', { name: nameOrAlias });
     }
     // A DID is an exact reference: it must be a node, or the identity is unknown.
     // Do not fall through to alias lookup, or a DID that was never created could
     // accidentally match some node's alias.
     if (isDid(raw)) {
       if (!nodes.has(raw)) {
-        throw new IdentityError(ERRORS.UNKNOWN_IDENTITY, `no identity for ${JSON.stringify(raw)}`, { name: String(raw) });
+        throw new StrategyError(ERRORS.UNKNOWN_IDENTITY, `no identity for ${JSON.stringify(raw)}`, { name: String(raw) });
       }
       const root = rootOf(raw);
       return { did: root.did, agentId: root.agentId, resolvedFrom: raw };
@@ -290,7 +287,7 @@ export function createIdentityGraph(options = {}) {
           .filter((d) => d !== exact)
           .sort();
         if (otherRoots.length > 0) {
-          throw new IdentityError(
+          throw new StrategyError(
             ERRORS.AMBIGUOUS_IDENTITY,
             `${JSON.stringify(raw)} is both the agentId of ${exact} and an alias of ${otherRoots.join(', ')}; pass a DID to disambiguate`,
             { name: String(raw), candidates: [exact, ...otherRoots].sort(), agentId: exact },
@@ -302,11 +299,11 @@ export function createIdentityGraph(options = {}) {
     const k = norm(raw);
     const hits = byAlias.get(k);
     if (!hits || hits.size === 0) {
-      throw new IdentityError(ERRORS.UNKNOWN_IDENTITY, `no identity for ${JSON.stringify(nameOrAlias)}`, { name: String(nameOrAlias) });
+      throw new StrategyError(ERRORS.UNKNOWN_IDENTITY, `no identity for ${JSON.stringify(nameOrAlias)}`, { name: String(nameOrAlias) });
     }
     const roots = [...new Set([...hits].map((d) => rootOf(d).did))].sort();
     if (roots.length > 1) {
-      throw new IdentityError(
+      throw new StrategyError(
         ERRORS.AMBIGUOUS_IDENTITY,
         `alias ${JSON.stringify(nameOrAlias)} is held by ${roots.length} identities: ${roots.join(', ')}`,
         { name: String(nameOrAlias), candidates: roots },
@@ -335,12 +332,12 @@ export function createIdentityGraph(options = {}) {
     const nb = asDid(b);
     if (!nodes.has(na.did) || !nodes.has(nb.did)) {
       const missing = [!nodes.has(na.did) ? na.did : null, !nodes.has(nb.did) ? nb.did : null].filter(Boolean);
-      throw new IdentityError(ERRORS.UNKNOWN_IDENTITY, `unknown identity: ${missing.join(', ')}`, { dids: missing });
+      throw new StrategyError(ERRORS.UNKNOWN_IDENTITY, `unknown identity: ${missing.join(', ')}`, { dids: missing });
     }
     const ra = rootOf(na.did);
     const rb = rootOf(nb.did);
     if (ra.did === rb.did) {
-      throw new IdentityError(
+      throw new StrategyError(
         ERRORS.CYCLE,
         `merge would create a cycle: ${na.did} and ${nb.did} are already the same identity (${ra.did})`,
         { didA: na.did, didB: nb.did, root: ra.did },
@@ -378,7 +375,7 @@ export function createIdentityGraph(options = {}) {
   function aliases(didOrAgentId) {
     const { did } = asDid(didOrAgentId);
     if (!nodes.has(did)) {
-      throw new IdentityError(ERRORS.UNKNOWN_IDENTITY, `unknown identity: ${did}`, { did });
+      throw new StrategyError(ERRORS.UNKNOWN_IDENTITY, `unknown identity: ${did}`, { did });
     }
     const root = rootOf(did);
     const out = new Set();

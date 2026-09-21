@@ -60,8 +60,10 @@ than treated as a no-op so a redundant merge cannot be mistaken for a real one.
 
 ## Refusals
 
-`IdentityError` carries a stable `code`, following the same pattern as
-`SpecError` (Scope A), `DivisionError` (Scope B) and `StrategyError` (Scope C).
+Refusals are thrown as **`StrategyError`** — the NEXUS layer's class (Scope C),
+keeping Phase 13's one-class-per-layer taxonomy (`SpecError` Scope A,
+`DivisionError` Scope B, `StrategyError` Scopes C and D). No new error class is
+introduced; each refusal carries a stable `code`.
 
 | Code | When |
 |---|---|

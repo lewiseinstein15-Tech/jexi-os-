@@ -27,7 +27,7 @@
  * See README.md.
  */
 
-import { createIdentityGraph, ERRORS, IdentityError, STATE_DIR, SEQ_FILE, GRAPH_FILE, GRAPH_VERSION } from './graph.js';
+import { createIdentityGraph, ERRORS, STATE_DIR, SEQ_FILE, GRAPH_FILE, GRAPH_VERSION } from './graph.js';
 import * as did from './did.js';
 import * as resolveModule from './resolve.js';
 
@@ -54,7 +54,8 @@ export function graph() { return identity().graph(); }
 export function stats() { return identity().stats(); }
 export function reload() { const g = identity(); return g.load(); }
 
-export { createIdentityGraph, ERRORS, IdentityError, STATE_DIR, SEQ_FILE, GRAPH_FILE, GRAPH_VERSION };
+export { createIdentityGraph, ERRORS, STATE_DIR, SEQ_FILE, GRAPH_FILE, GRAPH_VERSION };
+export { StrategyError } from '../nexus/strategy.js';
 export { did, resolveModule as resolveHelpers };
 export { toDid, isDid, parseDid, agentIdFromDid, asDid, DID_PREFIX, METHOD, DID_ERRORS, DidError } from './did.js';
 export { resolveName, resolveAll, duplicateNames, duplicateReport, seedFromRoster, mergePreview } from './resolve.js';

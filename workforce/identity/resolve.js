@@ -15,11 +15,11 @@
  * C surfaced as E_AMBIGUOUS_IDENTITY, measured here at roster scale.
  */
 
-import { ERRORS as GRAPH_ERRORS, IdentityError as GraphIdentityError } from './graph.js';
+import { ERRORS as GRAPH_ERRORS } from './graph.js';
+import { StrategyError } from '../nexus/strategy.js';
 
 /** Error codes surfaced by resolution (re-exported for callers). */
 export const ERRORS = GRAPH_ERRORS;
-export const IdentityError = GraphIdentityError;
 
 /**
  * Resolve one name against a graph.
@@ -33,7 +33,7 @@ export function resolveName(graph, name) {
     const r = graph.resolve(name);
     return { ok: true, did: r.did, agentId: r.agentId, resolvedFrom: r.resolvedFrom };
   } catch (err) {
-    if (err instanceof GraphIdentityError) return { ok: false, code: err.code, error: err.message, name: String(name) };
+    if (err instanceof StrategyError) return { ok: false, code: err.code, error: err.message, name: String(name) };
     throw err;
   }
 }
@@ -86,7 +86,7 @@ export function seedFromRoster(graph, roster) {
     try {
       created.push(graph.create({ id: a.id, name: a.name }));
     } catch (err) {
-      if (err instanceof GraphIdentityError && err.code === GRAPH_ERRORS.DUPLICATE_AGENT) skipped.push({ id: a.id, code: err.code });
+      if (err instanceof StrategyError && err.code === GRAPH_ERRORS.DUPLICATE_AGENT) skipped.push({ id: a.id, code: err.code });
       else throw err;
     }
   }
@@ -137,16 +137,17 @@ export function mergePreview(graph, didA, didB) {
   const nodeA = g.nodes.find((n) => n.did === didA);
   const nodeB = g.nodes.find((n) => n.did === didB);
   if (!nodeA || !nodeB) {
-    throw new IdentityError(GRAPH_ERRORS.UNKNOWN_IDENTITY, `unknown identity in preview: ${!nodeA ? didA : didB}`, { didA, didB });
+    throw new StrategyError(GRAPH_ERRORS.UNKNOWN_IDENTITY, `unknown identity in preview: ${!nodeA ? didA : didB}`, { didA, didB });
   }
   const survivor = (nodeA.seq <= nodeB.seq) ? nodeA : nodeB;
   const absorbed = survivor === nodeA ? nodeB : nodeA;
   const aliasesA = new Set(graph.aliases(nodeA.did));
-  const aliasesB = new Set(graph.aliases(nodeB.did));
-  return {
+  const aliasesB = new Set(graph.aliases(nodeB.did));  return {
     survivor: { did: survivor.did, agentId: survivor.agentId, seq: survivor.seq },
     absorbed: { did: absorbed.did, agentId: absorbed.agentId, seq: absorbed.seq },
     aliasesAfter: [...new Set([...aliasesA, ...aliasesB])].sort(),
     sameIdentity: nodeA.root === nodeB.root,
   };
 }
+
+export { StrategyError };
