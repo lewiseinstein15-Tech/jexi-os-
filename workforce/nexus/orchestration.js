@@ -75,7 +75,7 @@ export function validateIntent(intent) {
 /**
  * Resolve an upstream agent reference to roster agents.
  *
- *   resolveReference(ref, agents) -> string[]   (roster ids, sorted)
+ *   resolveReference(ref, agents, warnings?) -> string[]   (roster ids, sorted)
  *
  * Upstream names agents by display name ("Frontend Developer") or by slug
  * ("engineering-frontend-developer"). Resolution tries, in order:
@@ -83,9 +83,16 @@ export function validateIntent(intent) {
  *   2. exact name, case-insensitive
  *   3. display name with spaces -> dashes, case-insensitive
  * Returns every match so the caller can refuse an ambiguous one rather than
- * pick by sort order. Empty array means the reference does not resolve.
+ * pick by sort order. Empty array means the reference does not resolve — a
+ * signal the caller should NOT swallow, because an upstream rename otherwise
+ * looks identical to a deliberate route to the next candidate.
+ *
+ * When a `warnings` array is supplied, an unresolved reference appends
+ * `unresolved candidate reference: <ref>` to it. The collector is passed in so
+ * this function stays free of module state and warning order stays the
+ * caller's candidate order.
  */
-export function resolveReference(ref, agents) {
+export function resolveReference(ref, agents, warnings) {
   const raw = String(ref || '').trim();
   if (!raw) return [];
   const ids = new Set();
@@ -99,7 +106,11 @@ export function resolveReference(ref, agents) {
     else if (norm(spec.id) === dashed) ids.add(spec.id);
     else if (norm(spec.id) === lower) ids.add(spec.id);
   }
-  return [...ids].sort();
+  const matches = [...ids].sort();
+  if (matches.length === 0 && Array.isArray(warnings)) {
+    warnings.push(`unresolved candidate reference: ${raw}`);
+  }
+  return matches;
 }
 
 /**
@@ -224,29 +235,35 @@ export function createNexus(options = {}) {
   /**
    * Rank a strategy's candidates against the roster.
    *
-   * Returns `{ able, unresolved, ambiguous }`. `able` preserves upstream
-   * candidate order: the strategy's own stated preference is the tie-break.
-   * A candidate is not able if it does not resolve, if it resolves ambiguously,
-   * or if context.division / context.capabilities exclude it.
+   * Returns `{ able, unresolved, ambiguous, warnings }`. `able` preserves
+   * upstream candidate order: the strategy's own stated preference is what
+   * decides, with no scoring layer on top. A candidate is not able if it does
+   * not resolve, if it resolves ambiguously, or if context.division /
+   * context.capabilities exclude it.
+   *
+   * `warnings` names every candidate reference that did not resolve, so a
+   * broken reference is visible on the route result instead of looking like a
+   * deliberate route to the next candidate.
    */
   function candidatesFor(strategy, context) {
     const able = [];
     const unresolved = [];
     const ambiguous = [];
+    const warnings = [];
     const wantDivision = context && !isBlank(context.division) ? String(context.division) : null;
     const wantCaps = context && Array.isArray(context.capabilities) ? context.capabilities : null;
 
     for (const ref of strategy.candidates) {
-      const matches = resolveReference(ref, state.agents);
+      const matches = resolveReference(ref, state.agents, warnings);
       if (matches.length === 0) { unresolved.push(ref); continue; }
       if (matches.length > 1) { ambiguous.push({ ref, matches }); continue; }
       const spec = state.agents.get(matches[0]);
-      if (!spec) { unresolved.push(ref); continue; }
+      if (!spec) { unresolved.push(ref); warnings.push(`unresolved candidate reference: ${ref}`); continue; }
       if (wantDivision && spec.division !== wantDivision) continue;
       if (wantCaps && !wantCaps.every((c) => (spec.capabilities || []).includes(c))) continue;
       able.push({ ref, spec });
     }
-    return { able, unresolved, ambiguous };
+    return { able, unresolved, ambiguous, warnings };
   }
 
   /**
@@ -257,6 +274,7 @@ export function createNexus(options = {}) {
    *     division: { id, name },
    *     agent: { id, name, role, division, capabilities, origin },
    *     reason: string,
+   *     warnings: string[],
    *     intent: { kind, description },
    *     matched: { token, candidateRef, candidateIndex },
    *   }
@@ -264,6 +282,10 @@ export function createNexus(options = {}) {
    * `context` may carry `strategyId` (name the strategy explicitly),
    * `division` (restrict able candidates), or `capabilities` (require tokens).
    * A context passed as the second argument is merged with intent.context.
+   *
+   * `warnings` is empty on a clean route. It names every candidate reference
+   * that failed to resolve, so a caller can tell a deliberate route to the
+   * first listed candidate from a route that skipped a broken reference.
    *
    * Throws E_INVALID_INTENT / E_NO_STRATEGY / E_NO_AGENT / E_UNKNOWN_STRATEGY.
    */
@@ -276,7 +298,7 @@ export function createNexus(options = {}) {
 
     const ctx = { ...(intent.context || {}), ...(context || {}) };
     const strategy = selectStrategy(intent, ctx);
-    const { able, unresolved, ambiguous } = candidatesFor(strategy, ctx);
+    const { able, unresolved, ambiguous, warnings } = candidatesFor(strategy, ctx);
 
     if (able.length === 0) {
       const why = [];
@@ -311,7 +333,7 @@ export function createNexus(options = {}) {
       `Intent "${intent.kind}" (${intent.description}) routed by ${via}`,
       `to strategy "${strategy.name}" [${strategy.id}, scope=${strategy.scope}${strategy.mode ? `, mode=${strategy.mode}` : ''}].`,
       `Strategy names ${strategy.candidates.length} candidate(s); candidate #${index0 + 1} "${chosen.ref}"${roleNote} resolves to roster agent "${spec.id}" (${spec.origin}, division ${spec.division}).`,
-      `${able.length} of ${strategy.candidates.length} candidate(s) were able; this is the strategy's highest-ranked able candidate${unresolved.length ? `, with ${unresolved.length} unresolved` : ''}${ambiguous.length ? ` and ${ambiguous.length} ambiguous` : ''}.`,
+      `${able.length} of ${strategy.candidates.length} candidate(s) were able; this is the strategy's first-listed able candidate${unresolved.length ? `, with ${unresolved.length} unresolved` : ''}${ambiguous.length ? ` and ${ambiguous.length} ambiguous` : ''}.`,
     ].join(' ');
 
     return {
@@ -326,6 +348,7 @@ export function createNexus(options = {}) {
         origin: spec.origin,
       },
       reason,
+      warnings: [...warnings],
       intent: { kind: intent.kind, description: intent.description },
       matched: { token: strategy.kind, candidateRef: chosen.ref, candidateIndex: index0 },
     };
