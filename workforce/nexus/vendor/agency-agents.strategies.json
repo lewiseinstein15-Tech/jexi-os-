@@ -1,0 +1,815 @@
+{
+  "kind": "jexi.workforce.nexus-strategies",
+  "version": 1,
+  "upstream": "msitarzewski/agency-agents",
+  "upstreamCommit": "87f8301cad3823a9a34d762036ae923a0eff306f",
+  "license": "MIT",
+  "note": "Machine-usable projection of the upstream NEXUS strategy tree. Prose is NOT vendored; see README.md. Agent references are upstream display names/slugs, resolved against the roster at runtime.",
+  "count": 24,
+  "kinds": [
+    "ai",
+    "ai-ml",
+    "ai-ml-feature",
+    "api",
+    "architecture",
+    "backend",
+    "backend-api",
+    "build",
+    "campaign",
+    "cli",
+    "cli-terminal",
+    "cockpit-ui",
+    "code-intel",
+    "code-intelligence",
+    "coding",
+    "compliance-feature",
+    "database",
+    "db",
+    "develop",
+    "devops",
+    "discovery",
+    "enterprise",
+    "enterprise-feature",
+    "feature",
+    "foundation",
+    "frontend",
+    "frontend-ui",
+    "go-to-market",
+    "growth",
+    "hardening",
+    "implementation",
+    "incident",
+    "incident-response",
+    "infra",
+    "infrastructure",
+    "intelligence",
+    "investigation",
+    "launch",
+    "market-research",
+    "marketing",
+    "marketing-campaign",
+    "ml",
+    "mobile",
+    "monitoring",
+    "mvp",
+    "operate",
+    "operations",
+    "outage",
+    "p0",
+    "persistence",
+    "planning",
+    "polish",
+    "premium-polish",
+    "prioritization",
+    "prototype",
+    "qa",
+    "quality",
+    "rapid-prototype",
+    "research",
+    "scaffolding",
+    "setup",
+    "spatial",
+    "spatial-xr",
+    "startup",
+    "startup-mvp",
+    "strategy",
+    "sustain",
+    "terminal",
+    "testing",
+    "ui",
+    "verification",
+    "visionos",
+    "xr"
+  ],
+  "aliasCollisions": [],
+  "strategies": [
+    {
+      "id": "nexus-phase-0-discovery",
+      "name": "NEXUS Phase 0 — Discovery",
+      "kind": "discovery",
+      "aliases": [
+        "intelligence",
+        "investigation",
+        "market-research",
+        "research"
+      ],
+      "scope": "phase",
+      "mode": "NEXUS-Full",
+      "phase": 0,
+      "candidates": [
+        "Trend Researcher",
+        "Feedback Synthesizer",
+        "UX Researcher",
+        "Analytics Reporter",
+        "Legal Compliance Checker",
+        "Tool Evaluator"
+      ],
+      "roles": {
+        "Trend Researcher": "Market intelligence lead",
+        "Feedback Synthesizer": "User needs analysis",
+        "UX Researcher": "User behavior analysis",
+        "Analytics Reporter": "Data landscape assessment",
+        "Legal Compliance Checker": "Regulatory scan",
+        "Tool Evaluator": "Technology landscape"
+      },
+      "doc": "strategy/nexus-strategy.md",
+      "playbook": "strategy/playbooks/phase-0-discovery.md",
+      "playbookMeta": {
+        "duration": "3-7 days",
+        "agents": 6,
+        "gateKeeper": "Executive Summary Generator",
+        "doc": "strategy/playbooks/phase-0-discovery.md"
+      }
+    },
+    {
+      "id": "nexus-phase-1-strategy",
+      "name": "NEXUS Phase 1 — Strategy",
+      "kind": "strategy",
+      "aliases": [
+        "architecture",
+        "planning",
+        "prioritization"
+      ],
+      "scope": "phase",
+      "mode": "NEXUS-Full",
+      "phase": 1,
+      "candidates": [
+        "Studio Producer",
+        "Senior Project Manager",
+        "Sprint Prioritizer",
+        "UX Architect",
+        "Brand Guardian",
+        "Backend Architect",
+        "AI Engineer",
+        "Finance Tracker"
+      ],
+      "roles": {
+        "Studio Producer": "Strategic portfolio alignment",
+        "Senior Project Manager": "Spec-to-task conversion",
+        "Sprint Prioritizer": "Feature prioritization",
+        "UX Architect": "Technical architecture + UX foundation",
+        "Brand Guardian": "Brand identity system",
+        "Backend Architect": "System architecture",
+        "AI Engineer": "AI/ML architecture (if applicable)",
+        "Finance Tracker": "Budget and resource planning"
+      },
+      "doc": "strategy/nexus-strategy.md",
+      "playbook": "strategy/playbooks/phase-1-strategy.md",
+      "playbookMeta": {
+        "duration": "5-10 days",
+        "agents": 8,
+        "gateKeeper": null,
+        "doc": "strategy/playbooks/phase-1-strategy.md"
+      }
+    },
+    {
+      "id": "nexus-phase-2-foundation",
+      "name": "NEXUS Phase 2 — Foundation",
+      "kind": "foundation",
+      "aliases": [
+        "scaffolding",
+        "setup"
+      ],
+      "scope": "phase",
+      "mode": "NEXUS-Full",
+      "phase": 2,
+      "candidates": [
+        "DevOps Automator",
+        "Frontend Developer",
+        "Backend Architect",
+        "UX Architect",
+        "Infrastructure Maintainer",
+        "Studio Operations"
+      ],
+      "roles": {
+        "DevOps Automator": "CI/CD pipeline + infrastructure",
+        "Frontend Developer": "Project scaffolding + component library",
+        "Backend Architect": "Database + API foundation",
+        "UX Architect": "CSS system implementation",
+        "Infrastructure Maintainer": "Cloud infrastructure setup",
+        "Studio Operations": "Process setup"
+      },
+      "doc": "strategy/nexus-strategy.md",
+      "playbook": "strategy/playbooks/phase-2-foundation.md",
+      "playbookMeta": {
+        "duration": "3-5 days",
+        "agents": 6,
+        "gateKeeper": null,
+        "doc": "strategy/playbooks/phase-2-foundation.md"
+      }
+    },
+    {
+      "id": "nexus-phase-3-build",
+      "name": "NEXUS Phase 3 — Build",
+      "kind": "build",
+      "aliases": [
+        "coding",
+        "develop",
+        "feature",
+        "implementation"
+      ],
+      "scope": "phase",
+      "mode": "NEXUS-Full",
+      "phase": 3,
+      "candidates": [
+        "Frontend Developer",
+        "Backend Architect",
+        "Mobile App Builder",
+        "AI Engineer",
+        "DevOps Automator",
+        "Senior Developer",
+        "Rapid Prototyper",
+        "XR Immersive Developer",
+        "visionOS Spatial Engineer",
+        "XR Cockpit Interaction Specialist",
+        "Terminal Integration Specialist",
+        "LSP/Index Engineer",
+        "Evidence Collector",
+        "API Tester",
+        "Test Results Analyzer",
+        "Performance Benchmarker",
+        "Agents Orchestrator"
+      ],
+      "roles": {},
+      "doc": "strategy/nexus-strategy.md",
+      "playbook": "strategy/playbooks/phase-3-build.md",
+      "playbookMeta": {
+        "duration": "2-12 weeks (varies by scope)",
+        "agents": 15,
+        "gateKeeper": "Agents Orchestrator",
+        "doc": "strategy/playbooks/phase-3-build.md"
+      },
+      "note": "Phase 3 candidates are composed from the 6.2 task-type matrix (primary developers, then QA agents) plus the Agents Orchestrator; upstream has no single Active Agents table for this phase."
+    },
+    {
+      "id": "nexus-phase-4-hardening",
+      "name": "NEXUS Phase 4 — Hardening",
+      "kind": "hardening",
+      "aliases": [
+        "qa",
+        "quality",
+        "testing",
+        "verification"
+      ],
+      "scope": "phase",
+      "mode": "NEXUS-Full",
+      "phase": 4,
+      "candidates": [
+        "Reality Checker",
+        "Evidence Collector",
+        "Performance Benchmarker",
+        "API Tester",
+        "Test Results Analyzer",
+        "Legal Compliance Checker",
+        "Infrastructure Maintainer",
+        "Workflow Optimizer"
+      ],
+      "roles": {
+        "Reality Checker": "Final integration testing (defaults to NEEDS WORK)",
+        "Evidence Collector": "Comprehensive visual evidence",
+        "Performance Benchmarker": "Load testing + optimization",
+        "API Tester": "Full API regression suite",
+        "Test Results Analyzer": "Aggregate quality metrics",
+        "Legal Compliance Checker": "Final compliance audit",
+        "Infrastructure Maintainer": "Production readiness check",
+        "Workflow Optimizer": "Process efficiency review"
+      },
+      "doc": "strategy/nexus-strategy.md",
+      "playbook": "strategy/playbooks/phase-4-hardening.md",
+      "playbookMeta": {
+        "duration": "3-7 days",
+        "agents": 8,
+        "gateKeeper": "Reality Checker (sole authority)",
+        "doc": "strategy/playbooks/phase-4-hardening.md"
+      }
+    },
+    {
+      "id": "nexus-phase-5-launch",
+      "name": "NEXUS Phase 5 — Launch",
+      "kind": "launch",
+      "aliases": [
+        "go-to-market",
+        "growth"
+      ],
+      "scope": "phase",
+      "mode": "NEXUS-Full",
+      "phase": 5,
+      "candidates": [
+        "Growth Hacker",
+        "Content Creator",
+        "Social Media Strategist",
+        "Twitter Engager",
+        "TikTok Strategist",
+        "Instagram Curator",
+        "Reddit Community Builder",
+        "App Store Optimizer",
+        "Executive Summary Generator",
+        "Project Shepherd",
+        "DevOps Automator",
+        "Infrastructure Maintainer"
+      ],
+      "roles": {
+        "Growth Hacker": "Launch strategy lead",
+        "Content Creator": "Launch content",
+        "Social Media Strategist": "Cross-platform campaign",
+        "Twitter Engager": "Twitter/X launch campaign",
+        "TikTok Strategist": "TikTok viral content",
+        "Instagram Curator": "Visual launch campaign",
+        "Reddit Community Builder": "Authentic community launch",
+        "App Store Optimizer": "Store optimization (if mobile)",
+        "Executive Summary Generator": "Stakeholder communication",
+        "Project Shepherd": "Launch coordination",
+        "DevOps Automator": "Deployment execution",
+        "Infrastructure Maintainer": "Launch monitoring"
+      },
+      "doc": "strategy/nexus-strategy.md",
+      "playbook": "strategy/playbooks/phase-5-launch.md",
+      "playbookMeta": {
+        "duration": "2-4 weeks (T-7 through T+14)",
+        "agents": 12,
+        "gateKeeper": null,
+        "doc": "strategy/playbooks/phase-5-launch.md"
+      }
+    },
+    {
+      "id": "nexus-phase-6-operate",
+      "name": "NEXUS Phase 6 — Operate",
+      "kind": "operate",
+      "aliases": [
+        "monitoring",
+        "operations",
+        "sustain"
+      ],
+      "scope": "phase",
+      "mode": "NEXUS-Full",
+      "phase": 6,
+      "candidates": [
+        "Infrastructure Maintainer",
+        "Support Responder",
+        "Analytics Reporter",
+        "Feedback Synthesizer",
+        "Finance Tracker",
+        "Legal Compliance Checker",
+        "Trend Researcher",
+        "Executive Summary Generator",
+        "Sprint Prioritizer",
+        "Experiment Tracker",
+        "Growth Hacker",
+        "Workflow Optimizer"
+      ],
+      "roles": {
+        "Infrastructure Maintainer": "Continuous",
+        "Support Responder": "Continuous",
+        "Analytics Reporter": "Weekly",
+        "Feedback Synthesizer": "Bi-weekly",
+        "Finance Tracker": "Monthly",
+        "Legal Compliance Checker": "Monthly",
+        "Trend Researcher": "Monthly",
+        "Executive Summary Generator": "Monthly",
+        "Sprint Prioritizer": "Per sprint",
+        "Experiment Tracker": "Per experiment",
+        "Growth Hacker": "Ongoing",
+        "Workflow Optimizer": "Quarterly"
+      },
+      "doc": "strategy/nexus-strategy.md",
+      "playbook": "strategy/playbooks/phase-6-operate.md",
+      "playbookMeta": {
+        "duration": "Ongoing",
+        "agents": 12,
+        "gateKeeper": null,
+        "doc": "strategy/playbooks/phase-6-operate.md"
+      }
+    },
+    {
+      "id": "nexus-runbook-enterprise-feature",
+      "name": "NEXUS Runbook — Enterprise Feature Development",
+      "kind": "enterprise-feature",
+      "aliases": [
+        "compliance-feature",
+        "enterprise"
+      ],
+      "scope": "scenario",
+      "mode": "NEXUS-Sprint",
+      "duration": "6-12 weeks",
+      "summary": "Ship a major feature into an existing enterprise product with non-negotiable compliance, security, and quality gates, and multi-stakeholder alignment.",
+      "groups": [
+        {
+          "group": "Core Team",
+          "activation": "always"
+        },
+        {
+          "group": "Compliance & Governance",
+          "activation": "as needed"
+        },
+        {
+          "group": "Quality Assurance",
+          "activation": "as needed"
+        }
+      ],
+      "candidates": [
+        "agents-orchestrator",
+        "project-management-project-shepherd",
+        "project-manager-senior",
+        "product-sprint-prioritizer",
+        "design-ux-architect",
+        "design-ux-researcher",
+        "design-ui-designer",
+        "engineering-frontend-developer",
+        "engineering-backend-architect",
+        "engineering-senior-developer",
+        "engineering-devops-automator",
+        "testing-evidence-collector",
+        "testing-api-tester",
+        "testing-reality-checker",
+        "testing-performance-benchmarker",
+        "support-legal-compliance-checker",
+        "design-brand-guardian",
+        "support-finance-tracker",
+        "support-executive-summary-generator",
+        "testing-test-results-analyzer",
+        "testing-workflow-optimizer",
+        "project-management-experiment-tracker"
+      ],
+      "doc": "strategy/runbooks/scenario-enterprise-feature.md"
+    },
+    {
+      "id": "nexus-runbook-incident-response",
+      "name": "NEXUS Runbook — Incident Response",
+      "kind": "incident-response",
+      "aliases": [
+        "incident",
+        "outage",
+        "p0"
+      ],
+      "scope": "scenario",
+      "mode": "NEXUS-Micro",
+      "duration": "Minutes to hours",
+      "summary": "Detection through post-mortem for a production incident — fast response without cutting corners.",
+      "groups": [
+        {
+          "group": "P0 Critical Response",
+          "activation": "always"
+        },
+        {
+          "group": "Verification & Post-Mortem",
+          "activation": "post-fix"
+        }
+      ],
+      "candidates": [
+        "support-infrastructure-maintainer",
+        "engineering-devops-automator",
+        "engineering-backend-architect",
+        "engineering-frontend-developer",
+        "support-support-responder",
+        "support-executive-summary-generator",
+        "testing-evidence-collector",
+        "testing-api-tester",
+        "testing-workflow-optimizer",
+        "product-sprint-prioritizer"
+      ],
+      "doc": "strategy/runbooks/scenario-incident-response.md"
+    },
+    {
+      "id": "nexus-runbook-marketing-campaign",
+      "name": "NEXUS Runbook — Multi-Channel Marketing Campaign",
+      "kind": "marketing-campaign",
+      "aliases": [
+        "campaign",
+        "marketing"
+      ],
+      "scope": "scenario",
+      "mode": "NEXUS-Sprint",
+      "duration": "2-4 weeks",
+      "summary": "Launch a coordinated, brand-consistent campaign across channels that drives measurable acquisition and engagement.",
+      "groups": [
+        {
+          "group": "Campaign Core",
+          "activation": "always"
+        },
+        {
+          "group": "Platform Specialists",
+          "activation": "as needed"
+        },
+        {
+          "group": "Support",
+          "activation": "as needed"
+        }
+      ],
+      "candidates": [
+        "marketing-social-media-strategist",
+        "marketing-content-creator",
+        "marketing-growth-hacker",
+        "design-brand-guardian",
+        "support-analytics-reporter",
+        "marketing-twitter-engager",
+        "marketing-tiktok-strategist",
+        "marketing-instagram-curator",
+        "marketing-reddit-community-builder",
+        "marketing-app-store-optimizer",
+        "product-trend-researcher",
+        "project-management-experiment-tracker",
+        "support-executive-summary-generator",
+        "support-legal-compliance-checker"
+      ],
+      "doc": "strategy/runbooks/scenario-marketing-campaign.md"
+    },
+    {
+      "id": "nexus-runbook-startup-mvp",
+      "name": "NEXUS Runbook — Startup MVP Build",
+      "kind": "startup-mvp",
+      "aliases": [
+        "mvp",
+        "startup"
+      ],
+      "scope": "scenario",
+      "mode": "NEXUS-Sprint",
+      "duration": "4-6 weeks",
+      "summary": "Idea to live product with real users, fast — without skipping QA.",
+      "groups": [
+        {
+          "group": "Core Team",
+          "activation": "always"
+        },
+        {
+          "group": "Growth Team",
+          "activation": "week 3+"
+        },
+        {
+          "group": "Support Team",
+          "activation": "as needed"
+        }
+      ],
+      "candidates": [
+        "agents-orchestrator",
+        "project-manager-senior",
+        "product-sprint-prioritizer",
+        "design-ux-architect",
+        "engineering-frontend-developer",
+        "engineering-backend-architect",
+        "engineering-devops-automator",
+        "testing-evidence-collector",
+        "testing-reality-checker",
+        "marketing-growth-hacker",
+        "marketing-content-creator",
+        "marketing-social-media-strategist",
+        "design-brand-guardian",
+        "support-analytics-reporter",
+        "engineering-rapid-prototyper",
+        "engineering-ai-engineer",
+        "testing-performance-benchmarker",
+        "support-infrastructure-maintainer"
+      ],
+      "doc": "strategy/runbooks/scenario-startup-mvp.md"
+    },
+    {
+      "id": "nexus-task-ai-ml-feature",
+      "name": "NEXUS Task — AI/ML Feature",
+      "kind": "ai-ml-feature",
+      "aliases": [
+        "ai",
+        "ai-ml",
+        "ml"
+      ],
+      "scope": "task",
+      "mode": "NEXUS-Micro",
+      "taskType": "AI/ML Feature",
+      "primary": "AI Engineer",
+      "qa": "Test Results Analyzer",
+      "candidates": [
+        "AI Engineer",
+        "Test Results Analyzer",
+        "Analytics Reporter"
+      ],
+      "doc": "strategy/nexus-strategy.md"
+    },
+    {
+      "id": "nexus-task-backend-api",
+      "name": "NEXUS Task — Backend API",
+      "kind": "backend-api",
+      "aliases": [
+        "api",
+        "backend"
+      ],
+      "scope": "task",
+      "mode": "NEXUS-Micro",
+      "taskType": "Backend API",
+      "primary": "Backend Architect",
+      "qa": "API Tester",
+      "candidates": [
+        "Backend Architect",
+        "API Tester",
+        "Performance Benchmarker"
+      ],
+      "doc": "strategy/nexus-strategy.md"
+    },
+    {
+      "id": "nexus-task-cli-terminal",
+      "name": "NEXUS Task — CLI/Terminal",
+      "kind": "cli-terminal",
+      "aliases": [
+        "cli",
+        "terminal"
+      ],
+      "scope": "task",
+      "mode": "NEXUS-Micro",
+      "taskType": "CLI/Terminal",
+      "primary": "Terminal Integration Specialist",
+      "qa": "API Tester",
+      "candidates": [
+        "Terminal Integration Specialist",
+        "API Tester",
+        "LSP/Index Engineer"
+      ],
+      "doc": "strategy/nexus-strategy.md"
+    },
+    {
+      "id": "nexus-task-cockpit-ui",
+      "name": "NEXUS Task — Cockpit UI",
+      "kind": "cockpit-ui",
+      "aliases": [],
+      "scope": "task",
+      "mode": "NEXUS-Micro",
+      "taskType": "Cockpit UI",
+      "primary": "XR Cockpit Interaction Specialist",
+      "qa": "Evidence Collector",
+      "candidates": [
+        "XR Cockpit Interaction Specialist",
+        "Evidence Collector",
+        "XR Interface Architect"
+      ],
+      "doc": "strategy/nexus-strategy.md"
+    },
+    {
+      "id": "nexus-task-code-intelligence",
+      "name": "NEXUS Task — Code Intelligence",
+      "kind": "code-intelligence",
+      "aliases": [
+        "code-intel"
+      ],
+      "scope": "task",
+      "mode": "NEXUS-Micro",
+      "taskType": "Code Intelligence",
+      "primary": "LSP/Index Engineer",
+      "qa": "Test Results Analyzer",
+      "candidates": [
+        "LSP/Index Engineer",
+        "Test Results Analyzer",
+        "Senior Developer"
+      ],
+      "doc": "strategy/nexus-strategy.md"
+    },
+    {
+      "id": "nexus-task-database",
+      "name": "NEXUS Task — Database",
+      "kind": "database",
+      "aliases": [
+        "db",
+        "persistence"
+      ],
+      "scope": "task",
+      "mode": "NEXUS-Micro",
+      "taskType": "Database",
+      "primary": "Backend Architect",
+      "qa": "API Tester",
+      "candidates": [
+        "Backend Architect",
+        "API Tester",
+        "Analytics Reporter"
+      ],
+      "doc": "strategy/nexus-strategy.md"
+    },
+    {
+      "id": "nexus-task-frontend-ui",
+      "name": "NEXUS Task — Frontend UI",
+      "kind": "frontend-ui",
+      "aliases": [
+        "frontend",
+        "ui"
+      ],
+      "scope": "task",
+      "mode": "NEXUS-Micro",
+      "taskType": "Frontend UI",
+      "primary": "Frontend Developer",
+      "qa": "Evidence Collector",
+      "candidates": [
+        "Frontend Developer",
+        "Evidence Collector",
+        "UI Designer",
+        "Whimsy Injector"
+      ],
+      "doc": "strategy/nexus-strategy.md"
+    },
+    {
+      "id": "nexus-task-infrastructure",
+      "name": "NEXUS Task — Infrastructure",
+      "kind": "infrastructure",
+      "aliases": [
+        "devops",
+        "infra"
+      ],
+      "scope": "task",
+      "mode": "NEXUS-Micro",
+      "taskType": "Infrastructure",
+      "primary": "DevOps Automator",
+      "qa": "Performance Benchmarker",
+      "candidates": [
+        "DevOps Automator",
+        "Performance Benchmarker",
+        "Infrastructure Maintainer"
+      ],
+      "doc": "strategy/nexus-strategy.md"
+    },
+    {
+      "id": "nexus-task-mobile",
+      "name": "NEXUS Task — Mobile",
+      "kind": "mobile",
+      "aliases": [],
+      "scope": "task",
+      "mode": "NEXUS-Micro",
+      "taskType": "Mobile",
+      "primary": "Mobile App Builder",
+      "qa": "Evidence Collector",
+      "candidates": [
+        "Mobile App Builder",
+        "Evidence Collector",
+        "UX Researcher"
+      ],
+      "doc": "strategy/nexus-strategy.md"
+    },
+    {
+      "id": "nexus-task-premium-polish",
+      "name": "NEXUS Task — Premium Polish",
+      "kind": "premium-polish",
+      "aliases": [
+        "polish"
+      ],
+      "scope": "task",
+      "mode": "NEXUS-Micro",
+      "taskType": "Premium Polish",
+      "primary": "Senior Developer",
+      "qa": "Evidence Collector",
+      "candidates": [
+        "Senior Developer",
+        "Evidence Collector",
+        "Visual Storyteller"
+      ],
+      "doc": "strategy/nexus-strategy.md"
+    },
+    {
+      "id": "nexus-task-rapid-prototype",
+      "name": "NEXUS Task — Rapid Prototype",
+      "kind": "rapid-prototype",
+      "aliases": [
+        "prototype"
+      ],
+      "scope": "task",
+      "mode": "NEXUS-Micro",
+      "taskType": "Rapid Prototype",
+      "primary": "Rapid Prototyper",
+      "qa": "Evidence Collector",
+      "candidates": [
+        "Rapid Prototyper",
+        "Evidence Collector",
+        "Experiment Tracker"
+      ],
+      "doc": "strategy/nexus-strategy.md"
+    },
+    {
+      "id": "nexus-task-spatial-xr",
+      "name": "NEXUS Task — Spatial/XR",
+      "kind": "spatial-xr",
+      "aliases": [
+        "spatial",
+        "xr"
+      ],
+      "scope": "task",
+      "mode": "NEXUS-Micro",
+      "taskType": "Spatial/XR",
+      "primary": "XR Immersive Developer",
+      "qa": "Evidence Collector",
+      "candidates": [
+        "XR Immersive Developer",
+        "Evidence Collector",
+        "XR Interface Architect"
+      ],
+      "doc": "strategy/nexus-strategy.md"
+    },
+    {
+      "id": "nexus-task-visionos",
+      "name": "NEXUS Task — visionOS",
+      "kind": "visionos",
+      "aliases": [],
+      "scope": "task",
+      "mode": "NEXUS-Micro",
+      "taskType": "visionOS",
+      "primary": "visionOS Spatial Engineer",
+      "qa": "Evidence Collector",
+      "candidates": [
+        "visionOS Spatial Engineer",
+        "Evidence Collector",
+        "macOS Spatial/Metal Engineer"
+      ],
+      "doc": "strategy/nexus-strategy.md"
+    }
+  ]
+}
