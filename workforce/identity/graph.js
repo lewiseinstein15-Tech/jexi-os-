@@ -35,7 +35,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'node:url';
-import { toDid, isDid, agentIdFromDid, asDid, DID_PREFIX, DID_ERRORS, DidError } from './did.js';
+import { toDid, isDid, agentIdFromDid, asDid, DID_PREFIX, DID_ERRORS } from './did.js';
 import { StrategyError } from '../nexus/strategy.js';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -228,7 +228,7 @@ export function createIdentityGraph(options = {}) {
     try {
       did = toDid(agentId);
     } catch (err) {
-      if (err instanceof DidError) throw new StrategyError(ERRORS.INVALID_AGENT, err.message, { agentId });
+      if (err instanceof StrategyError && err.code === DID_ERRORS.INVALID_DID) throw new StrategyError(ERRORS.INVALID_AGENT, err.message, { agentId });
       throw err;
     }
     if (nodes.has(did)) {

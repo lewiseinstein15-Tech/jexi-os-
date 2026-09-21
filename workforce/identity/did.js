@@ -1,6 +1,9 @@
 /**
  * JEXI OS — PHASE 13 SCOPE D — DID-STYLE IDENTITY IDS.
  *
+ * Refusals are the NEXUS layer's StrategyError (Phase 13's one-class-per-layer
+ * taxonomy) carrying DID-scoped codes — E_INVALID_DID. No DID-specific error
+ * class exists.
  *   import { toDid, isDid, agentIdFromDid } from './did.js';
  *   toDid('ui-designer')                    // 'did:jexi:ui-designer'
  *   agentIdFromDid('did:jexi:ui-designer')  // 'ui-designer'
@@ -19,6 +22,8 @@
  * than emitting a DID that cannot round-trip.
  */
 
+import { StrategyError } from '../nexus/strategy.js';
+
 /** DID method for this graph. */
 export const METHOD = 'jexi';
 
@@ -30,15 +35,10 @@ export const DID_ERRORS = {
   INVALID_DID: 'E_INVALID_DID',
 };
 
-/** Refusal raised by the DID helpers. Same shape as the other Phase 13 errors. */
-export class DidError extends Error {
-  constructor(code, message, detail = {}) {
-    super(message);
-    this.name = 'DidError';
-    this.code = code;
-    Object.assign(this, detail);
-  }
-}
+/**
+ * Refusal raised by the DID helpers: StrategyError with a DID-scoped code,
+ * the same class every Phase 13 layer refuses with.
+ */
 
 function isBlank(v) {
   return v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
@@ -54,14 +54,14 @@ function isBlank(v) {
  */
 export function toDid(agentId) {
   if (isBlank(agentId)) {
-    throw new DidError(DID_ERRORS.INVALID_DID, 'agentId must be a non-empty string');
+    throw new StrategyError(DID_ERRORS.INVALID_DID, 'agentId must be a non-empty string');
   }
   const id = String(agentId).trim();
   if (id.includes(':')) {
-    throw new DidError(DID_ERRORS.INVALID_DID, `agentId must not contain ':': ${JSON.stringify(id)}`, { agentId: id });
+    throw new StrategyError(DID_ERRORS.INVALID_DID, `agentId must not contain ':': ${JSON.stringify(id)}`, { agentId: id });
   }
   if (/\s/.test(id)) {
-    throw new DidError(DID_ERRORS.INVALID_DID, `agentId must not contain whitespace: ${JSON.stringify(id)}`, { agentId: id });
+    throw new StrategyError(DID_ERRORS.INVALID_DID, `agentId must not contain whitespace: ${JSON.stringify(id)}`, { agentId: id });
   }
   return DID_PREFIX + id;
 }
@@ -83,7 +83,7 @@ export function isDid(value) {
  */
 export function parseDid(did) {
   if (!isDid(did)) {
-    throw new DidError(DID_ERRORS.INVALID_DID, `not a JEXI DID: ${JSON.stringify(did)}`, { did });
+    throw new StrategyError(DID_ERRORS.INVALID_DID, `not a JEXI DID: ${JSON.stringify(did)}`, { did });
   }
   return { method: METHOD, agentId: did.slice(DID_PREFIX.length) };
 }

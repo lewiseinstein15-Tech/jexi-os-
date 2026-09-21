@@ -57,5 +57,5 @@ export function reload() { const g = identity(); return g.load(); }
 export { createIdentityGraph, ERRORS, STATE_DIR, SEQ_FILE, GRAPH_FILE, GRAPH_VERSION };
 export { StrategyError } from '../nexus/strategy.js';
 export { did, resolveModule as resolveHelpers };
-export { toDid, isDid, parseDid, agentIdFromDid, asDid, DID_PREFIX, METHOD, DID_ERRORS, DidError } from './did.js';
+export { toDid, isDid, parseDid, agentIdFromDid, asDid, DID_PREFIX, METHOD, DID_ERRORS } from './did.js';
 export { resolveName, resolveAll, duplicateNames, duplicateReport, seedFromRoster, mergePreview } from './resolve.js';
