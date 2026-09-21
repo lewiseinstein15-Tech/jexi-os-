@@ -44,7 +44,15 @@ export function createObserve(instinctsDir) {
       const entry = pushObservation(instinctsDir, observation);
       return { observationId: entry.id };
     },
-    drain: (projectId) => drainObservations(instinctsDir, assertProjectId(projectId)),
+    drain(projectId) {
+      assertProjectId(projectId);
+      // Diagnostic only (Phase 26 A-fix): missing observations dir is legal
+      // (drain returns []), but it is reported on stderr for observability.
+      if (!fs.existsSync(projectDir(instinctsDir, projectId))) {
+        console.error('[jexi:observe] drain called for project with no observations dir: ' + projectId);
+      }
+      return drainObservations(instinctsDir, projectId);
+    },
     scope(projectId) {
       assertProjectId(projectId);
       // isolated: the project's queue exists in its own directory and every

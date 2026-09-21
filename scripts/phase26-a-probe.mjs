@@ -53,6 +53,23 @@ ob2.push({ projectId: 'proj-x', sessionId: 'session-alpha', kind: 'file-edit', p
 ob2.push({ projectId: 'proj-x', sessionId: 'session-alpha', kind: 'error-seen', payload: { code: 'E1' } });
 ok(JSON.stringify(observe.drain('proj-x')) === JSON.stringify(ob2.drain('proj-x')), 'P5 same push sequence -> byte-identical drain output');
 
+// P7 — drain diagnostic for missing project (stderr, raw via child process)
+const { spawnSync } = await import('node:child_process');
+const child = spawnSync(process.execPath, ['-e',
+  "import('/home/user/jexi-os-/instincts/observe/index.js').then(({ createObserve }) => {" +
+  "const o = createObserve('/tmp/p26-observe');" +
+  "const r = o.drain('project-that-does-not-exist');" +
+  "console.log('RETURN=' + JSON.stringify(r));" +
+  "});",
+], { encoding: 'utf8' });
+console.log('P7 child stdout: ' + child.stdout.trim());
+console.log('P7 child stderr: ' + child.stderr.trim());
+ok(
+  child.stdout.trim() === 'RETURN=[]' &&
+  child.stderr.includes('[jexi:observe] drain called for project with no observations dir: project-that-does-not-exist'),
+  'P7 drain(missing project) -> [] AND stderr diagnostic line'
+);
+
 console.log('');
 console.log('SCOPE A: ' + pass + '/' + (pass + fail) + ' PASS, ' + fail + ' FAIL');
 process.exit(fail ? 1 : 0);
