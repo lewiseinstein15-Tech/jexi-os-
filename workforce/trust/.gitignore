@@ -1,0 +1,3 @@
+# Runtime state (op-seq counter + ledger snapshot) is not source.
+# See README.md §persistence.
+state/
