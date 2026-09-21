@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Sidebar from './Sidebar.jsx';
 import Header from './Header.jsx';
 import Placeholder from '../placeholder/Placeholder.jsx';
+import ChatWindow from '../../../../src/components/ChatWindow.jsx';
 import TokenInspector from './TokenInspector.jsx';
 import { ROUTES, DEFAULT_ROUTE, TOKENS_HASH, routeFromHash } from './routes.js';
 
@@ -29,7 +30,11 @@ export default function Shell() {
       <div className="jx-main">
         <Header routeTitle={showTokens ? 'Tokens' : route.title} />
         <main className="jx-content" data-route={showTokens ? 'tokens' : route.id}>
-          {showTokens ? <TokenInspector /> : <Placeholder route={route} />}
+          {showTokens
+            ? <TokenInspector />
+            : route.id === 'chat'
+              ? <ChatWindow />
+              : <Placeholder route={route} />}
         </main>
       </div>
     </div>
