@@ -39,8 +39,14 @@ if (r1.reason.includes('first-listed able candidate')) ok('P1a reason says "firs
 else no('P1a reason does not say "first-listed able candidate"');
 if (r1.reason.includes('highest-ranked')) no('P1b reason still claims "highest-ranked"');
 else ok('P1b reason no longer claims "highest-ranked"');
-if (Array.isArray(r1.warnings) && r1.warnings.length === 0) ok('P1c warnings is an empty array on a clean route');
-else no(`P1c warnings not empty: ${JSON.stringify(r1.warnings)}`);
+if (Array.isArray(r1.warnings)) ok('P1c warnings is an array on every route result');
+else no('P1c warnings missing');
+// The research route is NOT warning-free: the discovery strategy lists
+// "UX Researcher", and the roster holds two agents by that name, so C-fix-2
+// surfaces one ambiguity. Asserted explicitly rather than left incidental.
+if (r1.warnings.includes('ambiguous candidate reference: UX Researcher')) {
+  ok('P1d research route surfaces the real "UX Researcher" ambiguity');
+} else no(`P1d expected the UX Researcher ambiguity, got ${JSON.stringify(r1.warnings)}`);
 
 head('P2 route a build intent -> same shape');
 const r2 = nexus.route({ kind: 'build', description: 'implement the checkout flow' });

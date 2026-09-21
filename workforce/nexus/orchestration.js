@@ -75,26 +75,28 @@ export function validateIntent(intent) {
 /**
  * Resolve an upstream agent reference to roster agents.
  *
- *   resolveReference(ref, agents, warnings?) -> string[]   (roster ids, sorted)
+ *   resolveReference(ref, agents) -> { resolved: string[], warnings: string[] }
  *
  * Upstream names agents by display name ("Frontend Developer") or by slug
  * ("engineering-frontend-developer"). Resolution tries, in order:
  *   1. exact roster id
  *   2. exact name, case-insensitive
  *   3. display name with spaces -> dashes, case-insensitive
- * Returns every match so the caller can refuse an ambiguous one rather than
- * pick by sort order. Empty array means the reference does not resolve — a
- * signal the caller should NOT swallow, because an upstream rename otherwise
- * looks identical to a deliberate route to the next candidate.
  *
- * When a `warnings` array is supplied, an unresolved reference appends
- * `unresolved candidate reference: <ref>` to it. The collector is passed in so
- * this function stays free of module state and warning order stays the
- * caller's candidate order.
+ * `resolved` is the sorted list of matching roster ids. It holds every match so
+ * the caller can refuse an ambiguous one rather than pick by sort order; more
+ * than one entry means the reference is ambiguous. An empty list means the
+ * reference does not resolve.
+ *
+ * `warnings` is returned, not written to a caller-supplied array. This function
+ * has no way to resolve without a roster, so `agents` stays a required
+ * parameter, but the diagnostic must not depend on a caller opting in: an
+ * unresolved reference returns its own warning whether or not the caller was
+ * going to look. Every call site threads the returned warnings.
  */
-export function resolveReference(ref, agents, warnings) {
+export function resolveReference(ref, agents) {
   const raw = String(ref || '').trim();
-  if (!raw) return [];
+  if (!raw) return { resolved: [], warnings: [] };
   const ids = new Set();
 
   if (agents.has(raw)) ids.add(raw);
@@ -106,11 +108,9 @@ export function resolveReference(ref, agents, warnings) {
     else if (norm(spec.id) === dashed) ids.add(spec.id);
     else if (norm(spec.id) === lower) ids.add(spec.id);
   }
-  const matches = [...ids].sort();
-  if (matches.length === 0 && Array.isArray(warnings)) {
-    warnings.push(`unresolved candidate reference: ${raw}`);
-  }
-  return matches;
+  const resolved = [...ids].sort();
+  const warnings = resolved.length === 0 ? [`unresolved candidate reference: ${raw}`] : [];
+  return { resolved, warnings };
 }
 
 /**
@@ -241,9 +241,9 @@ export function createNexus(options = {}) {
    * not resolve, if it resolves ambiguously, or if context.division /
    * context.capabilities exclude it.
    *
-   * `warnings` names every candidate reference that did not resolve, so a
-   * broken reference is visible on the route result instead of looking like a
-   * deliberate route to the next candidate.
+   * `warnings` is the single diagnostic surface for the route: both an
+   * unresolved reference and an ambiguous one appear there, so a caller reading
+   * only `warnings` sees every candidate that did not cleanly resolve.
    */
   function candidatesFor(strategy, context) {
     const able = [];
@@ -254,11 +254,20 @@ export function createNexus(options = {}) {
     const wantCaps = context && Array.isArray(context.capabilities) ? context.capabilities : null;
 
     for (const ref of strategy.candidates) {
-      const matches = resolveReference(ref, state.agents, warnings);
-      if (matches.length === 0) { unresolved.push(ref); continue; }
-      if (matches.length > 1) { ambiguous.push({ ref, matches }); continue; }
-      const spec = state.agents.get(matches[0]);
-      if (!spec) { unresolved.push(ref); warnings.push(`unresolved candidate reference: ${ref}`); continue; }
+      const { resolved, warnings: refWarnings } = resolveReference(ref, state.agents);
+      warnings.push(...refWarnings);
+      if (resolved.length === 0) { unresolved.push(ref); continue; }
+      if (resolved.length > 1) {
+        ambiguous.push({ ref, matches: resolved });
+        warnings.push(`ambiguous candidate reference: ${ref}`);
+        continue;
+      }
+      const spec = state.agents.get(resolved[0]);
+      if (!spec) {
+        unresolved.push(ref);
+        warnings.push(`unresolved candidate reference: ${ref}`);
+        continue;
+      }
       if (wantDivision && spec.division !== wantDivision) continue;
       if (wantCaps && !wantCaps.every((c) => (spec.capabilities || []).includes(c))) continue;
       able.push({ ref, spec });
@@ -309,7 +318,10 @@ export function createNexus(options = {}) {
       throw new StrategyError(
         ERRORS.NO_AGENT,
         `strategy "${strategy.id}" matched but has no able agent${why.length ? ` (${why.join('; ')})` : ''}`,
-        { strategyId: strategy.id, unresolved, ambiguous },
+        // Same diagnostic surface a successful route returns, so a caller
+        // catching the refusal sees warnings[], unresolved[] and ambiguous[]
+        // together rather than having to reassemble them.
+        { strategyId: strategy.id, unresolved, ambiguous, warnings },
       );
     }
 

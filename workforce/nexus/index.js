@@ -20,12 +20,14 @@
  * Surface:
  *   createNexus(opts)          — new, independent router
  *   load(root?)                — load the default router -> { strategies: [] }
- *   route(intent, context?)    — -> { strategy, division, agent, reason }
+ *   route(intent, context?)    — -> { strategy, division, agent, reason, warnings }
  *   validate(intent)           — -> { valid, errors? }
  *   get(strategyId)            — one strategy; unknown id -> E_UNKNOWN_STRATEGY
  *   strategies()               — every strategy, sorted by id
  *   kinds()                    — every routing token
  *   refreshNexus()             — re-read disk into the default router
+ *   resolveReference(ref, agents)
+ *                              — -> { resolved: string[], warnings: string[] }
  */
 
 import { createNexus, validateIntent, resolveReference, INTENT_REQUIRED } from './orchestration.js';

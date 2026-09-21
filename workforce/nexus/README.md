@@ -42,18 +42,25 @@ unambiguous, and satisfies the context filters wins. There is deliberately no
 scoring or ranking pass — list order is the intended behavior for this scope, so
 the wording claims only the property the code actually has.
 
-`warnings[]` is empty on a clean route. It is populated when a candidate
-reference fails to resolve, with one string per failure:
+`warnings[]` is the single diagnostic surface for a route. It is empty when
+every candidate reference resolved cleanly, and otherwise carries one string per
+candidate that did not:
 
     unresolved candidate reference: <name>
+    ambiguous candidate reference: <name>
 
-This exists because an unresolvable reference is otherwise indistinguishable
-from a deliberate route to the next candidate — both produce the same
-lower-ranked agent and neither throws. With `warnings` populated, a caller can
-tell "routed to the first choice" apart from "skipped a reference that broke",
-which is what an upstream agent rename looks like from here. A warning is not an
-error: routing continues to the next candidate. Only when *no* candidate is able
-does routing refuse with `E_NO_AGENT`.
+An unresolved reference is a name nothing in the roster matches. An ambiguous
+one matches more than one roster agent — the roster legitimately holds two
+agents named "UX Researcher", for example — so it is refused rather than
+resolved by sort order. Both are warnings, not errors: routing skips the
+candidate and continues to the next. A caller that reads only `warnings` sees
+both conditions; there is no second place they are reported.
+
+This matters because a skipped candidate is otherwise invisible. An unresolvable
+reference and a deliberate route to the next candidate both produce the same
+lower-ranked agent and neither throws. With `warnings` populated, "routed to the
+first choice" is distinguishable from "skipped a reference that broke", which is
+what an upstream agent rename looks like from here.
 
 ## Refusals
 
@@ -65,6 +72,15 @@ Routing never falls back silently. A refusal carries a stable `code`:
 | `E_NO_AGENT` | A strategy matched but no candidate was able |
 | `E_UNKNOWN_STRATEGY` | `context.strategyId` names a strategy that does not exist |
 | `E_INVALID_INTENT` | The intent is missing `kind` or `description` |
+
+A refusal throws `StrategyError`. `E_NO_AGENT` carries the same diagnostic
+surface a successful route returns, so a caller gets it either way:
+
+    { strategyId, unresolved: string[], ambiguous: [{ ref, matches }], warnings: string[] }
+
+`unresolved` and `ambiguous` are the structured forms; `warnings` holds the same
+conditions as strings. A caller catching the refusal does not have to
+reconstruct the warnings from the arrays.
 
 ## Read-only dependencies
 
