@@ -66,7 +66,7 @@ export function updatePage(root, kind, slug, { compiledTruth, title, tags, now }
 
 /** List pages (all kinds or one). Sorted by (kind, slug) — deterministic. */
 export function listPages(root, { kind } = {}) {
-  const kinds = kind === undefined ? Object.keys(kindDirMap()) : [kind];
+  const kinds = kind === undefined ? Object.keys(kindDirMap) : [kind];   // FIX(B): KIND_DIRS is an object, not a function
   const out = [];
   for (const k of kinds) {
     const dir = abs(root, kindDir(k));
