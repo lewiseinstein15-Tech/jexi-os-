@@ -13,7 +13,7 @@ const browser = await chromium.launch({ args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
 page.on('console', (m) => { if (m.type() === 'error') console.log('console-error:', m.text()); });
 
-await page.goto(URL0, { waitUntil: 'load' });
+await page.goto(URL0, { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('.p24-composer');
 
 if (mode === 'offline') {

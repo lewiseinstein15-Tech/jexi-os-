@@ -11,7 +11,7 @@ const browser = await chromium.launch({ args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
 
 // P1 — settings route renders, sidebar intact
-await page.goto(URL0 + '#/settings', { waitUntil: 'load' });
+await page.goto(URL0 + '#/settings', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('.p24-settings');
 const items = await page.$$eval('.jx-nav-item', (els) => els.map((e) => e.textContent.trim()));
 const active = await page.$eval('.jx-nav-item.is-active', (e) => e.textContent.trim());
@@ -48,7 +48,7 @@ console.log('P3 shot: settings-keyref-refused');
 // P5 — theme light + persistence across reload
 await page.click('.p24-btn-group[aria-label="Theme"] >> text=light');
 await page.waitForSelector('[data-theme="light"]');
-await page.reload({ waitUntil: 'load' });
+await page.reload({ waitUntil: 'domcontentloaded' });
 await page.waitForSelector('.p24-settings');
 const persisted = await page.$eval('.jx-shell', (e) => e.getAttribute('data-theme'));
 console.log('P5 theme after reload:', persisted);

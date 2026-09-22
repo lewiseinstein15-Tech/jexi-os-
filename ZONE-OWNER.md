@@ -121,3 +121,17 @@ even if its own work is complete.
 | ID | Status | Source | Pri | Files | Why it matters |
 |---|---|---|---|---|---|
 | P25-H-01 | OPEN | G disclosure | P2 | `scripts/phase25-scope-f.mjs` (P5) | Scope F probe P5 asserts write-level E_UNTAGGED for untagged content. Scope G's pipeline (excise -> tag -> assert -> disk) now auto-tags user content as `[stated]` before assertWritable runs. P5 should be updated at Scope N (final gate) to reflect the new pipeline — either assert the auto-tag or assert the pipeline outcome instead of the pre-G refusal. |
+
+## Phase 24 carry-forward — Scope F final gate
+
+| ID | Status | Source | Pri | Files | Why it matters |
+|---|---|---|---|---|---|
+| P24-F-01 | OPEN | Scope F P10 | P1 | `ui/web/console/chat/` + console chat surface | Checkpoints UI not wired: `chat/checkpoints.js` runtime module exists (Phase 16) but the Phase 24 chat surface has no checkpoint control. Wire a create/restore control or retire the module. |
+| P24-F-02 | OPEN | Scope F P6 | P1 | `ui/web/console/chat/` + console chat surface | Artifact panel UI not wired: `chat/artifacts.js` exists; no console surface renders artifacts for edit-tool events. |
+| P24-F-03 | OPEN | Scope F audit | P2 | `ui/web/console/chat/{queue,steer}.js` | Queue/steer UI not wired into the console. |
+| P24-F-04 | OPEN | Scope F audit | P2 | `ui/web/console/chat/multiagent.js` | Multi-agent view not wired into the console. |
+| P24-F-05 | OPEN | Scope F P4 | P1 | providers + Settings | No provider configured in the gate environment — answers are the deterministic in-process default agent. Real LLM answer path (provider setup end-to-end) unverified. |
+| P24-F-06 | OPEN | Scope F architecture | P2 | `ui/web/console/chat/runtime.js`, `server/` | Chat runtime is in-process (browser); brain serves only /api/health + missions/graph APIs. Server-side wiring for the chat runtime backend remains open. |
+| P24-F-07 | OPEN | Phase 10 J | P3 | console nav | Agents View (Phase 10 J) not wired into the Phase 24 console nav (sidebar is exactly 3 items by charter). |
+| P24-F-08 | OPEN | Scope F suite | P1 | `server/test-b200.js`, `test-b205.js`, `test-b226.js`, `test-audit-b48.js`, `test-auto-mode.js`, `test-model-coworkers.js`, `test-web-search.js`, `test-thinking.js` | 8 tests assert legacy `src/components/ChatWindow.jsx` surfaces intentionally removed by approved Scope B. Retire or rewrite against the Phase 24 console; until then the suite baseline on Node>=22 shifts from 204/6 to 196/14. |
+| P24-F-09 | OPEN | Scope F env | P2 | sandbox runtime | This environment runs Node v20.20.2 — `node:sqlite` unavailable → 6 sqlite-backed tests fail here but pass on Node>=22 (pristine-main control run proved it). Not a phase-24 issue. |

@@ -18,7 +18,7 @@ async function newPage(opts) {
 
 /* ---------- P2: Scope B Q&A still works (fresh session, default modes) ---------- */
 let page = await newPage();
-await page.goto(URL_BASE + '#/chat', { waitUntil: 'load' });
+await page.goto(URL_BASE + '#/chat', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('.p24-composer', { timeout: 15000 });
 await page.fill('.p24-input', 'what does the scheduler do?');
 await page.click('.p24-send');
@@ -31,7 +31,7 @@ await page.screenshot({ path: OUT('phase24-scopeE-chat-after.png') });
 console.log('P2 shot: chat-after (transcript visible)');
 
 /* ---------- P3: mode switch in settings -> chat renders at new verbosity ---------- */
-await page.goto(URL_BASE + '#/settings', { waitUntil: 'load' });
+await page.goto(URL_BASE + '#/settings', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('.p24-section', { timeout: 15000 });
 await page.click('.p24-btn-group[aria-label="Display mode"] >> text=full');
 await page.click('.p24-btn-group[aria-label="Interaction mode"] >> text=act');
@@ -54,7 +54,7 @@ await page.context().close();
 
 /* ---------- P4: keyboard navigation ---------- */
 page = await newPage();
-await page.goto(URL_BASE + '#/chat', { waitUntil: 'load' });
+await page.goto(URL_BASE + '#/chat', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('.p24-composer', { timeout: 15000 });
 await page.evaluate(() => document.body.focus());
 const seq = [];
@@ -95,16 +95,16 @@ await page.context().close();
 
 /* ---------- P1 after shots: shell + graph (+ settings/chat already captured) ---------- */
 page = await newPage();
-await page.goto(URL_BASE + '#/chat', { waitUntil: 'load' });
+await page.goto(URL_BASE + '#/chat', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('.jx-shell');
 await page.waitForTimeout(500);
 await page.screenshot({ path: OUT('phase24-scopeE-shell-after.png') });
-await page.goto(URL_BASE + '#/graph', { waitUntil: 'load' });
+await page.goto(URL_BASE + '#/graph', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('.p24-gnode-card', { timeout: 20000 });
 await page.waitForTimeout(500);
 await page.screenshot({ path: OUT('phase24-scopeE-graph-after.png') });
 // focus ring shot: Tab onto a sidebar item
-await page.goto(URL_BASE + '#/chat', { waitUntil: 'load' });
+await page.goto(URL_BASE + '#/chat', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('.jx-shell');
 await page.keyboard.press('Tab');
 await page.waitForTimeout(200);
@@ -120,13 +120,13 @@ await page.context().close();
 
 /* ---------- empty states (fresh context = no messages, no keyRef) + keyRef refused ---------- */
 page = await newPage();
-await page.goto(URL_BASE + '#/chat', { waitUntil: 'load' });
+await page.goto(URL_BASE + '#/chat', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('.p24-empty', { timeout: 15000 });
 await page.screenshot({ path: OUT('phase24-scopeE-empty-chat.png') });
-await page.goto(URL_BASE + '#/settings', { waitUntil: 'load' });
+await page.goto(URL_BASE + '#/settings', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('.p24-keyref-none', { timeout: 15000 });
 await page.screenshot({ path: OUT('phase24-scopeE-empty-settings.png') });
-await page.goto(URL_BASE + '#/graph', { waitUntil: 'load' });
+await page.goto(URL_BASE + '#/graph', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('.p24-graph-toolbar', { timeout: 20000 });
 const emptyId = await page.evaluate(async () => {
   const list = await (await fetch('/api/missions')).json();
@@ -141,7 +141,7 @@ await page.waitForSelector('[data-testid="graph-empty"]');
 await page.screenshot({ path: OUT('phase24-scopeE-empty-graph.png') });
 console.log('P7 empty graph mission:', emptyId);
 // keyRef refused (error state, brain on)
-await page.goto(URL_BASE + '#/settings', { waitUntil: 'load' });
+await page.goto(URL_BASE + '#/settings', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('.p24-keyref input');
 await page.fill('.p24-keyref input', 'sk-inline-abc123');
 await page.click('.p24-keyref .p24-send');
@@ -152,12 +152,12 @@ await page.context().close();
 
 /* ---------- P6: reduced-motion respected (emulated) ---------- */
 const normal = await newPage();
-await normal.goto(URL_BASE + '#/chat', { waitUntil: 'load' });
+await normal.goto(URL_BASE + '#/chat', { waitUntil: 'domcontentloaded' });
 await normal.waitForSelector('.jx-shell');
 const tdNormal = await normal.$eval('.jx-nav-item', (e) => getComputedStyle(e).transitionDuration);
 await normal.context().close();
 const reduced = await newPage({ reducedMotion: 'reduce' });
-await reduced.goto(URL_BASE + '#/chat', { waitUntil: 'load' });
+await reduced.goto(URL_BASE + '#/chat', { waitUntil: 'domcontentloaded' });
 await reduced.waitForSelector('.jx-shell');
 const tdReduced = await reduced.$eval('.jx-nav-item', (e) => getComputedStyle(e).transitionDuration);
 console.log('P6 nav transition-duration normal:', tdNormal, '| prefers-reduced-motion:', tdReduced);

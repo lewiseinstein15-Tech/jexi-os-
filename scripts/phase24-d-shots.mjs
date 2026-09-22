@@ -14,7 +14,7 @@ const page = await (await browser.newContext({ viewport: { width: 1440, height: 
 page.on('pageerror', (e) => console.log('PAGEERR:', String(e).slice(0, 200)));
 
 async function gotoGraph() {
-  await page.goto(URL_BASE + '#/graph', { waitUntil: 'load' });
+  await page.goto(URL_BASE + '#/graph', { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.p24-graph-toolbar', { timeout: 20000 });
   await page.waitForFunction(() => {
     const el = document.querySelector('[data-testid="layout-hash"]');

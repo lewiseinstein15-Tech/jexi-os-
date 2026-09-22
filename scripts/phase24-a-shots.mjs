@@ -11,7 +11,7 @@ const browser = await chromium.launch({ args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
 page.on('console', (m) => { if (m.type() === 'error') console.log('console-error:', m.text()); });
 
-await page.goto(URL0, { waitUntil: 'load' });
+await page.goto(URL0, { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('.jx-sidebar');
 await page.waitForTimeout(400); // backend probe settles
 
@@ -57,7 +57,7 @@ await page.screenshot({ path: OUT('phase24-scopeA-tokens-applied.png'), fullPage
 console.log('shot: phase24-scopeA-tokens-applied.png');
 
 // P5 — keyboard: Tab cycles sidebar, Enter activates
-await page.goto(URL0 + '#/chat', { waitUntil: 'load' });
+await page.goto(URL0 + '#/chat', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('.jx-sidebar');
 await page.keyboard.press('Tab');
 let focused1 = await page.evaluate(() => document.activeElement && document.activeElement.textContent.trim());

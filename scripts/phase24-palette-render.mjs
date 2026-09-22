@@ -13,7 +13,7 @@ const OUT = [
 
 const browser = await chromium.launch({ args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 1060, height: 900 }, deviceScaleFactor: 2 });
-await page.goto(page_url, { waitUntil: 'load' });
+await page.goto(page_url, { waitUntil: 'domcontentloaded' });
 for (const [sel, out] of OUT) {
   const el = await page.$(sel);
   if (!el) { console.error(`FAIL — selector ${sel} not found`); process.exit(1); }
