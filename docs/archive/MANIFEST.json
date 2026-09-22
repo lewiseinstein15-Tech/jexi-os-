@@ -1,0 +1,858 @@
+{
+  "ageGate": 30,
+  "moves": [
+    {
+      "from": "FIXLOG-B100.md",
+      "to": "docs/archive/fixlog/FIXLOG-B100.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B101.md",
+      "to": "docs/archive/fixlog/FIXLOG-B101.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B102.md",
+      "to": "docs/archive/fixlog/FIXLOG-B102.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B103.md",
+      "to": "docs/archive/fixlog/FIXLOG-B103.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B104.md",
+      "to": "docs/archive/fixlog/FIXLOG-B104.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B105.md",
+      "to": "docs/archive/fixlog/FIXLOG-B105.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B106.md",
+      "to": "docs/archive/fixlog/FIXLOG-B106.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B107.md",
+      "to": "docs/archive/fixlog/FIXLOG-B107.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B108.md",
+      "to": "docs/archive/fixlog/FIXLOG-B108.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B109.md",
+      "to": "docs/archive/fixlog/FIXLOG-B109.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B110.md",
+      "to": "docs/archive/fixlog/FIXLOG-B110.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B111.md",
+      "to": "docs/archive/fixlog/FIXLOG-B111.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B112.md",
+      "to": "docs/archive/fixlog/FIXLOG-B112.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B113.md",
+      "to": "docs/archive/fixlog/FIXLOG-B113.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B114.md",
+      "to": "docs/archive/fixlog/FIXLOG-B114.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B115.md",
+      "to": "docs/archive/fixlog/FIXLOG-B115.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B116.md",
+      "to": "docs/archive/fixlog/FIXLOG-B116.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B117.md",
+      "to": "docs/archive/fixlog/FIXLOG-B117.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B118.md",
+      "to": "docs/archive/fixlog/FIXLOG-B118.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B119.md",
+      "to": "docs/archive/fixlog/FIXLOG-B119.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B120.md",
+      "to": "docs/archive/fixlog/FIXLOG-B120.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B121.md",
+      "to": "docs/archive/fixlog/FIXLOG-B121.md",
+      "category": "fixlog",
+      "reason": "age 34d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B122.md",
+      "to": "docs/archive/fixlog/FIXLOG-B122.md",
+      "category": "fixlog",
+      "reason": "age 34d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B123.md",
+      "to": "docs/archive/fixlog/FIXLOG-B123.md",
+      "category": "fixlog",
+      "reason": "age 34d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B124.md",
+      "to": "docs/archive/fixlog/FIXLOG-B124.md",
+      "category": "fixlog",
+      "reason": "age 34d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B125.md",
+      "to": "docs/archive/fixlog/FIXLOG-B125.md",
+      "category": "fixlog",
+      "reason": "age 34d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B126.md",
+      "to": "docs/archive/fixlog/FIXLOG-B126.md",
+      "category": "fixlog",
+      "reason": "age 34d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B127-B128.md",
+      "to": "docs/archive/fixlog/FIXLOG-B127-B128.md",
+      "category": "fixlog",
+      "reason": "age 34d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B129.md",
+      "to": "docs/archive/fixlog/FIXLOG-B129.md",
+      "category": "fixlog",
+      "reason": "age 34d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B131.md",
+      "to": "docs/archive/fixlog/FIXLOG-B131.md",
+      "category": "fixlog",
+      "reason": "age 34d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B132.md",
+      "to": "docs/archive/fixlog/FIXLOG-B132.md",
+      "category": "fixlog",
+      "reason": "age 34d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B133.md",
+      "to": "docs/archive/fixlog/FIXLOG-B133.md",
+      "category": "fixlog",
+      "reason": "age 34d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B134.md",
+      "to": "docs/archive/fixlog/FIXLOG-B134.md",
+      "category": "fixlog",
+      "reason": "age 34d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B135.md",
+      "to": "docs/archive/fixlog/FIXLOG-B135.md",
+      "category": "fixlog",
+      "reason": "age 34d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B136.md",
+      "to": "docs/archive/fixlog/FIXLOG-B136.md",
+      "category": "fixlog",
+      "reason": "age 34d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B137.md",
+      "to": "docs/archive/fixlog/FIXLOG-B137.md",
+      "category": "fixlog",
+      "reason": "age 34d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B138.md",
+      "to": "docs/archive/fixlog/FIXLOG-B138.md",
+      "category": "fixlog",
+      "reason": "age 33d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B139.md",
+      "to": "docs/archive/fixlog/FIXLOG-B139.md",
+      "category": "fixlog",
+      "reason": "age 33d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B140.md",
+      "to": "docs/archive/fixlog/FIXLOG-B140.md",
+      "category": "fixlog",
+      "reason": "age 33d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B141.md",
+      "to": "docs/archive/fixlog/FIXLOG-B141.md",
+      "category": "fixlog",
+      "reason": "age 33d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B142.md",
+      "to": "docs/archive/fixlog/FIXLOG-B142.md",
+      "category": "fixlog",
+      "reason": "age 33d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B143.md",
+      "to": "docs/archive/fixlog/FIXLOG-B143.md",
+      "category": "fixlog",
+      "reason": "age 33d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B144.md",
+      "to": "docs/archive/fixlog/FIXLOG-B144.md",
+      "category": "fixlog",
+      "reason": "age 33d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B145.md",
+      "to": "docs/archive/fixlog/FIXLOG-B145.md",
+      "category": "fixlog",
+      "reason": "age 33d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B146.md",
+      "to": "docs/archive/fixlog/FIXLOG-B146.md",
+      "category": "fixlog",
+      "reason": "age 33d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B147.md",
+      "to": "docs/archive/fixlog/FIXLOG-B147.md",
+      "category": "fixlog",
+      "reason": "age 33d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B150.md",
+      "to": "docs/archive/fixlog/FIXLOG-B150.md",
+      "category": "fixlog",
+      "reason": "age 33d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B151.md",
+      "to": "docs/archive/fixlog/FIXLOG-B151.md",
+      "category": "fixlog",
+      "reason": "age 33d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B152.md",
+      "to": "docs/archive/fixlog/FIXLOG-B152.md",
+      "category": "fixlog",
+      "reason": "age 33d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B153.md",
+      "to": "docs/archive/fixlog/FIXLOG-B153.md",
+      "category": "fixlog",
+      "reason": "age 32d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B154.md",
+      "to": "docs/archive/fixlog/FIXLOG-B154.md",
+      "category": "fixlog",
+      "reason": "age 32d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B155.md",
+      "to": "docs/archive/fixlog/FIXLOG-B155.md",
+      "category": "fixlog",
+      "reason": "age 32d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B48.md",
+      "to": "docs/archive/fixlog/FIXLOG-B48.md",
+      "category": "fixlog",
+      "reason": "age 38d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B49.md",
+      "to": "docs/archive/fixlog/FIXLOG-B49.md",
+      "category": "fixlog",
+      "reason": "age 38d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B50.md",
+      "to": "docs/archive/fixlog/FIXLOG-B50.md",
+      "category": "fixlog",
+      "reason": "age 38d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B54.md",
+      "to": "docs/archive/fixlog/FIXLOG-B54.md",
+      "category": "fixlog",
+      "reason": "age 38d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B55.md",
+      "to": "docs/archive/fixlog/FIXLOG-B55.md",
+      "category": "fixlog",
+      "reason": "age 38d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B56.md",
+      "to": "docs/archive/fixlog/FIXLOG-B56.md",
+      "category": "fixlog",
+      "reason": "age 38d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B57.md",
+      "to": "docs/archive/fixlog/FIXLOG-B57.md",
+      "category": "fixlog",
+      "reason": "age 37d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B58.md",
+      "to": "docs/archive/fixlog/FIXLOG-B58.md",
+      "category": "fixlog",
+      "reason": "age 37d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B59.md",
+      "to": "docs/archive/fixlog/FIXLOG-B59.md",
+      "category": "fixlog",
+      "reason": "age 37d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B61.md",
+      "to": "docs/archive/fixlog/FIXLOG-B61.md",
+      "category": "fixlog",
+      "reason": "age 37d > 30d; R2 only referrers move in the same batch (FIXLOG-B64.md); R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B62.md",
+      "to": "docs/archive/fixlog/FIXLOG-B62.md",
+      "category": "fixlog",
+      "reason": "age 37d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B63.md",
+      "to": "docs/archive/fixlog/FIXLOG-B63.md",
+      "category": "fixlog",
+      "reason": "age 37d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B64.md",
+      "to": "docs/archive/fixlog/FIXLOG-B64.md",
+      "category": "fixlog",
+      "reason": "age 37d > 30d; R2 only referrers move in the same batch (FIXLOG-B61.md); R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B65.md",
+      "to": "docs/archive/fixlog/FIXLOG-B65.md",
+      "category": "fixlog",
+      "reason": "age 37d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B66.md",
+      "to": "docs/archive/fixlog/FIXLOG-B66.md",
+      "category": "fixlog",
+      "reason": "age 37d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B67.md",
+      "to": "docs/archive/fixlog/FIXLOG-B67.md",
+      "category": "fixlog",
+      "reason": "age 37d > 30d; R2 only referrers move in the same batch (FIXLOG-B66.md); R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B69.md",
+      "to": "docs/archive/fixlog/FIXLOG-B69.md",
+      "category": "fixlog",
+      "reason": "age 37d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B70.md",
+      "to": "docs/archive/fixlog/FIXLOG-B70.md",
+      "category": "fixlog",
+      "reason": "age 37d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B71.md",
+      "to": "docs/archive/fixlog/FIXLOG-B71.md",
+      "category": "fixlog",
+      "reason": "age 37d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B72.md",
+      "to": "docs/archive/fixlog/FIXLOG-B72.md",
+      "category": "fixlog",
+      "reason": "age 36d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B73.md",
+      "to": "docs/archive/fixlog/FIXLOG-B73.md",
+      "category": "fixlog",
+      "reason": "age 36d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B74.md",
+      "to": "docs/archive/fixlog/FIXLOG-B74.md",
+      "category": "fixlog",
+      "reason": "age 36d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B75.md",
+      "to": "docs/archive/fixlog/FIXLOG-B75.md",
+      "category": "fixlog",
+      "reason": "age 36d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B76.md",
+      "to": "docs/archive/fixlog/FIXLOG-B76.md",
+      "category": "fixlog",
+      "reason": "age 36d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B77.md",
+      "to": "docs/archive/fixlog/FIXLOG-B77.md",
+      "category": "fixlog",
+      "reason": "age 36d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B78.md",
+      "to": "docs/archive/fixlog/FIXLOG-B78.md",
+      "category": "fixlog",
+      "reason": "age 36d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B79.md",
+      "to": "docs/archive/fixlog/FIXLOG-B79.md",
+      "category": "fixlog",
+      "reason": "age 36d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B80.md",
+      "to": "docs/archive/fixlog/FIXLOG-B80.md",
+      "category": "fixlog",
+      "reason": "age 36d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B81.md",
+      "to": "docs/archive/fixlog/FIXLOG-B81.md",
+      "category": "fixlog",
+      "reason": "age 36d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B82.md",
+      "to": "docs/archive/fixlog/FIXLOG-B82.md",
+      "category": "fixlog",
+      "reason": "age 36d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B84.md",
+      "to": "docs/archive/fixlog/FIXLOG-B84.md",
+      "category": "fixlog",
+      "reason": "age 36d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B85.md",
+      "to": "docs/archive/fixlog/FIXLOG-B85.md",
+      "category": "fixlog",
+      "reason": "age 36d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B86.md",
+      "to": "docs/archive/fixlog/FIXLOG-B86.md",
+      "category": "fixlog",
+      "reason": "age 36d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B89.md",
+      "to": "docs/archive/fixlog/FIXLOG-B89.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B90.md",
+      "to": "docs/archive/fixlog/FIXLOG-B90.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B91.md",
+      "to": "docs/archive/fixlog/FIXLOG-B91.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B92.md",
+      "to": "docs/archive/fixlog/FIXLOG-B92.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B93.md",
+      "to": "docs/archive/fixlog/FIXLOG-B93.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B94.md",
+      "to": "docs/archive/fixlog/FIXLOG-B94.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B95.md",
+      "to": "docs/archive/fixlog/FIXLOG-B95.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B96.md",
+      "to": "docs/archive/fixlog/FIXLOG-B96.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B97.md",
+      "to": "docs/archive/fixlog/FIXLOG-B97.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B98.md",
+      "to": "docs/archive/fixlog/FIXLOG-B98.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "FIXLOG-B99.md",
+      "to": "docs/archive/fixlog/FIXLOG-B99.md",
+      "category": "fixlog",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "ARCHITECTURE-REPORT.md",
+      "to": "docs/archive/reports/ARCHITECTURE-REPORT.md",
+      "category": "reports",
+      "reason": "age 37d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "B96-IMPLEMENTATION-REPORT.md",
+      "to": "docs/archive/reports/B96-IMPLEMENTATION-REPORT.md",
+      "category": "reports",
+      "reason": "age 35d > 30d; R2 zero inbound references; R3/R4/R5/R6/R7/R8 clear"
+    },
+    {
+      "from": "DEEPSEEK-HARNESS-REPORT.md",
+      "to": "docs/archive/reports/DEEPSEEK-HARNESS-REPORT.md",
+      "category": "reports",
+      "reason": "age 35d > 30d; R2 only referrers move in the same batch (FIXLOG-B96.md); R3/R4/R5/R6/R7/R8 clear"
+    }
+  ],
+  "skipped": [
+    {
+      "path": "FINAL-PROOF-REPORT.md",
+      "category": "reports",
+      "age": 12,
+      "blocks": [
+        "R1 age 12d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B156.md",
+      "category": "fixlog",
+      "age": 29,
+      "blocks": [
+        "R1 age 29d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B158-B160.md",
+      "category": "fixlog",
+      "age": 24,
+      "blocks": [
+        "R1 age 24d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B197.md",
+      "category": "fixlog",
+      "age": 18,
+      "blocks": [
+        "R1 age 18d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B199.md",
+      "category": "fixlog",
+      "age": 18,
+      "blocks": [
+        "R1 age 18d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B200.md",
+      "category": "fixlog",
+      "age": 18,
+      "blocks": [
+        "R1 age 18d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B201.md",
+      "category": "fixlog",
+      "age": 18,
+      "blocks": [
+        "R1 age 18d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B202.md",
+      "category": "fixlog",
+      "age": 18,
+      "blocks": [
+        "R1 age 18d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B203.md",
+      "category": "fixlog",
+      "age": 18,
+      "blocks": [
+        "R1 age 18d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B204.md",
+      "category": "fixlog",
+      "age": 18,
+      "blocks": [
+        "R1 age 18d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B205.md",
+      "category": "fixlog",
+      "age": 18,
+      "blocks": [
+        "R1 age 18d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B206.md",
+      "category": "fixlog",
+      "age": 18,
+      "blocks": [
+        "R1 age 18d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B207.md",
+      "category": "fixlog",
+      "age": 18,
+      "blocks": [
+        "R1 age 18d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B208.md",
+      "category": "fixlog",
+      "age": 18,
+      "blocks": [
+        "R1 age 18d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B209.md",
+      "category": "fixlog",
+      "age": 18,
+      "blocks": [
+        "R1 age 18d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B210.md",
+      "category": "fixlog",
+      "age": 17,
+      "blocks": [
+        "R1 age 17d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B211.md",
+      "category": "fixlog",
+      "age": 17,
+      "blocks": [
+        "R1 age 17d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B213.md",
+      "category": "fixlog",
+      "age": 17,
+      "blocks": [
+        "R1 age 17d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B214.md",
+      "category": "fixlog",
+      "age": 17,
+      "blocks": [
+        "R1 age 17d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B215.md",
+      "category": "fixlog",
+      "age": 17,
+      "blocks": [
+        "R1 age 17d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B216.md",
+      "category": "fixlog",
+      "age": 3,
+      "blocks": [
+        "R6 audit Section 5 risk flag",
+        "R1 age 3d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B217.md",
+      "category": "fixlog",
+      "age": 17,
+      "blocks": [
+        "R1 age 17d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B218.md",
+      "category": "fixlog",
+      "age": 17,
+      "blocks": [
+        "R1 age 17d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B219.md",
+      "category": "fixlog",
+      "age": 17,
+      "blocks": [
+        "R1 age 17d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B220.md",
+      "category": "fixlog",
+      "age": 17,
+      "blocks": [
+        "R1 age 17d ≤ 30d"
+      ]
+    },
+    {
+      "path": "FIXLOG-B51.md",
+      "category": "fixlog",
+      "age": 38,
+      "blocks": [
+        "R2 referenced by staying file(s): server/test-b51.js"
+      ]
+    },
+    {
+      "path": "FIXLOG-B52.md",
+      "category": "fixlog",
+      "age": 38,
+      "blocks": [
+        "R2 referenced by staying file(s): server/test-b52.js"
+      ]
+    },
+    {
+      "path": "FIXLOG-B53.md",
+      "category": "fixlog",
+      "age": 38,
+      "blocks": [
+        "R2 referenced by staying file(s): server/test-b53.js"
+      ]
+    },
+    {
+      "path": "FIXLOG-B68.md",
+      "category": "fixlog",
+      "age": 37,
+      "blocks": [
+        "R2 referenced by staying file(s): FIXLOG.md"
+      ]
+    },
+    {
+      "path": "FIXLOG.md",
+      "category": "fixlog",
+      "age": 37,
+      "blocks": [
+        "R2 referenced by staying file(s): server/src/services/SessionStore.js"
+      ]
+    },
+    {
+      "path": "research/PHASE-21-PLAN.md",
+      "category": "research",
+      "age": 2,
+      "blocks": [
+        "R1 age 2d ≤ 30d"
+      ]
+    },
+    {
+      "path": "research/program/program.md",
+      "category": "research",
+      "age": null,
+      "blocks": [
+        "R1 age unknown"
+      ]
+    }
+  ]
+}
