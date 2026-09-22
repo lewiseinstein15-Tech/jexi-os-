@@ -892,6 +892,61 @@
         "NETWORK"
       ],
       "notes": "Phase 11 G — 16-channel internet reach. Reads do real HTTP; login walls surface as AUTH_REQUIRED, never placeholder content."
+    },
+    {
+      "name": "aas",
+      "description": "JEXI native — local stdio MCP over the AAS (Agent Ability Sets) catalog: search_catalog, inspect_skill, compose_stack, compare_stacks — real frontmatter metadata from skills/**/SKILL.md, overlap validation (cosine >= 0.85) and context budget checks.",
+      "transport": "stdio",
+      "command": "node",
+      "args": [
+        "skills/aas/mcp-server.js"
+      ],
+      "enabled": true,
+      "trustLevel": "curated",
+      "permissions": [
+        "READ_ONLY"
+      ],
+      "notes": "Phase 31 Scope 5 (W14) — declarative registration of the shipped Phase AAS stdio server (skills/aas/mcp-server.js), resolved from the repo root like codegraph-mcp/reach-mcp. Live-probeable locally: initialize + tools/list answered by the real process (no network, no keys).",
+      "keyless": true,
+      "keylessNote": "local stdio over the on-disk catalog; no API key",
+      "upstream": "skills/aas/mcp-server.js (in-repo)"
+    },
+    {
+      "name": "n8n-mcp",
+      "description": "Upstream n8n-mcp — exposes n8n workflow automation (workflow management, execution, node documentation) as MCP tools.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "n8n-mcp"
+      ],
+      "enabled": false,
+      "trustLevel": "curated",
+      "permissions": [
+        "NETWORK"
+      ],
+      "notes": "Phase 31 Scope 5 (S4-N8N) — declarative v3.3 pattern entry, NOT live-verified in the build sandbox (no n8n instance or network egress was exercised). Enable only on a host that has provisioned n8n and verified the first handshake.",
+      "keyless": true,
+      "keylessNote": "no API key for the MCP surface itself; an n8n instance is the operator's provision",
+      "upstream": "https://github.com/czlonkowski/n8n-mcp"
+    },
+    {
+      "name": "forgejo-mcp",
+      "description": "JEXI native — Forgejo/Gitea toolset (Phase 23 Scope B): 103-tool taxonomy across repo/issue/pr/org/admin with local param validation and verbatim error transport.",
+      "transport": "stdio",
+      "command": "node",
+      "args": [
+        "harness/hardening/forgejo/index.js"
+      ],
+      "enabled": false,
+      "trustLevel": "curated",
+      "permissions": [
+        "NETWORK"
+      ],
+      "notes": "Phase 31 Scope 5 (W23c) — DECLARATIVE PLACEHOLDER. The shipped forge toolset is a library surface (taxonomy + dispatch), NOT an MCP stdio server: spawning this entry fails honestly until a stdio bridge is built. Live forge leg (W23d) is additionally blocked by the no-credentials rule. Do not enable until both land.",
+      "keyless": false,
+      "keylessNote": "forge tokens ride via keyRef (env var name or keyring ref), per the madtea credential discipline",
+      "upstream": "harness/hardening/forgejo/index.js (in-repo library)"
     }
   ]
 }

@@ -61,6 +61,12 @@ import { Gsd } from '../../../workgraph/phases/gsd/index.js';
 import { run as looperRun } from '../../../swarm/loops/looper.js';
 import { run as ralphRun, emitCheckpoint as ralphEmitCheckpoint, registerCheckpointHandler as ralphRegisterCheckpoint } from '../../../swarm/loops/ralph.js';
 
+/* ------------- Phase 31 Scope 5 — shipped module imports (READ-ONLY) ------ */
+import { gatedDispatch } from '../../../skills/gates/gated-dispatch.js';
+import { runPreflight } from '../capability/doctor/preflight.js';
+import { registerExecutableSkills, executableSkillsStatus } from '../skills/executable-registry.js';
+import { initRepoCtx } from './phase31-repoctx.js';
+
 /* ---------------- server-side consumers (integration entry points) -------- */
 import { assemblePrompt } from '../services/PromptAssembly.js';
 import { canChat } from '../providers/index.js';
@@ -71,6 +77,7 @@ import { claimsBrowserMethod } from '../services/director/Verifier.js';
 import { registerAction, autonomyScheduler } from '../scheduler/index.js';
 import { initWa4Topology } from './phase31-wa4-topology.js';
 import { initCiDoctor } from './phase31-cidoctor.js';
+import { initRegistriesWiring, makeGatedExecutor, executorGateStatus, mcpRegistryEntries } from './phase31-registries.js';
 
 /* ---------------- module state ------------------------------------------- */
 const W31 = [];
@@ -93,7 +100,7 @@ export function assertNodeFloor(version = process.version) {
   return `node ${version} >= ${NODE_FLOOR}`;
 }
 
-const state = { wired: null, rlm: null, fleet: null, hot: null, repo: null, index: null, hybrid: null, protocol: null, graph: null, viking: null, observersRoot: null, observerId: null, sessionId: null, autonomous: null, scheduler: null, dreamCycle: null, offloadRoot: null, sessionsDir: null, gsd: null, gsdLoopFn: null, ciDoctor: null, wa4: null };
+const state = { wired: null, rlm: null, fleet: null, hot: null, repo: null, index: null, hybrid: null, protocol: null, graph: null, viking: null, observersRoot: null, observerId: null, sessionId: null, autonomous: null, scheduler: null, dreamCycle: null, offloadRoot: null, sessionsDir: null, gsd: null, gsdLoopFn: null, ciDoctor: null, wa4: null, repoCtx: null, w13Entries: null, w14Entry: null, w29Mounted: false, s4n8nEntry: null, s4exec: null, s4repo: false, w23cEntry: null };
 
 /* ---------------- the one boot call --------------------------------------- */
 export function initPhase31Wiring(opts = {}) {
@@ -387,6 +394,98 @@ export function initPhase31Wiring(opts = {}) {
   process.once('SIGTERM', shutdownScope3);
   process.once('SIGINT', shutdownScope3);
 
+  /* ── PHASE 31 SCOPE 5 — registries, gates, dispatch ───────────────────── */
+
+  // W13 — gatedDispatch -> executor path (audit-only default). The gate
+  // module self-registers via its approved extension (one import + one
+  // register call); this mount validates the seam and exposes
+  // makeGatedExecutor() — the SHIPPED executor with the audit leg composed
+  // in front. Default-deny stays an owner call.
+  soft('W13', () => {
+    const reg = initRegistriesWiring();
+    if (!reg.gate.registered) throw Object.assign(new Error('W13 gate registration missing'), { code: 'E_WIRING' });
+    state.w13Entries = reg.entries;
+    return `gate registered=${reg.gate.registered}; mcp entries [${reg.entries.join(', ')}]`;
+  });
+  if (executorGateStatus().registered) log('W31 W13: gatedDispatch -> executor path (audit-only default; default-deny owner call untouched)');
+
+  // W14 — AAS -> mcp/registry.json (declarative; local stdio live-probeable).
+  soft('W14', () => {
+    const [aas] = mcpRegistryEntries(['aas']);
+    if (!aas) throw Object.assign(new Error('aas entry missing'), { code: 'E_WIRING' });
+    state.w14Entry = aas;
+    return `entry aas enabled=${!!aas.enabled} command=${aas.command} ${aas.args.join(' ')}`;
+  });
+  if (state.w14Entry) log('W31 W14: AAS -> mcp registry (aas entry, local stdio; live ping in probe)');
+
+  // W29 — Ralph pre-flight checks -> server-side capability doctor consumer
+  // (agent-clis + mcp-registry + bundles, shipped doctor shape, READ-ONLY).
+  soft('W29', () => {
+    if (typeof runPreflight !== 'function') throw Object.assign(new Error('preflight missing'), { code: 'E_WIRING' });
+    state.w29Mounted = true;
+    return 'agent-clis + mcp-registry + bundles checks mounted';
+  });
+  if (state.w29Mounted) log('W31 W29: ralph pre-flight checks -> capability doctor (agent-clis, mcp-registry, bundles)');
+
+  // S4-N8N — n8n-mcp -> mcp/registry.json (declarative v3.3 pattern).
+  soft('S4-N8N', () => {
+    const [n8n] = mcpRegistryEntries(['n8n-mcp']);
+    if (!n8n) throw Object.assign(new Error('n8n-mcp entry missing'), { code: 'E_WIRING' });
+    state.s4n8nEntry = n8n;
+    return `entry n8n-mcp enabled=${!!n8n.enabled}`;
+  });
+  if (state.s4n8nEntry) log('W31 S4-N8N: n8n-mcp -> mcp registry (declarative, enabled:false — NOT live-verified)');
+
+  // S4-EXEC — executable skills -> server skills catalog. Registration goes
+  // through the catalog's OWN plugin-skill seam (pluginSkillDirs), merged
+  // with the real PluginRegistry global — no shipped edits, no copies.
+  soft('S4-EXEC', () => {
+    const st = registerExecutableSkills();
+    if (!st.registered) throw Object.assign(new Error(`executable skills not registered: ${st.error || 'unknown'}`), { code: 'E_WIRING' });
+    state.s4exec = st;
+    return `skills [${st.skills.join(', ')}] via plugin-skill seam`;
+  });
+  if (state.s4exec) log('W31 S4-EXEC: executable skills -> skills catalog (plugin-skill seam, dir skills/executable)');
+
+  // S4-REPOCTX — semantica/repo-map -> session bootstrap context path (the
+  // SAME registerSource seam the chat/prompt pipeline consumes). Lazy build,
+  // shipped disk cache (os.tmpdir), budget-bounded.
+  soft('S4-REPOCTX', () => {
+    state.repoCtx = initRepoCtx();
+    registerSource('repo-map', {
+      priority: 10, weight: 1,
+      produce: async () => {
+        try {
+          const m = state.repoCtx.map();
+          if (!m || !m.files || !m.files.length) return '';
+          return `Repo map (bounded, ${m.files.length} file(s), ~${m.tokens} tokens):\n${String(m.summary).slice(0, 1600)}`;
+        } catch { return ''; }
+      },
+    });
+    state.s4repo = true;
+    return 'source repo-map + accessor wiring.repoCtx';
+  });
+  if (state.s4repo) log('W31 S4-REPOCTX: semantica/repo-map -> session bootstrap (source repo-map, bounded scan)');
+
+  // W23c — forgejo-mcp -> mcp/registry.json (declarative placeholder; the
+  // shipped toolset is a library, no stdio bridge; live forge leg W23d is
+  // blocked by the no-credentials rule).
+  soft('W23c', () => {
+    const [forgejo] = mcpRegistryEntries(['forgejo-mcp']);
+    if (!forgejo) throw Object.assign(new Error('forgejo-mcp entry missing'), { code: 'E_WIRING' });
+    state.w23cEntry = forgejo;
+    return `entry forgejo-mcp enabled=${!!forgejo.enabled}`;
+  });
+  if (state.w23cEntry) log('W31 W23c: forgejo-mcp -> mcp registry (declarative placeholder, enabled:false — live forge leg blocked)');
+
+  // W16 — Phase 12 gates loop call sites: LOCATED, NOT WIRED. The gates'
+  // designated loop checkpoints live in server/src/services/CodingLoop.js and
+  // server/src/services/VerificationLoop.js (ZONE-OWNER items 16 / W16);
+  // neither references skills/gates today, and both files are OUTSIDE this
+  // scope's named call sites — reported per the call-site discipline, edit
+  // left to the loop owner.
+  log('W31 W16: Phase 12 gates loop call sites located (CodingLoop.js, VerificationLoop.js) — NOT WIRED, owner call');
+
   const wired = {
     W36: true, B1: !!state.repo, B2: !!state.index, B3: !!state.hybrid, B4: !!state.hot,
     B5: !!state.protocol, WA1: typeof assemblePrompt === 'function', WA8: true, WA2: !!state.graph,
@@ -394,6 +493,9 @@ export function initPhase31Wiring(opts = {}) {
     W19: typeof claimsBrowserMethod === 'function',
     'S3-AUTO': !!state.scheduler, 'S3-CYCLE': !!state.dreamCycle, 'S3-OFFLOAD': !!state.offloadRoot,
     'S3-GSD': !!state.gsd, W23e: typeof ralphEmitCheckpoint === 'function', W23f: !!state.ciDoctor, WA4: !!state.wa4,
+    W13: executorGateStatus().registered, W14: true, W29: typeof runPreflight === 'function',
+    'S4-N8N': true, 'S4-EXEC': executableSkillsStatus().registered, 'S4-REPOCTX': !!state.repoCtx,
+    W23c: true, W16: false,
   };
   state.wired = wired;
   return { wired, sessionId, brainRoot, fleetDir, observersRoot, vikingRoot, log: W31.slice() };
@@ -484,5 +586,26 @@ export const wiring = {
   wa4: {
     dispatch: (capability, opts) => (state.wa4 ? state.wa4.dispatch(capability, opts) : null),
     knownTopologies: () => (state.wa4 ? state.wa4.known : []),
+  },
+
+  /* -------- Phase 31 Scope 5 — consumer seams (read-only surface) -------- */
+  gates: {
+    status: executorGateStatus,
+    makeGatedExecutor,
+    dispatch: (action, ctx) => gatedDispatch(action, ctx),
+  },
+  mcpRegistry: {
+    file: 'server/mcp/registry.json',
+    entries: mcpRegistryEntries,
+  },
+  doctor: {
+    preflight: runPreflight,
+  },
+  executableSkills: {
+    status: executableSkillsStatus,
+  },
+  repoCtx: {
+    map: (over) => (state.repoCtx ? state.repoCtx.map(over) : null),
+    root: () => (state.repoCtx ? state.repoCtx.root : null),
   },
 };

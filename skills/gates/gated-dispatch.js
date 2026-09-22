@@ -16,6 +16,14 @@
  */
 import { GATES } from './index.js';
 import { appendAudit } from './state.js';
+import { registerExecutorGate } from '../../server/src/wiring/phase31-registries.js';
+
+// W13 wiring (Phase 31 Scope 5 — approved extension): expose gatedDispatch to
+// the server executor path. Exactly one import + one register call — the
+// blocking dispatch above is untouched, and default-deny stays an owner call.
+// The wiring module composes this dispatcher in AUDIT-ONLY mode in front of
+// the shipped tool executor (see makeGatedExecutor).
+registerExecutorGate(gatedDispatch);
 
 export async function gatedDispatch(action, ctx = {}) {
   if (!action || typeof action.run !== 'function' || !action.name) {
