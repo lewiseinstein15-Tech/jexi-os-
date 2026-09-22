@@ -47,6 +47,14 @@ COPY src ./src
 # Phase 7(G) — the commands subsystem lives at the repo root (ECC layout);
 # the container resolves /app/commands (dual-depth seam: /app/commands).
 COPY commands ./commands
+# Phase 24: src/components/ChatWindow.jsx imports ../../ui/web/console/chat/mount.js
+# (Phase 16 chat runtime wiring) — the new console shell must be in the image,
+# and its import closure reaches events/ (chat taxonomy), providers/ (keyRef
+# profile schema) and workforce/ (narration modules imported by the runtime).
+COPY ui ./ui
+COPY events ./events
+COPY providers ./providers
+COPY workforce ./workforce
 RUN npm ci --no-audit --no-fund && npm run build
 # server/public is a git symlink to ../dist — vite writes the bundle
 # straight through it, so the old `cp -r dist/* server/public/` copied
