@@ -1,7 +1,13 @@
 name: Deploy Frontend to GitHub Pages
+# DISABLED push trigger 2026-09-22 (CI failure sweep):
+# GitHub Pages is DISABLED at the repo level — actions/deploy-pages@v4 fails
+# with "Failed to create deployment (status: 404) ... Ensure GitHub Pages has
+# been enabled" on every push (see keepalive.yml B216-1 notes: the site was
+# found disabled before, cause never identified). The build job succeeds; the
+# deploy job can never succeed until Pages is re-enabled in repo Settings by
+# the owner (ENV item — reported to lead). Manual runs only until then.
 on:
-  push:
-    branches: [ main ]
+  workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
