@@ -1,0 +1,72 @@
+$ git diff -- src/main.jsx
+diff --git a/src/main.jsx b/src/main.jsx
+index 977e699..b3faeb5 100644
+--- a/src/main.jsx
++++ b/src/main.jsx
+@@ -1,9 +1,12 @@
+ import React from 'react'
+ import ReactDOM from 'react-dom/client'
+ import App from './App.jsx'
++import Shell from '../ui/web/console/shell/Shell.jsx'
+ import './index.css'
+ import './jexi-theme.css' // FINAL — visual system layer (fonts, flat reskin, a11y)
+ import 'katex/dist/katex.min.css' // B151 — KaTeX math rendering (bundled)
++import '../ui/web/console/shell/tokens.css'
++import '../ui/web/console/shell/shell.css'
+ import { setupPushSubscription } from './utils/pushSubscribe'
+ import { setupFcm, armFcmForegroundRetry } from './utils/fcmSetup'
+ import { apply as applyOfficialBrand } from './brand/official'
+@@ -30,8 +33,19 @@ window.addEventListener('load', () => {
+   armFcmForegroundRetry()
+ })
+ 
+-ReactDOM.createRoot(document.getElementById('root')).render(
+-  <React.StrictMode>
+-    <App />
+-  </React.StrictMode>,
+-)
++// phase-30(H-fix) — the Phase 24 shell (Chat / Settings / Work Graph) is the
++// default boot. Only a deliberate #classic mounts the legacy console. The
++// shell is mounted exactly as its standalone entry does
++// (ui/web/console/shell/main.jsx: no StrictMode) because the Phase 16 chat
++// mount owns its own React root and StrictMode's double-effect would unmount
++// that root synchronously mid-render. Legacy keeps StrictMode unchanged.
++const root = ReactDOM.createRoot(document.getElementById('root'))
++if (window.location.hash === '#classic') {
++  root.render(
++    <React.StrictMode>
++      <App />
++    </React.StrictMode>,
++  )
++} else {
++  root.render(<Shell />)
++}
+
+$ default boot DOM inspection (playwright, http://localhost:3000/)
+hash #/chat
+root html head <div class="jx-shell" data-theme="dark"><nav class="jx-sidebar" aria-label="Console"><div class="jx-brand"><span class="jx-brand-mark" aria-hidden="true"></span><span class="jx-brand-name">JEXI</span></div><ul class="jx-nav"><li><a class="jx-nav-item is-active" href="#/chat" aria-current="page">Chat</a></li><li><a class="jx-nav-item" href="#/settings">Settings</a></li><li><a class="jx-nav-item" href="#/graph">Work Graph</a></li></ul><div class="jx-sidebar-foot">phase-24 rebuild</div></nav><div class="jx-main"><header class="jx-header"><h1 class="jx-route-title">Chat</h1><div class="jx-header-s
+classes {
+  shell: 1,
+  app: 0,
+  composer: 1,
+  nav: [ 'Chat', 'Settings', 'Work Graph' ]
+}
+
+$ #classic DOM inspection (playwright, setup flags in localStorage, http://localhost:3000/#classic)
+hash #classic
+classes {
+  jxShell: 0,
+  jxApp: 1,
+  p24composer: 1,
+  legacyNav: [
+    'Home',
+    'Missions',
+    'Agents',
+    'Memory',
+    'Tools',
+    'Files',
+    'Settings',
+    'Chat history',
+    'Workshop'
+  ]
+}

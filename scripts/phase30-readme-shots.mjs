@@ -11,8 +11,8 @@
  *   node scripts/phase30-readme-shots.mjs
  *
  * Provider-backed generation is not required for the deterministic Phase 16
- * runtime captures. The executive-console capture records the provider state
- * exactly as reported by the live brain (including an unconfigured state).
+ * runtime captures: without a configured provider the in-process default agent
+ * answers with narration + tool receipts + a turn-end row (not an LLM answer).
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -24,7 +24,6 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'docs', 'assets', 'screenshots');
 const LIVE_ORIGIN = process.env.JEXI_LIVE_ORIGIN || 'http://localhost:3000';
 const BRAIN_ORIGIN = process.env.JEXI_BRAIN_ORIGIN || 'http://localhost:3002';
-const PHASE24 = `${LIVE_ORIGIN}/ui/web/console/shell/index.html`;
 const shot = (name) => path.join(OUT, name);
 
 await fs.mkdir(OUT, { recursive: true });
@@ -46,30 +45,63 @@ async function liveGoto(page, url, selector, timeout = 60_000) {
 
 try {
   /* ------------------------------------------------------------------
-   * Phase 24 shell + Phase 16 deterministic chat runtime.
+   * Phase 30 H-fix: the DEFAULT boot (http://localhost:3000/) now mounts
+   * the Phase 24 shell (Chat / Settings / Work Graph). Every product
+   * capture below comes from the default origin, not the nested
+   * standalone entry. The legacy console is reachable only at #classic.
    * ------------------------------------------------------------------ */
   const p24Context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
   const p24 = await p24Context.newPage();
   p24.setDefaultTimeout(30_000);
-  p24.on('pageerror', (error) => console.log(`PAGEERR phase24: ${String(error).slice(0, 240)}`));
+  p24.on('pageerror', (error) => console.log(`PAGEERR default-boot: ${String(error).slice(0, 240)}`));
 
-  await liveGoto(p24, `${PHASE24}#/chat`, '.p24-composer');
+  // console-hero: empty hash boot -> Phase 24 chat surface.
+  await liveGoto(p24, `${LIVE_ORIGIN}/`, '.p24-composer', 180_000);
+  await p24.waitForFunction(() => /backend (online|offline)/.test(document.querySelector('.jx-header')?.textContent || ''));
+  const navItems = await p24.locator('.jx-nav-item').allTextContents();
+  const legacyNav = await p24.evaluate(() => /Executive|Resources|Extensions/.test(document.body.innerText));
+  await p24.screenshot({ path: shot('console-hero.png') });
+  console.log(`CAPTURE console-hero.png · default boot · hash=${await p24.evaluate(() => location.hash)} · nav=${JSON.stringify(navItems)} · legacy-nav-present=${legacyNav}`);
+
+  // Real Q&A through the live composer: streaming, answer, tool cards.
   await p24.fill('.p24-input', 'What does the scheduler do?');
+  // Row-arrival timeline: the deterministic in-process agent finishes a turn in
+  // a few milliseconds, so the rows land progressively but faster than any
+  // screenshot can be taken. The timeline is logged as the streaming evidence;
+  // the capture shows the composer still in its busy state with the rows in.
+  await p24.evaluate(() => {
+    window.__p30rows = [];
+    new MutationObserver(() => {
+      window.__p30rows.push({ t: Number(performance.now().toFixed(1)), narration: document.querySelectorAll('.p24-narration').length, toolcards: document.querySelectorAll('.p24-toolcard').length, turnend: document.querySelectorAll('.p24-turnend').length });
+    }).observe(document.querySelector('.p24-transcript'), { childList: true, subtree: true });
+  });
   await p24.click('.p24-send');
+  await p24.waitForSelector('.p24-narration');
+  await p24.screenshot({ path: shot('chat-streaming.png') });
+  const firstRow = await p24.locator('.p24-narration .p24-row-text').first().textContent();
+  const sendLabel = (await p24.locator('.p24-send').textContent())?.trim();
+  console.log(`CAPTURE chat-streaming.png · send button=${JSON.stringify(sendLabel)} · first narration row=${JSON.stringify(firstRow)}`);
+  console.log(`STREAM timeline (ms since navigation, rows present after each DOM mutation): ${JSON.stringify(await p24.evaluate(() => window.__p30rows))}`);
   await p24.waitForFunction(() => document.body.innerText.includes('turn completed: console-main:turn-1 ok'));
+  await p24.screenshot({ path: shot('chat-answer.png') });
+  const turnEnd = await p24.locator('.p24-turnend .p24-row-text').first().textContent();
+  console.log(`CAPTURE chat-answer.png · ${JSON.stringify(turnEnd)}`);
   await p24.waitForSelector('.p24-toolcard');
-  await p24.screenshot({ path: shot('chat-toolcards.png') });
-  console.log(`CAPTURE chat-toolcards.png · ${await p24.locator('.p24-toolcard').count()} live tool cards`);
+  const toolCards = await p24.locator('.p24-toolcard').allInnerTexts();
+  await p24.locator('.p24-transcript').screenshot({ path: shot('chat-toolcards.png') });
+  console.log(`CAPTURE chat-toolcards.png · ${toolCards.length} live tool cards · ${JSON.stringify(toolCards.map((t) => t.replace(/\s+/g, ' ').trim()))}`);
 
-  await liveGoto(p24, `${PHASE24}#/settings`, '.p24-settings');
+  // settings-provider: #/settings from the default boot.
+  await liveGoto(p24, `${LIVE_ORIGIN}/#/settings`, '.p24-settings');
   const provider = await p24.locator('.p24-select').first().inputValue();
   const keyRefConfigured = (await p24.locator('.p24-keyref-none').count()) === 0;
   await p24.screenshot({ path: shot('settings-provider.png') });
   console.log(`CAPTURE settings-provider.png · provider=${provider} · key-reference-configured=${keyRefConfigured}`);
 
+  // chat-modes: full/act switch + approval-gated write, real receipts.
   await p24.getByRole('button', { name: 'full', exact: true }).click();
   await p24.getByRole('button', { name: 'act', exact: true }).click();
-  await liveGoto(p24, `${PHASE24}#/chat`, '.p24-composer');
+  await liveGoto(p24, `${LIVE_ORIGIN}/#/chat`, '.p24-composer');
   await p24.fill('.p24-input', 'write a scheduler runbook with cron, event, and condition trigger details for the operations team');
   await p24.click('.p24-send');
   await p24.waitForSelector('.p24-approval');
@@ -79,7 +111,8 @@ try {
   const modes = await p24.evaluate(async () => (await import('/ui/web/console/chat/runtime.js')).state('console-main').modes);
   console.log(`CAPTURE chat-modes.png · ${modes.displayMode}/${modes.interactionMode} · real approval + tool receipts`);
 
-  await liveGoto(p24, `${PHASE24}#/graph`, '.p24-graph-toolbar');
+  // workgraph-nodes: #/graph from the default boot.
+  await liveGoto(p24, `${LIVE_ORIGIN}/#/graph`, '.p24-graph-toolbar');
   await p24.waitForFunction(() => {
     const counts = document.querySelector('[data-testid="graph-counts"]');
     return counts && /\d+ nodes? · \d+ edges?/.test(counts.textContent || '');
@@ -91,64 +124,24 @@ try {
   await p24Context.close();
 
   /* ------------------------------------------------------------------
-   * Current React executive console. The boot sequence talks to the live
-   * brain, then the automatic replay exposes the real multi-agent plan.
-   * No request interception and no seeded response data are used.
+   * legacy-console.png — record only (NOT linked from README). Proves the
+   * legacy console still exists, only behind a deliberate #classic hash.
    * ------------------------------------------------------------------ */
-  const executiveContext = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
-  const executive = await executiveContext.newPage();
-  executive.setDefaultTimeout(180_000);
-  executive.on('pageerror', (error) => console.log(`PAGEERR executive: ${String(error).slice(0, 240)}`));
-  await executive.addInitScript((brainOrigin) => {
-    // Workshop previews use sandboxed child frames; storage setup belongs only
-    // to the product's top-level document.
+  const legacyContext = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+  const legacy = await legacyContext.newPage();
+  legacy.setDefaultTimeout(120_000);
+  await legacy.addInitScript((brainOrigin) => {
     if (window.top !== window) return;
     localStorage.setItem('jexi_setup_done', '1');
     localStorage.setItem('jexi_backend_url', brainOrigin);
   }, BRAIN_ORIGIN);
-
-  await liveGoto(executive, `${LIVE_ORIGIN}/#chat`, '.vw.active[data-view="chat"]', 180_000);
-  let multiAgentStatus = 'verified';
-  try {
-    await executive.waitForSelector('.plancard', { timeout: 120_000 });
-    await executive.waitForFunction(() => document.querySelectorAll('.tcard').length >= 3, { timeout: 30_000 });
-  } catch (error) {
-    multiAgentStatus = `NOT VERIFIED - ${String(error).split('\n')[0]}`;
-  }
-  await executive.screenshot({ path: shot('console-hero.png') });
-  console.log(`CAPTURE console-hero.png · live executive console · multi-agent=${multiAgentStatus}`);
-
-  const summaries = executive.locator('.tcard summary');
-  const summaryCount = await summaries.count();
-  for (let i = 0; i < Math.min(2, summaryCount); i += 1) {
-    await summaries.nth(i).click().catch(() => {});
-  }
-  await executive.screenshot({ path: shot('chat-multiagent.png') });
-  const rosterText = await executive.locator('.plancard').first().innerText().catch(() => 'plan unavailable');
-  console.log(`CAPTURE chat-multiagent.png · ${rosterText.replace(/\s+/g, ' ').slice(0, 180)}`);
-
-  await executive.evaluate(() => { window.location.hash = '#agents'; });
-  await executive.waitForSelector('.vw.active[data-view="agents"]');
-  await executive.waitForFunction(() => document.querySelectorAll('.vw.active[data-view="agents"] .rowline').length > 0);
-  await executive.screenshot({ path: shot('agents-view.png') });
-  const agentRows = await executive.locator('.vw.active[data-view="agents"] .rowline').count();
-  console.log(`CAPTURE agents-view.png · ${agentRows} live contract rows`);
-
-  // The classic Files surface has a real workspace checkpoint control. It is
-  // separate from Phase 16's runtime-only chat checkpoint module; the README
-  // labels that distinction and does not invent a chat checkpoint panel.
-  await executive.evaluate(() => { window.location.hash = '#classic'; });
-  await executive.waitForSelector('.jx-app');
-  await executive.getByRole('button', { name: 'Files', exact: true }).click();
-  await executive.getByText('WORKSPACE RUNTIME', { exact: true }).waitFor();
-  // Keep the surface at its real top position: the CHECKPOINT action and the
-  // live checkpoint count are both visible without rearranging product UI.
-  await executive.waitForTimeout(350);
-  await executive.screenshot({ path: shot('checkpoint.png') });
-  const workspaceText = await executive.locator('.jx-view.show').innerText();
-  const checkpointMatch = workspaceText.match(/(\d+)\s+CHECKPOINTS/);
-  console.log(`CAPTURE checkpoint.png · live workspace checkpoint surface · count=${checkpointMatch?.[1] || 'unknown'}`);
-  await executiveContext.close();
+  await legacy.goto(`${LIVE_ORIGIN}/#classic`, { waitUntil: 'commit', timeout: 30_000 });
+  await legacy.waitForFunction(() => document.querySelector('.jx-app') && !document.querySelector('.jx-shell'), null, { timeout: 120_000 });
+  await legacy.waitForTimeout(1500);
+  await legacy.screenshot({ path: shot('legacy-console.png') });
+  const legacyHasP24 = (await legacy.locator('.jx-shell').count()) > 0;
+  console.log(`CAPTURE legacy-console.png · #classic · legacy .jx-app mounted · phase24-shell-present=${legacyHasP24}`);
+  await legacyContext.close();
 
   /* ------------------------------------------------------------------
    * GitHub-style local render of the actual README (P1 evidence).

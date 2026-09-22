@@ -103,18 +103,18 @@ Every file under `docs/` is linked below. **Indexed files: 126.**
 
 ## `assets/screenshots/`
 
-- [`assets/screenshots/agents-view.png`](assets/screenshots/agents-view.png) — Live agent-contract fleet loaded from the local brain.
 - [`assets/screenshots/architecture.svg`](assets/screenshots/architecture.svg) — README architecture diagram showing Kernel → Agents → Brain → Tools → Surfaces.
-- [`assets/screenshots/chat-modes.png`](assets/screenshots/chat-modes.png) — Live full/act chat mode with approval and tool receipts.
-- [`assets/screenshots/chat-multiagent.png`](assets/screenshots/chat-multiagent.png) — Live executive chat plan with a three-agent roster and named pipeline events.
-- [`assets/screenshots/chat-toolcards.png`](assets/screenshots/chat-toolcards.png) — Live Phase 16 chat-runtime tool and result cards in the Phase 24 shell.
-- [`assets/screenshots/checkpoint.png`](assets/screenshots/checkpoint.png) — Live classic Files surface with workspace checkpoint controls and count.
-- [`assets/screenshots/console-hero.png`](assets/screenshots/console-hero.png) — Live executive-console hero captured from the local Phase 24/React console.
+- [`assets/screenshots/chat-answer.png`](assets/screenshots/chat-answer.png) — Completed real Q&A turn in the default console: user message, narration rows, tool receipts, turn-end row (deterministic in-process agent, no provider).
+- [`assets/screenshots/chat-modes.png`](assets/screenshots/chat-modes.png) — Live full/act chat mode in the default console with approval and tool receipts.
+- [`assets/screenshots/chat-streaming.png`](assets/screenshots/chat-streaming.png) — Same turn captured immediately after send, composer still in its busy state.
+- [`assets/screenshots/chat-toolcards.png`](assets/screenshots/chat-toolcards.png) — Live Phase 16 tool.started / tool.completed cards rendered in the default console transcript.
+- [`assets/screenshots/console-hero.png`](assets/screenshots/console-hero.png) — Default boot of http://localhost:3000/ — Phase 24 shell with exactly Chat / Settings / Work Graph.
+- [`assets/screenshots/legacy-console.png`](assets/screenshots/legacy-console.png) — Record-only capture of the legacy console at #classic (not linked from the README).
 - [`assets/screenshots/placeholder-computer-control.svg`](assets/screenshots/placeholder-computer-control.svg) — Explicit placeholder icon used because no local desktop worker was available.
 - [`assets/screenshots/placeholder-runtime-only.svg`](assets/screenshots/placeholder-runtime-only.svg) — Explicit placeholder icon for runtime modules without a wired console surface.
-- [`assets/screenshots/readme-rendered.png`](assets/screenshots/readme-rendered.png) — GitHub-style browser rendering of the rewritten README hero.
-- [`assets/screenshots/settings-provider.png`](assets/screenshots/settings-provider.png) — Live provider, model, and key-reference settings surface.
-- [`assets/screenshots/workgraph-nodes.png`](assets/screenshots/workgraph-nodes.png) — Live Work Graph route showing the current honest zero-node mission state.
+- [`assets/screenshots/readme-rendered.png`](assets/screenshots/readme-rendered.png) — GitHub-style browser rendering of the README hero.
+- [`assets/screenshots/settings-provider.png`](assets/screenshots/settings-provider.png) — Live provider, model, and key-reference settings route of the default console.
+- [`assets/screenshots/workgraph-nodes.png`](assets/screenshots/workgraph-nodes.png) — Live Work Graph route of the default console showing the honest zero-node state.
 
 ## `assets/screenshots/badges/`
 
@@ -126,7 +126,9 @@ Every file under `docs/` is linked below. **Indexed files: 126.**
 
 ## `assets/screenshots/evidence/`
 
-- [`assets/screenshots/evidence/capture-run.txt`](assets/screenshots/evidence/capture-run.txt) — Raw output from the live Phase 30 README capture run.
+- [`assets/screenshots/evidence/capture-run.txt`](assets/screenshots/evidence/capture-run.txt) — Raw output from the live Phase 30 H-fix README capture run (default-boot Phase 24 shell).
+- [`assets/screenshots/evidence/hfix-boot-diff.txt`](assets/screenshots/evidence/hfix-boot-diff.txt) — H-fix boot-switch diff for src/main.jsx plus default-boot DOM inspection.
+- [`assets/screenshots/evidence/hfix-screenshot-inventory.txt`](assets/screenshots/evidence/hfix-screenshot-inventory.txt) — H-fix screenshot dimensions and byte sizes.
 - [`assets/screenshots/evidence/p1-readme-first-40.txt`](assets/screenshots/evidence/p1-readme-first-40.txt) — P1 raw README first-40-lines output and rendered-image metadata.
 - [`assets/screenshots/evidence/p2-screenshot-inventory.txt`](assets/screenshots/evidence/p2-screenshot-inventory.txt) — P2 raw screenshot dimensions and byte-size inventory.
 - [`assets/screenshots/evidence/p3-live-capture-source.txt`](assets/screenshots/evidence/p3-live-capture-source.txt) — P3 raw localhost capture-source lines and script digest.

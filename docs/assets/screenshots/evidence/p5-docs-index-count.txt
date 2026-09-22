@@ -1,8 +1,5 @@
-$ docs index/file count validation
-filesystem files: 126
-index entries:    126
-declared count:   126
-missing entries:  []
-extra entries:    []
-duplicate entries:[]
-RESULT: PASS
+index_entries 128
+docs_files 128
+missing_from_index []
+stale_in_index []
+result: PASS

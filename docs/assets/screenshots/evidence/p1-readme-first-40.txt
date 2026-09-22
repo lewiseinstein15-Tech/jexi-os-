@@ -1,4 +1,4 @@
-$ sed -n '1,40p' README.md
+$ head -40 README.md
 # JEXI OS
 
 **An agentic operating system that plans, acts, remembers, and proves.**
@@ -11,7 +11,7 @@ $ sed -n '1,40p' README.md
   <a href="#quality"><img src="docs/assets/screenshots/badges/tests.svg" alt="More than 4,000 checks"></a>
 </p>
 
-![JEXI OS executive console running against the live local brain](docs/assets/screenshots/console-hero.png)
+![JEXI OS console — default boot: Chat / Settings / Work Graph against the live local brain](docs/assets/screenshots/console-hero.png)
 
 ## What is JEXI?
 
@@ -21,26 +21,21 @@ JEXI is an agentic operating system that turns an objective into observable, res
 
 ## Feature matrix
 
-Screens are captured from the current local console; a labeled icon is used where a capability has no wired UI. Nothing below is a product mockup.
+Screens are captured from the default local console (the Phase 24 three-surface shell: Chat / Settings / Work Graph) with the brain running; a labeled icon is used where a capability has no wired UI in that shell. Nothing below is a product mockup.
 
 | Capability | What exists today | Surface evidence |
 |---|---|---|
 | **Executive kernel** | Deterministic-first intent, policy, budget, scheduling, recovery, and verification seams. | <img src="docs/assets/screenshots/placeholder-runtime-only.svg" alt="Runtime-only capability placeholder" width="180"> |
 | **Brain and providers** | Provider/model selection, key-reference handling, health, context, memory, and provider-independent routing. A hosted provider requires a valid key. | <img src="docs/assets/screenshots/settings-provider.png" alt="Live provider settings" width="180"> |
-| **Agent workforce** | Stable employee contracts, capability staffing, runtime bench controls, and per-agent execution history. | <img src="docs/assets/screenshots/agents-view.png" alt="Live agent fleet" width="180"> |
-| **Chat and tool receipts** | The Phase 16 runtime routes narration, tool calls, results, approvals, and terminal turn state into the Phase 24 console. | <img src="docs/assets/screenshots/chat-toolcards.png" alt="Live chat tool cards" width="180"> |
+| **Agent workforce** | Stable employee contracts, capability staffing, runtime bench controls, and per-agent execution history. No agent-roster surface is wired in the default shell yet; the fleet is served by the brain API. | <img src="docs/assets/screenshots/placeholder-runtime-only.svg" alt="Runtime-only capability placeholder" width="180"> |
+| **Chat and tool receipts** | The Phase 16 runtime routes narration, tool calls, results, approvals, and terminal turn state into the default console. Without a configured provider the deterministic in-process agent answers with narration, tool receipts, and a turn-end row. | <img src="docs/assets/screenshots/chat-toolcards.png" alt="Live chat tool cards" width="180"> |
 | **Modes and approvals** | Inline through full display modes plus plan/act interaction controls; destructive work is approval-gated. | <img src="docs/assets/screenshots/chat-modes.png" alt="Live full mode and approval receipts" width="180"> |
 | **Persistent work graph** | Mission graph route with deterministic layout, node details, zoom/pan, and an explicit empty state. The current capture reports zero nodes rather than seeding fake work. | <img src="docs/assets/screenshots/workgraph-nodes.png" alt="Live work graph route in its current state" width="180"> |
-| **Multi-agent execution** | The executive chat shows the live plan, selected roster, named pipeline events, and tool routing. Phase 16 split/nested projections remain runtime-only. | <img src="docs/assets/screenshots/chat-multiagent.png" alt="Live multi-agent plan" width="180"> |
+| **Multi-agent execution** | Plan, roster, pipeline events, and tool routing run in the brain and the Phase 16 runtime. Split/nested multi-agent projections are not wired into the default shell. | <img src="docs/assets/screenshots/placeholder-runtime-only.svg" alt="Runtime-only capability placeholder" width="180"> |
 | **Computer control** | Browser Router, desktop, Android, shell, file, and MCP seams are permission-gated. No local desktop worker was available during this capture. | <img src="docs/assets/screenshots/placeholder-computer-control.svg" alt="No local desktop worker placeholder" width="180"> |
-| **Workspace checkpoints** | The classic Files surface exposes real checkpoint, diff, and rollback controls. This is separate from the runtime-only Phase 16 chat checkpoint module. | <img src="docs/assets/screenshots/checkpoint.png" alt="Live workspace checkpoint surface" width="180"> |
+| **Workspace checkpoints** | Checkpoint, diff, and rollback controls exist in the brain and the Phase 16 checkpoint module. No checkpoint surface is wired into the default shell. | <img src="docs/assets/screenshots/placeholder-runtime-only.svg" alt="Runtime-only capability placeholder" width="180"> |
 
 ## Gallery
 
 <table>
   <tr>
-
-$ file docs/assets/screenshots/readme-rendered.png
-docs/assets/screenshots/readme-rendered.png: PNG image data, 1440 x 1000, 8-bit/color RGB, non-interlaced
-$ stat -c '%s bytes' docs/assets/screenshots/readme-rendered.png
-189709 bytes
