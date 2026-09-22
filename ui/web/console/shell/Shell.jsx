@@ -5,6 +5,7 @@ import Placeholder from '../placeholder/Placeholder.jsx';
 import ChatWindow from '../../../../src/components/ChatWindow.jsx';
 import Settings from '../settings/Settings.jsx';
 import '../settings/settings.css';
+import Graph from '../graph/Graph.jsx';
 import TokenInspector from './TokenInspector.jsx';
 import { ROUTES, DEFAULT_ROUTE, TOKENS_HASH, routeFromHash } from './routes.js';
 
@@ -43,7 +44,9 @@ export default function Shell() {
               ? <ChatWindow />
               : route.id === 'settings'
                 ? <Settings sessionId="console-main" />
-                : <Placeholder route={route} />}
+                : route.id === 'graph'
+                  ? <Graph />
+                  : <Placeholder route={route} />}
         </main>
       </div>
     </div>
