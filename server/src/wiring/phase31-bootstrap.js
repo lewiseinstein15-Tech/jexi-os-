@@ -27,6 +27,14 @@
  * deterministic `W31 <ID>: FAIL-SOFT <reason>` line and boot continues
  * (hud-seam philosophy). The only hard gate is W36.
  * Log lines carry NO timestamps so P7 determinism holds.
+ *
+ * Phase 31 Scope 7 (S5-BOOTSTRAP) dependency note:
+ *   `npm ci` (repo root) and `npm --prefix server ci` (server/) were
+ *   already executed during Scope 1 environment bring-up on the
+ *   phase-31-wiring branch and are NOT re-run by this boot path —
+ *   this bootstrap performs no package installation. Boot requires
+ *   both node_modules trees to be present. Runtime floor and resource
+ *   minimums: docs/SERVER-REQUIREMENTS.md.
  */
 
 import fs from 'node:fs';
