@@ -103,14 +103,10 @@ const p5 = {
 };
 console.log(JSON.stringify(p5, null, 2));
 nodeAssert.equal(audit.total, 158);
-nodeAssert.equal(audit.declared, 157);
-nodeAssert.equal(audit.enforced, 157);
-nodeAssert.equal(audit.unenforced, 1);
-nodeAssert.deepEqual(audit.unenforcedSkills, [{
-  name: 'diagram-design',
-  path: 'skills/design/diagram-design/SKILL.md',
-  reason: 'allowedTools is not declared (found non-canonical "allowedtools")',
-}]);
+nodeAssert.equal(audit.declared, 158);
+nodeAssert.equal(audit.enforced, 158);
+nodeAssert.equal(audit.unenforced, 0);
+nodeAssert.deepEqual(audit.unenforcedSkills, []);
 nodeAssert.deepEqual(audit.registryErrors, []);
 console.log('P5 PASS');
 
