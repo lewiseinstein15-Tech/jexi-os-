@@ -5,17 +5,23 @@
 
 name: Publish Docker image
 
-# DISABLED push trigger 2026-09-22 (CI failure sweep):
-# Phase 24 (merge 3c1446a4) rewired src/components/ChatWindow.jsx to import
-# ../../ui/web/console/chat/mount.js, but Dockerfile.slim copies only
-# package*/index.html/vite/tailwind/postcss/public/src/commands into the
-# image — never ui/. The in-image `npm run build` therefore fails:
-#   Could not resolve "../../ui/web/console/chat/mount.js" from
-#   "src/components/ChatWindow.jsx"
-# Root fix = add `COPY ui ./ui` to Dockerfile.slim before the build step.
-# Dockerfile.slim is OUTSIDE this sweep's file zone (.github/**, tests) —
-# fix proposed to lead, pending approval. Manual runs only until then.
+# Push trigger RE-ENABLED 2026-09-22 on cleanup/ci-followup-1 (lead-approved):
+# the Phase 24 regression (ChatWindow.jsx -> ui/web/console/chat/mount.js not
+# resolvable in-image) is fixed by `COPY ui ./ui` in Dockerfile.slim.
 on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'server/**'
+      - 'mcp/**'
+      - 'src/**'
+      - 'public/**'
+      - 'commands/**'
+      - 'ui/**'
+      - 'Dockerfile.slim'
+      - 'package.json'
+      - 'index.html'
+      - 'vite.config.js'
   workflow_dispatch:
 
 env:
