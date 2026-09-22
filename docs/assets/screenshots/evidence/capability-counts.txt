@@ -1,0 +1,57 @@
+$ node --input-type=module -e "const m=await import('./workforce/agents/index.js');await m.load?.();console.log('agents',m.list().length);console.log('divisions',m.divisions().length)"
+agents 400
+divisions 18
+
+$ node -e "const j=require('./workforce/divisions.json');console.log('divisions.json',j.divisions.length,j.divisions.map(d=>d.id).join(','))"
+divisions.json 18 automation,business,content,data,design,engineering,integration,learning,legal,localization,meta,ops,product,research,security,testing,visualization,voice
+
+$ grep -rhoE "name: *'[a-z]+_[a-z0-9_]+'" server/src/tools/domains | sort -u | wc -l
+39
+
+$ ls -d server/src/tools/domains/*/ | wc -l
+12
+
+$ find skills/library -name SKILL.md | wc -l
+1164
+
+$ node -e "const a=require('./server/mcp/registry.json').servers;console.log('registered',a.length,'enabled',a.filter(s=>s.enabled!==false).length)"
+registered 53 enabled 29
+
+$ node -e "const s=require('./server/mcp/tool-directory.json').servers;let t=0;for(const k in s)t+=(s[k].tools||[]).length;console.log('directory servers',Object.keys(s).length,'tools',t)"
+directory servers 44 tools 538
+
+$ grep -oE "id: *'[a-z0-9-]+'" server/src/services/WebSearch.js | sort -u | wc -l
+20
+
+$ grep -oE "id: *'[a-z0-9-]+'" server/src/services/WebSearch.js | sort -u | tr '\n' ' '
+id: 'anysearch' id: 'arxiv' id: 'bing' id: 'brave' id: 'commoncrawl' id: 'ddg-html' id: 'ddg-instant' id: 'ddg-lite' id: 'exa-anon' id: 'firecrawl' id: 'google-news' id: 'hackernews' id: 'marginalia' id: 'mojeek' id: 'openalex' id: 'parallel' id: 'searxng' id: 'stackoverflow' id: 'tavily' id: 'wikipedia' 
+$ grep -cE '^[0-9]+\. \{"action"' server/src/services/ComputerUseTraining.js
+16
+
+$ grep -oE '^[0-9]+\. \{"action":"[a-z_]+"' server/src/services/ComputerUseTraining.js | grep -oE '"[a-z_]+"$' | tr '\n' ' '
+"goto" "click_index" "type_index" "type" "press" "click_text" "click" "scroll" "back" "forward" "read_page" "screenshot" "write_file" "shell" "wait" "done" 
+$ node --input-type=module -e "const m=await import('./harness/parity/hooks/catalog.js');console.log('hook events',m.HOOK_CATALOG.length)"
+hook events 30
+
+$ node --input-type=module -e "const m=await import('./brain/protocol/verbs.js');console.log(m.PROTOCOL_VERSION,m.VERB_NAMES.length,m.VERB_NAMES.join(','))"
+1.0 5 recall,remember,entity,synthesize,forget
+
+$ ls brain/cycle/phases | wc -l
+13
+
+$ node --input-type=module -e "const m=await import('./ui/web/console/shell/routes.js');console.log(m.ROUTES.length,m.ROUTES.map(r=>r.label).join(' / '))"
+3 Chat / Settings / Work Graph
+
+$ node --input-type=module -e "const m=await import('./surfsense/output/formats.js');console.log(m.FORMAT_NAMES.length)"
+12
+
+$ node --input-type=module -e "const m=await import('./surfsense/connectors/index.js');console.log(m.list().length)"
+16
+
+$ grep -n 'p@5 and r@5\|p5:\|r5:' brain/evals/brainbench.js
+31: * Macro-average p@5 and r@5 over declared queries. The retriever sees query
+58:      p5: score.precision,
+59:      r5: score.recall,
+66:    p5: mean('p5'),
+67:    r5: mean('r5'),
+

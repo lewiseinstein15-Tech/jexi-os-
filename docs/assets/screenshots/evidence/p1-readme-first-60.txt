@@ -1,3 +1,4 @@
+$ head -60 README.md
 # JEXI OS
 
 **Your own agentic OS: it plans, acts, remembers, and proves.**
@@ -58,56 +59,3 @@ You type a request that writes something: *"write a scheduler runbook with cron,
 
 ![A completed write turn: narration, approval requested, approval approved, write_file tool.started and tool.completed cards, closing narration, and the turn-end row](docs/assets/screenshots/example-flow.png)
 
-## Quick Start
-
-Requires **Node.js 22 or newer**.
-
-```bash
-git clone https://github.com/lewiseinstein15-Tech/jexi-os-.git
-cd jexi-os-
-npm ci
-npm --prefix server ci
-npm run dev:full
-```
-
-Then open <http://localhost:3000>. `dev:full` starts the brain on `:3002` and the console on `:3000`.
-
-**Provider.** Configure ONE provider in **Settings → Model**: pick the provider and model, then set a `keyRef` (an environment-variable name such as `OPENAI_API_KEY`, or `keyring:<ref>`). Keys are never entered inline. Without a configured provider the console still works: the deterministic in-process agent answers with narration, tool receipts, and a turn-end row, not a model-generated answer. Configure a provider to unlock real LLM answers.
-
-Verification note: `npm ci`, `npm --prefix server ci`, and `npm run dev:full` were verified on the capture host against the checked-out tree; the `git clone` step is NOT VERIFIED on that host because it has no Git transport to this repository.
-
-## Architecture
-
-![Kernel to Agents to Brain to Tools to Surfaces architecture](docs/assets/screenshots/architecture.svg)
-
-Surfaces (web console, Android, API) send commands to the executive kernel and receive its event stream back. The kernel owns intent, policy, budgets, scheduling, and recovery, and staffs work to agents through stable contracts. Agents reason through the brain (providers, context, memory, verification) and act through permission-gated tools that reach the computer, the browser, the shell, files, and MCP servers. Everything a tool does returns as evidence and receipts that flow back into the kernel and the transcript. The deep dive is in [docs/REBUILD-MAP.md](docs/REBUILD-MAP.md).
-
-## What's inside
-
-- **Agent runtime** (`workforce/`, `server/src/services`): a 400-agent, 18-division registry with capability inference, trust levels, subagent spawning, and per-turn narration.
-- **Brain** (`brain/`): hybrid search, hot memory, knowledge graph, the five-verb memory protocol, a 13-phase dream cycle, and the BrainBench retrieval benchmark.
-- **Computer agent** (`server/src/services/ComputerUseAgent.js`, `runtimes/browser`): vision-grounded browser and desktop control with a 16-action vocabulary and screenshot read-back.
-- **Tools and MCP** (`server/src/tools`, `server/mcp`): 39 built-in tools across 12 domains plus 53 registered MCP servers, all behind approval gates and receipts.
-- **Swarm and instincts** (`swarm/`, `instincts/`): parallel worker orchestration and learned behavioural priors that shape how agents pick tools.
-- **Prompt architecture** (`prompt/`): a layered constitution, output-format contracts, and per-agent identity.
-- **Research engine** (`surfsense/`): 16 source connectors, 20 web search engines, and 12 output formats.
-- **Harness** (`harness/`, `hooks/`): the 30-event lifecycle hook catalog, rules, and parity probes that keep the runtime honest.
-
-## Docs
-
-The complete, linked index of everything under `docs/` is [docs/README-INDEX.md](docs/README-INDEX.md).
-
-## License
-
-Code is licensed **MIT** — see [LICENSE](LICENSE). Data obtained from external
-providers is **NOT** covered by MIT: every external data source carries its own
-license and terms, documented per source in [DATA_SOURCES.md](DATA_SOURCES.md).
-Dependency licenses are aggregated in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-## Contributing
-
-Work on a branch per scope and stop after each one for review. Keep every change inside its declared zone, attach raw probe evidence (commands and their output, real screenshots, never mockups), and report anything you could not exercise as not verified rather than claiming it. Never add credentials or new dependencies without explicit approval.
-
----
-
-*Built by Lewis & the JEXI agent · MIT · 100% free-tier infrastructure, no credit card, ever.*

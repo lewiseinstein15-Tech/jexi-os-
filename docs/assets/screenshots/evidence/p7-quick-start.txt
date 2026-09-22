@@ -1,0 +1,33 @@
+$ sed -n "/## Quick Start/,/## Architecture/p" README.md
+## Quick Start
+
+Requires **Node.js 22 or newer**.
+
+```bash
+git clone https://github.com/lewiseinstein15-Tech/jexi-os-.git
+cd jexi-os-
+npm ci
+npm --prefix server ci
+npm run dev:full
+```
+
+Then open <http://localhost:3000>. `dev:full` starts the brain on `:3002` and the console on `:3000`.
+
+**Provider.** Configure ONE provider in **Settings → Model**: pick the provider and model, then set a `keyRef` (an environment-variable name such as `OPENAI_API_KEY`, or `keyring:<ref>`). Keys are never entered inline. Without a configured provider the console still works: the deterministic in-process agent answers with narration, tool receipts, and a turn-end row, not a model-generated answer. Configure a provider to unlock real LLM answers.
+
+Verification note: `npm ci`, `npm --prefix server ci`, and `npm run dev:full` were verified on the capture host against the checked-out tree; the `git clone` step is NOT VERIFIED on that host because it has no Git transport to this repository.
+
+## Architecture
+$ node --version
+v20.20.2
+$ git clone https://github.com/lewiseinstein15-Tech/jexi-os-.git
+NOT VERIFIED - no Git transport to this repository on the capture host (standing auth incident; no new credential authorized).
+$ npm ci (tail)
+added 762 packages, and audited 763 packages
+$ npm --prefix server ci (tail)
+added 395 packages, and audited 396 packages
+$ npm run dev:full
+[ui]   ➜  Local:   http://localhost:3000/
+[brain] 🧠 JEXI OS BRAIN running on http://0.0.0.0:3002
+$ curl -s -o /dev/null -w "%{http_code}" http://localhost:3002/api/health
+200

@@ -1,0 +1,6 @@
+$ python3 count.py  (files = every file under docs/ incl. README-INDEX.md; entries = "- [`path`](path)" lines)
+files under docs/ = 117
+index entries    = 117
+missing = []
+stale   = []
+result: PASS

@@ -1,9 +1,12 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
+import Shell from '../ui/web/console/shell/Shell.jsx'
 import './index.css'
 import './jexi-theme.css' // FINAL — visual system layer (fonts, flat reskin, a11y)
 import 'katex/dist/katex.min.css' // B151 — KaTeX math rendering (bundled)
+import '../ui/web/console/shell/tokens.css'
+import '../ui/web/console/shell/shell.css'
 import { setupPushSubscription } from './utils/pushSubscribe'
 import { setupFcm, armFcmForegroundRetry } from './utils/fcmSetup'
 import { apply as applyOfficialBrand } from './brand/official'
@@ -30,8 +33,19 @@ window.addEventListener('load', () => {
   armFcmForegroundRetry()
 })
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)
+// phase-30(H-fix) — the Phase 24 shell (Chat / Settings / Work Graph) is the
+// default boot. Only a deliberate #classic mounts the legacy console. The
+// shell is mounted exactly as its standalone entry does
+// (ui/web/console/shell/main.jsx: no StrictMode) because the Phase 16 chat
+// mount owns its own React root and StrictMode's double-effect would unmount
+// that root synchronously mid-render. Legacy keeps StrictMode unchanged.
+const root = ReactDOM.createRoot(document.getElementById('root'))
+if (window.location.hash === '#classic') {
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  )
+} else {
+  root.render(<Shell />)
+}

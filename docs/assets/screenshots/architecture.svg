@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="460" viewBox="0 0 1600 460" role="img" aria-labelledby="title desc">
+  <title id="title">JEXI OS architecture</title>
+  <desc id="desc">A five-stage architecture flowing from Kernel to Agents to Brain to Tools to Surfaces, with evidence returning to the Kernel.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#090b10"/>
+      <stop offset="1" stop-color="#141018"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8178ff"/>
+      <stop offset="1" stop-color="#ff7848"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0 0L12 6L0 12Z" fill="#8178ff"/>
+    </marker>
+    <marker id="returnArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0 0L12 6L0 12Z" fill="#5d6472"/>
+    </marker>
+  </defs>
+  <rect width="1600" height="460" rx="28" fill="url(#bg)"/>
+  <circle cx="800" cy="-80" r="350" fill="#6c63ff" opacity=".08"/>
+  <text x="72" y="68" fill="#f5f6fa" font-family="Inter,Segoe UI,sans-serif" font-size="28" font-weight="700" letter-spacing="3">JEXI OS · EXECUTION PATH</text>
+  <text x="72" y="100" fill="#8e94a3" font-family="ui-monospace,SFMono-Regular,monospace" font-size="15">intent enters once · observable evidence returns at every boundary</text>
+
+  <g font-family="Inter,Segoe UI,sans-serif">
+    <g transform="translate(72 150)">
+      <rect width="240" height="152" rx="20" fill="#141720" stroke="#8178ff" stroke-width="2"/>
+      <circle cx="35" cy="36" r="13" fill="#8178ff" filter="url(#glow)"/>
+      <text x="62" y="44" fill="#ffffff" font-size="21" font-weight="700">KERNEL</text>
+      <text x="28" y="88" fill="#aeb3c0" font-size="15">intent · policy</text>
+      <text x="28" y="115" fill="#aeb3c0" font-size="15">budgets · scheduling</text>
+      <text x="28" y="139" fill="#6f7582" font-size="12" font-family="ui-monospace,SFMono-Regular,monospace">deterministic first</text>
+    </g>
+    <g transform="translate(376 150)">
+      <rect width="240" height="152" rx="20" fill="#141720" stroke="#726ff0" stroke-width="2"/>
+      <circle cx="35" cy="36" r="13" fill="#726ff0"/>
+      <text x="62" y="44" fill="#ffffff" font-size="21" font-weight="700">AGENTS</text>
+      <text x="28" y="88" fill="#aeb3c0" font-size="15">director · specialists</text>
+      <text x="28" y="115" fill="#aeb3c0" font-size="15">delegate · verify</text>
+      <text x="28" y="139" fill="#6f7582" font-size="12" font-family="ui-monospace,SFMono-Regular,monospace">stable contracts</text>
+    </g>
+    <g transform="translate(680 150)">
+      <rect width="240" height="152" rx="20" fill="#141720" stroke="#9a65d8" stroke-width="2"/>
+      <circle cx="35" cy="36" r="13" fill="#9a65d8"/>
+      <text x="62" y="44" fill="#ffffff" font-size="21" font-weight="700">BRAIN</text>
+      <text x="28" y="88" fill="#aeb3c0" font-size="15">providers · context</text>
+      <text x="28" y="115" fill="#aeb3c0" font-size="15">memory · recovery</text>
+      <text x="28" y="139" fill="#6f7582" font-size="12" font-family="ui-monospace,SFMono-Regular,monospace">provider-independent</text>
+    </g>
+    <g transform="translate(984 150)">
+      <rect width="240" height="152" rx="20" fill="#141720" stroke="#cf626f" stroke-width="2"/>
+      <circle cx="35" cy="36" r="13" fill="#cf626f"/>
+      <text x="62" y="44" fill="#ffffff" font-size="21" font-weight="700">TOOLS</text>
+      <text x="28" y="88" fill="#aeb3c0" font-size="15">MCP · shell · files</text>
+      <text x="28" y="115" fill="#aeb3c0" font-size="15">browser · computer</text>
+      <text x="28" y="139" fill="#6f7582" font-size="12" font-family="ui-monospace,SFMono-Regular,monospace">permission-gated</text>
+    </g>
+    <g transform="translate(1288 150)">
+      <rect width="240" height="152" rx="20" fill="#141720" stroke="#ff7848" stroke-width="2"/>
+      <circle cx="35" cy="36" r="13" fill="#ff7848" filter="url(#glow)"/>
+      <text x="62" y="44" fill="#ffffff" font-size="21" font-weight="700">SURFACES</text>
+      <text x="28" y="88" fill="#aeb3c0" font-size="15">web · Android</text>
+      <text x="28" y="115" fill="#aeb3c0" font-size="15">API · event stream</text>
+      <text x="28" y="139" fill="#6f7582" font-size="12" font-family="ui-monospace,SFMono-Regular,monospace">truthful state</text>
+    </g>
+  </g>
+
+  <g stroke="#8178ff" stroke-width="3" fill="none" marker-end="url(#arrow)">
+    <path d="M322 226H361"/><path d="M626 226H665"/><path d="M930 226H969"/><path d="M1234 226H1273"/>
+  </g>
+  <path d="M1408 330C1408 398 192 398 192 330" fill="none" stroke="#5d6472" stroke-width="2" stroke-dasharray="7 8" marker-end="url(#returnArrow)"/>
+  <rect x="626" y="371" width="348" height="40" rx="20" fill="#10131a" stroke="#343a46"/>
+  <text x="800" y="397" text-anchor="middle" fill="#8e94a3" font-family="ui-monospace,SFMono-Regular,monospace" font-size="14">observations · receipts · verification</text>
+</svg>
