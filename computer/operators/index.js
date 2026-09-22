@@ -18,12 +18,16 @@ import { ComputerError } from '../errors.js';
 import { assertOperator, OPERATOR_CAPABILITY_KEYS, OPERATOR_CODES } from './interface.js';
 import { createDesktopOperator } from './desktop.js';
 import { createFakeOperator } from './fake.js';
+// Phase 29 Scope C — registry extension (BUILD-sanctioned additive edit to
+// this Scope B file; nothing about desktop/fake/interface changes):
+import { createBrowserOperator } from './browser.js';
 
 export const DEFAULT_OPERATOR = 'desktop';
 
 const CREATORS = Object.freeze({
   desktop: createDesktopOperator,
   fake: createFakeOperator,
+  browser: createBrowserOperator, // Scope C
 });
 
 function buildRegistry() {
@@ -68,4 +72,4 @@ function buildRegistry() {
 
 export const registry = buildRegistry();
 
-export { assertOperator, OPERATOR_CAPABILITY_KEYS, OPERATOR_CODES, createDesktopOperator, createFakeOperator };
+export { assertOperator, OPERATOR_CAPABILITY_KEYS, OPERATOR_CODES, createDesktopOperator, createFakeOperator, createBrowserOperator };
