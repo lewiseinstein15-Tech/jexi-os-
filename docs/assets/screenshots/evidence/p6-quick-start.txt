@@ -1,0 +1,74 @@
+$ node --version && npm --version
+v20.20.2
+10.8.2
+
+$ git clone https://github.com/lewiseinstein15-Tech/jexi-os-.git
+NOT VERIFIED - repository Git transport is unavailable under the standing repository-wide auth/404 incident; no new credential was authorized.
+
+$ npm ci (captured successful cold lockfile install; tail)
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: 'concurrently@10.0.4',
+npm warn EBADENGINE   required: { node: '>=22' },
+npm warn EBADENGINE   current: { node: 'v20.20.2', npm: '10.8.2' }
+npm warn EBADENGINE }
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated coverup@0.1.1: No longer maintained
+npm warn deprecated uuid@7.0.3: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated react-use-gesture@8.0.1: This package is no longer maintained. Please use @use-gesture/react instead
+
+added 762 packages, and audited 763 packages in 22s
+
+241 packages are looking for funding
+  run `npm fund` for details
+
+7 vulnerabilities (4 moderate, 3 high)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+$ npm --prefix server ci (captured successful cold lockfile install; tail)
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: 'unpdf@1.8.0',
+npm warn EBADENGINE   required: { node: '>=22' },
+npm warn EBADENGINE   current: { node: 'v20.20.2', npm: '10.8.2' }
+npm warn EBADENGINE }
+npm warn deprecated whatwg-encoding@3.1.1: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+
+added 395 packages, and audited 396 packages in 13s
+
+93 packages are looking for funding
+  run `npm fund` for details
+
+7 vulnerabilities (4 moderate, 3 high)
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+
+$ provider configuration state from live Settings capture
+CAPTURE settings-provider.png · provider=anthropic · key-reference-configured=false
+Provider-backed execution: NOT VERIFIED - requires provider
+
+$ npm run dev (intentionally stopped after ready evidence)
+
+> jexi-os@1.2.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 191 ms
+
+  ➜  Local:   http://localhost:3000/
+  ➜  Network: http://169.254.0.21:3000/
+
+command_exit=124 (124/130 means intentionally stopped after startup evidence)
+
+$ GET /api/health (captured while npm run dev:full was live)
+{"ok":true,"name":"JEXI OS Brain","version":"1.6.2","instanceId":"tjhlym","uptime":196,"redis":false,"durable":{"backend":"none","active":false},"port":3002,"providers":[{"provider":"Groq","key":"groq","order":1,"configured":false,"calls":29,"ok":0,"fails":29,"inCooldown":false,"cooldownLeftSec":0},{"provider":"Gemini","key":"gemini","order":2,"configured":false,"calls":29,"ok":0,"fails":29,"inCooldown":false,"cooldownLeftSec":0},{"provider":"OpenRouter","key":"openrouter","order":3,"configured":false,"calls":29,"ok":0,"fails":29,"inCooldown":false,"cooldownLeftSec":0},{"provider":"Mistral","key":"mistral","order":4,"configured":false,"calls":29,"ok":0,"fails":29,"inCooldown":false,"cooldownLeftSec":0},{"provider":"NVIDIA NIM","key":"nvidia","order":5,"configured":false,"calls":29,"ok":0,"fails":29,"inCooldown":false,"cooldownLeftSec":0},{"provider":"Cloudflare Workers AI","key":"cloudflare","order":6,"configured":false,"calls":29,"ok":0,"fails":29,"inCooldown":false,"cooldownLeftSec":0},{"provider":"vLLM (self-hosted)","key":"vllm","order":7,"configured":false,"calls":29,"ok":0,"fails":29,"inCooldown":false,"cooldownLeftSec":0},{"provider":"HuggingFace","key":"huggingface","order":8,"configured":false,"calls":29,"ok":0,"fails":29,"inCooldown":false,"cooldownLeftSec":0},{"provider":"Pollinations (keyless)","key":"pollinations","order":9,"configured":false,"calls":29,"ok":0,"fails":29,"inCooldown":false,"cooldownLeftSec":0}],"platform":{"observability":{"spans":0,"running":0},"guardrail":{"safeMode":false},"offline":{"configured":false},"voice":{"active":false,"state":"idle"},"plugins":0,"locks":0,"chaos":false},"time":"2026-09-22T11:14:51.870Z"}

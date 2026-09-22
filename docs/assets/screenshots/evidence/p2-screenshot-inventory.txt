@@ -1,0 +1,20 @@
+$ PNG screenshot inventory (dimensions, bytes)
+docs/assets/screenshots/agents-view.png	1440x900	220675 bytes	215.5 KiB
+docs/assets/screenshots/chat-modes.png	1440x900	70791 bytes	69.1 KiB
+docs/assets/screenshots/chat-multiagent.png	1440x900	188888 bytes	184.5 KiB
+docs/assets/screenshots/chat-toolcards.png	1440x900	47711 bytes	46.6 KiB
+docs/assets/screenshots/checkpoint.png	1440x900	96288 bytes	94.0 KiB
+docs/assets/screenshots/console-hero.png	1440x900	182752 bytes	178.5 KiB
+docs/assets/screenshots/readme-rendered.png	1440x1000	189709 bytes	185.3 KiB
+docs/assets/screenshots/settings-provider.png	1440x900	69783 bytes	68.1 KiB
+docs/assets/screenshots/workgraph-nodes.png	1440x900	36210 bytes	35.4 KiB
+
+$ SVG README-asset inventory (declared dimensions, bytes)
+docs/assets/screenshots/architecture.svg	1600x460	5337 bytes
+docs/assets/screenshots/badges/build.svg	90x20	2263 bytes
+docs/assets/screenshots/badges/license.svg	78x20	1275 bytes
+docs/assets/screenshots/badges/node.svg	87x20	3511 bytes
+docs/assets/screenshots/badges/phases.svg	86x20	1285 bytes
+docs/assets/screenshots/badges/tests.svg	98x20	1285 bytes
+docs/assets/screenshots/placeholder-computer-control.svg	420x240	864 bytes
+docs/assets/screenshots/placeholder-runtime-only.svg	420x240	893 bytes

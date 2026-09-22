@@ -1,0 +1,12 @@
+LIVE source: http://localhost:3000
+LIVE brain : http://localhost:3002 · HTTP 200 · v1.6.2
+CAPTURE chat-toolcards.png · 2 live tool cards
+CAPTURE settings-provider.png · provider=anthropic · key-reference-configured=false
+CAPTURE chat-modes.png · full/act · real approval + tool receipts
+CAPTURE workgraph-nodes.png · 0 nodes · 0 edges · honest live empty state
+CAPTURE console-hero.png · live executive console · multi-agent=verified
+CAPTURE chat-multiagent.png · PLAN 3 steps · Researcher, Reasoner, Memory Agent RUNNING Researcher Reasoner Memory Agent
+CAPTURE agents-view.png · 10 live contract rows
+CAPTURE checkpoint.png · live workspace checkpoint surface · count=0
+CAPTURE readme-rendered.png · actual README rendered with GitHub-style Markdown CSS · 0 broken images
+DONE phase30 README captures

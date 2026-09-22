@@ -1,0 +1,22 @@
+$ grep -nE 'LIVE_ORIGIN|BRAIN_ORIGIN|PHASE24|liveGoto|page.goto|request interception|fixture' scripts/phase30-readme-shots.mjs
+7: * localhost:3002 for the brain. It never substitutes mocked routes or fixture
+25:const LIVE_ORIGIN = process.env.JEXI_LIVE_ORIGIN || 'http://localhost:3000';
+26:const BRAIN_ORIGIN = process.env.JEXI_BRAIN_ORIGIN || 'http://localhost:3002';
+27:const PHASE24 = `${LIVE_ORIGIN}/ui/web/console/shell/index.html`;
+32:const healthResponse = await fetch(`${BRAIN_ORIGIN}/api/health`);
+35:  throw new Error(`Live brain unavailable at ${BRAIN_ORIGIN}/api/health (HTTP ${healthResponse.status})`);
+37:console.log(`LIVE source: ${LIVE_ORIGIN}`);
+38:console.log(`LIVE brain : ${BRAIN_ORIGIN} · HTTP ${healthResponse.status} · v${health.version || 'unknown'}`);
+42:async function liveGoto(page, url, selector, timeout = 60_000) {
+43:  await page.goto(url, { waitUntil: 'commit', timeout: 30_000 });
+56:  await liveGoto(p24, `${PHASE24}#/chat`, '.p24-composer');
+64:  await liveGoto(p24, `${PHASE24}#/settings`, '.p24-settings');
+72:  await liveGoto(p24, `${PHASE24}#/chat`, '.p24-composer');
+82:  await liveGoto(p24, `${PHASE24}#/graph`, '.p24-graph-toolbar');
+96:   * No request interception and no seeded response data are used.
+108:  }, BRAIN_ORIGIN);
+110:  await liveGoto(executive, `${LIVE_ORIGIN}/#chat`, '.vw.active[data-view="chat"]', 180_000);
+165:  const baseHref = `${LIVE_ORIGIN}/`;
+
+$ sha256sum scripts/phase30-readme-shots.mjs
+0e7e15c671267b246da41723f7150c315b28c80be0f7155c2357cc671452e5fd  scripts/phase30-readme-shots.mjs

@@ -1,180 +1,142 @@
-# ⚡ JEXI OS — Your Personal AI Operating System
+# JEXI OS
 
-**JEXI** is a multi-agent AI system you can talk to like a person. She plans, builds, researches, remembers, schedules, and ships — streaming every step live so you always see what she's doing.
+**An agentic operating system that plans, acts, remembers, and proves.**
 
-> One chat box. Behind it: **the Director** — JEXI runs as the boss of a small team of stable AI employees (Zola · Forge · Vera · Echo · Ada…). She interprets your request, plans, staffs the right people by capability, delegates real work with structured briefs, **watches them work live and redirects bad approaches mid-stream**, runs and verifies the results, and reports back in her own voice. Under her: a wider bench of 213 profiled specialists, 18 search engines, a coding loop that runs and fixes real code, isolated per-agent memory, a self-improving skill loop, and her own workspace where builds go live on the public internet — all on **100% free infrastructure, no credit card**.
+<p>
+  <a href="https://github.com/lewiseinstein15-Tech/jexi-os-/actions/workflows/ci.yml"><img src="docs/assets/screenshots/badges/build.svg" alt="CI build status"></a>
+  <a href="LICENSE"><img src="docs/assets/screenshots/badges/license.svg" alt="MIT license"></a>
+  <a href="package.json"><img src="docs/assets/screenshots/badges/node.svg" alt="Node.js 22 or newer"></a>
+  <a href="#roadmap"><img src="docs/assets/screenshots/badges/phases.svg" alt="Phases 0 through 30"></a>
+  <a href="#quality"><img src="docs/assets/screenshots/badges/tests.svg" alt="More than 4,000 checks"></a>
+</p>
 
----
+![JEXI OS executive console running against the live local brain](docs/assets/screenshots/console-hero.png)
 
-## 🔥 ARENA REBUILD (Sept 2026) — the executive rebuild
+## What is JEXI?
 
-JEXI has been rebuilt for speed and honesty around an **Executive Kernel**:
-small talk answers in **~80ms with ZERO model calls**; every turn carries a
-meter showing exactly how many model calls it cost and where the milliseconds
-went; Ollama on your own machine is a first-class provider
-(`MODEL_PROVIDER=ollama`); missions steer mid-flight preserving finished
-work; the Memory Vault labels stale knowledge for re-verification; the
-Browser Router enforces hard safety rules (CAPTCHA never bypassed, private
-storage never read); and the UI is a warm orange/coral desktop with a left
-rail (Home / Missions / Agents / Memory / Tools / Files / Settings), a
-phone drawer (no bottom nav bar), and JEXI's dialogue in her own
-handwriting. Full evidence: **`docs/ARENA-REBUILD-REPORT.md`**.
+JEXI is an agentic operating system that turns an objective into observable, resumable work. Its brain combines deterministic routing, provider-backed reasoning, memory, scheduling, recovery, and evidence. Specialized agents plan, delegate, execute, critique, and verify through stable contracts instead of pretending that one model did everything. Permission-gated computer control connects the system to browsers, files, shells, devices, and external tools while reporting unavailable workers honestly.
 
-## ⚡ ARENA ASTRA (Sept 2026) — the executive architecture
+![Kernel to Agents to Brain to Tools to Surfaces architecture](docs/assets/screenshots/architecture.svg)
 
-The rebuild continued into a full Astra-class execution architecture: a
-unified **Observer** event bus, deterministic-first **IntentEngine**
-(2ms p50, 0 model calls), provider-independent **ReasoningEngine** with
-first-class **OllamaProvider**, budgeted **ContextEngine**, persistent
-**MemoryVault**, dependency-aware **Scheduler**, diagnose→retry→replan
-**Recovery**, human-gated **SelfImprovement**, external **JEXI Market**
-provider (honest when unconnected), and a private **UserProfile** for
-Lewis — plus a reference-look UI (top search, Lewis chip, live desktop
-mission rail, phone hamburger, zero neon green). Proven live: 11/11 new
-test suites, 14/14 DOM checks, real screenshots. Full evidence:
-**`docs/ARENA-ASTRA-REBUILD-REPORT.md**`.
+## Feature matrix
 
----
+Screens are captured from the current local console; a labeled icon is used where a capability has no wired UI. Nothing below is a product mockup.
 
-## 🌐 Use JEXI
+| Capability | What exists today | Surface evidence |
+|---|---|---|
+| **Executive kernel** | Deterministic-first intent, policy, budget, scheduling, recovery, and verification seams. | <img src="docs/assets/screenshots/placeholder-runtime-only.svg" alt="Runtime-only capability placeholder" width="180"> |
+| **Brain and providers** | Provider/model selection, key-reference handling, health, context, memory, and provider-independent routing. A hosted provider requires a valid key. | <img src="docs/assets/screenshots/settings-provider.png" alt="Live provider settings" width="180"> |
+| **Agent workforce** | Stable employee contracts, capability staffing, runtime bench controls, and per-agent execution history. | <img src="docs/assets/screenshots/agents-view.png" alt="Live agent fleet" width="180"> |
+| **Chat and tool receipts** | The Phase 16 runtime routes narration, tool calls, results, approvals, and terminal turn state into the Phase 24 console. | <img src="docs/assets/screenshots/chat-toolcards.png" alt="Live chat tool cards" width="180"> |
+| **Modes and approvals** | Inline through full display modes plus plan/act interaction controls; destructive work is approval-gated. | <img src="docs/assets/screenshots/chat-modes.png" alt="Live full mode and approval receipts" width="180"> |
+| **Persistent work graph** | Mission graph route with deterministic layout, node details, zoom/pan, and an explicit empty state. The current capture reports zero nodes rather than seeding fake work. | <img src="docs/assets/screenshots/workgraph-nodes.png" alt="Live work graph route in its current state" width="180"> |
+| **Multi-agent execution** | The executive chat shows the live plan, selected roster, named pipeline events, and tool routing. Phase 16 split/nested projections remain runtime-only. | <img src="docs/assets/screenshots/chat-multiagent.png" alt="Live multi-agent plan" width="180"> |
+| **Computer control** | Browser Router, desktop, Android, shell, file, and MCP seams are permission-gated. No local desktop worker was available during this capture. | <img src="docs/assets/screenshots/placeholder-computer-control.svg" alt="No local desktop worker placeholder" width="180"> |
+| **Workspace checkpoints** | The classic Files surface exposes real checkpoint, diff, and rollback controls. This is separate from the runtime-only Phase 16 chat checkpoint module. | <img src="docs/assets/screenshots/checkpoint.png" alt="Live workspace checkpoint surface" width="180"> |
 
-| Where | Link |
-|---|---|
-| **Web (always newest)** | https://lewiseinstein15-Tech.github.io/jexi-os-/ |
-| **Android app (APK)** | https://github.com/lewiseinstein15-Tech/jexi-os-/releases/latest/download/app-debug.apk |
-| **Her build workspace** (live apps she made) | https://lewiseinstein15-tech.github.io/jexi-workspace/ |
+## Gallery
 
----
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/screenshots/console-hero.png" alt="JEXI executive console"><br><strong>Executive console</strong> — current local brain, HUD, event stream, and plan.</td>
+    <td width="50%"><img src="docs/assets/screenshots/chat-toolcards.png" alt="Phase 24 chat tool cards"><br><strong>Tool receipts</strong> — deterministic Phase 16 read call and result.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screenshots/settings-provider.png" alt="Provider settings"><br><strong>Provider settings</strong> — provider, model, and key reference; no inline secret.</td>
+    <td><img src="docs/assets/screenshots/workgraph-nodes.png" alt="Work graph"><br><strong>Work graph</strong> — honest live state: the selected mission currently has no work items.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screenshots/agents-view.png" alt="Agent fleet"><br><strong>Agent fleet</strong> — contracts loaded from the live brain.</td>
+    <td><img src="docs/assets/screenshots/chat-modes.png" alt="Chat modes"><br><strong>Full / act</strong> — approval plus started/completed tool receipts.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screenshots/chat-multiagent.png" alt="Multi-agent execution"><br><strong>Multi-agent execution</strong> — real roster and named pipeline; the model is visibly unresolved.</td>
+    <td><img src="docs/assets/screenshots/checkpoint.png" alt="Workspace checkpoint controls"><br><strong>Workspace checkpoints</strong> — live Files surface; current checkpoint history is empty.</td>
+  </tr>
+</table>
 
-## ✨ What she does
+## Quick Start
 
-### 👑 The Director — JEXI as the boss (B208–B210)
-- **Every complex request runs as a directed task**: interpret (vague requests get refined into proper objectives) → plan → staff → delegate → **supervise live** → verify → report. She declines honestly when the lanes are down — never fakes it.
-- **A team with stable identities**: employees are *people* (roles, personalities, capabilities), not models — the model powering Zola is a swappable session detail.
-- **Live mid-work supervision**: deterministic watchers (repetition loops, refusals, credential leaks, runaway length) run on every token, plus one bounded checkpoint review — if the approach is off-track, she stops it, re-instructs, and reruns (bounded, never loops). You watch it happen: employee thinking streams live, by name.
-- **Real execution, no theater**: employees with EXECUTE permission run allowlisted commands in a confined per-task workspace — real exit codes, real test verdicts (`TEST_PASSED`/`TEST_FAILED` from actual processes). An **anti-fabrication gate** fails any deliverable that claims execution without a matching real event, and if the engineer skips running her own script, **the boss runs it herself** — transparently.
-- **Enforced permissions**: every tool call passes a gate (READ/WRITE/EXECUTE/NETWORK/GIT; destructive ops are hard-blocked). Denials are evented and the tool provably never runs.
-- **The NEEDS channel**: employees flag missing facts — assumptions get recorded, blockers pause the turn and ask *you* instead of guessing.
-- **Runtime team management**: bench, activate, or hire employees from the app (Team tab) — staffing obeys instantly. Per-employee history shows what each one actually did.
-- **Every task is replayable**: per-task records with a fully chained event log (`parentEventId`), multi-task conversations, events filterable by task.
+> **Requirement:** Node.js **22 or newer**. This repository uses APIs that degrade under Node 20.
 
-### 🤖 The wider agent bench (Hermes Agent architecture)
-- **Nova** (orchestrator) receives every request and delegates: **Ada** (dev), **Kito** (research), **Zuri** (comms/delivery), **Tari** (scheduler)
-- Each agent = its own **profile**: `config.yaml` (model lane, allowed tools, budgets) + `SOUL.md` (identity) + **isolated memory** + **auto-saved skills**
-- **213/213 planner-deployable agents have profiles** — 5 hand-crafted + the rest auto-generated from the roster (`/api/agents/coverage`)
-- Agents **talk to each other** mid-task (`agent_ask`, bounded to 2 questions/task) and return **structured envelopes** — parallel or sequential
-- **Multi-model by design**: tasks rotate across all free providers (Groq, Gemini, OpenRouter, Mistral, NVIDIA, …) — never glued to one brain
+1. **Clone the repository.**
 
-### 🛠 Building (the DSH coding loop)
-- One agent + real tools: `str_replace_editor` → shell → python → GitHub — **write → run → observe the exact error → fix → re-run**
-- Narrates every action in first person: *"I created index.html (412 bytes)" · "I ran `node app.js` → success" · "🔁 I fixed it — the rerun passed"*
-- If a first pass comes back empty she **rewrites the brief herself** and retries (never asks you to rephrase)
-- Guaranteed build: if the smart loop stalls, the classic builder delivers — never a text-only reply to a build request
+   ```bash
+   git clone https://github.com/lewiseinstein15-Tech/jexi-os-.git
+   cd jexi-os-
+   ```
 
-### 🚀 Her workspace (separate build home)
-- Finished web builds **auto-publish** to a dedicated free site with a **public link that works on any phone**
-- Portfolio-style index of every project; **links are verified live before handover** (she waits out the GitHub Pages rebuild — never a fresh 404), Jekyll disabled (`.nojekyll`) so underscore assets always serve, and auto-cleans after the TTL (24h default, **7 days in production**) or on demand ("done with X", "clear my workspace")
-- Zero localhost links, ever — enforced in every summary AND every live stream token
+2. **Install the locked root and brain dependencies.**
 
-### 💾 Project memory
-- "remember this project" → goal, files, decisions, next steps and the conversation are saved durably
-- Days later: "continue my project" → a full **restore brief** — she picks up exactly where she stopped
-- "my projects" lists them; "project X is done" archives it
+   ```bash
+   npm ci
+   npm --prefix server ci
+   ```
 
-### 🧠 Memory & self-improvement
-- Per-agent isolated memory (no context bleed) + hybrid keyword/vector recall
-- **Skill loop**: after every task she saves what worked as a portable skill (agentskills.io format); before every task she recalls precedent — `/refine` forces a save
-- Conversation continuity: rolling summaries, episodes, learned facts/preferences
+3. **Configure one provider through Settings → Model.** Export a valid hosted-provider key first, for example `OPENAI_API_KEY`, then choose its provider/model and enter the environment-variable name or approved keyring reference after the console opens. The key-reference field must not contain the secret itself; at least one configured provider with a valid key is required for provider-backed execution.
 
-### 🔎 Whole-internet search (18 engines)
-- **Tavily** (free key) + DeepSeek Search + Google News + DuckDuckGo ×2 + Mojeek + Bing + SearXNG + Marginalia + HN + DDG Answers + Wikipedia + arXiv + OpenAlex + Stack Overflow + Brave (optional)
-- Health-aware rotation, cross-engine rank fusion, **diversity cap** (no single source floods results)
+4. **Run the brain and web console.**
 
-### 📺 Video watching (`/watch`)
-- Paste a link (TikTok/Instagram/Vimeo/X/direct) or just say *"what is this YouTube video about ___"*
-- Downloads → transcript (captions or free Whisper on Groq) → **scene-cut frames + 0–10s hook microscope** → answers with timestamps
+   ```bash
+   # terminal 1 — brain on :3002
+   npm --prefix server start
 
-### 🎨 The presenter (answers that look right)
-- Real rendered **math** (KaTeX; every LaTeX dialect normalized, no half-typed formulas mid-stream)
-- **Charts** (bar/line/pie, drawn as real graphs), **mermaid diagrams**, **vision-verified pictures**, AI **image generation** (free), tables with thousand separators
-- Named coworkers stream live: *MAYA · WRITING…*, 💭 Think row, ⚡ per-answer speed line
+   # terminal 2 — Vite on :3000
+   npm run dev
+   ```
 
-### ⏰ Autonomy & delivery
-- Natural-language scheduling: *"every morning at 8am give me tech news"* — no cron syntax
-- Jobs run **unattended, survive restarts**, and **deliver** results (file + email + chat) without being asked
-- `/agents` shows the team, jobs and recent skills; `/workspace` shows published builds
+   Open <http://localhost:3000>. `npm run dev:full` is the one-terminal equivalent.
 
-### 🐙 GitHub engine
-- Scan any repo, read files, **edit + commit via API**, full repo/PR review — `GITHUB_TOKEN` already wired
+> Capture-host provider execution: **NOT VERIFIED - requires provider**. Health, deterministic chat runtime, settings, agents, and console rendering were verified without claiming a configured model.
 
-### 🔐 Self-healing APK
-- In-app updates with ZIP validation + browser fallback
-- If her brain ever moves servers, installed apps **find the new home automatically** (brain.json discovery) — an app can never be stranded
-- Boot warmup: the first message after a server restart answers in seconds
+## Roadmap
 
----
+| Stage | Status | Outcome |
+|---|---|---|
+| **Phases 0–27** | **Merged** | Core OS, brain, workforce, tools, memory, autonomy, Phase 16 chat runtime, Phase 24 console rebuild, and provider profiles. |
+| **Phase 28** | **In flight** | Memory, retrieval, knowledge-graph, reranking, and evaluation work is backend-only; no UI is claimed. |
+| **Phase 29** | **In flight** | Backend-only system work; no visible surface is fabricated for it. |
+| **Phase 30** | **In flight** | Harness parity, agent patterns, documentation, and the final regression gate. |
+| **Benchmark** | **Next** | Run the frozen benchmark and publish comparable evidence. |
+| **Go Live** | **Next** | Complete release checks, deployment, monitoring, and operator handoff. |
 
-## 🗣 Try these
+## Architecture
 
-```
-have your team research X and prove it    → the Director staffs, supervises, verifies
-build me a quiz app as a web app          → Ada builds + publishes it live
-give me the preview link                  → a working public link, no questions
-what is 2/3 + 1/4? show working          → textbook math
-compare rust vs go for backends           → sourced research + a chart
-show me a picture of a cheetah            → vision-verified photo
-every morning at 8am give me AI news      → scheduled + delivered
-remember this project  …  continue it     → resumes days later
-/agents · /workspace · /refine · /watch   → the command surface
+The Executive Kernel owns intent, policy, budgets, scheduling, and recovery. It staffs agents through stable contracts; agents use brain services for reasoning, context, memory, and verification; permission-gated tools touch the outside world; every surface consumes the same observable events. The visual chain above is the short form, while [REBUILD-MAP.md](docs/REBUILD-MAP.md) maps the broader rebuild to its implementation and proof.
+
+```mermaid
+flowchart TB
+    S[Surfaces: Web · Android · API] --> K[Executive Kernel]
+    K --> A[Agent workforce]
+    A --> B[Brain services: providers · context · memory]
+    B --> T[Permission-gated tools]
+    T --> C[Computer · browser · shell · files · MCP]
+    C --> E[Evidence · receipts · world state]
+    E --> K
 ```
 
----
-
-## 🏗 Architecture (quick map)
-
-```
-chat ──► THE DIRECTOR (the boss lane)
-          ├─ interpret → plan → staff (capability-driven) → delegate
-          ├─ supervise live (token-stream watchers + checkpoint review)
-          ├─ execute (allowlisted shell, real tests, anti-fabrication gate)
-          ├─ verify (Vera) → report in JEXI's voice — or ask, honestly
-          └─ heavy builds → the engineering department (Forge's responsibility)
-        └─ classic pipeline still handles the rest:
-             Nova's dispatcher (TeamRouter) · 18-engine research seam
-             NL scheduling (restart-safe) · 213 profiled specialists
-memory: per-agent stores · skills (agentskills.io) · project memory
-        · per-task records (fully chained event logs, replayable)
-hosting: Render image (GH Actions builds it — zero build minutes)
-         + GitHub Pages (app) + GitHub Pages (workspace) — all free
+```text
+SURFACES
+   ↓ commands / ↑ events
+KERNEL → AGENTS → BRAIN → TOOLS → COMPUTER + EXTERNAL SYSTEMS
+   ↑                                            │
+   └──────── evidence, receipts, verification ──┘
 ```
 
-Key modules: `Director` · `EmployeeSession` · `Supervisor` · `CommandRunner` · `Permissions` · `Verifier` · `ModelRouter` · `TaskState` · `AgentMail` · plus `AgentProfiles` · `SkillLoop` · `TeamRouter` · `DshCoding` · `WebSearch` · `VideoWatch` · `WorkspacePublisher` · `ProjectMemory` · `updateCenter`
+## Documentation
 
----
+Start with the complete, linked [documentation index](docs/README-INDEX.md). It inventories every file under `docs/`, including architecture, audits, implementation reports, research, screenshots, and Scope H evidence.
 
-## 🧪 Quality
+## Quality
 
-- **4,000+ automated checks**, 0 failures (`cd server && npm test`) — including 588 that test the Director's boss behavior specifically (staffing, supervision, redirection bounds, permissions, real execution, the fabrication and method-provenance gates) and 343 for the B211+ autonomy layer (persistent missions + work graphs, imagination, operational lessons, real computer use, restart/disconnect/failure-injection proofs, plus B212's fix-in-place rewrites, API answers, live-prod browser honesty and B213's evidence-grounded verification)
-- CI on every push; live smoke tests for math/search/pictures/video/builds
-- Every fix traced from real chat logs → regression test
+- The repository contains **4,000+ automated checks** across the brain, agents, tools, memory, autonomy, security, browser routing, and UI contracts.
+- Run the full backend suite with `npm test`; run the production frontend build with `npm run build`.
+- Screenshots in this README are generated by [`scripts/phase30-readme-shots.mjs`](scripts/phase30-readme-shots.mjs) against `localhost`, not by a design mock.
+- Provider-dependent behavior must be reported as not verified when no valid provider is configured.
 
-## 🔧 Self-hosting
+## Contributing
 
-```bash
-# brain
-cd server && npm ci && npm start          # port 3002, DATA_DIR for memory
-# web
-npm ci && npm run dev                     # proxies /api → 3002
-```
-Env keys: any of GROQ/GEMINI/OPENROUTER/MISTRAL/NVIDIA/SAMBANOVA/TAVILY (all free tiers) + GITHUB_TOKEN. The API is open (no key). Full guide: `DEPLOY-IMAGE-RENDER.md`.
-
-Small-box / local-model operation (proven live on 2GB, CPU-only — see `FINAL-PROOF-REPORT.md`):
-`MODEL_PROVIDER=ollama` + `OLLAMA_MODEL=qwen2.5:0.5b` runs the whole mission loop on a local model;
-`JEXI_MCP_MINIMAL=1` keeps the 42 MCP servers lazy (~460MB saved at boot). Missions must run
-serially on a single local slot; budgets are progress-aware (idle+cap for streams, 5min for the
-local rung) and bounded per turn (1500/600 tokens), so weak brains terminate instead of hanging.
-
----
+Use a **branch per scope**, keep each change inside its declared zone, and attach raw verification evidence. Prefer small, reviewable commits; do not combine unrelated scopes or claim a surface that was not exercised.
 
 ## License
 
