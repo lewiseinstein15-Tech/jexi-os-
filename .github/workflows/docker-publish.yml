@@ -90,6 +90,15 @@ jobs:
             -H "Accept: application/json" \
             -d '{"clearCache":"do_not_clear"}')
           cat deploy.json; echo
+          # HARDENED 2026-09-22 (cleanup/ci-followup-1): an auth rejection means
+          # RENDER_API_KEY is dead/rotated — a repo-owner secret problem, not a
+          # build problem. The image is already pushed to GHCR at this point, so
+          # degrade to a loud warning instead of failing every publish. Any
+          # OTHER non-201 still fails hard.
+          if [ "$HTTP" = "401" ] || [ "$HTTP" = "403" ]; then
+            echo "::warning::RENDER_API_KEY rejected (HTTP $HTTP) — rotate the secret in repo Settings. Image is on GHCR; Render auto-deploy skipped."
+            exit 0
+          fi
           if [ "$HTTP" != "201" ]; then echo "::error::Render deploy trigger failed (HTTP $HTTP)"; exit 1; fi
           DEPLOY_ID=$(jq -r '.deploy.id // .id' deploy.json)
           if [ -z "$DEPLOY_ID" ] || [ "$DEPLOY_ID" = "null" ]; then echo "::error::could not read deploy id from Render response"; cat deploy.json; exit 1; fi
