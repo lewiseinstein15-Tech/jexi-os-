@@ -189,6 +189,19 @@ export function request(turnId, opts = {}) {
           const err = fail('E_APPROVAL_DENIED', `Approval denied for action: ${action}`);
           err.action = action;
           err.approvalId = approvalId;
+          // P30.F — PermissionDenied lifecycle fires AFTER the denial
+          // (fail-soft; the seam is mounted by server boot — scope 6 — and
+          // is absent in browser-only bundles, where the denial stands).
+          try {
+            const seam = globalThis.__jexiP30PermissionDenied;
+            if (seam && typeof seam.decide === 'function') {
+              err.permissionDecision = seam.decide({
+                requestId: approvalId,
+                action,
+                error: { code: 'E_APPROVAL_DENIED', action, approvalId },
+              });
+            }
+          } catch { /* fail-soft: the denial stands */ }
           reject(err);
         } else if (decision === 'yes') {
           resolve({

@@ -79,6 +79,14 @@ import { initWa4Topology } from './phase31-wa4-topology.js';
 import { initCiDoctor } from './phase31-cidoctor.js';
 import { initRegistriesWiring, makeGatedExecutor, executorGateStatus, mcpRegistryEntries } from './phase31-registries.js';
 
+/* ------------- Phase 31 Scope 6 — shipped module imports (READ-ONLY) ------ */
+import { initPhase31Hooks } from './phase31-hooks.js';
+import { initSubagentEnforcement } from './phase31-subagent.js';
+import { initWorktreeIsolation } from './phase31-worktree.js';
+import { initSelfEvolve } from './phase31-self-evolve.js';
+import { assert as assertSkillTools } from '../../../harness/parity/skills/index.js';
+import rules from '../../../harness/parity/rules/index.js';
+
 /* ---------------- module state ------------------------------------------- */
 const W31 = [];
 const log = (line) => { W31.push(line); console.log(line); };
@@ -100,7 +108,7 @@ export function assertNodeFloor(version = process.version) {
   return `node ${version} >= ${NODE_FLOOR}`;
 }
 
-const state = { wired: null, rlm: null, fleet: null, hot: null, repo: null, index: null, hybrid: null, protocol: null, graph: null, viking: null, observersRoot: null, observerId: null, sessionId: null, autonomous: null, scheduler: null, dreamCycle: null, offloadRoot: null, sessionsDir: null, gsd: null, gsdLoopFn: null, ciDoctor: null, wa4: null, repoCtx: null, w13Entries: null, w14Entry: null, w29Mounted: false, s4n8nEntry: null, s4exec: null, s4repo: false, w23cEntry: null };
+const state = { wired: null, rlm: null, fleet: null, hot: null, repo: null, index: null, hybrid: null, protocol: null, graph: null, viking: null, observersRoot: null, observerId: null, sessionId: null, autonomous: null, scheduler: null, dreamCycle: null, offloadRoot: null, sessionsDir: null, gsd: null, gsdLoopFn: null, ciDoctor: null, wa4: null, repoCtx: null, w13Entries: null, w14Entry: null, w29Mounted: false, s4n8nEntry: null, s4exec: null, s4repo: false, w23cEntry: null, hooks: null, subagentEnf: null, worktreeIso: null, selfEvolveW: null, rulesLoaded: false, rulesRoot: null };
 
 /* ---------------- the one boot call --------------------------------------- */
 export function initPhase31Wiring(opts = {}) {
@@ -390,9 +398,12 @@ export function initPhase31Wiring(opts = {}) {
   // Scope 3 shutdown: stop the shipped heartbeat timers (engine ticker is
   // already unref'd; heartbeat setTimeout timers are not).
   const shutdownScope3 = () => { try { if (state.autonomous) state.autonomous.heartbeat.close(); } catch { /* fail-open */ } };
+  // Scope 6 shutdown: the SessionEnd lifecycle hook fires at session end.
+  const shutdownScope6 = () => { try { if (state.hooks) state.hooks.fireSessionEnd('shutdown'); } catch { /* fail-open */ } };
   process.once('exit', shutdownScope3);
-  process.once('SIGTERM', shutdownScope3);
-  process.once('SIGINT', shutdownScope3);
+  process.once('SIGTERM', () => { shutdownScope3(); shutdownScope6(); });
+  process.once('SIGINT', () => { shutdownScope3(); shutdownScope6(); });
+  process.once('exit', shutdownScope6);
 
   /* ── PHASE 31 SCOPE 5 — registries, gates, dispatch ───────────────────── */
 
@@ -486,6 +497,105 @@ export function initPhase31Wiring(opts = {}) {
   // left to the loop owner.
   log('W31 W16: Phase 12 gates loop call sites located (CodingLoop.js, VerificationLoop.js) — NOT WIRED, owner call');
 
+  /* ── PHASE 31 SCOPE 6 — Phase 30 primitives -> runtime ───────────── */
+
+  // P30.A — 30-hook catalog -> session lifecycle runtime. SessionStart
+  // fires HERE at boot; SessionEnd fires at shutdown (handlers below);
+  // PreToolUse fires on every executor dispatch via the shipped Phase 7(B)
+  // gate; Stop/PreCompact production call sites are outside named call
+  // sites (NOT WIRED, owner call). 25 stub events get runtime stub handlers.
+  soft('P30.A', () => {
+    state.hooks = initPhase31Hooks({ sessionId });
+    const c = state.hooks.counts();
+    if (c.catalog !== 30 || c.wired !== 5 || c.stubs !== 25) {
+      throw Object.assign(new Error(`catalog ${c.catalog}/wired ${c.wired}/stubs ${c.stubs} mismatch`), { code: 'E_WIRING' });
+    }
+    return `catalog ${c.catalog} (wired ${c.wired}, stubs ${c.stubs}); SessionStart fired at boot`;
+  });
+  if (state.hooks) log(`W31 P30.A: 30-hook catalog -> session lifecycle runtime (5 wired events mapped, 25 stub handlers registered; SessionStart fired at boot, SessionEnd on shutdown)`);
+
+  // P30.B — skill allowedTools -> executor dispatch enforcement. The
+  // fail-closed check lives IN server/src/tools/execution/executor.js (named
+  // call site) ahead of the permission gate; this mount verifies the same
+  // READ-ONLY primitive loads. Proven end-to-end by the scope probe.
+  soft('P30.B', () => {
+    if (typeof assertSkillTools !== 'function') throw Object.assign(new Error('skill enforcement primitive missing'), { code: 'E_WIRING' });
+    return 'executor dispatch enforcement mounted (ctx.skill calls only)';
+  });
+  if (typeof assertSkillTools === 'function') log('W31 P30.B: skill allowedTools -> executor dispatch enforcement (fail-closed when ctx.skill present; plain calls unaffected)');
+
+  // P30.C — subagent contract fields -> dispatch enforcement (allowedTools,
+  // maxTurns, permissionMode enforced at call time via the shipped
+  // subagent.enforce; shipped error classes reused).
+  soft('P30.C', () => {
+    state.subagentEnf = initSubagentEnforcement();
+    return 'extendSpec + enforce composed on the dispatch seam';
+  });
+  if (state.subagentEnf) log('W31 P30.C: subagent contract fields -> dispatch enforcement (allowedTools, maxTurns, permissionMode at call time)');
+
+  // P30.D — path-scoped rules -> session prompt assembly. The Phase 25
+  // section registry has no live assembly consumer (registerCanonical is
+  // unconsumed), so per the disclosed fallback this routes through the
+  // Phase 6 context-source pipeline (the B4 seam). Default rules root is
+  // the boot-scoped runtime/rules-project (deterministic; accessor accepts
+  // any root) — the repo-wide AGENTS.md walk is deliberately NOT run at boot.
+  soft('P30.D', () => {
+    state.rulesRoot = opts.rulesRoot || process.env.JEXI_W31_RULES || path.join(runtime, 'rules-project');
+    rules.load(state.rulesRoot, {});
+    state.rulesLoaded = true;
+    registerSource('path-rules', {
+      priority: 14, weight: 2,
+      produce: async (input) => {
+        try {
+          const filePath = input?.filePath ?? input?.touchedFile ?? null;
+          const inj = rules.inject(filePath, {});
+          if (!inj.rules.length) return '';
+          return `Path-scoped rules (${inj.rules.length} rule(s), ${inj.tokens}/${inj.budget} tokens):\n${inj.rules.map((r) => `[${r.source}:${r.path}] ${r.content.trim().slice(0, 400)}`).join('\n---\n')}`;
+        } catch { return ''; }
+      },
+    });
+    return `root ${path.relative(REPO_ROOT, state.rulesRoot) || state.rulesRoot}; source path-rules registered`;
+  });
+  if (state.rulesLoaded) log('W31 P30.D: path-scoped rules -> prompt assembly (B4-route: context source "path-rules"; section seam unconsumed — DISCLOSED)');
+
+  // P30.E — worktree isolation -> subagent runtime dispatch. isolation:
+  // 'worktree' specs run inside a REAL shipped-manager worktree; the main
+  // tree is untouched. Root is injectable (probe drives a fixture repo so
+  // the jexi-29 git state stays pristine).
+  soft('P30.E', () => {
+    state.worktreeIso = initWorktreeIsolation({
+      repoRoot: REPO_ROOT,
+      worktreesDir: path.join(runtime, 'worktrees'),
+      fleetDir: path.join(runtime, 'fleet'),
+      sessionsDir: path.join(runtime, 'sessions'),
+    });
+    return 'shipped worktree manager mounted (lazy; isolation-aware dispatch)';
+  });
+  if (state.worktreeIso) log('W31 P30.E: worktree isolation -> subagent dispatch (isolation:worktree runs in a real worktree; main tree untouched)');
+
+  // P30.F — permission + command lifecycle hooks -> approval path, command
+  // expansion path, parallel tool batch. Mounted inside initPhase31Hooks
+  // with behavior-neutral defaults; the browser-safe consumers (approvals.js
+  // denial path, commands/registry.js resolve path — both named call sites)
+  // fire the shipped lifecycle through fail-soft globalThis seams.
+  soft('P30.F', () => {
+    if (!globalThis.__jexiP30PermissionDenied || !globalThis.__jexiP30PromptExpansion) {
+      throw Object.assign(new Error('P30.F seams missing after hook mount'), { code: 'E_WIRING' });
+    }
+    return 'PermissionDenied + PromptExpansion + PostToolBatch mounted (neutral defaults)';
+  });
+  if (state.hooks) log('W31 P30.F: lifecycle hooks -> approval denial + command expansion + tool batch (fail-soft seams; neutral defaults)');
+
+  // P30.G — self-evolve -> agent runtime post-run callback. Fires the
+  // shipped selfEvolve.afterRun when the agent declares skill ownership;
+  // every accepted update lands as a Phase 14 decision + PROV-O record
+  // under the boot-scoped evolution root.
+  soft('P30.G', () => {
+    state.selfEvolveW = initSelfEvolve({ root: path.join(runtime, 'self-evolve-skills') });
+    return `post-run callback mounted (root ${path.relative(REPO_ROOT, state.selfEvolveW.root) || state.selfEvolveW.root})`;
+  });
+  if (state.selfEvolveW) log('W31 P30.G: self-evolve -> agent runtime post-run (afterRun on declared skill ownership; Phase 14 decisions + PROV-O)');
+
   const wired = {
     W36: true, B1: !!state.repo, B2: !!state.index, B3: !!state.hybrid, B4: !!state.hot,
     B5: !!state.protocol, WA1: typeof assemblePrompt === 'function', WA8: true, WA2: !!state.graph,
@@ -496,6 +606,8 @@ export function initPhase31Wiring(opts = {}) {
     W13: executorGateStatus().registered, W14: true, W29: typeof runPreflight === 'function',
     'S4-N8N': true, 'S4-EXEC': executableSkillsStatus().registered, 'S4-REPOCTX': !!state.repoCtx,
     W23c: true, W16: false,
+    'P30.A': !!state.hooks, 'P30.B': typeof assertSkillTools === 'function', 'P30.C': !!state.subagentEnf,
+    'P30.D': state.rulesLoaded, 'P30.E': !!state.worktreeIso, 'P30.F': !!state.hooks, 'P30.G': !!state.selfEvolveW,
   };
   state.wired = wired;
   return { wired, sessionId, brainRoot, fleetDir, observersRoot, vikingRoot, log: W31.slice() };
@@ -607,5 +719,38 @@ export const wiring = {
   repoCtx: {
     map: (over) => (state.repoCtx ? state.repoCtx.map(over) : null),
     root: () => (state.repoCtx ? state.repoCtx.root : null),
+  },
+
+  /* -------- Phase 31 Scope 6 — consumer seams (read-only surface) -------- */
+  hooks: {
+    emit: (event, payload) => (state.hooks ? state.hooks.emit(event, payload) : null),
+    register: (event, fn) => (state.hooks ? state.hooks.register(event, fn) : null),
+    journal: () => (state.hooks ? state.hooks.journal() : []),
+    counts: () => (state.hooks ? state.hooks.counts() : null),
+    wiredEvents: () => (state.hooks ? state.hooks.wiredEvents() : []),
+    stubEvents: () => (state.hooks ? state.hooks.stubEvents() : []),
+    fireSessionEnd: (reason) => (state.hooks ? state.hooks.fireSessionEnd(reason) : null),
+    lifecycle: () => (state.hooks ? state.hooks.lifecycle : null),
+  },
+  subagent: {
+    dispatch: (spec, call) => (state.subagentEnf ? state.subagentEnf.dispatch(spec, call) : null),
+    journal: () => (state.subagentEnf ? state.subagentEnf.journal() : []),
+  },
+  worktree: {
+    dispatchIsolated: (spec, opts) => (state.worktreeIso ? state.worktreeIso.dispatchIsolated(spec, opts) : null),
+    list: (opts) => (state.worktreeIso ? state.worktreeIso.list(opts) : []),
+  },
+  selfEvolve: {
+    postRun: (agent, runResult) => (state.selfEvolveW ? state.selfEvolveW.postRun(agent, runResult) : null),
+    audit: (agentId) => (state.selfEvolveW ? state.selfEvolveW.audit(agentId) : []),
+    rollback: (decisionId) => (state.selfEvolveW ? state.selfEvolveW.rollback(decisionId) : null),
+    root: () => (state.selfEvolveW ? state.selfEvolveW.root : null),
+  },
+  rules: {
+    load: (root, opts) => rules.load(root, opts),
+    inject: (filePath, opts) => rules.inject(filePath, opts),
+    snapshot: () => rules.snapshot(),
+    budget: () => rules.tokenBudget(),
+    root: () => state.rulesRoot,
   },
 };

@@ -25,6 +25,7 @@ const NAME_RE = /^[a-z][a-z0-9-]*$/;
 
 const commands = new Map();   // name → def
 const aliases = new Map();    // alias → name
+const expansionBlocks = [];   // P30.F — UserPromptExpansion block journal (deterministic, no timestamps)
 
 /** Register a command. Returns an unregister fn (reversible). */
 export function register(def) {
@@ -85,7 +86,29 @@ export function unregister(name) {
 /** Resolve a name OR alias → the command def (or undefined). */
 export function resolve(nameOrAlias) {
   const n = String(nameOrAlias || '').trim().toLowerCase();
-  return commands.get(n) || commands.get(aliases.get(n) || '');
+  const def = commands.get(n) || commands.get(aliases.get(n) || '');
+  if (!def) return undefined;
+  // P30.F — UserPromptExpansion fires before a slash-command expansion
+  // reaches the model (fail-soft; the seam is mounted by server boot —
+  // scope 6 — with a behavior-neutral allow default). A blocking verdict
+  // prevents the command: resolve yields undefined and the block is
+  // journaled (read via expansionJournal()).
+  try {
+    const seam = globalThis.__jexiP30PromptExpansion;
+    if (seam && typeof seam.decide === 'function') {
+      const verdict = seam.decide({ command: def.name, arguments: null });
+      if (verdict && verdict.block) {
+        expansionBlocks.push({ command: def.name, reason: verdict.reason ?? null });
+        return undefined;
+      }
+    }
+  } catch { /* fail-soft: resolution continues */ }
+  return def;
+}
+
+/** P30.F probe/ops surface: blocked expansion verdicts, in block order. */
+export function expansionJournal() {
+  return expansionBlocks.map((entry) => ({ ...entry }));
 }
 
 /** All registered commands, sorted by name. */
