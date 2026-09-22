@@ -50,6 +50,9 @@ export default function KeyRefInput({ provider, model, value, onAccept }) {
         />
         <button className="p24-send" onClick={submit}>set</button>
       </div>
+      {!state && (
+        <div className="p24-keyref-none">no key reference set — the active provider profile runs with its own env/keyring credential</div>
+      )}
       {state && state.code === 'ACCEPTED' && (
         <div className="p24-keyref-ok" role="status">keyRef accepted ({state.kind}) — value never rendered</div>
       )}

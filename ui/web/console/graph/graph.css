@@ -14,8 +14,8 @@
 .p24-graph-toolbar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
+  gap: 8px;
+  padding: 8px 16px;
   border-bottom: 1px solid #333333;
   background: #0f1011;
   flex: 0 0 auto;
@@ -73,12 +73,13 @@
   border-left-width: 3px;
   border-radius: 8px;
   background: #191a1b;
-  padding: 8px 10px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
   gap: 4px;
   cursor: pointer;
   overflow: hidden;
+  transition: border-color 150ms ease;
 }
 .p24-gnode-title {
   font-size: 12px;
@@ -102,6 +103,12 @@
 .p24-gnode-card.st-failed     { border-left-color: #ff0000; }
 .p24-gnode-card.st-skipped,
 .p24-gnode-card.st-superseded { border-left-color: #62666d; }
+
+/* Scope E — detail panel open: 160ms slide+fade, no bounce. */
+@keyframes jx-panel-in {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: none; }
+}
 
 /* empty state */
 .p24-graph-empty {
@@ -137,8 +144,9 @@
   border-left: 1px solid #333333;
   display: flex;
   flex-direction: column;
-  padding: 12px;
-  gap: 10px;
+  padding: 16px;
+  gap: 8px;
+  animation: jx-panel-in 160ms ease-out;
   overflow-y: auto;
 }
 .p24-gdetail-head {
@@ -167,7 +175,7 @@
 .p24-gdetail-rows {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 .p24-gdetail-row {
   display: flex;
@@ -194,7 +202,7 @@
   padding-top: 8px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 .p24-gdetail-edge-head {
   font-size: 12px;
@@ -209,7 +217,7 @@
 .p24-gdetail-edge {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 8px;
   font-size: 12px;
   flex-wrap: wrap;
 }

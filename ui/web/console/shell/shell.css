@@ -71,6 +71,7 @@ body {
   font-size: 13.5px;
   font-weight: 500;
   outline: none;
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
 .jx-nav-item:hover { color: var(--text-primary); background: var(--surface-elevated); }
@@ -81,9 +82,9 @@ body {
   box-shadow: inset 2px 0 0 var(--accent-bright);
 }
 
-.jx-nav-item:focus-visible,
-button:focus-visible,
-a:focus-visible {
+/* Scope E — focus: every interactive element gets a visible ring (--accent-bright,
+   2px, offset 2px — >=3px separation from both bg and surface fills). */
+.jx-shell :is(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--accent-bright);
   outline-offset: 2px;
 }
@@ -129,6 +130,25 @@ a:focus-visible {
 /* ---------- content / placeholder ---------- */
 .jx-content { flex: 1; min-height: 0; overflow: auto; padding: var(--space-6); }
 
+/* Scope E — route change: subtle 150ms fade+rise, no overshoot. */
+.jx-content > * { animation: jx-route-in 150ms ease-out; }
+@keyframes jx-route-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Scope E — prefers-reduced-motion: disable non-essential motion entirely. */
+@media (prefers-reduced-motion: reduce) {
+  .jx-shell *,
+  .jx-shell *::before,
+  .jx-shell *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 .jx-placeholder {
   height: 100%;
   display: flex;
@@ -161,7 +181,7 @@ a:focus-visible {
 
 .jx-insp-table th {
   text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em;
-  color: var(--text-muted); padding: 10px var(--space-3); border-bottom: 1px solid var(--border);
+  color: var(--text-muted); padding: 8px var(--space-3); border-bottom: 1px solid var(--border);
   background: var(--surface-elevated);
 }
 

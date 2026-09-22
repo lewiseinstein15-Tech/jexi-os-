@@ -22,12 +22,16 @@ export default function Composer({ backend, turn, modes, lastError, onSend, onMo
       )}
       {lastError && <div className="p24-send-error" role="alert">send refused: {lastError}</div>}
       <div className="p24-composer">
-        <input
+        <textarea
           className="p24-input"
+          rows={1}
           placeholder="Ask JEXI anything…"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
+            /* Shift+Enter: native newline (textarea) */
+          }}
           aria-label="Message"
         />
         <button className="p24-send" onClick={submit} disabled={busy || !text.trim()}>
