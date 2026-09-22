@@ -53,6 +53,14 @@ import { VikingFs } from '../../../context/viking/filesystem.js';
 import { createSceneQA } from '../../../verification/visual/scene-qa.js';
 import { createMcpMeta } from '../../../brain/hot/mcp-meta.js';
 
+/* ------------- Phase 31 Scope 3 — shipped module imports (READ-ONLY) ------ */
+import { createAutonomous } from '../../../scheduler/autonomous/index.js';
+import { createDreamCycle } from '../../../brain/cycle/index.js';
+import { offload as offloadStore, history as offloadHistory } from '../../../context/offload/index.js';
+import { Gsd } from '../../../workgraph/phases/gsd/index.js';
+import { run as looperRun } from '../../../swarm/loops/looper.js';
+import { run as ralphRun, emitCheckpoint as ralphEmitCheckpoint, registerCheckpointHandler as ralphRegisterCheckpoint } from '../../../swarm/loops/ralph.js';
+
 /* ---------------- server-side consumers (integration entry points) -------- */
 import { assemblePrompt } from '../services/PromptAssembly.js';
 import { canChat } from '../providers/index.js';
@@ -60,6 +68,9 @@ import { loadSettings } from '../services/SettingsManager.js';
 import { registerCommand, tryExecuteCommand } from '../services/CommandRegistry.js';
 import { registerSource, listSources } from '../context/sources/index.js';
 import { claimsBrowserMethod } from '../services/director/Verifier.js';
+import { registerAction, autonomyScheduler } from '../scheduler/index.js';
+import { initWa4Topology } from './phase31-wa4-topology.js';
+import { initCiDoctor } from './phase31-cidoctor.js';
 
 /* ---------------- module state ------------------------------------------- */
 const W31 = [];
@@ -82,7 +93,7 @@ export function assertNodeFloor(version = process.version) {
   return `node ${version} >= ${NODE_FLOOR}`;
 }
 
-const state = { wired: null, rlm: null, fleet: null, hot: null, repo: null, index: null, hybrid: null, protocol: null, graph: null, viking: null, observersRoot: null, observerId: null, sessionId: null };
+const state = { wired: null, rlm: null, fleet: null, hot: null, repo: null, index: null, hybrid: null, protocol: null, graph: null, viking: null, observersRoot: null, observerId: null, sessionId: null, autonomous: null, scheduler: null, dreamCycle: null, offloadRoot: null, sessionsDir: null, gsd: null, gsdLoopFn: null, ciDoctor: null, wa4: null };
 
 /* ---------------- the one boot call --------------------------------------- */
 export function initPhase31Wiring(opts = {}) {
@@ -258,11 +269,131 @@ export function initPhase31Wiring(opts = {}) {
   });
   log('W31 W19: visual QA attached to Verifier claim path (browser absent -> honest BROWSER_UNAVAILABLE skip)');
 
+  /* ── PHASE 31 SCOPE 3 — event + scheduler wiring ──────────────────────── */
+
+  // S3-AUTO — autonomy (scheduler/autonomous) -> server/src/scheduler.
+  // The SchedulerEngine is the server-side autonomy engine; the shipped goal
+  // ledger gets one honest pass per scheduler tick via the registered handler.
+  soft('S3-AUTO', () => {
+    state.autonomous = createAutonomous({ directory: path.join(runtime, 'autonomous'), sessionId, cwd: SERVER_ROOT });
+    registerAction('autonomy-cycle', async () => {
+      const goals = state.autonomous.goal.list();
+      return { goals: goals.length, active: goals.filter((g) => g.status === 'active').map((g) => g.id) };
+    });
+    state.scheduler = autonomyScheduler();
+    state.scheduler.start();
+    const job = state.scheduler.createJob({
+      id: 'w31-autonomy-cycle', kind: 'cron', cron: '* * * * *', lane: 'autonomy', name: 'w31 autonomy cycle',
+      action: { type: 'handler', name: 'autonomy-cycle' },
+    });
+    if (!job.ok) throw Object.assign(new Error(`cron job refused: ${job.error}`), { code: 'E_WIRING' });
+    return 'handler autonomy-cycle + cron job w31-autonomy-cycle (fires on tick)';
+  });
+  if (state.scheduler) log('W31 S3-AUTO: autonomy -> scheduler (cron job w31-autonomy-cycle -> goal-ledger pass on tick)');
+
+  // S3-CYCLE — brain.cycle (dream cycle) -> scheduler cron job. The cycle
+  // factory binds the brain instances already wired at this boot (B1/B2/B4).
+  soft('S3-CYCLE', () => {
+    if (!state.scheduler) throw Object.assign(new Error('scheduler not started (S3-AUTO failed)'), { code: 'E_WIRING' });
+    state.dreamCycle = () => createDreamCycle({ repo: state.repo, hot: state.hot, index: state.index });
+    registerAction('brain-cycle', async (payload = {}) => state.dreamCycle().run({ dryRun: payload.dryRun === true }));
+    const job = state.scheduler.createJob({
+      id: 'w31-brain-cycle', kind: 'cron', cron: '0 3 * * *', lane: 'memory', name: 'w31 brain dream cycle',
+      action: { type: 'handler', name: 'brain-cycle', payload: { dryRun: false } },
+    });
+    if (!job.ok) throw Object.assign(new Error(`cron job refused: ${job.error}`), { code: 'E_WIRING' });
+    return 'handler brain-cycle + cron job w31-brain-cycle (03:00 daily)';
+  });
+  if (state.dreamCycle) log('W31 S3-CYCLE: brain.cycle -> cron job w31-brain-cycle (repo/hot/index bound at boot)');
+
+  // S3-OFFLOAD — context/offload -> chat retention. The chat context path
+  // reaches retained history through the SAME registerSource seam Scope 1
+  // used for brain-hybrid/hot/viking; the offload store sits beside it.
+  soft('S3-OFFLOAD', () => {
+    state.offloadRoot = path.join(runtime, 'offload');
+    state.sessionsDir = path.join(runtime, 'sessions');
+    registerSource('session-offload-history', {
+      priority: 12, weight: 1,
+      produce: async (input) => {
+        try {
+          const sid = String((input && input.sessionId) || sessionId);
+          const nodes = offloadHistory.recent(sid, 5, { directory: state.sessionsDir });
+          if (!nodes.length) return '';
+          return `Session history (offloaded, last ${nodes.length}):\n${nodes.map((n) => `- [${n.kind}] ${String(n.payload && n.payload.text !== undefined ? n.payload.text : JSON.stringify(n.payload)).slice(0, 160)}`).join('\n')}`;
+        } catch { return ''; }
+      },
+    });
+    return 'context source session-offload-history + offload store';
+  });
+  if (state.offloadRoot) log('W31 S3-OFFLOAD: context/offload -> chat retention (source session-offload-history; offload store reachable)');
+
+  // S3-GSD — GSD 5-phase loop (workgraph/phases/gsd) driven through the
+  // shipped looper, exposed at the workgraph consumer seam. Each phase is
+  // the real disk-artifact step; the looper only advances and stops it.
+  const gsdLoopHandler = async (payload = {}) => {
+    const safeTask = /^[A-Za-z0-9_-]{1,64}$/.test(String(payload.taskId || '')) ? payload.taskId : `gsd-${daySeq()}-${++opSeqCounter.n}`;
+    const seed = state.gsd.run(safeTask, { input: String(payload.input || 'wired GSD task (Phase 31 Scope 3)'), phase: 'discuss' });
+    const trace = [];
+    const loop = looperRun(() => state.gsd.step(safeTask), {
+      maxIterations: 5,
+      stopWhen: (r) => !!r && r.phase === 'ship',
+      onIteration: (it) => trace.push(`${it.n}:${it.result.phase}`),
+    });
+    return {
+      taskId: safeTask, seed: seed.phase,
+      loop: { iterations: loop.iterations, stoppedBy: loop.stoppedBy, error: loop.error || null },
+      trace, status: state.gsd.status(safeTask),
+    };
+  };
+  soft('S3-GSD', () => {
+    state.gsd = new Gsd({ root: path.join(runtime, 'gsd') });
+    registerAction('gsd-loop', gsdLoopHandler);
+    state.gsdLoopFn = gsdLoopHandler;
+    return 'action handler gsd-loop (discuss -> looper.run -> ship)';
+  });
+  if (state.gsd) log('W31 S3-GSD: GSD 5-phase loop -> workgraph seam (handler gsd-loop via swarm/loops/looper.run)');
+
+  // W23e — ralph diagnostics -> ralph loop checkpoint. The wiring lives IN
+  // swarm/loops/ralph.js as a wiring import + register call (run() body
+  // untouched); this boot check only proves the checkpoint seam loaded.
+  soft('W23e', () => {
+    if (typeof ralphEmitCheckpoint !== 'function' || typeof ralphRegisterCheckpoint !== 'function') {
+      throw Object.assign(new Error('ralph checkpoint seam missing'), { code: 'E_WIRING' });
+    }
+    return 'checkpoint seam live (default handler: diagnostics.evaluate)';
+  });
+  log('W31 W23e: ralph diagnostics -> loop checkpoint (evaluate() via emitCheckpoint; run() untouched)');
+
+  // W23f — ciDoctor -> CI failure path (PARTIAL). Handler wired; the
+  // .github/workflows call site stays OUTSIDE this scope's named call sites,
+  // and no CI runner exists in the sandbox — live-CI leg NOT VERIFIED.
+  soft('W23f', () => {
+    state.ciDoctor = initCiDoctor();
+    return `${state.ciDoctor.patternCount} failure signatures`;
+  });
+  if (state.ciDoctor) log('W31 W23f: ciDoctor -> CI failure path (diagnose() seam; live-CI leg NOT VERIFIED — no CI runner in sandbox)');
+
+  // WA4 — swarm topologies -> workforce dispatch (approved live-server mount).
+  soft('WA4', () => {
+    state.wa4 = initWa4Topology();
+    return `topologies: ${state.wa4.known.join(', ')}`;
+  });
+  if (state.wa4) log('W31 WA4: swarm topologies -> workforce dispatch (wa4-topology mounted; default passthrough)');
+
+  // Scope 3 shutdown: stop the shipped heartbeat timers (engine ticker is
+  // already unref'd; heartbeat setTimeout timers are not).
+  const shutdownScope3 = () => { try { if (state.autonomous) state.autonomous.heartbeat.close(); } catch { /* fail-open */ } };
+  process.once('exit', shutdownScope3);
+  process.once('SIGTERM', shutdownScope3);
+  process.once('SIGINT', shutdownScope3);
+
   const wired = {
     W36: true, B1: !!state.repo, B2: !!state.index, B3: !!state.hybrid, B4: !!state.hot,
     B5: !!state.protocol, WA1: typeof assemblePrompt === 'function', WA8: true, WA2: !!state.graph,
     WA3: !!state.observersRoot, WA5: !!state.fleet, W10A1: !!state.rlm, W17: true, W18: !!state.viking,
     W19: typeof claimsBrowserMethod === 'function',
+    'S3-AUTO': !!state.scheduler, 'S3-CYCLE': !!state.dreamCycle, 'S3-OFFLOAD': !!state.offloadRoot,
+    'S3-GSD': !!state.gsd, W23e: typeof ralphEmitCheckpoint === 'function', W23f: !!state.ciDoctor, WA4: !!state.wa4,
   };
   state.wired = wired;
   return { wired, sessionId, brainRoot, fleetDir, observersRoot, vikingRoot, log: W31.slice() };
@@ -317,4 +448,41 @@ export const wiring = {
   },
   assertNodeFloor,
   NODE_FLOOR,
+
+  /* -------- Phase 31 Scope 3 — consumer seams (read-only surface) -------- */
+  autonomy: {
+    engine: () => state.scheduler,
+    goals: () => (state.autonomous ? state.autonomous.goal.list() : []),
+    goalSet: (input) => state.autonomous.goal.set(input),
+    heartbeat: () => state.autonomous.heartbeat,
+  },
+  brainCycle: {
+    run: (opts = {}) => (state.dreamCycle ? state.dreamCycle().run(opts) : null),
+    job: (id) => (state.scheduler ? state.scheduler.getJob(id) : null),
+    runHistory: (opts) => (state.scheduler ? state.scheduler.history(opts) : []),
+  },
+  contextOffload: {
+    roots: () => ({ offload: state.offloadRoot, sessions: state.sessionsDir }),
+    write: (name, content) => offloadStore.write(name, content, { directory: state.offloadRoot }),
+    read: (name) => offloadStore.read(name, { directory: state.offloadRoot }),
+    list: () => offloadStore.list({ directory: state.offloadRoot }),
+    recent: (sid, n) => offloadHistory.recent(sid, n, { directory: state.sessionsDir }),
+  },
+  workgraph: {
+    gsdLoop: (payload) => (state.gsdLoopFn ? state.gsdLoopFn(payload) : null),
+    gsdStatus: (taskId) => state.gsd.status(taskId),
+  },
+  ralphCheckpoint: {
+    emit: (props) => ralphEmitCheckpoint(props),
+    run: (task, opts) => ralphRun(task, opts),
+    register: (fn) => ralphRegisterCheckpoint(fn),
+  },
+  ciDoctor: {
+    diagnose: ({ logs }) => (state.ciDoctor ? state.ciDoctor.diagnose({ logs }) : null),
+    signatures: () => (state.ciDoctor ? state.ciDoctor.knownSignatures : []),
+  },
+  wa4: {
+    dispatch: (capability, opts) => (state.wa4 ? state.wa4.dispatch(capability, opts) : null),
+    knownTopologies: () => (state.wa4 ? state.wa4.known : []),
+  },
 };
