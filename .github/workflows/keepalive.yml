@@ -54,30 +54,43 @@ jobs:
       # and redeploy automatically, then say so LOUDLY in the run log.
       - name: Guard the app site (self-heal on 404)
         env:
-          SITE: ${{ vars.APP_SITE_URL || 'https://lewiseinstein15-tech.github.io/jexi-os-/' }}
+          SITE: ${{ vars.APP_SITE_URL || 'https://leewiseinstein15-tech.github.io/jexi-os-/' }}
           GH_TOKEN: ${{ secrets.GH_PAGES_GUARD_TOKEN }}
-          REPO: lewiseinstein15-Tech/jexi-os-
+          REPO: leewiseinstein15-Tech/jexi-os-
         run: |
+          # HARDENED 2026-09-22 (CI failure sweep): this step used to FAIL the
+          # whole cron run (email flood) whenever the site 404'd AND self-heal
+          # couldn't complete — e.g. GH_PAGES_GUARD_TOKEN missing/revoked
+          # (observed: API answers "Bad credentials" 401, then the python
+          # parser crashed with KeyError on the error JSON). A down site with
+          # an unusable guard token is a WARNING, not a cron failure: the
+          # brain keep-warm pings above are the workflow's real job.
           CODE=$(curl -s -m 30 -o /dev/null -w '%{http_code}' "$SITE")
           echo "App site: HTTP $CODE"
-          if [ "$CODE" != "200" ]; then
-            echo "::warning::App site is $CODE (expected 200) — attempting self-heal"
-            echo "1/2 re-enabling Pages (build_type: workflow)…"
-            curl -s -X POST \
-              -H "Authorization: token $GH_TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              "https://api.github.com/repos/$REPO/pages" \
-              -d '{"build_type":"workflow"}' | head -c 300; echo
-            echo "2/2 re-running the latest successful frontend deploy…"
-            RUN_ID=$(curl -s -H "Authorization: token $GH_TOKEN" \
-              "https://api.github.com/repos/$REPO/actions/workflows/deploy.yml/runs?status=success&per_page=1" \
-              | python3 -c 'import json,sys; r=json.load(sys.stdin)["workflow_runs"]; print(r[0]["id"] if r else "")')
-            if [ -n "$RUN_ID" ]; then
-              curl -s -X POST -H "Authorization: token $GH_TOKEN" \
-                "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/rerun" \
-                -o /dev/null -w "rerun HTTP %{http_code}\n"
-              echo "::warning::PAGES SELF-HEAL DONE — site was $CODE; Pages re-enabled + deploy rerun ($RUN_ID). CHECK GITHUB SETTINGS → SECURITY LOG for who disabled it."
-            else
-              echo "::warning::No successful deploy run found to rerun — manual fix needed"
-            fi
+          if [ "$CODE" = "200" ]; then exit 0; fi
+          echo "::warning::App site is $CODE (expected 200) — attempting self-heal"
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::GH_PAGES_GUARD_TOKEN not set — self-heal impossible. Set the secret or re-enable Pages manually (repo Settings -> Pages)."
+            exit 0
           fi
+          echo "1/2 re-enabling Pages (build_type: workflow)…"
+          RESP=$(curl -s -X POST -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$REPO/pages" -d '{"build_type":"workflow"}')
+          echo "$RESP" | head -c 300; echo
+          if echo "$RESP" | grep -q 'Bad credentials'; then
+            echo "::warning::GH_PAGES_GUARD_TOKEN rejected (Bad credentials) — rotate the secret. Self-heal aborted; run still green."
+            exit 0
+          fi
+          echo "2/2 re-running the latest successful frontend deploy…"
+          RUN_ID=$(curl -s -H "Authorization: token $GH_TOKEN" "https://api.github.com/repos/$REPO/actions/workflows/deploy.yml/runs?status=success&per_page=1" | python3 -c 'import json,sys
+          try:
+              r=json.load(sys.stdin).get("workflow_runs",[])
+              print(r[0]["id"] if r else "")
+          except Exception:
+              print("")' 2>/dev/null || echo "")
+          if [ -n "$RUN_ID" ]; then
+            curl -s -X POST -H "Authorization: token $GH_TOKEN" "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/rerun" -o /dev/null -w "rerun HTTP %{http_code}\n" || true
+            echo "::warning::PAGES SELF-HEAL DONE — site was $CODE; Pages re-enabled + deploy rerun ($RUN_ID). CHECK GITHUB SETTINGS -> SECURITY LOG for who disabled it."
+          else
+            echo "::warning::No successful deploy run found to rerun (or API unreachable) — manual fix needed: re-enable Pages in repo Settings."
+          fi
+          exit 0
