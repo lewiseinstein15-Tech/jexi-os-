@@ -48,6 +48,12 @@ export function mount(el, opts = {}) {
       refused: !!envelope.refused,
       refuseReason: (envelope.modes && envelope.modes.reason) || null,
       approvalId: (ev.payload && ev.payload.approvalId) || null,
+      verb: (envelope.modes && envelope.modes.rowOverride) || null,
+      // Phase 24: full untruncated args for tool rows so the display-mode
+      // clip in Transcript decides verbosity (Phase 16 renderer caps at 80).
+      raw: (ev.type === 'tool.started' && ev.payload && ev.payload.args !== undefined)
+        ? JSON.stringify(ev.payload.args)
+        : null,
     });
     store.turn = runtime.state(sessionId).status;
     paint();
