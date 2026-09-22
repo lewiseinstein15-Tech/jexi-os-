@@ -24,7 +24,9 @@ import os from 'node:os';
 import path from 'node:path';
 import * as repoContext from '../providers/routing/repo-context.js';
 
-const P27_LOGS = '/home/z/my-project/p27-logs';
+// consolidation cleanup: host-portable scratch base (os.tmpdir()) instead of
+// the hardcoded sandbox path.
+const P27_LOGS = process.env.P27_LOGS || path.join(os.tmpdir(), 'p27-logs');
 fs.mkdirSync(P27_LOGS, { recursive: true });
 
 // Deterministic fixture tree (outside the git repo so it never leaks into

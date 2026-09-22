@@ -12,10 +12,12 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import url from 'node:url';
 
 const REPO = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '..');
-const OUTDIR = process.env.PHASE7_PROBE_DIR || '/home/z/my-project/phase7-probes';
+// consolidation cleanup: scratch default is os.tmpdir() (was a hardcoded sandbox path)
+const OUTDIR = process.env.PHASE7_PROBE_DIR || path.join(os.tmpdir(), 'phase7-probes');
 const PKG = path.join(OUTDIR, 'pkg-project');
 const PY = path.join(OUTDIR, 'py-project');
 

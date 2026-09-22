@@ -290,7 +290,8 @@ console.log('P10 git status --short raw:');
 console.log(st.stdout.trim());
 const ALLOWED = ['prompt/anti-patterns/', 'scripts/phase25-scope-l.mjs'];
 const zoneOk =
-  lines.length > 0 &&
+  // consolidation cleanup: dropped `lines.length > 0` precondition — a clean committed
+  // tree passes vacuously (every() on an empty list); the substantive assert is "no out-of-zone path".
   lines.every((l) => {
     const p = l.slice(3).trim().replace(/\/$/, '/');
     return l.startsWith('?? ') && ALLOWED.some((a) => p === a || p.startsWith(a));

@@ -35,6 +35,15 @@ import { fileURLToPath } from 'node:url';
 
 const here_ = path.dirname(fileURLToPath(import.meta.url));
 
+// Consolidated cleanup — workspace-state isolation: the director artifact
+// workspace (server/jexi-workspace/, gitignored runtime scratch) accumulates
+// per-task dirs across runs; the sanitized-landing assert below counts the
+// files in the task dir (`dirList.length === 1`) and fails when a prior run
+// left a collided taskId dir behind. Wipe the scratch root once at start so
+// every run is clean-room (task ids are per-process; nothing tracked lives
+// under jexi-workspace/ — see root .gitignore line `server/jexi-workspace/`).
+fs.rmSync(path.join(here_, 'jexi-workspace', 'director'), { recursive: true, force: true });
+
 let pass = 0, fail = 0;
 const check = (name, cond, extra = '') => {
   if (cond) { pass++; console.log(`  ✓ ${name}`); }

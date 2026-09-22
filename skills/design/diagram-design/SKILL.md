@@ -2,8 +2,8 @@
 name: diagram-design
 description: Create editorial-quality diagrams as standalone SVG — all 40 types (flowchart, sequence, state machine, swimlane, ER, Gantt, Sankey, Wardley, org chart, treemap, radar and more) render deterministically from a JSON spec via the bundled registry, themed from the live JEXI jexi-theme.css tokens. Use when a reader learns more from a visual than from prose.
 version: 1
-whentouse: Use when explaining structure, flow, state, comparison or hierarchy that would be clearer as a diagram — before drawing, verify the reader would not be better served by a well-written paragraph.
-allowedtools: [code-write, code-run]
+whenToUse: Use when explaining structure, flow, state, comparison or hierarchy that would be clearer as a diagram — before drawing, verify the reader would not be better served by a well-written paragraph.
+allowedTools: [code-write, code-run]
 origin: ported from cathrynlavery/diagram-design (MIT, © 2025 Cathryn Lavery) — philosophy, 40-type catalog, editorial token system; per-type layout references shipped verbatim in references/; phase-12 v1 rendered 8 core types; phase-17 Scope H v2: all 40 types as types/<name>.type.js registry modules (inputSchema + deterministic render) behind the same CLI, brand.js matching src/styles/jexi-theme.css --jcx-* tokens with the upstream cool-editorial defaults as fallback
 ---
 

@@ -60,5 +60,8 @@
         "tests/agi/test-verification-spawn.js"
       ]
     }
+  },
+  "engines": {
+    "node": ">=22.5"
   }
 }

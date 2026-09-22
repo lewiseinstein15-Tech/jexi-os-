@@ -11,7 +11,17 @@
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { classify, route, configure, DEFAULT_MAP } from '../providers/routing/index.js';
+
+// consolidation cleanup: the determinism child-script imports the routing
+// module via a REPO-ANCHORED file URL (was a hardcoded foreign worktree path)
+// and its scratch file now lives under os.tmpdir().
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ROUTING_ENTRY = pathToFileURL(path.join(REPO_ROOT, 'providers/routing/index.js')).href;
+const DET_CHILD = path.join(os.tmpdir(), 'p27-logs', 'phase27-c-detchild.mjs');
 
 const P_SIMPLE_1 = 'hi';
 const P_SIMPLE_2 = 'what is 2 + 2?';
@@ -107,7 +117,7 @@ await probe(4, () => {
 
 // -- P5 ---------------------------------------------------------------------
 const DET_CHILD_SCRIPT = `
-import { classify, route, configure } from 'file:///home/z/my-project/jexi-build-25/providers/routing/index.js';
+import { classify, route, configure } from '${ROUTING_ENTRY}';
 configure({ map: { simple: 'tier-cheap', strong: 'tier-strong' }, agentOverrides: {}, knownModels: [] });
 const P_SIMPLE_2 = 'what is 2 + 2?';
 const P_COMPLEX_2 =
@@ -129,8 +139,9 @@ await probe(5, async () => {
   const a = sequence();
   const b = sequence();
   if (a !== b) throw new Error(`two in-process runs differ:\n${a}\n---\n${b}`);
-  fs.writeFileSync('/home/z/my-project/p27-logs/phase27-c-detchild.mjs', DET_CHILD_SCRIPT);
-  const c = execFileSync(process.execPath, ['/home/z/my-project/p27-logs/phase27-c-detchild.mjs'], { encoding: 'utf8' }).trim();
+  fs.mkdirSync(path.dirname(DET_CHILD), { recursive: true });
+  fs.writeFileSync(DET_CHILD, DET_CHILD_SCRIPT);
+  const c = execFileSync(process.execPath, [DET_CHILD], { encoding: 'utf8' }).trim();
   if (a !== c) throw new Error(`fresh-process run differs:\n${a}\n---\n${c}`);
   return `byte-identical classify+route output across two runs and a fresh node process (${a.length} bytes each)`;
 });

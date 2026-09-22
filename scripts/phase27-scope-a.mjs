@@ -13,10 +13,17 @@
  *    every deterministic field compared byte-for-byte)
  */
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { execSync, execFileSync } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createFleet } from '../session/fleet/index.js';
 
-const BASE = '/home/z/my-project/p27-logs';
+// consolidation cleanup: host-portable scratch base (os.tmpdir()) instead of a
+// hardcoded sandbox path; REPO_ROOT anchors the reboot child-script's import.
+const BASE = process.env.P27_LOGS || path.join(os.tmpdir(), 'p27-logs');
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const FLEET_ENTRY = pathToFileURL(path.join(REPO_ROOT, 'session/fleet/index.js')).href;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function freshDir(name) {
@@ -62,7 +69,7 @@ async function expectCodeAsync(fn, code, label) {
 }
 
 const REBOOT_SCRIPT = `
-import { createFleet } from 'file:///home/z/my-project/jexi-build-25/session/fleet/index.js';
+import { createFleet } from '${FLEET_ENTRY}';
 const fleet = createFleet({ dir: '__DIR__' });
 console.log(JSON.stringify(fleet.list()));
 `;
