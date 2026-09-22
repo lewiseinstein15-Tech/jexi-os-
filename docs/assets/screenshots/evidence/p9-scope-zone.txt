@@ -1,0 +1,42 @@
+$ H-fix-2 overlay vs remote a0c2ef14 (repository-ID API tree)
+modify  README.md
+modify  docs/README-INDEX.md
+modify  docs/assets/screenshots/chat-toolcards.png
+add     docs/assets/screenshots/evidence/capability-counts.txt
+modify  docs/assets/screenshots/evidence/capture-run.txt
+add     docs/assets/screenshots/evidence/p1-readme-first-60.txt
+modify  docs/assets/screenshots/evidence/p3-live-capture-source.txt
+add     docs/assets/screenshots/evidence/p4-screenshot-inventory.txt
+add     docs/assets/screenshots/evidence/p6-no-roadmap.txt
+add     docs/assets/screenshots/evidence/p7-quick-start.txt
+modify  docs/assets/screenshots/evidence/p8-markdown-links-images.txt
+modify  docs/assets/screenshots/evidence/p9-scope-zone.txt
+add     docs/assets/screenshots/example-flow.png
+add     docs/assets/screenshots/hero-qa.png
+modify  docs/assets/screenshots/legacy-console.png
+modify  docs/assets/screenshots/readme-rendered.png
+modify  docs/assets/screenshots/settings-provider.png
+modify  docs/assets/screenshots/workgraph-nodes.png
+modify  scripts/phase30-readme-shots.mjs
+delete  docs/assets/screenshots/badges/build.svg
+delete  docs/assets/screenshots/badges/license.svg
+delete  docs/assets/screenshots/badges/node.svg
+delete  docs/assets/screenshots/badges/phases.svg
+delete  docs/assets/screenshots/badges/tests.svg
+delete  docs/assets/screenshots/chat-answer.png
+delete  docs/assets/screenshots/chat-modes.png
+delete  docs/assets/screenshots/chat-streaming.png
+delete  docs/assets/screenshots/console-hero.png
+delete  docs/assets/screenshots/evidence/hfix-boot-diff.txt
+delete  docs/assets/screenshots/evidence/hfix-screenshot-inventory.txt
+delete  docs/assets/screenshots/evidence/p1-readme-first-40.txt
+delete  docs/assets/screenshots/evidence/p2-screenshot-inventory.txt
+delete  docs/assets/screenshots/evidence/p4-architecture.txt
+delete  docs/assets/screenshots/evidence/p6-quick-start.txt
+delete  docs/assets/screenshots/evidence/p7-badge-checks.txt
+delete  docs/assets/screenshots/placeholder-computer-control.svg
+delete  docs/assets/screenshots/placeholder-runtime-only.svg
+
+total=37 out_of_zone=0
+code paths in overlay: none
+result: PASS

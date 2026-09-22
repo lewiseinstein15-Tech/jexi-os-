@@ -1,0 +1,16 @@
+$ marked parse
+{'inb': 9171, 'outb': 11035, 'headings': 11, 'tables': 2}
+marked_parse=PASS
+
+$ README image references (P5)
+EXISTS  docs/assets/screenshots/architecture.svg 5337
+EXISTS  docs/assets/screenshots/chat-toolcards.png 27846
+EXISTS  docs/assets/screenshots/example-flow.png 62648
+EXISTS  docs/assets/screenshots/hero-qa.png 42933
+EXISTS  docs/assets/screenshots/settings-provider.png 64925
+EXISTS  docs/assets/screenshots/workgraph-nodes.png 33727
+external badge images (shields.io): 5
+
+$ README local links
+local_links=11 broken=[]
+result: PASS

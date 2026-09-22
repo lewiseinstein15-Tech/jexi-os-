@@ -1,0 +1,6 @@
+$ grep -in "phase 1\|phase 2\|phase 3\|in flight\|roadmap\|where we are\|next" README.md
+(no output)
+
+$ grep -in "phase" README.md
+37:| Dream-cycle phases | **13** | `brain/cycle/phases` |
+88:- **Brain** (`brain/`): hybrid search, hot memory, knowledge graph, the five-verb memory protocol, a 13-phase dream cycle, and the BrainBench retrieval benchmark.
