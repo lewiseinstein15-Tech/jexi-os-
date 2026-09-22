@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="420" height="240" viewBox="0 0 420 240" role="img" aria-labelledby="title desc">
-  <title id="title">Runtime-only placeholder</title><desc id="desc">The capability exists as a runtime module but has no wired console surface.</desc>
-  <rect width="420" height="240" rx="22" fill="#0b0d12"/>
-  <path d="M126 65h168v110H126z" fill="none" stroke="#697080" stroke-width="4"/>
-  <path d="M147 92l22 18-22 18M184 132h48" fill="none" stroke="#8178ff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="273" cy="111" r="20" fill="none" stroke="#ff7848" stroke-width="4"/>
-  <path d="M263 111h20" stroke="#ff7848" stroke-width="4" stroke-linecap="round"/>
-  <text x="210" y="211" text-anchor="middle" fill="#a7adba" font-family="ui-monospace,SFMono-Regular,monospace" font-size="13">RUNTIME MODULE · NO WIRED UI</text>
-</svg>

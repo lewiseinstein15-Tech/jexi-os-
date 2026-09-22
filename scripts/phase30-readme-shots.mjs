@@ -60,8 +60,7 @@ try {
   await p24.waitForFunction(() => /backend (online|offline)/.test(document.querySelector('.jx-header')?.textContent || ''));
   const navItems = await p24.locator('.jx-nav-item').allTextContents();
   const legacyNav = await p24.evaluate(() => /Executive|Resources|Extensions/.test(document.body.innerText));
-  await p24.screenshot({ path: shot('console-hero.png') });
-  console.log(`CAPTURE console-hero.png · default boot · hash=${await p24.evaluate(() => location.hash)} · nav=${JSON.stringify(navItems)} · legacy-nav-present=${legacyNav}`);
+  console.log(`BOOT default · hash=${await p24.evaluate(() => location.hash)} · nav=${JSON.stringify(navItems)} · legacy-nav-present=${legacyNav}`);
 
   // Real Q&A through the live composer: streaming, answer, tool cards.
   await p24.fill('.p24-input', 'What does the scheduler do?');
@@ -77,15 +76,13 @@ try {
   });
   await p24.click('.p24-send');
   await p24.waitForSelector('.p24-narration');
-  await p24.screenshot({ path: shot('chat-streaming.png') });
   const firstRow = await p24.locator('.p24-narration .p24-row-text').first().textContent();
-  const sendLabel = (await p24.locator('.p24-send').textContent())?.trim();
-  console.log(`CAPTURE chat-streaming.png · send button=${JSON.stringify(sendLabel)} · first narration row=${JSON.stringify(firstRow)}`);
+  console.log(`TURN first narration row=${JSON.stringify(firstRow)}`);
   console.log(`STREAM timeline (ms since navigation, rows present after each DOM mutation): ${JSON.stringify(await p24.evaluate(() => window.__p30rows))}`);
   await p24.waitForFunction(() => document.body.innerText.includes('turn completed: console-main:turn-1 ok'));
-  await p24.screenshot({ path: shot('chat-answer.png') });
+  await p24.screenshot({ path: shot('hero-qa.png') });
   const turnEnd = await p24.locator('.p24-turnend .p24-row-text').first().textContent();
-  console.log(`CAPTURE chat-answer.png · ${JSON.stringify(turnEnd)}`);
+  console.log(`CAPTURE hero-qa.png · question + full answer turn in one frame · ${JSON.stringify(turnEnd)}`);
   await p24.waitForSelector('.p24-toolcard');
   const toolCards = await p24.locator('.p24-toolcard').allInnerTexts();
   await p24.locator('.p24-transcript').screenshot({ path: shot('chat-toolcards.png') });
@@ -107,9 +104,9 @@ try {
   await p24.waitForSelector('.p24-approval');
   await p24.getByRole('button', { name: 'approve', exact: true }).click();
   await p24.waitForFunction(() => document.body.innerText.includes('turn completed: console-main:turn-2 ok'));
-  await p24.screenshot({ path: shot('chat-modes.png') });
+  await p24.screenshot({ path: shot('example-flow.png') });
   const modes = await p24.evaluate(async () => (await import('/ui/web/console/chat/runtime.js')).state('console-main').modes);
-  console.log(`CAPTURE chat-modes.png · ${modes.displayMode}/${modes.interactionMode} · real approval + tool receipts`);
+  console.log(`CAPTURE example-flow.png · ${modes.displayMode}/${modes.interactionMode} · approval requested -> approved -> write_file started/completed -> turn end`);
 
   // workgraph-nodes: #/graph from the default boot.
   await liveGoto(p24, `${LIVE_ORIGIN}/#/graph`, '.p24-graph-toolbar');
@@ -165,6 +162,8 @@ try {
     .map((image) => image.getAttribute('src')));
   if (brokenImages.length) throw new Error(`README render has broken images: ${brokenImages.join(', ')}`);
   await renderPage.screenshot({ path: shot('readme-rendered.png') });
+  const heroBox = await renderPage.locator('img[src$="hero-qa.png"]').boundingBox();
+  console.log(`README hero-qa.png rendered inline at ${JSON.stringify(heroBox)}`);
   console.log('CAPTURE readme-rendered.png · actual README rendered with GitHub-style Markdown CSS · 0 broken images');
   await renderContext.close();
 } finally {

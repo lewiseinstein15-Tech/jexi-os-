@@ -1,37 +1,42 @@
-$ planned repository-ID API overlay relative to authoritative Scope H parent
-authoritative parent: 23c13a859b419fd17282d0a1616848dd8e4828b7
-authoritative parent tree: 04cd83e48a695f3b510f5b563db50cb30ddbcd31
-overlay path count: 30
-MODIFIED	README.md	10134 bytes	sha256:9837551c1c3f1405419f510d718dcb638edbc9b7cbcc66214ceffe50f3e2b576
-ADDED	docs/README-INDEX.md	18379 bytes	sha256:7f39e8acb8465f0c8f7f94f7bd8a150abde9ef5a8c135f9e6d741d52ac5ec500
-ADDED	docs/assets/screenshots/agents-view.png	220675 bytes	sha256:8f51dbf4175f4f84916e76bb38c8d49689ae46448eefb92aff4306436042bf14
-ADDED	docs/assets/screenshots/architecture.svg	5337 bytes	sha256:ef419fec46a2ef4326500a8abd82cfd3f3d25141f4217ee8f1f8e8e3624d705a
-ADDED	docs/assets/screenshots/badges/build.svg	2263 bytes	sha256:ad5834178f7599af9fdda11629d49cae07f2997beec49821b2920eff5bfd50e7
-ADDED	docs/assets/screenshots/badges/license.svg	1275 bytes	sha256:8378cbe3d7aa28071879db77f03153c7b7ca6ca9c418d747db7923627f07eff0
-ADDED	docs/assets/screenshots/badges/node.svg	3511 bytes	sha256:2b8ec67d255cce8068058c23064c6dfed662b3df705da8c487eb1349abc65c6b
-ADDED	docs/assets/screenshots/badges/phases.svg	1285 bytes	sha256:5474be1ad105ba9811cb4361582e6d9ab40da1f1c1e2c4ce9d77886d4d882ae9
-ADDED	docs/assets/screenshots/badges/tests.svg	1285 bytes	sha256:8138915e2e1d60d3803a0e84db7a144f39c685e1a3aa2c4097633efc7848dba7
-ADDED	docs/assets/screenshots/chat-modes.png	70791 bytes	sha256:971be9be28c6106d8517d2d0de70914f3932f16f79dc31a2fb34010281d58544
-ADDED	docs/assets/screenshots/chat-multiagent.png	188888 bytes	sha256:f39d6f5cf0453cde59f6e71f6d5d86c80fe3c402cf25839673aaa51006edc093
-ADDED	docs/assets/screenshots/chat-toolcards.png	47711 bytes	sha256:739ce0853bd3f11e9cbe3146d6464fbc1c615135476f2790b001fda836e8f701
-ADDED	docs/assets/screenshots/checkpoint.png	96288 bytes	sha256:2baae3d967574af1e5e94c0d4885f9ca866f0ff9416ea84eef00d0baeb89bb97
-ADDED	docs/assets/screenshots/console-hero.png	182752 bytes	sha256:d8a907c6ddfe9e268a1c8f9a511bfe568a8b219676963b5f0bb21c455de2f1a4
-ADDED	docs/assets/screenshots/evidence/capture-run.txt	822 bytes	sha256:594f04c456f95202feeabf59d00a3e28ce72286419b97a47eb4284d8135bc68f
-ADDED	docs/assets/screenshots/evidence/p1-readme-first-40.txt	4361 bytes	sha256:6552c3195fa0f7411da9dc885ea7a80204a92d9072ce0684f8e7e7c50cb39d77
-ADDED	docs/assets/screenshots/evidence/p2-screenshot-inventory.txt	1264 bytes	sha256:588bc41b4a0ad7fb47c697acf748a89f9cc2b3533dbfedb73ad698df91da61e6
-ADDED	docs/assets/screenshots/evidence/p3-live-capture-source.txt	1559 bytes	sha256:b2ae86a94ddc07b14cb639bcd9ebec9ae225593bc084a0df7fba9451ac8c468b
-ADDED	docs/assets/screenshots/evidence/p4-architecture.txt	1052 bytes	sha256:a7be8745ed9135c0f79dd420673103009d2ff66208f440d506c4e206e1c0a42a
-ADDED	docs/assets/screenshots/evidence/p5-docs-index-count.txt	177 bytes	sha256:0a80f99b98211e237b004be6819d01ae25c204d527705c8437aa30f784c68bcf
-ADDED	docs/assets/screenshots/evidence/p6-quick-start.txt	4790 bytes	sha256:cd1839a5c952b0926ab0510fa22f8b2635ddb9e9bddad91344040239f662f67e
-ADDED	docs/assets/screenshots/evidence/p7-badge-checks.txt	1541 bytes	sha256:e63658df82a2a91785e56b90f73649d728696ba8fa73852411e0247dc185ee23
-ADDED	docs/assets/screenshots/evidence/p8-markdown-links-images.txt	2557 bytes	sha256:4736adbb97ad1eae2a9704b422e5d07849e058da03d040257637815122bf3fcd
-ADDED	docs/assets/screenshots/evidence/p9-scope-zone.txt	self-report (digest intentionally omitted)
-ADDED	docs/assets/screenshots/placeholder-computer-control.svg	864 bytes	sha256:2b50c76c9af28088a4f5dbc5821bfaf08838b2debcdb7580c8513d43409c6df9
-ADDED	docs/assets/screenshots/placeholder-runtime-only.svg	893 bytes	sha256:b35863859963d073a97e8dffd948f37d2c76748262b6183ad2b4f42ddb00f607
-ADDED	docs/assets/screenshots/readme-rendered.png	189709 bytes	sha256:2cbc1bd4475154937d9c02f5d39f89a3713e7aae161c16861e1b6d43f5cc623b
-ADDED	docs/assets/screenshots/settings-provider.png	69783 bytes	sha256:5cad4ebd970ecc646e72899977f1ff93b3d7f3452d6ea05383336e68294c6441
-ADDED	docs/assets/screenshots/workgraph-nodes.png	36210 bytes	sha256:72217dcf76fda0ee74de5b25c096fc7a14080763b3bb4a4f483998b2bbfea2e1
-ADDED	scripts/phase30-readme-shots.mjs	11603 bytes	sha256:0e7e15c671267b246da41723f7150c315b28c80be0f7155c2357cc671452e5fd
-unauthorized overlay paths: []
-non-overlay parent entries preserved: yes (tree is constructed from the authoritative parent and replaces/adds only this manifest)
-RESULT: PASS
+$ H-fix-2 overlay vs remote a0c2ef14 (repository-ID API tree)
+modify  README.md
+modify  docs/README-INDEX.md
+modify  docs/assets/screenshots/chat-toolcards.png
+add     docs/assets/screenshots/evidence/capability-counts.txt
+modify  docs/assets/screenshots/evidence/capture-run.txt
+add     docs/assets/screenshots/evidence/p1-readme-first-60.txt
+modify  docs/assets/screenshots/evidence/p3-live-capture-source.txt
+add     docs/assets/screenshots/evidence/p4-screenshot-inventory.txt
+add     docs/assets/screenshots/evidence/p6-no-roadmap.txt
+add     docs/assets/screenshots/evidence/p7-quick-start.txt
+modify  docs/assets/screenshots/evidence/p8-markdown-links-images.txt
+modify  docs/assets/screenshots/evidence/p9-scope-zone.txt
+add     docs/assets/screenshots/example-flow.png
+add     docs/assets/screenshots/hero-qa.png
+modify  docs/assets/screenshots/legacy-console.png
+modify  docs/assets/screenshots/readme-rendered.png
+modify  docs/assets/screenshots/settings-provider.png
+modify  docs/assets/screenshots/workgraph-nodes.png
+modify  scripts/phase30-readme-shots.mjs
+delete  docs/assets/screenshots/badges/build.svg
+delete  docs/assets/screenshots/badges/license.svg
+delete  docs/assets/screenshots/badges/node.svg
+delete  docs/assets/screenshots/badges/phases.svg
+delete  docs/assets/screenshots/badges/tests.svg
+delete  docs/assets/screenshots/chat-answer.png
+delete  docs/assets/screenshots/chat-modes.png
+delete  docs/assets/screenshots/chat-streaming.png
+delete  docs/assets/screenshots/console-hero.png
+delete  docs/assets/screenshots/evidence/hfix-boot-diff.txt
+delete  docs/assets/screenshots/evidence/hfix-screenshot-inventory.txt
+delete  docs/assets/screenshots/evidence/p1-readme-first-40.txt
+delete  docs/assets/screenshots/evidence/p2-screenshot-inventory.txt
+delete  docs/assets/screenshots/evidence/p4-architecture.txt
+delete  docs/assets/screenshots/evidence/p6-quick-start.txt
+delete  docs/assets/screenshots/evidence/p7-badge-checks.txt
+delete  docs/assets/screenshots/placeholder-computer-control.svg
+delete  docs/assets/screenshots/placeholder-runtime-only.svg
+
+total=37 out_of_zone=0
+code paths in overlay: none
+result: PASS

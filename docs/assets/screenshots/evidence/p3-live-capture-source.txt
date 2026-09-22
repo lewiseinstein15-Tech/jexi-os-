@@ -1,4 +1,4 @@
-$ grep -n "LIVE_ORIGIN\|BRAIN_ORIGIN\|localhost" scripts/phase30-readme-shots.mjs
+$ grep -n "LIVE_ORIGIN =\|BRAIN_ORIGIN =\|localhost" scripts/phase30-readme-shots.mjs
 6: * Vite console. This script does the same: localhost:3000 for the UI and
 7: * localhost:3002 for the brain. It never substitutes mocked routes or fixture
 25:const LIVE_ORIGIN = process.env.JEXI_LIVE_ORIGIN || 'http://localhost:3000';
@@ -6,4 +6,4 @@ $ grep -n "LIVE_ORIGIN\|BRAIN_ORIGIN\|localhost" scripts/phase30-readme-shots.mj
 48:   * Phase 30 H-fix: the DEFAULT boot (http://localhost:3000/) now mounts
 
 $ sha256sum scripts/phase30-readme-shots.mjs
-270faa2b7d0e4761c91846191b0011630fc404aec7484a80d60746cc829a9340  scripts/phase30-readme-shots.mjs
+f2f9ddf446e8d34eb7337dfc6b2b12fed8b76cc12b616368f4a3edbd7bcbce3c  scripts/phase30-readme-shots.mjs

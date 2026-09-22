@@ -104,50 +104,26 @@ Every file under `docs/` is linked below. **Indexed files: 126.**
 ## `assets/screenshots/`
 
 - [`assets/screenshots/architecture.svg`](assets/screenshots/architecture.svg) — README architecture diagram showing Kernel → Agents → Brain → Tools → Surfaces.
-- [`assets/screenshots/chat-answer.png`](assets/screenshots/chat-answer.png) — Completed real Q&A turn in the default console: user message, narration rows, tool receipts, turn-end row (deterministic in-process agent, no provider).
-- [`assets/screenshots/chat-modes.png`](assets/screenshots/chat-modes.png) — Live full/act chat mode in the default console with approval and tool receipts.
-- [`assets/screenshots/chat-streaming.png`](assets/screenshots/chat-streaming.png) — Same turn captured immediately after send, composer still in its busy state.
-- [`assets/screenshots/chat-toolcards.png`](assets/screenshots/chat-toolcards.png) — Live Phase 16 tool.started / tool.completed cards rendered in the default console transcript.
-- [`assets/screenshots/console-hero.png`](assets/screenshots/console-hero.png) — Default boot of http://localhost:3000/ — Phase 24 shell with exactly Chat / Settings / Work Graph.
+- [`assets/screenshots/chat-toolcards.png`](assets/screenshots/chat-toolcards.png) — Live tool.started / tool.completed cards for a read_file call in the default console transcript.
+- [`assets/screenshots/example-flow.png`](assets/screenshots/example-flow.png) — Live approval-gated write turn: approval requested → approved → write_file receipts → turn end.
+- [`assets/screenshots/hero-qa.png`](assets/screenshots/hero-qa.png) — README hero: a real question and JEXI's full answer turn captured live in the default console (deterministic in-process agent, no provider).
 - [`assets/screenshots/legacy-console.png`](assets/screenshots/legacy-console.png) — Record-only capture of the legacy console at #classic (not linked from the README).
-- [`assets/screenshots/placeholder-computer-control.svg`](assets/screenshots/placeholder-computer-control.svg) — Explicit placeholder icon used because no local desktop worker was available.
-- [`assets/screenshots/placeholder-runtime-only.svg`](assets/screenshots/placeholder-runtime-only.svg) — Explicit placeholder icon for runtime modules without a wired console surface.
-- [`assets/screenshots/readme-rendered.png`](assets/screenshots/readme-rendered.png) — GitHub-style browser rendering of the README hero.
-- [`assets/screenshots/settings-provider.png`](assets/screenshots/settings-provider.png) — Live provider, model, and key-reference settings route of the default console.
-- [`assets/screenshots/workgraph-nodes.png`](assets/screenshots/workgraph-nodes.png) — Live Work Graph route of the default console showing the honest zero-node state.
-
-## `assets/screenshots/badges/`
-
-- [`assets/screenshots/badges/build.svg`](assets/screenshots/badges/build.svg) — Locally stored upstream CI status badge snapshot.
-- [`assets/screenshots/badges/license.svg`](assets/screenshots/badges/license.svg) — Locally stored MIT license badge.
-- [`assets/screenshots/badges/node.svg`](assets/screenshots/badges/node.svg) — Locally stored Node.js ≥22 requirement badge.
-- [`assets/screenshots/badges/phases.svg`](assets/screenshots/badges/phases.svg) — Locally stored phases 0–30 badge.
-- [`assets/screenshots/badges/tests.svg`](assets/screenshots/badges/tests.svg) — Locally stored 4,000+ checks badge.
+- [`assets/screenshots/readme-rendered.png`](assets/screenshots/readme-rendered.png) — GitHub-style browser rendering of the README hero with hero-qa.png inline.
+- [`assets/screenshots/settings-provider.png`](assets/screenshots/settings-provider.png) — Live Settings route: provider, model, and key reference (no inline secret).
+- [`assets/screenshots/workgraph-nodes.png`](assets/screenshots/workgraph-nodes.png) — Live Work Graph route in its honest zero-node state.
 
 ## `assets/screenshots/evidence/`
 
-- [`assets/screenshots/evidence/capture-run.txt`](assets/screenshots/evidence/capture-run.txt) — Raw output from the live Phase 30 H-fix README capture run (default-boot Phase 24 shell).
-- [`assets/screenshots/evidence/hfix-boot-diff.txt`](assets/screenshots/evidence/hfix-boot-diff.txt) — H-fix boot-switch diff for src/main.jsx plus default-boot DOM inspection.
-- [`assets/screenshots/evidence/hfix-screenshot-inventory.txt`](assets/screenshots/evidence/hfix-screenshot-inventory.txt) — H-fix screenshot dimensions and byte sizes.
-- [`assets/screenshots/evidence/p1-readme-first-40.txt`](assets/screenshots/evidence/p1-readme-first-40.txt) — P1 raw README first-40-lines output and rendered-image metadata.
-- [`assets/screenshots/evidence/p2-screenshot-inventory.txt`](assets/screenshots/evidence/p2-screenshot-inventory.txt) — P2 raw screenshot dimensions and byte-size inventory.
-- [`assets/screenshots/evidence/p3-live-capture-source.txt`](assets/screenshots/evidence/p3-live-capture-source.txt) — P3 raw localhost capture-source lines and script digest.
-- [`assets/screenshots/evidence/p4-architecture.txt`](assets/screenshots/evidence/p4-architecture.txt) — P4 raw architecture metadata, labels, and digest.
-- [`assets/screenshots/evidence/p5-docs-index-count.txt`](assets/screenshots/evidence/p5-docs-index-count.txt) — P5 raw docs-index and filesystem count comparison.
-- [`assets/screenshots/evidence/p6-quick-start.txt`](assets/screenshots/evidence/p6-quick-start.txt) — P6 raw clone/install/configure/dev verification output and explicit limits.
-- [`assets/screenshots/evidence/p7-badge-checks.txt`](assets/screenshots/evidence/p7-badge-checks.txt) — P7 raw upstream badge HEAD and repository API checks.
-- [`assets/screenshots/evidence/p8-markdown-links-images.txt`](assets/screenshots/evidence/p8-markdown-links-images.txt) — P8 raw Markdown, local-link, and image validation output.
-- [`assets/screenshots/evidence/p9-scope-zone.txt`](assets/screenshots/evidence/p9-scope-zone.txt) — P9 raw authorized-scope path manifest and zone result.
-
-## `research/`
-
-- [`research/ANTIDOOM.md`](research/ANTIDOOM.md) — Research: Antidoom (Liquid4All/antidoom) — runtime adaptations only — project documentation.
-- [`research/AWESOME_MCP_SERVERS.md`](research/AWESOME_MCP_SERVERS.md) — Research: Awesome MCP Servers — what JEXI should actually use — project documentation.
-- [`research/HERMES.md`](research/HERMES.md) — Research: Hermes Agent (NousResearch/hermes-agent) — project documentation.
-- [`research/MCP.md`](research/MCP.md) — Research: Model Context Protocol (MCP) — project documentation.
-- [`research/OBLITERATUS.md`](research/OBLITERATUS.md) — Research note: OBLITERATUS — studied, deliberately not integrated — project documentation.
-- [`research/orca-study.md`](research/orca-study.md) — Orca Study — what JEXI adopts, what it rejects, and why — project documentation.
-- [`research/PURO_RESEARCH.md`](research/PURO_RESEARCH.md) — Research: Puro-2B — future understanding only — project documentation.
+- [`assets/screenshots/evidence/capability-counts.txt`](assets/screenshots/evidence/capability-counts.txt) — Exact commands and outputs used to derive every number in the README capability table.
+- [`assets/screenshots/evidence/capture-run.txt`](assets/screenshots/evidence/capture-run.txt) — Raw output of the live README capture run (default-boot console, brain online).
+- [`assets/screenshots/evidence/p1-readme-first-60.txt`](assets/screenshots/evidence/p1-readme-first-60.txt) — P1 raw first 60 lines of the README.
+- [`assets/screenshots/evidence/p3-live-capture-source.txt`](assets/screenshots/evidence/p3-live-capture-source.txt) — P3 capture script localhost origins and digest.
+- [`assets/screenshots/evidence/p4-screenshot-inventory.txt`](assets/screenshots/evidence/p4-screenshot-inventory.txt) — P4 screenshot dimensions and byte sizes.
+- [`assets/screenshots/evidence/p5-docs-index-count.txt`](assets/screenshots/evidence/p5-docs-index-count.txt) — P5 docs index entry count vs files on disk.
+- [`assets/screenshots/evidence/p6-no-roadmap.txt`](assets/screenshots/evidence/p6-no-roadmap.txt) — P6 grep proving no roadmap / in-flight / phase-status strings remain in the README.
+- [`assets/screenshots/evidence/p7-quick-start.txt`](assets/screenshots/evidence/p7-quick-start.txt) — P7 Quick Start command verification and the explicit NOT VERIFIED clone line.
+- [`assets/screenshots/evidence/p8-markdown-links-images.txt`](assets/screenshots/evidence/p8-markdown-links-images.txt) — P8 Markdown parse, image existence, and local link validation.
+- [`assets/screenshots/evidence/p9-scope-zone.txt`](assets/screenshots/evidence/p9-scope-zone.txt) — P9 authorized-zone change manifest for the README rewrite commit.
 
 ## `screenshots/`
 

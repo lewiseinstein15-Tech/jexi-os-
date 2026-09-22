@@ -1,32 +1,16 @@
-$ Markdown parser
-marked_input_bytes=11349
-marked_output_bytes=13096
-marked_headings=11
-marked_tables=3
+$ marked parse
+{'inb': 9171, 'outb': 11035, 'headings': 11, 'tables': 2}
 marked_parse=PASS
 
-$ README image checks
-image_references: 23 unique: 15
-all_images_local: True
-all_images_in_docs_assets_screenshots: True
-OK docs/assets/screenshots/architecture.svg 5337 bytes
-OK docs/assets/screenshots/badges/build.svg 2263 bytes
-OK docs/assets/screenshots/badges/license.svg 1275 bytes
-OK docs/assets/screenshots/badges/node.svg 3511 bytes
-OK docs/assets/screenshots/badges/phases.svg 1285 bytes
-OK docs/assets/screenshots/badges/tests.svg 1285 bytes
-OK docs/assets/screenshots/chat-answer.png 42932 bytes
-OK docs/assets/screenshots/chat-modes.png 62648 bytes
-OK docs/assets/screenshots/chat-streaming.png 42932 bytes
-OK docs/assets/screenshots/chat-toolcards.png 27841 bytes
-OK docs/assets/screenshots/console-hero.png 25532 bytes
-OK docs/assets/screenshots/placeholder-computer-control.svg 864 bytes
-OK docs/assets/screenshots/placeholder-runtime-only.svg 893 bytes
-OK docs/assets/screenshots/settings-provider.png 62600 bytes
-OK docs/assets/screenshots/workgraph-nodes.png 34395 bytes
-legacy_only_captures_referenced: []
+$ README image references (P5)
+EXISTS  docs/assets/screenshots/architecture.svg 5337
+EXISTS  docs/assets/screenshots/chat-toolcards.png 27846
+EXISTS  docs/assets/screenshots/example-flow.png 62648
+EXISTS  docs/assets/screenshots/hero-qa.png 42933
+EXISTS  docs/assets/screenshots/settings-provider.png 64925
+EXISTS  docs/assets/screenshots/workgraph-nodes.png 33727
+external badge images (shields.io): 5
 
-$ README local link checks
-local_links=10 broken=[]
-anchors ['roadmap', 'quality'] missing []
+$ README local links
+local_links=11 broken=[]
 result: PASS
