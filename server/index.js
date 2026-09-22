@@ -115,6 +115,7 @@ import { mountHud } from './src/routes/hud.js'; // Phase 7(F) — HUD status con
 import { mountTokens } from './src/routes/tokens.js'; // ZONE-OWNER ITEM 6 (Phase 9 D) — ephemeral token mint/verify
 import { hudNoteCheck } from './src/kernel/hooks/hud-seam.js'; // Phase 7(F) — self-ping feeds checks.remote
 import { dispatchCommand, commandsAvailable } from './src/commands-seam.js'; // Phase 7(G) — commands subsystem (fail-soft)
+import { initPhase31Wiring } from './src/wiring/phase31-bootstrap.js'; // PHASE 31 Scope 1 — shipped subsystems -> boot seam (connect-only)
 import { autonomyScheduler } from './src/scheduler/index.js';
 import { taskManager } from './src/services/TaskManager.js';
 import { taskScheduler } from './src/services/TaskScheduler.js';
@@ -2834,6 +2835,8 @@ app.get('/api/browser/status', (req, res) => {
 const HOST = process.env.HOST || '0.0.0.0'; // CLI sets HOST=127.0.0.1 for a laptop-only brain
 app.listen(PORT, HOST, () => {
   console.log(`🧠 JEXI OS BRAIN running on http://${HOST}:${PORT}`);
+  // PHASE 31 Scope 1 — wire shipped subsystems at the boot seam (W36 gate hard-refuses below Node floor).
+  try { initPhase31Wiring({ sessionId: `boot-${process.pid}` }); } catch (e) { console.error(String(e && e.message || e)); process.exit(1); }
   // Phase 7(B): SessionStart lifecycle hook — the brain's session begins.
   try { runLifecycleHook('SessionStart', { sessionId: `boot-${process.pid}`, agentId: 'jexi-brain', pid: process.pid }); } catch { /* hooks fail open */ }
   // PERMANENT drop fix: visible proof the heap cap is active (OOM-kill was
