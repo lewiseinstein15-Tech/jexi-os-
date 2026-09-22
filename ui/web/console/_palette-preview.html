@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phase 24 palette preview (approval artifact — not shipped)</title>
+<style>
+  :root {
+    --bg: #08090a;            /* Linear canvas */
+    --surface: #0f1011;       /* Linear panel */
+    --surface-elevated: #191a1b; /* Linear surface L3 */
+    --border: #333333;        /* Vercel border-100 */
+    --border-strong: #444444; /* Vercel border-200 */
+    --text-primary: #f7f8f8;  /* Linear foreground */
+    --text-secondary: #d0d6e0;/* Linear silver */
+    --text-muted: #8a8f98;    /* Linear tertiary */
+    --text-quiet: #62666d;    /* Linear quaternary */
+    --accent: #5e6ad2;        /* Linear brand indigo */
+    --accent-bright: #7170ff; /* Linear accent violet */
+    --accent-hover: #828fff;  /* Linear accent hover */
+    --error: #ff0000;         /* Vercel error */
+    --success: #00dc82;       /* Vercel success */
+    --warn: #ffaa00;          /* Vercel warning */
+    --info: #0070f3;          /* Vercel info */
+    --radius: 8px;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --ui: Inter, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #050506; font-family: var(--ui); }
+  h2 { font-size: 15px; color: var(--text-primary); letter-spacing: -0.01em; margin: 0 0 14px 0; }
+  h3 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin: 22px 0 10px 0; font-weight: 590; }
+  h3:first-of-type { margin-top: 0; }
+
+  /* ---------- swatches ---------- */
+  #swatches { width: 980px; padding: 32px; background: var(--bg); }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .sw { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .sw .chip { height: 72px; }
+  .sw .meta { padding: 10px 12px; }
+  .sw .name { font-size: 13px; color: var(--text-primary); font-weight: 510; }
+  .sw .hex { font-family: var(--mono); font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
+  .sw .src { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+  .footer { margin-top: 22px; font-size: 11px; color: var(--text-quiet); }
+
+  /* ---------- test surface ---------- */
+  #surface { width: 980px; padding: 32px; background: var(--bg); display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .panel > h2 { display: flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; }
+
+  /* chat */
+  .msg-user { background: var(--surface-elevated); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-size: 14px; color: var(--text-primary); margin-bottom: 14px; }
+  .msg-user .who { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+  .msg-agent { padding: 2px 2px 0 2px; margin-bottom: 14px; }
+  .msg-agent .who { font-size: 11px; color: var(--accent-bright); margin-bottom: 4px; font-weight: 510; }
+  .msg-agent p { font-size: 14px; line-height: 1.55; color: var(--text-secondary); }
+  .msg-agent code { font-family: var(--mono); font-size: 12.5px; background: var(--surface-elevated); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--text-primary); }
+  .toolcard { background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); margin: 12px 0 0 0; overflow: hidden; }
+  .toolcard .th { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surface-elevated); }
+  .toolcard .tname { font-family: var(--mono); font-size: 12px; color: var(--text-primary); }
+  .toolcard .tstate { font-size: 11px; color: var(--success); margin-left: auto; }
+  .toolcard .tbody { padding: 10px 12px; font-family: var(--mono); font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+  .composer { display: flex; gap: 8px; margin-top: 16px; }
+  .composer .input { flex: 1; background: var(--surface-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 10px 12px; font-size: 13px; color: var(--text-quiet); }
+  .composer .send { background: var(--accent); color: #ffffff; border-radius: var(--radius); padding: 10px 18px; font-size: 13px; font-weight: 510; }
+
+  /* settings */
+  .row { display: flex; align-items: center; padding: 12px 4px; border-bottom: 1px solid var(--border); }
+  .row:last-child { border-bottom: none; }
+  .row .label { font-size: 13.5px; color: var(--text-primary); }
+  .row .sub { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+  .row .value { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--text-secondary); }
+  .toggle { width: 34px; height: 20px; border-radius: 10px; background: var(--accent); position: relative; margin-left: auto; }
+  .toggle::after { content: ""; position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; border-radius: 50%; background: #ffffff; }
+  .toggle.off { background: var(--border-strong); }
+  .toggle.off::after { right: auto; left: 2px; }
+  .keyref { font-family: var(--mono); font-size: 12px; color: var(--success); background: var(--surface-elevated); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; margin-left: auto; }
+  .refused { font-size: 11.5px; color: var(--error); margin-top: 4px; }
+
+  /* graph */
+  .graphwrap { position: relative; height: 210px; background: var(--surface-elevated); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .gnode { position: absolute; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px; padding: 8px 10px; font-size: 12px; color: var(--text-primary); box-shadow: 0 1px 0 rgba(0,0,0,0.4); }
+  .gnode .t { font-size: 10px; color: var(--text-muted); margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .gnode.active { border-color: var(--accent-bright); box-shadow: 0 0 0 1px var(--accent-bright); }
+  .gnode.active .t { color: var(--accent-bright); }
+  svg.edges { position: absolute; inset: 0; }
+  .legend { display: flex; gap: 14px; margin-top: 10px; font-size: 11px; color: var(--text-muted); }
+  .legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+  .lg-run::before { background: var(--success); }
+  .lg-warn::before { background: var(--warn); }
+  .lg-err::before { background: var(--error); }
+  .lg-info::before { background: var(--info); }
+</style>
+</head>
+<body>
+
+<section id="swatches">
+  <h2>JEXI Phase 24 — palette tokens (16) · primary: Linear dark · secondary: Vercel semantics</h2>
+
+  <h3>Background &amp; surfaces</h3>
+  <div class="grid">
+    <div class="sw"><div class="chip" style="background:#08090a"></div><div class="meta"><div class="name">bg</div><div class="hex">#08090a</div><div class="src">Linear — Marketing Black canvas</div></div></div>
+    <div class="sw"><div class="chip" style="background:#0f1011"></div><div class="meta"><div class="name">surface</div><div class="hex">#0f1011</div><div class="src">Linear — Panel Dark</div></div></div>
+    <div class="sw"><div class="chip" style="background:#191a1b"></div><div class="meta"><div class="name">surface-elevated</div><div class="hex">#191a1b</div><div class="src">Linear — Surface Level 3</div></div></div>
+    <div class="sw"><div class="chip" style="background:#333333"></div><div class="meta"><div class="name">border</div><div class="hex">#333333</div><div class="src">Vercel — border-100</div></div></div>
+  </div>
+
+  <h3>Borders &amp; text</h3>
+  <div class="grid">
+    <div class="sw"><div class="chip" style="background:#444444"></div><div class="meta"><div class="name">border-strong</div><div class="hex">#444444</div><div class="src">Vercel — border-200</div></div></div>
+    <div class="sw"><div class="chip" style="background:#f7f8f8"></div><div class="meta"><div class="name">text-primary</div><div class="hex">#f7f8f8</div><div class="src">Linear — Primary White (foreground)</div></div></div>
+    <div class="sw"><div class="chip" style="background:#d0d6e0"></div><div class="meta"><div class="name">text-secondary</div><div class="hex">#d0d6e0</div><div class="src">Linear — Silver Gray (body)</div></div></div>
+    <div class="sw"><div class="chip" style="background:#8a8f98"></div><div class="meta"><div class="name">text-muted</div><div class="hex">#8a8f98</div><div class="src">Linear — Tertiary Gray (5.4:1 AA)</div></div></div>
+  </div>
+
+  <h3>Quiet text &amp; accent family</h3>
+  <div class="grid">
+    <div class="sw"><div class="chip" style="background:#62666d"></div><div class="meta"><div class="name">text-quiet</div><div class="hex">#62666d</div><div class="src">Linear — Quaternary (placeholder only)</div></div></div>
+    <div class="sw"><div class="chip" style="background:#5e6ad2"></div><div class="meta"><div class="name">accent</div><div class="hex">#5e6ad2</div><div class="src">Linear — Brand Indigo (CTA fill)</div></div></div>
+    <div class="sw"><div class="chip" style="background:#7170ff"></div><div class="meta"><div class="name">accent-bright</div><div class="hex">#7170ff</div><div class="src">Linear — Accent Violet (active/links)</div></div></div>
+    <div class="sw"><div class="chip" style="background:#828fff"></div><div class="meta"><div class="name">accent-hover</div><div class="hex">#828fff</div><div class="src">Linear — Accent Hover</div></div></div>
+  </div>
+
+  <h3>Semantic (Vercel deployment-status palette)</h3>
+  <div class="grid">
+    <div class="sw"><div class="chip" style="background:#ff0000"></div><div class="meta"><div class="name">error</div><div class="hex">#ff0000</div><div class="src">Vercel — color-error (failed)</div></div></div>
+    <div class="sw"><div class="chip" style="background:#00dc82"></div><div class="meta"><div class="name">success</div><div class="hex">#00dc82</div><div class="src">Vercel — color-success (deployed)</div></div></div>
+    <div class="sw"><div class="chip" style="background:#ffaa00"></div><div class="meta"><div class="name">warn</div><div class="hex">#ffaa00</div><div class="src">Vercel — color-warning (building)</div></div></div>
+    <div class="sw"><div class="chip" style="background:#0070f3"></div><div class="meta"><div class="name">info</div><div class="hex">#0070f3</div><div class="src">Vercel — color-info (queued) / backend dot</div></div></div>
+  </div>
+
+  <div class="footer">Rendered from ui/web/console/_palette-preview.html · approval artifact only, not shipped · radius 8px · accent appears on interactive elements only</div>
+</section>
+
+<section id="surface" style="margin-top: 40px;">
+  <div class="panel" style="grid-column: 1 / -1;">
+    <h2><span class="dot"></span>Palette in context — mock chat · mock settings · mock graph node</h2>
+  </div>
+
+  <div class="panel">
+    <h2>Chat (mock)</h2>
+    <div class="msg-user"><div class="who">YOU</div>Why did the last deploy fail?</div>
+    <div class="msg-agent">
+      <div class="who">JEXI</div>
+      <p>The build failed at the test stage — <code>tests/agi/test-scheduler.js</code> exited 1 after the timeout patch. Rerunning it now.</p>
+      <div class="toolcard">
+        <div class="th"><span class="tname">Bash — npm test</span><span class="tstate">done · 1.2s</span></div>
+        <div class="tbody">$ npm test<br>pass: 204  fail: 6  total: 210</div>
+      </div>
+    </div>
+    <div class="composer"><div class="input">Ask JEXI anything…</div><div class="send">Send</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>Settings (mock)</h2>
+    <div class="row"><div><div class="label">Provider</div><div class="sub">Model routes through the selected provider</div></div><div class="value">anthropic · claude-4.5</div></div>
+    <div class="row"><div><div class="label">API key reference</div><div class="refused" style="margin:2px 0 0 0">✕ inline key refused — use an env var or keyring ref</div></div><span class="keyref">ANTHROPIC_API_KEY</span></div>
+    <div class="row"><div><div class="label">Interaction mode</div><div class="sub">plan reviews before acting</div></div><div class="toggle"></div></div>
+    <div class="row"><div><div class="label">Compact display</div><div class="sub">denser narration rows</div></div><div class="toggle off"></div></div>
+  </div>
+
+  <div class="panel" style="grid-column: 1 / -1;">
+    <h2>Work graph (mock)</h2>
+    <div class="graphwrap">
+      <svg class="edges" width="100%" height="100%">
+        <path d="M 150 60 C 230 60, 250 40, 330 40" stroke="#444444" fill="none" stroke-width="1.5"/>
+        <path d="M 150 60 C 230 60, 250 90, 330 90" stroke="#444444" fill="none" stroke-width="1.5"/>
+        <path d="M 480 40 C 560 40, 580 65, 660 65" stroke="#5e6ad2" fill="none" stroke-width="1.5"/>
+        <path d="M 480 90 C 560 90, 580 65, 660 65" stroke="#444444" fill="none" stroke-width="1.5"/>
+      </svg>
+      <div class="gnode" style="left:40px; top:42px;"><div class="t">phase</div>phase-24-rebuild</div>
+      <div class="gnode" style="left:330px; top:22px;"><div class="t">task · done</div>scope 0 — tokens</div>
+      <div class="gnode" style="left:330px; top:72px;"><div class="t">task · warn</div>scope A — shell</div>
+      <div class="gnode active" style="left:660px; top:47px;"><div class="t">selected</div>scope B — chat</div>
+    </div>
+    <div class="legend"><span class="lg-run">done / success</span><span class="lg-warn">warn</span><span class="lg-err">error</span><span class="lg-info">info / queued</span><span style="margin-left:auto">selected node border = accent-bright #7170ff</span></div>
+  </div>
+</section>
+
+</body>
+</html>

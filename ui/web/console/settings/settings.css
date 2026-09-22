@@ -1,0 +1,84 @@
+/* Phase 24 Scope C — settings surface + persisted theme. */
+
+.p24-settings {
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.p24-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+}
+
+.p24-section-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.p24-srow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+.p24-srow:last-child { border-bottom: none; }
+
+.p24-srow-label { min-width: 0; }
+.p24-srow-name { font-size: 13.5px; color: var(--text-primary); }
+.p24-srow-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+
+.p24-select {
+  margin-left: auto;
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 8px;
+  outline: none;
+}
+.p24-select:focus-visible { outline: 2px solid var(--accent-bright); }
+
+.p24-btn-group { margin-left: auto; display: flex; gap: var(--space-2); }
+.p24-settings .p24-mode-btn.is-active {
+  border-color: var(--accent-bright);
+  color: var(--text-primary);
+  background: var(--surface-elevated);
+}
+
+/* keyRef input */
+.p24-keyref { margin-left: auto; display: flex; flex-direction: column; gap: var(--space-2); align-items: stretch; min-width: 320px; }
+.p24-keyref-row { display: flex; gap: var(--space-2); }
+.p24-keyref .p24-input { flex: 1; font-family: var(--font-mono); font-size: 12px; }
+.p24-keyref .p24-input.is-refused { border-color: var(--error); }
+.p24-keyref-ok { font-family: var(--font-mono); font-size: 11.5px; color: var(--success); }
+.p24-keyref-refused { font-family: var(--font-mono); font-size: 11.5px; color: var(--error); }
+
+.p24-keyref-none {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* light theme — approved hexes only, inverted roles */
+[data-theme='light'] {
+  --bg: #f7f8f8;
+  --surface: #f7f8f8;
+  --surface-elevated: #d0d6e0;
+  --border: #8a8f98;
+  --border-strong: #62666d;
+  --text-primary: #08090a;
+  --text-secondary: #333333;
+  --text-muted: #62666d;
+  --text-quiet: #8a8f98;
+}

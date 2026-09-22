@@ -1,0 +1,38 @@
+/* Phase 24 — approved palette (docs/phase24-design-spec.md, Scope 0/0c).
+ * Primary: Linear dark · Secondary: Vercel semantics.
+ * Every hex below is the approved, traceable value — no other palette exists. */
+:root {
+  /* backgrounds & surfaces (Linear) */
+  --bg: #08090a;
+  --surface: #0f1011;
+  --surface-elevated: #191a1b;
+  /* borders (Vercel) */
+  --border: #333333;
+  --border-strong: #444444;
+  /* text (Linear) */
+  --text-primary: #f7f8f8;
+  --text-secondary: #d0d6e0;
+  --text-muted: #8a8f98;
+  --text-quiet: #62666d;
+  /* accent family (Linear) — interactive elements ONLY */
+  --accent: #5e6ad2;
+  --accent-bright: #7170ff;
+  --accent-hover: #828fff;
+  /* semantic (Vercel deployment-status palette) */
+  --error: #ff0000;
+  --success: #00dc82;
+  --warn: #ffaa00;
+  --info: #0070f3;
+
+  /* system tokens (declared alongside, consistent naming) */
+  --radius: 8px;
+  --sidebar-w: 240px;
+  --header-h: 48px;
+  --font-ui: Inter, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+}

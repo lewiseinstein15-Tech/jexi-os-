@@ -1,0 +1,23 @@
+// Scope E — BEFORE capture (pre-polish state of the four surfaces)
+import { chromium } from 'playwright';
+import path from 'path';
+const OUT = (f) => path.join(process.cwd(), 'docs', f);
+const URL_BASE = 'http://localhost:3000/ui/web/console/shell/index.html';
+const browser = await chromium.launch();
+const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+await page.goto(URL_BASE + '#/chat', { waitUntil: 'domcontentloaded' });
+await page.waitForSelector('.jx-shell', { timeout: 15000 });
+await page.waitForTimeout(600);
+await page.screenshot({ path: OUT('phase24-scopeE-shell-before.png') });
+await page.waitForSelector('.p24-composer');
+await page.screenshot({ path: OUT('phase24-scopeE-chat-before.png') });
+await page.goto(URL_BASE + '#/settings', { waitUntil: 'domcontentloaded' });
+await page.waitForSelector('.p24-section', { timeout: 15000 });
+await page.waitForTimeout(400);
+await page.screenshot({ path: OUT('phase24-scopeE-settings-before.png') });
+await page.goto(URL_BASE + '#/graph', { waitUntil: 'domcontentloaded' });
+await page.waitForSelector('.p24-gnode-card', { timeout: 20000 });
+await page.waitForTimeout(600);
+await page.screenshot({ path: OUT('phase24-scopeE-graph-before.png') });
+await browser.close();
+console.log('BEFORE shots done');
