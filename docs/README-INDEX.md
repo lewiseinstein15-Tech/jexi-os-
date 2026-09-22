@@ -125,6 +125,16 @@ Every file under `docs/` is linked below. **Indexed files: 126.**
 - [`assets/screenshots/evidence/p8-markdown-links-images.txt`](assets/screenshots/evidence/p8-markdown-links-images.txt) — P8 Markdown parse, image existence, and local link validation.
 - [`assets/screenshots/evidence/p9-scope-zone.txt`](assets/screenshots/evidence/p9-scope-zone.txt) — P9 authorized-zone change manifest for the README rewrite commit.
 
+## `research/`
+
+- [`research/ANTIDOOM.md`](research/ANTIDOOM.md) — Research: Antidoom (Liquid4All/antidoom) — runtime adaptations only — project documentation.
+- [`research/AWESOME_MCP_SERVERS.md`](research/AWESOME_MCP_SERVERS.md) — Research: Awesome MCP Servers — what JEXI should actually use — project documentation.
+- [`research/HERMES.md`](research/HERMES.md) — Research: Hermes Agent (NousResearch/hermes-agent) — project documentation.
+- [`research/MCP.md`](research/MCP.md) — Research: Model Context Protocol (MCP) — project documentation.
+- [`research/OBLITERATUS.md`](research/OBLITERATUS.md) — Research note: OBLITERATUS — studied, deliberately not integrated — project documentation.
+- [`research/orca-study.md`](research/orca-study.md) — Orca Study — what JEXI adopts, what it rejects, and why — project documentation.
+- [`research/PURO_RESEARCH.md`](research/PURO_RESEARCH.md) — Research: Puro-2B — future understanding only — project documentation.
+
 ## `screenshots/`
 
 - [`screenshots/arena-ui-gallery.html`](screenshots/arena-ui-gallery.html) — Local HTML gallery for Arena UI screenshots.
