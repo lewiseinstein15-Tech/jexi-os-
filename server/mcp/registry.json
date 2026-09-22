@@ -925,7 +925,7 @@
       "permissions": [
         "NETWORK"
       ],
-      "notes": "Phase 31 Scope 5 (S4-N8N) — declarative v3.3 pattern entry, NOT live-verified in the build sandbox (no n8n instance or network egress was exercised). Enable only on a host that has provisioned n8n and verified the first handshake.",
+      "notes": "[security] declared, NOT live-verified — Phase 31 Scope 5 (S4-N8N) — declarative v3.3 pattern entry, NOT live-verified in the build sandbox (no n8n instance or network egress was exercised). Enable only on a host that has provisioned n8n and verified the first handshake.",
       "keyless": true,
       "keylessNote": "no API key for the MCP surface itself; an n8n instance is the operator's provision",
       "upstream": "https://github.com/czlonkowski/n8n-mcp"
@@ -943,7 +943,7 @@
       "permissions": [
         "NETWORK"
       ],
-      "notes": "Phase 31 Scope 5 (W23c) — DECLARATIVE PLACEHOLDER. The shipped forge toolset is a library surface (taxonomy + dispatch), NOT an MCP stdio server: spawning this entry fails honestly until a stdio bridge is built. Live forge leg (W23d) is additionally blocked by the no-credentials rule. Do not enable until both land.",
+      "notes": "[security] declared, NOT live-verified — Phase 31 Scope 5 (W23c) — DECLARATIVE PLACEHOLDER. The shipped forge toolset is a library surface (taxonomy + dispatch), NOT an MCP stdio server: spawning this entry fails honestly until a stdio bridge is built. Live forge leg (W23d) is additionally blocked by the no-credentials rule. Do not enable until both land.",
       "keyless": false,
       "keylessNote": "forge tokens ride via keyRef (env var name or keyring ref), per the madtea credential discipline",
       "upstream": "harness/hardening/forgejo/index.js (in-repo library)"
