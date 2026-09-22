@@ -61,3 +61,15 @@ the boot path — the Phase 31 bootstrap (`server/src/wiring/phase31-bootstrap.j
 performs no package installation; it requires both `node_modules` trees to be
 present. The full regression chain is run chunked via
 `node scripts/run-tests-chunked.js` (state-persisting, resumable).
+
+## docs/README-INDEX.md maintenance status (Phase 31 Scope 8, S8.4)
+
+`docs/README-INDEX.md` (the every-file-under-docs index) is **hand-maintained
+as of Phase 31 Scope 8**: no generator or runner script for it exists in this
+repository — verified by scanning `scripts/` and `server/scripts/` for any
+reference to `README-INDEX` (zero hits; the file's own header credits a Phase 30
+Scope H generation whose tooling did not ship in the tree). Consequently there
+is no slice-based runner to correct (the Phase 30 H-fix-2 lesson: a
+partial/slice-based generation silently omitted docs). Rule for future edits:
+any regeneration must be a **full scan** — every file under `docs/` linked
+exactly once — or the index will drift from the directory it claims to cover.
