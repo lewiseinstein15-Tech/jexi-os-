@@ -112,7 +112,14 @@ console.log('\n== 3. Gateway client (api/gateway client mirror) ==');
   let timeoutErr = null;
   try { await gatewayFetch(`${base}/ok`, { timeoutMs: 1, retries: 0, signal: AbortSignal.timeout(5) }); } catch (e) { timeoutErr = e; }
   ok('timeout → GatewayError code TIMEOUT or NETWORK', timeoutErr instanceof GatewayError && (timeoutErr.code === 'TIMEOUT' || timeoutErr.code === 'NETWORK'));
-  server.close();
+  // Full deterministic teardown of the local listener (consolidated cleanup:
+  // the historical flake was lingering keep-alive sockets after close() —
+  // under suite load a later section could hit the dying listener or the
+  // process could hang on the open handle). closeAllConnections kills every
+  // keep-alive socket; the awaited close guarantees the port is released
+  // before any later section runs.
+  server.closeAllConnections?.();
+  await new Promise((r) => server.close(r));
   ok('no getAccessKey export (lock removed)', !('getAccessKey' in mod));
 }
 

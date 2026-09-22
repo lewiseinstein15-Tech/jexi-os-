@@ -14,6 +14,7 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 
 import { fileURLToPath } from 'node:url';
 
@@ -22,7 +23,10 @@ const RUNNER = path.join(REPO, 'tests/security/xbow/runner.js');
 const XBOW_DIR = path.join(REPO, 'tests/security/xbow');
 const WORKFLOW = path.join(REPO, '.github/workflows/xbow-benchmark.yml');
 const README = path.join(XBOW_DIR, 'README.md');
-const SCRATCH = '/home/z/my-project/scratch';
+// consolidation cleanup: scratch base is os.tmpdir() (was the hardcoded sandbox
+// path /home/z/my-project/scratch that crashed the probe on foreign machines —
+// flagged in ZONE-OWNER #12's resolution note as a candidate hygiene item).
+const SCRATCH = path.join(os.tmpdir(), 'phase8-h-scratch');
 fs.mkdirSync(SCRATCH, { recursive: true });
 const TMP = fs.mkdtempSync(path.join(SCRATCH, 'phase8-h-'));
 

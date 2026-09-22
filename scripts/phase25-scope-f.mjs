@@ -89,16 +89,23 @@ check('P4 write [inferred] -> refused E_INFERRED_NOT_WRITABLE, zero disk writes 
   `errorCode=${p4w.errorCode}; nothing touched disk`);
 
 // ---------------------------------------------------------------------------
-// P5 — untagged write -> E_UNTAGGED
+// P5 — untagged write under the Scope G pipeline (P25-H-01 re-target)
+// The pre-G refusal (E_UNTAGGED) no longer fires: the G pipeline orders
+// excise -> tag -> assertWritable, and untagged user content is auto-tagged
+// [stated] from the writer's epistemic source before assertWritable runs.
+// The assert now targets the PIPELINE OUTCOME: written:true, on-disk content
+// carries the [stated] prefix, excision left the content intact.
 // ---------------------------------------------------------------------------
 const root5 = useStore('p5');
 const p5w = memoryFs.write('/profile.md', 'user is a developer', 'user', { session: {} });
 const file5 = fs.existsSync(path.join(root5, 'profile.md'));
+const p5r = memoryFs.read('/profile.md', {});
 console.log(`write('/profile.md', 'user is a developer', 'user') [no tag] -> ${JSON.stringify(p5w)}`);
-console.log(`disk check: profile.md exists=${file5}`);
-const p5Ok = p5w.written === false && p5w.errorCode === EPISTEMIC_CODES.UNTAGGED && file5 === false;
-check('P5 untagged write -> E_UNTAGGED, no file written (RULE 2)', p5Ok,
-  `errorCode=${p5w.errorCode}`);
+console.log(`disk check: profile.md exists=${file5}; read back=${JSON.stringify(p5r)}`);
+const p5Ok = p5w.written === true && file5 === true && p5r.exists === true &&
+  p5r.content === '[stated] user is a developer';
+check('P5 untagged user write -> G pipeline auto-tags [stated] and writes (excise -> tag -> assert -> disk; P25-H-01)', p5Ok,
+  `written=${p5w.written}; disk content verbatim: ${JSON.stringify(p5r.content)}`);
 
 // ---------------------------------------------------------------------------
 // P6 — mid-text "[stated]" is NOT a tag (RULE 5)

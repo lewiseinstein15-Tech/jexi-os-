@@ -8,11 +8,17 @@
    Env:    PROBE_URL (default http://127.0.0.1:4179)
    Exit 0 = all checks pass · exit 1 = DO NOT SHIP */
 import { mkdirSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { chromium } from 'playwright';
 
 const URL_BASE = process.env.PROBE_URL || 'http://127.0.0.1:4179';
-const SHOTS = '/home/z/my-project/download';
+// consolidation cleanup: screenshots + result JSON go to os.tmpdir()
+// (was the hardcoded sandbox path /home/z/my-project/download).
+const SHOTS = path.join(os.tmpdir(), 'probe-v012-shots');
+const RESULTS = path.join(os.tmpdir(), 'probe-v012-results');
 mkdirSync(SHOTS, { recursive: true });
+mkdirSync(RESULTS, { recursive: true });
 
 const VIEWPORTS = [
   { label: 'desktop', width: 1440, height: 900, shot: `${SHOTS}/v012-desktop-chat.png` },
@@ -144,7 +150,7 @@ async function runViewport(vp, tok) {
     pageErrors.length === 0 ? ok('zero page errors') : bad('page errors', pageErrors.slice(0, 3).join(' | '));
     await page.screenshot({ path: vp.shot, fullPage: false });
     console.log(`  screenshot → ${vp.shot}`);
-    writeFileSync(`/home/z/my-project/scripts/probe-${vp.label}-result.json`, JSON.stringify({ vp: vp.label, selfTest, ...r, pageErrors }, null, 2));
+    writeFileSync(path.join(RESULTS, `probe-${vp.label}-result.json`), JSON.stringify({ vp: vp.label, selfTest, ...r, pageErrors }, null, 2));
   } catch (e) {
     bad(`${vp.label} probe crashed`, String(e && e.message || e).slice(0, 200));
     try { await page.screenshot({ path: vp.shot.replace('.png', '-CRASH.png'), fullPage: false }); } catch { /* ignore */ }

@@ -24,7 +24,7 @@
 | 12 | Multiple missions | ✅ | MissionRunner with persistence, recovery, chat-as-view |
 | 13 | Agents (few, capable) | 🔶 | 252 roster (too many to be meaningful); capability-based selection exists; consolidate to ~12 core workers + capability routing |
 | 14 | Capability Router | ✅ | Built last build: intent+query → minimum tools, both lanes |
-| 15 | Tool Registry | ✅ | 218 tools, schemas/permissions/health |
+| 15 | Tool Registry | ✅ | 219 tools, schemas/permissions/health |
 | 16 | MCP as connectors | ✅ | 42 servers through one gateway; breaker, tree-kill, lazy wake |
 | 17 | Browser/Computer use | ❌ | Browser trio MCPs unusable on free brain (BROWSER-PLAN). Build Browser Router (Android worker / desktop worker / remote worker) — the phone-browser idea becomes real architecture |
 | 18 | JEXI Market external provider | ✅ | ExternalProviders with not-connected placeholder, one-way rule |

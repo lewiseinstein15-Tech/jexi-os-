@@ -10,6 +10,17 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
+// P24-F-08 (consolidated cleanup): RETIRED FROM THE SUITE MANIFEST.
+// Asserts legacy `src/components/ChatWindow.jsx` surfaces intentionally
+// removed by approved Phase 24 Scope B. Excluded from `npm test`; the guard
+// below makes standalone runs skip explicitly instead of failing. Rewrite
+// against the Phase 24 console if these surfaces ever return.
+if (!process.env.JEXI_LEGACY_SUITE) {
+  console.log('SKIP (P24-F-08): legacy ChatWindow surface removed by Phase 24 Scope B; retired from the suite manifest.');
+  process.exit(0);
+}
+
+
 // Isolate stores FIRST (config reads env at import).
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'jexi-auto-'));
 process.env.DATA_DIR = path.join(TMP, 'data');

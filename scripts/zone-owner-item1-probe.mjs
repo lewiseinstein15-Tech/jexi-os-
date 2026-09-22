@@ -51,18 +51,18 @@ console.log('pre-fix parsed keys:', Object.keys(oldMeta).join(', '));
 check('pre-fix regex DROPPED whenToUse (bug reproduced)', oldMeta.whenToUse === undefined);
 check('pre-fix regex DROPPED allowedTools (bug reproduced)', oldMeta.allowedTools === undefined);
 
-// ---- 3. real diagram-design SKILL.md loads BOTH ways
-const dd = readSkillMeta('skills/design/diagram-design/SKILL.md');
-check('diagram-design lowercase workaround still loads (whentouse)', typeof dd.whentouse === 'string' && dd.whentouse.startsWith('Use when explaining'));
-check('diagram-design lowercase workaround still loads (allowedtools)', dd.allowedtools === '[code-write, code-run]');
-// camelCase the same file's frontmatter in a temp copy → must now parse
+// ---- 3. real diagram-design SKILL.md (ZONE-OWNER #38, consolidated cleanup):
+// the lowercase workaround was REVERTED â the file now carries camelCase keys
+// directly, and the lowercase spellings are gone. Assertions re-targeted to the
+// resolved contract: camelCase parses in place; no lowercase keys remain.
 const ddRaw = fs.readFileSync('skills/design/diagram-design/SKILL.md', 'utf-8');
-const ddCamel = ddRaw.replace('whentouse:', 'whenToUse:').replace('allowedtools:', 'allowedTools:');
-const ddCamelFile = path.join(dir, 'SKILL-camel.md');
-fs.writeFileSync(ddCamelFile, ddCamel);
-const dd2 = readSkillMeta(ddCamelFile);
-check('diagram-design camelCase variant NOW loads (whenToUse)', typeof dd2.whenToUse === 'string' && dd2.whenToUse.startsWith('Use when explaining'));
-check('diagram-design camelCase variant NOW loads (allowedTools)', dd2.allowedTools === '[code-write, code-run]');
+check('diagram-design carries camelCase whenToUse in its committed frontmatter', /^whenToUse:/m.test(ddRaw));
+check('diagram-design carries camelCase allowedTools in its committed frontmatter', /^allowedTools:/m.test(ddRaw));
+check('diagram-design lowercase workaround is gone (whentouse)', !/^whentouse:/m.test(ddRaw));
+check('diagram-design lowercase workaround is gone (allowedtools)', !/^allowedtools:/m.test(ddRaw));
+const dd = readSkillMeta('skills/design/diagram-design/SKILL.md');
+check('diagram-design camelCase frontmatter loads through the fixed regex (whenToUse)', typeof dd.whenToUse === 'string' && dd.whenToUse.startsWith('Use when explaining'));
+check('diagram-design camelCase frontmatter loads through the fixed regex (allowedTools)', dd.allowedTools === '[code-write, code-run]');
 
 // ---- 4. affected population: SKILL.md files with camelCase frontmatter keys
 let scanned = 0; let affected = 0;

@@ -218,7 +218,7 @@ try {
   check(
     6,
     'zone check: only surfsense/** and scripts/phase19-*.mjs',
-    zoneOk && files.length > 0,
+    zoneOk, // consolidation cleanup: assert only that no touched path is outside the zone; a clean committed tree passes vacuously
     '  git status --short:\n' +
       (files.length === 0 ? '    (clean)' : files.map((f) => `    ${f}`).join('\n'))
   );

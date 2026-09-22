@@ -9,16 +9,19 @@
  * P6 determinism: same load twice -> byte-identical profile list
  * P7 zone check: git status --short shows only providers/profiles/** and scripts/phase27-*.mjs
  *
- * Fixtures are generated under /home/z/my-project/p27-logs/ (outside the
- * repo working tree — keeps the zone check honest). Nothing is written to
+ * Fixtures are generated under os.tmpdir()/p27-logs/ (outside the
+ * repo working tree — keeps the zone check honest; consolidation cleanup
+ * replaced the hardcoded sandbox path). Nothing is written to
  * ~/.jexi/profiles/: the module only reads explicit paths.
  */
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import profiles, { validate, PROFILES_DIR } from '../providers/profiles/index.js';
 import { ProfilesError } from '../providers/profiles/_internal.js';
 
-const FIXTURE_DIR = '/home/z/my-project/p27-logs/profiles-fixture';
+const FIXTURE_DIR = path.join(os.tmpdir(), 'p27-logs', 'profiles-fixture');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const PROFILE_A = { name: 'profile-a', provider: 'openai', model: 'gpt-test-a', keyRef: 'OPENAI_API_KEY' };

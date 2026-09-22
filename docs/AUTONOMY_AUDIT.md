@@ -69,7 +69,7 @@ Employees registry.
 
 ### 1.5 Everything else that exists and must not be duplicated
 
-ToolRegistry/ToolRuntime (~151 tools, schemas, tiers), McpClient, plugins,
+ToolRegistry/ToolRuntime (219 tools, schemas, tiers), McpClient, plugins,
 hooks, connectors (WhatsApp/email/webhook), RiskGuard (destructive-action
 classification), GitHubRepo/GitHubEngine (scan/edit/commit/PR), WorkspaceRuntime
 + WorkspacePublisher (auto-publish builds), SandboxLocal/BashPersistent/
@@ -96,7 +96,7 @@ components incl. TeamLive (B208 strip), TeamManager, GoalsScreen, TasksScreen.
 | 10 | **Async multi-agent execution** (worker pool, leases, cancellation, graceful shutdown) | **PARTIAL** | Director already runs dependency waves with MAX_PARALLEL=3 inside a turn; AgentTeams/WorkerRouter exist in Lane B | Persistent worker pool across turns over ready work; task leases/locks; cancellation; graceful drain |
 | 11 | **ModelRouter fallback** (employee identity ≠ model identity) | **EXISTS** | B209 ModelRouter 9-rung ladder, telemetry-informed, identity preserved — tested | None (keep; missions reuse it) |
 | 12 | **Verification: ACTION COMPLETED vs OBJECTIVE VERIFIED** | **PARTIAL** | Verifier scores rubrics + anti-fabrication gate (B210); per-action FILE_CREATED/command events distinguish action from claim | Add acceptance criteria per mission; VERIFICATION must be evaluated against mission-level criteria, not per-task only |
-| 13 | **Tool discovery (filter by objective)** | **PARTIAL** | ToolRegistry has ~151 tools with schemas/tiers; Lane B auto-selects tools per task; Director employees have FIXED tool sets | Objective-driven tool discovery for Director employees (query registry, gate by permissions) |
+| 13 | **Tool discovery (filter by objective)** | **PARTIAL** | ToolRegistry has 219 tools with schemas/tiers; Lane B auto-selects tools per task; Director employees have FIXED tool sets | Objective-driven tool discovery for Director employees (query registry, gate by permissions) |
 | 14 | **Operational learning** (failure→cause→strategy→lesson, retrievable) | **PARTIAL** | Telemetry per employee/provider; employee history; recovery records with attempts | Lessons store: extract lesson on failure/recovery, retrieve relevant lessons at planning/steering time |
 | 15 | **Artifacts engine** (hashes, relationships, never claim non-existent) | **PARTIAL** | Task workspaces on disk; B210 anti-fabrication gate catches non-existent files | Artifact records with content hashes, produced-by/derived-from edges in the WorkGraph |
 | 16 | **Event sourcing: frontend never invents events** | **EXISTS** | B208 rule enforced; team events API with `sinceEventId` reconnect | Extend vocabulary: MISSION_*, WORK_*, COMPUTER_*, DISCOVERY_*, IMAGINATION_* — all from real execution only |

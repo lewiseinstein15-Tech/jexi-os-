@@ -1,8 +1,16 @@
 # JEXI OS — agent memory
 
-Commit-only flow: direct to `main`, no branches. Git token lives in
-`.jexi-secrets/git-token` (oauth2 form). Raw tool output only, no prose
-narratives in commits.
+Git workflow — two modes, both in active use:
+1. **Direct mode** (early single-agent phases): commit straight to `main`,
+   push direct to main.
+2. **Branch mode** (multi-agent phases, current standard): each agent works a
+   dedicated `phase-<n>-<builder>` branch (or `cleanup/*` for hygiene passes),
+   ONE commit per scope, cross-verified by a different agent, merged to
+   `main` with `--no-ff` after the final gate. Rollback tags `pre-phase-<n>-*`
+   / `post-phase-<n>-merge` bracket every merge.
+
+Git token lives in `.jexi-secrets/git-token` (oauth2 form). Raw tool output
+only, no prose narratives in commits.
 
 ## Verification subsystem (`server/src/verification`)
 

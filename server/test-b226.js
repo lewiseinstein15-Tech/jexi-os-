@@ -1,3 +1,13 @@
+// P24-F-08 (consolidated cleanup): RETIRED FROM THE SUITE MANIFEST.
+// Asserts legacy `src/components/ChatWindow.jsx` surfaces intentionally
+// removed by approved Phase 24 Scope B. Excluded from `npm test`; the guard
+// below makes standalone runs skip explicitly instead of failing. Rewrite
+// against the Phase 24 console if these surfaces ever return.
+if (!process.env.JEXI_LEGACY_SUITE) {
+  console.log('SKIP (P24-F-08): legacy ChatWindow surface removed by Phase 24 Scope B; retired from the suite manifest.');
+  process.exit(0);
+}
+
 /**
  * B226 — the camera & photos render fixes (found with real browser eyes):
  *

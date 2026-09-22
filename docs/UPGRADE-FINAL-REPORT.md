@@ -69,7 +69,7 @@ chat could only see ~12 old tools. Weather questions came back as guesses.
   memory, tools, MCPs, or agents. Exactly Lewis's separation rule.
 
 ## 6. Registry views + observability — NO new buttons
-- `GET /api/architecture` — live index of everything: 252 agents, 218 tools,
+- `GET /api/architecture` — live index of everything: 252 agents, 219 tools,
   42 MCP services (with health + circuit state), 51 plugins, capability map,
   backends, task-graph stats.
 - `GET /api/architecture/runs` + `/runs/:id` — run history with full

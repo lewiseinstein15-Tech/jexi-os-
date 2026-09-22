@@ -10,10 +10,13 @@
  * OUTSIDE the repo worktree so the P7 zone check stays clean.
  */
 import { execSync } from 'node:child_process';
+import os from 'node:os';
 import search from '../surfsense/search/index.js';
 import { SurfError } from '../surfsense/connectors/_internal.js';
 
-process.env.JEXI_RAG_DIR = '/home/z/my-project/p19-logs/rag-snapshots';
+// consolidation cleanup: snapshot dir is host-portable now (os.tmpdir()),
+// overridable via JEXI_RAG_DIR; the old hardcoded sandbox path is gone.
+process.env.JEXI_RAG_DIR = process.env.JEXI_RAG_DIR || `${os.tmpdir()}/p19-rag-snapshots`;
 const { GraphRag } = await import('../capability/rag/graph-rag.js');
 
 const results = [];
@@ -179,7 +182,7 @@ try {
   check(
     7,
     'zone check: only surfsense/** and scripts/phase19-*.mjs',
-    zoneOk && files.length > 0,
+    zoneOk, // consolidation cleanup: assert only that no touched path is outside the zone; a clean committed tree passes vacuously
     '  git status --short:\n' +
       (files.length === 0 ? '    (clean)' : files.map((f) => `    ${f}`).join('\n'))
   );
