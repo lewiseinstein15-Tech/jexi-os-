@@ -96,6 +96,9 @@ import { initSelfEvolve } from './phase31-self-evolve.js';
 import { assert as assertSkillTools } from '../../../harness/parity/skills/index.js';
 import rules from '../../../harness/parity/rules/index.js';
 
+/* ------------- Phase 31 Scope 19 — shipped module import (READ-ONLY) ------ */
+import { self as jexiSelf } from '../../../brain/self/index.js';
+
 /* ---------------- module state ------------------------------------------- */
 const W31 = [];
 const log = (line) => { W31.push(line); console.log(line); };
@@ -117,7 +120,7 @@ export function assertNodeFloor(version = process.version) {
   return `node ${version} >= ${NODE_FLOOR}`;
 }
 
-const state = { wired: null, rlm: null, fleet: null, hot: null, repo: null, index: null, hybrid: null, protocol: null, graph: null, viking: null, observersRoot: null, observerId: null, sessionId: null, autonomous: null, scheduler: null, dreamCycle: null, offloadRoot: null, sessionsDir: null, gsd: null, gsdLoopFn: null, ciDoctor: null, wa4: null, repoCtx: null, w13Entries: null, w14Entry: null, w29Mounted: false, s4n8nEntry: null, s4exec: null, s4repo: false, w23cEntry: null, hooks: null, subagentEnf: null, worktreeIso: null, selfEvolveW: null, rulesLoaded: false, rulesRoot: null };
+const state = { wired: null, rlm: null, fleet: null, hot: null, repo: null, index: null, hybrid: null, protocol: null, graph: null, viking: null, observersRoot: null, observerId: null, sessionId: null, autonomous: null, scheduler: null, dreamCycle: null, offloadRoot: null, sessionsDir: null, gsd: null, gsdLoopFn: null, ciDoctor: null, wa4: null, repoCtx: null, w13Entries: null, w14Entry: null, w29Mounted: false, s4n8nEntry: null, s4exec: null, s4repo: false, w23cEntry: null, hooks: null, subagentEnf: null, worktreeIso: null, selfEvolveW: null, rulesLoaded: false, rulesRoot: null, self: null };
 
 /* ---------------- the one boot call --------------------------------------- */
 export function initPhase31Wiring(opts = {}) {
@@ -616,6 +619,18 @@ export function initPhase31Wiring(opts = {}) {
   });
   if (state.selfEvolveW) log('W31 P30.G: self-evolve -> agent runtime post-run (afterRun on declared skill ownership; Phase 14 decisions + PROV-O)');
 
+  // S19 — JEXI self / identity -> session prompt + guard. Facts are READ from
+  // brain/self/core.md (immutable from JEXI's side); the reflex is bound to
+  // the existing provider bridge (canChat) and search service seams lazily.
+  soft('S19', () => {
+    const core = jexiSelf.facts({ reload: true });
+    if (!core || !core.facts || !core.facts.name) throw Object.assign(new Error('brain/self/core.md yielded no facts'), { code: 'E_WIRING' });
+    jexiSelf.guard.assertWritable(path.join(REPO_ROOT, 'tmp', 'not-core.md')); // guard alive (non-protected path passes)
+    state.self = { core, session: jexiSelf.session() };
+    return `${core.facts.name} (${core.facts.formal_name}) v${core.facts.version} — ${Object.keys(core.facts).length} facts, sha256 ${core.sha256.slice(0, 12)}`;
+  });
+  if (state.self) log(`W31 S19: self -> identity section + guard (${state.self.core.facts.formal_name} v${state.self.core.facts.version}, ${Object.keys(state.self.core.facts).length} facts from brain/self/core.md, E_SELF_IMMUTABLE armed)`);
+
   const wired = {
     W36: true, B1: !!state.repo, B2: !!state.index, B3: !!state.hybrid, B4: !!state.hot,
     B5: !!state.protocol, WA1: typeof assemblePrompt === 'function', WA8: true, WA2: !!state.graph,
@@ -629,6 +644,7 @@ export function initPhase31Wiring(opts = {}) {
     W10: !!state.providers,
     'P30.A': !!state.hooks, 'P30.B': typeof assertSkillTools === 'function', 'P30.C': !!state.subagentEnf,
     'P30.D': state.rulesLoaded, 'P30.E': !!state.worktreeIso, 'P30.F': !!state.hooks, 'P30.G': !!state.selfEvolveW,
+    S19: !!state.self,
   };
   state.wired = wired;
   return { wired, sessionId, brainRoot, fleetDir, observersRoot, vikingRoot, log: W31.slice() };
@@ -683,6 +699,29 @@ export const wiring = {
   },
   assertNodeFloor,
   NODE_FLOOR,
+
+  /* -------- Phase 31 Scope 19 — self / identity seam (read-only surface) -- */
+  self: {
+    facts: () => (state.self ? state.self.core.facts : jexiSelf.facts().facts),
+    identityBlock: () => jexiSelf.identityBlock(),
+    answer: (q, o = {}) => jexiSelf.answer(q, { session: state.self ? state.self.session : undefined, ...o }),
+    route: (q) => jexiSelf.route(q),
+    guard: jexiSelf.guard,
+    /** Reflex bound to the live seams: provider bridge (chat) + search service. Lazy imports; no live call here. */
+    reflex: async (seams = {}) => {
+      const model = seams.model || (async (prompt) => {
+        const { chat } = await import('../providers/index.js');
+        const r = await chat({ messages: [{ role: 'user', content: prompt }] });
+        return typeof r === 'string' ? r : (r && (r.text || r.content)) || '';
+      });
+      const search = seams.search || (async (prompt) => {
+        const { parallelSearch, rankSources } = await import('../services/SearchAgent.js');
+        const { merged } = await parallelSearch([prompt]);
+        return rankSources(prompt, merged).slice(0, 5).map((x) => ({ url: x.url, title: x.title, quote: x.snippet || x.description || '', date: x.date || x.published || null }));
+      });
+      return jexiSelf.reflex({ model, search, dispatch: seams.dispatch, now: seams.now });
+    },
+  },
 
   /* -------- Phase 31 Scope 3 — consumer seams (read-only surface) -------- */
   autonomy: {
