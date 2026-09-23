@@ -1,0 +1,50 @@
+{
+  "name": "terminal-bench mini tasks (Phase 31 scope 13 fixture)",
+  "benchmark": "terminal-bench",
+  "version": "2.1",
+  "split": "mini",
+  "transcript": "mini-transcript.json",
+  "provenance": "Synthetic self-contained tasks in the Terminal-Bench adapter shape (task_id/instruction/verification.tests). Not drawn from the real 2.1 task set; the real set is network-gated behind allowNetwork:true (scope 17). The recorded verifier verdicts in the sibling transcript are pre-declared build-only stubs, not measured results.",
+  "tasks": [
+    {
+      "task_id": "tb-mini-001",
+      "instruction": "Create /app/hello.txt containing exactly one line: JEXI-TB-MINI-1",
+      "category": "file-operations",
+      "difficulty": "easy",
+      "verification": {
+        "tests": [
+          "tests/test_outputs.py::test_hello_txt_exists",
+          "tests/test_outputs.py::test_hello_txt_content"
+        ]
+      }
+    },
+    {
+      "task_id": "tb-mini-002",
+      "instruction": "Read the integers in /app/data/numbers.txt (one per line) and write their sum to /app/sum.txt.",
+      "category": "computation",
+      "difficulty": "easy",
+      "verification": {
+        "tests": [
+          "tests/test_outputs.py::test_sum_txt_value"
+        ]
+      }
+    },
+    {
+      "task_id": "tb-mini-003",
+      "instruction": "Fix /app/scripts/rotate.py so that `python3 /app/scripts/rotate.py` prints the input list rotated left by one.",
+      "category": "bug-fix",
+      "difficulty": "medium",
+      "verification": {
+        "tests": [
+          "tests/test_outputs.py::test_rotate_left_output"
+        ]
+      }
+    },
+    {
+      "task_id": "tb-mini-004",
+      "instruction": "Intentionally malformed fixture entry: the verification block is missing so the loader must reject this task.",
+      "category": "malformed",
+      "difficulty": "easy"
+    }
+  ]
+}

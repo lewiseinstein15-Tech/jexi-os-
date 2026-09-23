@@ -1,0 +1,121 @@
+{
+  "name": "terminal-bench mini transcript (Phase 31 scope 13 fixture)",
+  "benchmark": "terminal-bench",
+  "version": "2.1",
+  "split": "mini",
+  "provenance": "Pre-recorded observation/action traces for the mini tasks. stdout fields are raw pane captures (ANSI CSI/OSC sequences included, blank lines and trailing whitespace deliberate — the observation normalizer must preserve them). The actions are the recorded agent side of the trace: run() replays observations through the injected pipeline (the actor) and does not force-match the recording. verifier entries are pre-declared build-only stub verdicts, not measured results.",
+  "tasks": {
+    "tb-mini-001": {
+      "steps": [
+        {
+          "observation": {
+            "stdout": "\u001B]0;agent-container: tb-mini-001\u0007\u001B[1;32mroot@7c1f:/app\u001B[0m$ ",
+            "exitCode": null,
+            "cwd": "/app"
+          }
+        },
+        {
+          "observation": {
+            "stdout": "\u001B[?2004h\u001B[1;32mroot@7c1f:/app\u001B[0m$ ",
+            "exitCode": 0,
+            "cwd": "/app"
+          }
+        },
+        {
+          "observation": {
+            "stdout": "JEXI-TB-MINI-1\n\u001B[1;32mroot@7c1f:/app\u001B[0m$ ",
+            "exitCode": 0,
+            "cwd": "/app"
+          }
+        }
+      ],
+      "actions": [
+        { "action": "exec", "args": { "command": "printf 'JEXI-TB-MINI-1\\n' > /app/hello.txt" } },
+        { "action": "exec", "args": { "command": "cat /app/hello.txt" } },
+        { "action": "submit", "args": {} }
+      ],
+      "verifier": {
+        "kind": "stub",
+        "resolved": true,
+        "tests": [
+          { "name": "tests/test_outputs.py::test_hello_txt_exists", "passed": true },
+          { "name": "tests/test_outputs.py::test_hello_txt_content", "passed": true }
+        ]
+      }
+    },
+    "tb-mini-002": {
+      "steps": [
+        {
+          "observation": {
+            "stdout": "\u001B]0;agent-container: tb-mini-002\u0007\u001B[1;32mroot@9d0e:/app\u001B[0m$ ",
+            "exitCode": null,
+            "cwd": "/app"
+          }
+        },
+        {
+          "observation": {
+            "stdout": "\u001B[32m72\u001B[0m\n\n\n\u001B[1;32mroot@9d0e:/app\u001B[0m$   ",
+            "exitCode": 0,
+            "cwd": "/app"
+          }
+        },
+        {
+          "observation": {
+            "stdout": "72\n\u001B[1;32mroot@9d0e:/app\u001B[0m$ ",
+            "exitCode": 0,
+            "cwd": "/app"
+          }
+        }
+      ],
+      "actions": [
+        { "action": "exec", "args": { "command": "awk '{s+=$1} END {print s}' /app/data/numbers.txt > /app/sum.txt" } },
+        { "action": "exec", "args": { "command": "cat /app/sum.txt" } },
+        { "action": "submit", "args": {} }
+      ],
+      "verifier": {
+        "kind": "stub",
+        "resolved": true,
+        "tests": [
+          { "name": "tests/test_outputs.py::test_sum_txt_value", "passed": true }
+        ]
+      }
+    },
+    "tb-mini-003": {
+      "steps": [
+        {
+          "observation": {
+            "stdout": "\u001B]0;agent-container: tb-mini-003\u0007\u001B[1;32mroot@5ab2:/app\u001B[0m$ ",
+            "exitCode": null,
+            "cwd": "/app"
+          }
+        },
+        {
+          "observation": {
+            "stdout": "\u001B[31mTraceback (most recent call last):\u001B[0m\n  File \"/app/scripts/rotate.py\", line 6, in <module>\n    rotated = rotate_right(items)\nNameError: name 'rotate_right' is not defined\n\n\u001B[1;32mroot@5ab2:/app\u001B[0m$ ",
+            "exitCode": 1,
+            "cwd": "/app"
+          }
+        },
+        {
+          "observation": {
+            "stdout": "\u001B[31mTraceback (most recent call last):\u001B[0m\n  File \"/app/scripts/rotate.py\", line 7, in <module>\n    print(format_output(rotated))\nNameError: name 'format_output' is not defined\n\n\u001B[1;32mroot@5ab2:/app\u001B[0m$ ",
+            "exitCode": 1,
+            "cwd": "/app"
+          }
+        }
+      ],
+      "actions": [
+        { "action": "exec", "args": { "command": "python3 /app/scripts/rotate.py" } },
+        { "action": "exec", "args": { "command": "sed -i 's/rotate_right/rotate_left/g' /app/scripts/rotate.py" } },
+        { "action": "submit", "args": {} }
+      ],
+      "verifier": {
+        "kind": "stub",
+        "resolved": false,
+        "tests": [
+          { "name": "tests/test_outputs.py::test_rotate_left_output", "passed": false }
+        ]
+      }
+    }
+  }
+}
