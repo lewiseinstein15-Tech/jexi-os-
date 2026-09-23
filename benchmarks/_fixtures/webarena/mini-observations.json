@@ -1,0 +1,204 @@
+{
+  "name": "webarena mini observations (Phase 31 scope 14 fixture)",
+  "benchmark": "webarena-verified",
+  "version": "v1",
+  "split": "mini",
+  "provenance": "Pre-recorded DOM snapshots, 3 per task. Episode model: the agent acts on snapshot i and the environment responds with snapshot i+1; the FINAL snapshot is the evaluated state, so the last scripted action of an episode is a no-op inspection. Snapshots are raw captures in the observe() input shape ({ url, visibleText, focus?, a11y? }); observe() projects them to the 4-key WebArena observation format.",
+  "tasks": {
+    "wa-mini-001": {
+      "snapshots": [
+        {
+          "url": "http://shopping.jexi.local/",
+          "visibleText": "OneStopMarket\nHome\nDeals\nCart (0)\nSearch products",
+          "focus": null,
+          "a11y": [
+            { "element_id": "el-1", "role": "searchbox", "name": "Search products" },
+            { "element_id": "el-2", "role": "link", "name": "Home" },
+            { "element_id": "el-3", "role": "link", "name": "Cart (0)" }
+          ]
+        },
+        {
+          "url": "http://shopping.jexi.local/search?q=coffee+grinder",
+          "visibleText": "Search results for 'coffee grinder'\nBurr coffee grinder - $29.99\nBlade coffee grinder - $19.99\nAdd to cart",
+          "focus": { "element_id": "el-6", "role": "textbox", "name": "Search products" },
+          "a11y": [
+            { "element_id": "el-4", "role": "link", "name": "Burr coffee grinder - $29.99" },
+            { "element_id": "el-5", "role": "button", "name": "Add to cart" },
+            { "element_id": "el-6", "role": "textbox", "name": "Search products" }
+          ]
+        },
+        {
+          "url": "http://shopping.jexi.local/cart",
+          "visibleText": "Your cart (1 item)\nBurr coffee grinder - $29.99\nSubtotal: $29.99\nCheckout",
+          "focus": null,
+          "a11y": [
+            { "element_id": "el-7", "role": "button", "name": "Checkout" },
+            { "element_id": "el-8", "role": "link", "name": "Home" }
+          ]
+        }
+      ]
+    },
+    "wa-mini-002": {
+      "snapshots": [
+        {
+          "url": "http://shopping.jexi.local/product/standing-desk",
+          "visibleText": "Electric standing desk - $249.99\nIn stock\nAdd to cart\nCart (0)",
+          "focus": null,
+          "a11y": [
+            { "element_id": "el-1", "role": "button", "name": "Add to cart" },
+            { "element_id": "el-2", "role": "link", "name": "Cart (0)" }
+          ]
+        },
+        {
+          "url": "http://shopping.jexi.local/cart",
+          "visibleText": "Your cart (1 item)\nElectric standing desk - $249.99\nCheckout",
+          "focus": null,
+          "a11y": [
+            { "element_id": "el-3", "role": "button", "name": "Checkout" },
+            { "element_id": "el-4", "role": "link", "name": "Home" }
+          ]
+        },
+        {
+          "url": "http://shopping.jexi.local/checkout",
+          "visibleText": "Payment declined\nYour order was not placed\nBack to cart",
+          "focus": null,
+          "a11y": [
+            { "element_id": "el-5", "role": "link", "name": "Back to cart" },
+            { "element_id": "el-6", "role": "button", "name": "Try again" }
+          ]
+        }
+      ]
+    },
+    "wa-mini-003": {
+      "snapshots": [
+        {
+          "url": "http://cms.jexi.local/admin/posts",
+          "visibleText": "Posts\nPhase 31 wiring notes (draft)\nPhase 30 handover (published)\nNew post",
+          "focus": null,
+          "a11y": [
+            { "element_id": "el-1", "role": "link", "name": "Edit draft: Phase 31 wiring notes" },
+            { "element_id": "el-2", "role": "button", "name": "New post" }
+          ]
+        },
+        {
+          "url": "http://cms.jexi.local/admin/posts/31/edit",
+          "visibleText": "Edit post\nTitle: Phase 31 wiring notes\nPublish\nSave draft",
+          "focus": { "element_id": "el-4", "role": "textbox", "name": "Body" },
+          "a11y": [
+            { "element_id": "el-3", "role": "button", "name": "Publish" },
+            { "element_id": "el-4", "role": "textbox", "name": "Body" }
+          ]
+        },
+        {
+          "url": "http://cms.jexi.local/admin/posts/31",
+          "visibleText": "Phase 31 wiring notes\nStatus: published",
+          "focus": null,
+          "a11y": [
+            { "element_id": "el-5", "role": "link", "name": "Edit" },
+            { "element_id": "el-6", "role": "heading", "name": "Phase 31 wiring notes" }
+          ]
+        }
+      ]
+    },
+    "wa-mini-004": {
+      "snapshots": [
+        {
+          "url": "http://reddit.jexi.local/r/jexi",
+          "visibleText": "r/jexi\nJEXI 29 shipped\nPhase 28 retro\nCreate post",
+          "focus": null,
+          "a11y": [
+            { "element_id": "el-1", "role": "link", "name": "r/jexi" },
+            { "element_id": "el-2", "role": "link", "name": "JEXI 29 shipped" },
+            { "element_id": "el-3", "role": "textbox", "name": "Create post" }
+          ]
+        },
+        {
+          "url": "http://reddit.jexi.local/r/jexi/posts/918",
+          "visibleText": "JEXI 29 shipped\nScore: 41\n3 comments\nUpvote",
+          "focus": null,
+          "a11y": [
+            { "element_id": "el-1", "role": "button", "name": "Upvote" },
+            { "element_id": "el-2", "role": "heading", "name": "JEXI 29 shipped" },
+            { "element_id": "el-4", "role": "link", "name": "3 comments" }
+          ]
+        },
+        {
+          "url": "http://reddit.jexi.local/r/jexi/posts/918",
+          "visibleText": "JEXI 29 shipped\nScore: 42\n3 comments",
+          "focus": null,
+          "a11y": [
+            { "element_id": "el-1", "role": "button", "name": "Upvoted" },
+            { "element_id": "el-2", "role": "heading", "name": "JEXI 29 shipped" },
+            { "element_id": "el-5", "role": "link", "name": "jexi-dev" }
+          ]
+        }
+      ]
+    },
+    "wa-mini-005": {
+      "snapshots": [
+        {
+          "url": "http://gitlab.jexi.local/jexi-os/jexi-core",
+          "visibleText": "jexi-os / jexi-core\nCode\nMerge requests\nIssues",
+          "focus": null,
+          "a11y": [
+            { "element_id": "el-1", "role": "link", "name": "Merge requests" },
+            { "element_id": "el-2", "role": "link", "name": "Code" }
+          ]
+        },
+        {
+          "url": "http://gitlab.jexi.local/jexi-os/jexi-core/-/merge_requests",
+          "visibleText": "Merge requests\n!7 WIP: wiring (open)\n!6 scope 5 (merged)",
+          "focus": null,
+          "a11y": [
+            { "element_id": "el-3", "role": "link", "name": "!7 WIP: wiring (open)" },
+            { "element_id": "el-4", "role": "link", "name": "!6 scope 5 (merged)" }
+          ]
+        },
+        {
+          "url": "http://gitlab.jexi.local/jexi-os/jexi-core/-/merge_requests/7",
+          "visibleText": "Merge request !7\nWIP: wiring\nStatus: open\nChanges\nCommits",
+          "focus": null,
+          "a11y": [
+            { "element_id": "el-5", "role": "link", "name": "Changes" },
+            { "element_id": "el-6", "role": "link", "name": "Commits" }
+          ]
+        }
+      ]
+    },
+    "wa-mini-006": {
+      "snapshots": [
+        {
+          "url": "http://map.jexi.local/",
+          "visibleText": "JEXI Maps\nStart\nDestination\nDirections",
+          "focus": { "element_id": "el-1", "role": "textbox", "name": "Start" },
+          "a11y": [
+            { "element_id": "el-1", "role": "textbox", "name": "Start" },
+            { "element_id": "el-2", "role": "textbox", "name": "Destination" },
+            { "element_id": "el-3", "role": "button", "name": "Directions" }
+          ]
+        },
+        {
+          "url": "http://map.jexi.local/",
+          "visibleText": "JEXI Maps\nStart: Depot\nDestination\nDirections",
+          "focus": { "element_id": "el-2", "role": "textbox", "name": "Destination" },
+          "a11y": [
+            { "element_id": "el-1", "role": "textbox", "name": "Start" },
+            { "element_id": "el-2", "role": "textbox", "name": "Destination" },
+            { "element_id": "el-3", "role": "button", "name": "Directions" }
+          ]
+        },
+        {
+          "url": "http://map.jexi.local/",
+          "visibleText": "JEXI Maps\nNo route found\nDepot not recognized",
+          "focus": null,
+          "a11y": [
+            { "element_id": "el-1", "role": "textbox", "name": "Start" },
+            { "element_id": "el-2", "role": "textbox", "name": "Destination" },
+            { "element_id": "el-3", "role": "button", "name": "Directions" },
+            { "element_id": "el-4", "role": "text", "name": "No route found" }
+          ]
+        }
+      ]
+    }
+  }
+}

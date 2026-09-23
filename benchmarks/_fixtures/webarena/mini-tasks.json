@@ -1,0 +1,57 @@
+{
+  "name": "webarena mini tasks (Phase 31 scope 14 fixture)",
+  "benchmark": "webarena-verified",
+  "version": "v1",
+  "split": "mini",
+  "observations": "mini-observations.json",
+  "provenance": "Synthetic self-contained tasks in the WebArena Verified adapter shape (task_id/intent/sites/start_url/evaluator). Not drawn from the real 812-task set; the real set is network-gated behind allowNetwork:true (scope 17). Hosts are non-resolvable *.jexi.local names. Evaluators are the adapter's frozen rule kinds (url_match | string_match | a11y_contains | { all }); pass/fail emerges from rule vs recorded final snapshot, not from declared booleans.",
+  "tasks": [
+    {
+      "task_id": "wa-mini-001",
+      "intent": "Add the cheapest coffee grinder to the cart.",
+      "sites": ["shopping"],
+      "start_url": "http://shopping.jexi.local/",
+      "evaluator": { "kind": "url_match", "pattern": "^http://shopping\\.jexi\\.local/cart$" }
+    },
+    {
+      "task_id": "wa-mini-002",
+      "intent": "Place the order for the standing desk and reach the confirmation page.",
+      "sites": ["shopping"],
+      "start_url": "http://shopping.jexi.local/product/standing-desk",
+      "evaluator": { "kind": "string_match", "text": "Order placed" }
+    },
+    {
+      "task_id": "wa-mini-003",
+      "intent": "Publish the draft post titled 'Phase 31 wiring notes'.",
+      "sites": ["cms"],
+      "start_url": "http://cms.jexi.local/admin/posts",
+      "evaluator": { "kind": "url_match", "pattern": "^http://cms\\.jexi\\.local/admin/posts/[0-9]+$" }
+    },
+    {
+      "task_id": "wa-mini-004",
+      "intent": "Upvote the post 'JEXI 29 shipped' in r/jexi.",
+      "sites": ["reddit"],
+      "start_url": "http://reddit.jexi.local/r/jexi",
+      "evaluator": { "kind": "a11y_contains", "role": "button", "name": "Upvoted" }
+    },
+    {
+      "task_id": "wa-mini-005",
+      "intent": "Open merge request !7 of jexi-os/jexi-core.",
+      "sites": ["gitlab"],
+      "start_url": "http://gitlab.jexi.local/jexi-os/jexi-core",
+      "evaluator": {
+        "all": [
+          { "kind": "url_match", "pattern": "^http://gitlab\\.jexi\\.local/.+/-/merge_requests/[0-9]+$" },
+          { "kind": "string_match", "text": "Merge request !7" }
+        ]
+      }
+    },
+    {
+      "task_id": "wa-mini-006",
+      "intent": "Get walking directions from the depot to the harbor.",
+      "sites": ["map"],
+      "start_url": "http://map.jexi.local/",
+      "evaluator": { "kind": "a11y_contains", "role": "heading", "name": "Route details" }
+    }
+  ]
+}
