@@ -1,0 +1,109 @@
+{
+  "name": "osworld mini observations (Phase 31 scope 15 fixture)",
+  "benchmark": "osworld",
+  "version": "v1",
+  "split": "mini",
+  "provenance": "Pre-recorded VM-state snapshots in the OSWorld observation shape (screenshot/instruction/cwd/screenSize/appFocus). SYNTHETIC: the screenshot fields are opaque deterministic capture tokens (snap://<task>/<step>/<size>), NOT real screen captures — the build-only sandbox never runs a VM. Episode model: the agent acts on snapshot i, the VM transitions, snapshot i+1 is the responding state; the LAST snapshot of each task is the state the evaluator judges. Task osw-mini-004 deliberately stalls inside Calc so its final state fails the app_focus(libreoffice_writer) rule — verdicts emerge from rules vs recorded state, not from declared booleans. Only the 4 VALID tasks carry traces; the malformed 5th entry is rejected at load and never runs.",
+  "tasks": {
+    "osw-mini-001": {
+      "snapshots": [
+        {
+          "screenshot": "snap://osw-mini-001/step-1/1280x800",
+          "instruction": "Book the cheapest one-way flight to Nairobi on the travel portal.",
+          "cwd": null,
+          "screenSize": { "width": 1280, "height": 800 },
+          "appFocus": "chrome"
+        },
+        {
+          "screenshot": "snap://osw-mini-001/step-2/1280x800",
+          "instruction": "Book the cheapest one-way flight to Nairobi on the travel portal.",
+          "cwd": null,
+          "screenSize": { "width": 1280, "height": 800 },
+          "appFocus": "chrome"
+        },
+        {
+          "screenshot": "snap://osw-mini-001/step-3/1280x800",
+          "instruction": "Book the cheapest one-way flight to Nairobi on the travel portal.",
+          "cwd": null,
+          "screenSize": { "width": 1280, "height": 800 },
+          "appFocus": "chrome"
+        }
+      ]
+    },
+    "osw-mini-002": {
+      "snapshots": [
+        {
+          "screenshot": "snap://osw-mini-002/step-1/1280x800",
+          "instruction": "Export the poster as PNG with a transparent background.",
+          "cwd": "/home/jexi",
+          "screenSize": { "width": 1280, "height": 800 },
+          "appFocus": "gimp"
+        },
+        {
+          "screenshot": "snap://osw-mini-002/step-2/1280x800",
+          "instruction": "Export the poster as PNG with a transparent background.",
+          "cwd": "/home/jexi",
+          "screenSize": { "width": 1280, "height": 800 },
+          "appFocus": "gimp"
+        },
+        {
+          "screenshot": "snap://osw-mini-002/step-3/1280x800",
+          "instruction": "Export the poster as PNG with a transparent background.",
+          "cwd": "/home/jexi",
+          "screenSize": { "width": 1280, "height": 800 },
+          "appFocus": "gimp"
+        }
+      ]
+    },
+    "osw-mini-003": {
+      "snapshots": [
+        {
+          "screenshot": "snap://osw-mini-003/step-1/1280x800",
+          "instruction": "Move the quarterly report into ~/archive and leave the shell open there.",
+          "cwd": "/home/jexi",
+          "screenSize": { "width": 1280, "height": 800 },
+          "appFocus": "terminal"
+        },
+        {
+          "screenshot": "snap://osw-mini-003/step-2/1280x800",
+          "instruction": "Move the quarterly report into ~/archive and leave the shell open there.",
+          "cwd": "/home/jexi",
+          "screenSize": { "width": 1280, "height": 800 },
+          "appFocus": "terminal"
+        },
+        {
+          "screenshot": "snap://osw-mini-003/step-3/1280x800",
+          "instruction": "Move the quarterly report into ~/archive and leave the shell open there.",
+          "cwd": "/home/jexi/archive",
+          "screenSize": { "width": 1280, "height": 800 },
+          "appFocus": "terminal"
+        }
+      ]
+    },
+    "osw-mini-004": {
+      "snapshots": [
+        {
+          "screenshot": "snap://osw-mini-004/step-1/1280x800",
+          "instruction": "Copy the Q3 budget table from Calc into a Writer memo and save it as memo.odt.",
+          "cwd": "/home/jexi/Documents",
+          "screenSize": { "width": 1280, "height": 800 },
+          "appFocus": "libreoffice_calc"
+        },
+        {
+          "screenshot": "snap://osw-mini-004/step-2/1280x800",
+          "instruction": "Copy the Q3 budget table from Calc into a Writer memo and save it as memo.odt.",
+          "cwd": "/home/jexi/Documents",
+          "screenSize": { "width": 1280, "height": 800 },
+          "appFocus": "libreoffice_calc"
+        },
+        {
+          "screenshot": "snap://osw-mini-004/step-3/1280x800",
+          "instruction": "Copy the Q3 budget table from Calc into a Writer memo and save it as memo.odt.",
+          "cwd": "/home/jexi/Documents",
+          "screenSize": { "width": 1280, "height": 800 },
+          "appFocus": "libreoffice_calc"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "name": "osworld mini tasks (Phase 31 scope 15 fixture)",
+  "benchmark": "osworld",
+  "version": "v1",
+  "split": "mini",
+  "observations": "mini-observations.json",
+  "provenance": "Synthetic self-contained tasks in the OSWorld adapter shape (task_id/instruction/app/category/evaluator). Not drawn from the real 369-task set; the real set is network-gated behind allowNetwork:true (scope 17). Apps are the frozen OSWorld domain enum (chrome | gimp | libreoffice_calc | libreoffice_impress | libreoffice_writer | os | vlc | thunderbird | vs_code | multi_apps). Evaluators are the adapter's frozen sandbox rule kinds (app_focus | cwd_match | screen_size | { all }); pass/fail emerges from rules vs the recorded final VM state, not from declared booleans. Entry 5 (osw-mini-005) is INTENTIONALLY malformed (missing evaluator) to prove the non-silent E_INVALID_TASK rejection surface.",
+  "tasks": [
+    {
+      "task_id": "osw-mini-001",
+      "instruction": "Book the cheapest one-way flight to Nairobi on the travel portal.",
+      "app": "chrome",
+      "category": "web",
+      "evaluator": {
+        "all": [
+          { "kind": "app_focus", "app": "chrome" },
+          { "kind": "screen_size", "width": 1280, "height": 800 }
+        ]
+      }
+    },
+    {
+      "task_id": "osw-mini-002",
+      "instruction": "Export the poster as PNG with a transparent background.",
+      "app": "gimp",
+      "category": "desktop",
+      "evaluator": {
+        "kind": "app_focus",
+        "app": "gimp"
+      }
+    },
+    {
+      "task_id": "osw-mini-003",
+      "instruction": "Move the quarterly report into ~/archive and leave the shell open there.",
+      "app": "os",
+      "category": "file",
+      "evaluator": {
+        "kind": "cwd_match",
+        "pattern": "^/home/jexi/archive$"
+      }
+    },
+    {
+      "task_id": "osw-mini-004",
+      "instruction": "Copy the Q3 budget table from Calc into a Writer memo and save it as memo.odt.",
+      "app": "multi_apps",
+      "category": "multi_app",
+      "evaluator": {
+        "kind": "app_focus",
+        "app": "libreoffice_writer"
+      }
+    },
+    {
+      "task_id": "osw-mini-005",
+      "instruction": "Play the intro video and set the playback speed to 1.5x.",
+      "app": "vlc"
+    }
+  ]
+}
