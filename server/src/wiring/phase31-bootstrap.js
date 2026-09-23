@@ -78,6 +78,7 @@ import { initRepoCtx } from './phase31-repoctx.js';
 /* ---------------- server-side consumers (integration entry points) -------- */
 import { assemblePrompt } from '../services/PromptAssembly.js';
 import { canChat } from '../providers/index.js';
+import { initPhase31Providers } from './phase31-providers.js'; // Phase 31 Scope 10 — provider config lock-in (keyRef-only)
 import { loadSettings } from '../services/SettingsManager.js';
 import { registerCommand, tryExecuteCommand } from '../services/CommandRegistry.js';
 import { registerSource, listSources } from '../context/sources/index.js';
@@ -202,6 +203,17 @@ export function initPhase31Wiring(opts = {}) {
     return `settings keys=${Object.keys(s || {}).length}`;
   });
   log('W31 WA8: provider config plumbing present (live-LLM leg NOT VERIFIED — no new credentials rule)');
+
+  // W10 — provider config lock-in (Phase 31 Scope 10): Groq + DeepSeek
+  // profiles via the Phase 27 schema, keyRef-only (values never read),
+  // + console model indicator resolution. WA8's verdict logic resolves
+  // here; the live-LLM leg stays NOT VERIFIED until a real key reaches
+  // the boot host (no credential escalation rule).
+  soft('W10', () => {
+    state.providers = initPhase31Providers();
+    return state.providers.summary;
+  });
+  for (const w10line of (state.providers && state.providers.lines) || []) log(w10line);
 
   // WA2 — semantica graph -> memory subsystem accessor.
   soft('WA2', () => { state.graph = semanticaGraph.create(); });
@@ -614,6 +626,7 @@ export function initPhase31Wiring(opts = {}) {
     W13: executorGateStatus().registered, W14: true, W29: typeof runPreflight === 'function',
     'S4-N8N': true, 'S4-EXEC': executableSkillsStatus().registered, 'S4-REPOCTX': !!state.repoCtx,
     W23c: true, W16: false,
+    W10: !!state.providers,
     'P30.A': !!state.hooks, 'P30.B': typeof assertSkillTools === 'function', 'P30.C': !!state.subagentEnf,
     'P30.D': state.rulesLoaded, 'P30.E': !!state.worktreeIso, 'P30.F': !!state.hooks, 'P30.G': !!state.selfEvolveW,
   };

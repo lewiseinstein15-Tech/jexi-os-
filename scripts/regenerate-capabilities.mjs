@@ -26,17 +26,31 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const rel = (p) => path.join(ROOT, p);
 const read = (p) => fs.readFileSync(rel(p), 'utf8');
 
-/* README-stated values (README.md "Capabilities" table as of Phase 31 Scope 8,
- * commit f7090cd). The script flags drift between these and the live tree. */
-const README_STATED = {
+/* README baseline (Phase 31 Scope 10, W10.5): the baseline is read at RUNTIME
+ * from README.md's capability table (readReadmeBaseline below), so ordinary
+ * README number updates never require touching this script — drift is
+ * reported dynamically. The constants below are only the FALLBACK used when
+ * the runtime parse yields nothing usable (e.g. the table is restructured),
+ * kept in sync with README as of Scope 10 (commit e3f434d).
+ *
+ * BASELINE UPDATE PROCEDURE (only if the fallback ever activates):
+ *   1. Update README.md's capability table numbers from this tool's DERIVED
+ *      column (the derived values are the source of truth, never the reverse).
+ *   2. If the runtime parse cannot read the new table shape, fix the
+ *      readReadmeBaseline regexes — do NOT just bump constants.
+ *   3. Only as a last resort bump the FALLBACK constants below to match the
+ *      README and note the commit in this comment. Then re-run:
+ *      node scripts/regenerate-capabilities.mjs  -> expect 0 mismatches.
+ */
+const README_STATED_FALLBACK = {
   agents: 400,
   divisions: 18,
   builtinTools: 39,
   toolDomains: 12,
   skills: 1164,
-  mcpRegistered: 53,
-  mcpEnabled: 29,
-  mcpDirectoryTools: 538,
+  mcpRegistered: 56,
+  mcpEnabled: 30,
+  mcpDirectoryTools: 542,
   webSearchEngines: 20,
   computerUseActions: 16,
   lifecycleHooks: 30,
@@ -46,6 +60,43 @@ const README_STATED = {
   researchFormats: 12,
   sourceConnectors: 16,
 };
+
+/* Parse the README capability table at runtime. Returns { baseline, missed }
+ * where baseline maps capability keys to README numbers (null = no README
+ * row / unparseable cell -> no drift check for that key, like the rows that
+ * legitimately have no README baseline). Capabilities with a non-null value
+ * feed the drift check directly. */
+function readReadmeBaseline() {
+  const md = read('README.md');
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const cell = (label) => {
+    const m = md.match(new RegExp(`\\| ${esc(label)} \\| \\*\\*([\\d,]+(?: \\/ [\\d,]+)?)\\*\\* \\|`));
+    return m ? m[1].replace(/,/g, '') : null;
+  };
+  const one = (label) => { const v = cell(label); return v === null ? null : Number(v); };
+  const regEn = cell('MCP servers registered / enabled by default');
+  const pair = regEn ? regEn.split('/').map((s) => Number(s.trim())) : [null, null];
+  const baseline = {
+    agents: one('Agents in the workforce registry'),
+    divisions: one('Divisions'),
+    builtinTools: one('Built-in tools (12 domains)'),
+    toolDomains: null, // no README row (domain count rides the Built-in tools row)
+    skills: one('Skills (`SKILL.md` catalog)'),
+    mcpRegistered: pair[0],
+    mcpEnabled: pair[1],
+    mcpDirectoryTools: one('Tools exposed by the MCP directory'),
+    webSearchEngines: one('Web search engines (keyed, keyless, and mesh)'),
+    computerUseActions: one('Computer-use actions'),
+    lifecycleHooks: one('Lifecycle hook events'),
+    memoryVerbs: one('Memory verbs (frozen protocol v1.0)'),
+    dreamPhases: one('Dream-cycle phases'),
+    consoleSurfaces: one('Console surfaces'),
+    researchFormats: one('Research output formats'),
+    sourceConnectors: one('Source connectors'),
+  };
+  const missed = Object.entries(baseline).filter(([, v]) => v === null).map(([k]) => k);
+  return { baseline, missed };
+}
 
 const derived = {};
 const how = {};
@@ -186,6 +237,19 @@ const how = {};
 }
 
 /* ---- render + compare ----------------------------------------------------- */
+/* W10.5: resolve the README baseline at runtime; fall back to the embedded
+ * constants only when the parse yields nothing usable at all. */
+let README_STATED = null;
+let baselineMode = 'README runtime parse';
+try {
+  const { baseline } = readReadmeBaseline();
+  const parsed = Object.values(baseline).filter((v) => v !== null);
+  if (parsed.length >= 3) README_STATED = baseline;
+} catch { /* README unreadable -> fallback */ }
+if (!README_STATED) {
+  README_STATED = README_STATED_FALLBACK;
+  baselineMode = 'embedded fallback constants (README runtime parse unusable)';
+}
 const rows = [
   ['Agents in the workforce registry', 'agents', README_STATED.agents],
   ['Divisions', 'divisions', README_STATED.divisions],
@@ -218,7 +282,8 @@ for (const [label, key, stated] of rows) {
 }
 lines.push(`Retrieval benchmark metrics ${derived.benchmarkMetrics}  (${how.benchmarkMetrics})`);
 lines.push('');
+lines.push(`baseline: ${baselineMode}`);
 lines.push(mismatches.length
-  ? `MISMATCHES vs README-stated values: ${mismatches.length} — ${mismatches.map((m) => `${m.key}: derived ${m.derived} vs README ${m.stated}`).join('; ')}. README NOT edited (Scope 8 boundary); a README-owning scope reconciles these.`
-  : 'All derived counts match the README-stated values.');
-console.log(json ? JSON.stringify({ derived, readme: README_STATED, mismatches, how }, null, 2) : lines.join('\n'));
+  ? `MISMATCHES vs README-stated values: ${mismatches.length} — ${mismatches.map((m) => `${m.key}: derived ${m.derived} vs README ${m.stated}`).join('; ')}.`
+  : 'All derived counts match the README values (0 drifts).');
+console.log(json ? JSON.stringify({ derived, readme: README_STATED, baselineMode, mismatches, how }, null, 2) : lines.join('\n'));
