@@ -1,0 +1,62 @@
+{
+  "name": "swebench-pro-mini",
+  "split": "mini",
+  "provenance": {
+    "hf_dataset": "SWE-bench Pro (731-instance multi-language set: JS/Go/Python/TS; live read deferred to scope 17)",
+    "note": "Synthetic 4-entry stand-in shaped after the SWE-bench family: 2 instances expected to resolve, 1 expected to fail, 1 malformed (missing PASS_TO_PASS) to prove E_INVALID_INSTANCE rejection. All problems are self-contained and synthetic. test_patch fields are omitted in the mini fixture; the FAIL_TO_PASS / PASS_TO_PASS test-name arrays carry the evaluation contract. Patch format = unified diff, exercised via patchFromEdits/apply.",
+    "author": "phase-31 scope 12"
+  },
+  "instances": [
+    {
+      "instance_id": "swepro-mini-001",
+      "repo": "acme/js-strutils",
+      "language": "javascript",
+      "base_commit": "1a2b3c4d5e6f708192a3b4c5d6e7f8090a1b2c3d",
+      "problem_statement": "slugify() in src/slugify.js keeps consecutive separator characters: slugify('a_-b') returns 'a--b'. It must collapse runs of separators into a single dash while still trimming leading and trailing dashes.",
+      "FAIL_TO_PASS": [
+        "test/slugify.test.js::collapses runs of separators"
+      ],
+      "PASS_TO_PASS": [
+        "test/slugify.test.js::lowercases the input",
+        "test/slugify.test.js::trims leading and trailing dashes"
+      ]
+    },
+    {
+      "instance_id": "swepro-mini-002",
+      "repo": "acme/py-strtools",
+      "language": "python",
+      "base_commit": "f0e1d2c3b4a5968778695a4b3c2d1e0f9a8b7c6d",
+      "problem_statement": "pluralize() in strtools/pluralize.py appends 's' unconditionally. Words ending in 'y' preceded by a consonant should switch to 'ies' (e.g. 'activity' becomes 'activities'); words ending in vowel+y keep the plain 's'.",
+      "FAIL_TO_PASS": [
+        "tests/test_pluralize.py::test_consonant_y_switches_to_ies"
+      ],
+      "PASS_TO_PASS": [
+        "tests/test_pluralize.py::test_plain_s",
+        "tests/test_pluralize.py::test_vowel_y_keeps_s"
+      ]
+    },
+    {
+      "instance_id": "swepro-mini-003",
+      "repo": "acme/go-datefmt",
+      "language": "go",
+      "base_commit": "00112233445566778899aabbccddeeff00112233",
+      "problem_statement": "FormatOffset() in datefmt.go renders negative offsets with a leading '+'. It must render '-' for negative offsets and zero-pad the hour component to two digits (e.g. -5h renders as '-05:00').",
+      "FAIL_TO_PASS": [
+        "datefmt_test.go::TestFormatOffsetNegative"
+      ],
+      "PASS_TO_PASS": [
+        "datefmt_test.go::TestFormatOffsetPositive"
+      ]
+    },
+    {
+      "instance_id": "swepro-mini-004",
+      "repo": "acme/ts-iterators",
+      "language": "typescript",
+      "base_commit": "9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c",
+      "problem_statement": "chained() in iter.ts drops items when the source iterator is longer than the first mapping array. It should yield every mapped item in order.",
+      "FAIL_TO_PASS": [
+        "tests/iter.test.ts::keeps every mapped item in order"
+      ]
+    }
+  ]
+}
