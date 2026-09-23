@@ -100,7 +100,8 @@ export class JobStore {
       priority: job.priority ?? 0,
       enabled: job.enabled === false ? 0 : 1,
       spec: JSON.stringify(specOf(job)),
-      action: JSON.stringify(job.action ?? {}),
+      // Scope 16.5 fix B — never double-encode an already-serialized action.
+      action: JSON.stringify(typeof job.action === 'string' ? (safeParse(job.action) ?? {}) : (job.action ?? {})),
       last_run_at: job.lastRunAt ?? null,
       last_status: job.lastStatus ?? null,
       run_count: job.runCount ?? 0,
@@ -124,7 +125,14 @@ export class JobStore {
   }
 
   getJob(id) {
-    if (!this.available) return this._mem.jobs.get(id) || null;
+    // Scope 16.5 fix A — memory mode hydrates exactly like the SQLite path.
+    // Returning the raw storage row (spec/action as JSON strings, snake_case
+    // columns, no top-level cron) made saveJob() rebuild spec from missing
+    // top-level fields and clobber cron/nextRunAt to null on re-save.
+    if (!this.available) {
+      const row = this._mem.jobs.get(id);
+      return row ? hydrateJob(row) : null;
+    }
     const row = this.db.prepare('SELECT * FROM jobs WHERE id = ?').get(id);
     return row ? hydrateJob(row) : null;
   }
@@ -205,11 +213,14 @@ export class JobStore {
 }
 
 function specOf(job) {
+  // Scope 16.5 fix B — reconstruct spec from top-level fields without
+  // clobbering values a raw storage row still carries in its spec payload.
+  const base = safeParse(typeof job.spec === 'string' ? job.spec : null) ?? {};
   return {
-    cron: job.cron ?? null,
-    event: job.event ?? null,
-    condition: job.condition ?? null,
-    intervalSeconds: job.intervalSeconds ?? null,
+    cron: job.cron ?? base.cron ?? null,
+    event: job.event ?? base.event ?? null,
+    condition: job.condition ?? base.condition ?? null,
+    intervalSeconds: job.intervalSeconds ?? base.intervalSeconds ?? null,
   };
 }
 
