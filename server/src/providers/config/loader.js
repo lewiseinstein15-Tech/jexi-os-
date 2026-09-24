@@ -59,7 +59,11 @@ export function loadProviderConfig() {
   const providersText = readFileSync(join(base, 'providers.yaml'), 'utf8');
   const modelsText = readFileSync(join(base, 'models.yaml'), 'utf8');
   cached = {
-    providers: parseYamlSubset(providersText).providers ?? {},
+    // Scope 17 fix: parseYamlSubset returns the parsed ROOT — providers.yaml's
+    // top-level keys ARE the provider ids (openai:, groq:, ...). The old
+    // `.providers` access read a wrapper key that never exists, so every
+    // adapter booted with cfg = {} and isConfigured() could never see keyEnv.
+    providers: parseYamlSubset(providersText) ?? {},
     models: parseYamlSubset(modelsText).models ?? {},
     taskClasses: parseYamlSubset(modelsText).taskClasses ?? {},
   };

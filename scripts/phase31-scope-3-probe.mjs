@@ -1,6 +1,18 @@
 /**
  * JEXI OS — PHASE 31 SCOPE 3 — live probe (P1–P6).
  *
+ * SCOPE 17 HYGIENE (probe-only, disclosed): the scope-3-era assertions below
+ * went stale as later scopes wired more targets onto the same boot. Fixed:
+ *   - boot line counts are read LIVE (in-process boot total; Scope 1's 15
+ *     asserted as the original floor, Scope 3's 7 still exact) instead of the
+ *     hardcoded 15+7=22 total;
+ *   - the ralph.js diff is asserted against the COMMITTED tip (diff vs the
+ *     last pre-wiring state) — the wiring lives in commits now, the old
+ *     working-tree diff is empty;
+ *   - the zone check accepts the full phase-31 committed surface + the
+ *     scope-17 named call sites instead of scope-3 files only.
+ * No production code is touched by this probe.
+ *
  * P1 server boots with all 7 Scope 3 targets initialized (+ Scope 1's 15 intact)
  * P2 per-item end-to-end reachability with real call traces:
  *      S3-AUTO    autonomy cycle fires on a scheduler tick (cron job -> handler)
@@ -66,8 +78,8 @@ const boot = initPhase31Wiring({ sessionId: `boot-${process.pid}`, runtimeRoot: 
 const probeLines = boot.log;
 const scope1Lines = probeLines.filter((l) => !/W31 (S3-|W23e|W23f|WA4:)/.test(l));
 const scope3Lines = probeLines.filter((l) => /W31 (S3-|W23e|W23f|WA4:)/.test(l));
-check('P2.probe-init', scope1Lines.length === 15 && scope3Lines.length === 7 && !probeLines.some((l) => l.includes('FAIL-SOFT')),
-  `probe boot: ${scope1Lines.length} Scope-1 lines + ${scope3Lines.length} Scope-3 lines, 0 FAIL-SOFT`);
+check('P2.probe-init', scope1Lines.length >= 15 && scope3Lines.length === 7 && !probeLines.some((l) => l.includes('FAIL-SOFT')),
+  `probe boot: ${probeLines.length} W31 lines live (>= 15 Scope-1 originals intact + exactly ${scope3Lines.length}/7 Scope-3 lines), 0 FAIL-SOFT`);
 console.log(scope3Lines.map((l) => `  ${l}`).join('\n'));
 
 /* ================= P1 — server boots with all 7 targets ==================== */
@@ -83,8 +95,8 @@ for (let i = 0; i < 10 && p1lines.length === 0 && !b1.child.killed; i++) { await
 console.log(p1lines.map((l) => `  ${l}`).join('\n'));
 const s1 = p1lines.filter((l) => !/W31 (S3-|W23e|W23f|WA4:)/.test(l));
 const s3 = p1lines.filter((l) => /W31 (S3-|W23e|W23f|WA4:)/.test(l));
-check('P1.all-7-targets', s3.length === 7 && !p1lines.some((l) => l.includes('FAIL-SOFT')),
-  `${s3.length}/7 Scope 3 boot lines, ${s1.length}/15 Scope 1 lines intact, 0 FAIL-SOFT`);
+check('P1.all-7-targets', s3.length === 7 && p1lines.length === probeLines.length && !p1lines.some((l) => l.includes('FAIL-SOFT')),
+  `${s3.length}/7 Scope 3 boot lines, server boot total ${p1lines.length} == live in-process total ${probeLines.length} (count read live, no hardcode), 0 FAIL-SOFT`);
 
 /* ================= P2 — per-item end-to-end reachability =================== */
 console.log('\n== P2 per-item reachability (end-to-end, consumer level) ==');
@@ -222,6 +234,11 @@ check('P2.S3-AUTO.tick-fired', !!autoRun && autoRun.run.trigger === 'cron' && au
   `autonomy cycle fired on a real scheduler cron tick -> handler autonomy-cycle -> goal ledger pass (goals=${autoRun && autoRun.run && autoRun.run.result ? autoRun.run.result.goals : 'n/a'}, active includes ${goal.goalId}); heartbeat leg pinged ${pings.length}x`);
 
 /* ================= P3 — read-only proof on shipped modules ================= */
+/* Scope 17 hygiene: the wiring is COMMITTED now, so the original working-tree
+ * diff is empty and the old assertions could never see it. The same rule is
+ * asserted against the committed tip: ralph.js is diffed against its last
+ * pre-wiring state (parent of the last commit that touched it), and every
+ * other shipped module's last-touching commit must predate phase 31. */
 console.log('\n== P3 read-only proof: shipped modules referenced by wired imports ==');
 const shippedRefs = [
   'scheduler/autonomous/index.js', 'brain/cycle/index.js', 'context/offload/index.js',
@@ -230,22 +247,32 @@ const shippedRefs = [
   'swarm/topologies/index.js', 'server/src/workforce/registry/index.js', 'server/src/scheduler/index.js',
 ];
 const numstat = execSync('git diff --numstat', { cwd: ROOT, encoding: 'utf8' }).trim().split('\n').filter(Boolean);
-console.log('  git diff --numstat:');
+console.log('  git diff --numstat (working tree):');
 console.log(numstat.map((l) => `    ${l}`).join('\n') || '    (empty)');
-const ralphDiff = execSync('git diff -- swarm/loops/ralph.js', { cwd: ROOT, encoding: 'utf8' });
-console.log('  swarm/loops/ralph.js diff (must be wiring import + register call only, run() untouched):');
+const ralphLast = execSync('git rev-list -1 HEAD -- swarm/loops/ralph.js', { cwd: ROOT, encoding: 'utf8' }).trim();
+const ralphPre = `${ralphLast}^`;
+const ralphDiff = execSync(`git diff ${ralphPre} -- swarm/loops/ralph.js`, { cwd: ROOT, encoding: 'utf8' });
+console.log(`  swarm/loops/ralph.js diff vs pre-wiring state ${ralphPre.slice(0, 12)} (committed + working tree; must be wiring import + register call only, run() untouched):`);
 console.log(ralphDiff.split('\n').map((l) => `    | ${l}`).join('\n'));
 const ralphBodyClean = !ralphDiff.includes('let context = initialContext') && !/^-.*(outcome|attempt|adjustContext|contextLog)/m.test(ralphDiff);
 const touched = numstat.map((l) => l.split('\t')[2]);
 const otherShippedDirty = shippedRefs.filter((f) => f !== 'swarm/loops/ralph.js' && touched.includes(f));
-check('P3.shipped-internals-empty', otherShippedDirty.length === 0, `every wired shipped module diff EMPTY except the disclosed W23e call site (violations: ${JSON.stringify(otherShippedDirty)})`);
+const phase31TouchedShipped = [];
+for (const f of shippedRefs) {
+  if (f === 'swarm/loops/ralph.js') continue;
+  const last = execSync(`git rev-list -1 HEAD -- ${f}`, { cwd: ROOT, encoding: 'utf8' }).trim();
+  const msg = last ? execSync(`git log -1 --format=%s ${last}`, { cwd: ROOT, encoding: 'utf8' }).trim() : '(untracked)';
+  if (msg.startsWith('phase-31')) phase31TouchedShipped.push(`${f} @ ${msg}`);
+}
+check('P3.shipped-internals-empty', otherShippedDirty.length === 0 && phase31TouchedShipped.length === 0,
+  `every wired shipped module untouched except the disclosed W23e call site (working-tree violations: ${JSON.stringify(otherShippedDirty)}; phase-31 commits touching shipped internals: ${JSON.stringify(phase31TouchedShipped)})`);
 check('P3.ralph-wiring-only', ralphBodyClean && ralphDiff.includes('+import { evaluate as evaluateLoopPolicy }') && ralphDiff.includes('+export const defaultCheckpointRegistration') && !ralphDiff.includes('-export function run'),
   'ralph.js = 1 wiring import + checkpoint registry + register call; run() body byte-identical (no removal lines)');
 
 /* ================= P4 — regression ========================================= */
 console.log('\n== P4 regression: clean boot, Scope 1 lines intact, endpoints respond ==');
-check('P4.boot-clean', !!h1 && h1.status === 200 && s1.length === 15 && !p1lines.some((l) => l.includes('FAIL-SOFT')),
-  `boot1 healthy; ${s1.length}/15 Scope 1 W31 lines present verbatim; 0 FAIL-SOFT`);
+check('P4.boot-clean', !!h1 && h1.status === 200 && s1.length >= 15 && p1lines.length === probeLines.length && !p1lines.some((l) => l.includes('FAIL-SOFT')),
+  `boot1 healthy; ${s1.length} non-Scope-3 W31 lines (>= 15 Scope 1 originals verbatim); server total ${p1lines.length} == live in-process total ${probeLines.length}; 0 FAIL-SOFT`);
 const epRoster = await fetch(`http://127.0.0.1:${PORT1}/api/roster`, { signal: AbortSignal.timeout(5000) }).then((r) => r.status).catch((e) => String(e).slice(0, 60));
 const epSched = await fetch(`http://127.0.0.1:${PORT1}/api/scheduler/jobs?limit=5`, { signal: AbortSignal.timeout(5000) }).then((r) => r.json()).catch((e) => String(e).slice(0, 60));
 const schedOk = epSched && typeof epSched === 'object';
@@ -259,15 +286,22 @@ const detached = logAfterKill.includes('W31 WA3: instincts observer detached');
 check('P4.graceful-shutdown', detached, 'SIGTERM -> W31 WA3 observer detached line present (SessionEnd seam)');
 
 /* ================= P5 — zone check ========================================= */
+/* Scope 17 hygiene: the allowed set now covers the full phase-31 committed
+ * surface (diff vs the parent of the oldest phase-31 commit) plus the scope-17
+ * named call sites, not just the four scope-3 files. A clean tree passes. */
 console.log('\n== P5 zone check ==');
 const status = execSync('git status --short', { cwd: ROOT, encoding: 'utf8' }).trim().split('\n').filter(Boolean);
-console.log(status.map((l) => `  ${JSON.stringify(l)}`).join('\n'));
-const allowedPaths = ['server/src/wiring/phase31-bootstrap.js', 'server/src/wiring/phase31-wa4-topology.js', 'server/src/wiring/phase31-cidoctor.js', 'swarm/loops/ralph.js'];
+console.log(status.map((l) => `  ${JSON.stringify(l)}`).join('\n') || '  (clean tree)');
+const first31c = execSync("git rev-list --reverse --grep='^phase-31' HEAD", { cwd: ROOT, encoding: 'utf8' }).trim().split('\n')[0];
+const pre31 = `${first31c}^`;
+const committedSurface = new Set(execSync(`git diff --name-only ${pre31} HEAD`, { cwd: ROOT, encoding: 'utf8' }).trim().split('\n').filter(Boolean));
+const allowedPaths = ['server/src/wiring/phase31-bootstrap.js', 'server/src/wiring/phase31-wa4-topology.js', 'server/src/wiring/phase31-cidoctor.js', 'swarm/loops/ralph.js', 'server/src/providers/config/loader.js'];
 const allowed = (l) => {
   const p = l.replace(/^(.{1,2})\s+/, '');
-  return allowedPaths.includes(p) || p.startsWith('scripts/phase31-');
+  return allowedPaths.includes(p) || committedSurface.has(p) || p.startsWith('scripts/phase31-');
 };
-check('P5.zone', status.length > 0 && status.every(allowed), `${status.length} entries, all inside named call sites + scripts/phase31-*.mjs`);
+const zoneViolations = status.map((l) => l.replace(/^(.{1,2})\s+/, '')).filter((p) => !allowed(p));
+check('P5.zone', zoneViolations.length === 0, `${status.length} entries, all inside named call sites (scope-3 + scope-17) + phase-31 committed surface + scripts/phase31-*.mjs (violations: ${JSON.stringify(zoneViolations)})`);
 
 /* ================= P6 — determinism ======================================== */
 console.log('\n== P6 determinism: same boot twice -> identical W31 boot lines ==');
