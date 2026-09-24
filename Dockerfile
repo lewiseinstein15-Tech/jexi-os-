@@ -38,8 +38,20 @@ ENV PLAYWRIGHT_BROWSERS_PATH=0
 
 # Frontend build -> served from server/public by Express
 COPY package*.json index.html vite.config.js tailwind.config.js postcss.config.js ./
-COPY interfaces/public ./interfaces/public
-COPY interfaces/console ./interfaces/console
+# ── Boot-chain trees (same set as Dockerfile.slim) ─────────────────────────
+# server/index.js -> src/wiring/phase31-bootstrap.js statically imports these
+# trees via ../..; ESM link fails before app.listen() if any is missing.
+COPY interfaces ./interfaces
+COPY capabilities ./capabilities
+COPY runtime ./runtime
+COPY integrations ./integrations
+COPY agents ./agents
+COPY mind ./mind
+COPY harness ./harness
+COPY services ./services
+COPY skills ./skills
+COPY security ./security
+COPY tests ./tests
 RUN npm ci --no-audit --no-fund && npm run build
 # server/public is a git symlink to ../dist — vite writes the bundle
 # straight through it, so the old `cp -r dist/* server/public/` copied
