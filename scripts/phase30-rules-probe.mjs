@@ -11,7 +11,7 @@ import rules, { globMatch } from '../harness/parity/rules/index.js';
 const [remoteRef, phase25Blob] = process.argv.slice(2);
 nodeAssert.ok(remoteRef, 'authoritative remote ref argument is required');
 nodeAssert.ok(phase25Blob, 'authoritative Phase 25 blob argument is required');
-const phase25Path = fileURLToPath(new URL('../prompt/sections/08-instructions.js', import.meta.url));
+const phase25Path = fileURLToPath(new URL('../capabilities/prompts/sections/08-instructions.js', import.meta.url));
 const phase25Bytes = fs.readFileSync(phase25Path);
 const actualPhase25Blob = createHash('sha1')
   .update(`blob ${phase25Bytes.length}\0`)
@@ -185,7 +185,7 @@ try {
   const bridgedPaths = bridged.map((rule) => rule.path);
   const bridge = {
     sourceRef: remoteRef,
-    sourcePath: 'prompt/sections/08-instructions.js',
+    sourcePath: 'capabilities/prompts/sections/08-instructions.js',
     sourceBlob: phase25Blob,
     loaded: bridged.length,
     unique: new Set(bridgedPaths).size,

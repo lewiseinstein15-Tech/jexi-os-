@@ -328,12 +328,12 @@ try {
 /* ================= P6 — shipped modules read-only ======================= */
 console.log('\n== P6 read-only proof — shipped module diffs EMPTY ==');
 const diffList = execSync('git diff --name-only HEAD', { cwd: ROOT, encoding: 'utf8' }).trim().split('\n').filter(Boolean);
-const NAMED = ['ui/web/console/chat/mount.js', 'ui/web/console/shell/Sidebar.jsx', 'ui/web/console/shell/Shell.jsx', 'scripts/phase31-scope-2-probe.mjs'];
+const NAMED = ['interfaces/ui/web/console/chat/mount.js', 'interfaces/ui/web/console/shell/Sidebar.jsx', 'interfaces/ui/web/console/shell/Shell.jsx', 'scripts/phase31-scope-2-probe.mjs'];
 const nonNamed = diffList.filter((f) => !NAMED.includes(f));
-const shippedTrees = ['services/computer', 'agents/swarm', 'server/src/workforce', 'src/components/console/views', 'src/components/ChatWindow.jsx', 'src/styles', 'events'];
+const shippedTrees = ['services/computer', 'agents/swarm', 'server/src/workforce', 'interfaces/console/components/console/views', 'interfaces/console/components/ChatWindow.jsx', 'interfaces/console/styles', 'runtime/events'];
 const shippedDirty = diffList.filter((f) => shippedTrees.some((t) => f.startsWith(t)));
-const chatDirty = diffList.filter((f) => f.startsWith('ui/web/console/chat/') && f !== 'ui/web/console/chat/mount.js');
-const shellDirty = diffList.filter((f) => f.startsWith('ui/web/console/shell/') && f !== 'ui/web/console/shell/Sidebar.jsx' && f !== 'ui/web/console/shell/Shell.jsx');
+const chatDirty = diffList.filter((f) => f.startsWith('interfaces/ui/web/console/chat/') && f !== 'interfaces/ui/web/console/chat/mount.js');
+const shellDirty = diffList.filter((f) => f.startsWith('interfaces/ui/web/console/shell/') && f !== 'interfaces/ui/web/console/shell/Sidebar.jsx' && f !== 'interfaces/ui/web/console/shell/Shell.jsx');
 check('P6.shipped-untouched', nonNamed.length === 0 && shippedDirty.length === 0 && chatDirty.length === 0 && shellDirty.length === 0,
   `diff files=[${diffList.join(', ') || 'NONE'}]; outside named=${nonNamed.length}; shipped trees dirty=${shippedDirty.length}; chat (excl mount.js)=${chatDirty.length}; shell (excl Sidebar/Shell)=${shellDirty.length}`);
 

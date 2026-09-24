@@ -2,7 +2,7 @@
 
 async function runtimeFor(ctx) {
   try {
-    const module = await import(new URL('../scheduler/autonomous/index.js', import.meta.url));
+    const module = await import(new URL('../../runtime/scheduler/autonomous/index.js', import.meta.url));
     const candidate = String(ctx?.session?.id || 'default');
     return module.autonomousRuntime({ sessionId: /^[A-Za-z0-9_-]{1,100}$/.test(candidate) ? candidate : 'default' });
   } catch { return null; }

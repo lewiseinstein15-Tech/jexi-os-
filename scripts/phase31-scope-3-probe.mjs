@@ -241,10 +241,10 @@ check('P2.S3-AUTO.tick-fired', !!autoRun && autoRun.run.trigger === 'cron' && au
  * other shipped module's last-touching commit must predate phase 31. */
 console.log('\n== P3 read-only proof: shipped modules referenced by wired imports ==');
 const shippedRefs = [
-  'scheduler/autonomous/index.js', 'brain/cycle/index.js', 'context/offload/index.js',
-  'workgraph/phases/gsd/index.js', 'swarm/loops/looper.js', 'swarm/loops/ralph.js',
+  'runtime/scheduler/autonomous/index.js', 'mind/brain/cycle/index.js', 'runtime/context/offload/index.js',
+  'runtime/workgraph/phases/gsd/index.js', 'agents/swarm/loops/looper.js', 'agents/swarm/loops/ralph.js',
   'harness/hardening/ralph/index.js', 'harness/hardening/ralph/ci-doctor.js', 'harness/hardening/ralph/diagnostics.js',
-  'swarm/topologies/index.js', 'server/src/workforce/registry/index.js', 'server/src/scheduler/index.js',
+  'agents/swarm/topologies/index.js', 'server/src/workforce/registry/index.js', 'server/src/scheduler/index.js',
 ];
 const numstat = execSync('git diff --numstat', { cwd: ROOT, encoding: 'utf8' }).trim().split('\n').filter(Boolean);
 console.log('  git diff --numstat (working tree):');

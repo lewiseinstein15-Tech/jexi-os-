@@ -63,7 +63,7 @@ export class VikingFs {
    * @param {string} [o.root]    disk root (default <repo>/data/viking)
    */
   constructor(o = {}) {
-    this.root = path.resolve(o.root || new URL('../../data/viking', import.meta.url).pathname);
+    this.root = path.resolve(o.root || new URL('../../../data/viking', import.meta.url).pathname);
     fs.mkdirSync(this.root, { recursive: true });
   }
 

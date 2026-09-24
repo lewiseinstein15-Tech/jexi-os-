@@ -281,7 +281,7 @@ const CLOCK_RE = /Date\.now|new Date|performance\.now|process\.hrtime/g;
 const SPEC_RE = /^import\s[\s\S]*?from\s['"]([^'"]+)['"];?$|^export\s\{[^}]*\}\sfrom\s['"]([^'"]+)['"];?$/;
 const ALLOW = new Set([
   'node:crypto', 'node:fs/promises', 'node:path',
-  '../../semantica/_internal.js',
+  '../../services/semantica/_internal.js',
   './manifest.js', './result.js', './trace.js', './cost.js',
 ]);
 let netHits = 0;

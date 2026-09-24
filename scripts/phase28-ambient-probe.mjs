@@ -86,7 +86,7 @@ const trivial = reflex.point('FYI: Alice Example.', {});
 const loaded = reflex.point('Review Alice Example before our project decision meeting.', { loadedSlugs: ['people/alice-example'] });
 console.log('P2 trivial pointers:', JSON.stringify(trivial));
 console.log('P2 already-loaded pointers:', JSON.stringify(loaded));
-const policyText = fs.readFileSync(new URL('../brain/ambient/reflex/policy.md', import.meta.url), 'utf8');
+const policyText = fs.readFileSync(new URL('../mind/brain/ambient/reflex/policy.md', import.meta.url), 'utf8');
 ok(trivial.length === 0, 'P2 trivial passing mention is silent');
 ok(loaded.length === 0, 'P2 entity already loaded in caller context is silent');
 ok(policyText.includes('## Trigger rule') && policyText.includes('## Escalation ladder'), 'P2 committed policy.md encodes trigger rule + escalation ladder');
