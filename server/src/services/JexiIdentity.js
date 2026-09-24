@@ -25,14 +25,22 @@
 import { AGENT_ROSTER, SKILL_REGISTRY, ROSTER_COUNT, SKILL_COUNT } from '../workforce/registry/index.js';
 import { TOOL_REGISTRY } from './ToolRegistry.js';
 import { classifyRisk } from './RiskGuard.js';
+import { facts as selfFacts, identityBlock as selfIdentityBlock } from '../../../brain/self/index.js'; // Phase 31 Scope 19 — canonical self (brain/self/core.md)
 
-/** The immutable facts. Editing this edits every identity answer at once. */
+/**
+ * The immutable facts — READ from brain/self/core.md (Phase 31 Scope 19).
+ * Nothing here is hardcoded any more: name / fullName / createdBy / version /
+ * birthday come from the canonical self file, which only Lewis edits.
+ */
+const SELF = selfFacts().facts;
 export const JEXI_IDENTITY = {
-  name: 'JEXI',
-  fullName: 'JEXI OS',
+  name: SELF.name,
+  fullName: SELF.formal_name,
+  version: SELF.version,
+  birthday: SELF.birthday,
   tagline: 'a sophisticated multi-agent AI operating system built to run any task',
-  createdBy: 'Lewis Einstein',
-  createdByTitle: 'an AI & ML Engineer',
+  createdBy: `${SELF.builder_primary} and ${SELF.builder_secondary}`,
+  createdByTitle: `purpose: ${SELF.purpose}`,
   tone: 'intelligent, precise, warm and confident. State the plan in one line, show work live, verify before claiming success, and ask for clarification only when genuinely needed.',
 };
 
@@ -97,9 +105,11 @@ export function buildLimitationLines() {
 export function buildIdentityPrompt() {
   const caps = buildCapabilityLines().join('\n');
   const limits = buildLimitationLines().join('\n');
-  return `You are **${JEXI_IDENTITY.fullName}** — ${JEXI_IDENTITY.tagline}.
+  return `${selfIdentityBlock()}
 
-WHO BUILT YOU: ${JEXI_IDENTITY.createdBy}, ${JEXI_IDENTITY.createdByTitle}.
+You are **${JEXI_IDENTITY.fullName}** v${JEXI_IDENTITY.version} — ${JEXI_IDENTITY.tagline}.
+
+WHO BUILT YOU: ${JEXI_IDENTITY.createdBy} (${JEXI_IDENTITY.createdByTitle}).
 
 HOW YOU WORK: you are not a single chatbot — you are a planner + a roster of
 specialist agents + memory + tools. For every objective you classify the intent,
@@ -121,7 +131,7 @@ TONE: ${JEXI_IDENTITY.tone}`;
  */
 export const IDENTITY_ANSWER = `I'm **${JEXI_IDENTITY.fullName}** — ${JEXI_IDENTITY.tagline}.
 
-I was created by **${JEXI_IDENTITY.createdBy}**, ${JEXI_IDENTITY.createdByTitle}.
+I was built by **${JEXI_IDENTITY.createdBy}** — ${JEXI_IDENTITY.createdByTitle}.
 
 I don't just answer — I **plan first, then run the team one-by-one** until the task is done. Right now my live registry holds **${ROSTER_COUNT}+ specialist agents** and **${SKILL_COUNT}+ skills** across:
 
