@@ -73,7 +73,7 @@ jobs:
           npx cap sync android
 
       - name: Compile debug APK
-        working-directory: android
+        working-directory: interfaces/android
         env:
           # Bake the GitHub run number into versionCode so every APK is a
           # strictly newer version than the last (Android refuses equal/lower).
@@ -103,7 +103,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: jexi-os-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: interfaces/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -135,7 +135,7 @@ jobs:
           # 2026-08-17); retry transient failures before failing the build.
           for attempt in 1 2 3 4 5; do
             if gh release create "$TAG" \
-              android/app/build/outputs/apk/debug/app-debug.apk \
+              interfaces/android/app/build/outputs/apk/debug/app-debug.apk \
               --title "JEXI OS Android App — build #${{ github.run_number }}" \
               --notes-file /tmp/release-notes.md \
               --latest 2>/tmp/gh-release-err.txt; then

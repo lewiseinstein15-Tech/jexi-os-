@@ -42,19 +42,21 @@ COPY server/mcp ./server/mcp
 
 # Frontend build → served by Express from server/public
 COPY package*.json index.html vite.config.js tailwind.config.js postcss.config.js ./
-COPY public ./public
-COPY src ./src
-# Phase 7(G) — the commands subsystem lives at the repo root (ECC layout);
-# the container resolves /app/commands (dual-depth seam: /app/commands).
-COPY commands ./commands
-# Phase 24: src/components/ChatWindow.jsx imports ../../ui/web/console/chat/mount.js
+COPY interfaces/public ./interfaces/public
+COPY interfaces/console ./interfaces/console
+# Phase 7(G) — the commands subsystem lives at capabilities/commands/ (ECC layout).
+# NOTE: server/src/commands-seam.js still probes the pre-restructure container
+# paths (/app/commands, /app/server/commands) — that is a source-side fix in 3B-2.
+COPY capabilities/commands ./capabilities/commands
+# Phase 24: interfaces/console/components/ChatWindow.jsx imports ../ui/web/console/chat/mount.js
 # (Phase 16 chat runtime wiring) — the new console shell must be in the image,
-# and its import closure reaches events/ (chat taxonomy), providers/ (keyRef
-# profile schema) and workforce/ (narration modules imported by the runtime).
-COPY ui ./ui
-COPY events ./events
-COPY providers ./providers
-COPY workforce ./workforce
+# and its import closure reaches runtime/events/ (chat taxonomy),
+# integrations/providers/ (keyRef profile schema) and agents/workforce/
+# (narration modules imported by the runtime).
+COPY interfaces/ui ./interfaces/ui
+COPY runtime/events ./runtime/events
+COPY integrations/providers ./integrations/providers
+COPY agents/workforce ./agents/workforce
 RUN npm ci --no-audit --no-fund && npm run build
 # server/public is a git symlink to ../dist — vite writes the bundle
 # straight through it, so the old `cp -r dist/* server/public/` copied

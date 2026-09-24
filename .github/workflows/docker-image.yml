@@ -19,20 +19,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Phase 7(F) — the HUD subsystem lives at the repo root (ECC layout).
+      # Phase 7(F) — the HUD subsystem lives at runtime/events/hud (ECC layout).
       # The image context is server/, so ship events/hud into it: the container
       # resolves /app/events/hud and the HUD contract deploys with the brain.
       - name: Ship events/hud into the server build context
         run: |
           mkdir -p server/events
-          cp -r events/hud server/events/
+          cp -r runtime/events/hud server/events/
 
-      # Phase 7(G) — same story for the commands subsystem: the container
+      # Phase 7(G) — same story for the commands subsystem (capabilities/commands): the container
       # resolves /app/commands and the 12 slash commands deploy with the brain.
       - name: Ship commands/ into the server build context
         run: |
           mkdir -p server/commands
-          cp -r commands/. server/commands/
+          cp -r capabilities/commands/. server/commands/
 
       - uses: docker/setup-buildx-action@v3
 

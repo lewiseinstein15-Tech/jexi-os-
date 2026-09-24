@@ -33,7 +33,7 @@ jobs:
         run: npm ci
       - name: Tool registry audit (doc-count drift guard, ZONE-OWNER #20)
         working-directory: .
-        run: node tools/registry/audit.js
+        run: node capabilities/tools/registry/audit.js
       - name: Syntax check
         run: |
           for f in index.js src/services/*.js; do node --check "$f"; done
