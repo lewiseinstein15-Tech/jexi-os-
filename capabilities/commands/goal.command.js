@@ -5,7 +5,7 @@ async function runtimeFor(ctx) {
   // bundle may not ship Scope G yet, so degrade this command without breaking
   // the entire command registry.
   let module;
-  try { module = await import(new URL('../scheduler/autonomous/index.js', import.meta.url)); } catch { return null; }
+  try { module = await import(new URL('../../runtime/scheduler/autonomous/index.js', import.meta.url)); } catch { return null; }
   const candidate = String(ctx?.session?.id || 'default');
   return module.autonomousRuntime({ sessionId: /^[A-Za-z0-9_-]{1,100}$/.test(candidate) ? candidate : 'default' });
 }

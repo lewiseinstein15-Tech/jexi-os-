@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const LEDGER = path.join(ROOT, 'ZONE-OWNER.md');
+const LEDGER = path.join(ROOT, 'docs', 'operations', 'ZONE-OWNER.md');
 const text = readFileSync(LEDGER, 'utf8');
 
 // ---------------------------------------------------------------- ledger ids

@@ -180,7 +180,7 @@ check('P3.gate-refusal', refused.includes('W36 NODE FLOOR') && refused.includes(
 
 /* ================= P4 — shipped modules untouched (read-only proof) ======== */
 console.log('\n== P4 read-only proof (git diff of shipped module trees) ==');
-const shippedTrees = ['brain', 'semantica', 'mind/instincts', 'session/fleet', 'rlm', 'capability', 'context/viking', 'verification/visual', 'prompt', 'computer', 'harness'];
+const shippedTrees = ['mind/brain', 'services/semantica', 'mind/instincts', 'runtime/session/fleet', 'runtime/rlm', 'capabilities', 'runtime/context/viking', 'tests/verification/visual', 'capabilities/prompts', 'services/computer', 'harness'];
 const diffArgs = ['diff', '--name-only', 'HEAD', '--', ...shippedTrees];
 let diffs = '';
 try { diffs = execSync(`git ${diffArgs.map((a) => `'${a}'`).join(' ')}`, { cwd: ROOT, encoding: 'utf8' }); } catch (e) { diffs = `GIT-ERR ${String(e.message).slice(0, 80)}`; }

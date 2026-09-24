@@ -223,7 +223,7 @@ const shippedRefs = [
   'server/src/tools/execution/executor.js', 'server/src/tools/registry/ToolRegistry.js',
   'server/src/tools/domains/index.js', 'server/src/tools/domains/filesystem/index.js',
   'server/src/services/PluginRegistry.js', 'server/src/skills/catalog.js', 'server/src/skills/loader.js',
-  'semantica/repo-map/index.js', 'semantica/repo-map/rank.js', 'semantica/repo-map/summarize.js', 'semantica/repo-map/cache.js',
+  'services/semantica/repo-map/index.js', 'services/semantica/repo-map/rank.js', 'services/semantica/repo-map/summarize.js', 'services/semantica/repo-map/cache.js',
   'skills/executable/python-skill.js', 'skills/aas/mcp-server.js', 'skills/aas/catalog.js',
   'harness/hardening/forgejo/index.js', 'harness/hardening/forgejo/taxonomy.js', 'harness/hardening/forgejo/transport.js',
 ];

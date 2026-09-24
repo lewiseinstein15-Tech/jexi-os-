@@ -4,7 +4,7 @@ import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { HOOK_CATALOG, HOOK_EVENT_COUNT } from './catalog.js';
 import { HOOK_RETURNS, makeContract, validateHookSpec } from './contract.js';
 
-const PHASE7_REGISTRY_URL = new URL('../../../hooks/hooks.json', import.meta.url);
+const PHASE7_REGISTRY_URL = new URL('../../../infra/hooks/hooks.json', import.meta.url);
 
 function readPhase7Registrations() {
   try {
