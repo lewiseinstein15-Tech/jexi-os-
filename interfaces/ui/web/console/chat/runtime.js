@@ -55,7 +55,7 @@ import { modes as modesScope } from './modes.js';
 import { approvals } from './approvals.js';
 import { draft } from './progress-draft.js';
 import { dualPane } from './dual-pane.js';
-import { narration } from '../../../../workforce/narration/index.js';
+import { narration } from '../../../../../agents/workforce/narration/index.js';
 
 /** Fixed epoch so timestamps are reproducible run to run. */
 const EPOCH_BASE_MS = 1767225600000; // 2026-01-01T00:00:00.000Z

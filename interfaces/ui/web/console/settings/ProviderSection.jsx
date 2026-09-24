@@ -1,5 +1,5 @@
 import KeyRefInput from './KeyRefInput.jsx';
-import { PROVIDERS } from '../../../../providers/profiles/schema.js';
+import { PROVIDERS } from '../../../../../integrations/providers/profiles/schema.js';
 
 /* UI-level model catalog per provider (config values; Phase 27 ships tiers,
  * deployments name real models at configure() time). */

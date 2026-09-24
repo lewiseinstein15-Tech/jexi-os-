@@ -21,7 +21,7 @@
  *  - emits approval.requested and approval.resolved events validated via Scope A taxonomy
  */
 
-import { taxonomy } from '../../../../events/chat/taxonomy.js';
+import { taxonomy } from '../../../../../runtime/events/chat/taxonomy.js';
 
 function fail(code, message) {
   const err = new Error(message || code);

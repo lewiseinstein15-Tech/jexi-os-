@@ -58,10 +58,10 @@
  *  - Deterministic: no clock and no randomness on the routing path.
  */
 
-import { taxonomy } from '../../../../events/chat/taxonomy.js';
+import { taxonomy } from '../../../../../runtime/events/chat/taxonomy.js';
 import { rows } from './rows/index.js';
 import { dualPane } from './dual-pane.js';
-import { narration } from '../../../../workforce/narration/index.js';
+import { narration } from '../../../../../agents/workforce/narration/index.js';
 import { modes as modesScope } from './modes.js';
 
 export const SURFACES = ['rows', 'draft', 'dual-pane', 'approval', 'narration'];

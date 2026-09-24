@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Sidebar, { AGENTS_ROUTE } from './Sidebar.jsx';
 import Header from './Header.jsx';
 import Placeholder from '../placeholder/Placeholder.jsx';
-import ChatWindow from '../../../../src/components/ChatWindow.jsx';
+import ChatWindow from '../../../../console/components/ChatWindow.jsx';
 import Settings from '../settings/Settings.jsx';
 import '../settings/settings.css';
 import Graph from '../graph/Graph.jsx';
@@ -15,8 +15,8 @@ import { ROUTES, DEFAULT_ROUTE, TOKENS_HASH, routeFromHash } from './routes.js';
 // .jcx scope while neutralizing the theme's full-screen takeover properties
 // (position/inset/z-index/display) via inline overrides — consumer-side
 // integration only; the view module itself is untouched.
-import AgentsView from '../../../../src/components/console/views/AgentsView.jsx';
-import '../../../../src/styles/jexi-theme.css';
+import AgentsView from '../../../../console/components/console/views/AgentsView.jsx';
+import '../../../../console/styles/jexi-theme.css';
 
 /**
  * Phase 24 app frame. Three-region shell: sidebar (240px) + header + content.

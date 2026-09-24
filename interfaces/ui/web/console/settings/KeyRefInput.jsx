@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { validate, ENV_REF_RE, KEYRING_REF_RE } from '../../../../providers/profiles/schema.js';
+import { validate, ENV_REF_RE, KEYRING_REF_RE } from '../../../../../integrations/providers/profiles/schema.js';
 
 /**
  * Phase 24 Scope C — keyRef input with Phase 27 discipline.
