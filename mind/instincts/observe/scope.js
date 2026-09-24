@@ -8,7 +8,7 @@
  * entry they return (defense in depth).
  */
 import path from 'node:path';
-import { fail } from '../../semantica/_internal.js';
+import { fail } from '../../../services/semantica/_internal.js';
 
 const PROJECT_RE = /^[a-z0-9][a-z0-9-]*$/;
 

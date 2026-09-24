@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { allowed, parse } from './scoping.js';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));

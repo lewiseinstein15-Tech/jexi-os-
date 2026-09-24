@@ -1,6 +1,6 @@
 /** JEXI OS — Phase 30 Scope F — bounded PermissionDenied retry lifecycle. */
-import { SemanticaError } from '../../../semantica/_internal.js';
-import approvals from '../../../ui/web/console/chat/approvals.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
+import approvals from '../../../interfaces/ui/web/console/chat/approvals.js';
 import hooks, { HOOK_CATALOG } from '../hooks/index.js';
 
 const MAX_RETRIES = 1;

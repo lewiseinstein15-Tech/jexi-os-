@@ -11,7 +11,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 /** Bump this timestamp whenever extraction logic changes. */
 export const LINK_EXTRACTOR_VERSION_TS = '2026-09-22T06:00:00Z';

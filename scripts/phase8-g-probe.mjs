@@ -27,8 +27,8 @@ import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { createWorkflow, store } from '../security/pipeline/index.js';
 import { startVulnApp } from '../security/pipeline/fixtures/vuln-app.js';
-import { open as openGraph } from '../knowledge/index.js';
-import { ExploitVerifier } from '../verification/verifiers/index.js';
+import { open as openGraph } from '../mind/knowledge/index.js';
+import { ExploitVerifier } from '../tests/verification/verifiers/index.js';
 import { planDraft } from '../security/engagements/planner.js';
 import { assembleBundle } from '../security/engagements/bundle.js';
 

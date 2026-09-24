@@ -31,7 +31,7 @@ export default {
     { name: 'session', required: false, type: 'string', default: '', description: 'session id (default: the newest journal)' },
   ],
   async handler(args, ctx) {
-    const { run } = await import('../harness/refine/index.js');
+    const { run } = await import('../../harness/refine/index.js');
     const trajectoryId = String(args.session || ctx?.session?.id || '').trim() || undefined;
     try {
       return { ok: true, ...await run(trajectoryId) };

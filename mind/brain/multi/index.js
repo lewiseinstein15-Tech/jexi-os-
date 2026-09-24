@@ -7,7 +7,7 @@
  *   scoped.pages(query);                 // source index selected first
  *   multi.archive(id); multi.recover(id); multi.purge();
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import {
   createSourceRegistry, assertSourceId, assertRecordType, RECORD_TYPES,
 } from './source.js';

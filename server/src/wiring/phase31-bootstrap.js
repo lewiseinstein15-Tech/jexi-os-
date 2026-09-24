@@ -47,27 +47,27 @@ const SERVER_ROOT = path.resolve(HERE, '..', '..');   // server/
 const REPO_ROOT = path.resolve(SERVER_ROOT, '..');    // repo root
 
 /* ---------------- shipped module imports (targets: READ-ONLY) ------------- */
-import { createRepo } from '../../../brain/repo/index.js';
-import { createIndex } from '../../../brain/index/index.js';
-import { createHybridSearch } from '../../../brain/search/index.js';
-import { createHotMemory } from '../../../brain/hot/index.js';
-import { createMemoryProtocol, VERB_NAMES as BRAIN_VERBS } from '../../../brain/protocol/index.js';
-import { graph as semanticaGraph, NODE_KINDS } from '../../../semantica/graph/index.js';
-import { attachObserver, pushObservation, requireActiveObserver, detachObserver } from '../../../instincts/observe/index.js';
-import { createFleet } from '../../../session/fleet/index.js';
-import { PersistentRepl } from '../../../rlm/kernel/index.js';
-import { answerStructuralQuery, answerViaFileRead } from '../../../capability/code/graph-first.js';
-import { VikingFs } from '../../../context/viking/filesystem.js';
-import { createSceneQA } from '../../../verification/visual/scene-qa.js';
-import { createMcpMeta } from '../../../brain/hot/mcp-meta.js';
+import { createRepo } from '../../../mind/brain/repo/index.js';
+import { createIndex } from '../../../mind/brain/index/index.js';
+import { createHybridSearch } from '../../../mind/brain/search/index.js';
+import { createHotMemory } from '../../../mind/brain/hot/index.js';
+import { createMemoryProtocol, VERB_NAMES as BRAIN_VERBS } from '../../../mind/brain/protocol/index.js';
+import { graph as semanticaGraph, NODE_KINDS } from '../../../services/semantica/graph/index.js';
+import { attachObserver, pushObservation, requireActiveObserver, detachObserver } from '../../../mind/instincts/observe/index.js';
+import { createFleet } from '../../../runtime/session/fleet/index.js';
+import { PersistentRepl } from '../../../runtime/rlm/kernel/index.js';
+import { answerStructuralQuery, answerViaFileRead } from '../../../capabilities/graph/code/graph-first.js';
+import { VikingFs } from '../../../runtime/context/viking/filesystem.js';
+import { createSceneQA } from '../../../tests/verification/visual/scene-qa.js';
+import { createMcpMeta } from '../../../mind/brain/hot/mcp-meta.js';
 
 /* ------------- Phase 31 Scope 3 — shipped module imports (READ-ONLY) ------ */
-import { createAutonomous } from '../../../scheduler/autonomous/index.js';
-import { createDreamCycle } from '../../../brain/cycle/index.js';
-import { offload as offloadStore, history as offloadHistory } from '../../../context/offload/index.js';
-import { Gsd } from '../../../workgraph/phases/gsd/index.js';
-import { run as looperRun } from '../../../swarm/loops/looper.js';
-import { run as ralphRun, emitCheckpoint as ralphEmitCheckpoint, registerCheckpointHandler as ralphRegisterCheckpoint } from '../../../swarm/loops/ralph.js';
+import { createAutonomous } from '../../../runtime/scheduler/autonomous/index.js';
+import { createDreamCycle } from '../../../mind/brain/cycle/index.js';
+import { offload as offloadStore, history as offloadHistory } from '../../../runtime/context/offload/index.js';
+import { Gsd } from '../../../runtime/workgraph/phases/gsd/index.js';
+import { run as looperRun } from '../../../agents/swarm/loops/looper.js';
+import { run as ralphRun, emitCheckpoint as ralphEmitCheckpoint, registerCheckpointHandler as ralphRegisterCheckpoint } from '../../../agents/swarm/loops/ralph.js';
 
 /* ------------- Phase 31 Scope 5 — shipped module imports (READ-ONLY) ------ */
 import { gatedDispatch } from '../../../skills/gates/gated-dispatch.js';
@@ -97,7 +97,7 @@ import { assert as assertSkillTools } from '../../../harness/parity/skills/index
 import rules from '../../../harness/parity/rules/index.js';
 
 /* ------------- Phase 31 Scope 19 — shipped module import (READ-ONLY) ------ */
-import { self as jexiSelf } from '../../../brain/self/index.js';
+import { self as jexiSelf } from '../../../mind/brain/self/index.js';
 
 /* ---------------- module state ------------------------------------------- */
 const W31 = [];

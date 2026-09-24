@@ -10,7 +10,7 @@
  * reimplementation. Unknown project -> empty result (declared).
  */
 import fs from 'node:fs';
-import { fail } from '../../semantica/_internal.js';
+import { fail } from '../../../services/semantica/_internal.js';
 import { run, dryRun } from './prune.js';
 import { DEFAULT_TTL, DEFAULT_MIN_CONFIDENCE, resolveOpts, isStale } from './ttl.js';
 
@@ -30,4 +30,4 @@ export function createPruner(root) {
 
 export { run, dryRun } from './prune.js';
 export { DEFAULT_TTL, DEFAULT_MIN_CONFIDENCE, resolveOpts, isStale } from './ttl.js';
-export { SemanticaError } from '../../semantica/_internal.js';
+export { SemanticaError } from '../../../services/semantica/_internal.js';

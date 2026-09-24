@@ -56,7 +56,7 @@ export function extractTokens(css) {
 }
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const THEME = path.join(REPO, 'src', 'styles', 'jexi-theme.css');
+const THEME = path.join(REPO, 'interfaces/console', 'styles', 'jexi-theme.css');
 
 /**
  * Load the brand palette.

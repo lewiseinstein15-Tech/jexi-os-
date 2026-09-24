@@ -11,12 +11,12 @@
  * subsystem call is fail-soft, so the build also works standalone.
  */
 import assert from 'node:assert/strict';
-import { HUD_VERSION, HUD_SCHEMA, TOP_LEVEL_KEYS, emptyPayload } from '../events/hud/schema.js';
-import { validateHud, acceptHudOrThrow, isCompleteHud } from '../events/hud/validator.js';
+import { HUD_VERSION, HUD_SCHEMA, TOP_LEVEL_KEYS, emptyPayload } from '../runtime/events/hud/schema.js';
+import { validateHud, acceptHudOrThrow, isCompleteHud } from '../runtime/events/hud/validator.js';
 import hud, {
   recordToolCall, noteToolPending, noteSpend, noteCheck, noteRisk,
   build, publish, snapshot, onPublish, consume, _resetProducer, _resetConsumer,
-} from '../events/hud/index.js';
+} from '../runtime/events/hud/index.js';
 
 let passed = 0;
 let failed = 0;

@@ -27,7 +27,7 @@
  * E_INVALID_ARGUMENT via SemanticaError (read-only reuse; no new class).
  */
 
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 /**
  * Build an isolated add-context instance with its own op-seq counter.

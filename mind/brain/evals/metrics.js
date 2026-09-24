@@ -1,5 +1,5 @@
 /** JEXI OS — Phase 28 Scope K — deterministic retrieval metrics. */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 function positiveK(k) {
   if (!Number.isInteger(k) || k <= 0) {

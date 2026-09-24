@@ -4,7 +4,7 @@
 
 import path from 'node:path';
 import { execSync } from 'node:child_process';
-import { openGraphStore, probeSqlite } from '../capability/code/graph/store.js';
+import { openGraphStore, probeSqlite } from '../capabilities/graph/code/graph/store.js';
 
 const args = process.argv.slice(2);
 const cmd = args[0];

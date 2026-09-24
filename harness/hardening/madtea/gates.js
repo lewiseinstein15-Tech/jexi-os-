@@ -27,7 +27,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 /** Max bytes of combined output kept per gate. Older discipline: keep evidence, bound memory. */
 export const GATE_OUTPUT_MAX_BYTES = 64 * 1024;

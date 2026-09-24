@@ -2,7 +2,7 @@
  * JEXI OS — Phase 28 Scope F — source-isolated hot-memory recall.
  * `since` is an injected operation sequence, not a timestamp.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { assertFactKind } from './kinds.js';
 
 const bySeqThenId = (a, b) => (a.op_seq - b.op_seq) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);

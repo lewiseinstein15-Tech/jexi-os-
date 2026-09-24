@@ -51,7 +51,7 @@
 
 import { ComputerError } from '../errors.js';
 import { actionNames } from '../action/space.js';
-import { taxonomy } from '../../events/chat/taxonomy.js';
+import { taxonomy } from '../../../runtime/events/chat/taxonomy.js';
 
 // Declared Scope K error codes (ComputerError; E_INVALID_ARGUMENT reused for
 // malformed known-kind input — no new error classes, per house rules).

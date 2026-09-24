@@ -3,7 +3,7 @@
  * Fixed order is a contract. Logical durationMs is phase-reported (default 0),
  * never wall-clock sampled, so equal inputs can be byte-identical.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import lint from './phases/lint.js';
 import backlinks from './phases/backlinks.js';
 import sync from './phases/sync.js';

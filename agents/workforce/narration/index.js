@@ -24,7 +24,7 @@
  *  - Text constructed from ctx fields, no placeholders left
  */
 
-import { taxonomy } from '../../events/chat/taxonomy.js';
+import { taxonomy } from '../../../runtime/events/chat/taxonomy.js';
 import * as acknowledge from './acknowledge.js';
 import * as recon from './recon.js';
 import * as finding from './finding.js';

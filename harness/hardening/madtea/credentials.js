@@ -24,7 +24,7 @@
  *   E_CRED_LEAK           a credential value reached an output surface
  */
 
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 /**
  * Field names that must never carry a value in a madtea props bag.

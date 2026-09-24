@@ -5,8 +5,8 @@
  * Raw output only. Run: node scripts/phase20-scope-d.mjs
  * Exit 0 = all pass, 1 = any fail.
  */
-import looper from '../swarm/loops/looper.js';
-import { SwarmError } from '../swarm/topologies/_internal.js';
+import looper from '../agents/swarm/loops/looper.js';
+import { SwarmError } from '../agents/swarm/topologies/_internal.js';
 
 let failures = 0;
 function verdict(id, ok, msg) {

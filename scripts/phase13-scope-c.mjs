@@ -18,8 +18,8 @@
 import path from 'path';
 import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'node:url';
-import { createNexus, ERRORS } from '../workforce/nexus/index.js';
-import { createRegistry as createAgentRegistry } from '../workforce/agents/index.js';
+import { createNexus, ERRORS } from '../agents/workforce/nexus/index.js';
+import { createRegistry as createAgentRegistry } from '../agents/workforce/agents/index.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pass = 0;

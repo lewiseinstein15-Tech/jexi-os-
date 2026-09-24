@@ -15,7 +15,7 @@
 // dead type.
 
 import { ComputerError } from '../errors.js';
-import { taxonomy } from '../../events/chat/taxonomy.js';
+import { taxonomy } from '../../../runtime/events/chat/taxonomy.js';
 import {
   map,
   EVENT_CODES,

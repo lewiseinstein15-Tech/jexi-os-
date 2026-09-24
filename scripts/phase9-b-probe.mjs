@@ -37,8 +37,8 @@ import {
   ShieldRefusedError,
 } from '../security/shield/ssrf.js';
 import { resolveAndVerify } from '../security/shield/dns-guard.js';
-import { createBroker } from '../intelligence/trust-pipeline/broker.js';
-import { registerUrl } from '../intelligence/trust-pipeline/allowlist.js';
+import { createBroker } from '../mind/intelligence/trust-pipeline/broker.js';
+import { registerUrl } from '../mind/intelligence/trust-pipeline/allowlist.js';
 
 const UA = 'jexi-os-phase9-b-probe/1.0';
 

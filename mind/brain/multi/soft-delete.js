@@ -1,5 +1,5 @@
 /** JEXI OS — Phase 28 Scope J — injected-time 72-hour archive lifecycle. */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 export const RECOVERY_WINDOW_MS = 72 * 60 * 60 * 1000;
 export const PURGE_REASON = 'archive recovery window expired';

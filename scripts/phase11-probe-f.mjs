@@ -18,10 +18,10 @@
 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { read } from '../capability/internet/reach/core.js';
-import { ReachConfig } from '../capability/internet/reach/config.js';
-import { getChannel } from '../capability/internet/reach/channels/index.js';
-import { Channel } from '../capability/internet/reach/channels/base.channel.js';
+import { read } from '../capabilities/graph/internet/reach/core.js';
+import { ReachConfig } from '../capabilities/graph/internet/reach/config.js';
+import { getChannel } from '../capabilities/graph/internet/reach/channels/index.js';
+import { Channel } from '../capabilities/graph/internet/reach/channels/base.channel.js';
 
 let pass = 0, fail = 0;
 function ok(cond, label) {

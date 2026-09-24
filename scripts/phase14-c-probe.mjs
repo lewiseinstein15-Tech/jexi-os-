@@ -2,8 +2,8 @@
  * JEXI OS — Phase 14 Scope C — live probe for the decision log.
  * Run: node scripts/phase14-c-probe.mjs
  */
-import { decisions, SemanticaError } from '../semantica/decisions/index.js';
-import { prov } from '../semantica/provenance/index.js';
+import { decisions, SemanticaError } from '../services/semantica/decisions/index.js';
+import { prov } from '../services/semantica/provenance/index.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, label) => { if (cond) { pass += 1; console.log(`PASS ${label}`); } else { fail += 1; console.log(`FAIL ${label}`); } };

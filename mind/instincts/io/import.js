@@ -23,7 +23,7 @@
  * provenance. Persistence goes through Scope C's save() — no
  * reimplementation.
  */
-import { fail } from '../../semantica/_internal.js';
+import { fail } from '../../../services/semantica/_internal.js';
 import { assertProjectId } from '../observe/scope.js';
 import { nextOp } from '../observe/queue.js';
 import { save, get } from '../store/store.js';

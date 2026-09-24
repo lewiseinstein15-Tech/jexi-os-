@@ -6,7 +6,7 @@
  * exhaustive). Kind determines directory; unknown kinds are refused
  * E_UNKNOWN_KIND (never auto-created).
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 /** Declared page kinds -> directory names. Frozen; additions are a schema change. */
 export const KIND_DIRS = Object.freeze({

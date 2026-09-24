@@ -7,12 +7,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { ALL_CHANNELS } from '../capability/internet/reach/channels/index.js';
-import { WebChannel, AntibotDetectedError } from '../capability/internet/reach/channels/web.channel.js';
-import { Channel } from '../capability/internet/reach/channels/base.channel.js';
-import { ReachConfig } from '../capability/internet/reach/config.js';
-import { read } from '../capability/internet/reach/core.js';
-import { checkAll, formatReport } from '../capability/internet/reach/doctor.js';
+import { ALL_CHANNELS } from '../capabilities/graph/internet/reach/channels/index.js';
+import { WebChannel, AntibotDetectedError } from '../capabilities/graph/internet/reach/channels/web.channel.js';
+import { Channel } from '../capabilities/graph/internet/reach/channels/base.channel.js';
+import { ReachConfig } from '../capabilities/graph/internet/reach/config.js';
+import { read } from '../capabilities/graph/internet/reach/core.js';
+import { checkAll, formatReport } from '../capabilities/graph/internet/reach/doctor.js';
 
 const ok = (cond, label) => console.log(`${cond ? '✅' : '❌'} ${label}`);
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
@@ -55,7 +55,7 @@ ok(c4.status === 'ok' && web.active_backend === 'Jina Reader', 'real probe succe
 
 // ═══ P5 — doctor (real, CLI) ═══
 console.log('\n════ P5 — doctor --json (CLI, real) ════');
-const out5 = execFileSync(process.execPath, [path.join(ROOT, 'capability/internet/reach/doctor.js'), '--json'], { encoding: 'utf8' });
+const out5 = execFileSync(process.execPath, [path.join(ROOT, 'capabilities/graph/internet/reach/doctor.js'), '--json'], { encoding: 'utf8' });
 console.log(out5.trim());
 
 // ═══ P6 — anti-bot detection (injected page — labeled) ═══

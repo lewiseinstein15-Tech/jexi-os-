@@ -4,10 +4,10 @@ import { once } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createSubagents } from '../workforce/subagent/index.js';
+import { createSubagents } from '../agents/workforce/subagent/index.js';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'p10f-'));
-const moduleUrl = new URL('../workforce/subagent/index.js', import.meta.url).href;
+const moduleUrl = new URL('../agents/workforce/subagent/index.js', import.meta.url).href;
 let passed = 0;
 let child;
 let now = Date.parse('2026-09-20T10:00:00.000Z');

@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createRepo } from '../brain/repo/index.js';
+import { createRepo } from '../mind/brain/repo/index.js';
 
 let pass = 0, fail = 0;
 const ok = (c, label, extra = '') => {

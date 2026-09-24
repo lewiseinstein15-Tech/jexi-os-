@@ -19,8 +19,8 @@ import { DualNetworkRuntime, dockerAvailable, DockerUnavailableError, RUNTIME_VE
 import { AuditLog } from './audit.js';
 import { ExecBridgeClient, BRIDGE_ENDPOINT, buildHttpRequest } from './exec-bridge.js';
 import { NETWORKS, JEXI_NET, SANDBOX_NET, ISOLATION_SPEC, DOCKER_VS_PROCESS, getNetwork, membersOf, isCrossNetwork } from './networks.js';
-import { createExecBridge } from '../../security/exec-bridge/index.js';
-import { MAX_FILE_BYTES } from '../../security/exec-bridge/allowlist.js';
+import { createExecBridge } from '../../../security/exec-bridge/index.js';
+import { MAX_FILE_BYTES } from '../../../security/exec-bridge/allowlist.js';
 
 export {
   DualNetworkRuntime, dockerAvailable, DockerUnavailableError, RUNTIME_VERSION,

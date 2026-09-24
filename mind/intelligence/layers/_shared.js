@@ -27,7 +27,7 @@ import { getRegistration } from '../trust-pipeline/registered-urls.js';
 import {
   attach,
   assertAll,
-} from '../../events/provenance/label.js';
+} from '../../../runtime/events/provenance/label.js';
 
 /* ------------------------------------------------------------------ */
 /* layer errors                                                        */

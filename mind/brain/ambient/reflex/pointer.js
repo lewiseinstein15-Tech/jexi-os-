@@ -5,7 +5,7 @@
  * catalog entries, applies the judgment gate + world visibility, and emits a
  * compact pointer. The entire point() path is fail-open: any error -> [].
  */
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../../services/semantica/_internal.js';
 import { extract as extractEdges } from '../../kg/index.js';
 import {
   DEFAULT_MAX_POINTERS, POINTER_INSTRUCTION, shouldPoint,

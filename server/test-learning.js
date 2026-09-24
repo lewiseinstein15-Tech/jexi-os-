@@ -13,16 +13,16 @@ process.env.JEXI_HOME = path.join(tmp, 'jexi-home');  // fake global home
 
 const {
   createInstinct, computeConfidence, instinctId, validateInstinct, INSTINCT_TYPES,
-} = await import('../learning/instinct.js');
+} = await import('../mind/learning/instinct.js');
 const {
   projectStorePath, globalStorePath, readRecords, foldStore, recordCandidate, listInstincts, appendRecord,
-} = await import('../learning/store.js');
+} = await import('../mind/learning/store.js');
 const { observePreToolUse, observePostToolUse, readJournal, listSessions } =
-  await import('../learning/observer.js');
+  await import('../mind/learning/observer.js');
 const { extractFromJournal, analyzeSession, analyzeAllSessions, wasAnalyzed, meetsPromotionCriteria } =
-  await import('../learning/analyzer.js');
-const { promoteQualified } = await import('../learning/promoter.js');
-const { recallForTask, instinctsSection } = await import('../learning/index.js');
+  await import('../mind/learning/analyzer.js');
+const { promoteQualified } = await import('../mind/learning/promoter.js');
+const { recallForTask, instinctsSection } = await import('../mind/learning/index.js');
 
 let passed = 0, failed = 0;
 function check(name, ok) {

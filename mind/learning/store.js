@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { createInstinct, sightInstinct, validateInstinct } from './instinct.js';
 
 /** Repo root = parent of this learning/ directory. */
-export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 export function projectLearningRoot(repoRoot = REPO_ROOT) {
   return path.join(repoRoot, '.jexi', 'learning');

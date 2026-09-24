@@ -5,7 +5,7 @@
  *   { name, available() -> boolean, rank(query, results, context) -> Promise<results[]> }
  * No backend is allowed to fabricate scores. The default backend is noop.
  */
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../../services/semantica/_internal.js';
 
 export const DEFAULT_RERANK_TOP_K = 20;
 export const TOKENMAX_MODE = 'tokenmax';

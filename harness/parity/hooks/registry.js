@@ -1,6 +1,6 @@
 /** JEXI OS — Phase 30 Scope A — hook lookup, Phase 7 mapping and validation. */
 import fs from 'node:fs';
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { HOOK_CATALOG, HOOK_EVENT_COUNT } from './catalog.js';
 import { HOOK_RETURNS, makeContract, validateHookSpec } from './contract.js';
 

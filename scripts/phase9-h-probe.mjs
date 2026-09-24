@@ -39,9 +39,9 @@ const EXAMPLE_COM = 'https://example.com';
 const URL_A = `file://${PAGE_A}`;
 const URL_B = `file://${PAGE_B}`;
 
-const { createRunner, detectBrowser } = await import('../verification/visual/puppeteer-runner.js');
-const { compare, decodePng } = await import('../verification/visual/screenshot-diff.js');
-const { createSceneQA, SCENE_SPEC_EXAMPLE } = await import('../verification/visual/scene-qa.js');
+const { createRunner, detectBrowser } = await import('../tests/verification/visual/puppeteer-runner.js');
+const { compare, decodePng } = await import('../tests/verification/visual/screenshot-diff.js');
+const { createSceneQA, SCENE_SPEC_EXAMPLE } = await import('../tests/verification/visual/scene-qa.js');
 
 let pass = 0;
 let fail = 0;

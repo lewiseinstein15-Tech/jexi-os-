@@ -17,7 +17,7 @@
  *   -> deterministic: the same member set always yields the same id.
  */
 import crypto from 'node:crypto';
-import { fail } from '../../semantica/_internal.js';
+import { fail } from '../../../services/semantica/_internal.js';
 import { assertProjectId } from '../observe/scope.js';
 import { list } from '../store/query.js';
 

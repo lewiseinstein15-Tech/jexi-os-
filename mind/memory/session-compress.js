@@ -31,7 +31,7 @@ export const COMPRESSION_MODE = 'rule-based';
 export const LLM_COMPRESSION_LABEL = 'rule-based - LLM compression NOT VERIFIED';
 export const CHARS_PER_TOKEN_ESTIMATE = 4;
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 export function storeDir() {
   return process.env.JEXI_SESSION_MEM_DIR || path.join(REPO_ROOT, '.jexi', 'session-mem');

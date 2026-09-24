@@ -2,7 +2,7 @@
  * JEXI OS — Phase 28 Scope H — frozen protocol error contract.
  * Reuses SemanticaError; this scope introduces no error class.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 export const ERROR_CODES = Object.freeze([
   'E_INVALID_ARGUMENT',

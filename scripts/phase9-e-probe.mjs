@@ -12,8 +12,8 @@
  * scratch/ (never committed).
  */
 
-import { createCaps } from '../providers/cost/caps.js';
-import { createTracker } from '../providers/cost/tracker.js';
+import { createCaps } from '../integrations/providers/cost/caps.js';
+import { createTracker } from '../integrations/providers/cost/tracker.js';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';

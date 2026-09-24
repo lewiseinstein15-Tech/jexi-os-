@@ -22,10 +22,10 @@ import os from 'os';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'node:url';
-import { createTrust } from '../workforce/trust/index.js';
-import { scoreOf, weightOf } from '../workforce/trust/scoring.js';
-import { StrategyError } from '../workforce/nexus/strategy.js';
-import { createRegistry as createAgentRegistry } from '../workforce/agents/index.js';
+import { createTrust } from '../agents/workforce/trust/index.js';
+import { scoreOf, weightOf } from '../agents/workforce/trust/scoring.js';
+import { StrategyError } from '../agents/workforce/nexus/strategy.js';
+import { createRegistry as createAgentRegistry } from '../agents/workforce/agents/index.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pass = 0;

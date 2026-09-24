@@ -10,7 +10,7 @@
  * Tokenizer parity: reuses Phase 19 B's tokenizer (read-only consumption of
  * the surfsense public API) so keyword and vector paths agree on terms.
  */
-import { tokenize } from '../../surfsense/connectors/local-search.js';
+import { tokenize } from '../../../services/surfsense/connectors/local-search.js';
 
 /** Bump this timestamp whenever chunking logic changes. */
 export const CHUNKER_VERSION = '2026-09-22T05:00:00Z';

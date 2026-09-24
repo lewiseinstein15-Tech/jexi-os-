@@ -21,7 +21,7 @@
  * an agent. "I found…" not "the search agent found…".
  * Error class: SemanticaError (reused).
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { classify } from './composer.js';
 
 const fail = (code, message, details = {}) => Object.assign(new SemanticaError(code, message), details);

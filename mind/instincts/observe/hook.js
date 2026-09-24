@@ -12,7 +12,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { fail, assertNonEmptyString } from '../../semantica/_internal.js';
+import { fail, assertNonEmptyString } from '../../../services/semantica/_internal.js';
 import { assertProjectId } from './scope.js';
 
 const observersFile = (root) => path.join(root, 'observers.json');

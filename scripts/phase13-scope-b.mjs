@@ -20,8 +20,8 @@ import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'node:url';
-import { createDivisionRegistry, ERRORS } from '../workforce/divisions/index.js';
-import { createRegistry as createAgentRegistry } from '../workforce/agents/index.js';
+import { createDivisionRegistry, ERRORS } from '../agents/workforce/divisions/index.js';
+import { createRegistry as createAgentRegistry } from '../agents/workforce/agents/index.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pass = 0;

@@ -22,7 +22,7 @@
 
 import path from 'node:path';
 import { createSelfEvolve } from '../../../harness/parity/self-evolve/evolve.js';
-import { decisions } from '../../../semantica/decisions/index.js';
+import { decisions } from '../../../services/semantica/decisions/index.js';
 
 const state = { mounted: null };
 

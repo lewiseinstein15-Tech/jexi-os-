@@ -9,7 +9,7 @@
  * Evidence is the frontmatter field itself. Deterministic order:
  * field order founded, investors, key_people, attendees; names sorted.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { assertVerb } from './verb-inference.js';
 
 const FIELD_MAP = Object.freeze([

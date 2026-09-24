@@ -77,7 +77,7 @@ console.log('\n== 2b. \\( \\) and \\[ \\] become renderable math ==');
 /* ══════════════ 2c. CLIENT PREPROCESSOR (B176 — the root fix) ══════════════ */
 console.log('\n== 2c. client-side preprocessor (every render path) ==');
 {
-  const { preprocessMath } = await import(path.join(ROOT, 'src/utils/mathPreprocess.js'));
+  const { preprocessMath } = await import(path.join(ROOT, 'interfaces/console/utils/mathPreprocess.js'));
   const cases = [
     ['\\( \\frac{d}{dx}(x^n) = n \\cdot x^{n-1} \\', 'pair dialect → $'],
     ["The derivative \\( f'(x) = 3 + 10x \\) is linear", 'inline pair in prose'],
@@ -101,9 +101,9 @@ console.log('\n== 2c. client-side preprocessor (every render path) ==');
   ok('plain text untouched', preprocessMath('plain answer 42') === 'plain answer 42');
   ok('$ dialect passes through untouched', preprocessMath('$\\sum_{i=1}^{n} i$ fine') === '$\\sum_{i=1}^{n} i$ fine');
   ok('odd-$ balance guard drops the stray dollar', ((preprocessMath('5\$ and \\(x^2\\)').match(/(?<!\$)\$(?!\$)/g) || []).length % 2) === 0);
-  const mr = fs.readFileSync(path.join(ROOT, 'src/components/MarkdownRenderer.jsx'), 'utf-8');
+  const mr = fs.readFileSync(path.join(ROOT, 'interfaces/console/components/MarkdownRenderer.jsx'), 'utf-8');
   ok('MarkdownRenderer preprocesses EVERY message before parsing', mr.includes('preprocessMath(content') && mr.includes('useMemo(() => preprocessMath'));
-  const css = fs.readFileSync(path.join(ROOT, 'src/index.css'), 'utf-8');
+  const css = fs.readFileSync(path.join(ROOT, 'interfaces/console/index.css'), 'utf-8');
   ok('katex dark-UI styling (centered display, mobile overflow-safe)', css.includes('.katex-display') && css.includes('overflow-x: auto'));
 }
 
@@ -114,9 +114,9 @@ console.log('\n== 3. wiring ==');
   ok('chat route buffers stream deltas (B174)', idx.includes('mathStream.push(data.text)') && idx.includes('createMathStreamBuffer'));
   ok('held tail flushed before done', idx.includes('mathStream.flush()'));
   ok('empty safe deltas are skipped (no dead events)', idx.includes('if (!safe) return;'));
-  const tw = fs.readFileSync(path.join(ROOT, 'src/hooks/useTypewriter.js'), 'utf-8');
+  const tw = fs.readFileSync(path.join(ROOT, 'interfaces/console/hooks/useTypewriter.js'), 'utf-8');
   ok('typewriter reveals whole LINES (never slices a formula)', tw.includes('lineEnds') && tw.includes('LINE-CHUNKED'));
-  const mr = fs.readFileSync(path.join(ROOT, 'src/components/MarkdownRenderer.jsx'), 'utf-8');
+  const mr = fs.readFileSync(path.join(ROOT, 'interfaces/console/components/MarkdownRenderer.jsx'), 'utf-8');
   ok('KaTeX forgiving + soft error color', mr.includes("strict: 'ignore'") && mr.includes('errorColor'));
 }
 

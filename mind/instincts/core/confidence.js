@@ -17,7 +17,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { fail } from '../../semantica/_internal.js';
+import { fail } from '../../../services/semantica/_internal.js';
 import { projectDir } from '../observe/scope.js';
 import { nextOp } from '../observe/queue.js';
 import { normalizeEvidence } from './schema.js';

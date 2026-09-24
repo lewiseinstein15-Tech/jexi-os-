@@ -3,7 +3,7 @@
  * No clocks. Visibility lanes are separate so a world cursor cannot consume
  * private changes before an opted-in caller asks for them.
  */
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../../services/semantica/_internal.js';
 
 const TYPE_ORDER = Object.freeze({ page: 0, fact: 1, thread: 2 });
 const clone = (value) => JSON.parse(JSON.stringify(value));

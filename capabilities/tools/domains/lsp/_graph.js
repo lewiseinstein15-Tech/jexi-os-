@@ -5,8 +5,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openGraphStore } from '../../../capability/code/graph/store.js';
-import { isIndexableSource } from '../../../capability/code/graph/pipeline/tree-sitter.js';
+import { openGraphStore } from '../../../graph/code/graph/store.js';
+import { isIndexableSource } from '../../../graph/code/graph/pipeline/tree-sitter.js';
 
 const REPO_ROOT = path.resolve(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..'));
 

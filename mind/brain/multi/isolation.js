@@ -3,7 +3,7 @@
  * The source partition is selected before index lookup; this module never
  * accepts a conflicting source and never relies on post-filtering results.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { assertSourceId } from './source.js';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));

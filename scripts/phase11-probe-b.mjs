@@ -3,11 +3,11 @@
 // registerCbmTools → real ToolRegistry → makeExecutor (schema → permission →
 // risk → engine) — the same pipeline runToolCalls/domainDispatch use.
 
-import { registerCbmTools, CBM_TOOL_NAMES, allRegistered } from '../tools/domains/lsp/index.js';
+import { registerCbmTools, CBM_TOOL_NAMES, allRegistered } from '../capabilities/tools/domains/lsp/index.js';
 import { registerAllDomains } from '../server/src/tools/domains/index.js';
 import { makeExecutor } from '../server/src/tools/index.js';
 import { hasTool, getTool, validateCall } from '../server/src/tools/registry/ToolRegistry.js';
-import { closeStore } from '../tools/domains/lsp/_graph.js';
+import { closeStore } from '../capabilities/tools/domains/lsp/_graph.js';
 
 const argc = process.argv.slice(2);
 const ONLY = argc[0] || null;
@@ -22,7 +22,7 @@ for (const name of CBM_TOOL_NAMES) {
   const d = getTool(name);
   console.log(`  ${hasTool(name) ? '✅' : '❌'} ${name} | risk=${d?.riskLevel} | params=${Object.keys(d?.parameters?.properties || {}).join(',') || '∅'}`);
 }
-const regLine = (await import('node:fs')).readFileSync(new URL('../tools/domains/lsp/index.js', import.meta.url), 'utf8')
+const regLine = (await import('node:fs')).readFileSync(new URL('../capabilities/tools/domains/lsp/index.js', import.meta.url), 'utf8')
   .split('\n').findIndex((l) => l.includes('registerToolBatch(defs)')) + 1;
 console.log(`registration file:line → tools/domains/lsp/index.js:${regLine} (registerToolBatch(defs))`);
 

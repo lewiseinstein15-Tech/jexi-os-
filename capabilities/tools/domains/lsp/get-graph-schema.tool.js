@@ -1,8 +1,8 @@
 // CBM tool — get-graph-schema: node/edge schema, counts, relationship patterns.
 import { defineTool } from '../../../server/src/tools/interface/ToolDefinition.js';
 import { getStore } from './_graph.js';
-import { NODE_LABELS } from '../../../capability/code/graph/nodes/index.js';
-import { EDGE_TYPES } from '../../../capability/code/graph/edges/index.js';
+import { NODE_LABELS } from '../../../graph/code/graph/nodes/index.js';
+import { EDGE_TYPES } from '../../../graph/code/graph/edges/index.js';
 
 export const def = defineTool({
   name: 'get-graph-schema',

@@ -3,7 +3,7 @@
  * Run: node scripts/phase15-c-probe.mjs
  */
 import fs from 'node:fs';
-import { createCouncil } from '../omnia/council/index.js';
+import { createCouncil } from '../services/omnia/council/index.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, label) => { if (cond) { pass += 1; console.log('PASS ' + label); } else { fail += 1; console.log('FAIL ' + label); } };

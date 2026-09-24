@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Phase 16 Scope C — Row Taxonomy Renderer probe
-import { rows } from '../ui/web/console/chat/rows/index.js';
-import { taxonomy } from '../events/chat/taxonomy.js';
+import { rows } from '../interfaces/ui/web/console/chat/rows/index.js';
+import { taxonomy } from '../runtime/events/chat/taxonomy.js';
 
 let pass = 0, fail = 0;
 const ok = (c, msg) => { c ? pass++ : fail++; console.log(`  ${c ? '✅' : '❌'} ${msg}`); };

@@ -11,9 +11,9 @@ import { deflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-import { capture, optimize, diff } from '../computer/screenshot/index.js';
-import { ComputerError } from '../computer/errors.js';
-import { normalize, NORMALIZE_FORMULA } from '../computer/action/coordinate.js';
+import { capture, optimize, diff } from '../services/computer/screenshot/index.js';
+import { ComputerError } from '../services/computer/errors.js';
+import { normalize, NORMALIZE_FORMULA } from '../services/computer/action/coordinate.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

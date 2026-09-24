@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const FILE = path.join(ROOT, 'ui/preview/agents-view.html');
+const FILE = path.join(ROOT, 'interfaces/ui/preview/agents-view.html');
 
 let pass = 0, fail = 0;
 const ok = (c, msg) => { c ? pass++ : fail++; console.log(`  ${c ? '✅' : '❌'} ${msg}`); };
@@ -19,7 +19,7 @@ console.log('\n════ P1 — File exists, ls -la ui/preview/agents-view.ht
   try {
     const stat = fs.statSync(FILE);
     console.log(`  exists: true, size=${stat.size} bytes, mtime=${stat.mtime.toISOString()}`);
-    const ls = fs.readdirSync(path.join(ROOT, 'ui/preview'));
+    const ls = fs.readdirSync(path.join(ROOT, 'interfaces/ui/preview'));
     console.log(`  ui/preview/ contents: ${ls.join(', ')}`);
     ok(stat.size > 1000, `P1 file exists ${stat.size} bytes >1000`);
   } catch (e) {
@@ -55,7 +55,7 @@ console.log('\n════ P3 — Theme tokens present, grep #0c0b09, #ff7a3d, 
     ok(matches, `P3 token ${t} present`);
   }
   // Also check verbatim inlined from src/styles/jexi-theme.css
-  const themeFile = fs.readFileSync(path.join(ROOT, 'src/styles/jexi-theme.css'), 'utf8');
+  const themeFile = fs.readFileSync(path.join(ROOT, 'interfaces/console/styles/jexi-theme.css'), 'utf8');
   const snippet = themeFile.slice(0, 200);
   console.log(`  theme file snippet: ${snippet.slice(0,100)}...`);
   ok(content.includes('--jcx-bg:#0c0b09'), 'P3 verbatim --jcx-bg token');
@@ -183,7 +183,7 @@ console.log('\n════ P10 — Zero non-zone files touched, git status --sh
     const lines = status.split('\n').filter(Boolean);
     console.log(`  lines: ${lines.length}`);
     for (const l of lines) console.log(`    ${l}`);
-    const allowedPrefixes = ['ui/preview/agents-view.html', 'scripts/phase10'];
+    const allowedPrefixes = ['interfaces/ui/preview/agents-view.html', 'scripts/phase10'];
     const disallowed = lines.filter(l => {
       const file = l.slice(3).trim();
       return !allowedPrefixes.some(p => file.startsWith(p));

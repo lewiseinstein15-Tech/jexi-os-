@@ -38,7 +38,7 @@ import {
 } from '../../server/src/tools/registry/ToolRegistry.js';
 import { TOOL_REGISTRY as ENGINE_CATALOG } from '../../server/src/services/ToolRegistry.js';
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 /**
  * The registry is seeded from the engine catalog exactly once per process,

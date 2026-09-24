@@ -40,10 +40,10 @@ const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url)); // server/src/k
 function locateHooksRoot() {
   const candidates = [];
   const cwd = process.cwd();
-  candidates.push(path.join(cwd, 'hooks'));
+  candidates.push(path.join(cwd, 'infra/hooks'));
   let parent = path.dirname(cwd);
-  for (let i = 0; i < 3; i++) { candidates.push(path.join(parent, 'hooks')); parent = path.dirname(parent); }
-  candidates.push(path.resolve(MODULE_DIR, '..', '..', '..', '..', 'hooks'));
+  for (let i = 0; i < 3; i++) { candidates.push(path.join(parent, 'infra/hooks')); parent = path.dirname(parent); }
+  candidates.push(path.resolve(MODULE_DIR, '..', '..', '..', '..', 'infra/hooks'));
   for (const c of candidates) {
     if (fs.existsSync(path.join(c, 'hooks.json'))) return c;
   }

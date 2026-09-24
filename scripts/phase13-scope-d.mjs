@@ -26,8 +26,8 @@ import { execFileSync } from 'node:child_process';
 import {
   createIdentityGraph, toDid, isDid, parseDid, agentIdFromDid, DID_PREFIX,
   resolveName, duplicateNames, duplicateReport, seedFromRoster,
-} from '../workforce/identity/index.js';
-import { createRegistry } from '../workforce/agents/index.js';
+} from '../agents/workforce/identity/index.js';
+import { createRegistry } from '../agents/workforce/agents/index.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pass = 0;

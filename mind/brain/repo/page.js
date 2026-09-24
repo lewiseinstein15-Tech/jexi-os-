@@ -5,7 +5,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { kindDir, pagePath } from './layout.js';
 import { makePage, serialize, parse } from './schema.js';
 import { appendEntry } from './timeline.js';

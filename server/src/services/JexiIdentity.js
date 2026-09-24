@@ -25,7 +25,7 @@
 import { AGENT_ROSTER, SKILL_REGISTRY, ROSTER_COUNT, SKILL_COUNT } from '../workforce/registry/index.js';
 import { TOOL_REGISTRY } from './ToolRegistry.js';
 import { classifyRisk } from './RiskGuard.js';
-import { facts as selfFacts, identityBlock as selfIdentityBlock } from '../../../brain/self/index.js'; // Phase 31 Scope 19 — canonical self (brain/self/core.md)
+import { facts as selfFacts, identityBlock as selfIdentityBlock } from '../../../mind/brain/self/index.js'; // Phase 31 Scope 19 — canonical self (brain/self/core.md)
 
 /**
  * The immutable facts — READ from brain/self/core.md (Phase 31 Scope 19).

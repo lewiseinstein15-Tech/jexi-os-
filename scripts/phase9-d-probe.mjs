@@ -32,8 +32,8 @@ import {
   MintRefusedError,
   MAX_TTL_MS,
   DEFAULT_SCOPES,
-} from '../providers/tokens/ephemeral.js';
-import { mintRealtimeSession } from '../providers/tokens/realtime.js';
+} from '../integrations/providers/tokens/ephemeral.js';
+import { mintRealtimeSession } from '../integrations/providers/tokens/realtime.js';
 
 const SUB = process.argv[2] || 'usage';
 

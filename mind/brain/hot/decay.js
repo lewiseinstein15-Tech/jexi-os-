@@ -8,7 +8,7 @@
  *   score = confidence * exp(-ageDays / halflifeDays), clamped [0,1].
  * `nowDay` and fact.created_day are injected integer day-sequences. No clock.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { assertFactKind } from './kinds.js';
 
 export const HALFLIFE_DAYS = Object.freeze({

@@ -10,12 +10,12 @@ import { pathToFileURL } from 'node:url';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-import { tools, render, budget, select, defaultCatalog, renderToolText, TOOL_BUDGET_RATIO, PER_TOOL_WARNING_RATIO } from '../prompt/tools/index.js';
+import { tools, render, budget, select, defaultCatalog, renderToolText, TOOL_BUDGET_RATIO, PER_TOOL_WARNING_RATIO } from '../capabilities/prompts/tools/index.js';
 import { listTools } from '../server/src/tools/registry/ToolRegistry.js';
-import { PromptError, isPromptError } from '../prompt/assembly/errors.js';
-import { createSectionRegistry } from '../prompt/assembly/registry.js';
-import { CANONICAL_SECTIONS, registerCanonical } from '../prompt/assembly/order.js';
-import { compute as computeBoundary } from '../prompt/assembly/boundary.js';
+import { PromptError, isPromptError } from '../capabilities/prompts/assembly/errors.js';
+import { createSectionRegistry } from '../capabilities/prompts/assembly/registry.js';
+import { CANONICAL_SECTIONS, registerCanonical } from '../capabilities/prompts/assembly/order.js';
+import { compute as computeBoundary } from '../capabilities/prompts/assembly/boundary.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -245,7 +245,7 @@ import { registerFilesystemTools } from '${pathToFileURL(path.join(WT, 'server/s
 import { registerTerminalTools } from '${pathToFileURL(path.join(WT, 'server/src/tools/domains/terminal/index.js')).href}';
 import { registerGitTools } from '${pathToFileURL(path.join(WT, 'server/src/tools/domains/git/index.js')).href}';
 import { listTools } from '${pathToFileURL(path.join(WT, 'server/src/tools/registry/ToolRegistry.js')).href}';
-import { render, createToolCatalog, loadToolRegistry } from '${pathToFileURL(path.join(WT, 'prompt/tools/index.js')).href}';
+import { render, createToolCatalog, loadToolRegistry } from '${pathToFileURL(path.join(WT, 'capabilities/prompts/tools/index.js')).href}';
 registerFilesystemTools();
 registerTerminalTools();
 registerGitTools();

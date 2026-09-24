@@ -12,8 +12,8 @@
  *   4. best-effort REAL network fetch through the default pinned transport
  *      (honest NOT VERIFIED if the sandbox has no egress to the host)
  */
-import { createBroker } from '../intelligence/trust-pipeline/broker.js';
-import { wrapBroker } from '../events/provenance/label.js';
+import { createBroker } from '../mind/intelligence/trust-pipeline/broker.js';
+import { wrapBroker } from '../runtime/events/provenance/label.js';
 
 let fails = 0; let checks = 0; let notVerified = 0;
 const check = (label, cond, detail = '') => {

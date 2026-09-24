@@ -13,7 +13,7 @@
  * Defaults: mode='balanced' (OFF), backend='noop'. External failures are
  * fail-open; E_RERANK_BUDGET is an intentional pre-call refusal and propagates.
  */
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../../services/semantica/_internal.js';
 import {
   DEFAULT_RERANK_TOP_K, assertRankInput, assertBackend, rerankEnabled,
 } from './interface.js';

@@ -8,7 +8,7 @@
  * E_PROVIDER_UNAVAILABLE; it NEVER falls back silently and NEVER fakes
  * vectors (the caller chooses the rule-based backend explicitly).
  */
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../../services/semantica/_internal.js';
 
 export const NAME = 'provider';
 

@@ -104,7 +104,7 @@ registerSource('instincts', {
   priority: 22, weight: 2, order: 4,
   produce: async (input) => {
     try {
-      const learning = await import('../../../../learning/index.js');
+      const learning = await import('../../../../mind/learning/index.js');
       return await learning.instinctsSection(input);
     } catch {
       return '';

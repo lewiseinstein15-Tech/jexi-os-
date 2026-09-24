@@ -6,7 +6,7 @@
  * There is deliberately NO update/delete API — corrections are new entries.
  * Ordering is (when asc, seq asc): deterministic even for equal timestamps.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 /** Validate one entry; returns the canonical { when, entry, seq }. */
 export function makeEntry({ entry, when, seq }) {

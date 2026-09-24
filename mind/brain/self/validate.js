@@ -12,7 +12,7 @@
  * The composer catches either and falls back to the deterministic formal voice.
  * Pure function: validate(answer, facts, { topic }) -> { ok, reason?, code? }.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 const fail = (code, message) => new SemanticaError(code, message);
 

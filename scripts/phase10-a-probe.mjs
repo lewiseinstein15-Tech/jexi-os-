@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { PersistentRepl, ContextVariable } from '../rlm/kernel/index.js';
+import { PersistentRepl, ContextVariable } from '../runtime/rlm/kernel/index.js';
 let passed = 0;
 function check(name, fn) { fn(); console.log(`PASS ${++passed}: ${name}`); }
 const repl = new PersistentRepl();
@@ -19,7 +19,7 @@ const snapshot = JSON.parse(JSON.stringify(repl.snapshot()));
 const restored = PersistentRepl.restore(snapshot);
 check('snapshot/restore lexical + slots', () => { assert.equal(restored.eval('x + count').result, 7); assert.equal(restored.eval("context.get('task')").result, 'build'); });
 check('restore in a NEW Node process', () => {
-  const moduleUrl = new URL('../rlm/kernel/index.js', import.meta.url).href;
+  const moduleUrl = new URL('../runtime/rlm/kernel/index.js', import.meta.url).href;
   const child = spawnSync(process.execPath, ['--input-type=module', '-e', `import {PersistentRepl} from ${JSON.stringify(moduleUrl)}; import fs from 'node:fs'; const r=PersistentRepl.restore(JSON.parse(fs.readFileSync(0,'utf8'))); console.log(JSON.stringify([r.eval('x + count').result,r.eval("context.get('task')").result]));`], { input: JSON.stringify(snapshot), encoding: 'utf8' });
   assert.equal(child.status, 0, child.stderr); assert.deepEqual(JSON.parse(child.stdout), [7, 'build']);
 });

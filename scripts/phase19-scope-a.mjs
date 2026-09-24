@@ -6,8 +6,8 @@
  * line is computed from real calls against surfsense/connectors.
  */
 import { execSync } from 'node:child_process';
-import registry from '../surfsense/connectors/index.js';
-import { assertConnector } from '../surfsense/connectors/_connector.js';
+import registry from '../services/surfsense/connectors/index.js';
+import { assertConnector } from '../services/surfsense/connectors/_connector.js';
 
 const results = [];
 function check(pid, label, pass, detail) {

@@ -3,7 +3,7 @@
  *
  * EXACTLY five kinds. Changing this list or its meaning is a semantic change.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 export const FACT_KINDS = Object.freeze([
   'event',

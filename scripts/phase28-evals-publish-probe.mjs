@@ -2,11 +2,11 @@
 /** Live probe — Phase 28 Scope K: BrainBench retrieval evals + static publish. */
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRepo } from '../brain/repo/index.js';
+import { createRepo } from '../mind/brain/repo/index.js';
 import {
   evals, loadCorpus, metricsAtK, precisionAtK, recallAtK,
-} from '../brain/evals/index.js';
-import { createPublisher } from '../brain/publish/index.js';
+} from '../mind/brain/evals/index.js';
+import { createPublisher } from '../mind/brain/publish/index.js';
 
 let passed = 0;
 let total = 0;

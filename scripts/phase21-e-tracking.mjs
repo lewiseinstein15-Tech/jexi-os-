@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import assert from 'node:assert';
 
-import { createDualTracker } from '../research/tracking/dual.js';
+import { createDualTracker } from '../services/research/tracking/dual.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const probesDir = join(root, 'research', '.probes');

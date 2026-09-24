@@ -18,7 +18,7 @@ const out = (s = '') => process.stdout.write(`${s}\n`);
 let failures = 0;
 const check = (id, ok, detail) => { out(`${ok ? 'PASS' : 'FAIL'} ${id}${detail ? ` — ${detail}` : ''}`); if (!ok) failures += 1; };
 
-const self = (await import(path.join(ROOT, 'brain/self/index.js'))).default;
+const self = (await import(path.join(ROOT, 'mind/brain/self/index.js'))).default;
 
 /* ───────────── P1 core.md ───────────── */
 out('═══ P1 brain/self/core.md');

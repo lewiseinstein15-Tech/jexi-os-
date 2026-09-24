@@ -38,7 +38,7 @@ import { fileURLToPath } from 'node:url';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 // snapshot.js lives at <projectRoot>/prompt/versioning/snapshot.js
-export const PROJECT_ROOT = path.resolve(MODULE_DIR, '..', '..');
+export const PROJECT_ROOT = path.resolve(MODULE_DIR, '..', '..', '..');
 
 /** Machine-readable codes for the versioning zone (Scope K). */
 export const VERSIONING_CODES = Object.freeze({

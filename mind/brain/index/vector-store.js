@@ -8,7 +8,7 @@
  * deterministic (chunkId-sorted JSON) so a store survives serialization
  * byte-identically.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 /** Real cosine similarity over two equal-length vectors. */
 export function cosine(a, b) {

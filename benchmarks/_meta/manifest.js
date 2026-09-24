@@ -20,7 +20,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../services/semantica/_internal.js';
 
 /**
  * Recursively key-sorted JSON — the canonical byte form for hashing

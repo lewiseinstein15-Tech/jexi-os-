@@ -103,15 +103,15 @@ const how = {};
 
 /* 1. Agents in the workforce registry — import the real registry module. */
 {
-  const m = await import('../workforce/agents/index.js');
+  const m = await import('../agents/workforce/agents/index.js');
   await m.load?.();
   derived.agents = m.list().length;
-  how.agents = "import '../workforce/agents/index.js'; await load?.(); list().length";
+  how.agents = "import '../agents/workforce/agents/index.js'; await load?.(); list().length";
 }
 
 /* 2. Divisions — same module's divisions() (cross-checked against divisions.json). */
 {
-  const m = await import('../workforce/agents/index.js');
+  const m = await import('../agents/workforce/agents/index.js');
   derived.divisions = m.divisions().length;
   const json = JSON.parse(read('workforce/divisions.json')).divisions;
   how.divisions = `divisions().length (divisions.json ids: ${json.length}${derived.divisions === json.length ? '' : ' — MISMATCH with module'})`;
@@ -195,7 +195,7 @@ const how = {};
 
 /* 10. Memory verbs (frozen protocol). */
 {
-  const m = await import('../brain/protocol/verbs.js');
+  const m = await import('../mind/brain/protocol/verbs.js');
   derived.memoryVerbs = m.VERB_NAMES.length;
   how.memoryVerbs = `VERB_NAMES.length (protocol ${m.PROTOCOL_VERSION}: ${m.VERB_NAMES.join(',')})`;
 }
@@ -208,23 +208,23 @@ const how = {};
 
 /* 12. Console surfaces. */
 {
-  const m = await import('../ui/web/console/shell/routes.js');
+  const m = await import('../interfaces/ui/web/console/shell/routes.js');
   derived.consoleSurfaces = m.ROUTES.length;
   how.consoleSurfaces = `ROUTES.length (${m.ROUTES.map((r) => r.label).join(' / ')})`;
 }
 
 /* 13. Research output formats. */
 {
-  const m = await import('../surfsense/output/formats.js');
+  const m = await import('../services/surfsense/output/formats.js');
   derived.researchFormats = m.FORMAT_NAMES.length;
-  how.researchFormats = "import '../surfsense/output/formats.js'; FORMAT_NAMES.length";
+  how.researchFormats = "import '../services/surfsense/output/formats.js'; FORMAT_NAMES.length";
 }
 
 /* 14. Source connectors. */
 {
-  const m = await import('../surfsense/connectors/index.js');
+  const m = await import('../services/surfsense/connectors/index.js');
   derived.sourceConnectors = m.list().length;
-  how.sourceConnectors = "import '../surfsense/connectors/index.js'; list().length";
+  how.sourceConnectors = "import '../services/surfsense/connectors/index.js'; list().length";
 }
 
 /* 15. Retrieval benchmark metrics — declared metric keys (non-numeric row). */

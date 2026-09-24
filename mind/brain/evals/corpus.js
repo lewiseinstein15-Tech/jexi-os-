@@ -4,7 +4,7 @@
  * scores must never be presented as real-world or published BrainBench results.
  */
 import fs from 'node:fs';
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 

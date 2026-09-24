@@ -15,7 +15,7 @@
  * formula in confidence.js. Phase 14 SemanticaError reused read-only.
  */
 import fs from 'node:fs';
-import { fail } from '../../semantica/_internal.js';
+import { fail } from '../../../services/semantica/_internal.js';
 import { assertProjectId } from '../observe/scope.js';
 import { nextOp } from '../observe/queue.js';
 import { create, validate } from './schema.js';
@@ -50,4 +50,4 @@ export function createInstincts(root) {
 
 export { create, validate } from './schema.js';
 export { score, reinforce, contradict, computeConfidence, MODEL } from './confidence.js';
-export { SemanticaError } from '../../semantica/_internal.js';
+export { SemanticaError } from '../../../services/semantica/_internal.js';

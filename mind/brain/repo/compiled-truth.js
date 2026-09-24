@@ -6,7 +6,7 @@
  * the Timeline is the append-only evidence ledger. compile() returns both
  * views of a page without mutating it.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 /**
  * Compile a page into its two canonical views.

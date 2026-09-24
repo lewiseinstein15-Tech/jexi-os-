@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { DaemonClient, DEFAULT_CACHE_ROOT } from '../kernel/daemon/client.js';
+import { DaemonClient, DEFAULT_CACHE_ROOT } from '../runtime/kernel/daemon/client.js';
 
 const FRESH = process.argv.includes('--fresh');
 const CACHE = DEFAULT_CACHE_ROOT;

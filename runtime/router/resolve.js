@@ -16,7 +16,7 @@
  * catalog); this module is the router-facing seam, kept dependency-free.
  */
 
-import { resolveTwoStage, mergedRoster, loadAgentFile, list, catalogSummary } from '../workforce/registry/index.js';
+import { resolveTwoStage, mergedRoster, loadAgentFile, list, catalogSummary } from '../../agents/workforce/registry/index.js';
 
 export { resolveTwoStage, mergedRoster, loadAgentFile, list, catalogSummary };
 

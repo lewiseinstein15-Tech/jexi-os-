@@ -2,7 +2,7 @@
 import path from 'node:path';
 import { defineTool } from '../../../server/src/tools/interface/ToolDefinition.js';
 import { repoRoot, getStore, ToolInputError } from './_graph.js';
-import { indexRepository } from '../../../capability/code/graph/index.js';
+import { indexRepository } from '../../../graph/code/graph/index.js';
 
 export const def = defineTool({
   name: 'index-repository',

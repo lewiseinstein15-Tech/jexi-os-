@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // Phase 16 Scope L — Terminal Inline Artifacts Panel probe (P1–P9)
 import fs from 'node:fs';
-import { artifacts } from '../ui/web/console/chat/artifacts.js';
-import { toolcards } from '../ui/web/console/chat/toolcards.js';
-import { runtime } from '../ui/web/console/chat/runtime.js';
-import { router } from '../ui/web/console/chat/router.js';
-import { modes } from '../ui/web/console/chat/modes.js';
-import { approvals } from '../ui/web/console/chat/approvals.js';
-import { draft } from '../ui/web/console/chat/progress-draft.js';
-import { taxonomy } from '../events/chat/taxonomy.js';
+import { artifacts } from '../interfaces/ui/web/console/chat/artifacts.js';
+import { toolcards } from '../interfaces/ui/web/console/chat/toolcards.js';
+import { runtime } from '../interfaces/ui/web/console/chat/runtime.js';
+import { router } from '../interfaces/ui/web/console/chat/router.js';
+import { modes } from '../interfaces/ui/web/console/chat/modes.js';
+import { approvals } from '../interfaces/ui/web/console/chat/approvals.js';
+import { draft } from '../interfaces/ui/web/console/chat/progress-draft.js';
+import { taxonomy } from '../runtime/events/chat/taxonomy.js';
 
 let pass = 0, fail = 0;
 const ok = (c, msg) => { c ? pass++ : fail++; console.log(`  ${c ? '✅' : '❌'} ${msg}`); };

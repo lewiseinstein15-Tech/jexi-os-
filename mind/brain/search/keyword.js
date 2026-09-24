@@ -5,7 +5,7 @@
  * b=0.75) from surfsense's public API, applied to brain chunks. Deterministic
  * (ties by chunkId asc, Phase 19 shape).
  */
-import { bm25Scores, K1, B } from '../../surfsense/search/keyword.js';
+import { bm25Scores, K1, B } from '../../../services/surfsense/search/keyword.js';
 
 /**
  * keywordRank(query, chunks) -> ranked[] = [{ chunkId, score }] desc.

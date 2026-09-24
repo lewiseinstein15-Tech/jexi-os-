@@ -2,7 +2,7 @@
  * JEXI OS — Phase 28 Scope H — live v1 conformance certification.
  * Validates all five verb handlers and the exact success/error envelope.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { inspectEnvelope } from './envelope.js';
 import { VERB_DEFINITIONS, VERB_NAMES } from './verbs.js';
 

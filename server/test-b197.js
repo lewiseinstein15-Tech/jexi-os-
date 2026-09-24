@@ -42,7 +42,7 @@ let failures = 0;
 const ok = (name, cond) => { console.log(`${cond ? '✅' : '❌'} ${name}`); if (!cond) failures += 1; };
 
 /* ─────────────── static source checks ─────────────── */
-const md = fs.readFileSync(path.join(ROOT, 'src', 'components', 'MarkdownRenderer.jsx'), 'utf-8');
+const md = fs.readFileSync(path.join(ROOT, 'interfaces/console', 'components', 'MarkdownRenderer.jsx'), 'utf-8');
 ok('components map is module-scope — inline identities remounted every node per delta (THE blink)',
   /const MARKDOWN_COMPONENTS = \{/.test(md) && !/components=\{\{/.test(md));
 ok('image dimension cache exists and is filled on load (box never resizes twice for a src)',
@@ -51,10 +51,10 @@ ok('generated-image URL dims parsed (exact aspect box before the first byte arri
   /function imgDimsFromUrl/.test(md));
 ok('onLoad records natural dimensions into the cache', /naturalWidth/.test(md) && /IMG_DIM_CACHE\.set\(src/.test(md));
 
-const rich = fs.readFileSync(path.join(ROOT, 'src', 'components', 'RichAnswer.jsx'), 'utf-8');
+const rich = fs.readFileSync(path.join(ROOT, 'interfaces/console', 'components', 'RichAnswer.jsx'), 'utf-8');
 ok('RichAnswer components map is memoized (same remount fix, second renderer)', /useMemo\(\(\) => \(\{/.test(rich));
 
-const css = fs.readFileSync(path.join(ROOT, 'src', 'index.css'), 'utf-8');
+const css = fs.readFileSync(path.join(ROOT, 'interfaces/console', 'index.css'), 'utf-8');
 ok('shimmer-bar finally HAS a CSS definition (was an empty ghost box)', /\.shimmer-bar\s*\{/.test(css) && css.includes('@keyframes jxshimmer'));
 ok('image box capped at the 400px image max (aspect reservation can never overflow)', /\.jx-imgbox\s*\{[^}]*max-height:\s*400px/.test(css));
 
@@ -62,7 +62,7 @@ ok('image box capped at the 400px image max (aspect reservation can never overfl
 let mod = null;
 try {
   execFileSync(esbuild, [
-    path.join(ROOT, 'src', 'components', 'MarkdownRenderer.jsx'),
+    path.join(ROOT, 'interfaces/console', 'components', 'MarkdownRenderer.jsx'),
     '--bundle', '--platform=node', '--format=cjs', '--loader:.jsx=jsx',
     '--external:react', '--outfile=' + tmpOut, '--log-level=error',
   ], { stdio: 'pipe' });

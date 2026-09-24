@@ -11,8 +11,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const STATE_DIR = path.join(REPO_ROOT, 'hooks', 'state');
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
+const STATE_DIR = path.join(REPO_ROOT, 'infra/hooks', 'state');
 
 const raw = await new Promise((resolve) => {
   let buf = '';

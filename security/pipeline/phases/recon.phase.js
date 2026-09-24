@@ -13,7 +13,7 @@
  */
 
 import * as store from '../orchestration/checkpoint.js';
-import { pipelineGraph, recordTarget } from '../../../knowledge/index.js';
+import { pipelineGraph, recordTarget } from '../../../mind/knowledge/index.js';
 import { gatePhase } from '../../engagements/validator.js'; // Phase 8(D): RoE gate
 
 const MAX_PAGES = 16;

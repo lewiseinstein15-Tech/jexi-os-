@@ -25,7 +25,7 @@
 // Determinism: emit adds no clock and no randomness of its own (map() adds
 // none either). Delivery ordering is the router's monotonic per-session seq.
 
-import { route } from '../../ui/web/console/chat/router.js';
+import { route } from '../../../interfaces/ui/web/console/chat/router.js';
 import { map } from './map.js';
 
 export function emit(guiEvent) {

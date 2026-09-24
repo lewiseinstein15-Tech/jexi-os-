@@ -26,7 +26,7 @@
  */
 
 import { resolveAllowed, AllowlistRefusedError } from './allowlist.js';
-import { createPinnedFetchImpl } from '../../security/shield/ssrf.js';
+import { createPinnedFetchImpl } from '../../../security/shield/ssrf.js';
 import {
   readBodyCapped,
   sanitizeError,
@@ -37,7 +37,7 @@ import {
 // ZONE-OWNER ITEM 4 (Phase 9 G seam): provenance labels on successful fetches.
 // Public engine API only — makeProvenance is internal, attach() builds the
 // identical frozen fixed-key-order provenance object.
-import { attach, isValidLabel, ProvenanceError } from '../../events/provenance/label.js';
+import { attach, isValidLabel, ProvenanceError } from '../../../runtime/events/provenance/label.js';
 
 export function createBroker({
   maxBytes = DEFAULT_MAX_BYTES,

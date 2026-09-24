@@ -1,5 +1,5 @@
 /** JEXI OS — Phase 30 Scope F — one post hook per parallel tool batch. */
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import hooks, { HOOK_CATALOG } from '../hooks/index.js';
 
 const clone = (value) => value === undefined ? undefined : JSON.parse(JSON.stringify(value));

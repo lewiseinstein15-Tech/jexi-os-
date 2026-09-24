@@ -1,5 +1,5 @@
 /** JEXI OS — Phase 30 Scope C — subagent dispatch enforcement. */
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { scoping } from '../skills/index.js';
 import { extendSpec, validate } from './contract.js';
 

@@ -6,15 +6,15 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createRepo } from '../brain/repo/index.js';
-import { createIndex } from '../brain/index/index.js';
-import { createHybridSearch } from '../brain/search/index.js';
-import { createHotMemory } from '../brain/hot/index.js';
-import { extract } from '../brain/kg/index.js';
+import { createRepo } from '../mind/brain/repo/index.js';
+import { createIndex } from '../mind/brain/index/index.js';
+import { createHybridSearch } from '../mind/brain/search/index.js';
+import { createHotMemory } from '../mind/brain/hot/index.js';
+import { extract } from '../mind/brain/kg/index.js';
 import {
   createMemoryProtocol, enforceEnvelope, inspectEnvelope,
   assertConformantEnvelope, runConformance, VERB_NAMES,
-} from '../brain/protocol/index.js';
+} from '../mind/brain/protocol/index.js';
 
 let pass = 0;
 let fail = 0;

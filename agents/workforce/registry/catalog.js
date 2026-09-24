@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 const REG_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(REG_DIR, '../..');
-const AGENTS_DIR = path.join(REPO_ROOT, 'agents');
+const AGENTS_DIR = path.join(REPO_ROOT, 'agents/catalog');
 
 /** Parse flat YAML frontmatter (key: value; `tools: [a, b]` → array; nested
  *  `services:` blocks are tolerated — their `- name:` lines are skipped). */

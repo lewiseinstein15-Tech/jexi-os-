@@ -1,5 +1,5 @@
 /** Deterministic gate: reject structurally unsafe pages/facts before writes. */
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../../services/semantica/_internal.js';
 
 export const name = 'lint';
 export const gate = true;

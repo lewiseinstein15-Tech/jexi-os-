@@ -5,8 +5,8 @@
  * Raw output only. Run: node scripts/phase20-scope-c.mjs
  * Exit 0 = all pass, 1 = any fail.
  */
-import consensus from '../swarm/consensus/index.js';
-import { SwarmError } from '../swarm/consensus/_internal.js';
+import consensus from '../agents/swarm/consensus/index.js';
+import { SwarmError } from '../agents/swarm/consensus/_internal.js';
 
 const MEMBERS = ['node-a', 'node-b', 'node-c', 'node-d', 'node-e'];
 let failures = 0;

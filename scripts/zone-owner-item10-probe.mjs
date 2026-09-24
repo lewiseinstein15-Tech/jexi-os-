@@ -86,7 +86,7 @@ try {
     n11.code === 0 && /\[P11\] \d+ PASS \/ 0 FAIL/.test(n11.out), `exit=${n11.code}`);
 
   // ---- 9. REAL absence (no forced env): behavior depends on what detection finds
-  const det = (await import('../verification/visual/puppeteer-runner.js')).detectBrowser();
+  const det = (await import('../tests/verification/visual/puppeteer-runner.js')).detectBrowser();
   const real = run(NEW, ['p2']);
   if (det.available === true) {
     check('REAL environment HAS a browser → p2 runs for real (no SKIP banner)',

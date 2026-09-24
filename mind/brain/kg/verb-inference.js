@@ -9,7 +9,7 @@
  *
  * Pure regex over text. NO LLM call. Ever.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 export const VERB_PRECEDENCE = Object.freeze(['founded', 'invested_in', 'advises', 'works_at', 'mentions']);
 

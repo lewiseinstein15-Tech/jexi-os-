@@ -14,9 +14,9 @@
  * Exit 0 iff every assertion passes.
  */
 
-import { createBroker } from '../intelligence/trust-pipeline/broker.js';
-import { REGISTERED_URLS } from '../intelligence/trust-pipeline/registered-urls.js';
-import { readBodyCapped } from '../intelligence/trust-pipeline/sanitize.js';
+import { createBroker } from '../mind/intelligence/trust-pipeline/broker.js';
+import { REGISTERED_URLS } from '../mind/intelligence/trust-pipeline/registered-urls.js';
+import { readBodyCapped } from '../mind/intelligence/trust-pipeline/sanitize.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => {

@@ -20,7 +20,7 @@
  * model NOT VERIFIED". Provider unavailable -> E_PROVIDER_UNAVAILABLE (the
  * caller falls back explicitly; nothing is faked).
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { chunk as chunkPage, CHUNKER_VERSION } from './chunker.js';
 import { embed as embedChunks, resolveBackend, isProviderAvailable } from './embedder.js';
 import { createStore, cosine } from './vector-store.js';

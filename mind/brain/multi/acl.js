@@ -1,5 +1,5 @@
 /** JEXI OS — Phase 28 Scope J — fail-closed source read ACL. */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { assertSourceId } from './source.js';
 import { declaredQuerySources } from './isolation.js';
 

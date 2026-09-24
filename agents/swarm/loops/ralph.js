@@ -25,7 +25,7 @@
  * - Deterministic given the same task and adjuster.
  */
 import { SwarmError } from '../topologies/_internal.js';
-import { evaluate as evaluateLoopPolicy } from '../../harness/hardening/ralph/diagnostics.js';
+import { evaluate as evaluateLoopPolicy } from '../../../harness/hardening/ralph/diagnostics.js';
 
 export const DEFAULT_MAX_ATTEMPTS = 5;
 

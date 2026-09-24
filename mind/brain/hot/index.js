@@ -12,7 +12,7 @@
  * injected content/op/day sequences. Supersession never deletes either fact.
  */
 import { createHash } from 'node:crypto';
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { ruleBased } from '../index/index.js';
 import { FACT_KINDS, assertFactKind } from './kinds.js';
 import { HALFLIFE_DAYS, decay as decayAtDay } from './decay.js';

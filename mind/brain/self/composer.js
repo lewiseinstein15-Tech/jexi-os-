@@ -18,7 +18,7 @@
  * Deterministic: same question + same rotation state -> same answer.
  * Error class: SemanticaError (reused).
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { loadCore } from './guard.js';
 import { validate } from './validate.js';
 

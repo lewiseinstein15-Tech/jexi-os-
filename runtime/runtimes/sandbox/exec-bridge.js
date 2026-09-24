@@ -9,7 +9,7 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { signRequest, newNonce } from '../../security/exec-bridge/auth.js';
+import { signRequest, newNonce } from '../../../security/exec-bridge/auth.js';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 

@@ -6,7 +6,7 @@
  * The lowest-ranked tail is removed until the token budget fits.
  * Visibility is world-only unless includePrivate === true.
  */
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../../services/semantica/_internal.js';
 import { mergeEntities, normalizeEntity } from '../reflex/pointer.js';
 
 export const PACK_PRIORITY = Object.freeze(['cards', 'facts', 'threads']);

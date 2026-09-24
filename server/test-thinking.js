@@ -98,24 +98,24 @@ console.log('\n== 2. think text sanitized ==');
 /* ══════════════ 3. ENGINE + UI WIRING ══════════════ */
 console.log('\n== 3. engine + UI wiring ==');
 {
-  const hook = fs.readFileSync(path.join(ROOT, 'src/hooks/useJexiEngine.js'), 'utf-8');
+  const hook = fs.readFileSync(path.join(ROOT, 'interfaces/console/hooks/useJexiEngine.js'), 'utf-8');
   ok("engine consumes 'think' events into message.thinking", hook.includes("data.type === 'think'") && hook.includes('thinking: (last.thinking') );
   ok('think row created before the first answer token', hook.includes("next.push({ role: 'jexi', at: Date.now(), text: '', thinking: delta"));
   ok('first answer token stamps thinkMs (live phase ends)', hook.includes('thinkMs = Date.now() - thinkT0'));
   ok('reasoning + thinkMs survive the done event', hook.includes('cur.thinking ? { thinking: cur.thinking }'));
 
-  const tr = fs.readFileSync(path.join(ROOT, 'src/components/ThinkRow.jsx'), 'utf-8');
+  const tr = fs.readFileSync(path.join(ROOT, 'interfaces/console/components/ThinkRow.jsx'), 'utf-8');
   ok('ThinkRow: live label with timer + coworker name', tr.includes('Thinking') && tr.includes('elapsed.toFixed(1)') && tr.includes('{by}'));
   ok('ThinkRow: auto-collapses when the answer starts', tr.includes('if (!active) setExpanded(false)'));
   ok('ThinkRow: tap to expand/collapse after the turn', tr.includes('tap to') && tr.includes('setExpanded((e) => !e)'));
 
-  const chat = fs.readFileSync(path.join(ROOT, 'src/components/ChatWindow.jsx'), 'utf-8');
+  const chat = fs.readFileSync(path.join(ROOT, 'interfaces/console/components/ChatWindow.jsx'), 'utf-8');
   // B205 — ThinkRow + NarrationFeed were unified into AgentThinking (the
   // arena-style panel): reasoning still renders above the answer, now with
   // narrations + agent activity in the same collapsible block.
   ok('ChatWindow renders the thinking panel above the answer', chat.includes('<AgentThinking') && chat.includes('thinking={msg.thinking}'));
 
-  const pipe = fs.readFileSync(path.join(ROOT, 'src/components/AgentPipeline.jsx'), 'utf-8');
+  const pipe = fs.readFileSync(path.join(ROOT, 'interfaces/console/components/AgentPipeline.jsx'), 'utf-8');
   ok('dead-air narration replaces flat "thinking…"', pipe.includes('reading your message…') && pipe.includes('planning the best approach') && !pipe.includes('"detail">thinking…'));
 
   const idx = fs.readFileSync('./index.js', 'utf-8');

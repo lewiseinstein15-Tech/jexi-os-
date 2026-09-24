@@ -5,7 +5,7 @@
  */
 
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines, buildIdentityPrompt } from './src/services/JexiIdentity.js';
-import { facts as selfFacts } from '../brain/self/index.js';
+import { facts as selfFacts } from '../mind/brain/self/index.js';
 
 // Canonical self facts — single source of truth: brain/self/core.md (Phase 31 Scope 19).
 // Identity asserts below are INVARIANTS derived from core.md; no builder string is hardcoded.

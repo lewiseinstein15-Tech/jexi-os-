@@ -21,7 +21,7 @@
  * SemanticaError with stable codes.
  */
 
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../services/semantica/_internal.js';
 
 export function createCost({ cap, currency } = {}) {
   if (typeof cap !== 'number' || !Number.isFinite(cap) || cap < 0) {

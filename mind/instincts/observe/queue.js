@@ -10,7 +10,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { assertNonEmptyString, fail } from '../../semantica/_internal.js';
+import { assertNonEmptyString, fail } from '../../../services/semantica/_internal.js';
 import { projectDir, assertScope } from './scope.js';
 
 const queueFile = (root, projectId) => path.join(projectDir(root, projectId), 'observations.jsonl');

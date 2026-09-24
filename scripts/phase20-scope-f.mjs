@@ -5,8 +5,8 @@
  * Raw output only. Run: node scripts/phase20-scope-f.mjs
  * Exit 0 = all pass, 1 = any fail.
  */
-import ralph from '../swarm/loops/ralph.js';
-import { SwarmError } from '../swarm/topologies/_internal.js';
+import ralph from '../agents/swarm/loops/ralph.js';
+import { SwarmError } from '../agents/swarm/topologies/_internal.js';
 
 let failures = 0;
 function verdict(id, ok, msg) {

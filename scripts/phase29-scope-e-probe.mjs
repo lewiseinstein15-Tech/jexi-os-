@@ -18,9 +18,9 @@ import {
   createHistory,
   DEFAULT_MAX_TURNS,
   DEFAULT_MODEL,
-} from '../computer/vlm/index.js';
-import { actionNames } from '../computer/action/space.js';
-import { ComputerError } from '../computer/errors.js';
+} from '../services/computer/vlm/index.js';
+import { actionNames } from '../services/computer/action/space.js';
+import { ComputerError } from '../services/computer/errors.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

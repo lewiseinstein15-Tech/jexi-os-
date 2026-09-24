@@ -6,8 +6,8 @@
  * calls against surfsense/podcast. No script text is faked.
  */
 import { execSync } from 'node:child_process';
-import podcast from '../surfsense/podcast/index.js';
-import { SurfError } from '../surfsense/connectors/_internal.js';
+import podcast from '../services/surfsense/podcast/index.js';
+import { SurfError } from '../services/surfsense/connectors/_internal.js';
 
 const results = [];
 function check(pid, label, pass, detail) {

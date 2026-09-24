@@ -5,7 +5,7 @@
  * or a real provider backend (injected callable; refuses when unconfigured —
  * never fakes). resolveBackend() is the single choice point.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import * as ruleBased from './backends/rule-based.js';
 import { createProviderBackend, isProviderAvailable } from './backends/provider.js';
 

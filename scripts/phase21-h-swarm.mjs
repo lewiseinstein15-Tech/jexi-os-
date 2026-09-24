@@ -1,7 +1,7 @@
 // PHASE 21 — SCOPE H — LIVE PROBE: distributed research swarm (3 simulated agents).
 // Zone-compliant: no file writes at all.
 import assert from 'node:assert';
-import { createResearchSwarm } from '../research/swarm/research-swarm.js';
+import { createResearchSwarm } from '../services/research/swarm/research-swarm.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

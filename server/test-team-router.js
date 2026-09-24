@@ -59,12 +59,12 @@ console.log('\n== 3. natural tone rule ==');
 /* 4. streaming upgrade */
 console.log('\n== 4. streaming upgrade ==');
 {
-  const css = fs.readFileSync(path.join(ROOT, 'src/index.css'), 'utf-8');
+  const css = fs.readFileSync(path.join(ROOT, 'interfaces/console/index.css'), 'utf-8');
   ok('think row breathes while working', css.includes('jx-breathe'));
   ok('caret glows', css.includes('box-shadow: 0 0 10px'));
   // B196: per-delta fade removed (replayed every chunk — blinked images)
   ok('streaming renders plainly (per-delta fade removed B196)', !css.includes('.jx-streaming-text .markdown-body { animation'));
-  const chat = fs.readFileSync(path.join(ROOT, 'src/components/ChatWindow.jsx'), 'utf-8');
+  const chat = fs.readFileSync(path.join(ROOT, 'interfaces/console/components/ChatWindow.jsx'), 'utf-8');
   // Transcript UI: the card-era jx-writer badge is gone — the live pulse now
   // lives on the Thought row (breathing panel + blinking ✻ while typing).
   ok('writer badge pulses while a coworker types', css.includes('.jx-agent.live') && css.includes('jx-breathe') && css.includes('jx-agent.live .jx-agent-ic'));

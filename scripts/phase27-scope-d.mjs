@@ -18,8 +18,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import profiles, { validate, PROFILES_DIR } from '../providers/profiles/index.js';
-import { ProfilesError } from '../providers/profiles/_internal.js';
+import profiles, { validate, PROFILES_DIR } from '../integrations/providers/profiles/index.js';
+import { ProfilesError } from '../integrations/providers/profiles/_internal.js';
 
 const FIXTURE_DIR = path.join(os.tmpdir(), 'p27-logs', 'profiles-fixture');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

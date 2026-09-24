@@ -10,7 +10,7 @@
  * Pure regex. NO LLM call. Ever.
  */
 import { inferType, assertVerb } from './verb-inference.js';
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 /** Capitalized surface-form entities (1-3 tokens), deterministic scan. */
 const ENTITY_RE = /\b([A-Z][a-zA-Z0-9'’.-]*(?:\s+[A-Z][a-zA-Z0-9'’.-]*){0,2})\b/g;

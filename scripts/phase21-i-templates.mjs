@@ -6,9 +6,9 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert';
 
-import { createDefaultRegistry, createTemplateRegistry } from '../research/templates/registry.js';
-import { parameterSweepSkill } from '../research/templates/template.skill.js';
-import { guardEdit } from '../research/constraints/guards.js';
+import { createDefaultRegistry, createTemplateRegistry } from '../services/research/templates/registry.js';
+import { parameterSweepSkill } from '../services/research/templates/template.skill.js';
+import { guardEdit } from '../services/research/constraints/guards.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const probesDir = join(root, 'research', '.probes');

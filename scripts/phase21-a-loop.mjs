@@ -5,9 +5,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert';
 
-import { runExperiment } from '../research/loop/lifecycle.js';
-import { runLoop } from '../research/loop/experiment-loop.js';
-import { runScheduled } from '../research/loop/scheduler.js';
+import { runExperiment } from '../services/research/loop/lifecycle.js';
+import { runLoop } from '../services/research/loop/experiment-loop.js';
+import { runScheduled } from '../services/research/loop/scheduler.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const fixtureDir = join(root, 'research', 'fixtures', 'toy-target');

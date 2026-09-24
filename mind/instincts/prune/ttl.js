@@ -10,7 +10,7 @@
  *   AND instinct.confidence < minConfidence          (weak)
  * Neither condition alone ever removes an instinct.
  */
-import { fail } from '../../semantica/_internal.js';
+import { fail } from '../../../services/semantica/_internal.js';
 
 export const DEFAULT_TTL = 100;
 export const DEFAULT_MIN_CONFIDENCE = 0.5;

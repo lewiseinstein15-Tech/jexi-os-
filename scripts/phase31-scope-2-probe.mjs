@@ -62,7 +62,7 @@ async function waitUrl(url, timeoutMs = 90000) {
 
 /* ---------------- P4 helpers (node-side, in-process WA4 proof) --------- */
 async function wa4Proof() {
-  const topologies = await import(path.join(ROOT, 'swarm', 'topologies', 'index.js'));
+  const topologies = await import(path.join(ROOT, 'agents/swarm', 'topologies', 'index.js'));
   const workforce = await import(path.join(ROOT, 'server', 'src', 'workforce', 'registry', 'index.js'));
   workforce.registerAll();
   const stats = workforce.rosterStats();
@@ -127,9 +127,9 @@ function encodeFixture(width, height, pixelAt) {
 const RED_PNG = encodeFixture(8, 6, () => [255, 0, 0, 255]);
 
 async function runRealLoopCaptureRawEvents() {
-  const { createGuiAgent } = await import(path.join(ROOT, 'computer', 'loop', 'index.js'));
-  const { createVlm } = await import(path.join(ROOT, 'computer', 'vlm', 'index.js'));
-  const { createFakeOperator } = await import(path.join(ROOT, 'computer', 'operators', 'index.js'));
+  const { createGuiAgent } = await import(path.join(ROOT, 'services/computer', 'loop', 'index.js'));
+  const { createVlm } = await import(path.join(ROOT, 'services/computer', 'vlm', 'index.js'));
+  const { createFakeOperator } = await import(path.join(ROOT, 'services/computer', 'operators', 'index.js'));
   const openAiResponse = (content) => ({
     id: 'chatcmpl-stub-w31s2', object: 'chat.completion',
     choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
@@ -330,7 +330,7 @@ console.log('\n== P6 read-only proof — shipped module diffs EMPTY ==');
 const diffList = execSync('git diff --name-only HEAD', { cwd: ROOT, encoding: 'utf8' }).trim().split('\n').filter(Boolean);
 const NAMED = ['ui/web/console/chat/mount.js', 'ui/web/console/shell/Sidebar.jsx', 'ui/web/console/shell/Shell.jsx', 'scripts/phase31-scope-2-probe.mjs'];
 const nonNamed = diffList.filter((f) => !NAMED.includes(f));
-const shippedTrees = ['computer', 'swarm', 'server/src/workforce', 'src/components/console/views', 'src/components/ChatWindow.jsx', 'src/styles', 'events'];
+const shippedTrees = ['services/computer', 'agents/swarm', 'server/src/workforce', 'src/components/console/views', 'src/components/ChatWindow.jsx', 'src/styles', 'events'];
 const shippedDirty = diffList.filter((f) => shippedTrees.some((t) => f.startsWith(t)));
 const chatDirty = diffList.filter((f) => f.startsWith('ui/web/console/chat/') && f !== 'ui/web/console/chat/mount.js');
 const shellDirty = diffList.filter((f) => f.startsWith('ui/web/console/shell/') && f !== 'ui/web/console/shell/Sidebar.jsx' && f !== 'ui/web/console/shell/Shell.jsx');

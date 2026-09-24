@@ -7,7 +7,7 @@
  * over these vectors IS the token-overlap cosine — real math, no model,
  * labeled accordingly. NOT a fake of a real embedding.
  */
-import { tokenize } from '../../../surfsense/connectors/local-search.js';
+import { tokenize } from '../../../../services/surfsense/connectors/local-search.js';
 
 export const NAME = 'rule-based';
 export const LABEL = 'rule-based — embedding model NOT VERIFIED';

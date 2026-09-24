@@ -2,8 +2,8 @@
 // Zone-compliant: no file writes at all (worker termination is in-memory).
 import assert from 'node:assert';
 
-import { enforceBudget } from '../research/budget/wall-clock.js';
-import { createCostLedger, withLedger } from '../research/budget/cost.js';
+import { enforceBudget } from '../services/research/budget/wall-clock.js';
+import { createCostLedger, withLedger } from '../services/research/budget/cost.js';
 
 const sleepFn = async () => {
   await new Promise((r) => setTimeout(r, 100));

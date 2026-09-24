@@ -10,7 +10,7 @@
  * Scope C save()/readAll() and Scope A op-seq — nothing reimplemented.
  */
 import fs from 'node:fs';
-import { fail } from '../../semantica/_internal.js';
+import { fail } from '../../../services/semantica/_internal.js';
 import { exportProject, BLOB_KIND, BLOB_VERSION } from './export.js';
 import { importBlob, decodeBlob } from './import.js';
 
@@ -31,4 +31,4 @@ export function createIo(root) {
 
 export { exportProject, BLOB_KIND, BLOB_VERSION } from './export.js';
 export { importBlob, decodeBlob } from './import.js';
-export { SemanticaError } from '../../semantica/_internal.js';
+export { SemanticaError } from '../../../services/semantica/_internal.js';

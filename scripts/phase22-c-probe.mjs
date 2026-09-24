@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   GraphRag, RagError, LLM_EXTRACTION_LABEL, snapshotDir,
-} from '../capability/rag/index.js';
+} from '../capabilities/graph/rag/index.js';
 
 const SCRIPTS = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(SCRIPTS, '..');

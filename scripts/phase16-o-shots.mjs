@@ -6,10 +6,10 @@
  * screenshots each. PNGs outside the repo.
  */
 import { createRequire } from 'node:module';
-import { multiagent } from '../ui/web/console/chat/multiagent.js';
-import { runtime } from '../ui/web/console/chat/runtime.js';
-import { router } from '../ui/web/console/chat/router.js';
-import { modes } from '../ui/web/console/chat/modes.js';
+import { multiagent } from '../interfaces/ui/web/console/chat/multiagent.js';
+import { runtime } from '../interfaces/ui/web/console/chat/runtime.js';
+import { router } from '../interfaces/ui/web/console/chat/router.js';
+import { modes } from '../interfaces/ui/web/console/chat/modes.js';
 
 const require = createRequire('/tmp/shot/package.json');
 const { chromium } = require('playwright');

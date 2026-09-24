@@ -1,5 +1,5 @@
 /** JEXI OS — Phase 28 Scope K — injected-retrieval BrainBench harness. */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { loadCorpus } from './corpus.js';
 import { metricsAtK } from './metrics.js';
 

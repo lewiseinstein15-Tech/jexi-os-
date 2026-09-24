@@ -5,7 +5,7 @@
  * prefix match wins; factor = coef * halflife / (halflife + days).
  * Deterministic; config injected (declared defaults below).
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 /** Declared defaults (days). Longer prefixes override shorter ones. */
 export const DEFAULT_RECENCY = Object.freeze({

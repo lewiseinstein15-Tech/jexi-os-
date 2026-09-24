@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const page_url = 'file://' + path.join(root, 'ui/web/console/_palette-preview.html');
+const page_url = 'file://' + path.join(root, 'interfaces/ui/web/console/_palette-preview.html');
 const OUT = [
   ['#swatches', path.join(root, 'docs/phase24-scope0-palette-swatches.png')],
   ['#surface', path.join(root, 'docs/phase24-scope0-palette-test-surface.png')],

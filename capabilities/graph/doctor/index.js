@@ -23,7 +23,7 @@ import { spawn } from 'node:child_process';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 const STATUS_RANK = { ok: 0, warn: 1, off: 2, error: 3 };
 const worst = (a, b) => (STATUS_RANK[a] >= STATUS_RANK[b] ? a : b);
@@ -34,7 +34,7 @@ function subsystem(name, status, message, detail = undefined, lastUpdated = unde
 
 /* ── Scope C — codegraph daemon ── */
 async function checkDaemon(project) {
-  const { DaemonClient } = await import(path.join(ROOT, 'kernel/daemon/client.js'));
+  const { DaemonClient } = await import(path.join(ROOT, 'runtime/kernel/daemon/client.js'));
   const started = Date.now();
   try {
     const client = await DaemonClient.open({ spawnIfDown: false });
@@ -69,8 +69,8 @@ async function checkDaemon(project) {
 /* ── Scope A — CBM code graph ── */
 async function checkCodeGraph(project) {
   try {
-    const { getStore, closeStore } = await import(path.join(ROOT, 'tools/domains/lsp/_graph.js'));
-    const { handler: coverageHandler } = await import(path.join(ROOT, 'tools/domains/lsp/check-index-coverage.tool.js'));
+    const { getStore, closeStore } = await import(path.join(ROOT, 'capabilities/tools/domains/lsp/_graph.js'));
+    const { handler: coverageHandler } = await import(path.join(ROOT, 'capabilities/tools/domains/lsp/check-index-coverage.tool.js'));
     const store = await getStore();
     const pj = store.listProjects().find((p) => p.project === project);
     if (!pj || !pj.nodes) {
@@ -99,9 +99,9 @@ async function checkCodeGraph(project) {
 /* ── Scope E — reach channels ── */
 async function checkReach() {
   try {
-    const { checkAll } = await import(path.join(ROOT, 'capability/internet/reach/doctor.js').replace(/^file:\/\//, ''));
-    const { ALL_CHANNELS } = await import(path.join(ROOT, 'capability/internet/reach/channels/index.js'));
-    const { ReachConfig } = await import(path.join(ROOT, 'capability/internet/reach/config.js'));
+    const { checkAll } = await import(path.join(ROOT, 'capabilities/graph/internet/reach/doctor.js').replace(/^file:\/\//, ''));
+    const { ALL_CHANNELS } = await import(path.join(ROOT, 'capabilities/graph/internet/reach/channels/index.js'));
+    const { ReachConfig } = await import(path.join(ROOT, 'capabilities/graph/internet/reach/config.js'));
     const rowsMap = await checkAll(new ReachConfig());
     const rows = Object.values(rowsMap);
     const byName = new Map(ALL_CHANNELS.map((c) => [c.name, c]));

@@ -6,12 +6,12 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createRepo } from '../brain/repo/index.js';
-import { extract } from '../brain/kg/index.js';
+import { createRepo } from '../mind/brain/repo/index.js';
+import { extract } from '../mind/brain/kg/index.js';
 import {
   createBrainAmbient, DEFAULT_MAX_POINTERS, JUDGMENT_RULE,
   POINTER_INSTRUCTION, estimatePackTokens, PACK_PRIORITY,
-} from '../brain/ambient/index.js';
+} from '../mind/brain/ambient/index.js';
 
 let pass = 0;
 let fail = 0;

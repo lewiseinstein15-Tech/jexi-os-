@@ -11,7 +11,7 @@
  * Every returned result carries a per-stage reasons[] audit list.
  * Deterministic: same query + same index/repo/config -> byte-identical.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { keywordRank } from './keyword.js';
 import { vectorRank } from './vector.js';
 import { rrfFuse, normalize, RRF_K } from './rrf.js';

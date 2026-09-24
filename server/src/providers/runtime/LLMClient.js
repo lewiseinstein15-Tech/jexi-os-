@@ -16,7 +16,7 @@ import { hudNoteSpend } from '../../kernel/hooks/hud-seam.js'; // Phase 7(F) —
 // ZONE-OWNER ITEM 5 (Phase 9 E seam): cost caps are consulted on the LIVE
 // model-call path. providers/cost/caps.js README: "check({ spendUsd }) … is
 // the pre-call gate a provider bridge uses BEFORE a model call."
-import { caps as costCaps, CapsError } from '../../../../providers/cost/caps.js';
+import { caps as costCaps, CapsError } from '../../../../integrations/providers/cost/caps.js';
 
 /**
  * Pre-call cost-cap gate (budget-gate precedent, generateContent @791 style).

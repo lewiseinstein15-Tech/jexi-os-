@@ -17,7 +17,7 @@
  * deterministic transformations labeled where they stand in for LLM work.
  */
 
-import { buildGraph, createRuleExtractor } from '../../memory/knowledge-graph.js';
+import { buildGraph, createRuleExtractor } from '../../../mind/memory/knowledge-graph.js';
 import { firstSentence } from './filesystem.js';
 
 export const COMPILE_LABEL = 'viking compile (deterministic organizers) — LLM summarization NOT VERIFIED';

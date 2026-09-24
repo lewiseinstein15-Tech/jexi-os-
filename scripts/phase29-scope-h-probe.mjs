@@ -17,8 +17,8 @@ import {
   GUI_TOOL_NAMES,
   CODE_TOOL_NAMES,
   TOOL_CALL_CODES,
-} from '../computer/tool-call/index.js';
-import { ComputerError } from '../computer/errors.js';
+} from '../services/computer/tool-call/index.js';
+import { ComputerError } from '../services/computer/errors.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

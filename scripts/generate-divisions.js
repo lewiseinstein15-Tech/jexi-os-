@@ -30,8 +30,8 @@ import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..');
-const AGENTS_DIR = path.join(REPO_ROOT, 'agents');
-const OUT_FILE = path.join(REPO_ROOT, 'workforce', 'divisions.json');
+const AGENTS_DIR = path.join(REPO_ROOT, 'agents/catalog');
+const OUT_FILE = path.join(REPO_ROOT, 'agents/workforce', 'divisions.json');
 
 const VERSION = '1.0.0';
 

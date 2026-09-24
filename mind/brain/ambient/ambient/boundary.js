@@ -3,7 +3,7 @@
  * session-start injects a warm context pack; pre-compaction banks standing
  * entities for the next start/rehydration. No clocks or model calls.
  */
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../../services/semantica/_internal.js';
 
 export const MAX_STANDING_ENTITIES = 8;
 

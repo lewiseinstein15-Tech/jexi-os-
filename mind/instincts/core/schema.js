@@ -10,7 +10,7 @@
  * every missing/invalid field. Confidence at creation is computed by
  * the declared formula (see confidence.js) — never fabricated.
  */
-import { fail } from '../../semantica/_internal.js';
+import { fail } from '../../../services/semantica/_internal.js';
 import { assertProjectId } from '../observe/scope.js';
 import { computeConfidence } from './confidence.js';
 import { nextOp } from '../observe/queue.js';

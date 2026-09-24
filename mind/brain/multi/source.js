@@ -4,7 +4,7 @@
  * partitioned by source so reads never scan a cross-source collection.
  */
 import { createHash } from 'node:crypto';
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 export const RECORD_TYPES = Object.freeze(['page', 'chunk', 'fact', 'edge']);
 const TYPE_SET = new Set(RECORD_TYPES);

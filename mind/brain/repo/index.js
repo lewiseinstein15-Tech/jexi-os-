@@ -18,7 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { KIND_DIRS, kindDir } from './layout.js';
 import { createPage, readPage, appendToPage, updatePage, listPages } from './page.js';
 import { compilePage } from './compiled-truth.js';

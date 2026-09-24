@@ -14,9 +14,9 @@
  * Runtime artifacts (p11 store file) live in scratch/ — never committed.
  */
 
-import { createBroker } from '../intelligence/trust-pipeline/broker.js';
-import * as label from '../events/provenance/label.js';
-import { MIXED_SIMULATED_OBSERVED_FLAG } from '../events/provenance/schema.js';
+import { createBroker } from '../mind/intelligence/trust-pipeline/broker.js';
+import * as label from '../runtime/events/provenance/label.js';
+import { MIXED_SIMULATED_OBSERVED_FLAG } from '../runtime/events/provenance/schema.js';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';

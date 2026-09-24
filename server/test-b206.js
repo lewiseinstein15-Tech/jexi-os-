@@ -16,7 +16,7 @@
  */
 import {
   sanitizeText, safeRows, capTail, capText, dedupeActivity, hasTrace,
-} from '../src/utils/agentStream.js';
+} from '../interfaces/console/utils/agentStream.js';
 import fs from 'node:fs';
 
 let pass = 0, fail = 0;

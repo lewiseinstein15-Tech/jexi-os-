@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { createSessions } from '../workgraph/session/index.js';
+import { createSessions } from '../runtime/workgraph/session/index.js';
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'p10e-'));
 const api = createSessions({ directory });
 const view = id => api.tree.reconstruct(id, { branch: id }).branchView;
@@ -36,7 +36,7 @@ try {
   assert.deepEqual(fs.readFileSync(file).subarray(0, prefix.length), prefix);
   console.log(JSON.stringify({ ...result, physicalKinds: api.compact.physical('long').map(n => n.kind), journalLinesBefore: prefix.toString().trim().split('\n').length, journalLinesAfter: fs.readFileSync(file, 'utf8').trim().split('\n').length, logicalNodes: 20, appendOnly: true })); pass('P5');
   console.log('P6'); assert.equal(JSON.stringify(api.compact.reconstruct('long')), before); console.log('logicalTreeByteIdentical=true (no timestamp masking needed)'); pass('P6');
-  console.log('P7'); const url = new URL('../workgraph/session/index.js', import.meta.url).href;
+  console.log('P7'); const url = new URL('../runtime/workgraph/session/index.js', import.meta.url).href;
   const setup = `import {createSessions} from ${JSON.stringify(url)}; const api=createSessions({directory:${JSON.stringify(directory)}});`;
   child = spawn(process.execPath, ['--input-type=module', '-e', setup + `let parentId=null;for(let i=0;i<5;i++)parentId=api.store('crash').append({parentId,kind:'turn',payload:{i}}).id;process.send({ready:true});setInterval(()=>{},1000);`], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
   const timer = setTimeout(() => child.kill('SIGKILL'), 10000);

@@ -12,7 +12,7 @@
  * loadInstinct/saveInstinct/computeConfidence. Nothing re-implemented.
  */
 import fs from 'node:fs';
-import { fail } from '../../semantica/_internal.js';
+import { fail } from '../../../services/semantica/_internal.js';
 import { save, get, prune, PRUNE_CONFIDENCE_CEILING } from './store.js';
 import { list, readAll } from './query.js';
 
@@ -34,4 +34,4 @@ export function createInstinctStore(root) {
 
 export { save, get, prune, PRUNE_CONFIDENCE_CEILING } from './store.js';
 export { list, readAll } from './query.js';
-export { SemanticaError } from '../../semantica/_internal.js';
+export { SemanticaError } from '../../../services/semantica/_internal.js';

@@ -16,12 +16,12 @@ import {
   INCIDENT_CODES,
   RULE_METHOD,
   log as incidentLog,
-} from '../prompt/incidents/index.js';
-import { CANONICAL_SECTIONS } from '../prompt/assembly/order.js';
-import { createSectionRegistry } from '../prompt/assembly/registry.js';
+} from '../capabilities/prompts/incidents/index.js';
+import { CANONICAL_SECTIONS } from '../capabilities/prompts/assembly/order.js';
+import { createSectionRegistry } from '../capabilities/prompts/assembly/registry.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const INDEX_URL = pathToFileURL(path.join(WT, 'prompt/incidents/index.js')).href;
+const INDEX_URL = pathToFileURL(path.join(WT, 'capabilities/prompts/incidents/index.js')).href;
 
 let failures = 0;
 function check(name, ok, evidence) {
@@ -182,7 +182,7 @@ console.log(`target section: id=${dtSpec.id} label="${dtSpec.label}" order=${dtS
 console.log('assembly-time wiring sketch (Scope M territory, NOT executed against prompt/assembly):');
 console.log("  import { registerCanonical } from 'prompt/assembly/order.js';");
 console.log("  import { createSectionRegistry } from 'prompt/assembly/registry.js';");
-console.log("  import { incidents } from 'prompt/incidents/index.js';");
+console.log("  import { incidents } from 'capabilities/prompts/incidents/index.js';");
 console.log('  const registry = registerCanonical(createSectionRegistry());   // Scope A sections');
 console.log('  const specs = registry.list().map((s) => ({ ...s }));          // unfrozen working copies');
 console.log("  const withShots = incidents.inject(specs, { section: 'doing-tasks' });  // bounded(5) + idempotent");

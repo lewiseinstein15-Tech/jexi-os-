@@ -6,7 +6,7 @@
 import {
   loadShownKeys, saveShownKeys, isNotificationShown, markNotificationShown,
   notificationKey, isNativePlatform,
-} from '../src/utils/phoneNotify.js';
+} from '../interfaces/console/utils/phoneNotify.js';
 
 let passed = 0;
 let failed = 0;

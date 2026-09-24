@@ -68,7 +68,7 @@ export class DaemonClient {
       } catch { /* stale endpoint — fall through to spawn */ }
     }
     if (!socket && spawnIfDown) {
-      spawn(process.execPath, [path.join(REPO_ROOT, 'kernel/daemon/codegraph-daemon.js'), '--cache-dir', cacheRoot], {
+      spawn(process.execPath, [path.join(REPO_ROOT, 'runtime/kernel/daemon/codegraph-daemon.js'), '--cache-dir', cacheRoot], {
         stdio: 'ignore',
         detached: false,
       });

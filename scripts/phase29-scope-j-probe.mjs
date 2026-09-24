@@ -18,10 +18,10 @@ import {
   assertRemoteClient,
   validateCredentials,
   buildVncPreviewUrl,
-} from '../computer/remote/index.js';
-import { ComputerError } from '../computer/errors.js';
-import { assertOperator, OPERATOR_CAPABILITY_KEYS } from '../computer/operators/interface.js';
-import { createDesktopOperator } from '../computer/operators/desktop.js';
+} from '../services/computer/remote/index.js';
+import { ComputerError } from '../services/computer/errors.js';
+import { assertOperator, OPERATOR_CAPABILITY_KEYS } from '../services/computer/operators/interface.js';
+import { createDesktopOperator } from '../services/computer/operators/desktop.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

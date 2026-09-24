@@ -14,13 +14,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { classify, route, configure, DEFAULT_MAP } from '../providers/routing/index.js';
+import { classify, route, configure, DEFAULT_MAP } from '../integrations/providers/routing/index.js';
 
 // consolidation cleanup: the determinism child-script imports the routing
 // module via a REPO-ANCHORED file URL (was a hardcoded foreign worktree path)
 // and its scratch file now lives under os.tmpdir().
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const ROUTING_ENTRY = pathToFileURL(path.join(REPO_ROOT, 'providers/routing/index.js')).href;
+const ROUTING_ENTRY = pathToFileURL(path.join(REPO_ROOT, 'integrations/providers/routing/index.js')).href;
 const DET_CHILD = path.join(os.tmpdir(), 'p27-logs', 'phase27-c-detchild.mjs');
 
 const P_SIMPLE_1 = 'hi';

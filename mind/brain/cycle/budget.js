@@ -1,5 +1,5 @@
 /** JEXI OS — Phase 28 Scope I — deterministic per-phase USD caps. */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 export const DEFAULT_PHASE_BUDGETS = Object.freeze({
   lint: 0,

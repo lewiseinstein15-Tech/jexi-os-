@@ -15,7 +15,7 @@
  * slipped through a stale gate is still caught here).
  */
 
-import { validateRoE } from '../../security/engagements/validator.js';
+import { validateRoE } from '../../../security/engagements/validator.js';
 
 /**
  * Pure check — never throws. Returns the raw verdict so callers can log it:

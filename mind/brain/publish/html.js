@@ -1,5 +1,5 @@
 /** JEXI OS — Phase 28 Scope K — deterministic, dependency-free static HTML. */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 /** Declared behavior for any requested private page or fact: fail closed. */
 export const PRIVATE_ID_BEHAVIOR = 'E_PRIVACY_VIOLATION';

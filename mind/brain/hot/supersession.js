@@ -5,7 +5,7 @@
  * identical links are idempotent. All ordering uses injected op_seq.
  */
 import { createHash } from 'node:crypto';
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 const bySeqThenId = (a, b) => (a.op_seq - b.op_seq) || (a.id < b.id ? -1 : 1);
 const linkId = (oldId, newId, sourceId, opSeq) => 'sup-' + createHash('sha256')

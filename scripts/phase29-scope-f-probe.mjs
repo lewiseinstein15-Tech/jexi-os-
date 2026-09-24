@@ -17,10 +17,10 @@ import {
   createGuiAgent,
   DEFAULT_MAX_LOOP_COUNT,
   WAIT_PAUSE_MS,
-} from '../computer/loop/index.js';
-import { createVlm } from '../computer/vlm/index.js';
-import { createFakeOperator, createDesktopOperator, createBrowserOperator } from '../computer/operators/index.js';
-import { ComputerError } from '../computer/errors.js';
+} from '../services/computer/loop/index.js';
+import { createVlm } from '../services/computer/vlm/index.js';
+import { createFakeOperator, createDesktopOperator, createBrowserOperator } from '../services/computer/operators/index.js';
+import { ComputerError } from '../services/computer/errors.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

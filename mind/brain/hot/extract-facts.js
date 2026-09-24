@@ -9,7 +9,7 @@
  *
  * Extraction and classification providers are injected. No network client.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { ruleBased, cosine } from '../index/index.js';
 import { assertFactKind } from './kinds.js';
 

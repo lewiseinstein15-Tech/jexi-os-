@@ -9,7 +9,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { fail } from '../../semantica/_internal.js';
+import { fail } from '../../../services/semantica/_internal.js';
 import { projectDir, assertProjectId } from '../observe/scope.js';
 
 const instinctsDir = (root, projectId) => path.join(projectDir(root, projectId), 'instincts');

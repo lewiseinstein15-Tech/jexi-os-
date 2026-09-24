@@ -221,7 +221,7 @@ function dropSessionFromWatchers(sessionId) {
 
 // ── graph reads (lazy, fresh store instance per call — jobs are the writers) ──
 async function graphStatus(project) {
-  const { openGraphStore } = await import('../../capability/code/graph/store.js');
+  const { openGraphStore } = await import('../../../capabilities/graph/code/graph/store.js');
   const store = await openGraphStore(GRAPH_DB, { project });
   const projects = store.listProjects();
   const out = { backend: store.backend, projects };

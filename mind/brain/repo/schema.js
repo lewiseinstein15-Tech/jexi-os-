@@ -10,7 +10,7 @@
  * (when asc, seq asc) — seq is the stable insertion counter, so equal
  * timestamps keep insertion order deterministically.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 /** Frontmatter keys in canonical serialization order. */
 export const FRONTMATTER_KEYS = Object.freeze(['kind', 'slug', 'title', 'tags', 'created_at', 'updated_at']);

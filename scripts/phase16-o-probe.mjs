@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // Phase 16 Scope O — Multi-Agent Chat View probe (P1–P8)
-import { multiagent } from '../ui/web/console/chat/multiagent.js';
-import { runtime } from '../ui/web/console/chat/runtime.js';
-import { router } from '../ui/web/console/chat/router.js';
-import { modes } from '../ui/web/console/chat/modes.js';
-import { queue } from '../ui/web/console/chat/queue.js';
-import { steer } from '../ui/web/console/chat/steer.js';
-import { checkpoints } from '../ui/web/console/chat/checkpoints.js';
-import { approvals } from '../ui/web/console/chat/approvals.js';
-import { draft } from '../ui/web/console/chat/progress-draft.js';
+import { multiagent } from '../interfaces/ui/web/console/chat/multiagent.js';
+import { runtime } from '../interfaces/ui/web/console/chat/runtime.js';
+import { router } from '../interfaces/ui/web/console/chat/router.js';
+import { modes } from '../interfaces/ui/web/console/chat/modes.js';
+import { queue } from '../interfaces/ui/web/console/chat/queue.js';
+import { steer } from '../interfaces/ui/web/console/chat/steer.js';
+import { checkpoints } from '../interfaces/ui/web/console/chat/checkpoints.js';
+import { approvals } from '../interfaces/ui/web/console/chat/approvals.js';
+import { draft } from '../interfaces/ui/web/console/chat/progress-draft.js';
 
 let pass = 0, fail = 0;
 const ok = (c, msg) => { c ? pass++ : fail++; console.log(`  ${c ? '✅' : '❌'} ${msg}`); };

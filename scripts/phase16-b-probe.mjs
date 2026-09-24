@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Phase 16 Scope B — Narration layer probe
-import { narration } from '../workforce/narration/index.js';
-import { taxonomy } from '../events/chat/taxonomy.js';
+import { narration } from '../agents/workforce/narration/index.js';
+import { taxonomy } from '../runtime/events/chat/taxonomy.js';
 
 let pass = 0, fail = 0;
 const ok = (c, msg) => { c ? pass++ : fail++; console.log(`  ${c ? '✅' : '❌'} ${msg}`); };

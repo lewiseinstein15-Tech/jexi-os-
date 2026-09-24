@@ -6,13 +6,13 @@
 import {
   createSectionRegistry,
   isPromptError,
-} from '../prompt/assembly/registry.js';
+} from '../capabilities/prompts/assembly/registry.js';
 import {
   CANONICAL_IDS,
   STATIC_SECTION_IDS,
   DYNAMIC_SECTION_IDS,
   registerCanonical,
-} from '../prompt/assembly/order.js';
+} from '../capabilities/prompts/assembly/order.js';
 
 const EXPECTED_ORDER = [
   'identity', 'output-style', 'system-rules', 'doing-tasks', 'actions',

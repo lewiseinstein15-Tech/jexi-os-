@@ -13,11 +13,11 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createBrowserRuntime } from '../runtimes/browser/index.js';
-import { connectCdp } from '../runtimes/browser/cdp.js';
-import { DomService } from '../runtimes/browser/dom-service.js';
-import { createActionRegistry, actionInventory } from '../runtimes/browser/actions/index.js';
-import { BrowserAgent } from '../runtimes/browser/agent-loop.js';
+import { createBrowserRuntime } from '../runtime/runtimes/browser/index.js';
+import { connectCdp } from '../runtime/runtimes/browser/cdp.js';
+import { DomService } from '../runtime/runtimes/browser/dom-service.js';
+import { createActionRegistry, actionInventory } from '../runtime/runtimes/browser/actions/index.js';
+import { BrowserAgent } from '../runtime/runtimes/browser/agent-loop.js';
 
 const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(SCRIPTS_DIR, '..');

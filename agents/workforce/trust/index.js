@@ -61,7 +61,7 @@ export { scoreOf, signPayload, payloadHash, canonicalJSON, deriveKey, SCHEME, ve
  */
 export function createTrust(options = {}) {
   const root = options.root || REPO_ROOT;
-  const stateDir = path.join(root, 'workforce', 'trust', 'state');
+  const stateDir = path.join(root, 'agents/workforce', 'trust', 'state');
   let agents = options.agents || null;
   let seq = 0;
   let loaded = false;

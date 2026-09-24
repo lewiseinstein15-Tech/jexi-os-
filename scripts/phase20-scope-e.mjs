@@ -5,8 +5,8 @@
  * Raw output only. Run: node scripts/phase20-scope-e.mjs
  * Exit 0 = all pass, 1 = any fail.
  */
-import clotho, { createClotho, Clotho } from '../swarm/loops/clotho.js';
-import { SwarmError } from '../swarm/topologies/_internal.js';
+import clotho, { createClotho, Clotho } from '../agents/swarm/loops/clotho.js';
+import { SwarmError } from '../agents/swarm/topologies/_internal.js';
 
 let failures = 0;
 function verdict(id, ok, msg) {

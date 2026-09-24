@@ -25,12 +25,12 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'node:url';
-import { inferCapabilities } from '../workforce/agents/capabilities.js';
-import { initialTrustLevel } from '../workforce/agents/infer.js';
+import { inferCapabilities } from '../agents/workforce/agents/capabilities.js';
+import { initialTrustLevel } from '../agents/workforce/agents/infer.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..');
-const OUT = path.join(REPO, 'workforce/agents/vendor/agency-agents.specs.json');
+const OUT = path.join(REPO, 'agents/workforce/agents/vendor/agency-agents.specs.json');
 
 const args = process.argv.slice(2);
 const argVal = (flag, dflt) => {

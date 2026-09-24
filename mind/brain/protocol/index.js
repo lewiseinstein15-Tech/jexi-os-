@@ -4,7 +4,7 @@
  * All five operations are async and always resolve to the same envelope shape;
  * dependency/validation failures are values, never raw throws to verb callers.
  */
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { extract as extractGraph } from '../kg/index.js';
 import { FACT_KINDS } from '../hot/index.js';
 import { KIND_DIRS } from '../repo/index.js';

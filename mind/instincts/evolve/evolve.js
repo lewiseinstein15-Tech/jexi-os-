@@ -10,7 +10,7 @@
  *
  * status(root, projectId, clusterId) -> { state: 'evolved'|'candidate', ... }
  */
-import { fail } from '../../semantica/_internal.js';
+import { fail } from '../../../services/semantica/_internal.js';
 import { assertProjectId } from '../observe/scope.js';
 import { nextOp } from '../observe/queue.js';
 import { list } from '../store/query.js';

@@ -10,7 +10,7 @@
  * Response may be `rows[]` or `{ results: rows[] }`, where each row is
  * `{ index, relevance_score }` (zerank shape) or `{ index, relevanceScore }`.
  */
-import { SemanticaError } from '../../../../semantica/_internal.js';
+import { SemanticaError } from '../../../../../services/semantica/_internal.js';
 import { resultText } from '../interface.js';
 
 export const NAME = 'cross-encoder';

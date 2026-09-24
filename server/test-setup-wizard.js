@@ -26,7 +26,7 @@ let failures = 0;
 const ok = (name, cond) => { console.log(`${cond ? '✅' : '❌'} ${name}`); if (!cond) failures += 1; };
 
 /* ─────────────── static source checks ─────────────── */
-const wiz = fs.readFileSync(path.join(ROOT, 'src', 'components', 'SetupWizard.jsx'), 'utf-8');
+const wiz = fs.readFileSync(path.join(ROOT, 'interfaces/console', 'components', 'SetupWizard.jsx'), 'utf-8');
 ok('wizard: two steps (brain → done)', /step === 1/.test(wiz) && /step === 2/.test(wiz) && !/step === 3/.test(wiz));
 ok('wizard: transition earned by a live probe (probeHealth)', /probeHealth\(url\)/.test(wiz));
 ok('wizard: no key step anywhere', !/verifyAccessKey|access [Kk]ey|JEXI_API_KEY|x-jexi-key/.test(wiz));
@@ -34,7 +34,7 @@ ok('wizard: no fetch on mount (static-markup safe)', !/useEffect/.test(wiz));
 ok('wizard: skip escape for later setup', /Skip setup for now/.test(wiz) && /onSkip/.test(wiz));
 ok('wizard: completion hands the proven address up (onDone)', /onDone\(normalizeBase\(url\)\)/.test(wiz));
 
-const app = fs.readFileSync(path.join(ROOT, 'src', 'App.jsx'), 'utf-8');
+const app = fs.readFileSync(path.join(ROOT, 'interfaces/console', 'App.jsx'), 'utf-8');
 ok('app: first-run gates on setup completion', /jexi_setup_done/.test(app) && /<SetupWizard/.test(app));
 ok('app: wizard completion persists url only', /setBackendUrl\(url\)/.test(app) && !/setAccessKey/.test(app));
 
@@ -46,7 +46,7 @@ ok('server: no key gate (no OPEN_PATHS, no 401 lock)', !/OPEN_PATHS/.test(indexJ
 let mod = null;
 try {
   execFileSync(esbuild, [
-    path.join(ROOT, 'src', 'components', 'SetupWizard.jsx'),
+    path.join(ROOT, 'interfaces/console', 'components', 'SetupWizard.jsx'),
     '--bundle', '--platform=node', '--format=cjs', '--loader:.jsx=jsx',
     '--external:react', '--outfile=' + tmpOut, '--log-level=error',
   ], { stdio: 'pipe' });
@@ -70,7 +70,7 @@ const stub = http.createServer((req, res) => {
 });
 await new Promise((r) => stub.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${stub.address().port}`;
-const probeMod = await import(pathToFileURL(path.join(ROOT, 'src', 'utils', 'setupProbe.js')).href);
+const probeMod = await import(pathToFileURL(path.join(ROOT, 'interfaces/console', 'utils', 'setupProbe.js')).href);
 const { probeHealth, normalizeBase } = probeMod;
 ok('probe: no verifyAccessKey export (lock removed)', !('verifyAccessKey' in probeMod));
 

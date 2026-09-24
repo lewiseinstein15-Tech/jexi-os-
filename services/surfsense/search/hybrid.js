@@ -36,7 +36,7 @@ export { VECTOR_LABEL };
 // load; absence is a normal, reported condition — not an error.
 let graphRagModule = null;
 try {
-  graphRagModule = await import('../../capability/rag/graph-rag.js');
+  graphRagModule = await import('../../../capabilities/graph/rag/graph-rag.js');
 } catch {
   graphRagModule = null;
 }

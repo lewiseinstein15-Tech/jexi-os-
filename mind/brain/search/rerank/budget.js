@@ -6,7 +6,7 @@
  * is dependency-free and deterministic: ceil(UTF-16 chars / 4), matching the
  * declared Scope D token heuristic.
  */
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../../services/semantica/_internal.js';
 import { resultText } from './interface.js';
 
 export const DEFAULT_RERANK_BUDGET_TOKENS = 8192;

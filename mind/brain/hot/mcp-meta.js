@@ -7,7 +7,7 @@
  * explicitly invalidate matching source/session entries.
  */
 import { createHash } from 'node:crypto';
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 export const HOT_META_CACHE_CAP = 100;
 

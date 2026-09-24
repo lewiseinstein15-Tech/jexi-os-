@@ -6,7 +6,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert';
 
-import { createExperimentGraph, EXPERIMENT_OWNER } from '../research/workgraph/experiment-node.js';
+import { createExperimentGraph, EXPERIMENT_OWNER } from '../services/research/workgraph/experiment-node.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const probesDir = join(root, 'research', '.probes');

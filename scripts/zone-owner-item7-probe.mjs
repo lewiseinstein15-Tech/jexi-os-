@@ -11,7 +11,7 @@
  */
 import {
   _resetProducer, noteToolPending, recordToolCall, publish, snapshot,
-} from '../events/hud/index.js';
+} from '../runtime/events/hud/index.js';
 
 const DEBOUNCE_MS = 120; // producer.js constant
 const WAIT = 400;        // > 3× debounce

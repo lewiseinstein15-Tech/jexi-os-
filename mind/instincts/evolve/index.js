@@ -10,7 +10,7 @@
  * cluster state live under the instincts root only.
  */
 import fs from 'node:fs';
-import { fail } from '../../semantica/_internal.js';
+import { fail } from '../../../services/semantica/_internal.js';
 import { cluster, DEFAULTS, clusterIdOf, related, evidenceSignature } from './cluster.js';
 import { evolve, status } from './evolve.js';
 import { KINDS } from './emit.js';
@@ -39,4 +39,4 @@ export function createEvolve(root) {
 export { cluster, clusterIdOf, related, evidenceSignature, DEFAULTS } from './cluster.js';
 export { evolve, status } from './evolve.js';
 export { KINDS, buildArtifact } from './emit.js';
-export { SemanticaError } from '../../semantica/_internal.js';
+export { SemanticaError } from '../../../services/semantica/_internal.js';

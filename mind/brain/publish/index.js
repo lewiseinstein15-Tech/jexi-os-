@@ -1,7 +1,7 @@
 /** JEXI OS — Phase 28 Scope K — static publisher public surface. */
 import fs from 'node:fs';
 import path from 'node:path';
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { renderDocument, canonicalPageId, PRIVATE_ID_BEHAVIOR } from './html.js';
 
 function pageCatalog(pages) {

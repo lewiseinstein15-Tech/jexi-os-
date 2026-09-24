@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { NETWORKS, JEXI_NET, SANDBOX_NET, validateNetworkId, isCrossNetwork, DOCKER_VS_PROCESS } from './networks.js';
 import { AuditLog } from './audit.js';
-import { ALLOWED_BINARIES } from '../../security/exec-bridge/allowlist.js';
+import { ALLOWED_BINARIES } from '../../../security/exec-bridge/allowlist.js';
 
 export const RUNTIME_VERSION = '1.0.0';
 

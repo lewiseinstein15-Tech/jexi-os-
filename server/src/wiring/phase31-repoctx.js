@@ -11,7 +11,7 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { repoMap, DEFAULT_BUDGET } from '../../../semantica/repo-map/index.js';
+import { repoMap, DEFAULT_BUDGET } from '../../../services/semantica/repo-map/index.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_ROOT = path.resolve(HERE, '..', '..');

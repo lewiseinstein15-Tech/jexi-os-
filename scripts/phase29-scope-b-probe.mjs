@@ -8,9 +8,9 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-import { action } from '../computer/action/index.js';
-import { registry, assertOperator, createFakeOperator } from '../computer/operators/index.js';
-import { ComputerError } from '../computer/errors.js';
+import { action } from '../services/computer/action/index.js';
+import { registry, assertOperator, createFakeOperator } from '../services/computer/operators/index.js';
+import { ComputerError } from '../services/computer/errors.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

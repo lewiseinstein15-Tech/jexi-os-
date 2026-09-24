@@ -3,7 +3,7 @@
  * Run: node scripts/phase15-e-probe.mjs
  */
 import fs from 'node:fs';
-import { createEvomap, DEFAULT_GENE } from '../evomap/index.js';
+import { createEvomap, DEFAULT_GENE } from '../services/evomap/index.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, label) => { if (cond) { pass += 1; console.log('PASS ' + label); } else { fail += 1; console.log('FAIL ' + label); } };

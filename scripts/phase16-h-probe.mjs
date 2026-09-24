@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Phase 16 Scope H — Display + Interaction Modes probe
-import { modes } from '../ui/web/console/chat/modes.js';
-import { rows } from '../ui/web/console/chat/rows/index.js';
+import { modes } from '../interfaces/ui/web/console/chat/modes.js';
+import { rows } from '../interfaces/ui/web/console/chat/rows/index.js';
 
 let pass = 0, fail = 0;
 const ok = (c, msg) => { c ? pass++ : fail++; console.log(`  ${c ? '✅' : '❌'} ${msg}`); };

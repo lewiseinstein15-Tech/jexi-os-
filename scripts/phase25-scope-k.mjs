@@ -11,8 +11,8 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
 
-import { versioning, VERSIONING_CODES } from '../prompt/versioning/index.js';
-import { testing, ASSERTION_KINDS, TESTING_CODES } from '../prompt/testing/index.js';
+import { versioning, VERSIONING_CODES } from '../capabilities/prompts/versioning/index.js';
+import { testing, ASSERTION_KINDS, TESTING_CODES } from '../capabilities/prompts/testing/index.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = fileURLToPath(import.meta.url);

@@ -1,6 +1,6 @@
 /** JEXI OS — Phase 30 Scope B — skill allowed-tools pattern scoping. */
 import path from 'node:path';
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 const TOOL_NAME = /^[A-Za-z][A-Za-z0-9_.:-]*$/;
 

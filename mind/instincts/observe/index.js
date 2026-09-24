@@ -18,7 +18,7 @@
  * Reuses SemanticaError/fail from Phase 14 (read-only import).
  */
 import fs from 'node:fs';
-import { fail } from '../../semantica/_internal.js';
+import { fail } from '../../../services/semantica/_internal.js';
 import { attachObserver, detachObserver, requireActiveObserver } from './hook.js';
 import { pushObservation, drainObservations, currentOp } from './queue.js';
 import { assertProjectId, projectDir } from './scope.js';
@@ -72,4 +72,4 @@ export function createObserve(instinctsDir) {
 export { attachObserver, detachObserver, requireActiveObserver } from './hook.js';
 export { pushObservation, drainObservations, nextOp, currentOp } from './queue.js';
 export { assertProjectId, projectDir, assertScope } from './scope.js';
-export { SemanticaError } from '../../semantica/_internal.js';
+export { SemanticaError } from '../../../services/semantica/_internal.js';

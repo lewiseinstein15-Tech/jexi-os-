@@ -38,7 +38,7 @@ import { fileURLToPath } from 'node:url';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 // log.js lives at <projectRoot>/prompt/incidents/log.js
-export const PROJECT_ROOT = path.resolve(MODULE_DIR, '..', '..');
+export const PROJECT_ROOT = path.resolve(MODULE_DIR, '..', '..', '..');
 
 /** Machine-readable codes for the incidents zone (Scope H). */
 export const INCIDENT_CODES = Object.freeze({

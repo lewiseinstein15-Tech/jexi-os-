@@ -34,7 +34,7 @@ import { fileURLToPath } from 'node:url';
 export const EXTRACTION_MODE = 'rule-based';
 export const LLM_EXTRACTION_LABEL = 'rule-based - LLM extraction NOT VERIFIED';
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 export function snapshotDir() {
   return process.env.JEXI_RAG_DIR || path.join(REPO_ROOT, '.jexi', 'rag');
