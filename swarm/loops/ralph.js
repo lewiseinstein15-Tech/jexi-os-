@@ -25,6 +25,7 @@
  * - Deterministic given the same task and adjuster.
  */
 import { SwarmError } from '../topologies/_internal.js';
+import { evaluate as evaluateLoopPolicy } from '../../harness/hardening/ralph/diagnostics.js';
 
 export const DEFAULT_MAX_ATTEMPTS = 5;
 
@@ -78,3 +79,34 @@ export function run(task, opts = {}) {
 }
 
 export default { DEFAULT_MAX_ATTEMPTS, run };
+
+/* ── W23e wiring (Phase 31 Scope 3): ralph diagnostics at the loop checkpoint ──
+ * Wiring import + register call ONLY — the run() body above is untouched.
+ * The checkpoint seam is the shipped `adjustContext` option (fires after every
+ * failed attempt): a consumer's adjuster calls emitCheckpoint() with the
+ * iteration props, and every handler registered here receives them. The
+ * shipped loop-policy evaluator (harness/hardening/ralph/diagnostics.js) is
+ * pre-registered below as the default handler. No new error class — reuses
+ * SwarmError from the import above. */
+const checkpointHandlers = new Set();
+
+/** Register a checkpoint handler; returns its unsubscribe fn. */
+export function registerCheckpointHandler(handler) {
+  if (typeof handler !== 'function') {
+    throw new SwarmError('E_INVALID_CHECKPOINT_HANDLER', `checkpoint handler must be a function, got ${typeof handler}`);
+  }
+  checkpointHandlers.add(handler);
+  return () => checkpointHandlers.delete(handler);
+}
+
+/** Invoke every registered checkpoint handler; findings come back in order. */
+export function emitCheckpoint(props) {
+  const results = [];
+  for (const handler of checkpointHandlers) results.push(handler(props));
+  return results;
+}
+
+/** W23e register call: the shipped policy evaluator is the default checkpoint handler. */
+export const defaultCheckpointRegistration = registerCheckpointHandler(
+  (props) => evaluateLoopPolicy(props)
+);

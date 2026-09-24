@@ -28,8 +28,8 @@ Every number below is read from the source tree in this repository; the derivati
 | Divisions | **18** | `workforce/divisions.json` |
 | Built-in tools (12 domains) | **39** | `server/src/tools/domains` |
 | Skills (`SKILL.md` catalog) | **1,164** | `skills/library` |
-| MCP servers registered / enabled by default | **53 / 29** | `server/mcp/registry.json` |
-| Tools exposed by the MCP directory | **538** | `server/mcp/tool-directory.json` |
+| MCP servers registered / enabled by default | **56 / 30** | `server/mcp/registry.json` |
+| Tools exposed by the MCP directory | **542** | `server/mcp/tool-directory.json` |
 | Web search engines (keyed, keyless, and mesh) | **20** | `server/src/services/WebSearch.js` |
 | Computer-use actions | **16** | `server/src/services/ComputerUseTraining.js` |
 | Lifecycle hook events | **30** | `harness/parity/hooks/catalog.js` |

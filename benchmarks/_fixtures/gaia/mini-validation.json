@@ -1,0 +1,59 @@
+{
+  "name": "gaia-mini-validation",
+  "split": "validation",
+  "provenance": {
+    "hf_dataset": "gaia-benchmark/GAIA",
+    "note": "Synthetic 6-task stand-in (2 per level) shaped like the GAIA validation split. All questions are self-contained or well-established facts; answers are deterministic constants. Live read of the real HuggingFace dataset is deferred to scope 17.",
+    "author": "phase-31 scope 11"
+  },
+  "tasks": [
+    {
+      "task_id": "a1b2c3d4-0001-4a01-8a01-000000000001",
+      "question": "What is the capital of France?",
+      "level": "1",
+      "final_answer": "Paris",
+      "file_name": "",
+      "annotator_metadata": "STEPS: 1. Identify the country. 2. Return its capital city."
+    },
+    {
+      "task_id": "a1b2c3d4-0001-4a01-8a01-000000000002",
+      "question": "How many seconds are there in two hours?",
+      "level": "1",
+      "final_answer": "7,200",
+      "file_name": "",
+      "annotator_metadata": "STEPS: 1. One hour has 3600 seconds. 2. Multiply by 2."
+    },
+    {
+      "task_id": "a1b2c3d4-0001-4a01-8a01-000000000003",
+      "question": "A US nickel minted in 1943 contains 35 percent silver by mass and weighs 5.000 grams. Using a silver spot price of 24.50 US dollars per troy ounce, where 1 troy ounce equals 31.1035 grams, what is the value in US dollars of the silver contained in that coin, rounded to the nearest cent?",
+      "level": "2",
+      "final_answer": "$1.38",
+      "file_name": "",
+      "annotator_metadata": "STEPS: 1. Silver mass = 5.000 x 0.35 = 1.75 g. 2. Convert to troy ounces: 1.75 / 31.1035 = 0.056264 oz. 3. Value = 0.056264 x 24.50 = 1.3784. 4. Round to nearest cent."
+    },
+    {
+      "task_id": "a1b2c3d4-0001-4a01-8a01-000000000004",
+      "question": "Which two countries share the longest international land border in the world? Answer as a comma-separated pair in alphabetical order.",
+      "level": "2",
+      "final_answer": "Canada, United States",
+      "file_name": "",
+      "annotator_metadata": "STEPS: 1. Recall the longest international land border (8,891 km). 2. Identify the two countries. 3. Order alphabetically."
+    },
+    {
+      "task_id": "a1b2c3d4-0001-4a01-8a01-000000000005",
+      "question": "During his pre-war exile, Leon Trotsky regularly played chess at the most famous coffeehouse of the Austrian capital. What is the name of that coffeehouse?",
+      "level": "3",
+      "final_answer": "Café Central",
+      "file_name": "",
+      "annotator_metadata": "STEPS: 1. Identify the Austrian capital (Vienna). 2. Identify Trotsky's regular chess coffeehouse there. 3. Return its proper name."
+    },
+    {
+      "task_id": "a1b2c3d4-0001-4a01-8a01-000000000006",
+      "question": "A GAIA evaluation defines three difficulty levels. The mini validation fixture used here ships six tasks in total. Compute the product of the level count and the task count, then add the level count once more. What single number is produced?",
+      "level": "3",
+      "final_answer": "21",
+      "file_name": "",
+      "annotator_metadata": "STEPS: 1. Level count = 3. 2. Task count = 6. 3. Product = 3 x 6 = 18. 4. Add the level count: 18 + 3 = 21."
+    }
+  ]
+}

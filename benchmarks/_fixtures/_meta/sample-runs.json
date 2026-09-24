@@ -1,0 +1,88 @@
+{
+  "gaia": {
+    "benchmark": "gaia",
+    "split": "validation",
+    "fixture": "mini-tasks.json",
+    "perLevel": {
+      "1": { "total": 1, "passed": 1, "rate": 1 },
+      "2": { "total": 1, "passed": 1, "rate": 1 },
+      "3": { "total": 1, "passed": 0, "rate": 0 }
+    },
+    "overall": { "total": 3, "passed": 2, "rate": 0.6666666666666666 },
+    "perTask": [
+      { "task_id": "gaia-mini-001", "level": 1, "pipeline": "web", "pass": true, "answer": "1917", "normalized": "1917", "expected": "1917", "tokens": 812, "durationMs": 3400, "costUsd": 0.0075 },
+      { "task_id": "gaia-mini-002", "level": 2, "pipeline": "web", "pass": true, "answer": "42", "normalized": "42", "expected": "42", "tokens": 1503, "durationMs": 5210, "costUsd": 0.0125 },
+      { "task_id": "gaia-mini-003", "level": 3, "pipeline": "code", "pass": false, "answer": "staged", "normalized": "staged", "expected": "committed", "tokens": 2104, "durationMs": 7308, "costUsd": 0.0175 }
+    ]
+  },
+  "swebench-pro": {
+    "benchmark": "swebench-pro",
+    "split": "lite",
+    "fixture": "mini-tasks.json",
+    "resolved": 2,
+    "total": 3,
+    "rate": 0.6666666666666666,
+    "rejected": [],
+    "perInstance": [
+      { "instance_id": "swb-mini-001", "repo": "astropy/astropy", "language": "python", "failToPass": ["test_units"], "passToPass": ["test_core"], "resolved": true, "tests": { "failToPass": true, "passToPass": true }, "tokens": 5210, "durationMs": 21400, "costUsd": 0.05 },
+      { "instance_id": "swb-mini-002", "repo": "django/django", "language": "python", "failToPass": ["test_migrations"], "passToPass": ["test_apps"], "resolved": true, "tests": { "failToPass": true, "passToPass": true }, "tokens": 6140, "durationMs": 24800, "costUsd": 0.0625 },
+      { "instance_id": "swb-mini-003", "repo": "sympy/sympy", "language": "python", "failToPass": ["test_solve"], "passToPass": ["test_expand"], "resolved": false, "tests": { "failToPass": false, "passToPass": true }, "tokens": 6980, "durationMs": 28900, "costUsd": 0.075 }
+    ]
+  },
+  "terminal-bench": {
+    "benchmark": "terminal-bench",
+    "version": "2.1",
+    "split": "mini",
+    "fixture": "mini-tasks.json",
+    "resolved": 1,
+    "total": 3,
+    "rate": 0.3333333333333333,
+    "rejected": [],
+    "perTask": [
+      { "task_id": "tb-mini-001", "category": "shell", "difficulty": "easy", "instruction": "archive the logs directory", "submitted": true, "stepsUsed": 4, "resolved": true, "actions": ["type", "hotkey", "type", "done"], "verifier": { "kind": "file_exists", "ok": true }, "tokens": 1100, "durationMs": 9800, "costUsd": 0.025 },
+      { "task_id": "tb-mini-002", "category": "git", "difficulty": "medium", "instruction": "rebase the feature branch", "submitted": true, "stepsUsed": 7, "resolved": false, "actions": ["type", "type", "hotkey", "type", "hotkey", "type", "done"], "verifier": { "kind": "exit_code", "ok": false }, "tokens": 1904, "durationMs": 15400, "costUsd": 0.05 },
+      { "task_id": "tb-mini-003", "category": "build", "difficulty": "hard", "instruction": "repair the broken makefile", "submitted": false, "stepsUsed": 9, "resolved": false, "actions": ["type", "type", "type", "type", "type", "type", "type", "type", "type"], "verifier": { "kind": "exit_code", "ok": false }, "tokens": 2760, "durationMs": 21100, "costUsd": 0.075 }
+    ]
+  },
+  "webarena": {
+    "benchmark": "webarena-verified",
+    "version": "v1",
+    "split": "mini",
+    "fixture": "mini-tasks.json",
+    "overall": { "passed": 2, "total": 3, "rate": 0.6666666666666666 },
+    "perSite": [
+      { "site": "shopping", "total": 1, "passed": 1, "rate": 1 },
+      { "site": "reddit", "total": 1, "passed": 0, "rate": 0 },
+      { "site": "gitlab", "total": 1, "passed": 1, "rate": 1 }
+    ],
+    "perTask": [
+      { "task_id": "wa-mini-001", "sites": ["shopping"], "stepsUsed": 4, "passed": true, "evaluatorKinds": ["string_match"], "actions": ["goto", "click", "click", "noop"], "rules": { "string_match": "Order placed" }, "tokens": 2610, "durationMs": 10300, "costUsd": 0.0375 },
+      { "task_id": "wa-mini-002", "sites": ["reddit"], "stepsUsed": 6, "passed": false, "evaluatorKinds": ["a11y_contains"], "actions": ["goto", "click", "type", "click", "click", "noop"], "rules": { "a11y_contains": "Comment posted" }, "tokens": 3520, "durationMs": 14900, "costUsd": 0.0625 },
+      { "task_id": "wa-mini-003", "sites": ["gitlab"], "stepsUsed": 5, "passed": true, "evaluatorKinds": ["url_match"], "actions": ["goto", "click", "type", "click", "noop"], "rules": { "url_match": "issues/42$" }, "tokens": 3040, "durationMs": 12600, "costUsd": 0.05 }
+    ],
+    "rejected": []
+  },
+  "osworld": {
+    "benchmark": "osworld",
+    "version": "v1",
+    "split": "mini",
+    "fixture": "mini-tasks.json",
+    "passAt1": 0.6666666666666666,
+    "perApp": [
+      { "app": "chrome", "total": 5, "passed": 5, "rate": 1 },
+      { "app": "gimp", "total": 5, "passed": 5, "rate": 1 },
+      { "app": "os", "total": 5, "passed": 0, "rate": 0 }
+    ],
+    "perCategory": [
+      { "category": "desktop", "total": 5, "passed": 5, "rate": 1 },
+      { "category": "file", "total": 5, "passed": 0, "rate": 0 },
+      { "category": "web", "total": 5, "passed": 5, "rate": 1 }
+    ],
+    "perTask": [
+      { "task_id": "osw-mini-001", "app": "chrome", "category": "web", "runs": 5, "runsPassed": 5, "rate": 1, "stepsUsed": 3, "rules": { "all": ["app_focus", "screen_size"] }, "actions": ["click", "type", "done"], "runVerdicts": [true, true, true, true, true], "tokens": 4400, "durationMs": 38500, "costUsd": 0.1 },
+      { "task_id": "osw-mini-002", "app": "gimp", "category": "desktop", "runs": 5, "runsPassed": 5, "rate": 1, "stepsUsed": 4, "rules": { "all": ["app_focus"] }, "actions": ["click", "drag", "hotkey", "done"], "runVerdicts": [true, true, true, true, true], "tokens": 5150, "durationMs": 46200, "costUsd": 0.125 },
+      { "task_id": "osw-mini-003", "app": "os", "category": "file", "runs": 5, "runsPassed": 0, "rate": 0, "stepsUsed": 6, "rules": { "cwd_match": "/home/user" }, "actions": ["hotkey", "type", "key_down", "key_up", "type", "wait"], "runVerdicts": [false, false, false, false, false], "tokens": 6300, "durationMs": 55800, "costUsd": 0.15 }
+    ],
+    "rejected": []
+  }
+}

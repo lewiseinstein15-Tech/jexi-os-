@@ -38,7 +38,7 @@ const clickAction = action.parse("click(start_box='<|box_start|>(100,200)<|box_e
 const typeAction = action.parse(String.raw`type(content='hello \'world\'')`);
 
 // ---------------------------------------------------------------------------
-// P1 — registry.list() -> desktop + fake; show capabilities of each
+// P1 — registry.list() -> browser + desktop + fake; show capabilities of each
 // ---------------------------------------------------------------------------
 const listed = registry.list();
 console.log('P1 registry.list() raw:');
@@ -50,8 +50,8 @@ const capsShape = listed.every((o) =>
   ['screenshot', 'mouse', 'keyboard', 'mobile', 'desktop'].every((k) => typeof o.capabilities[k] === 'boolean')
 );
 check(
-  'P1 registry exposes exactly desktop + fake, both with the 5-key capability declaration',
-  names === 'desktop,fake' && capsShape,
+  'P1 registry exposes exactly browser + desktop + fake, all with the 5-key capability declaration',
+  names === 'browser,desktop,fake' && capsShape,
   `names=${names} capsShape=${capsShape} desktop=${JSON.stringify(registry.get('desktop').capabilities)} fake=${JSON.stringify(registry.get('fake').capabilities)}`
 );
 console.log('');

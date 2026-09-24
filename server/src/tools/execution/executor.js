@@ -10,6 +10,7 @@ import { ToolResult } from '../interface/ToolResult.js';
 import { validateCall } from '../registry/ToolRegistry.js';
 import { makePermissionGate, denyByDefault } from './permission-gate.js';
 import { makeRiskGuard } from './risk-guard.js';
+import { assert as assertSkillTools } from '../../../../harness/parity/skills/index.js'; // P30.B — skill allowedTools enforcement (READ-ONLY primitive)
 import { runPostToolUseHook } from '../../kernel/hooks/runner.js'; // Phase 7(B) — PostToolUse hook point
 import { observePostToolUse } from '../../kernel/hooks/learning-seam.js'; // Phase 7(C) — observer journal
 import { hudObservePostToolUse } from '../../kernel/hooks/hud-seam.js'; // Phase 7(F) — HUD toolCalls feed
@@ -29,6 +30,15 @@ export function makeExecutor({ engines = {}, permissions = {}, risk = {} } = {})
       const v = validateCall(call);
       if (!v.valid) return fail(new Error(`schema: ${v.errors.join('; ')}`));
       const def = v.definition;
+
+      // 1.5 P30.B — skill allowedTools enforcement (fail-closed). Fires only
+      // when the call carries a skill context (ctx.skill); calls without a
+      // skill are unaffected. Refusal reuses the shipped E_TOOL_NOT_ALLOWED
+      // error class — no new error class, no policy change for plain calls.
+      if (ctx && ctx.skill) {
+        try { assertSkillTools(ctx.skill, { tool: call.name, args: call.arguments }); }
+        catch (err) { return fail(err); }
+      }
 
       // 2. Permission gate (deny-by-default) — Phase 7(B): PreToolUse hooks
       //    run inside the gate, BEFORE the permission check.
