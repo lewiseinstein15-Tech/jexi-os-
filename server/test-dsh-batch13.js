@@ -41,7 +41,7 @@ console.log('\n== 1. Manifest completeness (every DSH package tracked) ==');
   for (const pkg of ['session-query/session-query', 'session-query/session-log-export', 'session-query/session-query-sqlite', 'session-query/tool-session-query', 'util/brand', 'util/native-command', 'util/output-retention', 'fs/tool-fs-search', 'compaction/compaction-tool-result-pruner', 'web/web-search-exa', 'core/system-prompt', 'client/ui-slots', 'boot/cmdline', 'test-support/acp-snapshot']) {
     ok(`tracked: ${pkg}`, names.includes(pkg));
   }
-  const parity = fs.readFileSync(path.join(SERVER_DIR, '..', 'DSH-PARITY.md'), 'utf-8');
+  const parity = fs.readFileSync(path.join(SERVER_DIR, '..', 'docs', 'guides', 'DSH-PARITY.md'), 'utf-8');
   ok('parity doc says 229/100%', parity.includes("229") && parity.includes('100%'));
   // Manifest file itself parses and matches the generator shape.
   const manifest = JSON.parse(fs.readFileSync(path.join(SERVER_DIR, 'bundles', 'manifest.json'), 'utf-8'));

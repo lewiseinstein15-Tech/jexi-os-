@@ -4,10 +4,10 @@
  * Loads the roster from disk. No hardcoded lists: every row is parsed from a
  * real file. Two inputs, one roster:
  *
- *   1. Live tree  — agents/**\/*.agent.md, server/agents, jexi-agents,
+ *   1. Live tree  — agents/catalog/**\/*.agent.md, server/agents, agents/jexi,
  *                   plugin.json contributions, SOUL profiles, runtime
  *                   employees. Re-read on every load so edits land immediately.
- *   2. Vendor catalog — workforce/agents/vendor/agency-agents.specs.json, the
+ *   2. Vendor catalog — agents/workforce/agents/vendor/agency-agents.specs.json, the
  *                   machine-usable projection of msitarzewski/agency-agents
  *                   (see vendor/README.md for provenance and the pinned SHA).
  *
@@ -28,7 +28,7 @@ import { inferCapabilities } from './capabilities.js';
 import { inferDivision, initialTrustLevel } from './infer.js';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_ROOT = path.resolve(MODULE_DIR, '../..');
+const DEFAULT_ROOT = path.resolve(MODULE_DIR, '../../..');
 
 export const VENDOR_CATALOG = path.join(MODULE_DIR, 'vendor', 'agency-agents.specs.json');
 
@@ -106,7 +106,7 @@ function loadTree(root, errors) {
   const out = [];
   const add = (row) => { const s = tryMake(row, errors); if (s) out.push(s); };
 
-  for (const f of walk(path.join(root, 'agents'))) {
+  for (const f of walk(path.join(root, 'agents/catalog'))) {
     if (!f.endsWith('.agent.md')) continue;
     const text = fs.readFileSync(f, 'utf8');
     const meta = parseFrontmatter(text);
@@ -147,7 +147,7 @@ function loadTree(root, errors) {
     }
   }
 
-  for (const f of walk(path.join(root, 'jexi-agents'))) {
+  for (const f of walk(path.join(root, 'agents/jexi'))) {
     if (!f.endsWith('.md')) continue;
     const text = fs.readFileSync(f, 'utf8');
     const meta = parseFrontmatter(text);
@@ -228,7 +228,7 @@ function loadTree(root, errors) {
 }
 
 function loadVendor(root, errors) {
-  const catalog = path.join(root, 'workforce/agents/vendor/agency-agents.specs.json');
+  const catalog = path.join(root, 'agents/workforce/agents/vendor/agency-agents.specs.json');
   if (!fs.existsSync(catalog)) return [];
   let data;
   try { data = JSON.parse(fs.readFileSync(catalog, 'utf8')); } catch { return []; }

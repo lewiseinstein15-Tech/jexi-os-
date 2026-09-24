@@ -1,7 +1,7 @@
 /**
  * JEXI OS — Phase 20 Scope B — hive-mind entry point.
  *
- *   import hive from 'swarm/hive/index.js';
+ *   import hive from 'agents/swarm/hive/index.js';
  *   hive.create({ queen: { type: 'strategist' }, workers: [...] });
  *   hive.assign('worker-1', 'map the corpus');
  *   hive.report('worker-1', 'task-001', { found: 42 });

@@ -25,7 +25,7 @@ const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process
 const { REGISTERED_URLS } = await import(
   pathToFileURL(join(ROOT, 'intelligence', 'trust-pipeline', 'registered-urls.js')).href
 );
-const dataSources = readFileSync(join(ROOT, 'DATA_SOURCES.md'), 'utf8');
+const dataSources = readFileSync(join(ROOT, 'docs', 'guides', 'DATA_SOURCES.md'), 'utf8');
 
 const rows = REGISTERED_URLS.map((r) => {
   // Exact-host match first; fall back to base-domain match for

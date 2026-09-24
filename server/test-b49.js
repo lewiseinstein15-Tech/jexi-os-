@@ -94,7 +94,7 @@ const legalPlan = await planner.analyzeIntent('draft a non-disclosure agreement'
 check('P1: legal phrasings route to legal_task (got ' + legalPlan.intent + ')', legalPlan.intent === 'legal_task');
 
 /* ---------------- P4 — catalog matches reality ---------------- */
-const catalogPath = path.resolve(__dirname, '../AGENT-CATALOG.md');
+const catalogPath = path.resolve(__dirname, '../docs/guides/AGENT-CATALOG.md');
 const catalog = fs.readFileSync(catalogPath, 'utf-8');
 const header = `**${report.counts.agents} specialist agents · ${report.counts.skills} skills · ${report.counts.tools} tools · 1 orchestrator.`;
 check('P4: AGENT-CATALOG.md header matches live counts', catalog.includes(header));

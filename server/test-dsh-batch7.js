@@ -205,7 +205,7 @@ console.log('\n== 7. Subagent tool provider routing ==');
 /* ══════════════ 8. FRONTEND PANEL + INTEGRATION ══════════════ */
 console.log('\n== 8. Frontend panel + integration ==');
 {
-  const panel = fs.readFileSync(path.join(__dirname_path(), '..', 'src', 'components', 'SettingsPanel.jsx'), 'utf-8');
+  const panel = fs.readFileSync(path.join(__dirname_path(), '..', 'interfaces', 'console', 'components', 'SettingsPanel.jsx'), 'utf-8');
   ok('SettingsPanel has the permission presets UI', panel.includes('PERMISSION PRESETS') && panel.includes('/api/permissions') && panel.includes('autonomous'));
   const { TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
   ok('registry stable at 207', TOOL_COUNT === 219);

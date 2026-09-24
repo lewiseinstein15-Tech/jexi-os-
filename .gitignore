@@ -39,7 +39,7 @@ __pycache__/
 *.pyc
 .jexi-secrets/
 scripts/apkinspect/
-hooks/state/
+infra/hooks/state/
 
 # Suite-runner scratch state (chunked test runner) — untracked by design;
 # listed here so probe zone checks (git status --porcelain) never see it.

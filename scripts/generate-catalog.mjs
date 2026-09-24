@@ -16,7 +16,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const CATALOG = path.join(ROOT, 'AGENT-CATALOG.md');
+const CATALOG = path.join(ROOT, 'docs', 'guides', 'AGENT-CATALOG.md');
 
 const { AGENT_ROSTER, SKILL_REGISTRY } = await import(path.join(ROOT, 'server/src/services/AgentRoster.js'));
 const { TOOL_REGISTRY } = await import(path.join(ROOT, 'server/src/services/ToolRegistry.js'));

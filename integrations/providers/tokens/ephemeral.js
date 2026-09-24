@@ -235,7 +235,7 @@ export function createEphemeral({ hmacKey, scopes, now = () => Date.now() } = {}
 
 /**
  * Default engine — module-level instance matching the contract:
- *   import { mint, verify } from 'providers/tokens/ephemeral.js';
+ *   import { mint, verify } from 'integrations/providers/tokens/ephemeral.js';
  */
 const defaultEngine = createEphemeral();
 export const mint = defaultEngine.mint;

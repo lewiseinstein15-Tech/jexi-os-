@@ -28,7 +28,7 @@ import fs from 'fs';
 import path from 'path';
 import { SERVER_ROOT } from '../config.js';
 
-export const AGENTS_DIR = process.env.JEXI_AGENTS_DIR || path.resolve(SERVER_ROOT, '..', 'jexi-agents');
+export const AGENTS_DIR = process.env.JEXI_AGENTS_DIR || path.resolve(SERVER_ROOT, '..', 'agents', 'jexi');
 export const COWORKERS_DIR = path.join(AGENTS_DIR, 'coworkers');
 
 /** WorkerRouter role slug → coworker file name. */

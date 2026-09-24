@@ -6,7 +6,7 @@
  * whether the docs' tool-count claims match the real registry.
  *
  * Library use:
- *   import { runAudit } from 'tools/registry/audit.js';
+ *   import { runAudit } from 'capabilities/tools/registry/audit.js';
  *   const { ok, drift, real, claimed } = runAudit();
  *
  * CLI:

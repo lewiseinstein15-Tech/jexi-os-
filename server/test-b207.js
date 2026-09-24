@@ -41,7 +41,7 @@ console.log('B207: layout regression guard\n');
 // --- 1. source contracts (the fix itself) ---
 console.log('[1] Fix contracts');
 {
-  const css = read('src/index.css');
+  const css = read('interfaces/console/index.css');
   check('panel capped (max-width:100% + min-width:0)', /\.jx-agent \{[^}]*max-width: 100%;[^}]*min-width: 0;/.test(css));
   check('activity cell may shrink (row-what min-width:0)', /\.jx-agent-row-what \{[^}]*min-width: 0;/.test(css));
   check('agent name cell may shrink (row-who min-width:0)', /\.jx-agent-row-who \{[^}]*min-width: 0;/.test(css));

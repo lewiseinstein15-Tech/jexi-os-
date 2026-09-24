@@ -43,7 +43,7 @@ export const ERRORS = {
 };
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(MODULE_DIR, '../..');
+const REPO_ROOT = path.resolve(MODULE_DIR, '../../..');
 const SEQ_FILE = 'trust-seq.txt';
 const STATE_FILE = 'trust-state.json';
 

@@ -52,7 +52,7 @@ const idx = fs.readFileSync(path.join(__d, 'index.js'), 'utf-8');
 ok(/runAgentLoop\(\{\s*query,\s*image,\s*sendEvent,\s*opts:\s*profile/.test(idx), '/api/agent passes profile inside opts');
 
 console.log('\n== 5. Settings picker wiring (static) ==');
-const settings = fs.readFileSync(path.join(__d, '..', 'src', 'components', 'SettingsView.jsx'), 'utf-8');
+const settings = fs.readFileSync(path.join(__d, '..', 'interfaces', 'console', 'components', 'SettingsView.jsx'), 'utf-8');
 ok(settings.includes('/api/tools/profile') && settings.includes("method: 'POST'"), 'picker POSTs to /api/tools/profile');
 ok(settings.includes('Tool permissions') && settings.includes('activeProfile'), 'picker renders profiles + active state from /api/tools');
 

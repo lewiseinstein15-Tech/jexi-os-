@@ -211,7 +211,7 @@ console.log('\n== 6. LLM mock server (test-support) ==');
 /* ══════════════ 7. SCHEMA FORM + THEME (client modules) ══════════════ */
 console.log('\n== 7. Schema form + theme (client modules) ==');
 {
-  const form = await import(pathToFileURL(path.join(SERVER_DIR, '..', 'src', 'utils', 'schemaForm.js')).href);
+  const form = await import(pathToFileURL(path.join(SERVER_DIR, '..', 'interfaces', 'console', 'utils', 'schemaForm.js')).href);
   const spec = { fields: { name: { type: 'string', required: true, label: 'Name' }, age: { type: 'number', min: 0, max: 120 }, role: { options: ['admin', 'user'] } } };
   ok('valid form', form.validateForm({ name: 'JEXI', age: 3, role: 'admin' }, spec).valid === true);
   const bad = form.validateForm({ age: 200 }, spec);
@@ -219,7 +219,7 @@ console.log('\n== 7. Schema form + theme (client modules) ==');
   ok('options validated', form.validateForm({ name: 'x', role: 'root' }, spec).errors.role.includes('admin'));
   const coerced = form.coerceFormValues({ age: '42', on: 'true' }, spec);
   ok('coercion to number', coerced.age === 42);
-  const theme = await import(pathToFileURL(path.join(SERVER_DIR, '..', 'src', 'utils', 'theme.js')).href);
+  const theme = await import(pathToFileURL(path.join(SERVER_DIR, '..', 'interfaces', 'console', 'utils', 'theme.js')).href);
   ok('theme get/set', theme.setTheme('light') === 'light' && theme.setTheme('dark') === 'dark');
   ok('theme init applies', theme.initTheme() === 'dark' || theme.initTheme() === 'light');
 }

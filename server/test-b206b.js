@@ -35,7 +35,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // → "Cannot read properties of null (reading 'useState')". (Phase 3 C1 fix.)
 const bundlePath = path.join(ROOT, 'server/node_modules/.tmp/at.mjs');
 fs.mkdirSync(path.dirname(bundlePath), { recursive: true });
-execSync(`npx esbuild src/components/AgentThinking.jsx --bundle --format=esm --outfile="${bundlePath}" --external:react --jsx=automatic --log-level=error`, { cwd: ROOT, stdio: 'pipe' });
+execSync(`npx esbuild interfaces/console/components/AgentThinking.jsx --bundle --format=esm --outfile="${bundlePath}" --external:react --jsx=automatic --log-level=error`, { cwd: ROOT, stdio: 'pipe' });
 
 const { default: AgentThinking } = await import(bundlePath);
 const React = (await import('react')).default;

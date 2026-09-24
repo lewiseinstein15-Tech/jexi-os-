@@ -19,9 +19,9 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url)); // server/src/routes
-// Dev: <root>/server/src/routes → <root>/events/hud · Container (context=server → /app): /app/src/routes → /app/events/hud
+// Dev: <root>/server/src/routes → <root>/runtime/events/hud · Container (context=server → /app): /app/src/routes → /app/events/hud (CI copies runtime/events/hud → server/events/)
 const HUD_CANDIDATES = [
-  path.resolve(MODULE_DIR, '..', '..', '..', 'events', 'hud', 'index.js'),
+  path.resolve(MODULE_DIR, '..', '..', '..', 'runtime', 'events', 'hud', 'index.js'),
   path.resolve(MODULE_DIR, '..', '..', 'events', 'hud', 'index.js'),
 ];
 

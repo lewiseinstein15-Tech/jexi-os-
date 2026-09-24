@@ -67,7 +67,7 @@ export function saveConfig(cfg, home = jexiHome()) {
 
 /**
  * Locate the backend server directory.
- * Order: JEXI_SERVER_DIR env → <cli-dir>/../server (repo checkout layout).
+ * Order: JEXI_SERVER_DIR env → <repo>/server (repo checkout layout, CLI now at interfaces/cli/).
  */
 export function findServerDir() {
   if (process.env.JEXI_SERVER_DIR && fs.existsSync(path.join(process.env.JEXI_SERVER_DIR, 'index.js'))) {
@@ -75,9 +75,9 @@ export function findServerDir() {
   }
   try {
     const cliDir = path.dirname(fileURLToPath(import.meta.url));
-    const candidate = path.resolve(cliDir, '..', '..', 'server');
-    // cli/lib/config.js → cli/ → repo/ → repo/server
-    const repoServer = path.resolve(path.dirname(cliDir), '..', 'server');
+    const candidate = path.resolve(cliDir, '..', '..', '..', 'server');
+    // interfaces/cli/lib/config.js → cli/ → interfaces/ → repo/ → repo/server
+    const repoServer = path.resolve(path.dirname(cliDir), '..', '..', 'server');
     void candidate;
     if (fs.existsSync(path.join(repoServer, 'index.js'))) return repoServer;
   } catch { /* fall through */ }

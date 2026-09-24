@@ -7,14 +7,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const SERVER_ROOT = '/home/z/my-project/jexi-os/server';
-const REPO_ROOT = '/home/z/my-project/jexi-os';
-const OUT = '/home/z/my-project/probe-out/scope-g';
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const SERVER_ROOT = path.join(REPO_ROOT, 'server');
+const OUT = path.join(REPO_ROOT, 'scripts', 'probe-out', 'scope-g');
 fs.mkdirSync(OUT, { recursive: true });
 
-const C = await import(pathToFileURL(path.join(REPO_ROOT, 'commands', 'index.js')).href);
+const C = await import(pathToFileURL(path.join(REPO_ROOT, 'capabilities', 'commands', 'index.js')).href);
 const Observer = await import(pathToFileURL(path.join(SERVER_ROOT, 'src', 'services', 'Observer.js')).href);
 
 const canLLM = process.env.POLLINATIONS_API_KEY || process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY;
@@ -128,7 +128,7 @@ function busEvents(prefix) {
 {
   // generate a REAL observation journal through the real learning observer
   // (post-phase records shaped exactly like the kernel seam writes them)
-  const observerMod = await import(pathToFileURL(path.join(REPO_ROOT, 'learning', 'observer.js')).href);
+  const observerMod = await import(pathToFileURL(path.join(REPO_ROOT, 'mind', 'learning', 'observer.js')).href);
   const sessionId = `scope-g-p5-${Date.now()}`;
   const observed = [];
   const post = (turn, tool, args, ok, extra = {}) => {

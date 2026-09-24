@@ -5,7 +5,7 @@
  * "No exploit, no report": a finding reaches a report only when THIS
  * layer says VERIFIED — and stays VERIFIED (snapshot intact).
  *
- *   import { ExploitVerifier, verifyFindingOnGraph } from 'verification/verifiers/index.js';
+ *   import { ExploitVerifier, verifyFindingOnGraph } from 'tests/verification/verifiers/index.js';
  *   const verifier = new ExploitVerifier({ graph, agent: 'security-verifier' });
  *   const verdict = await verifier.verifyFinding({ finding, record, target, engagement, exploitedBy });
  *   const integrity = verifier.integrityCheck({ findingId });

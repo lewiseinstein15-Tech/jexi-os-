@@ -9,7 +9,7 @@
  * expand — the attack-chain graph ships first because the Phase 8 pentest
  * pipeline persists into it (see security/pipeline integration).
  *
- *   import { open, pipelineGraph } from 'knowledge/index.js';
+ *   import { open, pipelineGraph } from 'mind/knowledge/index.js';
  *   const graph = open({ dbPath: '/abs/graph.db' });
  *   const g2 = pipelineGraph(ctx);   // engagement-scoped, durable path
  */

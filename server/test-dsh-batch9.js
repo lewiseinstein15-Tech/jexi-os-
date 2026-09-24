@@ -80,7 +80,7 @@ console.log('\n== 2. Bundle base (manifest + parity tracker) ==');
 /* ══════════════ 3. GATEWAY CLIENT (frontend) ══════════════ */
 console.log('\n== 3. Gateway client (api/gateway client mirror) ==');
 {
-  const mod = await import(pathToFileURL(path.join(SERVER_DIR, '..', 'src', 'utils', 'gatewayClient.js')).href);
+  const mod = await import(pathToFileURL(path.join(SERVER_DIR, '..', 'interfaces', 'console', 'utils', 'gatewayClient.js')).href);
   const { gatewayFetch, GatewayError } = mod;
 
   // A tiny local HTTP server to exercise retry + errors (no key header sent).
@@ -126,7 +126,7 @@ console.log('\n== 3. Gateway client (api/gateway client mirror) ==');
 /* ══════════════ 4. CLIENT RUNTIME (frontend) ══════════════ */
 console.log('\n== 4. Client runtime + projection store ==');
 {
-  const mod = await import(pathToFileURL(path.join(SERVER_DIR, '..', 'src', 'utils', 'jexiRuntime.js')).href);
+  const mod = await import(pathToFileURL(path.join(SERVER_DIR, '..', 'interfaces', 'console', 'utils', 'jexiRuntime.js')).href);
   const { ConnectionStatus, LocaleRuntime, ProjectionStore } = mod;
 
   const locale = new LocaleRuntime({ fetchStrings: false });

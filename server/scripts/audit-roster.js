@@ -28,7 +28,7 @@ import { analyze, executionModel, reachabilitySummary } from '../src/services/Re
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
-const CATALOG_PATH = path.join(REPO_ROOT, 'AGENT-CATALOG.md');
+const CATALOG_PATH = path.join(REPO_ROOT, 'docs', 'guides', 'AGENT-CATALOG.md');
 
 const report = analyze();
 

@@ -27,7 +27,7 @@ const read = (p) => fs.readFileSync(path.join(__dirname, p), 'utf-8');
 // P1 — FRONTEND: full-width chat + compact plan header.
 // ===========================================================================
 {
-  const cc = read('../src/components/CommandCenter.jsx');
+  const cc = read('../interfaces/console/components/CommandCenter.jsx');
   check('P1 CommandCenter no longer constrains the chat to max-w-[680px]', !/max-w-\[680px\]/.test(cc));
   check('P1 CommandCenter main column spans the work surface', /w-full min-w-0/.test(cc) || /w-full/.test(cc));
   check('P1 plan header collapses stages by default', /COLLAPSED_STAGES/.test(cc));
