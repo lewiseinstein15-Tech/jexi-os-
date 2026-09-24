@@ -5,6 +5,12 @@
  */
 
 import { JEXI_IDENTITY, IDENTITY_ANSWER, buildCapabilityLines, buildLimitationLines, buildIdentityPrompt } from './src/services/JexiIdentity.js';
+import { facts as selfFacts } from '../brain/self/index.js';
+
+// Canonical self facts — single source of truth: brain/self/core.md (Phase 31 Scope 19).
+// Identity asserts below are INVARIANTS derived from core.md; no builder string is hardcoded.
+const SELF = selfFacts().facts;
+const whoBuiltLine = (p) => (p.split('\n').find((l) => l.startsWith('WHO BUILT YOU:')) || '');
 
 let passed = 0;
 let failed = 0;
@@ -17,13 +23,13 @@ console.log('\n== Identity facts ==');
 ok(JEXI_IDENTITY.name === 'JEXI', 'name is JEXI');
 ok(JEXI_IDENTITY.fullName === 'JEXI OS', 'full name is JEXI OS');
 ok(JEXI_IDENTITY.createdBy && JEXI_IDENTITY.createdBy.length > 0, 'creator is set');
-ok(JEXI_IDENTITY.createdBy === 'Lewis Einstein', 'creator is Lewis Einstein');
+ok(SELF.builder_primary === 'Lewis' && SELF.builder_secondary.includes('JEXI'), 'core.md declares builder_primary Lewis + JEXI builder_secondary');
 ok(JEXI_IDENTITY.tagline && JEXI_IDENTITY.tagline.length > 20, 'tagline present');
 
 console.log('\n== Deterministic answer (no keys needed) ==');
 ok(IDENTITY_ANSWER.includes('JEXI OS'), 'answer names JEXI OS');
-ok(IDENTITY_ANSWER.includes('Lewis Einstein'), 'answer names the creator');
-ok(IDENTITY_ANSWER.includes('created by'), 'answer says who built her');
+ok(IDENTITY_ANSWER.includes(JEXI_IDENTITY.createdBy), 'answer names the creator as sourced from core.md');
+ok(JEXI_IDENTITY.createdBy.includes(SELF.builder_primary) && JEXI_IDENTITY.createdBy.includes(SELF.builder_secondary) && JEXI_IDENTITY.createdBy.includes('Lewis'), 'creator is sourced from core.md (Lewis + JEXI agents, no hardcoded string)');
 ok(/specialist agent/.test(IDENTITY_ANSWER), 'answer mentions the agent roster');
 
 console.log('\n== Live capabilities ==');
@@ -39,14 +45,14 @@ ok(limits.some((l) => /RiskGuard/.test(l)), 'limitations mention the real risk g
 console.log('\n== System-prompt embedding ==');
 const prompt = buildIdentityPrompt();
 ok(prompt.includes('You are **JEXI OS**'), 'system prompt embeds identity');
-ok(prompt.includes('WHO BUILT YOU: Lewis Einstein'), 'system prompt names the builder');
+ok(whoBuiltLine(prompt).includes(SELF.builder_primary) && whoBuiltLine(prompt).includes(SELF.builder_secondary), 'system prompt WHO BUILT YOU: line resolves from core.md');
 ok(prompt.includes('WHAT YOU CAN DO'), 'system prompt lists capabilities');
 ok(prompt.includes('WHAT YOU WON\'T DO'), 'system prompt lists limitations');
 
 console.log('\n== B103 — normal-mode prompt carries the SAME identity ==');
 const { JEXI_NORMAL_PROMPT, JEXI_SYSTEM_PROMPT, IDENTITY_QUESTION_RE } = await import('./src/services/JexiPrompt.js');
 ok(JEXI_NORMAL_PROMPT.includes('You are **JEXI OS**'), 'normal prompt embeds the canonical identity');
-ok(JEXI_NORMAL_PROMPT.includes('WHO BUILT YOU: Lewis Einstein'), 'normal prompt names the builder');
+ok(whoBuiltLine(JEXI_NORMAL_PROMPT).includes(SELF.builder_primary) && whoBuiltLine(JEXI_NORMAL_PROMPT).includes(SELF.builder_secondary), 'normal prompt WHO BUILT YOU: line resolves from core.md');
 ok(JEXI_NORMAL_PROMPT.includes('WHAT YOU CAN DO'), 'normal prompt lists live capabilities');
 ok(JEXI_NORMAL_PROMPT.includes('WHAT YOU WON\'T DO'), 'normal prompt lists real limitations');
 ok(/ANSWER THE QUESTION|answer the user's question directly/i.test(JEXI_NORMAL_PROMPT), 'normal prompt answers directly');
