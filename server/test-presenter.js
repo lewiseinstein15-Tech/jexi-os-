@@ -24,7 +24,7 @@ const ok = (name, cond) => {
 /* ══════════════ 1. CHART ENGINE ══════════════ */
 console.log('\n== 1. chart engine (real SVG graphs) ==');
 {
-  const { chartSvg } = await import('../src/utils/chartSvg.js');
+  const { chartSvg } = await import('../interfaces/console/utils/chartSvg.js');
 
   const bar = chartSvg(JSON.stringify({ type: 'bar', title: 'Revenue', unit: 'KSh', data: { Q1: 120, Q2: 180, Q3: 90 } }));
   ok('bar chart renders an SVG', bar.svg && bar.svg.startsWith('<svg') && bar.svg.includes('</svg>'));
@@ -124,7 +124,7 @@ console.log('\n== 4. presenter contract + renderer wiring ==');
   ok('contract: image_search for pictures', FORMAT_RULES.includes('image_search'));
   ok('contract: tables for numbers', FORMAT_RULES.includes('TABLE'));
 
-  const mr = fs.readFileSync(path.join(ROOT, 'src/components/MarkdownRenderer.jsx'), 'utf-8');
+  const mr = fs.readFileSync(path.join(ROOT, 'interfaces/console/components/MarkdownRenderer.jsx'), 'utf-8');
   ok('renderer: chart fence handled (ChartBlock)', mr.includes("lang === 'chart'") && mr.includes('ChartBlock'));
   ok('renderer: useMemo imported (runtime safety)', /import React, {[^}]*useMemo/.test(mr));
   ok('renderer: mermaid diagrams', mr.includes('MermaidBlock'));

@@ -22,9 +22,13 @@ export default defineConfig({
   plugins: [react(), jexiBuildStamp()],
   // Relative base: works on Vercel (root) and GitHub Pages (subpath)
   base: './',
+  // publicDir moved with the restructure: root public/ → interfaces/public/
+  // (holds sw.js). Without this, Vite's default 'public' dir is missing and
+  // the service worker silently disappears from dist/.
+  publicDir: 'interfaces/public',
   // Pin the dependency scanner to the real app entry. Without this, Vite
   // auto-discovers EVERY index.html in the project — including the COMPILED
-  // Android bundle at android/app/src/main/assets/public/index.html — and
+  // Android bundle at interfaces/android/app/src/main/assets/public/index.html — and
   // crashes the dev server trying to resolve imports inside that built file
   // ("@emotion/is-prop-valid could not be resolved").
   optimizeDeps: {

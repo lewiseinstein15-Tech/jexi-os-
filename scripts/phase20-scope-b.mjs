@@ -5,9 +5,9 @@
  * Raw output only. Run: node scripts/phase20-scope-b.mjs
  * Exit 0 = all pass, 1 = any fail.
  */
-import { Hive } from '../swarm/hive/index.js';
-import { SwarmError } from '../swarm/topologies/_internal.js';
-import hive from '../swarm/hive/index.js';
+import { Hive } from '../agents/swarm/hive/index.js';
+import { SwarmError } from '../agents/swarm/topologies/_internal.js';
+import hive from '../agents/swarm/hive/index.js';
 
 let failures = 0;
 function verdict(id, ok, msg) {

@@ -1,7 +1,7 @@
 // PHASE 21 — SCOPE G — LIVE PROBE: the simplicity criterion.
 // Zone-compliant: no file writes at all.
 import assert from 'node:assert';
-import { score, compare, SIMPLICITY_EPS } from '../research/simplicity/scorer.js';
+import { score, compare, SIMPLICITY_EPS } from '../services/research/simplicity/scorer.js';
 
 const show = (label, s) => {
   console.log(`[${label}] metricGain=${s.metricGain} complexityCost=${s.complexityCost} minimumGain=${s.minimumGain?.toFixed(6)} worth=${s.worth}`);

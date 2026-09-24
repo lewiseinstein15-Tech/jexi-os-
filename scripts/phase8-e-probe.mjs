@@ -18,7 +18,7 @@ import path from 'node:path';
 import net from 'node:net';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { createDualNetwork, dockerAvailable, NETWORKS, DOCKER_VS_PROCESS, ISOLATION_SPEC } from '../runtimes/sandbox/index.js';
+import { createDualNetwork, dockerAvailable, NETWORKS, DOCKER_VS_PROCESS, ISOLATION_SPEC } from '../runtime/runtimes/sandbox/index.js';
 import { createWorkflow } from '../security/pipeline/index.js';
 import { openEngagements } from '../security/engagements/store.js';
 
@@ -307,7 +307,7 @@ async function P10() {
   });
   const attempts = [
     ['write_file', { path: path.join(REPO, 'security/exec-bridge/allowlist.js'), content: 'pwned' }],
-    ['write_file', { path: path.join(REPO, 'runtimes/sandbox/dual-network.js'), content: 'pwned' }],
+    ['write_file', { path: path.join(REPO, 'runtime/runtimes/sandbox/dual-network.js'), content: 'pwned' }],
     ['read_file', { path: path.join(REPO, '.jexi-secrets/git-token') }],
     ['write_file', { path: '/etc/passwd', content: 'pwned' }],
   ];

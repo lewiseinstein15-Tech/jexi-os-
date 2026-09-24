@@ -6,7 +6,7 @@
 import {
   createReranker, rerank as defaultRerank, requiredTokens,
   DEFAULT_RERANK_TOP_K, DEFAULT_CROSS_ENCODER_MODEL,
-} from '../brain/search/rerank/index.js';
+} from '../mind/brain/search/rerank/index.js';
 
 let pass = 0;
 let fail = 0;

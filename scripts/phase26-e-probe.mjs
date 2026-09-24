@@ -3,9 +3,9 @@
  * Run: node scripts/phase26-e-probe.mjs
  */
 import fs from 'node:fs';
-import { createInstincts } from '../instincts/core/index.js';
-import { createInstinctStore } from '../instincts/store/index.js';
-import { createIo } from '../instincts/io/index.js';
+import { createInstincts } from '../mind/instincts/core/index.js';
+import { createInstinctStore } from '../mind/instincts/store/index.js';
+import { createIo } from '../mind/instincts/io/index.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, label) => { if (cond) { pass += 1; console.log('PASS ' + label); } else { fail += 1; console.log('FAIL ' + label); } };

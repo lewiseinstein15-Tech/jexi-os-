@@ -11,13 +11,13 @@
  */
 import { execSync } from 'node:child_process';
 import os from 'node:os';
-import search from '../surfsense/search/index.js';
-import { SurfError } from '../surfsense/connectors/_internal.js';
+import search from '../services/surfsense/search/index.js';
+import { SurfError } from '../services/surfsense/connectors/_internal.js';
 
 // consolidation cleanup: snapshot dir is host-portable now (os.tmpdir()),
 // overridable via JEXI_RAG_DIR; the old hardcoded sandbox path is gone.
 process.env.JEXI_RAG_DIR = process.env.JEXI_RAG_DIR || `${os.tmpdir()}/p19-rag-snapshots`;
-const { GraphRag } = await import('../capability/rag/graph-rag.js');
+const { GraphRag } = await import('../capabilities/graph/rag/graph-rag.js');
 
 const results = [];
 function check(pid, label, pass, detail) {

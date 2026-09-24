@@ -1,7 +1,7 @@
 /** JEXI OS — Phase 30 Scope G — Phase 14 decision and PROV-O audit bridge. */
-import { SemanticaError } from '../../../semantica/_internal.js';
-import { decisions } from '../../../semantica/decisions/index.js';
-import { prov } from '../../../semantica/provenance/index.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
+import { decisions } from '../../../services/semantica/decisions/index.js';
+import { prov } from '../../../services/semantica/provenance/index.js';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 

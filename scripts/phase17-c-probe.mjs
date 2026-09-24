@@ -37,12 +37,12 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
 
-import { connectCdp } from '../runtimes/browser/cdp.js';
-import { DomService } from '../runtimes/browser/dom-service.js';
-import { BrowserAgent } from '../runtimes/browser/agent-loop.js';
-import { createActionRegistry } from '../runtimes/browser/actions/index.js';
-import { chainDeciders } from '../runtimes/browser/agent-loop.js';
-import * as vision from '../runtimes/browser/vision/index.js';
+import { connectCdp } from '../runtime/runtimes/browser/cdp.js';
+import { DomService } from '../runtime/runtimes/browser/dom-service.js';
+import { BrowserAgent } from '../runtime/runtimes/browser/agent-loop.js';
+import { createActionRegistry } from '../runtime/runtimes/browser/actions/index.js';
+import { chainDeciders } from '../runtime/runtimes/browser/agent-loop.js';
+import * as vision from '../runtime/runtimes/browser/vision/index.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ART = '/tmp/phase17-c';

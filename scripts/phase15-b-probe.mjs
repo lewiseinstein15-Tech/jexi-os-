@@ -3,7 +3,7 @@
  * Run: node scripts/phase15-b-probe.mjs
  */
 import fs from 'node:fs';
-import { createRelay, claudeCode, codex } from '../omnia/relay/index.js';
+import { createRelay, claudeCode, codex } from '../services/omnia/relay/index.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, label) => { if (cond) { pass += 1; console.log('PASS ' + label); } else { fail += 1; console.log('FAIL ' + label); } };

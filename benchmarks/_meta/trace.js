@@ -26,7 +26,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { canonicalJson } from './manifest.js';
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../services/semantica/_internal.js';
 
 export function createTrace({ runId, adapter, tracePath = null } = {}) {
   if (typeof runId !== 'string' || runId.trim() === '') {

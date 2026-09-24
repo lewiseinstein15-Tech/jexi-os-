@@ -32,7 +32,7 @@
  * diagnosis.
  */
 
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 /**
  * The diagnostic table. `re` matches a single RAW line (never trimmed —

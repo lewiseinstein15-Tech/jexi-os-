@@ -11,10 +11,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
 
-import { memoryFs, epistemic, CODES, EPISTEMIC_CODES } from '../prompt/memory-fs/index.js';
+import { memoryFs, epistemic, CODES, EPISTEMIC_CODES } from '../capabilities/prompts/memory-fs/index.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const MODULE_URL = pathToFileURL(path.join(WT, 'prompt/memory-fs/index.js')).href;
+const MODULE_URL = pathToFileURL(path.join(WT, 'capabilities/prompts/memory-fs/index.js')).href;
 const AGENT = { role: 'agent' };
 
 let failures = 0;

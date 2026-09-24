@@ -1,5 +1,5 @@
 /** JEXI OS — Phase 30 Scope D — session and path-scoped rule injection. */
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { matchRule } from './scope.js';
 import { DEFAULT_TOKEN_BUDGET, snapshot, tokenBudget } from './rules.js';
 

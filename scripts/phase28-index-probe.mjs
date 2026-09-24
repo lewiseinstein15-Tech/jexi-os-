@@ -6,8 +6,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createRepo } from '../brain/repo/index.js';
-import { createIndex, CHUNKER_VERSION, cosine } from '../brain/index/index.js';
+import { createRepo } from '../mind/brain/repo/index.js';
+import { createIndex, CHUNKER_VERSION, cosine } from '../mind/brain/index/index.js';
 
 let pass = 0, fail = 0;
 const ok = (c, label, extra = '') => {
@@ -44,7 +44,7 @@ ok(hits.every((h, i) => i === 0 || hits[i - 1].score >= h.score), 'P2 scores des
 // verify scores are REAL cosine: recompute independently
 const snap = idx.store.snapshot();
 const rec = snap.records.find((x) => x.chunkId === hits[0].chunkId);
-const { embed } = await import('../brain/index/index.js');
+const { embed } = await import('../mind/brain/index/index.js');
 const qv = (await embed([{ chunkId: 'q', text: 'analytical engine punched cards' }])).vectors[0].vector;
 ok(Math.abs(cosine(qv, rec.vector) - hits[0].score) < 1e-12, 'P2 score equals independently recomputed cosine');
 

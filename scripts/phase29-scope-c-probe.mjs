@@ -9,10 +9,10 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-import { action } from '../computer/action/index.js';
-import { registry, createBrowserOperator, createFakeOperator } from '../computer/operators/index.js';
-import { ComputerError } from '../computer/errors.js';
-import { browserModeIds, DEFAULT_BROWSER_MODE, BROWSER_MODES } from '../computer/operators/browser-modes.js';
+import { action } from '../services/computer/action/index.js';
+import { registry, createBrowserOperator, createFakeOperator } from '../services/computer/operators/index.js';
+import { ComputerError } from '../services/computer/errors.js';
+import { browserModeIds, DEFAULT_BROWSER_MODE, BROWSER_MODES } from '../services/computer/operators/browser-modes.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

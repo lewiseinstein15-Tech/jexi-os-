@@ -24,9 +24,9 @@
  */
 
 import * as store from '../orchestration/checkpoint.js';
-import { pipelineGraph } from '../../../knowledge/index.js';
+import { pipelineGraph } from '../../../mind/knowledge/index.js';
 import { gatePhase } from '../../engagements/validator.js'; // Phase 8(D): RoE gate
-import { ExploitVerifier } from '../../../verification/verifiers/index.js'; // Phase 8(G)
+import { ExploitVerifier } from '../../../tests/verification/verifiers/index.js'; // Phase 8(G)
 
 const REMEDIATION = {
   'A01:2021 Broken Access Control': 'Enforce server-side authorization on every privileged route; canonicalize and jail all filesystem paths (path.normalize + allowlist base dir).',

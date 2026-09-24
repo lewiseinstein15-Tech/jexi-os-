@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Phase 16 Scope F — Progressive Disclosure probe
-import { disclosure } from '../ui/web/console/chat/disclosure.js';
+import { disclosure } from '../interfaces/ui/web/console/chat/disclosure.js';
 
 let pass = 0, fail = 0;
 const ok = (c, msg) => { c ? pass++ : fail++; console.log(`  ${c ? '✅' : '❌'} ${msg}`); };

@@ -3,8 +3,8 @@
  * Run: node scripts/phase26-d-probe.mjs
  */
 import fs from 'node:fs';
-import { createInstincts } from '../instincts/core/index.js';
-import { createEvolve } from '../instincts/evolve/index.js';
+import { createInstincts } from '../mind/instincts/core/index.js';
+import { createEvolve } from '../mind/instincts/evolve/index.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, label) => { if (cond) { pass += 1; console.log('PASS ' + label); } else { fail += 1; console.log('FAIL ' + label); } };

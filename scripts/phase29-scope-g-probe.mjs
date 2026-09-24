@@ -14,8 +14,8 @@ import {
   TOOL_ORDER,
   MODE_CODES,
   AGENT_MODE_SCHEMA,
-} from '../computer/modes/index.js';
-import { ComputerError } from '../computer/errors.js';
+} from '../services/computer/modes/index.js';
+import { ComputerError } from '../services/computer/errors.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

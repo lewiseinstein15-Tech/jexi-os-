@@ -123,7 +123,7 @@ const oid = att && att.observerId ? att.observerId : 'observer-p2-lifecycle';
 w.sessionLifecycle.push(obsRoot, { projectId: 'jexi-os', sessionId: 'p2-lifecycle', kind: 'probe', payload: { note: 'w31 scope1' } });
 const active = w.sessionLifecycle.require(obsRoot, 'p2-lifecycle');
 let drained = [];
-try { const { drainObservations } = await import(path.join(ROOT, 'instincts', 'observe', 'queue.js')); drained = drainObservations(obsRoot, 'jexi-os'); } catch { /* proven by require+push */ }
+try { const { drainObservations } = await import(path.join(ROOT, 'mind/instincts', 'observe', 'queue.js')); drained = drainObservations(obsRoot, 'jexi-os'); } catch { /* proven by require+push */ }
 let detachedErr = '';
 try { w.sessionLifecycle.detach(obsRoot, oid); w.sessionLifecycle.require(obsRoot, 'p2-lifecycle'); } catch (e) { detachedErr = e && e.code ? e.code : String(e && e.message || e).slice(0, 60); }
 check('P2.WA3.lifecycle', !!active && detachedErr.length > 0,
@@ -180,7 +180,7 @@ check('P3.gate-refusal', refused.includes('W36 NODE FLOOR') && refused.includes(
 
 /* ================= P4 — shipped modules untouched (read-only proof) ======== */
 console.log('\n== P4 read-only proof (git diff of shipped module trees) ==');
-const shippedTrees = ['brain', 'semantica', 'instincts', 'session/fleet', 'rlm', 'capability', 'context/viking', 'verification/visual', 'prompt', 'computer', 'harness'];
+const shippedTrees = ['brain', 'semantica', 'mind/instincts', 'session/fleet', 'rlm', 'capability', 'context/viking', 'verification/visual', 'prompt', 'computer', 'harness'];
 const diffArgs = ['diff', '--name-only', 'HEAD', '--', ...shippedTrees];
 let diffs = '';
 try { diffs = execSync(`git ${diffArgs.map((a) => `'${a}'`).join(' ')}`, { cwd: ROOT, encoding: 'utf8' }); } catch (e) { diffs = `GIT-ERR ${String(e.message).slice(0, 80)}`; }

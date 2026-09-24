@@ -8,13 +8,13 @@
  */
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
-import { queue } from '../ui/web/console/chat/queue.js';
-import { steer } from '../ui/web/console/chat/steer.js';
-import { runtime } from '../ui/web/console/chat/runtime.js';
-import { router } from '../ui/web/console/chat/router.js';
-import { modes } from '../ui/web/console/chat/modes.js';
-import { approvals } from '../ui/web/console/chat/approvals.js';
-import { draft } from '../ui/web/console/chat/progress-draft.js';
+import { queue } from '../interfaces/ui/web/console/chat/queue.js';
+import { steer } from '../interfaces/ui/web/console/chat/steer.js';
+import { runtime } from '../interfaces/ui/web/console/chat/runtime.js';
+import { router } from '../interfaces/ui/web/console/chat/router.js';
+import { modes } from '../interfaces/ui/web/console/chat/modes.js';
+import { approvals } from '../interfaces/ui/web/console/chat/approvals.js';
+import { draft } from '../interfaces/ui/web/console/chat/progress-draft.js';
 
 const require = createRequire('/tmp/shot/package.json');
 const { chromium } = require('playwright');

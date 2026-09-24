@@ -13,7 +13,7 @@ import {
   ACTION_SPACE_VERSION,
   NORMALIZE_FORMULA,
   ComputerError,
-} from '../computer/action/index.js';
+} from '../services/computer/action/index.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

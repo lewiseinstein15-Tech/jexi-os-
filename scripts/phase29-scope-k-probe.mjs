@@ -14,18 +14,18 @@ import { deflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-import { events, map, emit, GUI_EVENT_KINDS, MAP_TABLE } from '../computer/events/index.js';
-import { taxonomy } from '../events/chat/taxonomy.js';
+import { events, map, emit, GUI_EVENT_KINDS, MAP_TABLE } from '../services/computer/events/index.js';
+import { taxonomy } from '../runtime/events/chat/taxonomy.js';
 import {
   subscribe,
   history,
   handlerLog,
   _reset,
-} from '../ui/web/console/chat/router.js';
-import { createGuiAgent } from '../computer/loop/index.js';
-import { createVlm } from '../computer/vlm/index.js';
-import { createFakeOperator } from '../computer/operators/index.js';
-import { ComputerError } from '../computer/errors.js';
+} from '../interfaces/ui/web/console/chat/router.js';
+import { createGuiAgent } from '../services/computer/loop/index.js';
+import { createVlm } from '../services/computer/vlm/index.js';
+import { createFakeOperator } from '../services/computer/operators/index.js';
+import { ComputerError } from '../services/computer/errors.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

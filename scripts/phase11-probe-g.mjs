@@ -64,7 +64,7 @@ console.log('\n════ P1 — registry before (raw) ════');
 
 // ── P2–P4 — codegraph-mcp ──
 console.log('\n════ P2 — codegraph-mcp spawns: initialize (raw) ════');
-const cg = new McpClient('capability/code/mcp-server.js');
+const cg = new McpClient('capabilities/graph/code/mcp-server.js');
 {
   const init = await cg.call('initialize', {
     protocolVersion: '2025-06-18',
@@ -105,7 +105,7 @@ await cg.close();
 
 // ── P5–P7 — reach-mcp ──
 console.log('\n════ P5 — reach-mcp spawns: initialize (raw) ════');
-const rm = new McpClient('capability/internet/reach/mcp-server.js');
+const rm = new McpClient('capabilities/graph/internet/reach/mcp-server.js');
 {
   const init = await rm.call('initialize', {
     protocolVersion: '2025-06-18',

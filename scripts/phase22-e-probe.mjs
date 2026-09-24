@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 const PROBE = fileURLToPath(import.meta.url);
 const REPO = path.resolve(path.dirname(PROBE), '..');
-const GSD_MODULE = path.join(REPO, 'workgraph/phases/gsd/index.js');
+const GSD_MODULE = path.join(REPO, 'runtime/workgraph/phases/gsd/index.js');
 
 /* ───────────────────────── child mode ───────────────────────── */
 

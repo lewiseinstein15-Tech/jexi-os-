@@ -21,7 +21,7 @@ import { TOOL_COUNT, TOOL_REGISTRY } from './ToolRegistry.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const BUNDLES_DIR = path.resolve(__dirname, '..', '..', 'bundles');
 export const MANIFEST_FILE = path.join(BUNDLES_DIR, 'manifest.json');
-export const PARITY_FILE = path.resolve(__dirname, '..', '..', '..', 'DSH-PARITY.md');
+export const PARITY_FILE = path.resolve(__dirname, '..', '..', '..', 'docs', 'guides', 'DSH-PARITY.md');
 
 /** Read the parity manifest (missing file → empty list). */
 export function readBundleManifest() {

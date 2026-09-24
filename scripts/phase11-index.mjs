@@ -5,8 +5,8 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { execSync } from 'node:child_process';
-import { openGraphStore } from '../capability/code/graph/store.js';
-import { indexRepository } from '../capability/code/graph/index.js';
+import { openGraphStore } from '../capabilities/graph/code/graph/store.js';
+import { indexRepository } from '../capabilities/graph/code/graph/index.js';
 
 const args = process.argv.slice(2);
 const arg = (name, dflt) => {

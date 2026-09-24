@@ -5,10 +5,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createAutonomous } from '../scheduler/autonomous/index.js';
+import { createAutonomous } from '../runtime/scheduler/autonomous/index.js';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'p10g-'));
-const autonomousUrl = new URL('../scheduler/autonomous/index.js', import.meta.url).href;
+const autonomousUrl = new URL('../runtime/scheduler/autonomous/index.js', import.meta.url).href;
 let passed = 0;
 let child;
 const pass = name => { passed += 1; console.log(`PASS ${name}`); };
@@ -193,10 +193,10 @@ try {
   console.log('P10');
   {
     const commandNames = ['goal', 'heartbeat', 'autonomous'];
-    const commands = await import('../commands/index.js');
+    const commands = await import('../capabilities/commands/index.js');
     const rows = [];
     for (const name of commandNames) {
-      const file = path.resolve('commands', `${name}.command.js`);
+      const file = path.resolve('capabilities/commands', `${name}.command.js`);
       assert.equal(fs.existsSync(file), true);
       const loaded = await import(pathToFileURL(file).href);
       const registered = commands.resolve(name);

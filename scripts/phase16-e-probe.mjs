@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Phase 16 Scope E — Dual-Pane Process/Results probe
-import { dualPane } from '../ui/web/console/chat/dual-pane.js';
+import { dualPane } from '../interfaces/ui/web/console/chat/dual-pane.js';
 
 let pass = 0, fail = 0;
 const ok = (c, msg) => { c ? pass++ : fail++; console.log(`  ${c ? '✅' : '❌'} ${msg}`); };

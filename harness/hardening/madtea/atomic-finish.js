@@ -56,7 +56,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { runGates } from './gates.js';
 import { createSecretGuard, findInlineKeys, resolveCredentials } from './credentials.js';
 

@@ -8,7 +8,7 @@
  * logged" guarantee made inspectable.
  */
 
-import { AuditLog, redactArgs } from '../../runtimes/sandbox/audit.js';
+import { AuditLog, redactArgs } from '../../runtime/runtimes/sandbox/audit.js';
 
 export { AuditLog, redactArgs };
 

@@ -121,7 +121,7 @@ try {
   fs.writeFileSync(entry, `
 import { renderToString } from 'react-dom/server';
 import React from 'react';
-import Header, { resolveModelIndicator } from '${path.join(ROOT, 'ui/web/console/shell/Header.jsx').replace(/\\/g, '/')}';
+import Header, { resolveModelIndicator } from '${path.join(ROOT, 'interfaces/ui/web/console/shell/Header.jsx').replace(/\\/g, '/')}';
 export const unit = {
   groqRow: resolveModelIndicator([{ key: 'groq', configured: true }]),
   empty: resolveModelIndicator([]),
@@ -223,7 +223,7 @@ console.log(statusOut.map((l) => `  ${l}`).join('\n'));
 const ALLOWED = [
   'server/src/wiring/phase31-providers.js',   // W10.1 (new)
   'server/src/wiring/phase31-bootstrap.js',   // W10.1 init call + W10 lines
-  'ui/web/console/shell/Header.jsx',          // W10.2 (disclosed)
+  'interfaces/ui/web/console/shell/Header.jsx',          // W10.2 (disclosed)
   'scripts/regenerate-capabilities.mjs',      // W10.5
 ];
 const zoneViolations = statusOut.filter((line) => {

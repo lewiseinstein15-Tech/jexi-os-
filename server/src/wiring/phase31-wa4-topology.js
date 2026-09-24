@@ -16,7 +16,7 @@
  * any break logs one `W31 WA4: FAIL-SOFT <reason>` line and boot continues.
  */
 
-import * as topologies from '../../../swarm/topologies/index.js';
+import * as topologies from '../../../agents/swarm/topologies/index.js';
 import { composeWorkforce, ensureIndex } from '../workforce/registry/index.js';
 
 export function initWa4Topology() {

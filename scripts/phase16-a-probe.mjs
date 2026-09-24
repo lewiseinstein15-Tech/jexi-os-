@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Phase 16 Scope A — chat event taxonomy probe
-import { taxonomy } from '../events/chat/taxonomy.js';
+import { taxonomy } from '../runtime/events/chat/taxonomy.js';
 
 let pass = 0, fail = 0;
 const ok = (c, msg) => { c ? pass++ : fail++; console.log(`  ${c ? '✅' : '❌'} ${msg}`); };

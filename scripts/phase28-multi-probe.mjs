@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {
   createMultiSource, RECOVERY_WINDOW_MS, PURGE_REASON,
-} from '../brain/multi/index.js';
+} from '../mind/brain/multi/index.js';
 
 let pass = 0;
 let fail = 0;

@@ -90,7 +90,7 @@ export function createExecBridge({ workspaceMount, stateDir, execute, key = null
 
 async function serve(argv) {
   const arg = Object.fromEntries(argv.filter((a) => a.startsWith('--')).map((a) => { const [k, v] = a.replace(/^--/, '').split('='); return [k, v === undefined ? true : v]; }));
-  const { createDualNetwork } = await import('../../runtimes/sandbox/index.js');
+  const { createDualNetwork } = await import('../../runtime/runtimes/sandbox/index.js');
   const dual = createDualNetwork({
     workspaceMount: arg.mount,
     stateDir: arg['state-dir'],

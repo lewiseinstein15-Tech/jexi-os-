@@ -6,11 +6,11 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createRepo } from '../brain/repo/index.js';
+import { createRepo } from '../mind/brain/repo/index.js';
 import {
   extract, inferType, frontmatterEdges, stale, extractStale, validateEdge,
   VERB_PRECEDENCE, LINK_EXTRACTOR_VERSION_TS, readWatermark,
-} from '../brain/kg/index.js';
+} from '../mind/brain/kg/index.js';
 
 let pass = 0, fail = 0;
 const ok = (c, label, extra = '') => {
@@ -72,7 +72,7 @@ ok(has('Charles Babbage', 'analytical-co', 'mentions'), 'P2 attendees -> mention
 
 // ── P3: zero LLM / zero network ──
 console.log('── P3 zero-LLM / zero-network proof ──');
-const kgDir = path.resolve('brain/kg');
+const kgDir = path.resolve('mind/brain/kg');
 const files = fs.readdirSync(kgDir).filter((f) => f.endsWith('.js')).sort();
 const banned = /(fetch\(|https?\.request|XMLHttpRequest|axios|net\.(connect|createConnection)|WebSocket|openai|anthropic|llm|embedding|backends\/provider|brain\/index)/i;
 const allowedImport = /^(node:|\.\.\/\.\.\/semantica\/_internal\.js$|\.\/|\.\.\/repo\/index\.js$)/;

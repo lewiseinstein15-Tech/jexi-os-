@@ -8,8 +8,8 @@
  *   executor.js         → observePostToolUse (right after the PostToolUse hook)
  *   MissionRunner.js    → runStopAnalysis    (right after the Stop hook)
  *
- * The learning/ subsystem lives at the repo root (ECC reference layout, like
- * hooks/). It is imported DYNAMICALLY so a missing or broken learning/
+ * The learning/ subsystem lives at mind/learning/ (moved from repo root in the
+ * file restructure, like infra/hooks/). It is imported DYNAMICALLY so a missing or broken learning/
  * directory can never take the brain down — the seam stays wired and
  * harmless, mirroring the hooks runner' fail-open philosophy. Callers get
  * synchronous no-ops in that case.
@@ -19,7 +19,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url)); // server/src/kernel/hooks
-const LEARNING_URL = pathToFileURL(path.resolve(MODULE_DIR, '..', '..', '..', '..', 'learning', 'index.js')).href;
+const LEARNING_URL = pathToFileURL(path.resolve(MODULE_DIR, '..', '..', '..', '..', 'mind', 'learning', 'index.js')).href;
 
 let _learning = null;
 let _failed = false;

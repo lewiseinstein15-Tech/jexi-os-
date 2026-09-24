@@ -205,7 +205,7 @@ check('P2.P30.E', iso.isolated === true && iso.removed === true && iso.removalEr
 
 /* ---- P30.F: PermissionDenied / UserPromptExpansion / PostToolBatch -------- */
 console.log('-- P30.F --');
-const approve = await import(path.join(ROOT, 'ui/web/console/chat/approvals.js'));
+const approve = await import(path.join(ROOT, 'interfaces/ui/web/console/chat/approvals.js'));
 const lifecycle = wiring.hooks.lifecycle();
 lifecycle.permissionDenied.register(() => ({ retry: true }));
 let denialErr = null;
@@ -222,7 +222,7 @@ const retryLimit = await lifecycle.permissionDenied.handle({ requestId: 'w31-ret
 console.log('  handle(requestId, {retry}) #1 ->', j({ retry: retryOnce.retry, retried: retryOnce.retried, retryFnCalls: retryRuns.length, retryResult: retryOnce.retryResult }));
 console.log('  handle(requestId, {retry}) #2 ->', j({ retried: retryLimit.retried, hardDeny: retryLimit.hardDeny, reason: retryLimit.reason }));
 
-const cmdreg = await import(path.join(ROOT, 'commands/registry.js'));
+const cmdreg = await import(path.join(ROOT, 'capabilities/commands/registry.js'));
 cmdreg.register({ name: 'w31-probe-cmd', description: 'scope 6 expansion probe', category: 'debug', handler: async () => ({ ok: true }) });
 const resolvedAllow = cmdreg.resolve('w31-probe-cmd');
 lifecycle.promptExpansion.register(() => ({ block: true, reason: 'w31-probe-block' }));
@@ -278,7 +278,7 @@ console.log('\n== P3 read-only proof: wired shipped modules diff EMPTY except na
 const dirty = execSync('git diff --name-only', { cwd: ROOT }).toString().split('\n').filter(Boolean).sort();
 const parityDirty = execSync('git diff --name-only -- harness/parity', { cwd: ROOT }).toString().split('\n').filter(Boolean);
 console.log(dirty.map((l) => `  M ${l}`).join('\n') || '  (no dirty tracked files)');
-const NAMED = ['server/src/tools/execution/executor.js', 'ui/web/console/chat/approvals.js', 'commands/registry.js', 'server/src/wiring/phase31-bootstrap.js'];
+const NAMED = ['server/src/tools/execution/executor.js', 'interfaces/ui/web/console/chat/approvals.js', 'capabilities/commands/registry.js', 'server/src/wiring/phase31-bootstrap.js'];
 const nonNamedDirty = dirty.filter((f) => !NAMED.includes(f));
 console.log('  harness/parity diff:', parityDirty.length === 0 ? 'EMPTY' : j(parityDirty));
 check('P3.parity-untouched', parityDirty.length === 0, 'harness/parity/** diff EMPTY (Phase 30 primitives READ-ONLY, zero edits)');

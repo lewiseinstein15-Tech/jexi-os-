@@ -6,9 +6,9 @@
  * calls against surfsense/output. No rendered text is faked.
  */
 import { execSync } from 'node:child_process';
-import output from '../surfsense/output/index.js';
-import search from '../surfsense/search/index.js';
-import { SurfError } from '../surfsense/connectors/_internal.js';
+import output from '../services/surfsense/output/index.js';
+import search from '../services/surfsense/search/index.js';
+import { SurfError } from '../services/surfsense/connectors/_internal.js';
 
 const results = [];
 function check(pid, label, pass, detail) {

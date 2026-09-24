@@ -24,8 +24,8 @@ import { statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
 
-import { launchPage, detectBrowser } from '../verification/visual/puppeteer-runner.js';
-import { listLayers, getLayer } from '../intelligence/layers/index.js';
+import { launchPage, detectBrowser } from '../tests/verification/visual/puppeteer-runner.js';
+import { listLayers, getLayer } from '../mind/intelligence/layers/index.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');

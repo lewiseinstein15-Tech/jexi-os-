@@ -9,14 +9,14 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { SemanticaError } from '../semantica/_internal.js';
-import { createRepo } from '../brain/repo/index.js';
-import { createIndex } from '../brain/index/index.js';
-import { createHotMemory } from '../brain/hot/index.js';
+import { SemanticaError } from '../services/semantica/_internal.js';
+import { createRepo } from '../mind/brain/repo/index.js';
+import { createIndex } from '../mind/brain/index/index.js';
+import { createHotMemory } from '../mind/brain/hot/index.js';
 import {
   createDreamCycle, DECLARED_PHASE_ORDER, DETERMINISTIC_PHASES,
   LLM_BACKED_PHASES, CONSOLIDATION_THRESHOLD, cosineSimilarity,
-} from '../brain/cycle/index.js';
+} from '../mind/brain/cycle/index.js';
 
 let pass = 0;
 let fail = 0;
@@ -214,7 +214,7 @@ ok(deterministicBytesA === deterministicBytesB, 'P6 deterministic phases are byt
 
 // ── P7: no provider/network imports + honest LLM labels ─────────────────────
 console.log('── P7 LLM-free guard ──');
-const phasesDir = path.join(WORKSPACE, 'brain', 'cycle', 'phases');
+const phasesDir = path.join(WORKSPACE, 'mind/brain', 'cycle', 'phases');
 const phaseFiles = fs.readdirSync(phasesDir).filter((file) => file.endsWith('.js')).sort();
 const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
 const providerImports = [];

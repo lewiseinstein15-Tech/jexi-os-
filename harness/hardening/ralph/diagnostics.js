@@ -42,7 +42,7 @@
  * No new error class is introduced.
  */
 
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 /** Logging-completeness floor: a loop log below either bound is sparse. */
 export const LOGS_MIN_LINES = 3;

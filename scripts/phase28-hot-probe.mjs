@@ -8,7 +8,7 @@ import {
   createHotMemory, FACT_KINDS, HALFLIFE_DAYS,
   COSINE_FAST_PATH, CLASSIFIER_FALLBACK, HOT_QUEUE_CAP,
   RULE_BASED_EXTRACTION_LABEL,
-} from '../brain/hot/index.js';
+} from '../mind/brain/hot/index.js';
 
 let pass = 0;
 let fail = 0;

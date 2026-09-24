@@ -178,13 +178,13 @@ console.log('\n== 7. code-runtime/code-runtime-python ==');
 /* ══════════════ 8. CLIENT PORTS (files on disk) ══════════════ */
 console.log('\n== 8. client/ui-reference + ui-renderer + ui-brand-official ==');
 {
-  const ref = fs.readFileSync(path.join(ROOT, 'src/utils/referenceSource.js'), 'utf-8');
+  const ref = fs.readFileSync(path.join(ROOT, 'interfaces/console/utils/referenceSource.js'), 'utf-8');
   ok('ui-reference: unified file+session source', ref.includes("kind: 'file'") && ref.includes("kind: 'session'") && ref.includes('activeReferenceToken'));
-  const rend = fs.readFileSync(path.join(ROOT, 'src/utils/uiRenderer.jsx'), 'utf-8');
+  const rend = fs.readFileSync(path.join(ROOT, 'interfaces/console/utils/uiRenderer.jsx'), 'utf-8');
   ok('ui-renderer: slot registry + assembled root', rend.includes('registerSlot') && rend.includes('renderRoot') && rend.includes('UiRendererContext'));
-  const brand = fs.readFileSync(path.join(ROOT, 'src/brand/official.jsx'), 'utf-8');
+  const brand = fs.readFileSync(path.join(ROOT, 'interfaces/console/brand/official.jsx'), 'utf-8');
   ok('ui-brand-official: fills all 3 shipped slots', brand.includes("'sidebar.brand.mark'") && brand.includes("'sidebar.brand.name'") && brand.includes("'conversation.hero.brand.mark'"));
-  const main = fs.readFileSync(path.join(ROOT, 'src/main.jsx'), 'utf-8');
+  const main = fs.readFileSync(path.join(ROOT, 'interfaces/console/main.jsx'), 'utf-8');
   ok('brand applied at boot', main.includes('applyOfficialBrand()'));
   const app = fs.readFileSync(path.join(ROOT, 'src/App.jsx'), 'utf-8');
   ok('sidebar renders brand occupants', app.includes('SidebarBrandMark') && app.includes('SidebarBrandName'));

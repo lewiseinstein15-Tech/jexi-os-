@@ -1,7 +1,7 @@
 /** JEXI OS — Phase 30 Scope G — bounded self-evolution and rollback. */
 import fs from 'node:fs';
 import path from 'node:path';
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { createEvolutionAudit } from './audit.js';
 import { prepareUpdate, DEFAULT_MAX_BYTE_DELTA } from './guardrail.js';
 

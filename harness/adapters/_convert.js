@@ -63,9 +63,9 @@ function walkMd(dir, out = []) {
 function collectAgents(errors) {
   const agents = [];
   // 1) jexi-agents/coworkers/*.md — front-matter markdown coworkers (current home)
-  for (const f of listDir(path.join(REPO_ROOT, 'jexi-agents/coworkers'))) {
+  for (const f of listDir(path.join(REPO_ROOT, 'agents/jexi/coworkers'))) {
     if (!f.endsWith('.md')) continue;
-    const full = path.join(REPO_ROOT, 'jexi-agents/coworkers', f);
+    const full = path.join(REPO_ROOT, 'agents/jexi/coworkers', f);
     const text = readTextIfExists(full);
     if (text === null) continue;
     if (text.__error) {
@@ -91,8 +91,8 @@ function collectAgents(errors) {
   // (wired into the collector so cross-harness conversion covers the 68;
   //  division dirs are scanned one level deep, template in meta/ is NOT
   //  *.agent.md so it never enters the conversion set)
-  for (const div of listDir(path.join(REPO_ROOT, 'agents'))) {
-    const divDir = path.join(REPO_ROOT, 'agents', div);
+  for (const div of listDir(path.join(REPO_ROOT, 'agents/catalog'))) {
+    const divDir = path.join(REPO_ROOT, 'agents/catalog', div);
     for (const f of listDir(divDir)) {
       if (!f.endsWith('.agent.md')) continue;
       const full = path.join(divDir, f);
@@ -122,7 +122,7 @@ function collectAgents(errors) {
   }
   // 2) workforce/coworkers/*/agents/*.agent.js — canonical phase layout (if populated)
   for (const cw of listDir(path.join(REPO_ROOT, 'workforce/coworkers'))) {
-    const agDir = path.join(REPO_ROOT, 'workforce/coworkers', cw, 'agents');
+    const agDir = path.join(REPO_ROOT, 'workforce/coworkers', cw, 'agents/catalog');
     for (const f of listDir(agDir)) {
       if (!f.endsWith('.agent.js')) continue;
       const full = path.join(agDir, f);
@@ -220,7 +220,7 @@ function collectSkills(errors) {
 }
 
 function collectHooks(errors) {
-  const full = path.join(REPO_ROOT, 'hooks/hooks.json');
+  const full = path.join(REPO_ROOT, 'infra/hooks/hooks.json');
   const text = readTextIfExists(full);
   if (text === null) return { raw: null, entries: [] };
   if (text.__error) {
@@ -239,12 +239,12 @@ function collectHooks(errors) {
 
 async function collectCommands(errors) {
   try {
-    const facade = await import(path.join(REPO_ROOT, 'commands/index.js'));
+    const facade = await import(path.join(REPO_ROOT, 'capabilities/commands/index.js'));
     if (typeof facade.registerAll === 'function') facade.registerAll();
     const list = typeof facade.list === 'function' ? facade.list() : [];
     return list.map((c) => ({ name: c.name, aliases: c.aliases || [], description: c.description, category: c.category, args: c.args || [] }));
   } catch (e) {
-    errors.push({ file: 'commands/index.js', error: String(e.message) });
+    errors.push({ file: 'capabilities/commands/index.js', error: String(e.message) });
     return [];
   }
 }

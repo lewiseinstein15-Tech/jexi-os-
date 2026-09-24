@@ -29,7 +29,7 @@
  *   createTransport('http',  { baseUrl })  — POST tool calls to a forgejo-mcp HTTP endpoint
  */
 
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { taxonomy } from './taxonomy.js';
 import { findInlineKeys, resolveCredentials, ENV_REF_RE, KEYRING_REF_RE } from '../madtea/credentials.js';
 

@@ -13,8 +13,8 @@
  *   5. prefetch() re-ranks too (hybrid, was raw scoreRelevance)
  */
 import { openMemorySystem } from '../server/src/memory/index.js';
-import { confidenceScore } from '../memory/confidence.js';
-import { createHybridIndex } from '../memory/hybrid-search.js';
+import { confidenceScore } from '../mind/memory/confidence.js';
+import { createHybridIndex } from '../mind/memory/hybrid-search.js';
 
 const DAY = 86_400_000;
 let fails = 0; let checks = 0;

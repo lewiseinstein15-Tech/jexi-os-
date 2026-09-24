@@ -25,11 +25,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { parseUri, buildUri, joinUri, VIKING_SCOPES } from '../context/viking/uri.js';
-import { VikingFs, AUTO_LABEL } from '../context/viking/filesystem.js';
-import { createLoader } from '../context/viking/layers.js';
-import * as compile from '../context/viking/compile.js';
-import { capture as captureSession, toSessionMemory } from '../context/viking/session.js';
+import { parseUri, buildUri, joinUri, VIKING_SCOPES } from '../runtime/context/viking/uri.js';
+import { VikingFs, AUTO_LABEL } from '../runtime/context/viking/filesystem.js';
+import { createLoader } from '../runtime/context/viking/layers.js';
+import * as compile from '../runtime/context/viking/compile.js';
+import { capture as captureSession, toSessionMemory } from '../runtime/context/viking/session.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STORE = '/tmp/phase17-e/store';

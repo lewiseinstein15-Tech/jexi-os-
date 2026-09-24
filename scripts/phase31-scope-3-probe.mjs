@@ -104,7 +104,7 @@ console.log('\n== P2 per-item reachability (end-to-end, consumer level) ==');
 /* ---- S3-OFFLOAD: writer (shipped workgraph/session store) -> ndjournal -> context/offload history reader -> registered chat context source */
 console.log('-- S3-OFFLOAD --');
 const sessRoots = wiring.contextOffload.roots();
-const { createStore } = await import(path.join(ROOT, 'workgraph/session/index.js'));
+const { createStore } = await import(path.join(ROOT, 'runtime/workgraph/session/index.js'));
 const store = createStore({ directory: sessRoots.sessions, sessionId: 'chat-retention-probe' });
 const appended = store.append({ kind: 'user', payload: { text: 'offload probe: retain this turn in the session journal' } });
 console.log('  writer append (shipped workgraph/session store):', JSON.stringify(appended));

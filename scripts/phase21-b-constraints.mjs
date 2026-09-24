@@ -6,9 +6,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert';
 
-import { guardEdit, guardedWriteFile } from '../research/constraints/guards.js';
-import { mutableSet } from '../research/constraints/mutable.js';
-import { READ_ONLY, MUTABLE } from '../research/constraints/read-only.js';
+import { guardEdit, guardedWriteFile } from '../services/research/constraints/guards.js';
+import { mutableSet } from '../services/research/constraints/mutable.js';
+import { READ_ONLY, MUTABLE } from '../services/research/constraints/read-only.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const verdictOf = (v) => `${v.allowed ? 'ALLOWED' : 'BLOCKED'}  ${v.allowed ? '' : '— '}${v.reason ?? ''}`;

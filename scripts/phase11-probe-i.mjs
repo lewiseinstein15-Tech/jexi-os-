@@ -11,8 +11,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pass = 0, fail = 0;
 const ok = (c, l) => { c ? pass++ : fail++; console.log(`  ${c ? '✅' : '❌'} ${l}`); };
 
-const gf = await import(path.join(ROOT, 'capability/code/graph-first.js'));
-const hook = await import(path.join(ROOT, 'capability/context-hook.js'));
+const gf = await import(path.join(ROOT, 'capabilities/graph/code/graph-first.js'));
+const hook = await import(path.join(ROOT, 'capabilities/graph/context-hook.js'));
 
 const Q1 = 'What functions call readViaBackends?';
 
@@ -76,13 +76,13 @@ console.log('\n════ P5 — graph answer vs file-read answer (per questio
 // ── P6 — context-hook zone discipline ──
 console.log('\n════ P6 — capability/context-hook.js imports nothing from server/src/context ════');
 {
-  const src = fs.readFileSync(path.join(ROOT, 'capability/context-hook.js'), 'utf8');
+  const src = fs.readFileSync(path.join(ROOT, 'capabilities/graph/context-hook.js'), 'utf8');
   let naive = '';
-  try { naive = execFileSync('grep', ['-rn', 'server/src/context', path.join(ROOT, 'capability/context-hook.js')], { encoding: 'utf8' }); } catch { /* no matches */ }
+  try { naive = execFileSync('grep', ['-rn', 'server/src/context', path.join(ROOT, 'capabilities/graph/context-hook.js')], { encoding: 'utf8' }); } catch { /* no matches */ }
   console.log(`  naive grep -rn 'server/src/context' → ${naive.trim() ? `${naive.trim().split('\n').length} hits (all comment/doc lines):` : '(0 hits)'}`);
   if (naive.trim()) for (const l of naive.trim().split('\n')) console.log(`    | ${l.trim().slice(0, 110)}`);
   let importGrep = '';
-  try { importGrep = execFileSync('grep', ['-nE', '(^|[^a-zA-Z])(import|require)\\s*\\(?\\s*[\'\"].*server/src/context', path.join(ROOT, 'capability/context-hook.js')], { encoding: 'utf8' }); } catch { /* no matches */ }
+  try { importGrep = execFileSync('grep', ['-nE', '(^|[^a-zA-Z])(import|require)\\s*\\(?\\s*[\'\"].*server/src/context', path.join(ROOT, 'capabilities/graph/context-hook.js')], { encoding: 'utf8' }); } catch { /* no matches */ }
   console.log(`  import-statement grep (raw): ${importGrep.trim() || '(0 hits)'}`);
   const imports = src.split('\n').filter((l) => l.startsWith('import '));
   console.log(`  import lines: ${JSON.stringify(imports)}`);

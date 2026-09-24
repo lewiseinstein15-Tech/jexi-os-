@@ -206,11 +206,11 @@ console.log('\n== 7. Wiring ==');
   ok('status surface reports LIVE health (cooldowns, configured)', wsp.includes('webSearchHealth()'));
   // SourceCard.jsx was deleted as never-imported dead UI — search results
   // surface live as transcript step rows with command/stdout detail.
-  const row = fs.readFileSync(path.join(ROOT, 'src/components/StepRow.jsx'), 'utf-8');
+  const row = fs.readFileSync(path.join(ROOT, 'interfaces/console/components/StepRow.jsx'), 'utf-8');
   ok('search results surface as step rows with stdout detail', row.includes('jx-step-detail') && row.includes('stdout'));
-  const css = fs.readFileSync(path.join(ROOT, 'src/index.css'), 'utf-8');
+  const css = fs.readFileSync(path.join(ROOT, 'interfaces/console/index.css'), 'utf-8');
   ok('streaming caret styled', css.includes('.jx-caret'));
-  const chat = fs.readFileSync(path.join(ROOT, 'src/components/ChatWindow.jsx'), 'utf-8');
+  const chat = fs.readFileSync(path.join(ROOT, 'interfaces/console/components/ChatWindow.jsx'), 'utf-8');
   ok('streaming caret rendered while a coworker writes', chat.includes('jx-caret'));
 }
 

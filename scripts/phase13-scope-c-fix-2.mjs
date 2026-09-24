@@ -19,8 +19,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'node:url';
-import { createNexus, resolveReference } from '../workforce/nexus/index.js';
-import { createRegistry as createAgentRegistry } from '../workforce/agents/index.js';
+import { createNexus, resolveReference } from '../agents/workforce/nexus/index.js';
+import { createRegistry as createAgentRegistry } from '../agents/workforce/agents/index.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pass = 0;
@@ -42,14 +42,14 @@ function fixtureWith(firstCandidate, strategyId = DISCOVERY) {
     if (fs.existsSync(target)) fs.symlinkSync(target, path.join(tmp, d));
   }
   // The roster loader reads its vendored catalog from <root>/workforce/agents/vendor.
-  fs.symlinkSync(path.join(REPO, 'workforce/agents'), path.join(tmp, 'workforce/agents'));
-  fs.copyFileSync(path.join(REPO, 'workforce/divisions.json'), path.join(tmp, 'workforce/divisions.json'));
+  fs.symlinkSync(path.join(REPO, 'agents/workforce/agents'), path.join(tmp, 'agents/workforce/agents'));
+  fs.copyFileSync(path.join(REPO, 'agents/workforce/divisions.json'), path.join(tmp, 'agents/workforce/divisions.json'));
 
-  const projection = JSON.parse(fs.readFileSync(path.join(REPO, 'workforce/nexus/vendor/agency-agents.strategies.json'), 'utf8'));
+  const projection = JSON.parse(fs.readFileSync(path.join(REPO, 'agents/workforce/nexus/vendor/agency-agents.strategies.json'), 'utf8'));
   const d = projection.strategies.find((s) => s.id === strategyId);
   const before = d.candidates[0];
   d.candidates[0] = firstCandidate;
-  fs.writeFileSync(path.join(tmp, 'workforce/nexus/vendor/agency-agents.strategies.json'), JSON.stringify(projection, null, 2) + '\n');
+  fs.writeFileSync(path.join(tmp, 'agents/workforce/nexus/vendor/agency-agents.strategies.json'), JSON.stringify(projection, null, 2) + '\n');
 
   const nexus = createNexus({ root: tmp });
   return { nexus, tmp, before };
@@ -168,18 +168,18 @@ if (e && Array.isArray(e.warnings) && Array.isArray(e.unresolved) && Array.isArr
 // Force all candidates unresolved: rename every discovery candidate, then
 // require a division no candidate can be in, so the unresolved path is what
 // populates warnings on the refusal.
-const proj = JSON.parse(fs.readFileSync(path.join(REPO, 'workforce/nexus/vendor/agency-agents.strategies.json'), 'utf8'));
+const proj = JSON.parse(fs.readFileSync(path.join(REPO, 'agents/workforce/nexus/vendor/agency-agents.strategies.json'), 'utf8'));
 const tmp4 = fs.mkdtempSync(path.join(os.tmpdir(), 'p13c2-allunres-'));
 fs.mkdirSync(path.join(tmp4, 'workforce/nexus/vendor'), { recursive: true });
 for (const d of ['agents', 'jexi-agents', 'server']) {
   const target = path.join(REPO, d);
   if (fs.existsSync(target)) fs.symlinkSync(target, path.join(tmp4, d));
 }
-fs.symlinkSync(path.join(REPO, 'workforce/agents'), path.join(tmp4, 'workforce/agents'));
-fs.copyFileSync(path.join(REPO, 'workforce/divisions.json'), path.join(tmp4, 'workforce/divisions.json'));
+fs.symlinkSync(path.join(REPO, 'agents/workforce/agents'), path.join(tmp4, 'agents/workforce/agents'));
+fs.copyFileSync(path.join(REPO, 'agents/workforce/divisions.json'), path.join(tmp4, 'agents/workforce/divisions.json'));
 const dd = proj.strategies.find((s) => s.id === DISCOVERY);
 dd.candidates = dd.candidates.map((c) => `${c} RENAMED`);
-fs.writeFileSync(path.join(tmp4, 'workforce/nexus/vendor/agency-agents.strategies.json'), JSON.stringify(proj, null, 2) + '\n');
+fs.writeFileSync(path.join(tmp4, 'agents/workforce/nexus/vendor/agency-agents.strategies.json'), JSON.stringify(proj, null, 2) + '\n');
 const n4 = createNexus({ root: tmp4 });
 const p4b = caught(() => n4.route(RESEARCH));
 const e2 = p4b.error;

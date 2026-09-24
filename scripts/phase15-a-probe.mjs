@@ -4,7 +4,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { createVault } from '../omnia/vault/index.js';
+import { createVault } from '../services/omnia/vault/index.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, label) => { if (cond) { pass += 1; console.log('PASS ' + label); } else { fail += 1; console.log('FAIL ' + label); } };

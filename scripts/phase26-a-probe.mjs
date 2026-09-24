@@ -3,7 +3,7 @@
  * Run: node scripts/phase26-a-probe.mjs
  */
 import fs from 'node:fs';
-import { createObserve } from '../instincts/observe/index.js';
+import { createObserve } from '../mind/instincts/observe/index.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, label) => { if (cond) { pass += 1; console.log('PASS ' + label); } else { fail += 1; console.log('FAIL ' + label); } };

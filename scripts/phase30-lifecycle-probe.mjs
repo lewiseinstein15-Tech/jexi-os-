@@ -4,7 +4,7 @@ import nodeAssert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import approvals from '../ui/web/console/chat/approvals.js';
+import approvals from '../interfaces/ui/web/console/chat/approvals.js';
 import { createLifecycle } from '../harness/parity/lifecycle/index.js';
 
 const [remoteRef, approvalsBlob, phase7HooksBlob, scopeAHooksBlob] = process.argv.slice(2);
@@ -23,7 +23,7 @@ function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
 }
 
-nodeAssert.equal(gitBlob('../ui/web/console/chat/approvals.js'), approvalsBlob);
+nodeAssert.equal(gitBlob('../interfaces/ui/web/console/chat/approvals.js'), approvalsBlob);
 nodeAssert.equal(gitBlob('../hooks/hooks.json'), phase7HooksBlob);
 nodeAssert.equal(gitBlob('../harness/parity/hooks/index.js'), scopeAHooksBlob);
 

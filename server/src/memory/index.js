@@ -20,9 +20,9 @@ import { createSemanticLayer } from './layers/semantic.js';
 import { openSqliteMemoryBackend } from './backends/sqlite.js';
 import { MissionIsolation } from './scope/mission-isolation.js';
 // ZONE-OWNER ITEM 3 — Phase 17 D upgrade modules, now WIRED into recall/prefetch:
-import { createHybridIndex } from '../../../memory/hybrid-search.js';
-import { advanceEntry, isArchived } from '../../../memory/lifecycle.js';
-import { noteRetrieval } from '../../../memory/confidence.js';
+import { createHybridIndex } from '../../../mind/memory/hybrid-search.js';
+import { advanceEntry, isArchived } from '../../../mind/memory/lifecycle.js';
+import { noteRetrieval } from '../../../mind/memory/confidence.js';
 
 const ORDERED_TIERS = ['working', 'session', 'episodic', 'semantic'];
 

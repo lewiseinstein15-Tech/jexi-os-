@@ -110,7 +110,7 @@ console.log('\n== 4. SDK codec ==');
 /* ══════════════ 5. PLUGIN INVENTORY HOOK (frontend) ══════════════ */
 console.log('\n== 5. Plugin inventory hook (frontend) ==');
 {
-  const hookFile = path.join(SERVER_DIR, '..', 'src', 'hooks', 'usePluginInventory.js');
+  const hookFile = path.join(SERVER_DIR, '..', 'interfaces', 'console', 'hooks', 'usePluginInventory.js');
   ok('hook file exists + imports gatewayFetch', fs.existsSync(hookFile) && fs.readFileSync(hookFile, 'utf-8').includes('gatewayFetch'));
   ok('hook file parses', (() => { try { new Function('return 1'); return true; } catch { return false; } })());
 }
@@ -125,7 +125,7 @@ console.log('\n== 6. Integration ==');
   const { bundleStatus } = await import('./src/services/BundleBase.js');
   const st = bundleStatus();
   ok('parity manifest reflects the new ports', st.counts.ported >= 115);
-  const parity = fs.readFileSync(path.join(SERVER_DIR, '..', 'DSH-PARITY.md'), 'utf-8');
+  const parity = fs.readFileSync(path.join(SERVER_DIR, '..', 'docs', 'guides', 'DSH-PARITY.md'), 'utf-8');
   ok('parity doc lists cordis + bash-sandbox', parity.includes('tool-cordis') && parity.includes('bash-sandbox'));
 }
 

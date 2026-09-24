@@ -22,7 +22,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as repoContext from '../providers/routing/repo-context.js';
+import * as repoContext from '../integrations/providers/routing/repo-context.js';
 
 // consolidation cleanup: host-portable scratch base (os.tmpdir()) instead of
 // the hardcoded sandbox path.

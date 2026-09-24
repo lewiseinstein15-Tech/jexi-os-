@@ -40,7 +40,7 @@ const SERVER_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SERVER_ROOT, '..');
 
 // the subsystem under test — same module instance the seam loads (repo root)
-const C = await import(pathToFileURL(path.join(REPO_ROOT, 'commands', 'index.js')).href);
+const C = await import(pathToFileURL(path.join(REPO_ROOT, 'capabilities/commands', 'index.js')).href);
 const registry = C.registry;
 
 /* ── 1. registry contract ─────────────────────────────────────────────── */

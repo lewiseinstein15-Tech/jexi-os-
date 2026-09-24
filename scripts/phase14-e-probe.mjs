@@ -2,9 +2,9 @@
  * JEXI OS — Phase 14 Scope E — live probe for the reasoning engine.
  * Run: node scripts/phase14-e-probe.mjs
  */
-import { graph, SemanticaError } from '../semantica/graph/index.js';
-import { prov } from '../semantica/provenance/index.js';
-import { reasoning } from '../semantica/reasoning/index.js';
+import { graph, SemanticaError } from '../services/semantica/graph/index.js';
+import { prov } from '../services/semantica/provenance/index.js';
+import { reasoning } from '../services/semantica/reasoning/index.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, label) => { if (cond) { pass += 1; console.log(`PASS ${label}`); } else { fail += 1; console.log(`FAIL ${label}`); } };

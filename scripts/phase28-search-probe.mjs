@@ -6,13 +6,13 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createRepo } from '../brain/repo/index.js';
-import { createIndex } from '../brain/index/index.js';
-import { extract } from '../brain/kg/index.js';
+import { createRepo } from '../mind/brain/repo/index.js';
+import { createIndex } from '../mind/brain/index/index.js';
+import { extract } from '../mind/brain/kg/index.js';
 import {
   createHybridSearch, rrfFuse, RRF_K, applyRecency, decayFactor, matchPrefix,
   applyMMRLite, applySourceTier, dedup, estimateTokens,
-} from '../brain/search/index.js';
+} from '../mind/brain/search/index.js';
 
 let pass = 0;
 let fail = 0;

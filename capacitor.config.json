@@ -4,6 +4,7 @@
   "webDir": "dist",
   "backgroundColor": "#0c0b09",
   "android": {
+    "path": "interfaces/android",
     "allowMixedContent": false
   },
   "plugins": {

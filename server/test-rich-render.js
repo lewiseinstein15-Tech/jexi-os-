@@ -23,7 +23,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const esbuild = path.join(ROOT, 'node_modules', 'esbuild', 'bin', 'esbuild');
 const tmpSrc = path.join(ROOT, 'server', 'test-support', '.rich-test.jsx');
 const tmpOut = path.join(ROOT, 'server', 'test-support', '.rich-test.cjs');
-fs.copyFileSync(path.join(ROOT, 'src', 'components', 'RichAnswer.jsx'), tmpSrc);
+fs.copyFileSync(path.join(ROOT, 'interfaces/console', 'components', 'RichAnswer.jsx'), tmpSrc);
 
 const doc = [
   '# Weather App Review',

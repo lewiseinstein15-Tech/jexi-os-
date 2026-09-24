@@ -19,8 +19,8 @@ import {
   assertClient,
   checkHealth,
   resolvePath,
-} from '../computer/sandbox/index.js';
-import { ComputerError } from '../computer/errors.js';
+} from '../services/computer/sandbox/index.js';
+import { ComputerError } from '../services/computer/errors.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

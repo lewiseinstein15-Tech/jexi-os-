@@ -31,7 +31,7 @@
  *
  * Zero dependencies. No network. No writes. Fail-soft by construction.
  */
-import profiles from '../../../providers/profiles/index.js';
+import profiles from '../../../integrations/providers/profiles/index.js';
 import { listProviders as bridgeListProviders } from '../providers/index.js';
 
 /** The ONLY two authorized keyRef env vars (do NOT invent others). */

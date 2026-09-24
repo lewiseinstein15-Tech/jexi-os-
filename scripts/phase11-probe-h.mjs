@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const CLI = path.join(ROOT, 'capability/doctor/cli.js');
+const CLI = path.join(ROOT, 'capabilities/graph/doctor/cli.js');
 let pass = 0, fail = 0;
 const ok = (c, l) => { c ? pass++ : fail++; console.log(`  ${c ? '✅' : '❌'} ${l}`); };
 
@@ -19,11 +19,11 @@ const runCli = (args = [], timeoutMs = 120000) => {
 // ── bring the daemon UP for the healthy path (real process, Scope C client) ──
 console.log('════ setup — re-index the graph (real) + start the codegraph daemon ════');
 {
-  const { handler: indexRepo } = await import(path.join(ROOT, 'tools/domains/lsp/index-repository.tool.js'));
+  const { handler: indexRepo } = await import(path.join(ROOT, 'capabilities/tools/domains/lsp/index-repository.tool.js'));
   const stats = await indexRepo({ root: ROOT, project: 'jexi-os', fresh: true });
   console.log(`  re-indexed: ${JSON.stringify({ project: stats.project, nodes: stats.nodes, edges: stats.edges, backend: stats.backend })}`);
 }
-const { DaemonClient } = await import(path.join(ROOT, 'kernel/daemon/client.js'));
+const { DaemonClient } = await import(path.join(ROOT, 'runtime/kernel/daemon/client.js'));
 const client = await DaemonClient.open({ spawnIfDown: true, sessionId: 'phase11-h-probe', namespace: 'doctor-probe' });
 console.log(`  daemon up: ${JSON.stringify(client.daemon)}`);
 
@@ -135,12 +135,12 @@ console.log('\n════ P6 — failure visibility: KILL the daemon (real) �
 // ── P10 — relationship to the Phase 7 G /doctor command ──
 console.log('\n════ P10 — existing /doctor command (Phase 7 G) — no shadow ════');
 {
-  const cmdFile = path.join(ROOT, 'commands/doctor.command.js');
+  const cmdFile = path.join(ROOT, 'capabilities/commands/doctor.command.js');
   const exists = fs.existsSync(cmdFile);
   console.log(`  commands/doctor.command.js exists: ${exists}`);
   if (exists) console.log('  head (raw):\n' + fs.readFileSync(cmdFile, 'utf8').split('\n').slice(0, 16).map((l) => `    | ${l}`).join('\n'));
-  const registered = /doctor/i.test(fs.readFileSync(path.join(ROOT, 'capability/doctor/cli.js'), 'utf8'));
-  const inCommands = fs.existsSync(path.join(ROOT, 'commands')) && fs.readdirSync(path.join(ROOT, 'commands')).filter((f) => f.includes('doctor'));
+  const registered = /doctor/i.test(fs.readFileSync(path.join(ROOT, 'capabilities/graph/doctor/cli.js'), 'utf8'));
+  const inCommands = fs.existsSync(path.join(ROOT, 'capabilities/commands')) && fs.readdirSync(path.join(ROOT, 'capabilities/commands')).filter((f) => f.includes('doctor'));
   console.log(`  commands/ dir doctor files: ${JSON.stringify(inCommands)} (untouched by Scope H)`);
   console.log(`  Phase 11 doctor entry points: capability/doctor/index.js + capability/doctor/cli.js — registers NO slash command${registered ? '' : ''}`);
   ok(exists, 'P10 existing Phase 7 G /doctor command present and NOT modified');

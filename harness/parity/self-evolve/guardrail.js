@@ -2,7 +2,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import skills from '../skills/index.js';
 
 export const DEFAULT_MAX_BYTE_DELTA = 4096;

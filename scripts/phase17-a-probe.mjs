@@ -16,9 +16,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   obscuraAvailability, createBrowserRuntime, assertEngineIsObscura,
-} from '../runtimes/browser/index.js';
+} from '../runtime/runtimes/browser/index.js';
 
-import { buildStealthEnv, checkIdentityConsistency, stealthSupported } from '../runtimes/browser/stealth.js';
+import { buildStealthEnv, checkIdentityConsistency, stealthSupported } from '../runtime/runtimes/browser/stealth.js';
 
 const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(SCRIPTS_DIR, '..');

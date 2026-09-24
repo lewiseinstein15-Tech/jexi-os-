@@ -1,8 +1,8 @@
 /** JEXI OS — Phase 30 Scope D — rule schema, loader and Phase 25 bridge. */
 import fs from 'node:fs';
 import path from 'node:path';
-import { SemanticaError } from '../../../semantica/_internal.js';
-import instructions from '../../../prompt/sections/08-instructions.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
+import instructions from '../../../capabilities/prompts/sections/08-instructions.js';
 import { matchRule } from './scope.js';
 
 export const DEFAULT_TOKEN_BUDGET = 4000;

@@ -1,5 +1,5 @@
 /** JEXI OS — Phase 30 Scope E — worktree hook emission through Scope A. */
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import hooks from '../hooks/index.js';
 
 const WORKTREE_EVENTS = new Set(['WorktreeCreate', 'WorktreeRemove']);

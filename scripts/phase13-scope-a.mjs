@@ -17,7 +17,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { createRegistry, ERRORS } from '../workforce/agents/index.js';
+import { createRegistry, ERRORS } from '../agents/workforce/agents/index.js';
 
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 let pass = 0;

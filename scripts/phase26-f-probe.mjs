@@ -4,10 +4,10 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { createInstincts } from '../instincts/core/index.js';
-import { createInstinctStore } from '../instincts/store/index.js';
-import { createPruner } from '../instincts/prune/index.js';
-import { nextOp, currentOp } from '../instincts/observe/index.js';
+import { createInstincts } from '../mind/instincts/core/index.js';
+import { createInstinctStore } from '../mind/instincts/store/index.js';
+import { createPruner } from '../mind/instincts/prune/index.js';
+import { nextOp, currentOp } from '../mind/instincts/observe/index.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, label) => { if (cond) { pass += 1; console.log('PASS ' + label); } else { fail += 1; console.log('FAIL ' + label); } };

@@ -29,7 +29,7 @@ import {
   countTools,
   getToolSchema,
   checkDrift,
-} from '../tools/registry/governance.js';
+} from '../capabilities/tools/registry/governance.js';
 
 const SUB = process.argv[2] || 'all';
 

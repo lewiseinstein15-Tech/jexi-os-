@@ -7,7 +7,7 @@
 #        CLOUDFLARE_API_TOKEN = <the token>
 #        CLOUDFLARE_ACCOUNT_ID = <your account number, from dash.cloudflare.com URL>
 #   3. Run this workflow (Actions → "Deploy Load Balancer" → Run workflow),
-#      or just push a change to deploy/lb-worker.js — it deploys itself.
+#      or just push a change to infra/deploy/lb-worker.js — it deploys itself.
 #
 # Result: https://jexi-lb.<your-subdomain>.workers.dev
 
@@ -17,7 +17,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'deploy/lb-worker.js'
+      - 'infra/deploy/lb-worker.js'
       - '.github/workflows/deploy-worker.yml'
   workflow_dispatch:
 
@@ -42,4 +42,4 @@ jobs:
             echo "::warning::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets are not set — add them in repo Settings → Secrets to enable the optional load balancer. Skipping (the app talks to the brain directly)."
             exit 0
           fi
-          npx --yes wrangler@4 deploy deploy/lb-worker.js --name jexi-lb
+          npx --yes wrangler@4 deploy infra/deploy/lb-worker.js --name jexi-lb

@@ -3,9 +3,9 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { SemanticaError } from '../../../semantica/_internal.js';
-import { createFleet } from '../../../session/fleet/index.js';
-import { createSessions } from '../../../workgraph/session/index.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
+import { createFleet } from '../../../runtime/session/fleet/index.js';
+import { createSessions } from '../../../runtime/workgraph/session/index.js';
 import { createWorktreeHookEmitter } from './hooks.js';
 import {
   branchExists,

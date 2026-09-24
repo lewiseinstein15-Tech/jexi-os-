@@ -3,11 +3,11 @@
 // Phase 25 — Scope C live probe: five-section constitutional template.
 // Zero dependencies. Prints raw evidence per check. Exit 1 on any failure.
 
-import { constitution, escalation, outputFormat, constraints, SCHEMA_DIALECT, CONSTITUTION_SECTION_MAP } from '../prompt/constitution/index.js';
-import { createSectionRegistry } from '../prompt/assembly/registry.js';
-import { registerCanonical } from '../prompt/assembly/order.js';
-import { compute as computeBoundary } from '../prompt/assembly/boundary.js';
-import { PromptError, isPromptError } from '../prompt/assembly/errors.js';
+import { constitution, escalation, outputFormat, constraints, SCHEMA_DIALECT, CONSTITUTION_SECTION_MAP } from '../capabilities/prompts/constitution/index.js';
+import { createSectionRegistry } from '../capabilities/prompts/assembly/registry.js';
+import { registerCanonical } from '../capabilities/prompts/assembly/order.js';
+import { compute as computeBoundary } from '../capabilities/prompts/assembly/boundary.js';
+import { PromptError, isPromptError } from '../capabilities/prompts/assembly/errors.js';
 
 let failures = 0;
 

@@ -8,7 +8,7 @@ import { createState } from '../harness/state/index.js';
 import { createRefine } from '../harness/refine/index.js';
 import { apply } from '../harness/refine/applier.js';
 import { canonical } from '../harness/state/journal.js';
-import command from '../commands/refine.command.js';
+import command from '../capabilities/commands/refine.command.js';
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phase10-c-'));
 const cwd = process.cwd();
 let child;
@@ -105,7 +105,7 @@ try {
   pass('refine consumes trajectory read-only');
   console.log('P7 — command surface and handler routing');
   const oldSource = execFileSync('git', ['show', '0dfe788:commands/refine.command.js'], { encoding: 'utf8', cwd });
-  const newSource = fs.readFileSync(new URL('../commands/refine.command.js', import.meta.url), 'utf8');
+  const newSource = fs.readFileSync(new URL('../capabilities/commands/refine.command.js', import.meta.url), 'utf8');
   assert.equal(newSource.split('  async handler(args, ctx) {')[0], oldSource.split('  async handler(args, ctx) {')[0]);
   assert.equal(newSource.slice(newSource.lastIndexOf('  },')), oldSource.slice(oldSource.lastIndexOf('  },')));
   process.chdir(root);

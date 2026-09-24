@@ -7,8 +7,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert';
 
-import { loadProgram } from '../research/program/load.js';
-import { guardEdit } from '../research/constraints/guards.js';
+import { loadProgram } from '../services/research/program/load.js';
+import { guardEdit } from '../services/research/constraints/guards.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const programPath = join(root, 'research', 'program', 'program.md');

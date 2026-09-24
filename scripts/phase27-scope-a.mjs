@@ -17,13 +17,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { execSync, execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { createFleet } from '../session/fleet/index.js';
+import { createFleet } from '../runtime/session/fleet/index.js';
 
 // consolidation cleanup: host-portable scratch base (os.tmpdir()) instead of a
 // hardcoded sandbox path; REPO_ROOT anchors the reboot child-script's import.
 const BASE = process.env.P27_LOGS || path.join(os.tmpdir(), 'p27-logs');
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const FLEET_ENTRY = pathToFileURL(path.join(REPO_ROOT, 'session/fleet/index.js')).href;
+const FLEET_ENTRY = pathToFileURL(path.join(REPO_ROOT, 'runtime/session/fleet/index.js')).href;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function freshDir(name) {

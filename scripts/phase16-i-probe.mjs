@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Phase 16 Scope I — Event Router probe
-import { router } from '../ui/web/console/chat/router.js';
-import { modes } from '../ui/web/console/chat/modes.js';
-import { taxonomy } from '../events/chat/taxonomy.js';
+import { router } from '../interfaces/ui/web/console/chat/router.js';
+import { modes } from '../interfaces/ui/web/console/chat/modes.js';
+import { taxonomy } from '../runtime/events/chat/taxonomy.js';
 
 let pass = 0, fail = 0;
 const ok = (c, msg) => { c ? pass++ : fail++; console.log(`  ${c ? '✅' : '❌'} ${msg}`); };

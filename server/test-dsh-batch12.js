@@ -21,7 +21,7 @@ const ok = (name, cond) => {
 };
 
 const SERVER_DIR = process.cwd();
-const SRC_DIR = path.join(SERVER_DIR, '..', 'src');
+const SRC_DIR = path.join(SERVER_DIR, '..', 'interfaces', 'console');
 
 /* ══════════════ 1. CORDIS RUNNER (define → run → stop → undefine) ══════════════ */
 console.log('\n== 1. Cordis runner (dynamic plugin lifecycle) ==');
@@ -189,7 +189,7 @@ console.log('\n== 6. Parity 100% + integration ==');
   const { bundleStatus } = await import('./src/services/BundleBase.js');
   const st = bundleStatus();
   ok('ALL packages ported', st.counts.total >= 123 && st.counts.ported === st.counts.total && st.counts.notYet === 0 && st.counts.partial === 0);
-  const parity = fs.readFileSync(path.join(SERVER_DIR, '..', 'DSH-PARITY.md'), 'utf-8');
+  const parity = fs.readFileSync(path.join(SERVER_DIR, '..', 'docs', 'guides', 'DSH-PARITY.md'), 'utf-8');
   ok('parity doc says 100%', parity.includes('100%'));
   const { TOOL_COUNT } = await import('./src/services/ToolRegistry.js');
   ok('registry stable at 218', TOOL_COUNT === 219);

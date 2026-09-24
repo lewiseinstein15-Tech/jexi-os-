@@ -5,8 +5,8 @@
  * Raw output only. Run: node scripts/phase20-scope-a.mjs
  * Exit 0 = all pass, 1 = any fail.
  */
-import topologies from '../swarm/topologies/index.js';
-import { SwarmError } from '../swarm/topologies/_internal.js';
+import topologies from '../agents/swarm/topologies/index.js';
+import { SwarmError } from '../agents/swarm/topologies/_internal.js';
 
 const MEMBERS = ['agent-alpha', 'agent-bravo', 'agent-charlie', 'agent-delta', 'agent-echo'];
 let failures = 0;

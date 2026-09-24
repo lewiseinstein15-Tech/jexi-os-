@@ -2,7 +2,7 @@
  * JEXI OS — Phase 14 Scope A — live probe for the context graph.
  * Run: node scripts/phase14-a-probe.mjs
  */
-import { graph, SemanticaError } from '../semantica/graph/index.js';
+import { graph, SemanticaError } from '../services/semantica/graph/index.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, label) => { if (cond) { pass += 1; console.log(`PASS ${label}`); } else { fail += 1; console.log(`FAIL ${label}`); } };

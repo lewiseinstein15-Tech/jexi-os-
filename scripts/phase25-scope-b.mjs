@@ -6,12 +6,12 @@
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
-import { createSectionRegistry } from '../prompt/assembly/registry.js';
-import { registerCanonical } from '../prompt/assembly/order.js';
+import { createSectionRegistry } from '../capabilities/prompts/assembly/registry.js';
+import { registerCanonical } from '../capabilities/prompts/assembly/order.js';
 import {
   compute, cacheKey, assertOrder, boundary, BOUNDARY_SEPARATOR,
-} from '../prompt/assembly/boundary.js';
-import { PromptError, isPromptError } from '../prompt/assembly/errors.js';
+} from '../capabilities/prompts/assembly/boundary.js';
+import { PromptError, isPromptError } from '../capabilities/prompts/assembly/errors.js';
 
 let failures = 0;
 
@@ -86,7 +86,7 @@ const staticInput = [
 const k1 = cacheKey(staticInput);
 const k2 = cacheKey([...staticInput]);
 const manualSha = createHash('sha256').update('You are JEXI.\nTerse, evidence-first.', 'utf8').digest('hex');
-const boundaryHref = new URL('../prompt/assembly/boundary.js', import.meta.url).href;
+const boundaryHref = new URL('../capabilities/prompts/assembly/boundary.js', import.meta.url).href;
 const childCode = `
 import { cacheKey } from ${JSON.stringify(boundaryHref)};
 const s = [

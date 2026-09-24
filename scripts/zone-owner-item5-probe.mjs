@@ -61,7 +61,7 @@ process.env.OLLAMA_HOST = MOCK;
 process.env.MODEL_NAME = 'qwen3:latest';
 
 const { generateContent } = await import('../server/src/providers/runtime/LLMClient.js');
-const { caps } = await import('../providers/cost/caps.js');
+const { caps } = await import('../integrations/providers/cost/caps.js');
 
 // ---- 1. fake spend above cap → refusal
 caps.record({ sessionId: 'probe-capped', providerId: 'groq', usd: 1.5, budgetUsd: 1.0 }); // crossing record accepted, flips terminal

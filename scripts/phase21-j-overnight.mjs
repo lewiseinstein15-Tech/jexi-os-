@@ -7,7 +7,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert';
 
-import { runOvernight } from '../research/overnight.js';
+import { runOvernight } from '../services/research/overnight.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const probesDir = join(root, 'research', '.probes');

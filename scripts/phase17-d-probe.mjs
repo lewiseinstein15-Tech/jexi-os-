@@ -32,10 +32,10 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
-import { confidenceScore, confidenceBreakdown, reinforce, registerContradiction, noteRetrieval } from '../memory/confidence.js';
-import { advance, advanceEntry, reinforced, isArchived, LIFECYCLE_DEFAULTS } from '../memory/lifecycle.js';
-import { buildGraph, getEntity, neighbors, path as graphPath, createRuleExtractor } from '../memory/knowledge-graph.js';
-import { createHybridIndex, JsonlMemoryStore, hashEmbedder } from '../memory/hybrid-search.js';
+import { confidenceScore, confidenceBreakdown, reinforce, registerContradiction, noteRetrieval } from '../mind/memory/confidence.js';
+import { advance, advanceEntry, reinforced, isArchived, LIFECYCLE_DEFAULTS } from '../mind/memory/lifecycle.js';
+import { buildGraph, getEntity, neighbors, path as graphPath, createRuleExtractor } from '../mind/memory/knowledge-graph.js';
+import { createHybridIndex, JsonlMemoryStore, hashEmbedder } from '../mind/memory/hybrid-search.js';
 
 const SIM_NOW = new Date('2026-09-19T12:00:00Z').getTime();
 const DAY = 86_400_000;

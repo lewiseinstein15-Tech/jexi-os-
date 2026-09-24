@@ -16,7 +16,7 @@
  */
 import {
   sanitizeText, safeRows, capTail, capText, dedupeActivity, hasTrace,
-} from '../src/utils/agentStream.js';
+} from '../interfaces/console/utils/agentStream.js';
 import fs from 'node:fs';
 
 let pass = 0, fail = 0;
@@ -94,12 +94,12 @@ check('hasTrace with object narrations', hasTrace({ narrations: [{}] }) === true
 // --- 6. wiring contracts ---
 console.log('\n[6] wiring contracts');
 {
-  const hook = read('../src/hooks/useJexiEngine.js');
+  const hook = read('../interfaces/console/hooks/useJexiEngine.js');
   check('hook sanitizes log entries at ingestion', /agent: sanitizeText\(data\.agent, 40\)/.test(hook) && /message: sanitizeText\(data\.message, 240\)/.test(hook));
   check('hook caps stored activity (slice(-400))', /\.slice\(-400\)/.test(hook));
   check('hook imports sanitizeText', /from '\.\.\/utils\/agentStream\.js'/.test(hook));
 
-  const panel = read('../src/components/AgentThinking.jsx');
+  const panel = read('../interfaces/console/components/AgentThinking.jsx');
   check('panel wraps in a LOCAL crash boundary', /class PanelBoundary/.test(panel) && /PanelBoundary>/.test(panel));
   check('local boundary hides the panel, not the chat', /this\.state\.crashed \? null : this\.props\.children/.test(panel));
   check('panel coerces props via useMemo + safeRows', /safeRows\(activity\)/.test(panel) && /useMemo\(/.test(panel));
@@ -107,7 +107,7 @@ console.log('\n[6] wiring contracts');
   check('panel renders "+N earlier" markers', /jx-agent-more/.test(panel));
   check('panel coerces by/sourceCount defensively', /typeof by === 'string'/.test(panel) && /Number\.isFinite\(sourceCount\)/.test(panel));
 
-  const css = read('../src/index.css');
+  const css = read('../interfaces/console/index.css');
   check('.jx-agent-more styled', /\.jx-agent-more/.test(css));
 }
 

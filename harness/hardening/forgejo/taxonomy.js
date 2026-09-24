@@ -24,7 +24,7 @@
  *   E_INVALID_TOOL_SPEC  a data entry violates the shape (fail-fast at import)
  */
 
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 import { REPO_TOOLS } from './repo-tools.js';
 import { ISSUE_TOOLS } from './issue-tools.js';
 import { PR_TOOLS } from './pr-tools.js';

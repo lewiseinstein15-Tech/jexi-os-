@@ -2,8 +2,8 @@
  * JEXI OS — Phase 14 Scope D — live probe for ontology + validation + dedup.
  * Run: node scripts/phase14-d-probe.mjs
  */
-import { ontology, SemanticaError } from '../semantica/ontology/index.js';
-import { prov } from '../semantica/provenance/index.js';
+import { ontology, SemanticaError } from '../services/semantica/ontology/index.js';
+import { prov } from '../services/semantica/provenance/index.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, label) => { if (cond) { pass += 1; console.log(`PASS ${label}`); } else { fail += 1; console.log(`FAIL ${label}`); } };

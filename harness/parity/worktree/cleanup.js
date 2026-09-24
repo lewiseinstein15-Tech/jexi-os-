@@ -1,7 +1,7 @@
 /** JEXI OS — Phase 30 Scope E — commit, no-ff merge and safe discard. */
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { SemanticaError } from '../../../semantica/_internal.js';
+import { SemanticaError } from '../../../services/semantica/_internal.js';
 
 function fail(code, message, details = {}) {
   return Object.assign(new SemanticaError(code, message), details);

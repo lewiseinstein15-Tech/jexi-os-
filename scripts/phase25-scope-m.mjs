@@ -13,7 +13,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import instructions from '../prompt/sections/08-instructions.js';
+import instructions from '../capabilities/prompts/sections/08-instructions.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

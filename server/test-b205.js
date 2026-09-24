@@ -30,7 +30,7 @@ if (!process.env.JEXI_LEGACY_SUITE) {
  */
 import {
   dedupeActivity, countAgents, countSteps, formatDuration, traceChips, hasTrace,
-} from '../src/utils/agentStream.js';
+} from '../interfaces/console/utils/agentStream.js';
 import fs from 'node:fs';
 
 let pass = 0, fail = 0;

@@ -3,7 +3,7 @@
  * Run: node scripts/phase15-d-probe.mjs
  */
 import fs from 'node:fs';
-import { createGEP } from '../evomap/gep/index.js';
+import { createGEP } from '../services/evomap/gep/index.js';
 
 let pass = 0, fail = 0;
 const ok = (cond, label) => { if (cond) { pass += 1; console.log('PASS ' + label); } else { fail += 1; console.log('FAIL ' + label); } };

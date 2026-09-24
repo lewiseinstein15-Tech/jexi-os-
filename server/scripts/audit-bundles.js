@@ -14,7 +14,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_ROOT = path.resolve(__dirname, '..');
 const MANIFEST = path.join(SERVER_ROOT, 'bundles', 'manifest.json');
-const PARITY = path.resolve(SERVER_ROOT, '..', 'DSH-PARITY.md');
+const PARITY = path.resolve(SERVER_ROOT, '..', 'docs', 'guides', 'DSH-PARITY.md');
 
 let failures = 0;
 const check = (name, cond) => {

@@ -7,8 +7,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createFleet } from '../session/fleet/index.js';
-import { createSessions } from '../workgraph/session/index.js';
+import { createFleet } from '../runtime/session/fleet/index.js';
+import { createSessions } from '../runtime/workgraph/session/index.js';
 import {
   createWorktreeManager,
   deterministicWorktreeId,
@@ -26,8 +26,8 @@ function gitBlob(relativeUrl) {
   return createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
 }
 
-nodeAssert.equal(gitBlob('../session/fleet/index.js'), fleetBlob);
-nodeAssert.equal(gitBlob('../workgraph/session/index.js'), sessionBlob);
+nodeAssert.equal(gitBlob('../runtime/session/fleet/index.js'), fleetBlob);
+nodeAssert.equal(gitBlob('../runtime/workgraph/session/index.js'), sessionBlob);
 nodeAssert.equal(gitBlob('../harness/parity/hooks/index.js'), hooksBlob);
 
 process.env.GIT_AUTHOR_DATE = '2026-09-22T00:00:00Z';

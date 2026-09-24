@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Phase 16 Scope D — Progress Drafts probe
-import { draft } from '../ui/web/console/chat/progress-draft.js';
+import { draft } from '../interfaces/ui/web/console/chat/progress-draft.js';
 
 let pass = 0, fail = 0;
 const ok = (c, msg) => { c ? pass++ : fail++; console.log(`  ${c ? '✅' : '❌'} ${msg}`); };

@@ -4,10 +4,10 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ALL_CHANNELS, route } from '../capability/internet/reach/channels/index.js';
-import { read } from '../capability/internet/reach/core.js';
-import { checkAll, formatReport } from '../capability/internet/reach/doctor.js';
-import { ReachConfig } from '../capability/internet/reach/config.js';
+import { ALL_CHANNELS, route } from '../capabilities/graph/internet/reach/channels/index.js';
+import { read } from '../capabilities/graph/internet/reach/core.js';
+import { checkAll, formatReport } from '../capabilities/graph/internet/reach/doctor.js';
+import { ReachConfig } from '../capabilities/graph/internet/reach/config.js';
 import { tmpdir } from 'node:os';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -70,7 +70,7 @@ for (const r of Object.values(results4)) {
 
 // ═══ P5 — doctor --json over all 16 (CLI) ═══
 console.log('\n════ P5 — doctor --json (CLI, all channels) ════');
-const out5 = execFileSync(process.execPath, [path.join(ROOT, 'capability/internet/reach/doctor.js'), '--json'], { encoding: 'utf8', timeout: 120000 });
+const out5 = execFileSync(process.execPath, [path.join(ROOT, 'capabilities/graph/internet/reach/doctor.js'), '--json'], { encoding: 'utf8', timeout: 120000 });
 const parsed5 = JSON.parse(out5);
 console.log(`channels in doctor output: ${Object.keys(parsed5).length} → ${Object.keys(parsed5).join(', ')}`);
 console.log(out5.trim().split('\n').slice(0, 40).join('\n'));

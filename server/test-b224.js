@@ -186,7 +186,7 @@ test('index.js: the stream is mounted and open (key gate removed)', async () => 
 });
 
 test('frontend: EventSource subscription + duplicate-safe append + stretched poll while live', async () => {
-  const src = fs.readFileSync(path.join(SERVER_DIR, '../src/components/MissionsScreen.jsx'), 'utf-8');
+  const src = fs.readFileSync(path.join(SERVER_DIR, '../interfaces/console/components/MissionsScreen.jsx'), 'utf-8');
   assert.ok(src.includes('new EventSource('), 'subscribes via EventSource');
   assert.ok(src.includes("addEventListener('mission-event'"), 'listens for mission-event frames');
   assert.ok(src.includes('es.onerror'), 'on error the stream closes and polling remains');
@@ -195,14 +195,14 @@ test('frontend: EventSource subscription + duplicate-safe append + stretched pol
 });
 
 test('frontend: TOOLS_DISCOVERED surfaces on real event data only (B223 loop closed)', async () => {
-  const src = fs.readFileSync(path.join(SERVER_DIR, '../src/components/MissionsScreen.jsx'), 'utf-8');
+  const src = fs.readFileSync(path.join(SERVER_DIR, '../interfaces/console/components/MissionsScreen.jsx'), 'utf-8');
   assert.ok(src.includes("type === 'TOOLS_DISCOVERED'"), 'reads the TOOLS_DISCOVERED event');
   assert.ok(src.includes('requiredCapabilities') && src.includes('blockedByAllowlist'), 'renders the real discovery payload');
   assert.ok(!src.includes('discovery: { toolCount:'), 'no stubbed discovery data');
 });
 
 test('Part 29 closed honestly: the REST polling fabric still exists as fallback', async () => {
-  const src = fs.readFileSync(path.join(SERVER_DIR, '../src/components/MissionsScreen.jsx'), 'utf-8');
+  const src = fs.readFileSync(path.join(SERVER_DIR, '../interfaces/console/components/MissionsScreen.jsx'), 'utf-8');
   assert.ok(src.includes('MISSION_EVENTS_URL') && src.includes('setInterval'), 'the REST poll path remains');
 });
 

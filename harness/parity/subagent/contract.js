@@ -1,5 +1,5 @@
 /** JEXI OS — Phase 30 Scope C — additive Phase 13 subagent contract. */
-import { validate as validatePhase13 } from '../../../workforce/agents/agent-spec.js';
+import { validate as validatePhase13 } from '../../../agents/workforce/agents/agent-spec.js';
 import { scoping } from '../skills/index.js';
 
 export const PERMISSION_MODES = Object.freeze(['default', 'acceptEdits', 'plan']);

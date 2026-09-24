@@ -422,7 +422,7 @@ test('Director wiring: the recommendation reaches the event and the brief', asyn
 /* ── 11. frontend: the browser is the microphone ──────────────────────── */
 
 test('Composer voice input: feature-detected, honest when absent', async () => {
-  const src = fs.readFileSync('../src/components/Composer.jsx', 'utf8');
+  const src = fs.readFileSync('../interfaces/console/components/Composer.jsx', 'utf8');
   assert.match(src, /window\.SpeechRecognition \|\| window\.webkitSpeechRecognition/, 'Web Speech API, zero keys');
   assert.ok(src.includes('{SpeechRecognitionCtor && ('), 'the mic button renders ONLY when the engine exists — no dead button');
   assert.ok(src.includes('interimResults = true'), 'interim results stream into the draft');
@@ -434,7 +434,7 @@ test('Composer voice input: feature-detected, honest when absent', async () => {
 /* ── 12. docs tell the same story ─────────────────────────────────────── */
 
 test('docs: the android adapter and its honesty contract are documented', async () => {
-  const android = fs.readFileSync('../ANDROID.md', 'utf8');
+  const android = fs.readFileSync('../docs/guides/ANDROID.md', 'utf8');
   assert.match(android, /AndroidRuntime/, 'ANDROID.md documents the adapter');
   assert.match(android, /adb/, 'the adb mechanism is named');
   assert.match(android, /COMPUTER_RUNTIME=android/, 'activation is documented');

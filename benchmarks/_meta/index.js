@@ -31,7 +31,7 @@
  * same clock => byte-identical output.
  */
 
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../services/semantica/_internal.js';
 import { resolveClock } from './manifest.js';
 import { createCost } from './cost.js';
 import { createTrace } from './trace.js';

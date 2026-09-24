@@ -109,20 +109,20 @@ console.log('\n== 3. Streaming wires ==');
 
   // B162b — the UI actually CONSUMES the events the named lines ride on
   ok("engine consumes 'agent.log' (join/writing lines were dropped before)",
-    /data\.type === 'log' \|\| data\.type === 'agent\.log'/.test(fs.readFileSync(path.join(ROOT, 'src/hooks/useJexiEngine.js'), 'utf-8')));
+    /data\.type === 'log' \|\| data\.type === 'agent\.log'/.test(fs.readFileSync(path.join(ROOT, 'interfaces/console/hooks/useJexiEngine.js'), 'utf-8')));
   const llm2 = fs.readFileSync('./src/providers/runtime/LLMClient.js', 'utf-8');
   ok('Gemini streams natively with name meta (generateContentStream)', llm2.includes('generateContentStream(parts)') && llm2.includes("opts.onToken(piece, { provider: 'gemini', model: modelName })"));
   ok('non-streaming providers still emit once WITH meta (streamedAny fallback)', llm2.includes('streamedAny') && llm2.includes('opts.onToken(text, { provider, model: opts.model || null })'));
-  const hook = fs.readFileSync(path.join(ROOT, 'src/hooks/useJexiEngine.js'), 'utf-8');
+  const hook = fs.readFileSync(path.join(ROOT, 'interfaces/console/hooks/useJexiEngine.js'), 'utf-8');
   ok('engine carries `by` onto the streaming message', hook.includes('by: last.by || data.by') && hook.includes('...(data.by ? { by: data.by } : {})'));
-  const chat = fs.readFileSync(path.join(ROOT, 'src/components/ChatWindow.jsx'), 'utf-8');
-  const think = fs.readFileSync(path.join(ROOT, 'src/components/AgentThinking.jsx'), 'utf-8');
+  const chat = fs.readFileSync(path.join(ROOT, 'interfaces/console/components/ChatWindow.jsx'), 'utf-8');
+  const think = fs.readFileSync(path.join(ROOT, 'interfaces/console/components/AgentThinking.jsx'), 'utf-8');
   // Transcript UI: the card header is gone — the writer NAME rides the live
   // Thought row instead ("Thinking · NAME · 12.3s"), fed by by={msg.by}.
   // Same guarantee: a coworker NAME shows while streaming, never a model id
   // (model ids are masked server-side — see the sanitizer tests above).
   ok('chat header shows the writer NAME while streaming (never the model)', chat.includes('by={msg.by}') && think.includes('Thinking${safeBy'));
-  const settings = fs.readFileSync(path.join(ROOT, 'src/components/SettingsView.jsx'), 'utf-8');
+  const settings = fs.readFileSync(path.join(ROOT, 'interfaces/console/components/SettingsView.jsx'), 'utf-8');
   ok('Settings shows the named team (Meet the team)', settings.includes('Meet the team') && settings.includes('/api/team'));
 }
 

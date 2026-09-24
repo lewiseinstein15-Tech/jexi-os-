@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
 
-import { lint, DEFAULT_SEVERITIES, SEVERITIES } from '../prompt/anti-patterns/index.js';
+import { lint, DEFAULT_SEVERITIES, SEVERITIES } from '../capabilities/prompts/anti-patterns/index.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -261,7 +261,7 @@ console.log('');
 // ---------------------------------------------------------------------------
 // P9 — Catalog exists: 9 rule sections, each with violation + clean example
 // ---------------------------------------------------------------------------
-const catPath = path.join(WT, 'prompt', 'anti-patterns', 'catalog.md');
+const catPath = path.join(WT, 'capabilities/prompts', 'anti-patterns', 'catalog.md');
 const catText = fs.existsSync(catPath) ? fs.readFileSync(catPath, 'utf8') : '';
 const blocks = catText.split(/^## /m).slice(1); // first chunk is the header
 const catDetail = RULE_ORDER.map((id) => {

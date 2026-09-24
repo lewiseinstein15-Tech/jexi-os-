@@ -19,7 +19,7 @@
  *
  * Mounted from index.js via mountTokens(app).
  */
-import { createEphemeral, MintRefusedError, MAX_TTL_MS, DEFAULT_TTL_MS, DEFAULT_SCOPES } from '../../../providers/tokens/ephemeral.js';
+import { createEphemeral, MintRefusedError, MAX_TTL_MS, DEFAULT_TTL_MS, DEFAULT_SCOPES } from '../../../integrations/providers/tokens/ephemeral.js';
 
 function ok(res, body) { res.json({ ok: true, ...body }); }
 function fail(res, e, code = 500) { res.status(code).json({ ok: false, error: String(e?.message || e).slice(0, 300) }); }

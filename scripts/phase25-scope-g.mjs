@@ -17,10 +17,10 @@ import {
   BLACKLIST_CODES,
   EPISTEMIC_CODES,
   CODES,
-} from '../prompt/memory-fs/index.js';
+} from '../capabilities/prompts/memory-fs/index.js';
 
 const WT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const MODULE_URL = pathToFileURL(path.join(WT, 'prompt/memory-fs/index.js')).href;
+const MODULE_URL = pathToFileURL(path.join(WT, 'capabilities/prompts/memory-fs/index.js')).href;
 const AGENT = { role: 'agent' };
 
 let failures = 0;

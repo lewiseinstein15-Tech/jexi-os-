@@ -48,7 +48,7 @@
  * is deterministically null without one.
  */
 
-import { SemanticaError } from '../../semantica/_internal.js';
+import { SemanticaError } from '../../services/semantica/_internal.js';
 import { resolveClock } from './manifest.js';
 
 const WEBARENA_SHAPE = {

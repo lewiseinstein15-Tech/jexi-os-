@@ -15,9 +15,9 @@
  * P12 runs AFTER the commit (zone compliance).
  */
 
-import * as label from '../events/provenance/label.js';
-import { listLayers, getLayer } from '../intelligence/layers/index.js';
-import { LayerError, brokerFetch, normalizeLon, normalizeLat } from '../intelligence/layers/_shared.js';
+import * as label from '../runtime/events/provenance/label.js';
+import { listLayers, getLayer } from '../mind/intelligence/layers/index.js';
+import { LayerError, brokerFetch, normalizeLon, normalizeLat } from '../mind/intelligence/layers/_shared.js';
 
 let pass = 0;
 let fail = 0;

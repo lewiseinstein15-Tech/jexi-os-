@@ -10,9 +10,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OFFLOAD_DIR = path.join(ROOT, '.jexi/offload');
 
-const { offload } = await import(path.join(ROOT, 'context/offload/file.js'));
-const { history } = await import(path.join(ROOT, 'context/offload/history.js'));
-const { createSessions } = await import(path.join(ROOT, 'workgraph/session/index.js'));
+const { offload } = await import(path.join(ROOT, 'runtime/context/offload/file.js'));
+const { history } = await import(path.join(ROOT, 'runtime/context/offload/history.js'));
+const { createSessions } = await import(path.join(ROOT, 'runtime/workgraph/session/index.js'));
 
 let pass = 0, fail = 0;
 const ok = (cond, msg) => {

@@ -18,7 +18,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'node:url';
-import { createNexus } from '../workforce/nexus/index.js';
+import { createNexus } from '../agents/workforce/nexus/index.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pass = 0;
@@ -73,15 +73,15 @@ for (const d of ['agents', 'jexi-agents', 'server']) {
 // The loader reads the vendored catalog from <root>/workforce/agents/vendor,
 // so the fixture root needs that tree too — otherwise the agency-agents specs
 // never load and every one of their references looks unresolved.
-fs.symlinkSync(path.join(REPO, 'workforce/agents'), path.join(tmp, 'workforce/agents'));
-fs.copyFileSync(path.join(REPO, 'workforce/divisions.json'), path.join(tmp, 'workforce/divisions.json'));
+fs.symlinkSync(path.join(REPO, 'agents/workforce/agents'), path.join(tmp, 'agents/workforce/agents'));
+fs.copyFileSync(path.join(REPO, 'agents/workforce/divisions.json'), path.join(tmp, 'agents/workforce/divisions.json'));
 
-const projection = JSON.parse(fs.readFileSync(path.join(REPO, 'workforce/nexus/vendor/agency-agents.strategies.json'), 'utf8'));
+const projection = JSON.parse(fs.readFileSync(path.join(REPO, 'agents/workforce/nexus/vendor/agency-agents.strategies.json'), 'utf8'));
 const discovery = projection.strategies.find((s) => s.id === 'nexus-phase-0-discovery');
 const originalFirst = discovery.candidates[0];
 const brokenRef = 'Trend Researcher RENAMED';
 discovery.candidates[0] = brokenRef;
-fs.writeFileSync(path.join(tmp, 'workforce/nexus/vendor/agency-agents.strategies.json'), JSON.stringify(projection, null, 2) + '\n');
+fs.writeFileSync(path.join(tmp, 'agents/workforce/nexus/vendor/agency-agents.strategies.json'), JSON.stringify(projection, null, 2) + '\n');
 console.log(`fixture: renamed discovery candidate #1 from ${JSON.stringify(originalFirst)} to ${JSON.stringify(brokenRef)}`);
 
 const fixture = createNexus({ root: tmp });

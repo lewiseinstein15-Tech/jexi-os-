@@ -38,7 +38,7 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..');
-const OUT = path.join(REPO, 'workforce/nexus/vendor/agency-agents.strategies.json');
+const OUT = path.join(REPO, 'agents/workforce/nexus/vendor/agency-agents.strategies.json');
 
 const args = process.argv.slice(2);
 const argVal = (flag, dflt) => {

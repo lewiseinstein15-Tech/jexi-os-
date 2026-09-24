@@ -91,9 +91,9 @@ const reasoner = fs.readFileSync('./src/services/Reasoner.js', 'utf-8');
 ok('reasonAndWrite accepts an onToken streaming seam', reasoner.includes('opts.onToken'));
 
 /* ─────────────── 3. client wiring (static + rendered) ─────────────── */
-const engine = fs.readFileSync(path.join(ROOT, 'src/hooks/useJexiEngine.js'), 'utf-8');
+const engine = fs.readFileSync(path.join(ROOT, 'interfaces/console/hooks/useJexiEngine.js'), 'utf-8');
 ok("the stream engine handles 'narration' events onto the streaming message", engine.includes("data.type === 'narration'"));
-const chat = fs.readFileSync(path.join(ROOT, 'src/components/ChatWindow.jsx'), 'utf-8');
+const chat = fs.readFileSync(path.join(ROOT, 'interfaces/console/components/ChatWindow.jsx'), 'utf-8');
 // Transcript UI: NarrationFeed was replaced by the flat <Narration> paragraph.
 ok('the chat renders the NarrationFeed on the assistant message', chat.includes('<Narration'));
 
@@ -103,7 +103,7 @@ fs.mkdirSync(path.dirname(tmpOut), { recursive: true });
 let NarrationFeed = null;
 try {
   execFileSync(esbuild, [
-    path.join(ROOT, 'src/components/NarrationFeed.jsx'),
+    path.join(ROOT, 'interfaces/console/components/NarrationFeed.jsx'),
     '--bundle', '--platform=node', '--format=cjs', '--loader:.jsx=jsx',
     '--external:react', '--outfile=' + tmpOut, '--log-level=error',
   ], { stdio: 'pipe' });

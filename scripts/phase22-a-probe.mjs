@@ -18,8 +18,8 @@ import { fileURLToPath } from 'node:url';
 import {
   captureSession, captureTurn, compress, readObservations, readTurns,
   storeDir, LLM_COMPRESSION_LABEL,
-} from '../memory/session-compress.js';
-import { inject, DEFAULT_TOKEN_BUDGET } from '../memory/session-inject.js';
+} from '../mind/memory/session-compress.js';
+import { inject, DEFAULT_TOKEN_BUDGET } from '../mind/memory/session-inject.js';
 
 const SCRIPTS = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(SCRIPTS, '..');

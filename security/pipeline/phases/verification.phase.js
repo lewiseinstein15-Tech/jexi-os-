@@ -29,9 +29,9 @@
  */
 
 import * as store from '../orchestration/checkpoint.js';
-import { pipelineGraph } from '../../../knowledge/index.js';
+import { pipelineGraph } from '../../../mind/knowledge/index.js';
 import { gatePhase } from '../../engagements/validator.js'; // Phase 8(D): RoE gate
-import { ExploitVerifier } from '../../../verification/verifiers/index.js';
+import { ExploitVerifier } from '../../../tests/verification/verifiers/index.js';
 
 export const phase = {
   id: 'verification',
