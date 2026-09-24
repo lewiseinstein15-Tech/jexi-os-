@@ -281,4 +281,42 @@ Legend: in 17B? = declared in the excluded `c394139` registry; on main? = presen
 - No merges, no deletions, no branch rewrites; only tag created: `pre-excluded-scopes-investigation` (= base `d4b273f`).
 - Live-verified evidence produced on main's tree during this investigation: `actionInventory()` → total 59, duplicate_names: [] (17B registry), and `git merge-base --is-ancestor` checks for every twin SHA listed in §1 and §6.
 
+---
+
+# 10. CLOSE-OUT — LEAD RULING (FINAL)
+
+Investigation completed at `066be2d`. Lead ruling received and recorded verbatim in substance:
+
+> **CLOSE all 5 scopes as MIS-MERGED — no merge, no rebuild, no tag-delete.**
+>
+> - 8B  `c8b8bb0` → `9a2e4e5`
+> - 9J  `a809023` → `53ca1d7`
+> - 11I `930ec6f` → `b33eab2`
+> - 17B `c394139` → `d4fde5e`
+> - 21J `a63a820` → `dc81d27`
+>
+> **17B browser:** Obscura is the intended replacement. The Chromium/Playwright swap was deliberate. 59/59 actions live. No gap. **Confirmed.**
+>
+> **Phase 17 deferrals** (K-gate PARTIAL, vision model, SVG raster): environmental, separate, **keep as declared**.
+>
+> **Phase 21 zone-owner wiring task: FOLD INTO CONSOLIDATED CLEANUP.** Do not wire now. Record and close this investigation branch.
+
+## Disposition
+
+| Item | Ruling | Status after close-out |
+|---|---|---|
+| 8B — 20 security agents | CLOSED (MIS-MERGED, full parity) | no action; content on main via `9a2e4e5` |
+| 9J — 3D globe UI | CLOSED (MIS-MERGED, full parity) | no action; content on main via `53ca1d7` |
+| 11I — token-efficient graph queries | CLOSED (MIS-MERGED, full parity) | no action; content on main via `b33eab2` |
+| 17B — 45+ browser actions | CLOSED (MIS-MERGED, full parity; Obscura confirmed as intended engine) | no action; content on main via `d4fde5e` |
+| 21J — overnight autonomous run | CLOSED (MIS-MERGED, full parity) | no action; content on main via `dc81d27` |
+| Phase 21 wiring (research subsystem → server live work-graph) | FOLDED into Consolidated Cleanup | not wired now; ownership transferred to the consolidated-cleanup track |
+| Phase 17 deferrals (K-gate PARTIAL / vision model / SVG raster) | KEEP AS DECLARED | unchanged; environmental, separate from scope exclusion |
+| Phase 18 (voice) | RESOLVED OUTSIDE SCOPE (§ Resolved Outside Scope) | unchanged |
+| Branch `investigation/excluded-scopes` | KEPT | no branch deletion, no tag deletion (per close-out constraints) |
+
+**Final ledger: 5 investigated / 5 CLOSED as MIS-MERGED / 0 rebuilt / 0 merged-from-excluded-refs / 0 tags or branches deleted. Capability gaps introduced by the exclusions: 0.**
+
+This close-out is doc-only (one commit, insertions only, zero deletions) and merges to main via PR. With this section, `docs/EXCLUDED-SCOPES-INVESTIGATION.md` is the permanent record of the exclusion question and its resolution.
+
 
