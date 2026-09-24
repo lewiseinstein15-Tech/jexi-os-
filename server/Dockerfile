@@ -1,5 +1,9 @@
-# JEXI OS brain — server/ runtime image (Suga, node 22)
-# Replicates the Render buildCommand/startCommand 1:1.
+# JEXI OS brain — runtime image (Suga, node 22)
+# Build context is the REPO ROOT (see .github/workflows/docker-image.yml) so the
+# image can ship the same layout the sources expect: server/ at /app/server and
+# the boot-chain trees at /app/<tree>. server/src/... resolves them via `../..`
+# (up to /app); with the old context=server/ layout the server tree sat at /app
+# and every such import escaped to /<tree>, crashing ESM link at boot.
 FROM node:22-bookworm-slim
 
 RUN apt-get update -qq \
@@ -8,15 +12,27 @@ RUN apt-get update -qq \
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY server/package.json server/package-lock.json ./server/
+RUN cd server && npm ci
 
 ENV PLAYWRIGHT_BROWSERS_PATH=0
-RUN (npx playwright install --with-deps chromium || npx playwright install chromium || echo "playwright chromium install failed — browser mode degrades")
+RUN cd server && (npx playwright install --with-deps chromium || npx playwright install chromium || echo "playwright chromium install failed — browser mode degrades")
 
-COPY . .
+# ── App tree + boot-chain trees (repo layout mirrored, as in Dockerfile.slim) ─
+COPY server ./server
+COPY mind ./mind
+COPY runtime ./runtime
+COPY harness ./harness
+COPY services ./services
+COPY capabilities ./capabilities
+COPY agents ./agents
+COPY integrations ./integrations
+COPY skills ./skills
+COPY security ./security
+COPY tests ./tests
+COPY interfaces ./interfaces
 
-RUN mkdir -p bin \
+RUN mkdir -p /app/bin \
   && (curl -fsSL --fail -o bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux \
       && chmod +x bin/yt-dlp || echo "yt-dlp download failed — /watch URL mode degrades")
 ENV PATH="/app/bin:${PATH}"
@@ -34,4 +50,5 @@ ENV JEXI_NO_BROWSER=1 \
 # Run node DIRECTLY — `npm start` keeps the npm process resident (~60-80MB RSS)
 # for the container's whole lifetime, which alone blows the 256Mi hobby pool.
 # package.json "start" is exactly `node index.js`, so this is 1:1 minus npm.
+WORKDIR /app/server
 CMD ["node", "index.js"]

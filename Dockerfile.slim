@@ -42,21 +42,25 @@ COPY server/mcp ./server/mcp
 
 # Frontend build → served by Express from server/public
 COPY package*.json index.html vite.config.js tailwind.config.js postcss.config.js ./
-COPY interfaces/public ./interfaces/public
-COPY interfaces/console ./interfaces/console
-# Phase 7(G) — the commands subsystem lives at capabilities/commands/ (ECC layout).
-# NOTE: server/src/commands-seam.js still probes the pre-restructure container
-# paths (/app/commands, /app/server/commands) — that is a source-side fix in 3B-2.
-COPY capabilities/commands ./capabilities/commands
-# Phase 24: interfaces/console/components/ChatWindow.jsx imports ../ui/web/console/chat/mount.js
-# (Phase 16 chat runtime wiring) — the new console shell must be in the image,
-# and its import closure reaches runtime/events/ (chat taxonomy),
-# integrations/providers/ (keyRef profile schema) and agents/workforce/
-# (narration modules imported by the runtime).
-COPY interfaces/ui ./interfaces/ui
-COPY runtime/events ./runtime/events
-COPY integrations/providers ./integrations/providers
-COPY agents/workforce ./agents/workforce
+# ── Boot-chain trees ───────────────────────────────────────────────────────
+# server/index.js imports src/wiring/phase31-bootstrap.js, whose static ESM
+# closure reaches ../{mind,runtime,harness,services,capabilities,agents,
+# integrations,skills,security,tests,interfaces}. ESM link resolution runs
+# BEFORE app.listen(): a missing tree crashes the container with
+# ERR_MODULE_NOT_FOUND (observed: /app/mind/brain/repo/index.js).
+# Phase 7(G)/24 shipped only narrow subtrees (commands, events, workforce,
+# providers) — superseded by the whole-tree copies below.
+COPY interfaces ./interfaces
+COPY capabilities ./capabilities
+COPY runtime ./runtime
+COPY integrations ./integrations
+COPY agents ./agents
+COPY mind ./mind
+COPY harness ./harness
+COPY services ./services
+COPY skills ./skills
+COPY security ./security
+COPY tests ./tests
 RUN npm ci --no-audit --no-fund && npm run build
 # server/public is a git symlink to ../dist — vite writes the bundle
 # straight through it, so the old `cp -r dist/* server/public/` copied
