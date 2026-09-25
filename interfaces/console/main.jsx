@@ -7,6 +7,11 @@ import './jexi-theme.css' // FINAL — visual system layer (fonts, flat reskin, 
 import 'katex/dist/katex.min.css' // B151 — KaTeX math rendering (bundled)
 import '../ui/web/console/shell/tokens.css'
 import '../ui/web/console/shell/shell.css'
+// ui-rebuild-premium — loaded AFTER the legacy tokens/shell styles so the
+// premium layer wins the cascade at equal specificity (same .jx- class
+// namespace is intentionally reused by the premium shell).
+import '../ui/web/console/shell/tokens-premium.css'
+import '../ui/web/console/shell/premium.css'
 import { setupPushSubscription } from './utils/pushSubscribe'
 import { setupFcm, armFcmForegroundRetry } from './utils/fcmSetup'
 import { apply as applyOfficialBrand } from './brand/official'

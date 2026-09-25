@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import './tokens-premium.css';
-import './premium.css';
+// Premium styles load from main.jsx (after the legacy shell.css import) so
+// the premium layer wins the cascade — see the note there.
 import Sidebar, { AGENTS_ROUTE } from './Sidebar.premium.jsx';
 import Header from './Header.premium.jsx';
 import { Toasts } from './toasts.jsx';
@@ -114,7 +114,7 @@ export default function Shell() {
         <main className="jx-content" data-route={routeId}>
           {showAgents
             ? (
-                <div className="jx-view" data-view="agents" style={{ display: 'flex', flexDirection: 'column' }}>
+                <div className="jx-page" data-view="agents" style={{ display: 'flex', flexDirection: 'column' }}>
                   <AgentsRosterView />
                 </div>
               )
@@ -124,13 +124,13 @@ export default function Shell() {
                 ? <ChatWindow />
                 : route.id === 'settings'
                 ? (
-                    <div className="jx-view" data-view="settings">
+                    <div className="jx-page" data-view="settings">
                       <Settings sessionId="console-main" />
                     </div>
                   )
                 : route.id === 'graph'
                   ? (
-                      <div className="jx-view" data-view="graph">
+                      <div className="jx-page" data-view="graph">
                         <Graph />
                       </div>
                     )
