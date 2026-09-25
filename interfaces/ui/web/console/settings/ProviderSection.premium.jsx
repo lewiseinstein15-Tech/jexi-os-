@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Check, CircleX, Loader2, PlugZap, Save } from 'lucide-react';
-import { toast } from '../shell/toasts.js';
+import { toast } from '../shell/toasts.jsx';
 
 /**
  * Premium Provider section (ui-rebuild-premium). Wired to the REAL unified
