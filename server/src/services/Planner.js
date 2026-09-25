@@ -137,11 +137,17 @@ export const COMPOUND_DETECT = [
 
 // B66 — intents judged SIMPLE (single coworker, fast path, no graph).
 // Everything else is COMPLEX and runs the typed-state graph.
-export const SIMPLE_INTENTS = new Set(['conversation', 'direct_answer', 'translate', 'math_solve']);
+// GAP 4 (chat-wiring-completion) — personal-memory intents join the fast
+// lane: memory_query (+ recall / what_did_i_say / remember_when) are
+// single-shot recalls that the SIMPLE lane's brain recall answers directly.
+// BEFORE: memory_query fell to the typed-state graph (a 3-agent team for
+// "what is my name?") — wasteful, and it died whenever a graph leg failed.
+export const SIMPLE_INTENTS = new Set(['conversation', 'direct_answer', 'translate', 'math_solve', 'memory_query', 'recall', 'what_did_i_say', 'remember_when']);
 
 const CLASSIFIER_INTENTS = [
   'image_recognition', 'clear_memory', 'link_analysis', 'math_solve', 'self_check',
   'code_task', 'computer_use', 'study_topic', 'direct_answer', 'conversation', 'memory_query',
+  'recall', 'what_did_i_say', 'remember_when', // GAP 4 — personal-memory intents (all SIMPLE)
   'knowledge_recall', 'news_latest', 'research', 'learning_research', 'explain_team',
   'github', 'translate', 'data', 'devops', 'docs', 'perf', 'compound_task',
   'creative_writing', 'business_plan', 'marketing_plan', 'event_planning', 'meal_plan',
@@ -379,6 +385,22 @@ export class Planner {
     // never pay an LLM classification call — answer conversationally directly.
     if (/^(hi|hello|hey|yo|howdy|sup|hola|good (morning|afternoon|evening)|whats up|what's up)[\s.!?]*$/i.test(q)) {
       return { intent: 'conversation', tasks: ['jexi'], reasoning: 'Greeting — respond conversationally without any pipeline.' };
+    }
+
+    // GAP 4 — PERSONAL-MEMORY FAST PATH (deterministic, zero AI cost):
+    // "what is my name?", "what is my favorite city?", "what did I say
+    // about X?", "do you remember Y?", "remember when Z" are single-shot
+    // recalls. They route to memory_query → the SIMPLE lane (one coworker
+    // with brain recall) BEFORE the LLM classifier, so the route holds even
+    // when no provider is reachable. Memory WRITES ("remember that my dog
+    // is Rusty", "my name is X") do NOT match — they keep their own lanes.
+    if (
+      /\b(what|who|which)\s+(is|are|was|were)\s+my\b/.test(q) ||
+      /\bwhat did i (say|tell|ask|mention|name)\b/.test(q) ||
+      /\bdo you remember\b/.test(q) ||
+      /\bremember when\b/.test(q)
+    ) {
+      return { intent: 'memory_query', tasks: ['memory'], reasoning: 'Personal-memory recall — single-shot SIMPLE lane with brain recall (no graph).' };
     }
 
     // 0.5 Agent-team safety controls: /careful, /freeze, /guard <paths>, /unfreeze
