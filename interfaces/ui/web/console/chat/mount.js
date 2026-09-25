@@ -41,6 +41,7 @@ import Transcript from '../components/transcript/Transcript.jsx';
 import Composer from './Composer.premium.jsx';
 import { backendAgent } from './backendAgent.js';
 import { applyTurnProvider, refreshModelStatus } from '../shell/useStatus.js';
+import { touchSession, snapshotTranscript } from './sessions.js';
 import './mount.css';
 
 /* ---------------- Phase 31 Scope 2 — strip/panel components ---------------- */
@@ -162,6 +163,12 @@ export function mount(el, opts = {}) {
   const sessionId = opts.sessionId || 'console-main';
   const backendUrl = opts.backendUrl || '/api/health';
 
+  // BUG 3 (ui-rebuild-premium-v2) — a restored session seeds its transcript
+  // from the localStorage snapshot (chat/sessions.js) BEFORE the router
+  // subscription attaches, so replayed live events append after the history.
+  // Rows render in array order; seqs were renumbered far-negative on load.
+  const snapshotRows = Array.isArray(opts.snapshotRows) ? opts.snapshotRows.slice(-400) : null;
+
   // PHASE 31 WA6 — attach the session so the runtime-module contracts hold
   // (checkpoints/multiagent assert runtime.isAttached). Idempotent.
   // ui-rebuild-premium — sends now run the REAL backend agent (POST /api/chat
@@ -186,7 +193,7 @@ export function mount(el, opts = {}) {
   });
 
   const store = {
-    rows: [],
+    rows: snapshotRows ? snapshotRows.map((r) => ({ ...r, streaming: false })) : [],
     backend: 'checking', // checking | online | offline
     turn: 'idle',
     modes: null,
@@ -321,6 +328,13 @@ export function mount(el, opts = {}) {
     const ev = envelope.event || {};
     if (envelope.turnId && !turnStarts.has(envelope.turnId)) turnStarts.set(envelope.turnId, Date.now());
     const isUser = !!(ev.payload && typeof ev.payload.messageId === 'string' && /-user$/.test(ev.payload.messageId));
+
+    // BUG 3 — the first user message of a session names it in the history
+    // list (and every later one bumps it to the top). Registered only when a
+    // real message is sent — never for an empty new-chat session.
+    if (isUser && ev.type === 'message.delta' && ev.payload && typeof ev.payload.delta === 'string') {
+      try { touchSession(sessionId, ev.payload.delta); } catch { /* history is best-effort */ }
+    }
 
     // BUG 1 (ui-rebuild-premium-v2) — the completion narration carries the
     // REAL provider+model of the turn that just answered (backendAgent
@@ -474,6 +488,19 @@ export function mount(el, opts = {}) {
   }
 
   const root = createRoot(el);
+
+  // BUG 3 — transcript persistence: a throttled snapshot (max ~1/s) of the
+  // session's rows so a history click restores it, including after a page
+  // reload. Never blocks a paint: the write happens on a timer.
+  let snapTimer = null;
+  function scheduleSnapshot() {
+    if (snapTimer) return;
+    snapTimer = setTimeout(() => {
+      snapTimer = null;
+      try { snapshotTranscript(sessionId, store.rows); } catch { /* best-effort */ }
+    }, 900);
+  }
+
   function paint() {
     if (!alive) return;
     // BUG 2 (ui-rebuild-premium-v2) — the turn status is re-read from the
@@ -485,6 +512,7 @@ export function mount(el, opts = {}) {
     // makes every paint self-correcting; no stale assignment can outlive
     // the next frame.
     try { store.turn = runtime.state(sessionId).status; } catch { /* keep the last known status */ }
+    if (store.rows.length) scheduleSnapshot();
     // PHASE 31 WA6 — strip state recomputed from the REAL modules each paint
     // (queue/steer surface events re-render the transcript anyway).
     try { store.queueCount = queue.list(sessionId).length; } catch { store.queueCount = 0; }
@@ -615,6 +643,10 @@ export function mount(el, opts = {}) {
     unmount() {
       alive = false;
       if (probeTimer) clearTimeout(probeTimer);
+      if (snapTimer) { clearTimeout(snapTimer); snapTimer = null; }
+      // BUG 3 — flush the final snapshot so leaving the chat route (or a
+      // session switch) never loses the last second of rows.
+      try { if (store.rows.length) snapshotTranscript(sessionId, store.rows); } catch { /* best-effort */ }
       unsubscribe();
       root.unmount();
     },

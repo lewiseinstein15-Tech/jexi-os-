@@ -96,6 +96,97 @@ body { background: var(--jx-bg-root); }
   overflow-y: auto;
 }
 
+/* BUG 3 — "+ New chat" action, top of the sidebar above the nav items. */
+.jx-newchat {
+  display: flex;
+  align-items: center;
+  gap: var(--jx-sp-3);
+  height: var(--jx-control-h);
+  padding: 0 var(--jx-sp-3);
+  margin: 0 0 var(--jx-sp-2);
+  border-radius: var(--jx-radius-md);
+  border: 1px solid var(--jx-accent-ring);
+  background: var(--jx-accent-soft);
+  color: var(--jx-text-1);
+  font-size: var(--jx-fs-ui);
+  font-weight: var(--jx-fw-600);
+  cursor: pointer;
+  transition: background var(--jx-motion-fast), border-color var(--jx-motion-fast), color var(--jx-motion-fast);
+}
+.jx-newchat svg { color: var(--jx-accent); flex: none; }
+.jx-newchat:hover { border-color: var(--jx-accent); color: var(--jx-text-1); }
+.jx-newchat:active { background: var(--jx-accent-ring); }
+
+/* BUG 3 — chat history list (localStorage-backed). */
+.jx-history {
+  margin-top: var(--jx-sp-2);
+  padding-top: var(--jx-sp-2);
+  border-top: 1px solid var(--jx-border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+.jx-history-head {
+  font-size: var(--jx-fs-12);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--jx-text-3);
+  padding: 0 var(--jx-sp-3) var(--jx-sp-1);
+}
+.jx-history-item {
+  display: flex;
+  align-items: stretch;
+  border-radius: var(--jx-radius-md);
+  border: 1px solid transparent;
+  min-width: 0;
+}
+.jx-history-item:hover { background: var(--jx-bg-raised); }
+.jx-history-item.is-active { background: var(--jx-accent-soft); border-color: var(--jx-accent-ring); }
+.jx-history-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--jx-sp-2) var(--jx-sp-3);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.jx-history-title {
+  font-size: var(--jx-fs-12);
+  font-weight: var(--jx-fw-500);
+  color: var(--jx-text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jx-history-time {
+  font-family: var(--jx-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--jx-text-3);
+}
+.jx-history-del {
+  flex: none;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  margin: 4px 4px 4px 0;
+  border-radius: var(--jx-radius-sm);
+  border: 0;
+  background: transparent;
+  color: var(--jx-text-3);
+  cursor: pointer;
+}
+.jx-history-item:hover .jx-history-del { display: inline-flex; }
+.jx-history-del:hover { color: var(--jx-danger); background: rgba(239, 68, 68, 0.12); }
+
 .jx-nav-item {
   display: flex;
   align-items: center;
@@ -1008,6 +1099,11 @@ body { background: var(--jx-bg-root); }
   .jx-model-indicator { padding: var(--jx-sp-2); justify-content: center; }
   .jx-roster { grid-template-columns: 1fr; }
   .jx-roster-side { display: none; }
+  /* BUG 3 — icons-only mode cannot show the new-chat label or the history
+     list sensibly; hide both (the nav still reaches Chat). */
+  .jx-newchat span { display: none; }
+  .jx-newchat { justify-content: center; padding: 0; width: 40px; margin: 0 auto var(--jx-sp-2); }
+  .jx-history { display: none; }
 }
 
 /* <600px: sidebar hidden behind hamburger */

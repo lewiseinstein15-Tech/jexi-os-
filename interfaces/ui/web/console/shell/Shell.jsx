@@ -7,7 +7,11 @@ import { Toasts } from './toasts.jsx';
 import { useShortcuts } from './shortcuts.js';
 import ShortcutsOverlay from './ShortcutsOverlay.jsx';
 import Placeholder from '../placeholder/Placeholder.jsx';
-import ChatWindow from '../../../../console/components/ChatWindow.jsx';
+// ui-rebuild-premium-v2 BUG 3 — ChatView replaces the legacy out-of-zone
+// ChatWindow import: same mount contract + localStorage snapshot restore.
+// ChatWindow.jsx itself is untouched on disk (zero deletions).
+import ChatView from './ChatView.jsx';
+import { listSessions, newSessionId, removeSession } from '../chat/sessions.js';
 import Settings from '../settings/Settings.jsx';
 import '../settings/settings.css';
 import Graph from '../graph/Graph.jsx';
@@ -50,6 +54,43 @@ export default function Shell() {
   const [appearance, setAppearance] = useState(loadAppearance);
   const [navOpen, setNavOpen] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // BUG 3 — chat session state. The active session is the newest history
+  // entry (or a fresh id that only registers once a message is sent). The
+  // `jx-sessions-change` event (chat/sessions.js) keeps the sidebar list
+  // in sync no matter which component touched the registry.
+  const [chatSessionId, setChatSessionId] = useState(() => {
+    const l = listSessions();
+    return l[0] ? l[0].id : newSessionId();
+  });
+  const [sessions, setSessions] = useState(listSessions);
+  useEffect(() => {
+    const onChange = () => setSessions(listSessions());
+    window.addEventListener('jx-sessions-change', onChange);
+    return () => window.removeEventListener('jx-sessions-change', onChange);
+  }, []);
+
+  const openSession = useCallback((id) => {
+    if (!id || id === chatSessionId) return;
+    setChatSessionId(id);
+    setNavOpen(false);
+    if (window.location.hash !== '#/chat') window.location.hash = '#/chat';
+  }, [chatSessionId]);
+
+  const startNewChat = useCallback(() => {
+    setChatSessionId(newSessionId());
+    setNavOpen(false);
+    if (window.location.hash !== '#/chat') window.location.hash = '#/chat';
+  }, []);
+
+  const deleteSession = useCallback((id) => {
+    removeSession(id);
+    setSessions(listSessions());
+    if (id === chatSessionId) {
+      const rest = listSessions();
+      setChatSessionId(rest[0] ? rest[0].id : newSessionId());
+    }
+  }, [chatSessionId]);
 
   const toggleThemeShortcut = useCallback(() => {
     setTheme((t) => {
@@ -103,7 +144,16 @@ export default function Shell() {
       data-fontsize={appearance.fontsize || 'medium'}
       data-spacing={appearance.spacing || 'comfortable'}
     >
-      <Sidebar routes={ROUTES} activeHash={activeHash} onNavigate={() => setNavOpen(false)} />
+      <Sidebar
+        routes={ROUTES}
+        activeHash={activeHash}
+        onNavigate={() => setNavOpen(false)}
+        sessions={sessions}
+        activeSessionId={chatSessionId}
+        onNewChat={startNewChat}
+        onOpenSession={openSession}
+        onDeleteSession={deleteSession}
+      />
       <div className="jx-main">
         <Header
           routeTitle={routeTitle}
@@ -121,7 +171,7 @@ export default function Shell() {
             : showTokens
               ? <TokenInspector />
               : route.id === 'chat'
-                ? <ChatWindow />
+                ? <ChatView key={chatSessionId} sessionId={chatSessionId} />
                 : route.id === 'settings'
                 ? (
                     <div className="jx-page" data-view="settings">
