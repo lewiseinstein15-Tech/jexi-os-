@@ -44,6 +44,7 @@ import { WORKSPACE_DIR, MANAGER_URL, PUBLIC_URL, MAX_DEBUG_ATTEMPTS } from '../c
 import { resolveInside } from './PathSafety.js'; // security: real path-resolution for /guard writes
 import { setTaskCheckpoint } from './TaskRegistry.js'; // B53 P6 — durable task checkpoints
 import { loadCoworker, orchestratorPromptFragment } from './CoworkerFiles.js'; // B78 — filesystem-native coworker + orchestrator rules
+import { brainRecallBlock, withCoordinatorContext } from './BrainRecall.js'; // GAP 3 — the graph lane consumes the SAME brain bridge as the SIMPLE lane
 import { appendEvent } from './EventLog.js'; // B78 — orchestrator decisions are first-class events
 
 // B189 — deliverable titles: strip conversational filler so a summary is
@@ -244,7 +245,17 @@ export class Orchestrator {
   wrapCase(nodeName, body) {
     return async (state) => {
       const { results, sendEvent, opts } = state.context;
-      const query = state.query;
+      // GAP 3 — COORDINATOR FEED (one-shot): the FIRST specialist node to run
+      // for a plan (the plan's lead/coordinator) receives the brain-recall
+      // block prepended to its query. state.query is NEVER mutated — every
+      // subsequent node sees the original query, so the block rides the
+      // coordinator prompt only, never every sub-agent.
+      let query = state.query;
+      if (state.brainContext && !state.context.coordinatorFed) {
+        state.context.coordinatorFed = true;
+        query = withCoordinatorContext(state.query, state.brainContext);
+        try { sendEvent('log', { agent: 'Orchestrator', message: `🧠 Coordinator prompt carries brain context (${state.brainContext.length} chars) — ${nodeName} leads.` }); } catch { /* narration never breaks a node */ }
+      }
       const plan = state.plan;
       // B51 P5 — bodies get `state` so they can set outcome/retry + failure
       // history for real correction paths (backward compatible: extra arg).
@@ -1757,6 +1768,13 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
       state.context.opts = opts;
 
       const graph = this.buildGraph();
+      // GAP 3 — brain recall for the graph lane: computed ONCE per run (same
+      // bridge the SIMPLE lane uses), consumed by the coordinator via wrapCase.
+      // Fail-soft: an unavailable brain means an empty block and zero changes.
+      try {
+        state.brainContext = await brainRecallBlock({ sessionId: opts?.convId || null, query });
+        if (state.brainContext) sendEvent('log', { agent: 'Orchestrator', message: `🧠 Brain recall ready (${state.brainContext.length} chars) — rides the coordinator prompt.` });
+      } catch { state.brainContext = ''; }
       await graph.run({ ...state, startNode });
     } catch (error) {
       results.success = false;

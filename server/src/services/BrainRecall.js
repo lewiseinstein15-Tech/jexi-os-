@@ -155,6 +155,18 @@ export async function brainHotWriteTurn({ sessionId = null, userMessage = '', as
 }
 
 /**
+ * GAP 3 — COORDINATOR PROMPT composition (pure, exported for tests).
+ * The graph lane's coordinator (the FIRST specialist node to run for a
+ * plan) receives the brain block prepended to its query; every later node
+ * sees the original query untouched (wrapCase one-shot — see Orchestrator).
+ */
+export function withCoordinatorContext(query, brainContext) {
+  const bc = String(brainContext || '').trim();
+  if (!bc) return String(query || '');
+  return `${String(query || '')}\n\n${bc}`;
+}
+
+/**
  * Build the bounded recall block. Returns '' when there is nothing to say.
  * @param {object} opts
  * @param {string|null} opts.sessionId  conversation id (hot-memory scope hint)

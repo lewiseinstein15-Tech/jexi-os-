@@ -26,7 +26,7 @@ import { imageSearch, detectPictureIntent, detectCorrectionToPicture, verifyImag
 import { setGoalEngine } from './src/services/PromptAssembly.js'; // B158 — goals reach every assembled prompt
 import { orchestrator } from './src/services/Orchestrator.js';
 import { runSimpleTask } from './src/services/SimpleTask.js'; // B66 — Orchestrator-Workers SIMPLE fast path
-import { brainHotWriteTurn } from './src/services/BrainRecall.js'; // GAP 2 — chat turns write back into brain.hot
+import { brainHotWriteTurn } from './src/services/BrainRecall.js'; // GAP 2 — chat turns write back into brain.hot (GAP 3's graph-lane recall lives in Orchestrator)
 import { Director } from './src/services/director/Director.js'; // B208 — JEXI the boss: interpret→plan→staff→delegate→supervise→verify→report
 import { realLlmAdapter, realTools } from './src/services/director/RealAdapters.js';
 import { missionRunner } from './src/services/director/MissionRunner.js'; // B211 — persistent missions (work graph)
@@ -2086,6 +2086,7 @@ app.post('/api/chat', async (req, res) => {
       ? await runSimpleTask(plan, q, sendEvent, { image, convId }) // AUDIT FIX (Part C1) — convId rides: conversationContext gets compaction + session refs for THIS conversation (was dropped: { image } only)
       : await orchestrator.executePlan(plan, q, sendEvent, {
           image,
+          convId, // GAP 3 — the graph lane's brain recall scopes to this conversation
           taskId: activeTaskId || null,
           isContinuation: hasPending || ['continue', 'switch'].includes(intelClassification),
           onPause: async (pausedState) => {
