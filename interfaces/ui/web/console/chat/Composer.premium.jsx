@@ -27,13 +27,27 @@ export default function Composer({ backend, turn, modes, lastError, onSend, onMo
   }, [text]);
 
   function submit() {
+    // BUG 2 (ui-rebuild-premium-v2) — every submit attempt logs its reason so
+    // a recurrence is debuggable from the console (lead requirement).
     const t = text.trim();
-    if (!t || busy) return;
+    if (!t || busy) {
+      console.log('[composer] send refused:', JSON.stringify({ reason: !t ? 'empty-input' : 'turn-running', turn, chars: text.length }));
+      return;
+    }
+    console.log('[composer] send:', JSON.stringify({ chars: t.length, turn }));
     onSend(t);
     setText('');
   }
 
   const interactionMode = modes ? modes.interactionMode : null;
+  // BUG 2 — the disabled button carries an HONEST reason tooltip: why it is
+  // not clickable right now (turn running) or what is missing (empty input).
+  const sendDisabled = busy || !text.trim();
+  const sendTitle = busy
+    ? `turn is ${turn} — wait for it to finish (or it auto-releases on completion)`
+    : !text.trim()
+      ? 'type a message first'
+      : 'send (Enter)';
 
   return (
     <div className="jx-composer-wrap">
@@ -55,9 +69,15 @@ export default function Composer({ backend, turn, modes, lastError, onSend, onMo
           }}
           aria-label="Message"
         />
-        <button className="jx-send" onClick={submit} disabled={busy || !text.trim()} aria-label="Send message">
+        <button
+          className="jx-send"
+          onClick={submit}
+          disabled={sendDisabled}
+          title={sendTitle}
+          aria-label="Send message"
+        >
           <SendHorizontal size={15} aria-hidden="true" />
-          {busy ? '…' : 'Send'}
+          {busy ? 'running…' : 'Send'}
         </button>
       </div>
 

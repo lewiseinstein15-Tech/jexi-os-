@@ -331,12 +331,12 @@ export function mount(el, opts = {}) {
     if (ev.type === 'narration.line' && tp && tp.provider) {
       applyTurnProvider(tp.provider, tp.model || null);
     }
-    // BUG 1 + BUG 2 — after a turn reaches its terminal event, re-poll the
-    // provider routes ONCE the runtime has finished its synchronous
-    // bookkeeping (the 'done' status is set right after the last emit; a
-    // microtask runs after that, never before).
+    // BUG 1 + BUG 2 — after a turn reaches its terminal event, re-read the
+    // runtime status and re-poll the provider routes ONCE the runtime has
+    // finished its synchronous bookkeeping (the 'done' status is set right
+    // after the last emit; a microtask runs after that, never before).
     if (ev.type === 'turn.completed') {
-      queueMicrotask(() => { refreshModelStatus(); });
+      queueMicrotask(() => { refreshMeta(); refreshModelStatus(); });
     }
 
     let rendered = null;
@@ -476,6 +476,15 @@ export function mount(el, opts = {}) {
   const root = createRoot(el);
   function paint() {
     if (!alive) return;
+    // BUG 2 (ui-rebuild-premium-v2) — the turn status is re-read from the
+    // runtime at EVERY paint. The final event of a turn is emitted while the
+    // status is still 'closing' (runtime sets 'done' right after the emit
+    // returns, and router.route delivers synchronously), which used to leave
+    // store.turn stuck at 'closing' — a busy state — so the composer's send
+    // button stayed disabled forever after turn 1. Reading it fresh here
+    // makes every paint self-correcting; no stale assignment can outlive
+    // the next frame.
+    try { store.turn = runtime.state(sessionId).status; } catch { /* keep the last known status */ }
     // PHASE 31 WA6 — strip state recomputed from the REAL modules each paint
     // (queue/steer surface events re-render the transcript anyway).
     try { store.queueCount = queue.list(sessionId).length; } catch { store.queueCount = 0; }
