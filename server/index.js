@@ -2072,7 +2072,7 @@ app.post('/api/chat', async (req, res) => {
     // single shared closure — used by BOTH the Director's build department
     // and the standard planner lane below (one call site, one contract).
     const runLegacyPipeline = async (plan, q) => plan.complexity === 'SIMPLE'
-      ? await runSimpleTask(plan, q, sendEvent, { image })
+      ? await runSimpleTask(plan, q, sendEvent, { image, convId }) // AUDIT FIX (Part C1) — convId rides: conversationContext gets compaction + session refs for THIS conversation (was dropped: { image } only)
       : await orchestrator.executePlan(plan, q, sendEvent, {
           image,
           taskId: activeTaskId || null,
