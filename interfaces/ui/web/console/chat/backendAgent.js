@@ -9,13 +9,17 @@
  * bridge — see server/index.js:1648 and server/src/wiring/phase31-providers.js)
  * and translates the NDJSON event stream into Phase 16 agent intents:
  *
- *   {type:'log', agent, message}   -> narrate progress   (stage/tool logs)
- *   {type:'plan', steps, roster}   -> narrate decision   (plan summary)
- *   {type:'think', by, text}       -> buffered; rendered as ONE recon line
- *                                     when the answer starts (no spam)
+ *   {type:'log', agent, message}   -> progress narration (executed steps in
+ *                                     the Arena step list)
+ *   {type:'plan', steps, roster}   -> decision narration carrying the REAL
+ *                                     plan lines (rendered as pending steps)
+ *   {type:'think', by, text}       -> recon narration PER CHUNK — thinking
+ *                                     streams into the ThinkingBlock as it
+ *                                     arrives (mount merges consecutive
+ *                                     recon rows into one growing block)
  *   {type:'narration', text}       -> narrate finding
  *   {type:'stream', text, by?}     -> text delta  (the streaming answer)
- *   {type:'done', summary, success, sources} -> answer fallback + completion
+ *   {type:'done', summary, success, sources, statistics?} -> completion
  *   anything else (team/intel/agent.done/subagent.aggregate) -> telemetry, skipped
  *
  * The generator protocol is exactly what runtime.js handleIntent consumes
@@ -29,6 +33,10 @@ const TELEMETRY_TYPES = new Set(['team', 'intel', 'agent.done', 'subagent.aggreg
 function clip(text, max) {
   const t = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
   return t.length > max ? t.slice(0, max - 1) + '…' : t;
+}
+
+function oneLine(text) {
+  return String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
 }
 
 export function backendAgent({ endpoint = '/api/chat' } = {}) {
@@ -65,20 +73,21 @@ export function backendAgent({ endpoint = '/api/chat' } = {}) {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = '';
-    let thinkBuf = '';
-    let answerStarted = false;
     let streamedAnswer = false;
     let sources = null;
 
-    const flushThinking = function* () {
-      if (thinkBuf) {
-        yield {
-          kind: 'narrate',
-          type: 'recon',
-          ctx: { input: clip(thinkBuf, 240), source: 'model-reasoning' },
-        };
-        thinkBuf = '';
-      }
+    // ui-rebuild-premium-v2 — think chunks stream out as recon narrations
+    // the moment they arrive; mount.js merges consecutive recon rows of the
+    // same turn into one growing ThinkingBlock. No content is dropped and
+    // nothing is held back to be rendered later.
+    const emitThinking = function* (chunk) {
+      const t = String(chunk || '').trim();
+      if (!t) return;
+      yield {
+        kind: 'narrate',
+        type: 'recon',
+        ctx: { input: t.slice(0, 400), source: 'model-reasoning' },
+      };
     };
 
     for (;;) {
@@ -117,27 +126,27 @@ export function backendAgent({ endpoint = '/api/chat' } = {}) {
             const steps = Array.isArray(ev.steps) ? ev.steps : [];
             const roster = Array.isArray(ev.roster) ? ev.roster : [];
             if (steps.length || roster.length) {
+              // The REAL plan lines go to the UI: header + numbered steps.
+              // Multi-line input is deliberate — StepList parses it. Capped
+              // at 1200 chars to protect the row store, never re-wrapped.
+              const lines = [
+                `plan composed · ${steps.length} step${steps.length === 1 ? '' : 's'}${roster.length ? ` · team: ${clip(roster.join(', '), 80)}` : ''}`,
+                ...steps.slice(0, 12).map((s, i) => `${i + 1}. ${oneLine(s)}`),
+              ];
               yield {
                 kind: 'narrate',
                 type: 'decision',
-                ctx: {
-                  input: `plan composed · ${steps.length} step${steps.length === 1 ? '' : 's'}${roster.length ? ` · team: ${clip(roster.join(', '), 80)}` : ''}`,
-                  source: 'planner',
-                },
+                ctx: { input: lines.join('\n').slice(0, 1200), source: 'planner' },
               };
             }
             break;
           }
           case 'think': {
-            if (ev.text) thinkBuf += String(ev.text);
+            if (ev.text) yield* emitThinking(ev.text);
             break;
           }
           case 'stream': {
             if (ev.text) {
-              if (!answerStarted) {
-                yield* flushThinking();
-                answerStarted = true;
-              }
               streamedAnswer = true;
               yield { kind: 'text', delta: String(ev.text) };
             }
@@ -154,7 +163,6 @@ export function backendAgent({ endpoint = '/api/chat' } = {}) {
             break;
           }
           case 'done': {
-            yield* flushThinking();
             const ok = ev.success !== false;
             const summary = String(ev.summary || '');
             if (!streamedAnswer && summary) {
