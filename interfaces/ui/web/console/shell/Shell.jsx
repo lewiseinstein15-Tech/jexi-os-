@@ -3,7 +3,7 @@ import './tokens-premium.css';
 import './premium.css';
 import Sidebar, { AGENTS_ROUTE } from './Sidebar.premium.jsx';
 import Header from './Header.premium.jsx';
-import { Toasts } from './toasts.js';
+import { Toasts } from './toasts.jsx';
 import { useShortcuts } from './shortcuts.js';
 import ShortcutsOverlay from './ShortcutsOverlay.jsx';
 import Placeholder from '../placeholder/Placeholder.jsx';
