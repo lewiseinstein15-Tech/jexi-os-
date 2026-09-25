@@ -1716,6 +1716,12 @@ app.post('/api/chat', async (req, res) => {
   // Stable per-conversation id for this request (hoisted so the deadline and
   // the result store can use it too).
   const convId = conversationId(req);
+  // GAP 5 — SESSION-HEADER OBSERVABILITY: conversationId() reads the
+  // x-jexi-session header FIRST and falls back to req.ip only when absent.
+  // The resolution is logged per turn so the behavior is provable:
+  //   [chat] session=<id> source=x-jexi-session header   <- header honored
+  //   [chat] session=<id> source=fallback(ip)            <- no header sent
+  try { console.log(`[chat] session=${convId} source=${req.headers['x-jexi-session'] ? 'x-jexi-session header' : 'fallback(ip)'}`); } catch { /* logging never breaks chat */ }
   // D2 — the chat turn lifecycle is an event-bus citizen like every other
   // runtime flow; started fires once per request, completed fires in done().
   try {
