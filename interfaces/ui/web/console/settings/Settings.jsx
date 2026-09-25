@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import ProviderSection from './ProviderSection.jsx';
+import ProviderSection from './ProviderSection.premium.jsx';
+import AppearanceSection from './AppearanceSection.jsx';
 import ModeSection from './ModeSection.jsx';
 import GeneralSection from './GeneralSection.jsx';
 import * as runtime from '../../../../ui/web/console/chat/runtime.js';
@@ -44,6 +45,7 @@ export default function Settings({ sessionId }) {
       <ProviderSection settings={settings} onChange={patch} />
       <ModeSection sessionId={sessionId} modes={modes} onLive={refreshModes} />
       <GeneralSection theme={theme} onTheme={changeTheme} />
+      <AppearanceSection />
     </div>
   );
 }
