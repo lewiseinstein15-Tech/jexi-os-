@@ -13,7 +13,7 @@
  */
 
 import { conversationContext } from './Orchestrator.js';
-import { addChat } from './MemoryManager.js';
+import { addChat, getChatHistory } from './MemoryManager.js';
 import { brainRecallBlock } from './BrainRecall.js'; // AUDIT FIX (Part C2) — the JEXI brain finally feeds chat turns
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { assemblePrompt } from './PromptAssembly.js'; // B119 — dsh prompt assembly
@@ -78,7 +78,11 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
   });
   emit('log', { agent: 'Orchestrator', message: `🧭 Complexity: SIMPLE — single coworker (${plan.intent}), no graph.` });
 
-  try { addChat('user', query); } catch (e) {}
+  // GAP 6 — DEDUP: the chat handler already persisted this user turn via
+  // rememberTurn() before the pipeline ran; logging it again duplicated
+  // every user message in the session store. Suppress only the EXACT
+  // same-text duplicate (a genuinely different effectiveQuery still logs).
+  try { const __last = getChatHistory(1)[0]; if (!(__last && __last.role === 'user' && __last.text === String(query))) addChat('user', query); } catch (e) {}
   const ctx = await conversationContext(query, opts.convId).catch(() => '');
   // AUDIT FIX (Part C2) — JEXI-brain recall before the LLM call:
   //   brain.hot.recall(sessionId)  → today's hot facts for THIS conversation

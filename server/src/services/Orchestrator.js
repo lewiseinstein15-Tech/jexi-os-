@@ -1705,7 +1705,10 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
 
     try {
       // Log the incoming request into memory so long conversations keep context
-      try { addChat('user', query); } catch (e) {}
+      // GAP 6 — DEDUP: same rule as SimpleTask — the handler's rememberTurn()
+      // already persisted this user turn; only a genuinely different
+      // effectiveQuery may log an additional entry.
+      try { const __last = getChatHistory(1)[0]; if (!(__last && __last.role === 'user' && __last.text === String(query))) addChat('user', query); } catch (e) {}
 
       let state;
       let startNode;
