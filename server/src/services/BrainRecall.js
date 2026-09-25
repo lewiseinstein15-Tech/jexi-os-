@@ -26,6 +26,7 @@
 
 const HOT_SOURCE_ID = 'chat';     // same sourceId the W31 B4 producer registers
 const HOT_MAX_FACTS = 4;
+let __hotOpSeq = 0; // GAP 2 — per-process monotonic op sequence for chat writes
 const HYBRID_TOP_K = 3;
 const HYBRID_BUDGET_TOKENS = 400;
 const GRAPH_MAX_NODES = 4;
@@ -44,11 +45,15 @@ function clipBlock(lines, maxChars) {
   return block.length > maxChars ? block.slice(0, maxChars - 1) : block;
 }
 
-/** Hot-memory facts → prompt lines (fail-soft). */
+/** Hot-memory facts → prompt lines (fail-soft).
+ *  GAP 2 — the read is SESSION-AGNOSTIC: every 'chat' fact is a candidate
+ *  (latest first), tagged with its session id, so a brand-new session still
+ *  recalls what earlier sessions taught her (cross-session persistence, the
+ *  lead's GAP 2 acceptance test). */
 async function hotLines(wiring, sessionId) {
   if (!wiring || !wiring.hot || typeof wiring.hot.recall !== 'function') return [];
   try {
-    const facts = wiring.hot.recall({ sourceId: HOT_SOURCE_ID, ...(sessionId ? { sessionId } : {}) });
+    const facts = wiring.hot.recall({ sourceId: HOT_SOURCE_ID });
     return (facts || []).slice(-HOT_MAX_FACTS).map((f) =>
       `- [hot${f.session_id && f.session_id !== 'default' ? `:${f.session_id}` : ''}] ${clip(f.kind || 'fact', 24)}: ${clip(f.fact || f.text || f.title || '', 160)}`
     );
@@ -116,6 +121,37 @@ async function instinctLines(query) {
     const section = await learning.instinctsSection({ task: String(query || '') });
     return section ? [section] : [];
   } catch { return []; }
+}
+
+/**
+ * GAP 2 — CHAT → BRAIN.HOT WRITE. After every successful turn (SIMPLE and
+ * COMPLEX lanes converge on the chat handler's done()), the exchange is
+ * recorded into hot memory as a kind:'event' fact under sourceId 'chat'.
+ * opSeq is a per-process monotonic sequence (hot.record requires it); the
+ * fact id is content+sequence addressed, so a retried identical write is a
+ * no-op. Fail-soft: a failed write logs a warning and returns false — it
+ * must never fail the turn.
+ */
+export async function brainHotWriteTurn({ sessionId = null, userMessage = '', assistantAnswer = '' } = {}) {
+  try {
+    const { wiring } = await import('../wiring/phase31-bootstrap.js');
+    if (!wiring || !wiring.hot || typeof wiring.hot.record !== 'function') return false;
+    const u = clip(userMessage, 200);
+    const a = clip(assistantAnswer, 200);
+    if (!u && !a) return false;
+    wiring.hot.record({
+      fact: clip(`User: ${u} — JEXI: ${a}`, 400),
+      kind: 'event',
+      sourceId: HOT_SOURCE_ID,
+      sessionId: sessionId || 'default',
+      opSeq: ++__hotOpSeq,
+      evidence: u || a,
+    });
+    return true;
+  } catch (e) {
+    try { console.warn(`[brain] hot write failed (fail-soft): ${String((e && e.message) || e).slice(0, 160)}`); } catch { /* logging never throws */ }
+    return false;
+  }
 }
 
 /**

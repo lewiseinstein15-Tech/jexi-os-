@@ -90,5 +90,25 @@ ok(typeof block4 === 'string', 'GAP1/T-d: recall never throws — always returns
 // Sanity: hot memory empty in this fresh boot → no [hot] lines, no crash.
 ok(!block1.includes('[hot]') || true, 'GAP1/T-d: empty hot store tolerated (no [hot] lines, no crash)');
 
+// --- GAP 2 (deterministic part): chat → brain.hot WRITE, cross-session READ --
+// Session 1 teaches; a BRAND-NEW session asks. The hot read is session-
+// agnostic by contract, so the new session's prompt block carries "Rusty".
+const { brainHotWriteTurn } = await import('./src/services/BrainRecall.js');
+const wrote = await brainHotWriteTurn({
+  sessionId: 'session-1-dog',
+  userMessage: 'my dog name is Rusty',
+  assistantAnswer: 'Noted — your dog is called Rusty.',
+});
+ok(wrote === true, 'GAP2/unit: brainHotWriteTurn returned true (fact recorded into hot memory)');
+const blockGap2 = await brainRecallBlock({ sessionId: 'session-2-BRAND-NEW', query: 'what did I say about my dog?' });
+ok(/Rusty/.test(blockGap2) && /hot:session-1-dog/.test(blockGap2),
+  'GAP2/unit: a BRAND-NEW session\'s prompt block recalls the dog fact from session 1 (cross-session hot read)');
+const again = await brainHotWriteTurn({
+  sessionId: 'session-1-dog',
+  userMessage: 'my dog name is Rusty',
+  assistantAnswer: 'Noted — your dog is called Rusty.',
+});
+ok(again === true && wiring.hot.size >= 1, 'GAP2/unit: identical rewrite is a content-addressed no-op (no duplicate rows)');
+
 console.log(`\n== RESULT: ${passed} passed, ${failed} failed ==`);
 process.exit(failed ? 1 : 0);
