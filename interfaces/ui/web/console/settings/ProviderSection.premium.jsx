@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Check, CircleX, Loader2, PlugZap, Save } from 'lucide-react';
+import { toast } from '../shell/toasts.js';
 
 /**
  * Premium Provider section (ui-rebuild-premium). Wired to the REAL unified
@@ -96,25 +97,31 @@ export default function ProviderSection({ /* settings unused — real API is the
       });
       const j = await r.json().catch(() => ({}));
       if (r.ok && j.ok) {
+        const okMsg = probe
+          ? 'connection ok — config saved (probe passed)'
+          : 'config saved (not probed)';
         setResult({
           ok: true,
-          message: probe
-            ? 'connection ok — config saved (probe passed)'
-            : 'config saved (not probed)',
+          message: okMsg,
           detail: j.probe && j.probe.detail ? String(j.probe.detail).slice(0, 300) : '',
         });
+        toast(okMsg, 'ok');
         setApiKey('');
         await loadActive();
       } else {
         const errors = Array.isArray(j.errors) ? j.errors : [];
+        const failMsg = j.error || (errors.length ? errors.join(' · ') : `HTTP ${r.status}`);
         setResult({
           ok: false,
-          message: j.error || (errors.length ? errors.join(' · ') : `HTTP ${r.status}`),
+          message: failMsg,
           detail: j.hint ? String(j.hint).slice(0, 300) : '',
         });
+        toast(`provider config refused — ${failMsg}`, 'fail');
       }
     } catch (e) {
-      setResult({ ok: false, message: String((e && e.message) || e), detail: '' });
+      const msg = String((e && e.message) || e);
+      setResult({ ok: false, message: msg, detail: '' });
+      toast(`provider config failed — ${msg}`, 'fail');
     } finally {
       setBusy(null);
     }

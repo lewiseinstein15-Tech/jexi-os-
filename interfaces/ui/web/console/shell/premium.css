@@ -979,6 +979,13 @@ body { background: var(--jx-bg-root); }
   border-radius: var(--jx-radius-sm);
 }
 
+/* ── Spinner (lucide Loader2) ────────────────────────────────────────── */
+.jx-spin { animation: jx-spin 900ms linear infinite; }
+@keyframes jx-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────── */
 /* <900px: sidebar collapses to icons-only */
 @media (max-width: 900px) {

@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import './tokens-premium.css';
 import './premium.css';
 import Sidebar, { AGENTS_ROUTE } from './Sidebar.premium.jsx';
 import Header from './Header.premium.jsx';
+import { Toasts } from './toasts.js';
+import { useShortcuts } from './shortcuts.js';
+import ShortcutsOverlay from './ShortcutsOverlay.jsx';
 import Placeholder from '../placeholder/Placeholder.jsx';
 import ChatWindow from '../../../../console/components/ChatWindow.jsx';
 import Settings from '../settings/Settings.jsx';
@@ -46,6 +49,17 @@ export default function Shell() {
   });
   const [appearance, setAppearance] = useState(loadAppearance);
   const [navOpen, setNavOpen] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  const toggleThemeShortcut = useCallback(() => {
+    setTheme((t) => {
+      const next = t === 'dark' ? 'light' : 'dark';
+      try { localStorage.setItem('p24-theme', next); } catch { /* storage unavailable */ }
+      return next;
+    });
+  }, []);
+  const toggleOverlay = useCallback(() => setShowShortcuts((v) => !v), []);
+  useShortcuts({ onOverlay: toggleOverlay, onTheme: toggleThemeShortcut });
 
   useEffect(() => {
     const onHash = () => { setHash(window.location.hash || DEFAULT_ROUTE.hash); setNavOpen(false); };
@@ -123,6 +137,8 @@ export default function Shell() {
                   : <Placeholder route={route} />}
         </main>
       </div>
+      {showShortcuts ? <ShortcutsOverlay onClose={() => setShowShortcuts(false)} /> : null}
+      <Toasts />
     </div>
   );
 }
