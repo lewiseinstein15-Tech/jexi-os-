@@ -37,14 +37,16 @@ import { checkpoints } from './checkpoints.js';
 import { queue } from './queue.js';
 import { steer } from './steer.js';
 import { multiagent } from './multiagent.js';
-import Transcript from './Transcript.jsx';
-import Composer from './Composer.jsx';
+import Transcript from './Transcript.premium.jsx';
+import Composer from './Composer.premium.jsx';
+import { backendAgent } from './backendAgent.js';
 import './mount.css';
 
 /* ---------------- Phase 31 Scope 2 — strip/panel components ---------------- */
 
 const stripBtn = {
-  background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.12)',
+  background: 'var(--jx-surface, rgba(255,255,255,.04))',
+  border: '1px solid var(--jx-border, rgba(255,255,255,.12))',
   color: 'inherit', borderRadius: 8, padding: '3px 10px', fontSize: 11, cursor: 'pointer',
 };
 
@@ -161,7 +163,10 @@ export function mount(el, opts = {}) {
 
   // PHASE 31 WA6 — attach the session so the runtime-module contracts hold
   // (checkpoints/multiagent assert runtime.isAttached). Idempotent.
-  runtime.attach(sessionId);
+  // ui-rebuild-premium — sends now run the REAL backend agent (POST /api/chat
+  // NDJSON model pipeline). The keyword-driven defaultAgent stays in
+  // runtime.js as the library fallback; here the real pipeline is the default.
+  runtime.attach(sessionId, { agent: opts.agent || backendAgent() });
 
   // PHASE 31 WA6 — artifacts content source: synchronous read over the
   // server workspace endpoint. Real I/O; null -> honest E_ARTIFACT_UNREADABLE
@@ -299,35 +304,81 @@ export function mount(el, opts = {}) {
   }
 
   // One router subscription: every routed taxonomy event becomes a row.
+  // ui-rebuild-premium additions (consumer-side only, no runtime changes):
+  //   - turn wall-clock timing (first envelope of a turn -> turn-end row ms)
+  //   - voice tagging from the runtime messageId contract
+  //     (msg-<turnId>-user vs msg-<turnId>-N) so user vs JEXI rows render
+  //     right/left aligned
+  //   - streaming: consecutive JEXI message.delta rows of the same turn
+  //     merge into one growing row instead of one row per token
+  const turnStarts = new Map(); // turnId -> Date.now() at first envelope
   const unsubscribe = router.subscribe(sessionId, (envelope) => {
     // PHASE 31 WA6 — feed the Scope K toolcard store (the artifacts panel
     // aggregates card artifacts from here). Read-only consumption of the
     // routed envelope; a card-build failure must never kill the row path.
     try { if (toolcards.isToolEvent(envelope)) toolcards.build(envelope); } catch { /* card already open / terminal */ }
     const ev = envelope.event || {};
+    if (envelope.turnId && !turnStarts.has(envelope.turnId)) turnStarts.set(envelope.turnId, Date.now());
+    const isUser = !!(ev.payload && typeof ev.payload.messageId === 'string' && /-user$/.test(ev.payload.messageId));
     let rendered = null;
     try {
       rendered = rows.render(ev);
     } catch {
       rendered = { rowType: 'text', content: JSON.stringify(ev).slice(0, 400) };
     }
+    const toolName = (ev.payload && ev.payload.toolName) || (rendered && rendered.toolName) || null;
+
+    // Streaming merge: a JEXI text delta of the active turn appends to the
+    // turn's last delta row (if any) so the answer grows in place.
+    const streamingStatus = runtime.state(sessionId).status;
+    const last = store.rows.length ? store.rows[store.rows.length - 1] : null;
+    const mergeable = !isUser
+      && rendered.rowType === 'text'
+      && ev.type === 'message.delta'
+      && last
+      && last.turnId === envelope.turnId
+      && last.type === 'message.delta'
+      && last.rowType === 'text'
+      && last.voice === 'jexi';
+    if (mergeable) {
+      last.content += rendered.content;
+      last.streaming = streamingStatus === 'streaming';
+      store.turn = streamingStatus;
+      paint();
+      return;
+    }
+    // Any non-delta event clears the streaming chip off the last row.
+    if (last && last.streaming) last.streaming = false;
+
+    let content = rendered.content;
+    // Turn footer with REAL wall-clock ms: "turn completed: <id> · <ms> ms".
+    if ((rendered.rowType === 'turn-end-ok' || rendered.rowType === 'turn-end-fail') && turnStarts.has(envelope.turnId)) {
+      const ms = Date.now() - turnStarts.get(envelope.turnId);
+      content = rendered.rowType === 'turn-end-ok'
+        ? `turn completed: ${envelope.turnId} · ${ms} ms`
+        : `turn failed: ${envelope.turnId} · ${(ev.payload && ev.payload.error) || 'error'} · ${ms} ms`;
+    }
+
     store.rows.push({
       seq: envelope.seq,
       turnId: envelope.turnId,
       type: ev.type,
       rowType: rendered.rowType,
-      content: rendered.content,
+      content,
       refused: !!envelope.refused,
       refuseReason: (envelope.modes && envelope.modes.reason) || null,
       approvalId: (ev.payload && ev.payload.approvalId) || null,
       verb: (envelope.modes && envelope.modes.rowOverride) || null,
+      toolName,
+      voice: isUser ? 'user' : 'jexi',
+      streaming: false,
       // Phase 24: full untruncated args for tool rows so the display-mode
       // clip in Transcript decides verbosity (Phase 16 renderer caps at 80).
       raw: (ev.type === 'tool.started' && ev.payload && ev.payload.args !== undefined)
         ? JSON.stringify(ev.payload.args)
         : null,
     });
-    store.turn = runtime.state(sessionId).status;
+    store.turn = streamingStatus;
     paint();
   });
 
