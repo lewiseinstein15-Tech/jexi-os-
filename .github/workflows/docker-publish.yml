@@ -12,15 +12,35 @@ on:
   push:
     branches: [ main ]
     paths:
+      # Boot-chain trees (12) — cleanup v2 2026-09: the prior list was
+      # hand-picked and missed mind/, harness/, services/, skills/,
+      # security/, tests/ entirely, and covered runtime/, capabilities/,
+      # agents/, integrations/, interfaces/ only as narrow subpaths.
+      # Future rule: derive triggers from the boot graph, not subpath
+      # guesses (documented in docs/CONSOLIDATED-CLEANUP-v2-2026-09.md).
       - 'server/**'
+      - 'mind/**'
+      - 'runtime/**'
+      - 'harness/**'
+      - 'services/**'
+      - 'capabilities/**'
+      - 'agents/**'
+      - 'integrations/**'
+      - 'skills/**'
+      - 'security/**'
+      - 'tests/**'
+      - 'interfaces/**'
+      # Superseded narrow entries (kept commented for history — zero
+      # deletions; the broad tree entries above subsume every one):
+      # - 'interfaces/console/**'      # subsumed by interfaces/**
+      # - 'interfaces/public/**'       # subsumed by interfaces/**
+      # - 'capabilities/commands/**'   # subsumed by capabilities/**
+      # - 'interfaces/ui/**'           # subsumed by interfaces/**
+      # - 'runtime/events/**'          # subsumed by runtime/**
+      # - 'integrations/providers/**'  # subsumed by integrations/**
+      # - 'agents/workforce/**'        # subsumed by agents/**
+      # Build/deploy plumbing (unchanged):
       - 'mcp/**'
-      - 'interfaces/console/**'
-      - 'interfaces/public/**'
-      - 'capabilities/commands/**'
-      - 'interfaces/ui/**'
-      - 'runtime/events/**'
-      - 'integrations/providers/**'
-      - 'agents/workforce/**'
       - 'Dockerfile.slim'
       - 'package.json'
       - 'index.html'

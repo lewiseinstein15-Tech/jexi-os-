@@ -6,7 +6,11 @@ name: build-brain-image
 
 on:
   push:
-    branches: [main]
+    # FIX (cleanup v2, 2026-09): the push trigger was born broken at f1733516
+    # as `branches: ain]` (a mangled main-array literal), so it never fired;
+    # the workflow only ever ran via workflow_dispatch. Restored to the
+    # documented intent (header: "every push to main builds ... GHCR").
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
