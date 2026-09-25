@@ -30,7 +30,9 @@
  * tool calls, not JSON-in-prose parsing.
  */
 
-import { generateWithToolsLoop, generateContentSafe } from '../runtime/LLMClient.js';
+import { generateWithToolsLoop, generateContentSafe, resolveKeys, GROQ_TEXT_MODEL, TOOL_CAPABLE } from '../runtime/LLMClient.js';
+import { providerOrder } from '../runtime/ProviderRouter.js';
+import { isUnifiedConfigured } from '../../services/providers/modelConfig.js';
 import { executeTool } from '../../services/ToolRuntime.js';
 import { appendEvent } from '../../services/EventLog.js'; // B78 — coworker calls/results are first-class events
 import { getActiveSession } from '../../services/MemoryManager.js';
@@ -109,6 +111,115 @@ export function coworkerChain(role) {
   return [...primary.providers, ...COWORKERS.fallback.providers];
 }
 
+/* ================================================================== *
+ * AUDIT FIX (fix/chat-memory-provider-wiring, Part B) — CONFIGURED-FIRST
+ * RUNTIME CHAIN ASSEMBLY.
+ *
+ * Live-laptop evidence (GROQ_API_KEY only, boot "keys present 1/2"):
+ * a simple chat turn routed to the memory coworker whose chain is
+ * gemini → openrouter → openrouter → vllm → huggingface → mistral.
+ * GROQ — the ONLY provider with a key, and tool-capable — is on NONE of
+ * the coder/memory/fallback chains, and every walk here is PINNED per leg
+ * (LLMClient generateWithToolsLoop / __generateWalk honor opts.provider as
+ * a one-leg order), so the turn could never slide to groq. Result: every
+ * leg failed on a missing key and the user got "No coworker completed
+ * the request" (degraded) — while the boot chip honestly said
+ * "provider ready - groq groq".
+ *
+ * The static COWORKERS table above stays EXACTLY as-is (zero edits — it
+ * remains the auditable roster + model choices). runtimeChain() assembles
+ * the chain actually walked at turn time:
+ *   1. CONFIGURED FIRST — the highest-priority configured provider per
+ *      ProviderRouter.providerOrder() leads the chain. With only
+ *      GROQ_API_KEY set, groq is ALWAYS attempt #1 of every coworker.
+ *   2. UNCONFIGURED LEGS ARE DROPPED — gemini/openrouter/vllm/hf/mistral
+ *      are only attempted when their own key/env exists (lead rule B1:
+ *      "never if no keys for them exist"). No more wasted 11.5s of
+ *      guaranteed failures ahead of a working provider.
+ *   3. KEYLESS FAIL-SOFT FLOOR — pollinations (keyless) is appended as
+ *      the honest last resort so a conversational turn degrades to an
+ *      answer instead of a hard failure (lead rule B3).
+ * The head leg preserves the role's own model choice for that provider
+ * when the chain has one (researcher keeps groq/gpt-oss-120b); otherwise
+ * a live-verified default from HEAD_MODELS is used.
+ * ================================================================== */
+
+/** resolveKeys() field per provider key (mirrors LLMClient key resolution). */
+const LEG_KEY_FIELD = {
+  groq: 'groqKey', gemini: 'geminiKey', openrouter: 'openrouterKey',
+  huggingface: 'hfKey', mistral: 'mistralKey', nvidia: 'nvidiaKey',
+  deepseek: 'deepseekKey', xai: 'xaiKey', cerebras: 'cerebrasKey',
+  deepinfra: 'deepinfraKey', sambanova: 'sambanovaKey', cloudflare: 'cloudflareKey',
+};
+
+/** Default model when a configured provider has no leg on this role's chain
+ *  (values mirror the live-verified models already used inside COWORKERS). */
+const HEAD_MODELS = {
+  groq: GROQ_TEXT_MODEL,                      // B219 live-verified flagship
+  gemini: 'gemini-3.6-flash',                 // B219 current generation
+  openrouter: 'cohere/north-mini-code:free',  // B73 live-verified $0
+  nvidia: 'deepseek-ai/deepseek-v4-flash-0731',
+  huggingface: 'Qwen/Qwen2.5-7B-Instruct',    // B73 free HF serverless
+  mistral: 'open-mistral-7b',                 // Experiment free tier
+};
+
+/**
+ * Is this chain leg actually usable right now? (No secrets handled —
+ * presence check only. Unified/vLLM/Ollama/pollinations follow the same
+ * rules ProviderRouter.configuredProviders() applies for health views.)
+ */
+export function legConfigured(p, keys = resolveKeys()) {
+  const k = String(p?.key || '');
+  if (k === 'pollinations') return true; // keyless last resort — always reachable
+  if (k === 'vllm') return !!process.env.VLLM_BASE_URL; // B74 — configured = base URL set
+  if (k === 'ollama') return String(process.env.MODEL_PROVIDER || '').toLowerCase() === 'ollama'; // Phase 6
+  if (k === 'unified') { try { return isUnifiedConfigured(); } catch { return false; } }
+  const field = LEG_KEY_FIELD[k];
+  return field ? !!keys[field] : false;
+}
+
+/**
+ * The chain a turn actually walks: configured-first, unconfigured legs
+ * dropped, pollinations floor. Pure + additive over coworkerChain().
+ */
+export function runtimeChain(role, keys = resolveKeys()) {
+  const raw = coworkerChain(role);
+  const kept = raw.filter((p) => legConfigured(p, keys));
+  // Highest-priority configured provider right now. providerOrder() is the
+  // single priority source (it pins a configured `unified` first and an
+  // explicitly-chosen local `ollama`); membership in `kept` (resolveKeys —
+  // env OR Settings) is the single "configured" source, so a Settings-only
+  // key leads exactly like an env key. The keyless pollinations leg never
+  // LEADS just because it is listed.
+  let top = null;
+  try {
+    const order = providerOrder();
+    // configured = key resolves (env OR Settings) for keyed providers; the
+    // unified/ollama pins are configured by definition when they appear.
+    top = order.find((k) => k !== 'pollinations' && (k === 'unified' || k === 'ollama' || legConfigured({ key: k }, keys))) || null;
+  } catch { top = null; }
+
+  const out = [];
+  const sameLeg = (p) => p && out[0] && p.key === out[0].key && (p.model || null) === (out[0].model || null);
+  if (top) {
+    const own = kept.find((p) => p.key === top); // the role's own model choice wins
+    if (own) out.push({ key: own.key, ...(own.model ? { model: own.model } : {}) });
+    else {
+      const model = HEAD_MODELS[top];
+      if (model) out.push({ key: top, model });
+      else if (top === 'unified' || top === 'ollama') out.push({ key: top }); // model lives in the cfg
+    }
+  }
+  for (const p of kept) {
+    if (sameLeg(p)) continue; // head already carries this exact leg
+    out.push(p);
+  }
+  // B3 — the keyless floor: a conversational turn must degrade to an answer,
+  // never to a hard failure, even when every keyed provider dies mid-turn.
+  if (!out.some((p) => p.key === 'pollinations')) out.push({ key: 'pollinations' });
+  return out;
+}
+
 /** Exposed for the Models/status screen — the REAL running roster (B66 honesty). */
 export function workerRoster() {
   return Object.entries(COWORKERS).map(([slug, w]) => ({
@@ -170,7 +281,10 @@ export async function executeNativeToolCalls(calls, opts = {}) {
 const VISION_PROVIDERS = new Set(['groq', 'gemini', 'openrouter']);
 
 export async function runWorker(role, prompt, system = '', opts = {}) {
-  const chain = coworkerChain(role);
+  // AUDIT FIX (Part B) — walk the CONFIGURED-FIRST runtime chain (groq leads
+  // when GROQ_API_KEY is set; unconfigured legs are dropped; pollinations
+  // floor). coworkerChain() remains the static roster for the Models screen.
+  const chain = runtimeChain(role);
   const attempts = [];
   const wantsTools = Array.isArray(opts.tools) && opts.tools.length > 0;
   // B227 — VISION: the native-tools loop cannot carry images — a vision turn
@@ -180,6 +294,13 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
   // honestly decline images by returning null).
   const image = typeof opts.image === 'string' && opts.image.startsWith('data:image/') ? opts.image : null;
   const toolLane = wantsTools && !image;
+  // AUDIT FIX (Part B3) — honest banner: when tools were requested but NO
+  // configured provider on the runtime chain can speak native tool calls,
+  // the text-only answer still ships — with the limitation stated plainly.
+  const toolCapableConfigured = chain.some((p) => TOOL_CAPABLE.has(p.key) && legConfigured(p));
+  const toolsDisabledNote = (wantsTools && !toolCapableConfigured)
+    ? '\n\n> ⚠ tools disabled — no tool-capable provider configured.'
+    : '';
   // B99 — CODE MODE (PTC): when enabled and tools are offered, the model may
   // write ONE TypeScript program via run_code composing the same tools (dsh
   // `code` preset). The SDK section regenerates from THIS coworker's tool
@@ -266,7 +387,7 @@ export async function runWorker(role, prompt, system = '', opts = {}) {
       const res = await generateContentSafe(prompt, system, image, { provider: p.key, model: p.model, temperature: opts.temperature, onToken: (typeof opts.onToken === 'function') ? opts.onToken : undefined, onThink: (typeof opts.onThink === 'function') ? opts.onThink : undefined }); // B227 — the image rides (was hardcoded null: the photo never reached the model)
       if (res.ok && res.text) {
         logResult({ ok: true, mode: 'text', provider: res.provider || p.key, model: res.model || p.model || null, degraded: !!res.degraded, local: !!res.local });
-        return { ok: true, text: res.text, degraded: !!res.degraded, local: !!res.local, worker: role, provider: res.provider || p.key, model: res.model || p.model || null, attempts };
+        return { ok: true, text: `${res.text}${toolsDisabledNote}`, degraded: !!res.degraded, local: !!res.local, worker: role, provider: res.provider || p.key, model: res.model || p.model || null, attempts };
       }
       attempts.push(`${label}: ${res.error || 'empty response'}`);
     } catch (e) {

@@ -104,7 +104,7 @@ const GROQ_VISION_MODELS = [
 // verified 2026-09-04: openai/gpt-oss-120b, openai/gpt-oss-20b, qwen3.8-27b,
 // qwen3.6-27b, groq/compound, allam-2-7b). Default to the live flagship;
 // discovery still self-heals future retirements.
-const GROQ_TEXT_MODEL = process.env.GROQ_TEXT_MODEL || 'openai/gpt-oss-120b';
+export const GROQ_TEXT_MODEL = process.env.GROQ_TEXT_MODEL || 'openai/gpt-oss-120b';
 let groqModelCache = null; // discovered fallback model id
 const deadGroqModels = new Set(); // B219 — 404'd ids this process: never retried
 
@@ -983,7 +983,7 @@ export async function testAllProviders() {
 /* only here and are skipped for tool calling).                        */
 /* ------------------------------------------------------------------ */
 
-const TOOL_CAPABLE = new Set(['unified', 'groq', 'openrouter', 'deepseek', 'xai', 'cerebras', 'deepinfra', 'mistral', 'ollama']); // ARENA — ollama speaks OpenAI tool-calling; UNIFIED — user-chosen model (OpenAI lane or native Anthropic)
+export const TOOL_CAPABLE = new Set(['unified', 'groq', 'openrouter', 'deepseek', 'xai', 'cerebras', 'deepinfra', 'mistral', 'ollama']); // ARENA — ollama speaks OpenAI tool-calling; UNIFIED — user-chosen model (OpenAI lane or native Anthropic)
 
 /**
  * Parse a provider's tool_calls into { id, name, arguments }. The id is
