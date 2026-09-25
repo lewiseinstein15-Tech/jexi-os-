@@ -9,27 +9,29 @@
 FROM node:22-slim
 
 # Chromium system dependencies (Playwright — JEXI's eyes)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
-    libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 \
-    libasound2 libpango-1.0-0 libcairo2 libglib2.0-0 libx11-6 libx11-xcb1 \
-    libxext6 libxi6 libxtst6 libxrender1 libxss1 \
-    ca-certificates fonts-liberation \
-    # B167 — /watch (video): ffmpeg for frames/audio, python3+pip for yt-dlp
-    ffmpeg python3 python3-pip \
+# ── Optional heavy tooling — OFF by default (see server/Dockerfile) ─────────
+# INSTALL_BROWSER=1 → Chromium system libs (JEXI's eyes on this image).
+# INSTALL_MEDIA=1   → ffmpeg + python3/pip + yt-dlp (/watch URL path).
+# Full-featured build:
+#   docker build --build-arg INSTALL_BROWSER=1 --build-arg INSTALL_MEDIA=1 .
+ARG INSTALL_BROWSER=0
+ARG INSTALL_MEDIA=0
+RUN PKGS="ca-certificates fonts-liberation"; \
+    if [ "$INSTALL_BROWSER" = "1" ]; then PKGS="$PKGS libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 libpango-1.0-0 libcairo2 libglib2.0-0 libx11-6 libx11-xcb1 libxext6 libxi6 libxtst6 libxrender1 libxss1"; fi; \
+    if [ "$INSTALL_MEDIA" = "1" ]; then PKGS="$PKGS ffmpeg python3 python3-pip"; fi; \
+    apt-get update && apt-get install -y --no-install-recommends $PKGS \
     && rm -rf /var/lib/apt/lists/* \
-    # yt-dlp via pip (Debian 12+ needs --break-system-packages); the build
-    # must NEVER fail on this — /watch degrades honestly without yt-dlp.
-    && (pip3 install --no-cache-dir --break-system-packages yt-dlp \
+    && if [ "$INSTALL_MEDIA" = "1" ]; then (pip3 install --no-cache-dir --break-system-packages yt-dlp \
         || pip3 install --no-cache-dir yt-dlp \
-        || echo 'WARN: yt-dlp install failed - /watch URL downloads disabled on this image')
+        || echo 'WARN: yt-dlp install failed - /watch URL downloads disabled on this image'); else echo 'INSTALL_MEDIA=0 - skipping yt-dlp (VideoWatch degrades honestly)'; fi
 
 WORKDIR /app
 
 # Backend dependencies + Chromium download (runs as root inside Docker).
 # PLAYWRIGHT_BROWSERS_PATH=0 keeps browsers inside node_modules (persist to runtime).
 COPY server/package*.json ./server/
-RUN cd server && npm ci --no-audit --no-fund && PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+RUN cd server && npm ci --no-audit --no-fund \
+    && if [ "$INSTALL_BROWSER" = "1" ]; then (PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium || echo "playwright chromium install failed — browser mode degrades"); else echo "INSTALL_BROWSER=0 — skipping Chromium (set the build arg to restore JEXI's eyes)"; fi
 COPY server ./server
 # mcp/ lives INSIDE server/ since the f5659d0 layout move (shipped by the
 # COPY server line above; kept explicit here so the registry is never lost).

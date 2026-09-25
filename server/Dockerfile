@@ -6,8 +6,19 @@
 # and every such import escaped to /<tree>, crashing ESM link at boot.
 FROM node:22-bookworm-slim
 
+# ── Optional heavy tooling — OFF by default ────────────────────────────────
+# Boot needs none of it: JEXI_NO_BROWSER=1 short-circuits the browser paths
+# (DesktopManager.ensureBrowser / BrowserRouter.registerDesktopWorker) and
+# /watch degrades honestly without ffmpeg/yt-dlp. ffmpeg still reaches the
+# container via the `ffmpeg-static` npm dependency (no apt needed).
+# Full image: --build-arg INSTALL_BROWSER=1 --build-arg INSTALL_MEDIA=1
+ARG INSTALL_BROWSER=0
+ARG INSTALL_MEDIA=0
+
 RUN apt-get update -qq \
-  && (apt-get install -y -qq ffmpeg ca-certificates curl || echo "apt ffmpeg/curl failed — /watch degrades to captions-only") \
+  && PKGS="ca-certificates curl"; \
+     if [ "$INSTALL_MEDIA" = "1" ]; then PKGS="$PKGS ffmpeg"; fi; \
+     (apt-get install -y -qq $PKGS || echo "apt install failed — /watch degrades to captions-only") \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -16,7 +27,7 @@ COPY server/package.json server/package-lock.json ./server/
 RUN cd server && npm ci
 
 ENV PLAYWRIGHT_BROWSERS_PATH=0
-RUN cd server && (npx playwright install --with-deps chromium || npx playwright install chromium || echo "playwright chromium install failed — browser mode degrades")
+RUN if [ "$INSTALL_BROWSER" = "1" ]; then cd server && (npx playwright install --with-deps chromium || npx playwright install chromium || echo "playwright chromium install failed — browser mode degrades"); else echo "INSTALL_BROWSER=0 — skipping Chromium (~338 MiB); runtime sets JEXI_NO_BROWSER=1"; fi
 
 # ── App tree + boot-chain trees (repo layout mirrored, as in Dockerfile.slim) ─
 COPY server ./server
@@ -33,8 +44,8 @@ COPY tests ./tests
 COPY interfaces ./interfaces
 
 RUN mkdir -p /app/bin \
-  && (curl -fsSL --fail -o bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux \
-      && chmod +x bin/yt-dlp || echo "yt-dlp download failed — /watch URL mode degrades")
+  && if [ "$INSTALL_MEDIA" = "1" ]; then (curl -fsSL --fail -o bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux \
+      && chmod +x bin/yt-dlp || echo "yt-dlp download failed — /watch URL mode degrades"); else echo "INSTALL_MEDIA=0 — skipping yt-dlp (~38 MiB); VideoWatch degrades honestly"; fi
 ENV PATH="/app/bin:${PATH}"
 
 EXPOSE 3002

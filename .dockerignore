@@ -2,3 +2,18 @@ node_modules
 dist
 .git
 *.md
+# ── never ship env/secret material into any build context ──
+.env
+.env.*
+*.pem
+*.key
+# ── repo metadata / non-runtime trees (no Dockerfile COPYs these) ──
+.github
+.vscode
+.idea
+coverage
+docs
+benchmarks
+.DS_Store
+*.log
+scripts/.chunked-state.json
