@@ -99,7 +99,7 @@ export default function Shell() {
     <div
       className={'jx-shell' + (navOpen ? ' is-nav-open' : '')}
       data-theme={theme}
-      data-accent={appearance.accent || 'violet'}
+      data-accent={appearance.accent || 'coral'}
       data-fontsize={appearance.fontsize || 'medium'}
       data-spacing={appearance.spacing || 'comfortable'}
     >

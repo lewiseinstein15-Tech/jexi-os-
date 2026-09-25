@@ -2,27 +2,29 @@ import { useState } from 'react';
 import { loadAppearance, patchAppearance } from '../shell/Shell.jsx';
 
 /**
- * Appearance section (ui-rebuild-premium, NEW).
- *  - Accent: violet (default) / cyan / emerald / amber — re-points --jx-accent
+ * Appearance section (ui-rebuild-premium-v2, palette D — SIGNAL).
+ *  - Accent: coral (default) / green / blurple — the locked D signature plus
+ *    its two verified alternates (Supabase green, Stripe blurple)
  *  - Font size: small / medium / large  (--jx-fs-body / --jx-fs-ui)
  *  - Density: compact / comfortable     (--jx-row-pad-y / --jx-control-h)
  * State lives in localStorage 'jx-appearance'; Shell.jsx applies it to
  * .jx-shell data-attributes consumed by tokens-premium.css. This view only
- * reads/writes that store — nothing else to keep in sync.
+ * reads/writes that store — nothing else to keep in sync. Legacy accent ids
+ * (violet/cyan/emerald/amber) no longer match a rule and fall back to the
+ * default coral — stale localStorage is self-healing.
  */
 
 const ACCENTS = [
-  { id: 'violet', hex: '#8B5CF6' },
-  { id: 'cyan', hex: '#22D3EE' },
-  { id: 'emerald', hex: '#10B981' },
-  { id: 'amber', hex: '#F59E0B' },
+  { id: 'coral', hex: '#FF5D5D' },
+  { id: 'green', hex: '#3ECF8E' },
+  { id: 'blurple', hex: '#635BFF' },
 ];
 const FONT_SIZES = ['small', 'medium', 'large'];
 const DENSITIES = ['compact', 'comfortable'];
 
 export default function AppearanceSection() {
   const [appearance, setAppearance] = useState(loadAppearance);
-  const accent = appearance.accent || 'violet';
+  const accent = appearance.accent || 'coral';
   const fontsize = appearance.fontsize || 'medium';
   const spacing = appearance.spacing || 'comfortable';
 
