@@ -227,6 +227,10 @@ body { background: var(--jx-bg-root); }
   align-items: center;
   gap: 6px;
   height: 26px;
+  /* width:auto + flex:none defeat the legacy 14x14 chip-dot rule
+     (legacy theme stylesheet) that would otherwise clamp this pill. */
+  width: auto;
+  flex: 0 0 auto;
   padding: 0 10px;
   border-radius: 999px;
   border: 1px solid var(--jx-border);
@@ -234,8 +238,12 @@ body { background: var(--jx-bg-root); }
   font-size: var(--jx-fs-12);
   color: var(--jx-text-2);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+  min-width: 0;
 }
-.jx-chip svg { color: var(--jx-text-3); }
+.jx-chip svg { color: var(--jx-text-3); width: 13px; height: 13px; flex: none; }
 .jx-chip.is-ok { border-color: rgba(16, 185, 129, 0.35); }
 .jx-chip.is-ok svg { color: var(--jx-success); }
 .jx-chip.is-warn { border-color: rgba(245, 158, 11, 0.40); }
@@ -259,7 +267,7 @@ body { background: var(--jx-bg-root); }
 .jx-iconbtn:active { background: var(--jx-accent-soft); }
 
 /* ── Generic view scaffolding ─────────────────────────────────────────── */
-.jx-view {
+.jx-page {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -819,9 +827,9 @@ body { background: var(--jx-bg-root); }
   border: 1px solid var(--jx-border);
 }
 .jx-agent-card.is-selected .jx-agent-avatar { color: var(--jx-accent); border-color: var(--jx-accent-ring); background: var(--jx-bg-raised); }
-.jx-agent-id { font-size: var(--jx-fs-ui); font-weight: var(--jx-fw-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.jx-agent-sub { font-size: 11px; color: var(--jx-text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.jx-agent-min { min-width: 0; }
+.jx-agent-id { display: block; font-size: var(--jx-fs-ui); font-weight: var(--jx-fw-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jx-agent-sub { display: block; font-size: 11px; color: var(--jx-text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jx-agent-min { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 
 .jx-detail-card { padding: var(--jx-sp-4); }
 .jx-detail-head { display: flex; align-items: center; gap: var(--jx-sp-3); margin-bottom: var(--jx-sp-3); }
@@ -845,7 +853,7 @@ body { background: var(--jx-bg-root); }
 }
 
 /* ══ WORK GRAPH polish (Graph.jsx is real — restyle only) ═════════════ */
-.jx-view[data-view='graph'] .reaflow svg { background: transparent; }
+.jx-page[data-view='graph'] .reaflow svg { background: transparent; }
 
 /* ══ POLISH: empty / skeleton / error / toast / shortcuts ══════════════ */
 .jx-empty {
