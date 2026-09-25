@@ -37,7 +37,7 @@ import { checkpoints } from './checkpoints.js';
 import { queue } from './queue.js';
 import { steer } from './steer.js';
 import { multiagent } from './multiagent.js';
-import Transcript from './Transcript.premium.jsx';
+import Transcript from '../components/transcript/Transcript.jsx';
 import Composer from './Composer.premium.jsx';
 import { backendAgent } from './backendAgent.js';
 import './mount.css';
@@ -328,6 +328,20 @@ export function mount(el, opts = {}) {
     }
     const toolName = (ev.payload && ev.payload.toolName) || (rendered && rendered.toolName) || null;
 
+    // ui-rebuild-premium-v2 — narration rows carry the REAL narrationType and
+    // the RAW payload.input. rows/narration.js prefers the builder template
+    // text ('Let me check the existing code first — …'), but the Arena-style
+    // transcript needs the actual data: reasoning text for recon, step text
+    // for progress, plan lines for decision. Consumer-side only — the runtime
+    // and the narration scope are untouched.
+    let narrationType = null;
+    if (ev.type === 'narration.line' && ev.payload) {
+      narrationType = typeof ev.payload.narrationType === 'string' ? ev.payload.narrationType : null;
+      if (typeof ev.payload.input === 'string' && ev.payload.input) {
+        rendered = { ...rendered, content: ev.payload.input };
+      }
+    }
+
     // Streaming merge: a JEXI text delta of the active turn appends to the
     // turn's last delta row (if any) so the answer grows in place.
     const streamingStatus = runtime.state(sessionId).status;
@@ -342,6 +356,23 @@ export function mount(el, opts = {}) {
       && last.voice === 'jexi';
     if (mergeable) {
       last.content += rendered.content;
+      last.streaming = streamingStatus === 'streaming';
+      store.turn = streamingStatus;
+      paint();
+      return;
+    }
+    // ui-rebuild-premium-v2 — thinking streams too: consecutive recon
+    // narrations of the same turn merge into ONE growing row so the
+    // ThinkingBlock grows in place instead of stacking a row per chunk.
+    const reconMerge = !isUser
+      && rendered.rowType === 'narration'
+      && narrationType === 'recon'
+      && last
+      && last.turnId === envelope.turnId
+      && last.type === 'narration.line'
+      && last.narrationType === 'recon';
+    if (reconMerge) {
+      last.content += (last.content ? '\n' : '') + rendered.content;
       last.streaming = streamingStatus === 'streaming';
       store.turn = streamingStatus;
       paint();
@@ -364,6 +395,8 @@ export function mount(el, opts = {}) {
       turnId: envelope.turnId,
       type: ev.type,
       rowType: rendered.rowType,
+      narrationType,
+      t: Date.now(),
       content,
       refused: !!envelope.refused,
       refuseReason: (envelope.modes && envelope.modes.reason) || null,
