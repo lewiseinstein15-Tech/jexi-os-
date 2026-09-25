@@ -57,10 +57,13 @@ function groupTurns(rows) {
 function TurnGroup({ turn, isLast, onApprove }) {
   const items = [];
   const active = isLast && !turn.rows.some((r) => r.rowType === 'turn-end-ok' || r.rowType === 'turn-end-fail');
+  const consumed = new Set(); // paired tool_use completion rows already rendered
+  let stepCounter = 0; // continuous Arena numbering across the whole turn
 
   let i = 0;
   while (i < turn.rows.length) {
     const r = turn.rows[i];
+    if (consumed.has(r.seq)) { i += 1; continue; }
 
     // ---- user message ------------------------------------------------
     if (r.rowType === 'text' && r.voice === 'user') {
@@ -110,39 +113,92 @@ function TurnGroup({ turn, isLast, onApprove }) {
         j += 1;
       }
       items.push(
-        <StepList key={`steps-${r.seq ?? i}`} planSteps={planSteps} steps={executed} streaming={active} />
+        <StepList key={`steps-${r.seq ?? i}`} planSteps={planSteps} steps={executed}
+          start={stepCounter} streaming={active} />
       );
+      stepCounter += executed.length + planSteps.length;
       i = j;
       continue;
     }
 
-    // ---- tool rows (pair started with its result/error) ----------------
+    // ---- tool rows ------------------------------------------------------
     if (r.rowType === 'tool-use' || r.rowType === 'tool-result' || r.rowType === 'tool-error') {
       let parsed = null;
       if (r.raw) { try { parsed = JSON.parse(r.raw); } catch { /* raw is display text */ } }
 
-      // /gui dispatch rows carry {command} -> terminal-style block
+      // server-side tool_use (ToolUseBridge): pair by the REAL toolId —
+      // deep-reads run in parallel, so completion rows may interleave.
+      if (r.toolUse && r.toolUse.id) {
+        const pair = turn.rows.find((q, qi) => qi > i
+          && q.toolUse && q.toolUse.id === r.toolUse.id
+          && (q.rowType === 'tool-result' || q.rowType === 'tool-error'));
+        if (pair) consumed.add(pair.seq);
+        const failed = r.rowType === 'tool-error' || (pair && (pair.rowType === 'tool-error' || pair.toolUse.status === 'error'));
+        const done = !!pair && !failed;
+        const msRaw = (pair && pair.toolUse && pair.toolUse.duration_ms) || r.toolUse.duration_ms || null;
+        const ms = msRaw != null ? Math.round(msRaw / 100) / 10 : null;
+        const detail = String(r.toolUse.detail || r.content || '');
+        if (detail.startsWith('$')) {
+          const lines = detail.split('\n');
+          items.push(
+            <CommandBlock key={`tu-${r.seq}`}
+              command={lines[0].slice(1).trim()}
+              state={failed ? 'failed' : done ? 'done' : 'running'}
+              output={failed ? '' : lines.slice(1).join('\n').trim()}
+              error={failed ? lines.slice(1).join('\n').trim() : ''}
+              ms={ms} />
+          );
+        } else {
+          items.push(
+            <ToolCallBlock key={`tu-${r.seq}`} name={r.toolUse.tool || r.toolUse.slug || 'tool'}
+              params={r.toolUse.summary || null}
+              result={pair ? oneLine(pair.content) : null}
+              state={failed ? 'failed' : done ? 'completed' : 'running'}
+              ms={ms != null ? Math.round(msRaw) : null} />
+          );
+        }
+        i += 1;
+        continue;
+      }
+
+      // /gui dispatch rows carry {command} -> terminal-style block. The
+      // dispatch completes when its output row lands: either the gui.status
+      // text row (the fetch's real output) or a tool-result/error row.
       if (parsed && typeof parsed.command === 'string') {
         const next = turn.rows[i + 1];
-        const failed = next && next.rowType === 'tool-error';
-        const done = next && next.rowType === 'tool-result';
-        const out = next ? oneLine(next.content) : '';
-        const ms = next && r.t ? Math.round((next.t - r.t) / 100) / 10 : null;
+        const isStatus = next && next.rowType === 'text' && next.type === 'gui.status';
+        const pairable = next && (next.rowType === 'tool-result' || next.rowType === 'tool-error' || isStatus);
+        const failed = pairable && next.rowType === 'tool-error';
+        const out = pairable ? oneLine(next.content) : '';
+        const ms = pairable && !isStatus && r.t ? Math.round((next.t - r.t) / 100) / 10 : null;
         items.push(
           <CommandBlock key={`cmd-${r.seq ?? i}`} command={parsed.command + (parsed.task ? ` ${oneLine(parsed.task)}` : '')}
-            state={failed ? 'failed' : done ? 'done' : 'running'}
+            state={failed ? 'failed' : pairable ? 'done' : 'running'}
             output={!failed ? out : ''} error={failed ? out : ''} ms={ms} />
         );
-        i += next ? 2 : 1;
+        i += pairable ? 2 : 1;
+        continue;
+      }
+
+      // bare completion rows (no started pair in this turn group)
+      if (r.rowType === 'tool-result' || r.rowType === 'tool-error') {
+        items.push(
+          <ToolCallBlock key={`tc-${r.seq ?? i}`} name={r.toolName || r.type || 'tool'}
+            params={null}
+            result={oneLine(r.content)}
+            state={r.rowType === 'tool-error' ? 'failed' : 'completed'}
+            ms={null} />
+        );
+        i += 1;
         continue;
       }
 
       const next = turn.rows[i + 1];
       const isRes = next && (next.rowType === 'tool-result' || next.rowType === 'tool-error');
       items.push(
-        <ToolCallBlock key={`tool-${r.seq ?? i}`} name={r.toolName}
-          params={r.raw || null}
-          result={isRes ? oneLine(next.content) : null}
+        <ToolCallBlock key={`tool-${r.seq ?? i}`} name={r.toolName || r.type || 'tool'}
+          params={r.raw || (r.rowType === 'tool-error' ? null : oneLine(r.content) || null)}
+          result={isRes ? oneLine(next.content) : (r.rowType === 'tool-error' ? oneLine(r.content) : null)}
           state={r.rowType === 'tool-error' ? 'failed' : isRes ? (next.rowType === 'tool-error' ? 'failed' : 'completed') : 'running'}
           ms={isRes && r.t ? Math.round((next.t - r.t)) : null} />
       );
@@ -203,6 +259,12 @@ function TurnGroup({ turn, isLast, onApprove }) {
     }
 
     // ---- everything else: muted system line ------------------------------
+    // acknowledge + completion narrations are meta: the queue step card and
+    // the turn footer already carry them — no duplicate rows.
+    if (r.rowType === 'narration' && (r.narrationType === 'acknowledge' || r.narrationType === 'completion')) {
+      i += 1;
+      continue;
+    }
     items.push(
       <div key={r.seq ?? `sys${i}`} className="jx-ta-sys" data-rowtype={r.rowType}>
         {oneLine(r.content) || JSON.stringify(r).slice(0, 160)}

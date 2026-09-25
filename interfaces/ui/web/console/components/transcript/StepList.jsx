@@ -34,18 +34,18 @@ function StepRow({ n, text, state, agent }) {
   );
 }
 
-export default function StepList({ planSteps = [], steps = [], streaming }) {
+export default function StepList({ planSteps = [], steps = [], start = 0, streaming }) {
   if (!planSteps.length && !steps.length) return null;
   const lastIdx = streaming ? steps.length - 1 : -1;
 
   return (
     <div className="jx-steps">
       {steps.map((s, i) => (
-        <StepRow key={`s${i}`} n={i + 1} text={s.text} agent={s.agent}
+        <StepRow key={`s${i}`} n={start + i + 1} text={s.text} agent={s.agent}
           state={i === lastIdx ? 'running' : (s.state || 'done')} />
       ))}
       {planSteps.map((p, i) => (
-        <StepRow key={`p${i}`} n={steps.length + i + 1} text={p} state="pending" />
+        <StepRow key={`p${i}`} n={start + steps.length + i + 1} text={p} state="pending" />
       ))}
     </div>
   );

@@ -19,6 +19,12 @@
  *                                     recon rows into one growing block)
  *   {type:'narration', text}       -> narrate finding
  *   {type:'stream', text, by?}     -> text delta  (the streaming answer)
+ *   {type:'tool_use', id, tool, status, duration_ms, summary, detail}
+ *                                  -> progress narration carrying the REAL
+ *                                     ToolUseBridge payload (server-side tool
+ *                                     runs) — mount converts it to the tool
+ *                                     row family so CommandBlock/ToolCallBlock
+ *                                     render real paired executions
  *   {type:'done', summary, success, sources, statistics?} -> completion
  *   anything else (team/intel/agent.done/subagent.aggregate) -> telemetry, skipped
  *
@@ -160,6 +166,33 @@ export function backendAgent({ endpoint = '/api/chat' } = {}) {
                 ctx: { input: clip(ev.text, 240), source: 'narration' },
               };
             }
+            break;
+          }
+          case 'tool_use': {
+            // Real server-side tool run (ToolUseBridge shape: paired
+            // running->success/error with toolId, duration_ms, $ detail).
+            // Relayed verbatim inside the narration ctx — mount converts it
+            // to the tool row family. Nothing is invented here.
+            const tu = ev || {};
+            yield {
+              kind: 'narrate',
+              type: 'progress',
+              ctx: {
+                input: clip(tu.summary || tu.detail || `tool ${tu.tool || ''}`, 200),
+                source: `tool-use:${tu.tool || tu.slug || 'tool'}`,
+                ctx: {
+                  toolUse: {
+                    id: tu.id || null,
+                    tool: tu.tool || null,
+                    slug: tu.slug || null,
+                    status: tu.status || 'running',
+                    duration_ms: Number(tu.duration_ms) || 0,
+                    summary: tu.summary ? String(tu.summary).slice(0, 200) : null,
+                    detail: tu.detail ? String(tu.detail).slice(0, 500) : null,
+                  },
+                },
+              },
+            };
             break;
           }
           case 'done': {

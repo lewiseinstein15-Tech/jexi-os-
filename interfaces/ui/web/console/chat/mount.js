@@ -335,10 +335,23 @@ export function mount(el, opts = {}) {
     // for progress, plan lines for decision. Consumer-side only — the runtime
     // and the narration scope are untouched.
     let narrationType = null;
+    let toolUse = null;
     if (ev.type === 'narration.line' && ev.payload) {
       narrationType = typeof ev.payload.narrationType === 'string' ? ev.payload.narrationType : null;
       if (typeof ev.payload.input === 'string' && ev.payload.input) {
         rendered = { ...rendered, content: ev.payload.input };
+      }
+      // backendAgent relays REAL server-side tool runs (ToolUseBridge shape:
+      // paired running->success/error with id + duration_ms) inside the
+      // narration ctx. They become the tool row family here so the Arena
+      // transcript renders CommandBlock/ToolCallBlock from real executions.
+      const tu = ev.payload.ctx && ev.payload.ctx.toolUse;
+      if (tu && tu.id) {
+        toolUse = tu;
+        rendered = {
+          rowType: tu.status === 'success' ? 'tool-result' : tu.status === 'error' ? 'tool-error' : 'tool-use',
+          content: String(tu.detail || tu.summary || ''),
+        };
       }
     }
 
@@ -396,6 +409,7 @@ export function mount(el, opts = {}) {
       type: ev.type,
       rowType: rendered.rowType,
       narrationType,
+      toolUse,
       t: Date.now(),
       content,
       refused: !!envelope.refused,
