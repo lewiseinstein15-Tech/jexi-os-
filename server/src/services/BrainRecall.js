@@ -1,52 +1,60 @@
 /**
- * JEXI OS — BRAIN RECALL BRIDGE (fix/chat-memory-provider-wiring, Part C2).
+ * JEXI OS — BRAIN RECALL BRIDGE (fix/chat-memory-provider-wiring Part C2,
+ * extended by fix/chat-wiring-completion GAP 1: semantica + instincts feed).
  *
  * The Phase-31 wiring (server/src/wiring/phase31-bootstrap.js) builds JEXI's
  * real brain at boot — brain.hot (hot memory), brain.search.hybrid (hybrid
- * recall over the brain index), semantica graph, instincts observer — and
- * registers them as "context sources". AUDIT FINDING (A3): the chat prompt
- * pipeline never collected them. assemblePrompt() maintains its own local
- * section list, collectSources() had zero chat-path callers, and the unique
- * JEXI brain therefore never fed a single chat turn — JEXI behaved like a
- * generic LLM proxy.
+ * recall over the brain index), the semantica graph, instincts (mind/learning)
+ * — and registers them as "context sources". AUDIT FINDING (A3): the chat
+ * prompt pipeline never collected them. assemblePrompt() maintains its own
+ * local section list, collectSources() had zero chat-path callers, and the
+ * unique JEXI brain therefore never fed a single chat turn.
  *
  * This bridge is the missing WIRE, not a new brain: it lazily reaches the
- * SAME boot-built instances through the wiring facade (wiring.hot /
- * wiring.hybrid — server/src/wiring/phase31-bootstrap.js:654-665) and renders
- * a bounded, fail-soft prompt block:
+ * SAME boot-built instances through the wiring facade and renders a bounded,
+ * fail-soft prompt block from FOUR sources:
  *
- *   - brain.hot.recall({ sourceId: 'chat', sessionId }) — today's hot facts
- *     for this session (real fact text + evidence).
- *   - wiring.hybrid.hybrid(query, { topK, budgetTokens }) — the most relevant
- *     compiled brain pages/facts for this query, as scored page pointers.
+ *   1. brain.hot.recall({ sourceId: 'chat' })  — hot conversation facts
+ *   2. wiring.hybrid.hybrid(query)             — relevant brain pages (scored)
+ *   3. wiring.graphQuery(...)                  — semantica ontology nodes
+ *   4. mind/learning instinctsSection          — learned instinct patterns
  *
- * Contract: NEVER throws, NEVER blocks a turn, NEVER exceeds maxChars, and
- * returns '' (inject nothing) whenever the brain is unavailable, empty, or
- * the query is too short to recall on. No model calls, no network, no clock
- * assumptions beyond what the brain itself maintains.
+ * Budget (GAP 1): hot 400 → hybrid 500 → semantica 300 → instincts 300 chars,
+ * 1500 total. Fail-soft: any source that errors or is empty is SKIPPED —
+ * never crashes a turn, never blocks on the brain.
  */
 
 const HOT_SOURCE_ID = 'chat';     // same sourceId the W31 B4 producer registers
 const HOT_MAX_FACTS = 4;
 const HYBRID_TOP_K = 3;
 const HYBRID_BUDGET_TOKENS = 400;
+const GRAPH_MAX_NODES = 4;
+// GAP 1 — per-source prompt budgets (priority order hot → hybrid → semantica → instincts)
+export const BRAIN_BUDGETS = { hot: 400, hybrid: 500, semantica: 300, instincts: 300 };
+export const BRAIN_TOTAL_BUDGET = 1500;
 
 function clip(text, n) {
   const s = String(text || '').replace(/\s+/g, ' ').trim();
   return s.length > n ? `${s.slice(0, n - 1)}…` : s;
 }
 
-/** Hot-memory facts for this session → prompt lines (fail-soft). */
+function clipBlock(lines, maxChars) {
+  if (!lines.length) return '';
+  const block = lines.join('\n');
+  return block.length > maxChars ? block.slice(0, maxChars - 1) : block;
+}
+
+/** Hot-memory facts → prompt lines (fail-soft). */
 async function hotLines(wiring, sessionId) {
   if (!wiring || !wiring.hot || typeof wiring.hot.recall !== 'function') return [];
   try {
     const facts = wiring.hot.recall({ sourceId: HOT_SOURCE_ID, ...(sessionId ? { sessionId } : {}) });
-    return (facts || []).slice(0, HOT_MAX_FACTS).map((f) =>
-      `- [hot] ${clip(f.kind || 'fact', 24)}: ${clip(f.fact || f.text || f.title || '', 160)}`
+    return (facts || []).slice(-HOT_MAX_FACTS).map((f) =>
+      `- [hot${f.session_id && f.session_id !== 'default' ? `:${f.session_id}` : ''}] ${clip(f.kind || 'fact', 24)}: ${clip(f.fact || f.text || f.title || '', 160)}`
     );
   } catch {
-    // recall() validates its args strictly (E_INVALID_ARGUMENT on an empty
-    // sourceId, bad `since`…) — a strict-refusal must never break the turn.
+    // recall() validates its args strictly (E_INVALID_ARGUMENT on a bad
+    // sourceId/since) — a strict-refusal must never break the turn.
     try {
       const meta = wiring.hot.meta({ ...(sessionId ? { sessionId } : {}), sourceId: HOT_SOURCE_ID });
       const facts = meta && meta.brain_hot_memory && meta.brain_hot_memory.facts;
@@ -69,23 +77,74 @@ async function hybridLines(wiring, query) {
 }
 
 /**
+ * GAP 1 — semantica ontology feed. The graph stores typed nodes
+ * ({id, kind, label, props}); query({}) returns every node id-sorted.
+ * Relevance = label tokens that intersect the query's tokens (the graph has
+ * no text index — this is the honest keyword overlap it supports). Nodes
+ * whose label shares no token with the question are skipped; nothing
+ * relevant → nothing injected (never filler).
+ */
+async function semanticaLines(wiring, query) {
+  if (!wiring || typeof wiring.graphQuery !== 'function') return [];
+  const q = String(query || '').toLowerCase();
+  if (q.length < 4) return [];
+  try {
+    const nodes = wiring.graphQuery({}) || [];
+    if (!nodes.length) return [];
+    const qTokens = new Set(q.match(/[a-z0-9_]+/g) || []);
+    const relevant = nodes.filter((n) => {
+      const toks = String(n.label || '').toLowerCase().match(/[a-z0-9_]+/g) || [];
+      return toks.some((t) => t.length >= 3 && qTokens.has(t));
+    });
+    if (!relevant.length) return [];
+    return relevant.slice(0, GRAPH_MAX_NODES).map((n) =>
+      `- [graph] ${clip(n.kind || 'node', 24)}: ${clip(n.label, 90)}`
+    );
+  } catch { return []; }
+}
+
+/**
+ * GAP 1 — instincts feed. mind/learning keeps learned patterns
+ * (error resolutions, user corrections, workarounds…) in append-only JSONL
+ * stores; instinctsSection() renders the "INSTINCTS:" block — project
+ * instincts matched to the task, global instincts always. Dynamic import +
+ * try/catch: an absent or broken learning/ yields an empty section.
+ */
+async function instinctLines(query) {
+  try {
+    const learning = await import('../../../mind/learning/index.js');
+    const section = await learning.instinctsSection({ task: String(query || '') });
+    return section ? [section] : [];
+  } catch { return []; }
+}
+
+/**
  * Build the bounded recall block. Returns '' when there is nothing to say.
  * @param {object} opts
- * @param {string|null} opts.sessionId  conversation id (hot-memory scope)
- * @param {string} opts.query           the user's message (hybrid retrieval)
- * @param {number} [opts.maxChars=900]  hard cap on the injected block
+ * @param {string|null} opts.sessionId  conversation id (hot-memory scope hint)
+ * @param {string} opts.query           the user's message (retrieval input)
+ * @param {number} [opts.maxChars=1500] hard cap on the injected block
  */
-export async function brainRecallBlock({ sessionId = null, query = '', maxChars = 900 } = {}) {
+export async function brainRecallBlock({ sessionId = null, query = '', maxChars = BRAIN_TOTAL_BUDGET } = {}) {
   try {
     // Dynamic import: phase31-bootstrap imports PromptAssembly (which the
     // SIMPLE lane already imports) — a static edge here would create an ESM
-    // cycle. Lazy resolution at call time is cycle-free and fail-soft: if the
-    // wiring module or the boot sequence is unavailable, we inject nothing.
+    // cycle. Lazy resolution at call time is cycle-free and fail-soft.
     const { wiring } = await import('../wiring/phase31-bootstrap.js');
-    const [hot, hybrid] = await Promise.all([hotLines(wiring, sessionId), hybridLines(wiring, query)]);
-    const lines = [...hot, ...hybrid];
-    if (!lines.length) return '';
-    const block = `Relevant JEXI brain memory (use silently — never mention that you recalled it):\n${lines.join('\n')}`;
+    const [hot, hybrid, semantica, instincts] = await Promise.all([
+      hotLines(wiring, sessionId),
+      hybridLines(wiring, query),
+      semanticaLines(wiring, query),
+      instinctLines(query),
+    ]);
+    const sections = [
+      clipBlock(hot, BRAIN_BUDGETS.hot) && `Hot memory (latest facts):\n${clipBlock(hot, BRAIN_BUDGETS.hot)}`,
+      clipBlock(hybrid, BRAIN_BUDGETS.hybrid) && `Relevant brain pages (hybrid retrieval):\n${clipBlock(hybrid, BRAIN_BUDGETS.hybrid)}`,
+      clipBlock(semantica, BRAIN_BUDGETS.semantica) && `Ontology (semantica graph):\n${clipBlock(semantica, BRAIN_BUDGETS.semantica)}`,
+      clipBlock(instincts, BRAIN_BUDGETS.instincts) && `${clipBlock(instincts, BRAIN_BUDGETS.instincts)}`,
+    ].filter(Boolean);
+    if (!sections.length) return '';
+    const block = `Relevant JEXI brain memory (use silently — never mention that you recalled it):\n${sections.join('\n')}`;
     return block.length > maxChars ? block.slice(0, maxChars - 1) : block;
   } catch {
     return ''; // the brain must never break a chat turn
