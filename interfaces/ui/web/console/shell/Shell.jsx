@@ -120,10 +120,18 @@ export default function Shell() {
               : route.id === 'chat'
                 ? <ChatWindow />
                 : route.id === 'settings'
-                  ? <Settings sessionId="console-main" />
-                  : route.id === 'graph'
-                    ? <Graph />
-                    : <Placeholder route={route} />}
+                ? (
+                    <div className="jx-view" data-view="settings">
+                      <Settings sessionId="console-main" />
+                    </div>
+                  )
+                : route.id === 'graph'
+                  ? (
+                      <div className="jx-view" data-view="graph">
+                        <Graph />
+                      </div>
+                    )
+                  : <Placeholder route={route} />}
         </main>
       </div>
     </div>
