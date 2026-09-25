@@ -11,12 +11,21 @@ FROM node:22-slim
 # qrencode + pandoc: binaries the qrcode/pandoc MCP servers shell out to.
 # uv: fast Python runner for the uvx-based MCP servers (sqlite, osm, rss,
 # chroma, mermaid, pandoc, ...) — no pip venv juggling, cached wheels.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg python3 python3-pip ca-certificates fonts-liberation qrencode pandoc curl \
+# ── Optional heavy tooling — OFF by default (see server/Dockerfile) ─────────
+# INSTALL_MEDIA=1 restores apt ffmpeg + python3/pip + yt-dlp (/watch URL path).
+# Default 0: /watch degrades to metadata+captions; ffmpeg still ships via the
+# `ffmpeg-static` npm dependency. qrencode/pandoc/uv stay (MCP tooling, small).
+# INSTALL_BROWSER is a no-op here by design — the slim image never installs
+# Chromium; declared for parity with server/Dockerfile and Dockerfile.
+ARG INSTALL_BROWSER=0
+ARG INSTALL_MEDIA=0
+RUN PKGS="ca-certificates fonts-liberation qrencode pandoc curl"; \
+    if [ "$INSTALL_MEDIA" = "1" ]; then PKGS="$PKGS ffmpeg python3 python3-pip"; fi; \
+    apt-get update && apt-get install -y --no-install-recommends $PKGS \
     && rm -rf /var/lib/apt/lists/* \
-    && (pip3 install --no-cache-dir --break-system-packages yt-dlp \
+    && if [ "$INSTALL_MEDIA" = "1" ]; then (pip3 install --no-cache-dir --break-system-packages yt-dlp \
         || pip3 install --no-cache-dir yt-dlp \
-        || echo 'WARN: yt-dlp install failed — /watch URL mode degrades') \
+        || echo 'WARN: yt-dlp install failed — /watch URL mode degrades'); else echo 'INSTALL_MEDIA=0 — skipping yt-dlp (ffmpeg-static covers frames)'; fi \
     && (curl -LsSf https://astral.sh/uv/install.sh | sh \
         && cp /root/.local/bin/uv /usr/local/bin/uv && cp /root/.local/bin/uvx /usr/local/bin/uvx \
         || echo 'WARN: uv install failed — python uvx MCP servers degrade')
