@@ -10,15 +10,11 @@ import '../settings/settings.css';
 import Graph from '../graph/Graph.jsx';
 import TokenInspector from './TokenInspector.jsx';
 import { ROUTES, DEFAULT_ROUTE, TOKENS_HASH, routeFromHash } from './routes.js';
-// PHASE 31 Scope 2 (WA7) — Agents View (shipped Phase 24 console view, RO)
-// wired into the shell at this seam: routes.js is NOT edited. The view's
-// classes/vars are scoped under `.jcx` in the shipped theme file (imported
-// below — zero global selectors, verified), so the host wrapper supplies the
-// .jcx scope while neutralizing the theme's full-screen takeover properties
-// (position/inset/z-index/display) via inline overrides — consumer-side
-// integration only; the view module itself is untouched.
-import AgentsView from '../../../../console/components/console/views/AgentsView.jsx';
-import '../../../../console/styles/jexi-theme.css';
+// ui-rebuild-premium — the agents route now renders the ROSTER view
+// (/api/roster: 252 registry agents grouped by tier, search + detail panel).
+// The shipped Phase 31 AgentsView (jcx theme, /api/agents/definitions) is no
+// longer mounted from here; the module stays untouched on disk for rollback.
+import AgentsRosterView from '../agents/AgentsRosterView.jsx';
 
 /**
  * Premium app frame (ui-rebuild-premium).
@@ -59,12 +55,9 @@ export default function Shell() {
     window.addEventListener('p24-theme-change', onTheme);
     window.addEventListener('jx-appearance-change', onAppearance);
     if (!window.location.hash) window.location.replace(DEFAULT_ROUTE.hash);
-    // PHASE 31 WA7 — the shipped AgentsView consumes brainGet, whose contract
-    // refuses to fetch without a configured backend URL ("No brain
-    // configured"). The shell seeds it with this origin (same-origin; the
-    // dev proxy forwards /api to the JEXI server) so the view's live fetch
-    // works inside the hosted shell. No other view is affected: an absolute
-    // same-origin base resolves identically to a relative path.
+    // Seed the legacy brainGet base (ui/web console services refuse to fetch
+    // without it). Same-origin: the dev proxy forwards /api to the JEXI
+    // server on 3002.
     try { if (!localStorage.getItem('jexi_backend_url')) localStorage.setItem('jexi_backend_url', window.location.origin); } catch { /* storage unavailable */ }
     return () => {
       window.removeEventListener('hashchange', onHash);
@@ -107,14 +100,10 @@ export default function Shell() {
         <main className="jx-content" data-route={routeId}>
           {showAgents
             ? (
-              <div
-                className="jcx"
-                data-testid="agents-host"
-                style={{ position: 'static', inset: 'auto', zIndex: 'auto', display: 'block', overflowY: 'auto', height: '100%', gridTemplateColumns: 'none', padding: '18px 22px' }}
-              >
-                <AgentsView />
-              </div>
-            )
+                <div className="jx-view" data-view="agents" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <AgentsRosterView />
+                </div>
+              )
             : showTokens
               ? <TokenInspector />
               : route.id === 'chat'
