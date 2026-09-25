@@ -1,0 +1,139 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   JEXI OS — PREMIUM CONSOLE DESIGN TOKENS (ui-rebuild-premium)
+   Layered ON TOP of tokens.css (Phase 24 Linear palette) via the CSS cascade:
+   every token below is re-declared under the --jx- namespace only, so the old
+   palette stays intact for any legacy surface that still reads it. The premium
+   shell (Shell.jsx + premium.css) consumes ONLY these --jx- tokens.
+
+   Accent decision (proposed default): VIOLET #8B5CF6 — reads premium against
+   the deep-neutral stack and is distinct from the old Linear indigo. The
+   Settings → Appearance picker re-points --jx-accent at runtime
+   (cyan #22D3EE / emerald #10B981 / amber #F59E0B) via [data-accent].
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Backgrounds: deep neutral stack ─────────────────────────────── */
+  --jx-bg-root: #0B0D10;        /* app canvas            */
+  --jx-bg-sunken: #12151A;      /* sidebar / wells       */
+  --jx-bg-raised: #1A1F26;      /* cards over canvas     */
+
+  /* ── Surface: subtle elevation ───────────────────────────────────── */
+  --jx-surface: #1E242C;        /* inputs, chips, cards  */
+
+  /* ── Border: hairline ────────────────────────────────────────────── */
+  --jx-border: #2A323C;
+  --jx-border-strong: #3A4450;
+
+  /* ── Text ────────────────────────────────────────────────────────── */
+  --jx-text-1: #E8EAED;         /* primary   */
+  --jx-text-2: #9AA3AD;         /* secondary */
+  --jx-text-3: #6B7280;         /* muted     */
+
+  /* ── Accent: ONE signature color, used sparingly ─────────────────── */
+  --jx-accent: #8B5CF6;
+  --jx-accent-soft: rgba(139, 92, 246, 0.14);   /* tinted fills   */
+  --jx-accent-ring: rgba(139, 92, 246, 0.45);   /* focus rings    */
+  --jx-on-accent: #FFFFFF;
+
+  /* ── Semantic ────────────────────────────────────────────────────── */
+  --jx-success: #10B981;
+  --jx-warn: #F59E0B;
+  --jx-danger: #EF4444;
+  --jx-info: #38BDF8;
+
+  /* ── Typography ──────────────────────────────────────────────────── */
+  --jx-font-sans: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --jx-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --jx-fs-12: 12px;
+  --jx-fs-13: 13px;
+  --jx-fs-14: 14px;
+  --jx-fs-16: 16px;
+  --jx-fs-20: 20px;
+  --jx-fs-24: 24px;
+  --jx-fs-32: 32px;
+  --jx-fw-400: 400;
+  --jx-fw-500: 500;
+  --jx-fw-600: 600;
+  --jx-fw-700: 700;
+
+  /* ── Spacing: 4px base scale ─────────────────────────────────────── */
+  --jx-sp-1: 4px;
+  --jx-sp-2: 8px;
+  --jx-sp-3: 12px;
+  --jx-sp-4: 16px;
+  --jx-sp-6: 24px;
+  --jx-sp-8: 32px;
+  --jx-sp-12: 48px;
+
+  /* ── Radius ──────────────────────────────────────────────────────── */
+  --jx-radius-sm: 6px;
+  --jx-radius-md: 10px;
+  --jx-radius-lg: 16px;
+
+  /* ── Elevation: exactly three levels ─────────────────────────────── */
+  --jx-elev-flat: none;
+  --jx-elev-subtle: 0 1px 2px rgba(0, 0, 0, 0.30), 0 2px 8px rgba(0, 0, 0, 0.22);
+  --jx-elev-strong: 0 4px 12px rgba(0, 0, 0, 0.38), 0 12px 40px rgba(0, 0, 0, 0.36);
+
+  /* ── Motion: ease-out only. NO bouncy springs. ───────────────────── */
+  --jx-motion-fast: 150ms ease-out;   /* state changes  */
+  --jx-motion-slow: 250ms ease-out;   /* layout changes */
+
+  /* ── Layout metrics ──────────────────────────────────────────────── */
+  --jx-sidebar-w: 240px;
+  --jx-sidebar-w-icons: 64px;
+  --jx-header-h: 52px;
+
+  /* ── Derived component tokens (spacing scale responds to density) ── */
+  --jx-row-pad-y: var(--jx-sp-3);
+  --jx-row-gap: var(--jx-sp-3);
+  --jx-control-h: 36px;
+}
+
+/* ═══ Appearance runtime switching (Settings → Appearance) ═══════════════ */
+
+/* Accent picker */
+.jx-shell[data-accent='cyan'] {
+  --jx-accent: #22D3EE;
+  --jx-accent-soft: rgba(34, 211, 238, 0.14);
+  --jx-accent-ring: rgba(34, 211, 238, 0.45);
+}
+.jx-shell[data-accent='emerald'] {
+  --jx-accent: #10B981;
+  --jx-accent-soft: rgba(16, 185, 129, 0.14);
+  --jx-accent-ring: rgba(16, 185, 129, 0.45);
+}
+.jx-shell[data-accent='amber'] {
+  --jx-accent: #F59E0B;
+  --jx-accent-soft: rgba(245, 158, 11, 0.14);
+  --jx-accent-ring: rgba(245, 158, 11, 0.45);
+}
+
+/* Font size scale */
+.jx-shell[data-fontsize='small'] { --jx-fs-body: 13px; --jx-fs-ui: 12px; }
+.jx-shell[data-fontsize='medium'] { --jx-fs-body: 14px; --jx-fs-ui: 13px; }
+.jx-shell[data-fontsize='large'] { --jx-fs-body: 16px; --jx-fs-ui: 14px; }
+.jx-shell { --jx-fs-body: 14px; --jx-fs-ui: 13px; }
+
+/* Density */
+.jx-shell[data-spacing='compact'] { --jx-row-pad-y: var(--jx-sp-2); --jx-row-gap: var(--jx-sp-2); --jx-control-h: 32px; }
+.jx-shell[data-spacing='comfortable'] { --jx-row-pad-y: var(--jx-sp-3); --jx-row-gap: var(--jx-sp-3); --jx-control-h: 38px; }
+
+/* Light theme (optional, dark is default): neutral paper, same accents */
+.jx-shell[data-theme='light'] {
+  --jx-bg-root: #F4F5F7;
+  --jx-bg-sunken: #ECEEF1;
+  --jx-bg-raised: #FFFFFF;
+  --jx-surface: #FFFFFF;
+  --jx-border: #D6DAE0;
+  --jx-border-strong: #B9C0C9;
+  --jx-text-1: #171A1F;
+  --jx-text-2: #4E5761;
+  --jx-text-3: #8A929C;
+  --jx-accent-soft: rgba(139, 92, 246, 0.10);
+  --jx-elev-subtle: 0 1px 2px rgba(15, 18, 24, 0.08), 0 2px 8px rgba(15, 18, 24, 0.06);
+  --jx-elev-strong: 0 4px 12px rgba(15, 18, 24, 0.10), 0 12px 40px rgba(15, 18, 24, 0.12);
+}
+.jx-shell[data-theme='light'][data-accent='cyan'] { --jx-accent: #0891B2; --jx-accent-soft: rgba(8, 145, 178, 0.10); --jx-accent-ring: rgba(8, 145, 178, 0.40); }
+.jx-shell[data-theme='light'][data-accent='emerald'] { --jx-accent: #059669; --jx-accent-soft: rgba(5, 150, 105, 0.10); --jx-accent-ring: rgba(5, 150, 105, 0.40); }
+.jx-shell[data-theme='light'][data-accent='amber'] { --jx-accent: #D97706; --jx-accent-soft: rgba(217, 119, 6, 0.10); --jx-accent-ring: rgba(217, 119, 6, 0.40); }
