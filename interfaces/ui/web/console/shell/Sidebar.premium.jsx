@@ -24,11 +24,14 @@ export default function Sidebar({ activeHash, routes, onNavigate }) {
   const { backend } = useBackendStatus();
   const model = useModelStatus();
 
+  // BUG 1 (ui-rebuild-premium-v2) — same shared signal as the header chip:
+  // unified config OR legacy key (env/settings) OR the last turn's real
+  // provider. "unresolved" only when there is genuinely nothing configured.
   const unresolved = model.loading ? null : model.configured !== true;
   const modelLabel = model.loading
     ? 'checking…'
     : model.configured
-      ? `${model.provider || 'unified'} · ${model.model || 'default'}`
+      ? `${model.provider || 'key detected'}${model.model ? ` · ${model.model}` : ''}`
       : 'unresolved';
 
   return (

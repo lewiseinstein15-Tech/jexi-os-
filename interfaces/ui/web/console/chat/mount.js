@@ -40,6 +40,7 @@ import { multiagent } from './multiagent.js';
 import Transcript from '../components/transcript/Transcript.jsx';
 import Composer from './Composer.premium.jsx';
 import { backendAgent } from './backendAgent.js';
+import { applyTurnProvider, refreshModelStatus } from '../shell/useStatus.js';
 import './mount.css';
 
 /* ---------------- Phase 31 Scope 2 — strip/panel components ---------------- */
@@ -320,6 +321,24 @@ export function mount(el, opts = {}) {
     const ev = envelope.event || {};
     if (envelope.turnId && !turnStarts.has(envelope.turnId)) turnStarts.set(envelope.turnId, Date.now());
     const isUser = !!(ev.payload && typeof ev.payload.messageId === 'string' && /-user$/.test(ev.payload.messageId));
+
+    // BUG 1 (ui-rebuild-premium-v2) — the completion narration carries the
+    // REAL provider+model of the turn that just answered (backendAgent
+    // parsed it from the done event's statistics.meter.calls). Feed the
+    // shared model-status signal so the header chip / sidebar indicator /
+    // turn footer reflect the provider actually used — no page refresh.
+    const tp = ev.payload && ev.payload.ctx && ev.payload.ctx.turnProvider;
+    if (ev.type === 'narration.line' && tp && tp.provider) {
+      applyTurnProvider(tp.provider, tp.model || null);
+    }
+    // BUG 1 + BUG 2 — after a turn reaches its terminal event, re-poll the
+    // provider routes ONCE the runtime has finished its synchronous
+    // bookkeeping (the 'done' status is set right after the last emit; a
+    // microtask runs after that, never before).
+    if (ev.type === 'turn.completed') {
+      queueMicrotask(() => { refreshModelStatus(); });
+    }
+
     let rendered = null;
     try {
       rendered = rows.render(ev);

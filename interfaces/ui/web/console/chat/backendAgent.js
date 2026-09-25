@@ -214,6 +214,23 @@ export function backendAgent({ endpoint = '/api/chat' } = {}) {
             }
             sources = Array.isArray(ev.sources) ? ev.sources.filter(Boolean) : null;
             const ms = Date.now() - t0;
+            // BUG 1 (ui-rebuild-premium-v2) — the done event's
+            // statistics.meter.calls carry the REAL model calls of this turn
+            // ("provider:model" strings, failed attempts suffixed "(failed)").
+            // The last successful call is what answered the user; relay it in
+            // the completion narration ctx so mount.js can feed the shared
+            // model-status signal (chip/footer show the per-turn truth).
+            const calls = (ev.statistics && ev.statistics.meter && Array.isArray(ev.statistics.meter.calls))
+              ? ev.statistics.meter.calls
+              : [];
+            const okCall = [...calls].reverse().find((c) => typeof c === 'string' && c && !c.endsWith('(failed)'));
+            let turnProvider = null;
+            if (okCall) {
+              const colon = okCall.indexOf(':');
+              turnProvider = colon > 0
+                ? { provider: okCall.slice(0, colon), model: okCall.slice(colon + 1) }
+                : { provider: okCall, model: null };
+            }
             yield {
               kind: 'narrate',
               type: 'completion',
@@ -222,6 +239,7 @@ export function backendAgent({ endpoint = '/api/chat' } = {}) {
                   ? `answer complete · ${ms} ms · ${sources.length} source${sources.length === 1 ? '' : 's'}`
                   : `answer complete · ${ms} ms`,
                 source: 'pipeline-done',
+                ...(turnProvider ? { ctx: { turnProvider } } : {}),
               },
             };
             return;

@@ -2,21 +2,32 @@ import { Menu, Moon, Sun, Cpu, TriangleAlert, Check } from 'lucide-react';
 import { useBackendStatus, useModelStatus } from './useStatus.js';
 
 /**
- * Premium header — route title, model status chip ("model configured
- * (unified)" or a warning chip when unresolved), backend status, theme
+ * Premium header — route title, model status chip, backend status, theme
  * toggle (dark default; light optional) and the mobile hamburger.
  * Hamburger visibility is CSS-driven (<600px); it toggles the shell's
  * is-nav-open state which slides the fixed sidebar in.
+ *
+ * BUG 1 (ui-rebuild-premium-v2) — the chip now derives from the SHARED
+ * useModelStatus signal that merges /api/providers/active (unified config),
+ * /api/settings/status (legacy key presence — env OR Settings) and the
+ * provider the last completed turn actually used (applyTurnProvider).
+ *   - key present (env or Settings, unified or legacy) -> is-ok (green)
+ *     with the best-known provider/model
+ *   - nothing resolvable                               -> is-warn (amber)
+ *     "model unresolved / configure in Settings" — honestly.
  */
 export default function Header({ routeTitle, theme, onTheme, onToggleNav }) {
   const { backend } = useBackendStatus();
   const model = useModelStatus();
 
+  const value = `${model.provider || ''}${model.provider && model.model ? ' · ' : ''}${model.model || ''}`;
   const chip = model.loading
     ? { cls: '', icon: Cpu, label: 'model status…', value: '' }
-    : model.configured
-      ? { cls: 'is-ok', icon: Check, label: 'model configured (unified)', value: `${model.provider || ''}${model.provider && model.model ? ' · ' : ''}${model.model || ''}` }
-      : { cls: 'is-warn', icon: TriangleAlert, label: 'model unresolved', value: 'configure in Settings' };
+    : model.configured && model.model
+      ? { cls: 'is-ok', icon: Check, label: `model ready — ${value}`, value }
+      : model.configured
+        ? { cls: 'is-ok', icon: Check, label: `provider ready — ${model.provider || 'key detected'}`, value: model.provider || '' }
+        : { cls: 'is-warn', icon: TriangleAlert, label: 'model unresolved', value: 'configure in Settings' };
 
   const ChipIcon = chip.icon;
 

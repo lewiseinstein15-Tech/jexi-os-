@@ -16,10 +16,14 @@ import { useModelStatus } from '../../shell/useStatus.js';
 export default function TurnFooter({ turnId, ms, ok = true, failReason }) {
   const model = useModelStatus();
   const shortTurn = String(turnId || '').replace(/^turn-?/, 'turn-');
+  // BUG 1 (ui-rebuild-premium-v2) — the shared signal now merges the unified
+  // config, legacy key presence (/api/settings/status) and the provider the
+  // LAST completed turn actually used (applyTurnProvider from the done
+  // event's meter). "provider unresolved" only when nothing is configured.
   const modelLabel = model.loading
     ? 'model · …'
-    : model.configured && model.model
-      ? `${model.model}${model.provider ? ` · ${model.provider}` : ''}`
+    : model.configured && (model.model || model.provider)
+      ? `${model.model || ''}${model.model && model.provider ? ' · ' : ''}${model.provider || ''}`
       : 'provider unresolved';
 
   return (
