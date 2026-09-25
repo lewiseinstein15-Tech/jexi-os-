@@ -12,8 +12,15 @@
 #   3. Run this workflow from the Actions tab. It asks for your Space ID,
 #      e.g.  your-username/jexi-os   (the Space is created automatically).
 #
-# The Space will build this repo's Dockerfile as root, so Chromium's system
-# libraries install and JEXI's virtual desktop works. URL:
+# The Space builds this repo's ROOT Dockerfile server-side with the default
+# build args, i.e. INSTALL_BROWSER=0 / INSTALL_MEDIA=0 (cleanup v2 2026-09:
+# corrected - an earlier version of this note claimed Chromium libs install;
+# they do not under the 0/0 defaults). A `--build-arg INSTALL_BROWSER=1
+# INSTALL_MEDIA=1` is NOT possible from this workflow: it never runs
+# `docker build` - `huggingface-cli upload` only ships the repo and HF's
+# builder applies the Dockerfile defaults (HF Spaces has no build-arg
+# channel). To get browser/media on a Space: fork the Dockerfile with the
+# args flipped, or point the Space at a prebuilt image. URL:
 #   https://<your-username>-jexi-os.hf.space  (check /api/health)
 # Add GROQ_API_KEY / GEMINI_API_KEY under the Space's "Settings -> Variables".
 
