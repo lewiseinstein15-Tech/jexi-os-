@@ -143,8 +143,10 @@ crash site; `index.js:101` the caller.
 **Why acceptance saw 22/22:** docs/SERVER-REQUIREMENTS.md: "Phase 31 verification was
 performed on Node v24.21.0". On v24 `require('node:sqlite')` succeeds unflagged → SQLite path.
 On the sandbox's v22.12.0 it throws `ERR_UNKNOWN_BUILTIN_MODULE` without `--experimental-sqlite`
-→ memory fallback → crash. CI (`.github/workflows/ci.yml`) pins `node-version: 22`, so CI
-resolves to whatever 22.x is current (22.13+ ships node:sqlite unflagged; older 22.x does not).
+→ memory fallback → crash. CI (`.github/workflows/ci.yml`) now pins `node-version: 24`
+(bumped from 22 by cleanup v2, 2026-09 — see docs/CONSOLIDATED-CLEANUP-v2-2026-09.md), so CI
+always ships node:sqlite unflagged. (Historical: while CI pinned 22, it resolved to
+whatever 22.x was current — 22.13+ ships node:sqlite unflagged; older 22.x does not.)
 
 ## P6 — Verdict
 

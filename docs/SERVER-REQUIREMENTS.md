@@ -20,6 +20,18 @@ The floor exists because the server's memory backend uses the built-in
 `node:sqlite` module, which the W36 error message names explicitly. Phase 31
 verification was performed on Node v24.21.0, which satisfies the floor.
 
+## CI / image runtime: Node 24.x (cleanup v2, 2026-09)
+
+The declared **floor** stays `>= 22.5` (it mirrors the W36 boot gate and
+`node:sqlite`'s landing version), but the pinned **runtime** used by CI and
+the shipped images is now Node 24: `node-version: 24` in every workflow
+(`ci.yml`, `validate-divisions.yml`, `apk.yml`, `deploy.yml`;
+`xbow-benchmark.yml` already pinned 24) and `FROM node:24-slim` in both
+`Dockerfile` and `Dockerfile.slim`. Bumped from 22 by the consolidated
+cleanup v2 pass — see `docs/CONSOLIDATED-CLEANUP-v2-2026-09.md`. The root
+`package.json` now also declares the same floor (`engines.node >= 22.5`),
+so both install roots state the identical minimum.
+
 ## Minimum server requirements
 
 | Resource | Minimum | Comfortable | Measured reference |

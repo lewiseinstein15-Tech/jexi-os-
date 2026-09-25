@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.2.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.5"
+  },
   "scripts": {
     "dev": "vite --host",
     "dev:full": "concurrently -k -n brain,ui -c green,cyan \"PORT=3002 npm --prefix server start\" \"vite --host\"",

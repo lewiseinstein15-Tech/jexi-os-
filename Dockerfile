@@ -6,7 +6,7 @@
 # Hugging Face Spaces (free, no credit card): create a Space with SDK "Docker"
 # and push this repo — HF runs this Dockerfile as root, so everything installs.
 
-FROM node:22-slim
+FROM node:24-slim
 
 # Chromium system dependencies (Playwright — JEXI's eyes)
 # ── Optional heavy tooling — OFF by default (see server/Dockerfile) ─────────

@@ -16,7 +16,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
       - name: Install and Build
         # Point the free GitHub Pages frontend at the Render backend.
         # Change this if your Render service URL differs.
