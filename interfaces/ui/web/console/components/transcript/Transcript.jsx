@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Bot, TriangleAlert } from 'lucide-react';
 import ThinkingBlock from './ThinkingBlock.jsx';
 import StepList from './StepList.jsx';
@@ -28,6 +28,14 @@ import TurnFooter from './TurnFooter.jsx';
 
 function oneLine(s) {
   return String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+}
+
+/** P4-4 (ui/decision-layer-rendering) — FULL event visibility: tool results
+ * and command output keep their real line breaks (the old oneLine() collapsed
+ * every output to a single line, hiding command output and tool results).
+ * Steps stay oneLine (log lines are naturally single-line); OUTPUTS are not. */
+function multiLine(s) {
+  return String(s == null ? '' : s).replace(/\r\n/g, '\n').trim();
 }
 
 function parsePlan(text) {
@@ -144,15 +152,15 @@ function TurnGroup({ turn, isLast, onApprove }) {
             <CommandBlock key={`tu-${r.seq}`}
               command={lines[0].slice(1).trim()}
               state={failed ? 'failed' : done ? 'done' : 'running'}
-              output={failed ? '' : lines.slice(1).join('\n').trim()}
-              error={failed ? lines.slice(1).join('\n').trim() : ''}
+              output={failed ? '' : multiLine(lines.slice(1).join('\n'))}
+              error={failed ? multiLine(lines.slice(1).join('\n')) : ''}
               ms={ms} />
           );
         } else {
           items.push(
             <ToolCallBlock key={`tu-${r.seq}`} name={r.toolUse.tool || r.toolUse.slug || 'tool'}
               params={r.toolUse.summary || null}
-              result={pair ? oneLine(pair.content) : null}
+              result={pair ? multiLine(pair.content) : null}
               state={failed ? 'failed' : done ? 'completed' : 'running'}
               ms={ms != null ? Math.round(msRaw) : null} />
           );
@@ -169,7 +177,7 @@ function TurnGroup({ turn, isLast, onApprove }) {
         const isStatus = next && next.rowType === 'text' && next.type === 'gui.status';
         const pairable = next && (next.rowType === 'tool-result' || next.rowType === 'tool-error' || isStatus);
         const failed = pairable && next.rowType === 'tool-error';
-        const out = pairable ? oneLine(next.content) : '';
+        const out = pairable ? multiLine(next.content) : '';
         const ms = pairable && !isStatus && r.t ? Math.round((next.t - r.t) / 100) / 10 : null;
         items.push(
           <CommandBlock key={`cmd-${r.seq ?? i}`} command={parsed.command + (parsed.task ? ` ${oneLine(parsed.task)}` : '')}
@@ -185,7 +193,7 @@ function TurnGroup({ turn, isLast, onApprove }) {
         items.push(
           <ToolCallBlock key={`tc-${r.seq ?? i}`} name={r.toolName || r.type || 'tool'}
             params={null}
-            result={oneLine(r.content)}
+            result={multiLine(r.content)}
             state={r.rowType === 'tool-error' ? 'failed' : 'completed'}
             ms={null} />
         );
@@ -197,8 +205,8 @@ function TurnGroup({ turn, isLast, onApprove }) {
       const isRes = next && (next.rowType === 'tool-result' || next.rowType === 'tool-error');
       items.push(
         <ToolCallBlock key={`tool-${r.seq ?? i}`} name={r.toolName || r.type || 'tool'}
-          params={r.raw || (r.rowType === 'tool-error' ? null : oneLine(r.content) || null)}
-          result={isRes ? oneLine(next.content) : (r.rowType === 'tool-error' ? oneLine(r.content) : null)}
+          params={r.raw || (r.rowType === 'tool-error' ? null : multiLine(r.content) || null)}
+          result={isRes ? multiLine(next.content) : (r.rowType === 'tool-error' ? multiLine(r.content) : null)}
           state={r.rowType === 'tool-error' ? 'failed' : isRes ? (next.rowType === 'tool-error' ? 'failed' : 'completed') : 'running'}
           ms={isRes && r.t ? Math.round((next.t - r.t)) : null} />
       );
@@ -278,8 +286,36 @@ function TurnGroup({ turn, isLast, onApprove }) {
 
 export default function Transcript({ rows, onApprove }) {
   const turns = groupTurns(rows || []);
+  // ── P4-3 (ui/decision-layer-rendering) — STREAM AUTO-SCROLL ──
+  // If the user is at the bottom (within 100px) the view stays pinned to the
+  // newest line while events stream in. If the user scrolled UP, the view is
+  // NEVER force-scrolled — a "↓ jump to latest" pill appears at the bottom
+  // instead; clicking it scrolls to the newest line AND resumes auto-scroll.
+  const scrollRef = useRef(null);
+  const [pinned, setPinned] = useState(true);
+  const pinnedRef = useRef(true); // the scroll handler + effects share it live
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 100;
+    pinnedRef.current = atBottom;
+    setPinned(atBottom);
+  };
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !pinnedRef.current) return;
+    el.scrollTop = el.scrollHeight; // keep pinned to the newest line
+  }, [rows]);
+  const jumpToLatest = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    pinnedRef.current = true;
+    setPinned(true);
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  };
   return (
-    <div className="jx-transcript jx-transcript-v2" role="log" aria-live="polite">
+    <div className="jx-transcript jx-transcript-v2" role="log" aria-live="polite"
+      ref={scrollRef} onScroll={onScroll}>
       {rows.length === 0 ? (
         <div className="jx-empty">
           <div className="jx-empty-frame" aria-hidden="true"><Bot size={22} /></div>
@@ -298,6 +334,12 @@ export default function Transcript({ rows, onApprove }) {
             <TurnGroup turn={t} isLast={idx === turns.length - 1} onApprove={onApprove} />
           </Fragment>
         ))
+      )}
+      {!pinned && rows.length > 0 && (
+        <button type="button" className="jx-jump-latest" onClick={jumpToLatest}
+          title="resume auto-scroll">
+          ↓ jump to latest
+        </button>
       )}
     </div>
   );
