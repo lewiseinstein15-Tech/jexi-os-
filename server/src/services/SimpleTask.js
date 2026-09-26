@@ -14,6 +14,7 @@
 
 import { conversationContext } from './Orchestrator.js';
 import { addChat } from './MemoryManager.js';
+import { brainRecallBlock } from './BrainRecall.js'; // AUDIT FIX (Part C2) — the JEXI brain finally feeds chat turns
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { assemblePrompt } from './PromptAssembly.js'; // B119 — dsh prompt assembly
 import { preferencesBlock } from './PreferenceLearner.js';
@@ -79,6 +80,13 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
 
   try { addChat('user', query); } catch (e) {}
   const ctx = await conversationContext(query, opts.convId).catch(() => '');
+  // AUDIT FIX (Part C2) — JEXI-brain recall before the LLM call:
+  //   brain.hot.recall(sessionId)  → today's hot facts for THIS conversation
+  //   brain.search.hybrid(query)   → relevant long-term brain pages
+  // Bounded + fail-soft ('' when the brain has nothing or is unavailable).
+  // AUDIT FINDING A3: these subsystems were boot-registered but never
+  // collected by any chat path — the bridge below is the missing wire.
+  const brainBlock = await brainRecallBlock({ sessionId: opts.convId || null, query }).catch(() => '');
   const role = coworkerFor(plan.intent);
 
   // B78 — filesystem-native coworker definitions: the mandate for the
@@ -113,7 +121,7 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
   const visionNote = image
     ? '\n\n[An image is attached to the user\'s message. Look at the ACTUAL image and ground your answer in what you truly see — real objects, colors, people, text, setting. If something is unclear or not visible, say exactly that. NEVER invent content that is not in the picture.]'
     : '';
-  const prompt = `The user asked: "${query}"${visionNote}\n\n${ctx ? `Conversation context:\n${ctx.slice(0, 4000)}\n\n` : ''}Answer directly and completely. ${FORMAT_RULES}`;
+  const prompt = `The user asked: "${query}"${visionNote}\n\n${ctx ? `Conversation context:\n${ctx.slice(0, 4000)}\n\n` : ''}${brainBlock ? `${brainBlock}\n\n` : ''}Answer directly and completely. ${FORMAT_RULES}`;
 
   // B157 — LIVE STREAMING + ANSWER PRESERVATION. Every token the coworker
   // emits streams straight to the UI (the answer types itself live, like a
