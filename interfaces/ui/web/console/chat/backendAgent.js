@@ -32,6 +32,15 @@
  * (narrate / text / fail). No backend routes are invented: /api/chat is the
  * shipped brain endpoint. If it is unreachable the turn FAILS honestly with
  * E_BACKEND_* — nothing is faked.
+ *
+ * GAP 5 (frontend half) — every POST /api/chat carries
+ * `x-jexi-session: <ctx.sessionId>`, the id runtime.send attaches to the turn
+ * (runtime.js ctx = { sessionId, turnId, userInput, agentId }). The server
+ * reads that header FIRST when it derives the conversation id
+ * (server/index.js conversationId() / clientBucketKey()), so chat memory and
+ * history key on the conversation, not the carrier IP. When the runtime
+ * supplies no sessionId the header is omitted and the server's existing IP
+ * fallback applies unchanged — never a fabricated or guessed id.
  */
 
 const TELEMETRY_TYPES = new Set(['team', 'intel', 'agent.done', 'subagent.aggregate', 'agent.log']);
@@ -49,6 +58,11 @@ export function backendAgent({ endpoint = '/api/chat' } = {}) {
   return async function* agent(ctx) {
     const userInput = String((ctx && ctx.userInput) || '');
     const turnId = (ctx && ctx.turnId) || 'turn';
+    // GAP 5 — the runtime hands every turn its session id (runtime.js attaches
+    // ctx.sessionId from runtime.attach(sessionId, ...)). Relayed to the server
+    // as x-jexi-session; trimmed, and omitted entirely when absent so the
+    // server keeps its IP fallback rather than receiving a blank id.
+    const sessionId = String((ctx && ctx.sessionId) || '').trim();
     const src = `dispatch:${turnId}`;
 
     yield {
@@ -62,7 +76,10 @@ export function backendAgent({ endpoint = '/api/chat' } = {}) {
     try {
       res = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(sessionId ? { 'x-jexi-session': sessionId } : {}),
+        },
         body: JSON.stringify({ query: userInput }),
       });
     } catch (e) {
