@@ -101,6 +101,20 @@ export function createHotMemory({
         throw new SemanticaError('E_INVALID_ARGUMENT', 'supersession target must exist in the same source_id');
       }
     }
+    // ui/decision-layer-rendering (Part 2) — optional STRUCTURED chat-turn
+    // payload. The chat bridge (BrainRecall.brainHotWriteTurn) passes the
+    // full turn {user, assistant, ts, sessionId} so downstream consumers can
+    // read who said what and when without parsing the composed fact string.
+    // Pure metadata: everything is passed IN by the caller — this store stays
+    // wall-clock-free and generates nothing itself.
+    const turnMeta = input.turn && typeof input.turn === 'object' && !Array.isArray(input.turn)
+      ? {
+          user: typeof input.turn.user === 'string' ? input.turn.user.slice(0, 400) : '',
+          assistant: typeof input.turn.assistant === 'string' ? input.turn.assistant.slice(0, 400) : '',
+          ts: typeof input.turn.ts === 'string' ? input.turn.ts : '',
+          sessionId: typeof input.turn.sessionId === 'string' ? input.turn.sessionId : sessionId,
+        }
+      : null;
 
     // IDs are content-addressed WITH source/session/op sequence. Callers may
     // not inject an id that collides across source boundaries.
@@ -118,6 +132,7 @@ export function createHotMemory({
       created_day: createdDay,
       confidence,
       superseded_by: null,
+      ...(turnMeta ? { turn: turnMeta } : {}),
     };
     records.push(row);
     byId.set(id, row);

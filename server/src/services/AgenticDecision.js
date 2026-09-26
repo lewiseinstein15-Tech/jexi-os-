@@ -277,10 +277,12 @@ const REFERENCE_NOTES = [
 
 async function runDirectAnswer(args, opts = {}) {
   const q = String(args.query || '');
-  // 1) live model when one is configured
+  // 1) live model when one is configured (brain context injected when the
+  // loop fetched it — Part 2 closed loop: every chat path reads the brain)
   if (canChat()) {
     try {
-      const out = await generateContent(q, 'Answer the user directly and completely. Use markdown. For math use LaTeX ($inline$, $$block$$).', null, { temperature: 0.3 });
+      const brainNote = opts.brainContext ? `\n\n${String(opts.brainContext).slice(0, 1500)}` : '';
+      const out = await generateContent(q, `Answer the user directly and completely. Use markdown. For math use LaTeX ($inline$, $$block$$).${brainNote}`, null, { temperature: 0.3 });
       if (out && String(out).trim()) {
         return { ok: true, output: String(out).trim(), observation: 'direct answer via model', meta: { writer: 'model' } };
       }
@@ -624,6 +626,13 @@ export async function agenticTurn({ raw, effectiveQuery, sessionId = null, sendE
   const q = String(effectiveQuery || raw || '').trim();
   if (!q) return null;
   const emit = (type, data) => { try { if (typeof sendEvent === 'function') sendEvent(type, data); } catch { /* never break a turn */ } };
+  // Part 2 closed loop — the agentic lane READS the brain too (4 sources,
+  // bounded, fail-soft) and hands it to the model-backed runners.
+  let brainContext = '';
+  try {
+    const { brainRecallBlock } = await import('./BrainRecall.js');
+    brainContext = await brainRecallBlock({ sessionId, query: q });
+  } catch { brainContext = ''; }
   const decision = await routeDecision(q);
   emit('log', {
     agent: 'Decision',
@@ -631,7 +640,7 @@ export async function agenticTurn({ raw, effectiveQuery, sessionId = null, sendE
   });
   // Only the six concrete capabilities take this lane; 'none'/unknown falls through.
   if (!decision.ok || !RUNNERS[decision.route]) return null;
-  const executed = await executePlan(decision, q, { sessionId });
+  const executed = await executePlan(decision, q, { sessionId, brainContext });
   if (!executed.success || !executed.summary) {
     // Honest handoff: this lane could not complete (keyless question with no
     // deterministic path, empty search…) — the legacy pipeline gets the turn.
