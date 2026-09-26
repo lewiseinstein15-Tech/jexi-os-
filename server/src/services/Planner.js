@@ -920,3 +920,20 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
 }
 
 export const planner = new Planner();
+
+/* ═══ AGENTIC DECISION LAYER (ui/decision-layer-rendering) — compat re-exports ═══
+ * The modern agentic routing surface (catalog → routeDecision → executePlan →
+ * verifyAnswer) lives in AgenticDecision.js and is re-exported here so the
+ * intent classifier's module remains the single import point every consumer
+ * already knows. The legacy exports above are UNTOUCHED — the server boots
+ * exactly as before, and the new lane is additive (index.js calls it before
+ * the legacy pipeline; anything it does not take falls through unchanged). */
+export {
+  CAPABILITY_CATALOG,
+  routeDecision,
+  executePlan,
+  verifyAnswer,
+  agenticTurn,
+  queryTerms,
+  evalArithmetic,
+} from './AgenticDecision.js';

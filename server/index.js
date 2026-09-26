@@ -7,7 +7,7 @@ import v8 from 'v8';
 import { githubKeyStatus, answerGithubKey, forgetGithubKey, migrateStoredGithubSecrets } from './src/services/SessionKeys.js';
 import fs from 'fs';
 import path from 'path';
-import { planner } from './src/services/Planner.js';
+import { planner, agenticTurn } from './src/services/Planner.js';
 import { lifecycleUserMessage } from './src/services/SessionLifecycle.js'; // B158 — user/message lifecycle event
 import { sanitizeStreamText, teamRoster } from './src/providers/catalog/ModelCoworkers.js'; // B162 — named model coworkers in every log line
 import { runLifecycleHook } from './src/kernel/hooks/runner.js'; // Phase 7(B) — SessionStart/SessionEnd lifecycle hooks
@@ -2302,6 +2302,28 @@ app.post('/api/chat', async (req, res) => {
             }
           } catch (e) {
             sendEvent('log', { agent: 'Kernel', message: `⚡ Lean lane skipped (${String(e && e.message || e).slice(0, 80)}) — full lanes take this turn.` });
+          }
+          // ═══ AGENTIC DECISION LANE (ui/decision-layer-rendering) ═══
+          // The modern routing surface: routeDecision picks a capability from
+          // the catalog (model pick with a key, deterministic matcher keyless),
+          // executePlan runs the bounded think→act→observe loop, verifyAnswer
+          // gates the result. ONLY fresh, self-contained turns take this lane
+          // (no image, no task continuation) — every other shape and every
+          // non-verified outcome falls through to the legacy pipeline
+          // unchanged. A failed verification is handed off, never faked.
+          if (!image && decision && decision.action === 'execute' && decision.metadata.classification === 'new') {
+            try {
+              const agentic = await agenticTurn({ raw, effectiveQuery, sessionId: convId, sendEvent });
+              meterLap('agenticLane');
+              if (agentic && agentic.done) {
+                sendEvent('agent.done', { answer: agentic.done.summary });
+                done(agentic.done);
+                finish();
+                return;
+              }
+            } catch (e) {
+              sendEvent('log', { agent: 'Decision', message: `⚠ Agentic lane error (${String(e && e.message || e).slice(0, 80)}) — the legacy pipeline takes this turn.` });
+            }
           }
           try {
             const director = new Director({
