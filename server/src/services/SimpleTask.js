@@ -13,7 +13,7 @@
  */
 
 import { conversationContext } from './Orchestrator.js';
-import { addChat, getChatHistory } from './MemoryManager.js';
+import { addChat } from './MemoryManager.js';
 import { brainRecallBlock } from './BrainRecall.js'; // AUDIT FIX (Part C2) — the JEXI brain finally feeds chat turns
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { assemblePrompt } from './PromptAssembly.js'; // B119 — dsh prompt assembly
@@ -78,11 +78,20 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
   });
   emit('log', { agent: 'Orchestrator', message: `🧭 Complexity: SIMPLE — single coworker (${plan.intent}), no graph.` });
 
-  // GAP 6 — DEDUP: the chat handler already persisted this user turn via
-  // rememberTurn() before the pipeline ran; logging it again duplicated
-  // every user message in the session store. Suppress only the EXACT
-  // same-text duplicate (a genuinely different effectiveQuery still logs).
-  try { const __last = getChatHistory(1)[0]; if (!(__last && __last.role === 'user' && __last.text === String(query))) addChat('user', query); } catch (e) {}
+  // GAP 6 v2 — SINGLE WRITER (Option A): the /api/chat handler is the SOLE
+  // writer of user entries. rememberTurn('user', raw) (server/index.js:1858)
+  // persists every turn BEFORE any lane runs, so this lane must never write
+  // one. The exact-text guard below was structurally leaky: the query a lane
+  // receives can be a COMPOSED string — server/index.js:2406-2407 prepends a
+  // failed-task context block + "User's follow-up:" on continue/switch turns —
+  // which does not equal the raw text and sailed past the guard, double-
+  // logging the turn (GLM independent verify: 2 user entries per turn in 2/3
+  // sessions, non-deterministic). The composed string STILL feeds the LLM
+  // below (ctx + brainBlock + worker prompt) — only the duplicate user-entry
+  // write is retired. Invariant: ONE user entry per user turn, always,
+  // regardless of composed text.
+  const GAP6_HANDLER_IS_THE_SOLE_USER_WRITER = true; // handler owns the user-turn record
+  if (!GAP6_HANDLER_IS_THE_SOLE_USER_WRITER) { addChat('user', query); } // retired lane write — never fires (edit, not deletion)
   const ctx = await conversationContext(query, opts.convId).catch(() => '');
   // AUDIT FIX (Part C2) — JEXI-brain recall before the LLM call:
   //   brain.hot.recall(sessionId)  → today's hot facts for THIS conversation

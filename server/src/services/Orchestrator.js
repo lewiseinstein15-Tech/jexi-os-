@@ -1705,10 +1705,19 @@ What I saw:\n${auth.detail.slice(0, 300)}`;
 
     try {
       // Log the incoming request into memory so long conversations keep context
-      // GAP 6 — DEDUP: same rule as SimpleTask — the handler's rememberTurn()
-      // already persisted this user turn; only a genuinely different
-      // effectiveQuery may log an additional entry.
-      try { const __last = getChatHistory(1)[0]; if (!(__last && __last.role === 'user' && __last.text === String(query))) addChat('user', query); } catch (e) {}
+      // GAP 6 v2 — SINGLE WRITER (Option A): the /api/chat handler is the SOLE
+      // writer of user entries — rememberTurn('user', raw)
+      // (server/index.js:1858) persisted this turn before any lane ran. The
+      // exact-text guard here was structurally leaky: `query` can be a COMPOSED
+      // string (server/index.js:2406-2407 prepends a failed-task context block
+      // + "User's follow-up:" on continue/switch turns) which never equals the
+      // raw text, so the guard let a second user entry through every time the
+      // failed-task path fired (GLM independent verify: 2 user entries per
+      // turn in 2/3 sessions). The composed string STILL drives the graph
+      // below — only the duplicate user-entry write is retired. Invariant:
+      // ONE user entry per user turn, always, regardless of composed text.
+      const GAP6_HANDLER_IS_THE_SOLE_USER_WRITER = true; // handler owns the user-turn record
+      if (!GAP6_HANDLER_IS_THE_SOLE_USER_WRITER) { addChat('user', query); } // retired lane write — never fires (edit, not deletion)
 
       let state;
       let startNode;
