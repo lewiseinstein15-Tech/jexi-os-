@@ -26,6 +26,7 @@ import { imageSearch, detectPictureIntent, detectCorrectionToPicture, verifyImag
 import { setGoalEngine } from './src/services/PromptAssembly.js'; // B158 — goals reach every assembled prompt
 import { orchestrator } from './src/services/Orchestrator.js';
 import { runSimpleTask } from './src/services/SimpleTask.js'; // B66 — Orchestrator-Workers SIMPLE fast path
+import { brainHotWriteTurn } from './src/services/BrainRecall.js'; // GAP 2 — chat turns write back into brain.hot (GAP 3's graph-lane recall lives in Orchestrator)
 import { Director } from './src/services/director/Director.js'; // B208 — JEXI the boss: interpret→plan→staff→delegate→supervise→verify→report
 import { realLlmAdapter, realTools } from './src/services/director/RealAdapters.js';
 import { missionRunner } from './src/services/director/MissionRunner.js'; // B211 — persistent missions (work graph)
@@ -1663,6 +1664,7 @@ app.post('/api/chat', async (req, res) => {
   // summary, the content that already streamed to the user IS the answer
   // (root fix for the "Task completed - no readable summary" reply).
   let streamedAnswer = '';
+  let turnUserMessage = ''; // GAP 2 — captured when the raw query is parsed; read by done()
   // B187 — the PUBLIC base URL (computed early: the link-safe stream needs it)
   const PUBLIC_BASE = `${req.protocol}://${(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim()}`;
   const mathStream = createMathStreamBuffer(); // B174 — formulas arrive WHOLE
@@ -1714,6 +1716,12 @@ app.post('/api/chat', async (req, res) => {
   // Stable per-conversation id for this request (hoisted so the deadline and
   // the result store can use it too).
   const convId = conversationId(req);
+  // GAP 5 — SESSION-HEADER OBSERVABILITY: conversationId() reads the
+  // x-jexi-session header FIRST and falls back to req.ip only when absent.
+  // The resolution is logged per turn so the behavior is provable:
+  //   [chat] session=<id> source=x-jexi-session header   <- header honored
+  //   [chat] session=<id> source=fallback(ip)            <- no header sent
+  try { console.log(`[chat] session=${convId} source=${req.headers['x-jexi-session'] ? 'x-jexi-session header' : 'fallback(ip)'}`); } catch { /* logging never breaks chat */ }
   // D2 — the chat turn lifecycle is an event-bus citizen like every other
   // runtime flow; started fires once per request, completed fires in done().
   try {
@@ -1810,6 +1818,14 @@ app.post('/api/chat', async (req, res) => {
     } catch { /* bus mirroring never breaks the chat turn */ }
     sendEvent('done', payload);
     if (payload && payload.summary) rememberTurn('jexi', payload.summary);
+    // GAP 2 — CHAT → BRAIN.HOT WRITE: every SUCCESSFUL turn (both lanes —
+    // SIMPLE and COMPLEX converge on this done()) is persisted into the
+    // brain's hot memory so later turns — even brand-new sessions — recall
+    // it. Fail-soft by contract (brainHotWriteTurn never throws); an empty
+    // raw query (image-only turns) writes nothing.
+    if (payload && payload.summary && payload.success !== false && turnUserMessage) {
+      try { brainHotWriteTurn({ sessionId: convId, userMessage: turnUserMessage, assistantAnswer: payload.summary }).catch(() => {}); } catch { /* the brain write must never break the turn */ }
+    }
   };
 
   // Heartbeat: Cloudflare's proxy in front of Render kills streams that stay
@@ -1837,6 +1853,7 @@ app.post('/api/chat', async (req, res) => {
 
   try {
     const raw = String(query || '').trim();
+    turnUserMessage = raw; // GAP 2 — for the done() hot-memory write
     if (raw) {
       rememberTurn('user', raw);
       // Phase 7(G) — the commands subsystem dispatches BEFORE the model and
@@ -2075,6 +2092,7 @@ app.post('/api/chat', async (req, res) => {
       ? await runSimpleTask(plan, q, sendEvent, { image, convId }) // AUDIT FIX (Part C1) — convId rides: conversationContext gets compaction + session refs for THIS conversation (was dropped: { image } only)
       : await orchestrator.executePlan(plan, q, sendEvent, {
           image,
+          convId, // GAP 3 — the graph lane's brain recall scopes to this conversation
           taskId: activeTaskId || null,
           isContinuation: hasPending || ['continue', 'switch'].includes(intelClassification),
           onPause: async (pausedState) => {
