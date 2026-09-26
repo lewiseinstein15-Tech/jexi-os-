@@ -1,48 +1,124 @@
-import { useEffect, useState } from 'react';
-import Sidebar, { AGENTS_ROUTE } from './Sidebar.jsx';
-import Header from './Header.jsx';
+import { useEffect, useState, useCallback } from 'react';
+// Premium styles load from main.jsx (after the legacy shell.css import) so
+// the premium layer wins the cascade — see the note there.
+import Sidebar, { AGENTS_ROUTE } from './Sidebar.premium.jsx';
+import Header from './Header.premium.jsx';
+import { Toasts } from './toasts.jsx';
+import { useShortcuts } from './shortcuts.js';
+import ShortcutsOverlay from './ShortcutsOverlay.jsx';
 import Placeholder from '../placeholder/Placeholder.jsx';
-import ChatWindow from '../../../../console/components/ChatWindow.jsx';
+// ui-rebuild-premium-v2 BUG 3 — ChatView replaces the legacy out-of-zone
+// ChatWindow import: same mount contract + localStorage snapshot restore.
+// ChatWindow.jsx itself is untouched on disk (zero deletions).
+import ChatView from './ChatView.jsx';
+import { listSessions, newSessionId, removeSession } from '../chat/sessions.js';
 import Settings from '../settings/Settings.jsx';
 import '../settings/settings.css';
 import Graph from '../graph/Graph.jsx';
 import TokenInspector from './TokenInspector.jsx';
 import { ROUTES, DEFAULT_ROUTE, TOKENS_HASH, routeFromHash } from './routes.js';
-// PHASE 31 Scope 2 (WA7) — Agents View (shipped Phase 24 console view, RO)
-// wired into the shell at this seam: routes.js is NOT edited. The view's
-// classes/vars are scoped under `.jcx` in the shipped theme file (imported
-// below — zero global selectors, verified), so the host wrapper supplies the
-// .jcx scope while neutralizing the theme's full-screen takeover properties
-// (position/inset/z-index/display) via inline overrides — consumer-side
-// integration only; the view module itself is untouched.
-import AgentsView from '../../../../console/components/console/views/AgentsView.jsx';
-import '../../../../console/styles/jexi-theme.css';
+// ui-rebuild-premium — the agents route now renders the ROSTER view
+// (/api/roster: 252 registry agents grouped by tier, search + detail panel).
+// The shipped Phase 31 AgentsView (jcx theme, /api/agents/definitions) is no
+// longer mounted from here; the module stays untouched on disk for rollback.
+import AgentsRosterView from '../agents/AgentsRosterView.jsx';
 
 /**
- * Phase 24 app frame. Three-region shell: sidebar (240px) + header + content.
- * No HUD, no event-stream panel, no stats rail. Content is per-route
- * placeholders until Scopes B/C/D mount real surfaces.
+ * Premium app frame (ui-rebuild-premium).
+ * Grid shell: sidebar (240px, icons <900px, drawer <600px) + header + content.
+ * Theme (dark default) + appearance (accent / font size / density) ride on
+ * data-attributes consumed by tokens-premium.css; state persists in
+ * localStorage and is shared with the Settings view via CustomEvents.
+ * Content per-route: Chat / Settings / Work Graph / Agents (+ dev tokens).
  */
+const APPEARANCE_KEY = 'jx-appearance';
+
+export function loadAppearance() {
+  try { return JSON.parse(localStorage.getItem(APPEARANCE_KEY)) || {}; } catch { return {}; }
+}
+
+export function patchAppearance(patch) {
+  try {
+    const next = { ...loadAppearance(), ...patch };
+    localStorage.setItem(APPEARANCE_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent('jx-appearance-change', { detail: next }));
+    return next;
+  } catch { return loadAppearance(); }
+}
+
 export default function Shell() {
   const [hash, setHash] = useState(() => window.location.hash || DEFAULT_ROUTE.hash);
   const [theme, setTheme] = useState(() => {
     try { return localStorage.getItem('p24-theme') || 'dark'; } catch { return 'dark'; }
   });
+  const [appearance, setAppearance] = useState(loadAppearance);
+  const [navOpen, setNavOpen] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // BUG 3 — chat session state. The active session is the newest history
+  // entry (or a fresh id that only registers once a message is sent). The
+  // `jx-sessions-change` event (chat/sessions.js) keeps the sidebar list
+  // in sync no matter which component touched the registry.
+  const [chatSessionId, setChatSessionId] = useState(() => {
+    const l = listSessions();
+    return l[0] ? l[0].id : newSessionId();
+  });
+  const [sessions, setSessions] = useState(listSessions);
+  useEffect(() => {
+    const onChange = () => setSessions(listSessions());
+    window.addEventListener('jx-sessions-change', onChange);
+    return () => window.removeEventListener('jx-sessions-change', onChange);
+  }, []);
+
+  const openSession = useCallback((id) => {
+    if (!id || id === chatSessionId) return;
+    setChatSessionId(id);
+    setNavOpen(false);
+    if (window.location.hash !== '#/chat') window.location.hash = '#/chat';
+  }, [chatSessionId]);
+
+  const startNewChat = useCallback(() => {
+    setChatSessionId(newSessionId());
+    setNavOpen(false);
+    if (window.location.hash !== '#/chat') window.location.hash = '#/chat';
+  }, []);
+
+  const deleteSession = useCallback((id) => {
+    removeSession(id);
+    setSessions(listSessions());
+    if (id === chatSessionId) {
+      const rest = listSessions();
+      setChatSessionId(rest[0] ? rest[0].id : newSessionId());
+    }
+  }, [chatSessionId]);
+
+  const toggleThemeShortcut = useCallback(() => {
+    setTheme((t) => {
+      const next = t === 'dark' ? 'light' : 'dark';
+      try { localStorage.setItem('p24-theme', next); } catch { /* storage unavailable */ }
+      return next;
+    });
+  }, []);
+  const toggleOverlay = useCallback(() => setShowShortcuts((v) => !v), []);
+  useShortcuts({ onOverlay: toggleOverlay, onTheme: toggleThemeShortcut });
 
   useEffect(() => {
-    const onHash = () => setHash(window.location.hash || DEFAULT_ROUTE.hash);
+    const onHash = () => { setHash(window.location.hash || DEFAULT_ROUTE.hash); setNavOpen(false); };
     const onTheme = (e) => setTheme(e.detail);
+    const onAppearance = (e) => setAppearance(e.detail || loadAppearance());
     window.addEventListener('hashchange', onHash);
     window.addEventListener('p24-theme-change', onTheme);
+    window.addEventListener('jx-appearance-change', onAppearance);
     if (!window.location.hash) window.location.replace(DEFAULT_ROUTE.hash);
-    // PHASE 31 WA7 — the shipped AgentsView consumes brainGet, whose contract
-    // refuses to fetch without a configured backend URL ("No brain
-    // configured"). The shell seeds it with this origin (same-origin; the
-    // dev proxy forwards /api to the JEXI server) so the view's live fetch
-    // works inside the hosted shell. No other view is affected: an absolute
-    // same-origin base resolves identically to a relative path.
+    // Seed the legacy brainGet base (ui/web console services refuse to fetch
+    // without it). Same-origin: the dev proxy forwards /api to the JEXI
+    // server on 3002.
     try { if (!localStorage.getItem('jexi_backend_url')) localStorage.setItem('jexi_backend_url', window.location.origin); } catch { /* storage unavailable */ }
-    return () => { window.removeEventListener('hashchange', onHash); window.removeEventListener('p24-theme-change', onTheme); };
+    return () => {
+      window.removeEventListener('hashchange', onHash);
+      window.removeEventListener('p24-theme-change', onTheme);
+      window.removeEventListener('jx-appearance-change', onAppearance);
+    };
   }, []);
 
   const route = routeFromHash(hash);
@@ -51,33 +127,68 @@ export default function Shell() {
   // route): Agents View renders without adding a Phase 24 ROUTES entry.
   const showAgents = hash === AGENTS_ROUTE.hash;
 
+  const activeHash = showAgents ? AGENTS_ROUTE.hash : (showTokens ? DEFAULT_ROUTE.hash : route.hash);
+  const routeTitle = showAgents ? AGENTS_ROUTE.title : (showTokens ? 'Tokens' : route.title);
+  const routeId = showAgents ? 'agents' : (showTokens ? 'tokens' : route.id);
+
+  function changeTheme(t) {
+    setTheme(t);
+    try { localStorage.setItem('p24-theme', t); } catch { /* storage unavailable */ }
+  }
+
   return (
-    <div className="jx-shell" data-theme={theme}>
-      <Sidebar routes={ROUTES} activeHash={showAgents ? AGENTS_ROUTE.hash : (showTokens ? DEFAULT_ROUTE.hash : route.hash)} />
+    <div
+      className={'jx-shell' + (navOpen ? ' is-nav-open' : '')}
+      data-theme={theme}
+      data-accent={appearance.accent || 'coral'}
+      data-fontsize={appearance.fontsize || 'medium'}
+      data-spacing={appearance.spacing || 'comfortable'}
+    >
+      <Sidebar
+        routes={ROUTES}
+        activeHash={activeHash}
+        onNavigate={() => setNavOpen(false)}
+        sessions={sessions}
+        activeSessionId={chatSessionId}
+        onNewChat={startNewChat}
+        onOpenSession={openSession}
+        onDeleteSession={deleteSession}
+      />
       <div className="jx-main">
-        <Header routeTitle={showAgents ? AGENTS_ROUTE.title : (showTokens ? 'Tokens' : route.title)} />
-        <main className="jx-content" data-route={showAgents ? 'agents' : (showTokens ? 'tokens' : route.id)}>
+        <Header
+          routeTitle={routeTitle}
+          theme={theme}
+          onTheme={changeTheme}
+          onToggleNav={() => setNavOpen((v) => !v)}
+        />
+        <main className="jx-content" data-route={routeId}>
           {showAgents
             ? (
-              <div
-                className="jcx"
-                data-testid="agents-host"
-                style={{ position: 'static', inset: 'auto', zIndex: 'auto', display: 'block', overflowY: 'auto', height: '100%', gridTemplateColumns: 'none', padding: '18px 22px' }}
-              >
-                <AgentsView />
-              </div>
-            )
+                <div className="jx-page" data-view="agents" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <AgentsRosterView />
+                </div>
+              )
             : showTokens
               ? <TokenInspector />
               : route.id === 'chat'
-                ? <ChatWindow />
+                ? <ChatView key={chatSessionId} sessionId={chatSessionId} />
                 : route.id === 'settings'
-                  ? <Settings sessionId="console-main" />
-                  : route.id === 'graph'
-                    ? <Graph />
-                    : <Placeholder route={route} />}
+                ? (
+                    <div className="jx-page" data-view="settings">
+                      <Settings sessionId="console-main" />
+                    </div>
+                  )
+                : route.id === 'graph'
+                  ? (
+                      <div className="jx-page" data-view="graph">
+                        <Graph />
+                      </div>
+                    )
+                  : <Placeholder route={route} />}
         </main>
       </div>
+      {showShortcuts ? <ShortcutsOverlay onClose={() => setShowShortcuts(false)} /> : null}
+      <Toasts />
     </div>
   );
 }

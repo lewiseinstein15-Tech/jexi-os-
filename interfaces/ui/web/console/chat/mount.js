@@ -37,14 +37,18 @@ import { checkpoints } from './checkpoints.js';
 import { queue } from './queue.js';
 import { steer } from './steer.js';
 import { multiagent } from './multiagent.js';
-import Transcript from './Transcript.jsx';
-import Composer from './Composer.jsx';
+import Transcript from '../components/transcript/Transcript.jsx';
+import Composer from './Composer.premium.jsx';
+import { backendAgent } from './backendAgent.js';
+import { applyTurnProvider, refreshModelStatus } from '../shell/useStatus.js';
+import { touchSession, snapshotTranscript } from './sessions.js';
 import './mount.css';
 
 /* ---------------- Phase 31 Scope 2 — strip/panel components ---------------- */
 
 const stripBtn = {
-  background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.12)',
+  background: 'var(--jx-surface, rgba(255,255,255,.04))',
+  border: '1px solid var(--jx-border, rgba(255,255,255,.12))',
   color: 'inherit', borderRadius: 8, padding: '3px 10px', fontSize: 11, cursor: 'pointer',
 };
 
@@ -159,9 +163,18 @@ export function mount(el, opts = {}) {
   const sessionId = opts.sessionId || 'console-main';
   const backendUrl = opts.backendUrl || '/api/health';
 
+  // BUG 3 (ui-rebuild-premium-v2) — a restored session seeds its transcript
+  // from the localStorage snapshot (chat/sessions.js) BEFORE the router
+  // subscription attaches, so replayed live events append after the history.
+  // Rows render in array order; seqs were renumbered far-negative on load.
+  const snapshotRows = Array.isArray(opts.snapshotRows) ? opts.snapshotRows.slice(-400) : null;
+
   // PHASE 31 WA6 — attach the session so the runtime-module contracts hold
   // (checkpoints/multiagent assert runtime.isAttached). Idempotent.
-  runtime.attach(sessionId);
+  // ui-rebuild-premium — sends now run the REAL backend agent (POST /api/chat
+  // NDJSON model pipeline). The keyword-driven defaultAgent stays in
+  // runtime.js as the library fallback; here the real pipeline is the default.
+  runtime.attach(sessionId, { agent: opts.agent || backendAgent() });
 
   // PHASE 31 WA6 — artifacts content source: synchronous read over the
   // server workspace endpoint. Real I/O; null -> honest E_ARTIFACT_UNREADABLE
@@ -180,7 +193,7 @@ export function mount(el, opts = {}) {
   });
 
   const store = {
-    rows: [],
+    rows: snapshotRows ? snapshotRows.map((r) => ({ ...r, streaming: false })) : [],
     backend: 'checking', // checking | online | offline
     turn: 'idle',
     modes: null,
@@ -299,35 +312,153 @@ export function mount(el, opts = {}) {
   }
 
   // One router subscription: every routed taxonomy event becomes a row.
+  // ui-rebuild-premium additions (consumer-side only, no runtime changes):
+  //   - turn wall-clock timing (first envelope of a turn -> turn-end row ms)
+  //   - voice tagging from the runtime messageId contract
+  //     (msg-<turnId>-user vs msg-<turnId>-N) so user vs JEXI rows render
+  //     right/left aligned
+  //   - streaming: consecutive JEXI message.delta rows of the same turn
+  //     merge into one growing row instead of one row per token
+  const turnStarts = new Map(); // turnId -> Date.now() at first envelope
   const unsubscribe = router.subscribe(sessionId, (envelope) => {
     // PHASE 31 WA6 — feed the Scope K toolcard store (the artifacts panel
     // aggregates card artifacts from here). Read-only consumption of the
     // routed envelope; a card-build failure must never kill the row path.
     try { if (toolcards.isToolEvent(envelope)) toolcards.build(envelope); } catch { /* card already open / terminal */ }
     const ev = envelope.event || {};
+    if (envelope.turnId && !turnStarts.has(envelope.turnId)) turnStarts.set(envelope.turnId, Date.now());
+    const isUser = !!(ev.payload && typeof ev.payload.messageId === 'string' && /-user$/.test(ev.payload.messageId));
+
+    // BUG 3 — the first user message of a session names it in the history
+    // list (and every later one bumps it to the top). Registered only when a
+    // real message is sent — never for an empty new-chat session.
+    if (isUser && ev.type === 'message.delta' && ev.payload && typeof ev.payload.delta === 'string') {
+      try { touchSession(sessionId, ev.payload.delta); } catch { /* history is best-effort */ }
+    }
+
+    // BUG 1 (ui-rebuild-premium-v2) — the completion narration carries the
+    // REAL provider+model of the turn that just answered (backendAgent
+    // parsed it from the done event's statistics.meter.calls). Feed the
+    // shared model-status signal so the header chip / sidebar indicator /
+    // turn footer reflect the provider actually used — no page refresh.
+    const tp = ev.payload && ev.payload.ctx && ev.payload.ctx.turnProvider;
+    if (ev.type === 'narration.line' && tp && tp.provider) {
+      applyTurnProvider(tp.provider, tp.model || null);
+    }
+    // BUG 1 + BUG 2 — after a turn reaches its terminal event, re-read the
+    // runtime status and re-poll the provider routes ONCE the runtime has
+    // finished its synchronous bookkeeping (the 'done' status is set right
+    // after the last emit; a microtask runs after that, never before).
+    if (ev.type === 'turn.completed') {
+      queueMicrotask(() => { refreshMeta(); refreshModelStatus(); });
+    }
+
     let rendered = null;
     try {
       rendered = rows.render(ev);
     } catch {
       rendered = { rowType: 'text', content: JSON.stringify(ev).slice(0, 400) };
     }
+    const toolName = (ev.payload && ev.payload.toolName) || (rendered && rendered.toolName) || null;
+
+    // ui-rebuild-premium-v2 — narration rows carry the REAL narrationType and
+    // the RAW payload.input. rows/narration.js prefers the builder template
+    // text ('Let me check the existing code first — …'), but the Arena-style
+    // transcript needs the actual data: reasoning text for recon, step text
+    // for progress, plan lines for decision. Consumer-side only — the runtime
+    // and the narration scope are untouched.
+    let narrationType = null;
+    let toolUse = null;
+    if (ev.type === 'narration.line' && ev.payload) {
+      narrationType = typeof ev.payload.narrationType === 'string' ? ev.payload.narrationType : null;
+      if (typeof ev.payload.input === 'string' && ev.payload.input) {
+        rendered = { ...rendered, content: ev.payload.input };
+      }
+      // backendAgent relays REAL server-side tool runs (ToolUseBridge shape:
+      // paired running->success/error with id + duration_ms) inside the
+      // narration ctx. They become the tool row family here so the Arena
+      // transcript renders CommandBlock/ToolCallBlock from real executions.
+      const tu = ev.payload.ctx && ev.payload.ctx.toolUse;
+      if (tu && tu.id) {
+        toolUse = tu;
+        rendered = {
+          rowType: tu.status === 'success' ? 'tool-result' : tu.status === 'error' ? 'tool-error' : 'tool-use',
+          content: String(tu.detail || tu.summary || ''),
+        };
+      }
+    }
+
+    // Streaming merge: a JEXI text delta of the active turn appends to the
+    // turn's last delta row (if any) so the answer grows in place.
+    const streamingStatus = runtime.state(sessionId).status;
+    const last = store.rows.length ? store.rows[store.rows.length - 1] : null;
+    const mergeable = !isUser
+      && rendered.rowType === 'text'
+      && ev.type === 'message.delta'
+      && last
+      && last.turnId === envelope.turnId
+      && last.type === 'message.delta'
+      && last.rowType === 'text'
+      && last.voice === 'jexi';
+    if (mergeable) {
+      last.content += rendered.content;
+      last.streaming = streamingStatus === 'streaming';
+      store.turn = streamingStatus;
+      paint();
+      return;
+    }
+    // ui-rebuild-premium-v2 — thinking streams too: consecutive recon
+    // narrations of the same turn merge into ONE growing row so the
+    // ThinkingBlock grows in place instead of stacking a row per chunk.
+    const reconMerge = !isUser
+      && rendered.rowType === 'narration'
+      && narrationType === 'recon'
+      && last
+      && last.turnId === envelope.turnId
+      && last.type === 'narration.line'
+      && last.narrationType === 'recon';
+    if (reconMerge) {
+      last.content += (last.content ? '\n' : '') + rendered.content;
+      last.streaming = streamingStatus === 'streaming';
+      store.turn = streamingStatus;
+      paint();
+      return;
+    }
+    // Any non-delta event clears the streaming chip off the last row.
+    if (last && last.streaming) last.streaming = false;
+
+    let content = rendered.content;
+    // Turn footer with REAL wall-clock ms: "turn completed: <id> · <ms> ms".
+    if ((rendered.rowType === 'turn-end-ok' || rendered.rowType === 'turn-end-fail') && turnStarts.has(envelope.turnId)) {
+      const ms = Date.now() - turnStarts.get(envelope.turnId);
+      content = rendered.rowType === 'turn-end-ok'
+        ? `turn completed: ${envelope.turnId} · ${ms} ms`
+        : `turn failed: ${envelope.turnId} · ${(ev.payload && ev.payload.error) || 'error'} · ${ms} ms`;
+    }
+
     store.rows.push({
       seq: envelope.seq,
       turnId: envelope.turnId,
       type: ev.type,
       rowType: rendered.rowType,
-      content: rendered.content,
+      narrationType,
+      toolUse,
+      t: Date.now(),
+      content,
       refused: !!envelope.refused,
       refuseReason: (envelope.modes && envelope.modes.reason) || null,
       approvalId: (ev.payload && ev.payload.approvalId) || null,
       verb: (envelope.modes && envelope.modes.rowOverride) || null,
+      toolName,
+      voice: isUser ? 'user' : 'jexi',
+      streaming: false,
       // Phase 24: full untruncated args for tool rows so the display-mode
       // clip in Transcript decides verbosity (Phase 16 renderer caps at 80).
       raw: (ev.type === 'tool.started' && ev.payload && ev.payload.args !== undefined)
         ? JSON.stringify(ev.payload.args)
         : null,
     });
-    store.turn = runtime.state(sessionId).status;
+    store.turn = streamingStatus;
     paint();
   });
 
@@ -357,8 +488,31 @@ export function mount(el, opts = {}) {
   }
 
   const root = createRoot(el);
+
+  // BUG 3 — transcript persistence: a throttled snapshot (max ~1/s) of the
+  // session's rows so a history click restores it, including after a page
+  // reload. Never blocks a paint: the write happens on a timer.
+  let snapTimer = null;
+  function scheduleSnapshot() {
+    if (snapTimer) return;
+    snapTimer = setTimeout(() => {
+      snapTimer = null;
+      try { snapshotTranscript(sessionId, store.rows); } catch { /* best-effort */ }
+    }, 900);
+  }
+
   function paint() {
     if (!alive) return;
+    // BUG 2 (ui-rebuild-premium-v2) — the turn status is re-read from the
+    // runtime at EVERY paint. The final event of a turn is emitted while the
+    // status is still 'closing' (runtime sets 'done' right after the emit
+    // returns, and router.route delivers synchronously), which used to leave
+    // store.turn stuck at 'closing' — a busy state — so the composer's send
+    // button stayed disabled forever after turn 1. Reading it fresh here
+    // makes every paint self-correcting; no stale assignment can outlive
+    // the next frame.
+    try { store.turn = runtime.state(sessionId).status; } catch { /* keep the last known status */ }
+    if (store.rows.length) scheduleSnapshot();
     // PHASE 31 WA6 — strip state recomputed from the REAL modules each paint
     // (queue/steer surface events re-render the transcript anyway).
     try { store.queueCount = queue.list(sessionId).length; } catch { store.queueCount = 0; }
@@ -489,6 +643,10 @@ export function mount(el, opts = {}) {
     unmount() {
       alive = false;
       if (probeTimer) clearTimeout(probeTimer);
+      if (snapTimer) { clearTimeout(snapTimer); snapTimer = null; }
+      // BUG 3 — flush the final snapshot so leaving the chat route (or a
+      // session switch) never loses the last second of rows.
+      try { if (store.rows.length) snapshotTranscript(sessionId, store.rows); } catch { /* best-effort */ }
       unsubscribe();
       root.unmount();
     },
