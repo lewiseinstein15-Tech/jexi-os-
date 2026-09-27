@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PHASE 7 — JEXI SIMULATION SUITE (10 simulations, one server boot).
+ * PHASE 7 — JEXI SIMULATION SUITE (15 simulations, one server boot).
  *
  *   SIM-01  Identity: 10 leak prompts → contains JEXI, zero forbidden strings
  *   SIM-02  Self-awareness: 8 questions → real registry numbers
@@ -13,6 +13,16 @@
  *   SIM-09  Rendering: answer carries KaTeX math + GFM table + code fence
  *           (visual rendering evidenced by docs/ui-fresh-screens/*, Phase 6)
  *   SIM-10  Auto-scroll: Transcript pin/pill logic present + Phase 6 evidence
+ *   SIM-11  P10 GAP 1: sub-agent final answer (keyless compound turn — real
+ *           child content in the final answer, coordinator composer verdict)
+ *   SIM-12  P10 GAP 2: skill execution (10 converted executable skills run
+ *           machine ## Steps through real domain tools, aggregate returned)
+ *   SIM-13  P10 GAP 3: MCP state classification (100% connected/declarative/
+ *           disabled; declarative offer served)
+ *   SIM-14  P10 GAP 4: sub-agent enforcement (allowedTools / maxTurns /
+ *           permissionMode refusals per tool call)
+ *   SIM-15  P10 GAP 5: capability gate (10 novel phrasings ≥8 routed, ≥3 via
+ *           the semantic layer, 0 false positives on 5 unrelated)
  *
  * Exit code 0 only when ALL sims pass. Honest FAILs print raw details.
  */
@@ -64,6 +74,7 @@ async function ask(base, prompt, session) {
     }
     lastLogs = logs;
     lastError = (done && done.error) || null;
+    lastStats = (done && done.statistics) || {}; // P10 — SIM-11 rides the done statistics
     return String((done && (done.summary || done.answer)) || streamText || '');
   };
   await wait(1100);
@@ -73,6 +84,7 @@ async function ask(base, prompt, session) {
 }
 let lastLogs = [];
 let lastError = null;
+let lastStats = {}; // P10 — the last done statistics (SIM-11)
 
 const leakTerms = (s) => FORBIDDEN.filter((f) => {
   if (f === 'GPT') return /\bgpt(?:[-\s]?\d|\b)/i.test(s);
@@ -235,6 +247,111 @@ async function main() {
       const pillShot = fs.existsSync(path.join(ROOT, 'docs/ui-fresh-screens', '05-jump-to-latest-pill.png')) && fs.existsSync(path.join(ROOT, 'docs/ui-fresh-screens', '06-after-jump-pinned-latest.png'));
       const ok = pinLogic && pillShot;
       record('SIM-10 long-stream auto-scroll', ok, `pin+pill logic in Transcript.jsx=${pinLogic} pill screenshots (Phase 6)=${pillShot}`);
+    }
+
+    /* SIM-11 — P10 GAP 1: sub-agent final answer (keyless compound turn).
+     * file_read + memory_write pair: a name-shaped query would be honestly
+     * answered by the deterministic recall lane before the agentic lane, and
+     * a repeated name fact would collide with SIM-03's stored fact. */
+    {
+      const a = await ask(base, 'read the file /home/z/my-project/jexi-os/THIRD_PARTY_NOTICES.md and remember that I wanted the notices file', `sim11-${Date.now()}`);
+      const stats = lastStats || {};
+      const results = stats.subagentResults || [];
+      const ok = a.trim().length > 0
+        && Number(stats.subagentsUsed || 0) >= 2
+        && results.some((r) => r.result && !/could not produce a final answer/i.test(r.result))
+        && /Contents of `\/home\/z\/my-project\/jexi-os\/THIRD_PARTY_NOTICES\.md`/.test(a)
+        && !/i don'?t know\b/i.test(a.slice(0, 400));
+      record('SIM-11 sub-agent final answer (keyless)', ok, `subagentsUsed=${stats.subagentsUsed} childResultsReal=${results.some((r) => r.result && !/could not produce a final answer/i.test(r.result))} composerVerdict=${JSON.stringify(stats.subagentComposition || null)} fileChildContentInAnswer=${/Contents of `\/home\/z\/my-project\/jexi-os\/THIRD_PARTY_NOTICES\.md`/.test(a)} answerHead=${JSON.stringify(a.slice(0, 110))}`);
+    }
+
+    /* SIM-12 — P10 GAP 2: skill execution (10 converted executable skills) */
+    {
+      const tasks = [
+        ['research', 'research the topic of federated learning systems'],
+        ['diagnosing-bugs', 'diagnose this bug for me'],
+        ['code-review', 'review the code in this branch for me'],
+        ['handoff', 'prepare the handoff document for the next agent'],
+        ['implement', 'implement the spec as agreed work'],
+        ['triage', 'triage the incoming issue queue'],
+        ['tdd', 'run the tdd cycle for the new feature test'],
+        ['json-canvas', 'create a json canvas mind map for the design'],
+        ['defuddle', 'use defuddle to extract clean markdown from the html page'],
+        ['obsidian-markdown', 'write an obsidian markdown note about the meeting'],
+      ];
+      let okCount = 0; const bad = [];
+      for (const [slug, q] of tasks) {
+        const res = await fetch(`${base}/api/skills/library/invoke`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query: q }) });
+        const r = await res.json().catch(() => ({}));
+        const steps = Array.isArray(r.steps) ? r.steps : [];
+        const good = r.ok === true && r.mode === 'steps' && r.slug === slug && steps.length > 0 && steps.every((s) => s.output && s.output.ok !== false) && /\[step \d+\]/.test(String(r.aggregate || ''));
+        if (good) okCount++; else bad.push(`${slug}(mode=${r.mode} slug=${r.slug} steps=${steps.length})`);
+      }
+      record('SIM-12 skill execution 10/10', okCount === 10, `${okCount}/10 executed in steps mode with real tool aggregates${bad.length ? ` | failures: ${bad.join(', ')}` : ''}`);
+    }
+
+    /* SIM-13 — P10 GAP 3: MCP state classification (three states) */
+    {
+      const res = await fetch(`${base}/api/mcps`);
+      const report = await res.json().catch(() => ({}));
+      const servers = Array.isArray(report.servers) ? report.servers : [];
+      const valid = new Set(['connected', 'declarative', 'disabled']);
+      const classified = servers.filter((s) => valid.has(s.state)).length;
+      const sum = report.summary || {};
+      const sumsOk = Number(sum.connected || 0) + Number(sum.declarative || 0) + Number(sum.disabled || 0) === servers.length;
+      const dres = await fetch(`${base}/api/mcps?server=nmap`);
+      const drep = await dres.json().catch(() => ({}));
+      const offerOk = drep.describe && drep.describe.ok === true && drep.describe.state === 'declarative' && Array.isArray(drep.describe.tools) && drep.describe.tools.length > 0;
+      const ok = report.ok === true && servers.length > 0 && classified === servers.length && sumsOk && offerOk;
+      record('SIM-13 MCP state classification', ok, `${classified}/${servers.length} classified — summary=${JSON.stringify(sum)} | nmap declarative offer=${offerOk} (${drep.describe && drep.describe.tools ? drep.describe.tools.map((t) => t.name).join(',') : 'none'})`);
+    }
+
+    /* SIM-14 — P10 GAP 4: sub-agent enforcement (3 contracts) */
+    {
+      const { runAgentLoop } = await import(path.join(ROOT, 'server/src/services/AgentLoop.js'));
+      const baseContract = { id: 'jexi-sim14', name: 'sim14', division: 'operations', role: 'probe', capabilities: ['reasoning'], trustLevel: 'restricted', origin: 'agentic-decision-lane', allowedTools: [], maxTurns: 10, permissionMode: 'default' };
+      const mk = (over) => ({ ...baseContract, ...over });
+      // T1 — allowedTools=[read_file], bash attempt → E_TOOL_NOT_ALLOWED
+      const t1 = await runAgentLoop({ query: 'sim14 T1', opts: { subagentContract: mk({ allowedTools: ['read_file'] }), __scriptedToolCalls: [{ name: 'read_file', args: { path: 'package.json' } }, { name: 'bash', args: { command: 'echo pwned' } }] }, sendEvent: () => {} });
+      const t1ok = (t1.stats.contractViolations || []).some((v) => v.tool === 'bash' && v.code === 'E_TOOL_NOT_ALLOWED');
+      // T2 — maxTurns=3, 4 steps → halt at 3
+      const t2 = await runAgentLoop({ query: 'sim14 T2', opts: { subagentContract: mk({ allowedTools: ['fs_read'], maxTurns: 3 }), __scriptedToolCalls: [1, 2, 3, 4].map((i) => ({ name: 'fs_read', args: { path: `f${i}.txt` } })) }, sendEvent: () => {} });
+      const t2v = (t2.stats.contractViolations || []).find((v) => v.code === 'E_MAX_TURNS');
+      const t2ok = Boolean(t2v) && t2v.turn === 4 && t2.stats.toolCalls === 3;
+      // T3 — permissionMode=readonly, write refused
+      const t3 = await runAgentLoop({ query: 'sim14 T3', opts: { subagentContract: mk({ allowedTools: ['fs_read', 'fs_write'], permissionMode: 'readonly' }), __scriptedToolCalls: [{ name: 'fs_read', args: { path: 'package.json' } }, { name: 'fs_write', args: { path: 'sim14.txt', content: 'x' } }] }, sendEvent: () => {} });
+      const t3ok = (t3.stats.contractViolations || []).some((v) => v.tool === 'fs_write' && v.code === 'E_TOOL_NOT_ALLOWED');
+      const ok = t1ok && t2ok && t3ok;
+      record('SIM-14 sub-agent enforcement (3 contracts)', ok, `T1 bashRefused=${t1ok} | T2 maxTurns halt@3=${t2ok} | T3 readonlyWriteRefused=${t3ok}`);
+    }
+
+    /* SIM-15 — P10 GAP 5: capability gate (novel phrasings + unrelated) */
+    {
+      const { routeDecision } = await import(path.join(ROOT, 'server/src/services/AgenticDecision.js'));
+      const paraphrases = [
+        'catch me up on the latest space headlines',
+        'pull up recent articles about electric vehicles',
+        'find out what is happening with the stock market today',
+        'look for current stories about the World Cup',
+        'what is the newest on the AI regulation debate?',
+        'get me today\'s top tech stories',
+        'scour the internet for news about the merger',
+        'browse for fresh publications on climate change',
+        'dig up the latest reports on the housing market',
+        'show me breaking stories from this hour',
+      ];
+      const unrelated = ['what is 17 * 24 + 9?', 'write a haiku about the ocean', 'my name is Lewis', 'what is my name?', 'explain Bayes theorem'];
+      let correct = 0, viaSemantic = 0, fp = 0;
+      for (const q of paraphrases) {
+        const d = await routeDecision(q);
+        if (d.route === 'web_search') { correct++; if (d.via === 'semantic') viaSemantic++; }
+      }
+      for (const q of unrelated) {
+        const d = await routeDecision(q);
+        if (d.route === 'web_search') fp++;
+      }
+      const ok = correct >= 8 && viaSemantic >= 3 && fp === 0;
+      record('SIM-15 capability gate (novel phrasings)', ok, `${correct}/10 routed to web_search (need ≥8), ${viaSemantic}/10 via semantic (need ≥3), ${fp}/5 false positives (need 0)`);
     }
   } finally {
     try { child.kill('SIGTERM'); } catch { /* gone */ }

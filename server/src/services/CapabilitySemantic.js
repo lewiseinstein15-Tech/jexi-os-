@@ -82,7 +82,7 @@ export const CAPABILITY_SEEDS = {
   direct_answer: 'answer explain define arithmetic calculate compute solve math question knowledge directly theorem formula',
 };
 
-const DEFAULT_THRESHOLD = 0.22; // recall-oriented: L1 guards the common cases; novel phrasings score ~0.22-0.4
+const DEFAULT_THRESHOLD = 0.25; // recall-oriented but bounded: L1 guards the common phrasings; novel phrasings score ~0.25-0.4. Below this, diffuse matches (e.g. a how-to query loosely near file_read) must NOT hijack routing — they fall through to the model lanes / skill library.
 
 let __index = null; // [{ id, vector }]
 let __df = null;    // feature → document frequency across profiles (down-weights generic trigrams)
