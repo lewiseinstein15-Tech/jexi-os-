@@ -253,6 +253,16 @@ try {
   } catch (e) { console.error('[Warmup] skipped:', e.message); }
 })();
 
+// PHASE 4 — load the full live roster into brain context at boot so
+// capability questions are answered from REAL registry counts. Independent
+// of the provider warmup (the roster needs no AI key and must load keyless).
+(async () => {
+  try {
+    const warmed = await warmRoster();
+    console.log(warmed.line);
+  } catch (e) { console.log(`[Roster] warm skipped: ${String(e && e.message || e).slice(0, 120)}`); }
+})();
+
 loadPlugins({ services: {} }).then(({ ctx }) => {
   if (ctx) setActivePluginContext(ctx);
   try { startSkillWatcher(); } catch { /* optional */ }
@@ -360,6 +370,7 @@ app.use(['/api/chat', '/api/vision', '/api/knowledge/search', '/api/agent'], aiL
 // the full pipeline) and per-request model-call accounting.
 import { kernelTurn, kernelGate, kernelIntentGate, runLeanAnswer, startMeter, meterStage, meterReport } from './src/services/JexiKernel.js';
 import { IDENTITY_LEAK_QUESTION_RE, JEXI_IDENTITY_FILTER_ANSWER, sanitizeIdentityLeak } from './src/services/IdentityGuard.js'; // PHASE 3 — identity leak question gate + terminal post-filter
+import { warmRoster, answerCapabilityQuestion, rosterSummary } from '../mind/brain/roster.js'; // PHASE 4 — brain.roster() live self-knowledge (real numbers)
 import { meterEnter, meterLap, meterFreeze, requestMeterReport } from './src/services/RequestMeter.js'; // ARENA — per-turn model-call meter, all lanes
 import { browserRouter, registerDesktopWorker, registerAndroidWorker } from './src/services/BrowserRouter.js'; // ARENA Phase 3 — browser router (workers + policy + audit)
 import { lifecycleScan, lastLifecycleReport } from './src/services/MemoryLifecycle.js'; // ARENA Phase 4 — memory vault lifecycle
@@ -2254,6 +2265,19 @@ app.post('/api/chat', async (req, res) => {
               return;
             }
           } catch { /* identity gate must never break the turn */ }
+          // PHASE 4 — CAPABILITY GATE: "how many agents / what tools / what
+          // MCPs / what hooks / do you have memory" are answered from the
+          // LIVE registries (brain.roster()) — real numbers, never "I don't
+          // have any", key or no key.
+          try {
+            const cap = await answerCapabilityQuestion(raw);
+            if (cap && cap.handled) {
+              sendEvent('agent.done', { answer: cap.answer });
+              done({ success: true, query, summary: cap.answer, statistics: { fastPath: true, rosterGate: true, modelCalls: 0, agentsUsed: 0, confidence: 1 } });
+              finish();
+              return;
+            }
+          } catch { /* capability gate must never break the turn */ }
           try {
             const activeMissionFlag = (() => {
               try { return Boolean(activeMissionFor(convId)); } catch { return false; }
