@@ -25,29 +25,62 @@ if (!(await networkUp())) {
   process.exit(0);
 }
 
+// P11 A5 — book-sources preflight: sections 1–2 probe LIVE book sources
+// (openlibrary / gutendex / wikipedia api). Some restricted networks (live
+// sandbox verified Sept 27 2026) 403 the probe UA or time those hosts out —
+// an environment property, not a code regression, so those two sections SKIP
+// honestly when the hosts themselves are unusable while the aggregate's
+// other lanes (news/planner) still run. When the hosts ARE up but the
+// aggregate still returns nothing, that is a REAL regression and fails.
+async function bookSourcesUp() {
+  const probes = [
+    'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=test&format=json&srlimit=1',
+    'https://openlibrary.org/search.json?q=test&limit=1',
+    'https://gutendex.com/books?search=test',
+  ];
+  for (const url of probes) {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (r.ok) return true;
+    } catch { /* host unreachable from here */ }
+  }
+  return false;
+}
+const BOOKS_UP = await bookSourcesUp();
+
 // 1) Trusted book search for a science topic
 let trusted = [];
-try {
-  trusted = await searchTrustedBooks('photosynthesis');
-} catch (e) { console.log(`⚠️  trusted search threw: ${e.message}`); }
-console.log(`   sources found: ${trusted.length}`);
+if (BOOKS_UP) {
+  try {
+    trusted = await searchTrustedBooks('photosynthesis');
+  } catch (e) { console.log(`⚠️  trusted search threw: ${e.message}`); }
+}
+console.log(`   sources found: ${trusted.length}${BOOKS_UP ? '' : ' (book sources unreachable from this network — sections 1–2 skip honestly)'}`);
 for (const s of trusted) console.log(`   - [${s.source}] ${s.title}`);
-ok(trusted.length >= 1, 'searchTrustedBooks returns at least one trusted source');
+if (BOOKS_UP) {
+  ok(trusted.length >= 1, 'searchTrustedBooks returns at least one trusted source');
+} else {
+  console.log('⏭️  SKIPPED — book sources (wikipedia api / openlibrary / gutendex) refuse this network (403/timeout); live probes are environment-bound');
+}
 
 // 2) Read a trusted book/overview (first PDF-free source that looks readable)
 let readOK = false;
-for (const s of trusted.slice(0, 3)) {
-  try {
-    const text = await getTrustedBookText(s.url, 30000);
-    if (text && text.length > 200) {
-      console.log(`   read ${text.length} chars from ${s.source}`);
-      ok(true, `getTrustedBookText reads content from ${s.source}`);
-      readOK = true;
-      break;
-    }
-  } catch (e) { console.log(`   (${s.source} read failed: ${String(e.message).slice(0, 50)})`); }
+if (BOOKS_UP) {
+  for (const s of trusted.slice(0, 3)) {
+    try {
+      const text = await getTrustedBookText(s.url, 30000);
+      if (text && text.length > 200) {
+        console.log(`   read ${text.length} chars from ${s.source}`);
+        ok(true, `getTrustedBookText reads content from ${s.source}`);
+        readOK = true;
+        break;
+      }
+    } catch (e) { console.log(`   (${s.source} read failed: ${String(e.message).slice(0, 50)})`); }
+  }
 }
-if (!readOK) { ok(false, 'getTrustedBookText reads a trusted source'); console.log('   ⚠️  network may be restricted — re-check later'); }
+if (!BOOKS_UP) {
+  console.log('⏭️  SKIPPED — getTrustedBookText (section 2 rides the same unreachable sources)');
+} else if (!readOK) { ok(false, 'getTrustedBookText reads a trusted source'); console.log('   ⚠️  network may be restricted — re-check later'); }
 
 // 3) Latest news
 let news = [];

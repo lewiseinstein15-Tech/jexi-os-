@@ -38,6 +38,24 @@ async function networkUp() {
 }
 const ONLINE = await networkUp();
 if (!ONLINE) console.log('  ⏭️  offline sandbox — live-feed checks will be skipped');
+// P11 A5 — the study-search section (4) probes the BOOK sources specifically
+// (openlibrary/gutendex), which some restricted networks 403/timeout even
+// when the general network is "up" (live sandbox: wiki HEAD ok, book APIs
+// 403). Probe the real target before asserting on it — environment-bound
+// skips stay honest; a real aggregate regression still fails.
+async function bookSourcesUp() {
+  for (const url of [
+    'https://openlibrary.org/search.json?q=test&limit=1',
+    'https://gutendex.com/books?search=test',
+  ]) {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (r.ok) return true;
+    } catch { /* unreachable from this network */ }
+  }
+  return false;
+}
+const BOOKS_ONLINE = ONLINE && await bookSourcesUp();
 
 console.log('=== 1) TrustedLibrary TTL cache ===');
 {
@@ -103,8 +121,8 @@ console.log('=== 4) Trusted books cache (study topics) ===');
   const t1 = Date.now();
   const second = await searchTrustedBooks('machine learning');
   const t2 = Date.now();
-  if (ONLINE) check('first study search found sources', first.length > 0, `${first.length} sources`);
-  else skip('first study search found sources', 'offline sandbox — live fetch not attemptable');
+  if (BOOKS_ONLINE) check('first study search found sources', first.length > 0, `${first.length} sources`);
+  else skip('first study search found sources', 'offline sandbox / book sources refuse this network — live fetch not attemptable');
   // Same clock-floor guard as section 1 — the chain warms this cache too.
   const t3 = Date.now();
   await searchTrustedBooks('machine learning');

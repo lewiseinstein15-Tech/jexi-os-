@@ -224,7 +224,11 @@ test('the architecture snapshot indexes every registry with metadata + health', 
   assert.equal(snap.registries.mcp.total, MCPG.loadRegistry().servers.length, 'snapshot indexes every MCP server in the shipped registry');
   assert.equal(snap.registries.plugins.total, pi.pluginInventory().plugins.length, 'snapshot indexes every packaged plugin');
   for (const m of snap.registries.mcp.items) {
-    assert.ok(['disabled', 'ready', 'connected', 'error', 'cooldown'].includes(m.status));
+    // P11 A5 — 'declarative' is a legitimate status since the P10 GAP 3
+    // tri-state (connected | declarative | disabled): declarative-by-design
+    // servers report status 'declarative' in the health view. The wire-now
+    // P11 A2 flips made it observable in the shipped registry.
+    assert.ok(['disabled', 'declarative', 'ready', 'connected', 'error', 'cooldown'].includes(m.status));
     assert.ok(['open', 'closed'].includes(m.circuit));
   }
   assert.ok(snap.capabilityRouting.capabilities.length > 10);
