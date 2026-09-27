@@ -190,10 +190,18 @@ function catalogMatch(query) {
 
 /**
  * Route a query to ONE capability from the catalog.
- * With a configured provider the MODEL picks (schema-checked); keyless the
- * deterministic catalog matcher decides. Always resolves — never throws.
+ * P10 GAP 5 — the gate is now LAYERED:
+ *   L1  regex evidence fast path (strong evidence, score >= 3) — deterministic,
+ *       zero cost, catches every phrasing the evidence regexes were built for;
+ *   L2  SEMANTIC matcher (CapabilitySemantic: hashed token+trigram embeddings,
+ *       cosine over each capability's profile) — catches novel phrasings the
+ *       regexes miss; below threshold falls through;
+ *   L3  the MODEL picks from the catalog (only with a configured key);
+ *   L4  weak regex evidence (> 0) still routes before giving up;
+ *   L5  direct_answer fallback (no tool pretense).
+ * Always resolves — never throws.
  *
- * @returns {Promise<{ok:boolean, route:string, via:'model'|'catalog'|'none',
+ * @returns {Promise<{ok:boolean, route:string, via:'catalog'|'semantic'|'model'|'none',
  *   confidence:number, reasoning:string, capability:object|null}>}
  */
 export async function routeDecision(query, opts = {}) {
@@ -201,7 +209,38 @@ export async function routeDecision(query, opts = {}) {
   if (!q) {
     return { ok: false, route: 'none', via: 'none', confidence: 0, reasoning: 'empty query', capability: null, tools: [], catalog: realToolCatalogSummary() };
   }
-  // PRIMARY — the model picks from the catalog (zero cost when keyless: the
+  const hit = catalogMatch(q);
+  // LAYER 1 — regex fast path: strong, deterministic evidence routes immediately.
+  if (hit && hit.score >= 3) {
+    const cap = CAPABILITY_CATALOG.find((c) => c.id === hit.id);
+    return {
+      ok: true, route: hit.id, via: 'catalog',
+      confidence: Math.min(1, 0.55 + 0.15 * hit.score),
+      reasoning: `catalog evidence matched (score ${hit.score})${hit.hits.length ? `: ${hit.hits[0]}` : ''}`,
+      capability: cap,
+      tools: CAPABILITY_TOOLS[hit.id] || [],
+      catalog: realToolCatalogSummary(),
+    };
+  }
+  // LAYER 2 — semantic matcher: novel phrasings, cosine over capability profiles.
+  try {
+    const { semanticRoute } = await import('./CapabilitySemantic.js');
+    const sem = await semanticRoute(q);
+    if (sem) {
+      const cap = CAPABILITY_CATALOG.find((c) => c.id === sem.id);
+      if (cap) {
+        return {
+          ok: true, route: sem.id, via: 'semantic',
+          confidence: Math.min(1, 0.35 + sem.score),
+          reasoning: `semantic match (${sem.score} ≥ ${sem.threshold}) — novel phrasing routed by the vector layer`,
+          capability: cap,
+          tools: CAPABILITY_TOOLS[sem.id] || [],
+          catalog: realToolCatalogSummary(),
+        };
+      }
+    }
+  } catch { /* the semantic layer must never break routing */ }
+  // LAYER 3 — the model picks from the catalog (zero cost when keyless: the
   // gate skips the call instead of firing a doomed one).
   if (canChat()) {
     try {
@@ -225,8 +264,7 @@ export async function routeDecision(query, opts = {}) {
       }
     } catch (e) { /* fall through to the catalog matcher — never crash */ }
   }
-  // FALLBACK — deterministic catalog evidence matcher (keyless + model-unsure).
-  const hit = catalogMatch(q);
+  // LAYER 4 — weak regex evidence (score > 0) still beats guessing.
   if (hit) {
     const cap = CAPABILITY_CATALOG.find((c) => c.id === hit.id);
     return {
@@ -238,7 +276,7 @@ export async function routeDecision(query, opts = {}) {
       catalog: realToolCatalogSummary(),
     };
   }
-  // Nothing matched — the generic agent answers directly (no tool pretense).
+  // LAYER 5 — nothing matched — the generic agent answers directly (no tool pretense).
   const direct = CAPABILITY_CATALOG.find((c) => c.id === 'direct_answer');
   return { ok: true, route: 'direct_answer', via: 'catalog', confidence: 0.5, reasoning: 'no tool evidence — default to direct answer', capability: direct, tools: [], catalog: realToolCatalogSummary() };
 }

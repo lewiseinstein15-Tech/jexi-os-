@@ -261,6 +261,14 @@ try {
     const warmed = await warmRoster();
     console.log(warmed.line);
   } catch (e) { console.log(`[Roster] warm skipped: ${String(e && e.message || e).slice(0, 120)}`); }
+  // P10 GAP 5 — semantic capability gate warm: each capability's profile is
+  // embedded at boot so turn-time routing is a cosine lookup (layer 2 behind
+  // the regex fast-path, ahead of the model lanes).
+  try {
+    const { warmSemanticIndex, SEMANTIC_GATE } = await import('./src/services/CapabilitySemantic.js');
+    const idx = await warmSemanticIndex();
+    console.log(`[CapabilityGate] semantic layer warm: ${idx.length} capabilities embedded (dim ${SEMANTIC_GATE.DIM}, threshold ${SEMANTIC_GATE.DEFAULT_THRESHOLD}) — regex fast-path → semantic → model lanes.`);
+  } catch (e) { console.error(`[CapabilityGate] semantic warm failed: ${String(e && e.message || e).slice(0, 120)}`); }
 })();
 
 loadPlugins({ services: {} }).then(({ ctx }) => {
