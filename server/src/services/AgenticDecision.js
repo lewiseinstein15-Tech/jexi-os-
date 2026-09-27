@@ -629,7 +629,7 @@ async function runTerminal(args, opts = {}) {
     return { ok: false, output: `⛔ The read-only terminal lane refused this command: ${verdict.reason}`, observation: `terminal refused: ${verdict.reason}`, meta: { command: raw, refused: true, toolInvocations: 1 } };
   }
   const { runNativeCommand } = await import('./NativeCommand.js');
-  const res = await runNativeCommand('bash', ['-lc', raw], { timeoutMs: 15000, cwd: WORKSPACE_DIR, maxOutputChars: 16000 });
+  const res = await runNativeCommand('bash', ['-lc', raw], { timeoutMs: 15000, cwd: WORKSPACE_DIR, maxOutputChars: 16000, displayCmd: raw });
   const out = res.stdout || '';
   const err = res.stderr || '';
   const output = [
@@ -675,15 +675,24 @@ function deriveArgs(route, query) {
     }
     case 'code_run': return { query: q };
     case 'terminal': {
-      // "run ls -la" / "execute git status" / "list the files in src" — the
-      // command is whatever follows the verb; plain command-shaped queries
-      // ("ls -la") pass through verbatim.
-      const m = q.match(/^(?:please\s+)?(?:can you\s+)?(?:run|execute|exec)\s+(?:the\s+)?(?:shell\s+)?(?:command\s+)?["']?(.+?)["']?\s*$/i)
-        || q.match(/^(?:please\s+)?(?:list|show)(?: the)? files?(?: in| of)?\s+(.+)$/i);
-      let cmd = m ? m[1] : q;
-      cmd = String(cmd).trim().replace(/[.?!]+$/, '');
-      if (/^(the |this |current )?(files?|directory|folder)$/i.test(cmd)) cmd = 'ls -la';
-      return { command: cmd || 'ls -la' };
+      // P11 B4 fix — extract the ACTUAL command from the request. The naive
+      // "everything after run/execute" grab swallowed trailing clauses
+      // ("…and also remember that…"), turning the request text into a broken
+      // shell line. Now: take the text after the verb and cut at the first
+      // clause boundary (in the terminal / and also / then / also / and / a
+      // new line); backticks/quotes are stripped; if what remains does not
+      // start with a safe-listed binary, the runner refuses honestly.
+      const q2 = q.replace(/\s+/g, ' ').trim();
+      const verb = q2.match(/^(?:please\s+)?(?:can you\s+)?(?:run|execute|exec)\s+(?:the\s+)?(?:shell\s+)?(?:command\s+)?["']?(.+?)["']?\s*$/i);
+      const listVerb = q2.match(/^(?:please\s+)?(?:list|show)(?: the)? files?(?: in| of)?\s+(.+)$/i);
+      let cand = verb ? verb[1] : (listVerb ? listVerb[1] : q2);
+      cand = cand.replace(/^(?:this|the following|following)\s+(?:command|shell)[:\s]*/i, '');
+      // cut at the first clause boundary, on a word edge
+      const boundary = cand.match(/\s+(?:in (?:the|a) terminal|in a shell|and also|and remember|and then|,? then\b|,? also\b|,? and\b|;)/i);
+      if (boundary) cand = cand.slice(0, boundary.index);
+      cand = cand.trim().replace(/^["'`]+|["'`]+$/g, '').replace(/[.?!]+$/, '').trim();
+      if (/^(the |this |current )?(files?|directory|folder)$/i.test(cand)) cand = 'ls -la';
+      return { command: cand || 'ls -la' };
     }
     case 'memory_write': {
       let fact = null;

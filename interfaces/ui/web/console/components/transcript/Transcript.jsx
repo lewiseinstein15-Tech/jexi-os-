@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { Bot, TriangleAlert } from 'lucide-react';
 import ThinkingBlock from './ThinkingBlock.jsx';
 import StepList from './StepList.jsx';
-import CommandBlock from './CommandBlock.jsx';
+import TerminalBlock from './TerminalBlock.jsx';
 import ToolCallBlock from './ToolCallBlock.jsx';
 import FinalAnswer from './FinalAnswer.jsx';
 import TurnFooter from './TurnFooter.jsx';
@@ -129,6 +129,22 @@ function TurnGroup({ turn, isLast, onApprove }) {
       continue;
     }
 
+    // ---- terminal rows (P11 B3/B4): REAL shell executions streamed as
+    // `command` NDJSON events, merged per command id by mount.js. The block
+    // grows IN PLACE as stdout/stderr deltas arrive, then finalizes.
+    if (r.rowType === 'command-use' && r.commandUse) {
+      const cu = r.commandUse;
+      items.push(
+        <TerminalBlock key={`term-${cu.id ?? r.seq ?? i}`} command={cu.cmd}
+          state={cu.status === 'done' ? (typeof cu.exit === 'number' && cu.exit !== 0 ? 'failed' : 'done') : 'running'}
+          output={multiLine(cu.output || '')} error={multiLine(cu.errput || '')}
+          ms={cu.duration_ms ?? null} exit={cu.exit}
+          streaming={active && cu.status !== 'done'} />
+      );
+      i += 1;
+      continue;
+    }
+
     // ---- tool rows ------------------------------------------------------
     if (r.rowType === 'tool-use' || r.rowType === 'tool-result' || r.rowType === 'tool-error') {
       let parsed = null;
@@ -148,13 +164,15 @@ function TurnGroup({ turn, isLast, onApprove }) {
         const detail = String(r.toolUse.detail || r.content || '');
         if (detail.startsWith('$')) {
           const lines = detail.split('\n');
+          // P11 B7 — terminal-shaped tool runs render through the SAME
+          // TerminalBlock as the streamed `command` events (one visual language).
           items.push(
-            <CommandBlock key={`tu-${r.seq}`}
+            <TerminalBlock key={`tu-${r.seq}`}
               command={lines[0].slice(1).trim()}
               state={failed ? 'failed' : done ? 'done' : 'running'}
               output={failed ? '' : multiLine(lines.slice(1).join('\n'))}
               error={failed ? multiLine(lines.slice(1).join('\n')) : ''}
-              ms={ms} />
+              ms={ms != null ? msRaw : null} />
           );
         } else {
           items.push(
@@ -178,9 +196,9 @@ function TurnGroup({ turn, isLast, onApprove }) {
         const pairable = next && (next.rowType === 'tool-result' || next.rowType === 'tool-error' || isStatus);
         const failed = pairable && next.rowType === 'tool-error';
         const out = pairable ? multiLine(next.content) : '';
-        const ms = pairable && !isStatus && r.t ? Math.round((next.t - r.t) / 100) / 10 : null;
+        const ms = pairable && !isStatus && r.t ? Math.round((next.t - r.t)) : null;
         items.push(
-          <CommandBlock key={`cmd-${r.seq ?? i}`} command={parsed.command + (parsed.task ? ` ${oneLine(parsed.task)}` : '')}
+          <TerminalBlock key={`cmd-${r.seq ?? i}`} command={parsed.command + (parsed.task ? ` ${oneLine(parsed.task)}` : '')}
             state={failed ? 'failed' : pairable ? 'done' : 'running'}
             output={!failed ? out : ''} error={failed ? out : ''} ms={ms} />
         );
@@ -291,31 +309,67 @@ export default function Transcript({ rows, onApprove }) {
   // newest line while events stream in. If the user scrolled UP, the view is
   // NEVER force-scrolled — a "↓ jump to latest" pill appears at the bottom
   // instead; clicking it scrolls to the newest line AND resumes auto-scroll.
+  //
+  // P11 B6 — LIVE FIX: React's synthetic onScroll never fired here for
+  // programmatic and container scrolls (verified in a real browser: the view
+  // sat 1276px above the bottom with no pill), so the pin state was stale.
+  // A NATIVE scroll listener on the container is authoritative now.
   const scrollRef = useRef(null);
   const [pinned, setPinned] = useState(true);
   const pinnedRef = useRef(true); // the scroll handler + effects share it live
-  const onScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 100;
-    pinnedRef.current = atBottom;
-    setPinned(atBottom);
-  };
+  // P11 B6 — DIRECTION-BASED pin state (replaces synthetic onScroll + flag
+  // bookkeeping, both live-verified broken):
+  //   at bottom                        → pinned
+  //   scrollTop DECREASED (scrolled up) → unpinned (never force-scrolled)
+  //   scrollTop increased / unchanged   → keep current state (the pin itself
+  //                                       and content growth move scrollTop;
+  //                                       they must never read as “user left”)
+  // This makes the pin immune to the feedback race where our own pinning
+  // generated scroll events that cancelled the pin mid-stream.
+  const lastTopRef = useRef(0);
   useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return undefined;
+    const onNativeScroll = () => {
+      const cur = el.scrollTop;
+      const prev = lastTopRef.current;
+      lastTopRef.current = cur;
+      const atBottom = el.scrollHeight - cur - el.clientHeight <= 100;
+      if (atBottom) {
+        if (!pinnedRef.current) { pinnedRef.current = true; setPinned(true); }
+        return;
+      }
+      if (cur < prev - 1 && pinnedRef.current) {
+        pinnedRef.current = false;
+        setPinned(false);
+      }
+    };
+    el.addEventListener('scroll', onNativeScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onNativeScroll);
+  }, []);
+  useEffect(() => {
+    // P11 B6 — runs after EVERY render (no dep array): mount.js pushes into a
+    // STABLE rows array, so a [rows] dep never changes identity and the pin
+    // silently stopped following the stream (live-verified bug: the view sat
+    // at scrollTop 0 while the answer grew below the fold). Painting happens
+    // per event, so pinning after each commit follows the newest line; when
+    // the user scrolled up, pinnedRef is false and we never force-scroll.
     const el = scrollRef.current;
     if (!el || !pinnedRef.current) return;
     el.scrollTop = el.scrollHeight; // keep pinned to the newest line
-  }, [rows]);
+  });
   const jumpToLatest = () => {
     const el = scrollRef.current;
     if (!el) return;
     pinnedRef.current = true;
     setPinned(true);
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    // instant jump: a smooth animation would emit mid-flight scroll events
+    // that re-evaluate atBottom as false and cancel the pin we just resumed
+    el.scrollTop = el.scrollHeight; // scrollTop increases → no unpinned flip
   };
   return (
     <div className="jx-transcript jx-transcript-v2" role="log" aria-live="polite"
-      ref={scrollRef} onScroll={onScroll}>
+      ref={scrollRef} data-pinned={pinned ? 'true' : 'false'}>
       {rows.length === 0 ? (
         <div className="jx-empty">
           <div className="jx-empty-frame" aria-hidden="true"><Bot size={22} /></div>

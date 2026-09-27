@@ -539,7 +539,10 @@ body { background: var(--jx-bg-root); }
   display: flex;
   flex-direction: column;
   gap: var(--jx-sp-3);
-  scroll-behavior: smooth;
+  /* P11 B6 — scroll-behavior:smooth removed: CSS smooth made even the pin's
+     scrollTop assignments animate, so every mid-animation scroll event
+     re-evaluated atBottom and cancelled the pin mid-chase. Instant pinning
+     is the coding-agent contract (always pinned to the newest line). */
 }
 
 /* P4-2 (ui/decision-layer-rendering): the chat pane was too narrow —
@@ -1154,8 +1157,8 @@ body { background: var(--jx-bg-root); }
 .jx-ta-turn { display: flex; flex-direction: column; gap: 10px; padding-bottom: 20px; }
 .jx-ta-turn + .jx-ta-turn { border-top: 1px solid var(--jx-border); padding-top: 18px; }
 
-/* narration rail: thinking/steps/tool blocks indent, final answer does not */
-.jx-think, .jx-steps, .jx-cmd, .jx-tool {
+/* narration rail: thinking/steps/terminal/tool blocks indent, final answer does not */
+.jx-think, .jx-steps, .jx-cmd, .jx-term, .jx-tool {
   margin-left: 22px;
   border-left: 2px solid var(--jx-border);
   padding-left: 12px;
@@ -1246,6 +1249,45 @@ body { background: var(--jx-bg-root); }
 }
 .jx-cmd-out { color: var(--jx-text-2); white-space: pre-wrap; word-break: break-word; }
 .jx-cmd-err { color: var(--jx-danger); white-space: pre-wrap; word-break: break-word; }
+
+/* ── terminal block (P11 B1/B7 — TerminalBlock, inline streamed shell) ── */
+/* joins the narration indent rail; the final answer stays full width */
+.jx-term {
+  background: var(--jx-bg-elevated);
+  border: 1px solid var(--jx-border);
+  border-radius: var(--jx-radius-sm);
+  overflow: hidden;
+}
+.jx-term.is-fail { border-color: var(--jx-danger); }
+.jx-term.is-streaming { border-left: 2px solid var(--jx-accent); }
+.jx-term-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px;
+  background: var(--jx-bg-raised);
+  border-bottom: 1px solid var(--jx-border);
+}
+.jx-term-toggle { background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; }
+.jx-term-chevron { color: var(--jx-text-3); font-size: 10px; }
+.jx-term-ps { color: var(--jx-accent); font-weight: var(--jx-fw-600); flex: none; font-family: var(--jx-font-mono); }
+.jx-term-line {
+  font-family: var(--jx-font-mono); font-size: var(--jx-font-sm);
+  color: var(--jx-text-1); white-space: pre-wrap; word-break: break-word;
+}
+.jx-term-state {
+  margin-left: auto; flex: none;
+  font-family: var(--jx-font-mono); font-size: 10.5px; letter-spacing: var(--jx-ls-caps);
+  border: 1px solid var(--jx-success); color: var(--jx-success);
+  border-radius: 999px; padding: 1px 9px;
+}
+.jx-term-state.is-fail { border-color: var(--jx-danger); color: var(--jx-danger); }
+.jx-term-state.is-run { border-color: var(--jx-accent); color: var(--jx-accent); animation: jx-pulse 1.6s ease-out infinite; }
+.jx-term-body {
+  padding: 9px 12px; max-height: 320px; overflow: auto;
+  font-family: var(--jx-font-mono); font-size: var(--jx-font-xs); line-height: var(--jx-lh-code);
+}
+/* NO truncation: the full streamed output renders, wrapped */
+.jx-term-out { margin: 0; color: var(--jx-text-2); white-space: pre-wrap; word-break: break-word; }
+.jx-term-err { margin: 0; color: var(--jx-danger); white-space: pre-wrap; word-break: break-word; }
 
 /* ── tool call block ──────────────────────────────────────────────────── */
 .jx-tool { background: var(--jx-bg-raised); border-radius: var(--jx-radius-sm); overflow: hidden; }

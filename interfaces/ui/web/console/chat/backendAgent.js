@@ -25,6 +25,13 @@
  *                                     runs) — mount converts it to the tool
  *                                     row family so CommandBlock/ToolCallBlock
  *                                     render real paired executions
+ *   {type:'command', status, id, cmd, stream?, chunk?}
+ *   {type:'command.done', id, exit, duration_ms, stdout, stderr}
+ *                                  -> progress narration carrying the REAL
+ *                                     CommandTrace payload (server-side shell
+ *                                     runs) — mount merges them per id into
+ *                                     the command row family so TerminalBlock
+ *                                     streams the terminal INLINE (P11 B3/B4)
  *   {type:'done', summary, success, sources, statistics?} -> completion
  *   anything else (team/intel/agent.done/subagent.aggregate) -> telemetry, skipped
  *
@@ -206,6 +213,38 @@ export function backendAgent({ endpoint = '/api/chat' } = {}) {
                     duration_ms: Number(tu.duration_ms) || 0,
                     summary: tu.summary ? String(tu.summary).slice(0, 200) : null,
                     detail: tu.detail ? String(tu.detail).slice(0, 500) : null,
+                  },
+                },
+              },
+            };
+            break;
+          }
+          case 'command':
+          case 'command.done': {
+            // P11 B3/B4 — REAL shell execution on the server (CommandTrace).
+            // running/delta events carry { id, cmd?, stream?, chunk? }; the
+            // final command.done carries { id, exit, duration_ms, stdout,
+            // stderr }. Relayed verbatim in the narration ctx — mount builds
+            // ONE growing command row per id so the TerminalBlock streams
+            // its output as it arrived. No command event → no terminal block.
+            const ce = ev || {};
+            yield {
+              kind: 'narrate',
+              type: 'progress',
+              ctx: {
+                input: ce.cmd ? `$ ${clip(ce.cmd, 160)}` : (ce.status === 'delta' ? `output: ${clip(ce.chunk, 160)}` : 'command finished'),
+                source: `command:${ce.source || 'shell'}`,
+                ctx: {
+                  commandUse: {
+                    id: ce.id || null,
+                    status: ce.status || (ev.type === 'command.done' ? 'done' : 'running'),
+                    cmd: ce.cmd ? String(ce.cmd).slice(0, 400) : null,
+                    stream: ce.stream || null,
+                    chunk: ce.chunk != null ? String(ce.chunk).slice(0, 2000) : null,
+                    exit: typeof ce.exit === 'number' ? ce.exit : null,
+                    duration_ms: typeof ce.duration_ms === 'number' ? ce.duration_ms : null,
+                    stdout: typeof ce.stdout === 'string' ? ce.stdout.slice(0, 8000) : null,
+                    stderr: typeof ce.stderr === 'string' ? ce.stderr.slice(0, 4000) : null,
                   },
                 },
               },

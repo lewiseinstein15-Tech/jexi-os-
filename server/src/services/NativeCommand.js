@@ -17,11 +17,12 @@ import path from 'path';
 import { shellEnv } from './ShellEnv.js';
 import { traceBufferedCommand } from './CommandTrace.js';
 
-export async function runNativeCommand(command, args = [], { timeoutMs = 15000, cwd = process.cwd(), maxOutputChars = 16000, env = {} } = {}) {
+export async function runNativeCommand(command, args = [], { timeoutMs = 15000, cwd = process.cwd(), maxOutputChars = 16000, env = {}, displayCmd = null } = {}) {
   if (!String(command || '').trim()) return { ok: false, error: 'command required' };
-  // The displayed command line: the raw argv, shell-quoted where it contains
-  // spaces — exactly what a terminal would show, no invention.
-  const display = [command, ...args.map((a) => (/\s/.test(String(a)) ? `'${String(a).replaceAll("'", `'\\''`)}'` : String(a)))].join(' ');
+  // The displayed command line: the caller's clean form when provided (e.g.
+  // the terminal runner shows `ls -la`, not `bash -lc 'ls -la'`), otherwise
+  // the shell-quoted raw argv — exactly what a terminal would show.
+  const display = displayCmd || [command, ...args.map((a) => (/\s/.test(String(a)) ? `'${String(a).replaceAll("'", `'\\''`)}'` : String(a)))].join(' ');
   return traceBufferedCommand({
     cmd: display,
     source: `native:${path.basename(String(command))}`,

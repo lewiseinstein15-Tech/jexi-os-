@@ -386,6 +386,63 @@ export function mount(el, opts = {}) {
           content: String(tu.detail || tu.summary || ''),
         };
       }
+      // P11 B3/B4 — REAL server-side shell runs (CommandTrace) relay inside
+      // the narration ctx. They become the command row family here so the
+      // Arena transcript renders TerminalBlock from real executions: the
+      // running event OPENS the block, deltas APPEND output as it arrived,
+      // and command.done FINALIZES it (exit code + duration).
+      const cu = ev.payload.ctx && ev.payload.ctx.commandUse;
+      if (cu && cu.id) {
+        // merge into the already-open block of the SAME command id (deltas)
+        const openIdx = store.rows.findIndex((q) => q.commandUse && q.commandUse.id === cu.id);
+        if (openIdx >= 0) {
+          const row = store.rows[openIdx];
+          const cu2 = { ...row.commandUse };
+          if (cu.cmd) cu2.cmd = cu.cmd;
+          if (cu.status === 'delta' && cu.chunk) {
+            cu2.output = (cu2.output || '') + (cu.stream === 'stderr' ? '' : cu.chunk);
+            cu2.errput = (cu2.errput || '') + (cu.stream === 'stderr' ? cu.chunk : '');
+          }
+          if (cu.status === 'done') {
+            cu2.status = 'done';
+            cu2.exit = typeof cu.exit === 'number' ? cu.exit : cu2.exit;
+            cu2.duration_ms = typeof cu.duration_ms === 'number' ? cu.duration_ms : cu2.duration_ms;
+            // the done event carries the FULL buffered output — authoritative
+            cu2.output = typeof cu.stdout === 'string' ? cu.stdout : (cu2.output || '');
+            cu2.errput = typeof cu.stderr === 'string' ? cu.stderr : (cu2.errput || '');
+          }
+          row.commandUse = cu2;
+          row.content = cu2.cmd ? `$ ${cu2.cmd}` : 'command';
+          store.turn = runtime.state(sessionId).status;
+          paint();
+          return;
+        }
+        // first sighting: open the block (status running)
+        store.rows.push({
+          seq: envelope.seq,
+          turnId: envelope.turnId,
+          type: ev.type,
+          rowType: 'command-use',
+          narrationType,
+          commandUse: {
+            id: cu.id,
+            status: cu.status || 'running',
+            cmd: cu.cmd || '',
+            output: cu.status === 'delta' && cu.stream !== 'stderr' ? (cu.chunk || '') : '',
+            errput: cu.status === 'delta' && cu.stream === 'stderr' ? (cu.chunk || '') : '',
+            exit: typeof cu.exit === 'number' ? cu.exit : null,
+            duration_ms: typeof cu.duration_ms === 'number' ? cu.duration_ms : null,
+          },
+          t: Date.now(),
+          content: cu.cmd ? `$ ${cu.cmd}` : 'command',
+          refused: false,
+          refuseReason: null,
+          approvalId: null,
+        });
+        store.turn = runtime.state(sessionId).status;
+        paint();
+        return;
+      }
     }
 
     // Streaming merge: a JEXI text delta of the active turn appends to the
