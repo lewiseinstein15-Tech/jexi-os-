@@ -364,7 +364,9 @@ async function runDirectAnswer(args, opts = {}) {
       const brainNote = opts.brainContext ? `\n\n${String(opts.brainContext).slice(0, 1500)}` : '';
       const out = await generateContent(q, `${CORE_IDENTITY_BLOCK}\n\nAnswer the user directly and completely. Use markdown. For math use LaTeX ($inline$, $$block$$).${brainNote}`, null, { temperature: 0.3 });
       if (out && String(out).trim()) {
-        return { ok: true, output: String(out).trim(), observation: 'direct answer via model', meta: { writer: 'model' } };
+        // P11 A4 — model calls are NOT tool invocations (toolsUsed meters the
+        // runtime's tool primitives); meta.toolInvocations stays 0 here.
+        return { ok: true, output: String(out).trim(), observation: 'direct answer via model', meta: { writer: 'model', toolInvocations: 0 } };
       }
     } catch (e) { /* fall through to keyless paths */ }
   }
@@ -374,13 +376,13 @@ async function runDirectAnswer(args, opts = {}) {
     const val = evalArithmetic(m[1]);
     if (val !== null) {
       const pretty = Number.isInteger(val) ? String(val) : String(Number(val.toFixed(6)));
-      return { ok: true, output: `**${m[1].trim()} = ${pretty}**`, observation: `arithmetic evaluated exactly (${m[1].trim()} = ${pretty})`, meta: { writer: 'arithmetic' } };
+      return { ok: true, output: `**${m[1].trim()} = ${pretty}**`, observation: `arithmetic evaluated exactly (${m[1].trim()} = ${pretty})`, meta: { writer: 'arithmetic', toolInvocations: 0 } };
     }
   }
   // 3) built-in reference notes
   for (const note of REFERENCE_NOTES) {
     if (note.match.test(q)) {
-      return { ok: true, output: note.answer, observation: 'answered from the built-in reference notes (keyless mode)', meta: { writer: 'reference' } };
+      return { ok: true, output: note.answer, observation: 'answered from the built-in reference notes (keyless mode)', meta: { writer: 'reference', toolInvocations: 0 } };
     }
   }
   // 3b) PHASE 5 P5-1 — the skills library is callable when a turn needs it:
@@ -399,29 +401,33 @@ async function runDirectAnswer(args, opts = {}) {
           ok: true,
           output: `**${inv.slug}** (from my skills library — ${inv.mode} invocation)\n\n${content}`,
           observation: `answered from skills library: ${inv.slug} (${inv.mode})`,
-          meta: { writer: 'skills-library', skill: inv.slug, mode: inv.mode },
+          // P11 A4 — REAL metering: the skill dispatch executed its machine
+          // steps; each step that dispatched a tool invocation counts.
+          meta: { writer: 'skills-library', skill: inv.slug, mode: inv.mode, toolInvocations: Array.isArray(inv.steps) ? inv.steps.length : 1 },
         };
       }
     }
   } catch { /* library dispatch must never break the direct answer */ }
   // 4) honest keyless failure — never a fabricated answer
-  return { ok: false, output: '', observation: 'no provider key configured and no deterministic path for this question', meta: { writer: 'none' } };
+  return { ok: false, output: '', observation: 'no provider key configured and no deterministic path for this question', meta: { writer: 'none', toolInvocations: 0 } };
 }
 
 async function runWebSearch(args, opts = {}) {
   const q = String(args.query || '');
   const { aggregateSearch } = await import('./SearchEngine.js');
+  // P11 A4 — REAL metering: one web_search invocation = one aggregateSearch
+  // dispatch (the tool ran; a zero-result search still RAN — counted).
   const results = await aggregateSearch(q, null, {}) || [];
   const top = results.slice(0, 5);
   if (!top.length) {
-    return { ok: false, output: '', observation: `web_search returned 0 results for "${q}"`, meta: { results: 0 } };
+    return { ok: false, output: '', observation: `web_search returned 0 results for "${q}"`, meta: { results: 0, toolInvocations: 1 } };
   }
   const lines = top.map((r, i) => `${i + 1}. [${r.title || '(untitled)'}](${r.link || r.url})${r.snippet ? ` — ${String(r.snippet).slice(0, 200)}` : ''}`);
   return {
     ok: true,
     output: [`Searched the web (web_search) for **${q}** — top live sources:`, '', ...lines, '', '_Sources fetched live from the web just now._'].join('\n'),
     observation: `web_search returned ${results.length} results; top ${top.length} cited`,
-    meta: { results: results.length, urls: top.map((r) => r.link || r.url) },
+    meta: { results: results.length, urls: top.map((r) => r.link || r.url), toolInvocations: 1 },
   };
 }
 
@@ -431,9 +437,10 @@ async function runFileRead(args, opts = {}) {
   // ACI precondition: read-only, exists, regular file, size-capped.
   let st;
   try { st = fs.statSync(resolved); } catch {
-    return { ok: false, output: '', observation: `file not found: ${resolved}`, meta: { path: resolved } };
+    // P11 A4 — the read was ATTEMPTED and failed: one real invocation.
+    return { ok: false, output: '', observation: `file not found: ${resolved}`, meta: { path: resolved, toolInvocations: 1 } };
   }
-  if (!st.isFile()) return { ok: false, output: '', observation: `not a regular file: ${resolved}`, meta: { path: resolved } };
+  if (!st.isFile()) return { ok: false, output: '', observation: `not a regular file: ${resolved}`, meta: { path: resolved, toolInvocations: 1 } };
   const CAP = 64 * 1024;
   const fd = fs.openSync(resolved, 'r');
   try {
@@ -445,7 +452,7 @@ async function runFileRead(args, opts = {}) {
       ok: true,
       output: `Contents of \`${resolved}\`:\n\n\`\`\`\n${text}${truncated}\n\`\`\``,
       observation: `read ${buf.length} bytes from ${resolved}`,
-      meta: { path: resolved, bytes: buf.length },
+      meta: { path: resolved, bytes: buf.length, toolInvocations: 1 }, // P11 A4 — one real read
     };
   } finally { fs.closeSync(fd); }
 }
@@ -505,23 +512,24 @@ async function runCodeRun(args, opts = {}) {
     observation: success
       ? `${composed.lang} script written to ${fname} and executed (exit 0, output captured)`
       : `${composed.lang} script exited non-zero: ${String(ran.err && ran.err.message || ran.stderr).slice(0, 120)}`,
-    meta: { file: fname, lang: composed.lang, writer: composed.writer, exit: success ? 0 : 1 },
+    // P11 A4 — REAL metering: 1 workspace file write + 1 subprocess exec.
+    meta: { file: fname, lang: composed.lang, writer: composed.writer, exit: success ? 0 : 1, toolInvocations: 2 },
   };
 }
 
 async function runMemoryWrite(args, opts = {}) {
   const { rememberUserFact } = await import('./MemoryManager.js');
   const fact = String(args.fact || '').trim();
-  if (!fact) return { ok: false, output: '', observation: 'memory_write called with no fact', meta: {} };
-  const saved = rememberUserFact(fact, 0.8, args.label || 'fact');
-  if (!saved) return { ok: false, output: '', observation: `fact rejected (too short or duplicate): ${fact}`, meta: {} };
+  if (!fact) return { ok: false, output: '', observation: 'memory_write called with no fact', meta: { toolInvocations: 0 } };
+  const saved = rememberUserFact(fact, 0.8, args.label || 'fact'); // P11 A4 — the store write IS the invocation (1)
+  if (!saved) return { ok: false, output: '', observation: `fact rejected (too short or duplicate): ${fact}`, meta: { toolInvocations: 1 } };
   return {
     ok: true,
     // The stored fact is echoed back — the user sees WHAT was kept, and
     // verifyAnswer's term-overlap check has grounded text to verify against.
     output: `Noted — I'll remember that: ${fact} ✓`,
     observation: `stored fact: "${fact}"`,
-    meta: { fact, persisted: true },
+    meta: { fact, persisted: true, toolInvocations: 1 },
   };
 }
 
@@ -529,12 +537,12 @@ export async function runMemoryRead(args, opts = {}) {
   const { searchUserFacts, loadMemory } = await import('./MemoryManager.js');
   const q = String(args.query || '');
   let found = [];
-  try { found = await searchUserFacts(q, 5) || []; } catch { /* keyword fallback below */ }
+  try { found = await searchUserFacts(q, 5) || []; } catch { /* keyword fallback below */ } // P11 A4 — store query #1
   if (!found.length) {
     // Deterministic keyword fallback over the persisted fact store (the
     // vector layer can be unavailable keyless — the fact file is not).
     try {
-      const mem = loadMemory();
+      const mem = loadMemory(); // P11 A4 — store query #2 (fallback fires)
       const terms = queryTerms(q).filter((t) => t.length >= 3);
       found = (mem.userFacts || [])
         .filter((f) => terms.some((t) => String(f.fact || '').toLowerCase().includes(t)))
@@ -542,7 +550,7 @@ export async function runMemoryRead(args, opts = {}) {
     } catch { /* stay empty — honest */ }
   }
   if (!found.length) {
-    return { ok: false, output: "I don't have anything stored for that yet.", observation: `no stored facts matched "${q}"`, meta: { matches: 0 } };
+    return { ok: false, output: "I don't have anything stored for that yet.", observation: `no stored facts matched "${q}"`, meta: { matches: 0, toolInvocations: 1 } };
   }
   const facts = found.map((f) => String(f.fact || f.text || '')).filter(Boolean);
   // Name-shaped questions get a direct sentence when a name fact exists.
@@ -550,14 +558,14 @@ export async function runMemoryRead(args, opts = {}) {
     const nameFact = facts.find((f) => /name is ["']?([A-Za-z][\w'-]{1,30})/i.test(f));
     if (nameFact) {
       const nm = nameFact.match(/name is ["']?([A-Za-z][\w'-]{1,30})/i)[1];
-      return { ok: true, output: `Your name is **${nm}**.`, observation: `recalled name fact: "${nameFact}"`, meta: { matches: facts.length, fact: nameFact } };
+      return { ok: true, output: `Your name is **${nm}**.`, observation: `recalled name fact: "${nameFact}"`, meta: { matches: facts.length, fact: nameFact, toolInvocations: 1 } };
     }
   }
   return {
     ok: true,
     output: [`Here's what I remember:`, '', ...facts.slice(0, 5).map((f) => `- ${f}`)].join('\n'),
     observation: `recalled ${facts.length} fact(s) for "${q}"`,
-    meta: { matches: facts.length, facts: facts.slice(0, 3) },
+    meta: { matches: facts.length, facts: facts.slice(0, 3), toolInvocations: 1 },
   };
 }
 
@@ -616,12 +624,16 @@ function deriveArgs(route, query) {
  */
 export async function executeCapabilityKeyless(route, query, opts = {}) {
   const runner = RUNNERS[route];
-  if (!runner) return { ok: false, output: '', observation: `no runner for route "${route}"`, meta: {} };
+  // P11 A4 — every return path carries toolInvocations (the runner's REAL
+  // count of primitive tool invocations it performed — never a stub). A
+  // runner that throws still counts the attempt as routed work it began.
+  if (!runner) return { ok: false, output: '', observation: `no runner for route "${route}"`, meta: { toolInvocations: 0 } };
   const args = deriveArgs(route, query);
   try {
-    return await runner(args, opts);
+    const res = await runner(args, opts);
+    return { ...res, toolInvocations: Number(res && res.meta && res.meta.toolInvocations) || 0 };
   } catch (e) {
-    return { ok: false, output: '', observation: `keyless capability runner threw: ${String((e && e.message) || e).slice(0, 160)}`, meta: {} };
+    return { ok: false, output: '', observation: `keyless capability runner threw: ${String((e && e.message) || e).slice(0, 160)}`, meta: { toolInvocations: 0 }, toolInvocations: 0 };
   }
 }
 

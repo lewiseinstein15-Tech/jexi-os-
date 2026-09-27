@@ -381,8 +381,15 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         const capQuery = String(opts.subagentCapabilityQuery || query);
         const res = await executeCapabilityKeyless(opts.subagentCapability, capQuery, { sessionId: opts.sessionId || null, subagentId: opts.subagentId || null });
         finalText = String(res && res.output || '').trim();
+        // P11 A4 — REAL METERING, not a stub: the capability runner reports
+        // the ACTUAL number of primitive tool invocations it performed
+        // (search dispatch, file read, memory store write, subprocess exec).
+        // They flow into stats.toolCalls so SubagentRuntime → AgenticDecision
+        // report toolsUsed = the child's real tool work (was always 0).
+        const invocations = Number(res && res.toolInvocations) || 0;
+        if (invocations > 0) callsMade += invocations;
         if (finalText) {
-          emit('agent.log', { message: `🔧 keyless child brain: capability "${opts.subagentCapability}" executed for real (${String(res.observation || '').slice(0, 110)}).` });
+          emit('agent.log', { message: `🔧 keyless child brain: capability "${opts.subagentCapability}" executed for real (${String(res.observation || '').slice(0, 110)}${invocations ? ` · ${invocations} tool invocation${invocations === 1 ? '' : 's'} metered` : ''}).` });
         }
       } catch (e) {
         emit('agent.log', { message: `⚠ keyless child brain failed: ${String((e && e.message) || e).slice(0, 110)}.` });
