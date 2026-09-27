@@ -60,3 +60,41 @@ directory *named* `aas` (a guard meant for the `skills/aas` core layer), so
 becomes path-based. Workaround shipped today: point the AAS server at the
 library subset — `JEXI_AAS_SKILLS_ROOT=skills/library/aas` (118 skills
 searchable, probe-verified). The mattpocock 26 are in the combined index now.
+
+## Machine-executable `## Steps` (P10 GAP 2)
+
+A library skill is EXECUTABLE when its SKILL.md declares a machine `## Steps`
+section. The declared schema (consumed by `server/src/skills/catalog.js
+parseSteps` + `server/src/skills/library-registry.js runLibrarySteps`):
+
+    ## Steps
+
+    - step: 1. Search the live web for the topic
+      tool: web_search
+      args: {"query": "$args.query", "limit": 5}
+    - step: 2. Store the findings for later recall
+      tool: mem_store
+      args: {"key": "research:$args.query", "value": "$prev.output"}
+
+Rules:
+
+- `tool` is a REAL registered domain tool (web_search, web_fetch, fs_read,
+  fs_ls, data_json, mem_store, mem_recall, git_status, git_log, term_execute, …).
+- `args` is a single-line JSON object. Argument resolution:
+  - `"$args.<field>"` → the invoking task's args field; `"$args.<field>|<dflt>"`
+    falls back to `<dflt>` when absent (chat-triggered invocations pass only
+    the implicit `query`).
+  - `"$root"` → the execution root. `"$prev"` / `"$prev.output[.path]"` → the
+    previous step's entry / tool output / a deep path into it.
+  - Unresolvable tokens pass through verbatim — never silently nulled.
+- Execution root: the skill's own package dir by default; frontmatter
+  `executionRoot: workspace` binds file steps to the JEXI workspace.
+- `tool`-less steps (prose under `## Steps`) are ignored by the machine
+  runner — keep prose guidance under a different heading (`## Workflow`).
+- Every step runs in order through the gated domain executor; a failed step
+  stops the chain and reports honestly (`mode: error`). Discovery at boot
+  indexes each skill as `executable` (machine steps) or `reference-only`.
+
+The 10 P10-converted executable skills live under `engineering/` and
+`obsidian/` (research, diagnosing-bugs, code-review, handoff, implement,
+triage, tdd, json-canvas, defuddle, obsidian-markdown).
