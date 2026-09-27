@@ -32,6 +32,7 @@
 import { canChat } from '../providers/index.js';
 import { generateContent } from '../providers/runtime/LLMClient.js';
 import { CORE_IDENTITY_BLOCK } from './IdentityGuard.js'; // PHASE 3 — agentic direct answers carry the identity block too
+import { TOOL_REGISTRY } from './ToolRegistry.js'; // PHASE 5 P5-5 — routeDecision sees the REAL tool catalog
 import { WORKSPACE_DIR } from '../config.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -126,13 +127,49 @@ export const CAPABILITY_CATALOG = [
 /** Priority order when scores tie: specific tools before the generic agent. */
 const TIE_ORDER = ['memory_write', 'memory_read', 'file_read', 'code_run', 'web_search', 'direct_answer'];
 
+/**
+ * PHASE 5 P5-5 — the capability catalog is BRIDGED TO THE REAL TOOL REGISTRY:
+ * each capability names the actual TOOL_REGISTRY slugs that implement it, so
+ * routeDecision sees (and reports) the real catalog — never a subset invented
+ * for the prompt. Verified live: every slug here exists in TOOL_REGISTRY
+ * (asserted by scripts/p5-tools-sim.mjs on every run).
+ */
+const CAPABILITY_TOOLS = {
+  web_search: ['web-search', 'arxiv-search', 'semantic-search'],
+  file_read: ['fs_read'],
+  code_run: ['code-run', 'code-write'],
+  memory_write: ['memory-write', 'knowledge-save'],
+  memory_read: ['memory-recall', 'knowledge-search', 'episode-recall'],
+  direct_answer: [],
+};
+
+/** Real registry facts for the routing context (fail-soft, cached per call). */
+function realToolCatalogSummary() {
+  try {
+    const byDomain = {};
+    for (const t of TOOL_REGISTRY) {
+      const k = t.type || 'other';
+      byDomain[k] = (byDomain[k] || 0) + 1;
+    }
+    return { total: TOOL_REGISTRY.length, byDomain };
+  } catch (e) {
+    return { total: 0, byDomain: {}, error: String(e && e.message || e) };
+  }
+}
+
 /* ════════════════════════════════════════════════════════════════════
  * ROUTE DECISION — the model picks a capability from the catalog
  * ════════════════════════════════════════════════════════════════════ */
 
 /** Render the catalog for the model prompt (Claude Code tool-declaration style). */
 function catalogPromptBlock() {
-  return CAPABILITY_CATALOG.map((c) => `- ${c.id} (${c.kind}): ${c.description}`).join('\n');
+  const real = realToolCatalogSummary();
+  const lines = CAPABILITY_CATALOG.map((c) => {
+    const tools = (CAPABILITY_TOOLS[c.id] || []).join(', ');
+    return `- ${c.id} (${c.kind}): ${c.description}${tools ? ` [real tools: ${tools}]` : ''}`;
+  });
+  lines.push(`(The real tool registry holds ${real.total} tools across domains: ${Object.entries(real.byDomain).map(([k, v]) => `${k} ${v}`).join(', ')} — the list above names the tools each capability dispatches through.)`);
+  return lines.join('\n');
 }
 
 /** Deterministic evidence scorer — the keyless fallback (never throws). */
@@ -162,7 +199,7 @@ function catalogMatch(query) {
 export async function routeDecision(query, opts = {}) {
   const q = String(query || '').trim();
   if (!q) {
-    return { ok: false, route: 'none', via: 'none', confidence: 0, reasoning: 'empty query', capability: null };
+    return { ok: false, route: 'none', via: 'none', confidence: 0, reasoning: 'empty query', capability: null, tools: [], catalog: realToolCatalogSummary() };
   }
   // PRIMARY — the model picks from the catalog (zero cost when keyless: the
   // gate skips the call instead of firing a doomed one).
@@ -181,6 +218,8 @@ export async function routeDecision(query, opts = {}) {
             confidence: Math.min(1, Number(parsed.confidence) || 0.5),
             reasoning: String(parsed.reasoning || 'model pick').slice(0, 200),
             capability: cap,
+            tools: CAPABILITY_TOOLS[cap.id] || [],
+            catalog: realToolCatalogSummary(),
           };
         }
       }
@@ -195,11 +234,13 @@ export async function routeDecision(query, opts = {}) {
       confidence: Math.min(1, 0.55 + 0.15 * hit.score),
       reasoning: `catalog evidence matched (score ${hit.score})${hit.hits.length ? `: ${hit.hits[0]}` : ''}`,
       capability: cap,
+      tools: CAPABILITY_TOOLS[hit.id] || [],
+      catalog: realToolCatalogSummary(),
     };
   }
   // Nothing matched — the generic agent answers directly (no tool pretense).
   const direct = CAPABILITY_CATALOG.find((c) => c.id === 'direct_answer');
-  return { ok: true, route: 'direct_answer', via: 'catalog', confidence: 0.5, reasoning: 'no tool evidence — default to direct answer', capability: direct };
+  return { ok: true, route: 'direct_answer', via: 'catalog', confidence: 0.5, reasoning: 'no tool evidence — default to direct answer', capability: direct, tools: [], catalog: realToolCatalogSummary() };
 }
 
 /* ════════════════════════════════════════════════════════════════════
