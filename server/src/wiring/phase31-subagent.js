@@ -20,6 +20,21 @@ import { extendSpec, validate, enforce } from '../../../harness/parity/subagent/
 
 const state = { mounted: null };
 
+/**
+ * P10 GAP 4 — JEXI-side permission-mode alias: 'readonly' is accepted as a
+ * documented alias of the Phase 30 'plan' mode (write tools refused, reads
+ * allowed). The Phase 30 primitive stays READ-ONLY and untouched — the
+ * consumer normalizes BEFORE validate/enforce, and the requested mode rides
+ * along as requestedPermissionMode for honest reporting.
+ */
+export function normalizeContract(spec) {
+  if (!spec || typeof spec !== 'object') return spec;
+  if (String(spec.permissionMode || '').toLowerCase() === 'readonly') {
+    return { ...spec, permissionMode: 'plan', requestedPermissionMode: 'readonly' };
+  }
+  return spec;
+}
+
 export function initSubagentEnforcement() {
   const journal = [];
 

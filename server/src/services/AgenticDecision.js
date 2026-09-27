@@ -800,15 +800,19 @@ export async function dispatchSubagents(query, routes, opts = {}) {
   // seam (verdicts journaled; an invalid contract blocks the delegation honestly).
   const enforcement = [];
   try {
-    const { subagentEnforcement, initSubagentEnforcement } = await import('../wiring/phase31-subagent.js');
+    const { subagentEnforcement, initSubagentEnforcement, normalizeContract } = await import('../wiring/phase31-subagent.js');
     const enf = subagentEnforcement() || initSubagentEnforcement();
     for (const spec of contracts) {
-      const v = enf.validate ? enf.validate(spec) : null;
+      // P10 GAP 4 — normalize BEFORE validate: 'readonly' is a documented
+      // JEXI alias of plan-mode (write tools still refused per call). The
+      // raw mode rides along for honest reporting.
+      const normalized = normalizeContract ? normalizeContract(spec) : spec;
+      const v = enf.validate ? enf.validate(normalized) : null;
       const errors = v && Array.isArray(v.errors) ? v.errors : (v && v.valid === false ? [{ message: 'invalid' }] : []);
       if (errors.length) {
         enforcement.push({ id: spec.id, allowed: false, reason: errors.map((e) => e.message || e.code).join('; ').slice(0, 160) });
       } else {
-        enforcement.push({ id: spec.id, allowed: true, permissionMode: spec.permissionMode, maxTurns: spec.maxTurns });
+        enforcement.push({ id: spec.id, allowed: true, permissionMode: spec.permissionMode, enforcedAs: normalized.permissionMode, maxTurns: spec.maxTurns });
       }
     }
   } catch (e) {

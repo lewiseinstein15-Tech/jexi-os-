@@ -78,6 +78,24 @@ export function loopBreakerTrips(repeatCount) {
   return Number(repeatCount) >= LOOP_BREAKER_LIMIT;
 }
 
+// P10 GAP 4 — mounted P30.C enforcement seam (dynamic import: the wiring
+// module composes the Phase 30 primitive; no static cycle). Used by the
+// child contract gate below — EVERY tool call a contract-bound child makes
+// is checked against {allowedTools, maxTurns, permissionMode} BEFORE
+// execution; refusals are fail-closed (E_TOOL_NOT_ALLOWED / E_MAX_TURNS /
+// E_INVALID_SPEC) and the tool never runs.
+let __contractEnf = null;
+async function getContractEnforcement() {
+  if (__contractEnf) return __contractEnf;
+  try {
+    const m = await import('../wiring/phase31-subagent.js');
+    __contractEnf = { enf: m.subagentEnforcement() || m.initSubagentEnforcement(), normalize: m.normalizeContract || ((s) => s) };
+  } catch {
+    __contractEnf = { enf: null, normalize: (s) => s };
+  }
+  return __contractEnf;
+}
+
 /** planner.analyzeIntent returns a plan (intent/teamSlugs/steps/tools/toolsLine). */
 async function safePlan(query, image) {
   try {
@@ -235,6 +253,10 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   // B106 — repeat-tool-reminder state (consecutive identical calls).
   let lastCallKey = null;
   let repeatCount = 0;
+  // P10 GAP 4 — child contract state (validated once; refusals recorded).
+  const contract = opts.subagentContract || null;
+  let contractVerdict = null;
+  const contractViolations = [];
 
   if (checkCancelled()) return { answer: '', cancelled: true, stats: { cancelled: true, toolCalls: 0, tools: schemas.length, durationMs: Date.now() - start } };
 
@@ -243,14 +265,117 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   let announcedWriter = false; // B162 — one '✍️ writing…' step per answer
   try { lifecycleTurnStart(convId, 1); } catch { /* noop */ }
 
+  /**
+   * P10 GAP 4 — the ONE tool-call execution path for this loop. The model's
+   * native tool calls AND the deterministic scripted seam both flow through
+   * here, so a contract-bound child is enforced identically either way.
+   * Gate order (fail-closed): P30.C contract → budget → loop breaker → real
+   * gated execution.
+   */
+  const runToolCalls = async (calls) => {
+    const results = [];
+    const enforcement = contract ? await getContractEnforcement() : null;
+    for (const call of calls) {
+      // ═══ P30.C CONTRACT GATE — before EVERY tool call a child makes ═══
+      if (contract) {
+        const turn = callsMade + 1; // each tool-call step is one enforced turn
+        try {
+          if (!enforcement || !enforcement.enf) throw Object.assign(new Error('P30.C enforcement seam unavailable — fail-closed'), { code: 'E_INVALID_SPEC' });
+          const normalized = enforcement.normalize(contract);
+          if (!contractVerdict) {
+            const v = enforcement.enf.validate ? enforcement.enf.validate(normalized) : { valid: true };
+            contractVerdict = (v && v.valid === false) ? { ok: false, errors: v.errors } : { ok: true };
+          }
+          if (!contractVerdict.ok) {
+            const detail = contractVerdict.errors.map((er) => er.message || er.code || 'invalid').join('; ').slice(0, 160);
+            throw Object.assign(new Error(`E_INVALID_SPEC: child contract is invalid — ${detail}`), { code: 'E_INVALID_SPEC' });
+          }
+          enforcement.enf.dispatch(normalized, { tool: call.name, turn });
+        } catch (e) {
+          const code = (e && e.code) || 'E_ENFORCE';
+          const reason = String((e && e.message) || e).slice(0, 200);
+          contractViolations.push({ tool: call.name, code, turn, reason });
+          try { emit('tool/call', { callId: call.id, name: call.name, arguments: JSON.stringify(call.arguments || {}).slice(0, 300), contractRefused: true }); } catch (e2) {}
+          emit('agent.log', { message: `⛔ P30.C contract refusal (${code}) — "${call.name}" did NOT execute: ${reason.slice(0, 150)}` });
+          toolContext.push({ tool: call.name, args: call.arguments || {}, ok: false, done: false, blocked: true, contractRefused: true, error: code });
+          results.push({ tool_call_id: call.id, content: `ERROR: ${code}: ${reason}` });
+          continue;
+        }
+      }
+      if (callsMade >= MAX_TOOL_CALLS) {
+        results.push({ tool_call_id: call.id, content: 'ERROR: tool-call budget exhausted for this task.' });
+        continue;
+      }
+      // FINAL F4 — the breaker is checked BEFORE execution (and before the
+      // budget counter moves): a tripped call never runs and burns nothing.
+      const preKey = `${call.name}|${JSON.stringify(call.arguments || {})}`;
+      const preCount = preKey === lastCallKey ? repeatCount + 1 : 1;
+      if (loopBreakerTrips(preCount)) {
+        lastCallKey = preKey; repeatCount = preCount;
+        const msg = loopBreakerMessage(call.name, preCount);
+        try { emit('tool/call', { callId: call.id, name: call.name, arguments: JSON.stringify(call.arguments || {}).slice(0, 500), breaker: true }); } catch (e) {}
+        emit('agent.log', { message: `🛑 Loop breaker: blocked identical call #${preCount} to ${call.name} — no execution, no side effects.` });
+        toolContext.push({ tool: call.name, args: call.arguments || {}, ok: false, done: false, blocked: true, breaker: true, error: 'loop breaker tripped' });
+        results.push({ tool_call_id: call.id, content: msg });
+        continue;
+      }
+      callsMade++;
+      // B96 — dsh-style step events: tool/call + tool/result on the wire.
+      try { emit('step/start', { turn: 1, step: callsMade }); } catch (e) {}
+      try { emit('tool/call', { callId: call.id, name: call.name, arguments: JSON.stringify(call.arguments || {}).slice(0, 500) }); } catch (e) {}
+      // B119 — durable lifecycle events (dsh session-event vocabulary).
+      try { lifecycleStepStart(convId, 1, callsMade); lifecycleToolCall(convId, 1, callsMade, call.id, call.name, call.arguments || {}); } catch { /* noop */ }
+      const r = await executeTool({ slug: call.name, args: call.arguments || {}, profile, sendEvent: emit, confirm: opts.confirm, codeTools: codeMode ? codeTools : undefined, spillOwner: opts.spillOwner, ...(opts.subagentId ? { subagentId: opts.subagentId } : {}) });
+      try { emit('tool/result', { callId: call.id, name: call.name, ok: !!r.ok, error: r.error || null }); } catch (e) {}
+      try { lifecycleToolResult(convId, 1, callsMade, call.id, call.name, !!r.ok, r.error, r.durationMs); } catch { /* noop */ }
+      try { emit('step/end', { turn: 1, step: callsMade }); } catch (e) {}
+      try { lifecycleStepEnd(convId, 1, callsMade); } catch { /* noop */ }
+      const done = isToolDone(r);
+      toolContext.push({ tool: call.name, args: call.arguments || {}, ok: r.ok, done, error: r.error, result: r.result, paused: r.paused === true || r.approvalRequired === true, blocked: r.blocked === true });
+      // B106 — repeat-tool-reminder: identical consecutive calls get an
+      // advisory note in the result fed back to the model.
+      const callKey = `${call.name}|${JSON.stringify(call.arguments || {})}`;
+      if (callKey === lastCallKey) repeatCount += 1;
+      else { lastCallKey = callKey; repeatCount = 1; }
+      // FINAL F4 — TDZ fix: content is declared BEFORE the reminder
+      // appends to it (previously the 3rd identical call crashed the
+      // whole turn with "Cannot access 'content' before initialization").
+      let content = r.ok && r.result ? String(r.result).slice(0, 6000) : `ERROR: ${r.error || 'tool returned no output'}`;
+      const reminder = repeatReminderFor(callKey, repeatCount);
+      if (reminder) content = `${content}\n\n${reminder}`;
+      if (r.paused || r.approvalRequired) {
+        emit('agent.log', { message: `⏸ ${call.name} is an external action and needs your approval (real finalized details shown) — waiting for your yes/no before it can run.` });
+      }
+      if (r.blocked) {
+        emit('agent.log', { message: `⛔ ${call.name} blocked by permission profile "${profile}".` });
+      }
+      if (r.routed) {
+        emit('agent.log', { message: `🧭 ${call.name} is routed to its owning agents for the pipeline — it did NOT execute here, so it is not counted as a completed step.` });
+      }
+      results.push({ tool_call_id: call.id, content });
+    }
+    return results;
+  };
+
   try {
+    // P10 GAP 4 — DETERMINISTIC SCRIPTED SEAM (test seam, mirrors __mockAnswer):
+    // scripted tool calls run through the SAME runToolCalls path (contract
+    // gate included) and the SAME real gated executeTool — no model key
+    // needed, so contract enforcement is provable keylessly.
+    if (!image && Array.isArray(opts.__scriptedToolCalls) && opts.__scriptedToolCalls.length) {
+      const scripted = opts.__scriptedToolCalls.map((c, i) => ({ id: `scripted-${i + 1}`, name: String(c.name || c.slug || ''), arguments: (c.args !== undefined ? c.args : (c.arguments || {})) }));
+      await runToolCalls(scripted);
+      finalText = toolContext.length
+        ? toolContext.map((c) => `## Tool: ${c.tool}\n${c.error ? `${c.contractRefused ? 'REFUSED' : 'ERROR'}: ${c.error}` : String(c.result).slice(0, 2000)}`).join('\n\n')
+        : '';
+    }
     // P10 GAP 1 — KEYLESS CHILD BRAIN: a sub-agent child with no model key
     // still does REAL work. When the caller declared this child's capability
     // route (opts.subagentCapability, set by the sub-agent coordinator), the
     // child executes its own capability runner — live web search, real memory
     // write, real file read — as its deterministic brain. This is the child's
     // actual work, not a stub: the same runner the parent lane uses.
-    if (!image && opts.subagentCapability && !canChat()) {
+    if (!image && !Array.isArray(opts.__scriptedToolCalls) && opts.subagentCapability && !canChat()) {
       try {
         const { executeCapabilityKeyless } = await import('./AgenticDecision.js');
         const capQuery = String(opts.subagentCapabilityQuery || query);
@@ -299,9 +424,9 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         }
       );
     } else if (!finalText) {
-    // P10 GAP 1 — the model loop runs only when the keyless child brain did
-    // not already produce this child's real answer (keyed children always
-    // reach the model loop — their brain gate is skipped).
+    // P10 GAP 1 — the model loop runs only when the keyless child brain or
+    // the scripted seam did not already produce this child's real answer
+    // (keyed children always reach the model loop).
     const res = await generateWithToolsLoop(
       `The user asked: "${query}"`,
       await assemblePrompt({
@@ -335,63 +460,8 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         },
         // Execute the model's native tool calls through the gated runtime —
         // the same permission/risk/approval path as every other tool call.
-        executeToolCalls: async (calls) => {
-          const results = [];
-          for (const call of calls) {
-            if (callsMade >= MAX_TOOL_CALLS) {
-              results.push({ tool_call_id: call.id, content: 'ERROR: tool-call budget exhausted for this task.' });
-              continue;
-            }
-            // FINAL F4 — the breaker is checked BEFORE execution (and before the
-            // budget counter moves): a tripped call never runs and burns nothing.
-            const preKey = `${call.name}|${JSON.stringify(call.arguments || {})}`;
-            const preCount = preKey === lastCallKey ? repeatCount + 1 : 1;
-            if (loopBreakerTrips(preCount)) {
-              lastCallKey = preKey; repeatCount = preCount;
-              const msg = loopBreakerMessage(call.name, preCount);
-              try { emit('tool/call', { callId: call.id, name: call.name, arguments: JSON.stringify(call.arguments || {}).slice(0, 500), breaker: true }); } catch (e) {}
-              emit('agent.log', { message: `🛑 Loop breaker: blocked identical call #${preCount} to ${call.name} — no execution, no side effects.` });
-              toolContext.push({ tool: call.name, args: call.arguments || {}, ok: false, done: false, blocked: true, breaker: true, error: 'loop breaker tripped' });
-              results.push({ tool_call_id: call.id, content: msg });
-              continue;
-            }
-            callsMade++;
-            // B96 — dsh-style step events: tool/call + tool/result on the wire.
-            try { emit('step/start', { turn: 1, step: callsMade }); } catch (e) {}
-            try { emit('tool/call', { callId: call.id, name: call.name, arguments: JSON.stringify(call.arguments || {}).slice(0, 500) }); } catch (e) {}
-            // B119 — durable lifecycle events (dsh session-event vocabulary).
-            try { lifecycleStepStart(convId, 1, callsMade); lifecycleToolCall(convId, 1, callsMade, call.id, call.name, call.arguments || {}); } catch { /* noop */ }
-            const r = await executeTool({ slug: call.name, args: call.arguments || {}, profile, sendEvent: emit, confirm: opts.confirm, codeTools: codeMode ? codeTools : undefined, spillOwner: opts.spillOwner, ...(opts.subagentId ? { subagentId: opts.subagentId } : {}) });
-            try { emit('tool/result', { callId: call.id, name: call.name, ok: !!r.ok, error: r.error || null }); } catch (e) {}
-            try { lifecycleToolResult(convId, 1, callsMade, call.id, call.name, !!r.ok, r.error, r.durationMs); } catch { /* noop */ }
-            try { emit('step/end', { turn: 1, step: callsMade }); } catch (e) {}
-            try { lifecycleStepEnd(convId, 1, callsMade); } catch { /* noop */ }
-            const done = isToolDone(r);
-            toolContext.push({ tool: call.name, args: call.arguments || {}, ok: r.ok, done, error: r.error, result: r.result, paused: r.paused === true || r.approvalRequired === true, blocked: r.blocked === true });
-            // B106 — repeat-tool-reminder: identical consecutive calls get an
-            // advisory note in the result fed back to the model.
-            const callKey = `${call.name}|${JSON.stringify(call.arguments || {})}`;
-            if (callKey === lastCallKey) repeatCount += 1;
-            else { lastCallKey = callKey; repeatCount = 1; }
-            // FINAL F4 — TDZ fix: content is declared BEFORE the reminder
-            // appends to it (previously the 3rd identical call crashed the
-            // whole turn with "Cannot access 'content' before initialization").
-            let content = r.ok && r.result ? String(r.result).slice(0, 6000) : `ERROR: ${r.error || 'tool returned no output'}`;
-            const reminder = repeatReminderFor(callKey, repeatCount);
-            if (reminder) content = `${content}\n\n${reminder}`;
-            if (r.paused || r.approvalRequired) {
-              emit('agent.log', { message: `⏸ ${call.name} is an external action and needs your approval (real finalized details shown) — waiting for your yes/no before it can run.` });
-            }
-            if (r.blocked) {
-              emit('agent.log', { message: `⛔ ${call.name} blocked by permission profile "${profile}".` });
-            }
-            if (r.routed) {
-              emit('agent.log', { message: `🧭 ${call.name} is routed to its owning agents for the pipeline — it did NOT execute here, so it is not counted as a completed step.` });
-            }
-            results.push({ tool_call_id: call.id, content });
-          }
-          return results;
-        },
+        // P10 GAP 4 — runToolCalls now ALSO carries the child contract gate.
+        executeToolCalls: runToolCalls,
       }
     );
     finalText = res.ok ? res.text : '';
@@ -427,9 +497,12 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
       tools: schemas.length,
       durationMs: Date.now() - start,
       profile,
+      // P10 GAP 4 — the per-tool-call enforcement record for contract-bound
+      // children: every refusal (code, tool, turn) is visible to the caller.
+      ...(contract ? { contract: { id: contract.id, allowedTools: contract.allowedTools, maxTurns: contract.maxTurns, permissionMode: contract.permissionMode }, contractViolations } : {}),
     },
   });
 
   try { lifecycleTurnEnd(convId, 1, finalText ? 'completed' : 'error'); } catch { /* noop */ }
-  return { answer: finalText, stats: { toolCalls: callsMade, tools: schemas.length, durationMs: Date.now() - start } };
+  return { answer: finalText, stats: { toolCalls: callsMade, tools: schemas.length, durationMs: Date.now() - start, ...(contract ? { contract: { id: contract.id, allowedTools: contract.allowedTools, maxTurns: contract.maxTurns, permissionMode: contract.permissionMode }, contractViolations } : {}) } };
 }
