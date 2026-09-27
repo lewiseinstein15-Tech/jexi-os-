@@ -173,7 +173,7 @@ export async function runSubagents({ tasks, sendEvent, opts = {} }) {  if (typeo
         continue;
       }
       if (job.isolated) {
-        results.push(await runIsolatedSubagent({ name, query: job.query, image: job.image, sendEvent: (t, d) => sendEvent(t, { ...d, subagent: name }), opts: { ...opts, systemPromptOverride: job.def?.systemPrompt } }));
+        results.push(await runIsolatedSubagent({ name, query: job.query, image: job.image, sendEvent: (t, d) => sendEvent(t, { ...d, subagent: name }), opts: { ...opts, systemPromptOverride: job.def?.systemPrompt, subagentCapability: job.capabilityRoute || opts.subagentCapability, subagentCapabilityQuery: job.capabilityQuery || job.query, subagentContract: job.contract || opts.subagentContract } }));
         continue;
       }
       emit('subagent.start', { name });
@@ -182,7 +182,19 @@ export async function runSubagents({ tasks, sendEvent, opts = {} }) {  if (typeo
         const res = await runAgentLoop({
           query: job.query,
           image: job.image,
-          opts: { ...opts, signal: opts.signal, systemPromptOverride: job.def?.systemPrompt },
+          // P10 GAP 1/4 — children carry their capability route (keyless
+          // deterministic brain in AgentLoop), their clean original query
+          // (capability runners derive args from the task, not the annotated
+          // child prompt), and their P30.C contract (per-tool-call enforcement).
+          opts: {
+            ...opts,
+            signal: opts.signal,
+            systemPromptOverride: job.def?.systemPrompt,
+            subagentCapability: job.capabilityRoute || opts.subagentCapability,
+            subagentCapabilityQuery: job.capabilityQuery || job.query,
+            subagentContract: job.contract || opts.subagentContract,
+            sessionId: opts.sessionId || null,
+          },
           sendEvent: (type, data) => sendEvent(type, { ...data, subagent: name }),
         });
         const status = res.cancelled ? 'cancelled' : 'done';

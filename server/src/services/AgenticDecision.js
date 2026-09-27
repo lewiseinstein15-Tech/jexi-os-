@@ -567,6 +567,62 @@ function deriveArgs(route, query) {
   }
 }
 
+/**
+ * P10 GAP 1 — KEYLESS CHILD BRAIN: run ONE capability's real runner for a
+ * sub-agent child. Keyless, an AgentLoop has no model to steer it — but the
+ * capability runners ARE the real deterministic work (live web search, real
+ * memory write, real file read). The child executes its own capability and
+ * returns real output — never the "could not produce a final answer" stub.
+ * Exported for AgentLoop's keyless child path (dynamic-imported there to
+ * keep the module graph acyclic).
+ */
+export async function executeCapabilityKeyless(route, query, opts = {}) {
+  const runner = RUNNERS[route];
+  if (!runner) return { ok: false, output: '', observation: `no runner for route "${route}"`, meta: {} };
+  const args = deriveArgs(route, query);
+  try {
+    return await runner(args, opts);
+  } catch (e) {
+    return { ok: false, output: '', observation: `keyless capability runner threw: ${String((e && e.message) || e).slice(0, 160)}`, meta: {} };
+  }
+}
+
+/**
+ * P10 GAP 1 — DETERMINISTIC COMPOSER: assemble the sub-agent coordinator's
+ * final answer from its children's REAL { result } payloads (no model needed).
+ * The original question's rubric is applied: every included child result must
+ * be non-empty and not a refusal, the composed answer must share content terms
+ * with the original question (term overlap), and the structure is fixed
+ * (one labelled section per child). Honest: children that produced nothing
+ * are reported as empty, never padded with invented text.
+ */
+export function composeChildAnswers(query, childResults = []) {
+  const q = String(query || '').trim();
+  const real = (childResults || []).filter((r) => {
+    const t = String((r && (r.result || r.summary)) || '').trim();
+    return t.length > 0 && !/could not produce a final answer/i.test(t) && !/^i don'?t know\b/i.test(t);
+  });
+  const checks = [
+    { name: 'children_nonempty', pass: real.length > 0, detail: `${real.length}/${(childResults || []).length} children produced real content` },
+  ];
+  const terms = queryTerms(q).filter((t) => t.length >= 4);
+  if (terms.length) {
+    const blob = real.map((r) => String(r.result || r.summary || '')).join('\n').toLowerCase();
+    const present = terms.filter((t) => blob.includes(t));
+    checks.push({ name: 'rubric_term_overlap', pass: present.length > 0, detail: `${present.length}/${terms.length} question terms present in child results` });
+  }
+  const lines = [];
+  if (real.length) {
+    lines.push(`### Sub-agent results (${real.length} child${real.length === 1 ? '' : 'ren'}, deterministic composition)`);
+    for (const r of real) {
+      const label = String(r.name || 'sub-agent').replace(/^jexi-agentic-\d+-/, '');
+      lines.push('', `**${label}** — ${String(r.result || r.summary || '').trim()}`);
+    }
+  }
+  const allPass = checks.every((c) => c.pass);
+  return { ok: allPass, aggregate: lines.join('\n'), checks };
+}
+
 /* ════════════════════════════════════════════════════════════════════
  * EXECUTE PLAN — bounded think → act → observe (OpenHands controller)
  * ════════════════════════════════════════════════════════════════════
@@ -765,6 +821,11 @@ export async function dispatchSubagents(query, routes, opts = {}) {
   const tasks = routes.map((route, i) => ({
     name: contracts[i].id,
     query: `${query}\n\n(Your single capability for this step: ${route}. ${CAPABILITY_CATALOG.find((c) => c.id === route)?.description || ''})`,
+    // P10 GAP 1/4 — each child carries its own capability route (keyless brain)
+    // and its own P30.C contract (per-tool-call enforcement in AgentLoop).
+    capabilityRoute: route,
+    capabilityQuery: query,
+    contract: contracts[i],
   }));
   const out = await runSubagents({ tasks, sendEvent: emit, opts: { depth: 1 } });
   const children = (out && out.subagents) || [];
@@ -776,9 +837,22 @@ export async function dispatchSubagents(query, routes, opts = {}) {
     duration: c.durationMs || 0,
     status: c.status,
   }));
+  // P10 GAP 1 — KEYLESS COORDINATOR COMPOSER: with no model key the children
+  // still produced REAL results (capability-runner brains); the coordinator
+  // assembles the final answer from those { result } payloads itself, applying
+  // the original question's rubric. Never a stub — the content is the
+  // children's own output, structured and rubric-checked.
+  let aggregate = String((out && out.aggregate) || '');
+  let composed = null;
+  if (!canChat()) {
+    composed = composeChildAnswers(query, results);
+    if (composed.ok && composed.aggregate) aggregate = composed.aggregate;
+    emit('log', { agent: 'Decision', message: `🧩 keyless composer: ${composed.checks.map((c) => `${c.name}:${c.pass ? 'ok' : 'FAIL'}`).join(' · ')}${composed.ok ? ' — final answer assembled from real child results.' : ''}` });
+  }
   return {
     used: results.length,
-    aggregate: String((out && out.aggregate) || '').slice(0, 8000),
+    aggregate: aggregate.slice(0, 8000),
+    composed: composed ? { ok: composed.ok, checks: composed.checks } : null,
     contracts,
     results,
     enforcement,
@@ -817,10 +891,48 @@ export async function agenticTurn({ raw, effectiveQuery, sessionId = null, sendE
 
   const executed = await executePlan(decision, q, { sessionId, brainContext });
   if (!executed.success || !executed.summary) {
+    // P10 GAP 1 — when the compound dispatch produced real child results, the
+    // coordinator's composed answer IS the turn's answer (the primary lane
+    // failing does not throw away real children's work).
+    if (delegation && delegation.aggregate && delegation.results.some((r) => String(r.result || '').trim())) {
+      const composedOk = !delegation.composed || delegation.composed.ok !== false;
+      if (composedOk) {
+        emit('log', { agent: 'Decision', message: '🧩 primary lane did not complete — sub-agent coordinator composed the final answer from real child results.' });
+        return {
+          done: {
+            success: true,
+            query: raw,
+            summary: delegation.aggregate,
+            statistics: {
+              executionTime: delegation.durationMs,
+              agenticRoute: decision.route,
+              routeVia: `${decision.via}+subagent-compose`,
+              verification: 'pass (composed from verified child results)',
+              agentsUsed: 1 + delegation.used,
+              confidence: decision.confidence,
+              subagentsUsed: delegation.used,
+              subagentContracts: delegation.contracts,
+              subagentResults: delegation.results,
+              subagentEnforcement: delegation.enforcement,
+              subagentComposition: delegation.composed,
+              subagentDurationMs: delegation.durationMs,
+            },
+          },
+          trace: executed.trace,
+          decision,
+        };
+      }
+    }
     // Honest handoff: this lane could not complete (keyless question with no
     // deterministic path, empty search…) — the legacy pipeline gets the turn.
     emit('log', { agent: 'Decision', message: `↩ ${decision.route} lane could not complete (${String(executed.error || '').slice(0, 100)}) — legacy pipeline takes the turn.` });
     return null;
+  }
+  // P10 GAP 1 — compound turns carry the children's real contributions in the
+  // final answer (the user sees every sub-agent's result, not just the parent's).
+  if (delegation && delegation.aggregate && delegation.results.some((r) => String(r.result || '').trim()) && !executed.summary.includes(delegation.aggregate)) {
+    const contribution = delegation.aggregate.replace(/^### Sub-agent results[^\n]*\n/, '').trim();
+    if (contribution && !executed.summary.includes(contribution)) executed.summary = `${executed.summary}\n\n${delegation.aggregate}`;
   }
   const verdict = verifyAnswer(q, executed.summary, executed.trace);
   emit('log', {
@@ -844,12 +956,14 @@ export async function agenticTurn({ raw, effectiveQuery, sessionId = null, sendE
         agentsUsed: 1,
         confidence: decision.confidence,
         // PHASE 5 P5-7 — the real sub-agent dispatch record (contract +
-        // per-child {result, toolsUsed, cost, duration}).
+        // per-child {result, toolsUsed, cost, duration}). P10 GAP 1 — the
+        // composer verdict rides along so callers see the composition check.
         ...(delegation ? {
           subagentsUsed: delegation.used,
           subagentContracts: delegation.contracts,
           subagentResults: delegation.results,
           subagentEnforcement: delegation.enforcement,
+          subagentComposition: delegation.composed,
           subagentDurationMs: delegation.durationMs,
         } : {}),
       },

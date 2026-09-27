@@ -40,6 +40,7 @@ import { assemblePrompt } from './PromptAssembly.js'; // B119 — dsh systemProm
 import { coworkerName } from '../providers/catalog/ModelCoworkers.js'; // B162 — named model coworkers
 import { lifecycleTurnStart, lifecycleStepStart, lifecycleToolCall, lifecycleToolResult, lifecycleStepEnd, lifecycleTurnEnd } from './SessionLifecycle.js'; // B119 — dsh session-event vocabulary
 import { providerPreferenceForIntent } from '../providers/catalog/ModelRouting.js';
+import { canChat } from '../providers/index.js'; // P10 GAP 1 — keyless child brain gate
 import { REPORT_GUIDANCE } from './SubagentReport.js'; // B137 — dsh tool-subagent-report guidance for children
 
 // B96 — DeepSeek-Harness-style loop: more steps per turn (the rate limiter
@@ -243,6 +244,25 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   try { lifecycleTurnStart(convId, 1); } catch { /* noop */ }
 
   try {
+    // P10 GAP 1 — KEYLESS CHILD BRAIN: a sub-agent child with no model key
+    // still does REAL work. When the caller declared this child's capability
+    // route (opts.subagentCapability, set by the sub-agent coordinator), the
+    // child executes its own capability runner — live web search, real memory
+    // write, real file read — as its deterministic brain. This is the child's
+    // actual work, not a stub: the same runner the parent lane uses.
+    if (!image && opts.subagentCapability && !canChat()) {
+      try {
+        const { executeCapabilityKeyless } = await import('./AgenticDecision.js');
+        const capQuery = String(opts.subagentCapabilityQuery || query);
+        const res = await executeCapabilityKeyless(opts.subagentCapability, capQuery, { sessionId: opts.sessionId || null, subagentId: opts.subagentId || null });
+        finalText = String(res && res.output || '').trim();
+        if (finalText) {
+          emit('agent.log', { message: `🔧 keyless child brain: capability "${opts.subagentCapability}" executed for real (${String(res.observation || '').slice(0, 110)}).` });
+        }
+      } catch (e) {
+        emit('agent.log', { message: `⚠ keyless child brain failed: ${String((e && e.message) || e).slice(0, 110)}.` });
+      }
+    }
     // B227 — VISION: a turn with an image goes to a DIRECT vision call. The
     // native-tools loop cannot carry images, and the old text-only note
     // ("an image was provided — analyze it.") never showed the model the
@@ -278,7 +298,10 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
           },
         }
       );
-    } else {
+    } else if (!finalText) {
+    // P10 GAP 1 — the model loop runs only when the keyless child brain did
+    // not already produce this child's real answer (keyed children always
+    // reach the model loop — their brain gate is skipped).
     const res = await generateWithToolsLoop(
       `The user asked: "${query}"`,
       await assemblePrompt({
