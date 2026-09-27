@@ -1247,18 +1247,18 @@
       "transport": "stdio",
       "command": "node",
       "args": [
-        "harness/hardening/forgejo/index.js"
+        "${JEXI_SERVER_ROOT}/mcp/servers/forgejo-bridge.js"
       ],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "curated",
       "permissions": [
         "NETWORK"
       ],
-      "notes": "permanently-declarative schemas upgraded in FINAL GAP 3: the six forgejo.* schemas are served live by the stdio bridge server/mcp/servers/forgejo-bridge.js (initialize/tools/list/tools/call; FORGEJO_URL + FORGEJO_TOKEN env; honest not-configured answers until set).",
+      "notes": "WIRED (FINAL GAP 3): real stdio MCP bridge (server/mcp/servers/forgejo-bridge.js — initialize/tools/list/tools/call, zero deps). Six forgejo.* tools perform REAL HTTP against the configured instance: FORGEJO_URL + FORGEJO_TOKEN env (Bearer/token auth, /api/v1 routes). Unconfigured instances get an honest \"forgejo not configured\" error naming the exact env vars — never a stub. Live-verified against a local mock forgejo (HTTP interception).",
       "keyless": false,
       "keylessNote": "forge tokens ride via keyRef (env var name or keyring ref), per the madtea credential discipline",
       "upstream": "harness/hardening/forgejo/index.js (in-repo library)",
-      "declarative": true,
+      "declarative": false,
       "declaredTools": [
         {
           "name": "forgejo.list_repos",
