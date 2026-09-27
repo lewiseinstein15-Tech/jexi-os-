@@ -5,13 +5,31 @@
  * Run one native command (no shell) with a scrubbed environment, bounded
  * output, and a timeout — the fail-open utility used by diagnostics and
  * the headless CLI. Returns { ok, output, code, durationMs }.
+ *
+ * P11 B3/B4 — every run is traced through CommandTrace so an open chat
+ * turn streams it INLINE as `command` NDJSON events (running → done with
+ * real stdout/stderr + exit + duration). The trace is fail-soft and
+ * subscriber-less when no turn is open.
  */
 
 import { spawn } from 'child_process';
+import path from 'path';
 import { shellEnv } from './ShellEnv.js';
+import { traceBufferedCommand } from './CommandTrace.js';
 
 export async function runNativeCommand(command, args = [], { timeoutMs = 15000, cwd = process.cwd(), maxOutputChars = 16000, env = {} } = {}) {
   if (!String(command || '').trim()) return { ok: false, error: 'command required' };
+  // The displayed command line: the raw argv, shell-quoted where it contains
+  // spaces — exactly what a terminal would show, no invention.
+  const display = [command, ...args.map((a) => (/\s/.test(String(a)) ? `'${String(a).replaceAll("'", `'\\''`)}'` : String(a)))].join(' ');
+  return traceBufferedCommand({
+    cmd: display,
+    source: `native:${path.basename(String(command))}`,
+    exec: () => runNativeCommandInner(command, args, { timeoutMs, cwd, maxOutputChars, env }),
+  });
+}
+
+async function runNativeCommandInner(command, args = [], { timeoutMs = 15000, cwd = process.cwd(), maxOutputChars = 16000, env = {} } = {}) {
   const started = Date.now();
   return new Promise((resolve) => {
     let child;

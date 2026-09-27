@@ -112,6 +112,23 @@ export const CAPABILITY_CATALOG = [
     ],
   },
   {
+    id: 'terminal',
+    kind: 'tool',
+    label: 'Terminal',
+    // P11 B3/B4 — REAL shell capability for the agentic lane: "run ls -la"
+    // executes a real command through the traced, allowlisted executor and
+    // the chat stream renders it as a terminal block. Read-only safe list —
+    // anything outside it fails closed with an honest refusal.
+    description: 'Run a single READ-ONLY shell command in the workspace sandbox (ls, cat, head, tail, wc, pwd, date, git status/log/diff, du, df…) and show the real stdout/stderr. Use when the user says "run <command>" or "execute <command>".',
+    evidence: [
+      { w: 3, re: /\b(run|execute|exec)\b[^.!?\n]{0,10}\b(ls|pwd|date|uname|whoami|df|du|wc|head|tail|cat|echo|git)\b/i },
+      { w: 3, re: /\brun\s+(the\s+)?(shell\s+)?command\b/i },
+      { w: 2, re: /\b(list|show)( the)? files? (in|of)\b/i },
+      { w: 2, re: /\b(ls -|git status|git log|git diff)\b/i },
+      { w: 1, re: /\bin (the )?terminal\b/i },
+    ],
+  },
+  {
     id: 'direct_answer',
     kind: 'agent',
     label: 'Direct Answer',
@@ -125,7 +142,7 @@ export const CAPABILITY_CATALOG = [
 ];
 
 /** Priority order when scores tie: specific tools before the generic agent. */
-const TIE_ORDER = ['memory_write', 'memory_read', 'file_read', 'code_run', 'web_search', 'direct_answer'];
+const TIE_ORDER = ['memory_write', 'memory_read', 'file_read', 'code_run', 'terminal', 'web_search', 'direct_answer'];
 
 /**
  * PHASE 5 P5-5 — the capability catalog is BRIDGED TO THE REAL TOOL REGISTRY:
@@ -140,6 +157,7 @@ const CAPABILITY_TOOLS = {
   code_run: ['code-run', 'code-write'],
   memory_write: ['memory-write', 'knowledge-save'],
   memory_read: ['memory-recall', 'knowledge-search', 'episode-recall'],
+  terminal: ['term_execute', 'term_session'],
   direct_answer: [],
 };
 
@@ -569,6 +587,66 @@ export async function runMemoryRead(args, opts = {}) {
   };
 }
 
+/**
+ * P11 B3/B4 — TERMINAL RUNNER (read-only safe list, fail-closed).
+ *
+ * Executes ONE shell command in the workspace through the traced executor
+ * (runNativeCommand → CommandTrace → inline `command` NDJSON events in the
+ * chat stream). The safe list is read-only on purpose: this runner is the
+ * keyless agentic lane's shell, and it must never become a remote-write
+ * primitive. Chaining/forking metacharacters are refused; a command whose
+ * leading binary is not on the list fails closed with the honest reason.
+ */
+const TERMINAL_SAFE_BINARIES = new Set([
+  'ls', 'pwd', 'date', 'uname', 'whoami', 'hostname', 'df', 'du', 'wc',
+  'head', 'tail', 'cat', 'echo', 'stat', 'file', 'realpath', 'dirname',
+  'basename', 'tree', 'env', 'printenv', 'node', 'python3', 'pip3', 'which',
+  'git', // further restricted below: read-only subcommands only
+]);
+const TERMINAL_GIT_READONLY = new Set(['status', 'log', 'diff', 'show', 'branch', 'tag', 'remote', 'rev-parse', 'describe', 'ls-files']);
+const TERMINAL_META_RE = /[;&`$<>\\]/;
+
+export function terminalCommandAllowed(cmd) {
+  const c = String(cmd || '').trim();
+  if (!c) return { allowed: false, reason: 'empty command' };
+  if (TERMINAL_META_RE.test(c)) return { allowed: false, reason: 'command chaining/redirect metacharacters (; & ` $ < > \\) are not allowed in the read-only terminal lane' };
+  const first = c.split(/\s+/)[0].replace(/^.*\//, '');
+  if (!TERMINAL_SAFE_BINARIES.has(first)) return { allowed: false, reason: `"${first}" is not on the read-only safe list` };
+  if (first === 'git') {
+    const sub = (c.split(/\s+/)[1] || '').toLowerCase();
+    if (!TERMINAL_GIT_READONLY.has(sub)) return { allowed: false, reason: `git "${sub}" is not a read-only subcommand` };
+  }
+  if (first === 'printenv' || (first === 'env' && c.split(/\s+/).length > 1)) {
+    return { allowed: false, reason: 'environment dumping is refused (may expose secrets)' };
+  }
+  return { allowed: true };
+}
+
+async function runTerminal(args, opts = {}) {
+  const raw = String(args.command || args.query || '').trim();
+  const verdict = terminalCommandAllowed(raw);
+  if (!verdict.allowed) {
+    return { ok: false, output: `⛔ The read-only terminal lane refused this command: ${verdict.reason}`, observation: `terminal refused: ${verdict.reason}`, meta: { command: raw, refused: true, toolInvocations: 1 } };
+  }
+  const { runNativeCommand } = await import('./NativeCommand.js');
+  const res = await runNativeCommand('bash', ['-lc', raw], { timeoutMs: 15000, cwd: WORKSPACE_DIR, maxOutputChars: 16000 });
+  const out = res.stdout || '';
+  const err = res.stderr || '';
+  const output = [
+    `\`\`\`bash\n${raw}\n\`\`\``,
+    '',
+    '**Output:**',
+    '',
+    `\`\`\`\n${(out || err || '(no output)').slice(0, 4000)}\n\`\`\``,
+  ].join('\n');
+  return {
+    ok: res.ok,
+    output,
+    observation: `ran \`${raw}\` (exit ${res.code ?? '?'}${out ? `, ${out.length}B stdout` : ''}${err ? ', stderr present' : ''})`,
+    meta: { command: raw, exit: res.code ?? null, stdout: out.slice(0, 2000), stderr: err.slice(0, 1000), toolInvocations: 1 },
+  };
+}
+
 const RUNNERS = {
   direct_answer: runDirectAnswer,
   web_search: runWebSearch,
@@ -576,6 +654,7 @@ const RUNNERS = {
   code_run: runCodeRun,
   memory_write: runMemoryWrite,
   memory_read: runMemoryRead,
+  terminal: runTerminal,
 };
 
 /** Derive a capability's first action args deterministically from the query
@@ -595,6 +674,17 @@ function deriveArgs(route, query) {
       return { path: m ? m[0] : '' };
     }
     case 'code_run': return { query: q };
+    case 'terminal': {
+      // "run ls -la" / "execute git status" / "list the files in src" — the
+      // command is whatever follows the verb; plain command-shaped queries
+      // ("ls -la") pass through verbatim.
+      const m = q.match(/^(?:please\s+)?(?:can you\s+)?(?:run|execute|exec)\s+(?:the\s+)?(?:shell\s+)?(?:command\s+)?["']?(.+?)["']?\s*$/i)
+        || q.match(/^(?:please\s+)?(?:list|show)(?: the)? files?(?: in| of)?\s+(.+)$/i);
+      let cmd = m ? m[1] : q;
+      cmd = String(cmd).trim().replace(/[.?!]+$/, '');
+      if (/^(the |this |current )?(files?|directory|folder)$/i.test(cmd)) cmd = 'ls -la';
+      return { command: cmd || 'ls -la' };
+    }
     case 'memory_write': {
       let fact = null;
       let label = 'fact';

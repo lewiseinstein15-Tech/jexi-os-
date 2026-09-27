@@ -102,6 +102,7 @@ import { decide, applyDecision } from './src/services/DecisionEngine.js';
 import { recordDecision, retrieveDecisions, memoryStats as decisionMemoryStats } from './src/services/DecisionMemory.js';
 import { metricsSummary, startTrace, endTrace, emitMetric, scoreProviderHealth } from './src/services/ObservabilityAgent.js';
 import { emit as observerEmit } from './src/services/Observer.js'; // D2 — the chat path flows through the runtime event bus
+import { onCommandTrace } from './src/services/CommandTrace.js'; // P11 B3/B4 — shell executions stream INLINE as `command` NDJSON events
 import { scanPromptSafety, forceSafeMode, toolAllowed, blockExplanation, isSafeMode } from './src/services/GuardrailAgent.js';
 import { routeDecision, checkLocalBackend } from './src/services/OfflineAgent.js';
 import { voiceStatus } from './src/services/VoiceAgent.js';
@@ -1757,6 +1758,19 @@ app.post('/api/chat', async (req, res) => {
   // ARENA — every turn gets a request meter: model calls + per-stage latency,
   // counted automatically for every lane via AsyncLocalStorage (spec Part 1/3).
   meterEnter({ kind: 'chat', query: String(query || '').slice(0, 120) });
+  // P11 B3/B4 — TERMINAL VISIBILITY: while this turn is open, every REAL
+  // shell execution (term tools, persistent bash, capability-runners' script
+  // execs) streams INLINE as `command` NDJSON events. The subscription lives
+  // exactly as long as the turn (removed in finish()) so nothing is faked
+  // and nothing leaks across turns. Events:
+  //   { type:'command', status:'running', id, cmd, source }
+  //   { type:'command', status:'delta',  id, stream:'stdout'|'stderr', chunk }
+  //   { type:'command.done', id, exit, duration_ms, stdout, stderr, source }
+  const untraceCommands = onCommandTrace((evt) => {
+    if (finished) return;
+    const type = evt && evt.status === 'done' ? 'command.done' : 'command';
+    try { res.write(JSON.stringify({ type, ...evt }) + '\n'); } catch { /* stream closed */ }
+  });
   const sendEvent = (type, data) => {
     // B162 — named coworkers: raw model IDs are masked in every streamed log
     // line before it reaches the UI (answers/summaries are untouched).
@@ -1921,7 +1935,7 @@ app.post('/api/chat', async (req, res) => {
   // emits a readable done event instead of leaving the UI spinning forever.
   const CHAT_DEADLINE_MS = 15 * 60 * 1000;
   let finished = false;
-  const finish = () => { clearInterval(heartbeat); try { res.end(); } catch (e) {} };
+  const finish = () => { try { untraceCommands(); } catch { /* already gone */ } clearInterval(heartbeat); try { res.end(); } catch (e) {} };
   const deadline = setTimeout(() => {
     if (finished) return;
     finished = true;
