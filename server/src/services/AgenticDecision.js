@@ -685,6 +685,107 @@ export function verifyAnswer(query, answer, trace = null) {
  * route → execute → verify → shape the done() payload. Returns null when
  * the lane does not take the turn (caller falls through to legacy).
  */
+/* ════════════════════════════════════════════════════════════════════
+ * SUB-AGENT DISPATCH (PHASE 5 P5-7) — multi-step turns spawn REAL children
+ * ════════════════════════════════════════════════════════════════════
+ * A compound query (evidence for ≥2 capabilities) is executed by REAL
+ * sub-agents — each child is an independent AgentLoop run through
+ * SubagentRuntime (bounded MAX_PARALLEL=3), with the P30.C contract
+ * {allowedTools (from the REAL catalog bridge), maxTurns, permissionMode}
+ * validated through the mounted enforcement seam.
+ * Return contract per child: {result, toolsUsed, cost, duration}.
+ */
+
+/** Per-capability evidence score (the catalogMatch internals, exposed). */
+function catalogMatchFor(cap, query) {
+  const q = String(query || '');
+  const hits = [];
+  let score = 0;
+  for (const ev of cap.evidence || []) {
+    const re = new RegExp(ev.re.source, ev.re.flags.replace('g', ''));
+    if (re.test(q)) { hits.push(re.source); score += ev.w || 1; }
+  }
+  return { score, hits };
+}
+
+/** Detect compound queries: every catalog route with real evidence, ranked. */
+function detectCompoundRoutes(query) {
+  try {
+    const scored = CAPABILITY_CATALOG
+      .map((c) => ({ id: c.id, ...catalogMatchFor(c, query) }))
+      .filter((r) => r.score > 0)
+      .sort((a, b) => b.score - a.score || TIE_ORDER.indexOf(a.id) - TIE_ORDER.indexOf(b.id));
+    return scored.slice(0, 3).map((r) => r.id);
+  } catch { return []; }
+}
+
+/**
+ * Dispatch REAL sub-agents for the given routes. Returns
+ * { used, aggregate, contracts, results, enforcement, durationMs }.
+ */
+export async function dispatchSubagents(query, routes, opts = {}) {
+  const started = Date.now();
+  const emit = (type, data) => { try { if (typeof opts.sendEvent === 'function') opts.sendEvent(type, data); } catch { /* never break a turn */ } };
+  const contracts = routes.map((route, i) => ({
+    // Phase 13 base spec (agents/workforce/agents/agent-spec.js REQUIRED_FIELDS)
+    id: `jexi-agentic-${i + 1}-${route}`,
+    name: `agentic-step-${i + 1}`,
+    division: 'operations',
+    role: `execute the "${route}" capability for this turn step`,
+    capabilities: route === 'memory_write' || route === 'memory_read' ? ['memory'] : (route === 'code_run' ? ['code'] : (route === 'web_search' ? ['search', 'research'] : ['reasoning'])),
+    trustLevel: 'restricted',
+    origin: 'agentic-decision-lane',
+    // P30.C additive contract fields
+    allowedTools: CAPABILITY_TOOLS[route] || [],
+    maxTurns: 3,
+    permissionMode: 'default', // P30.C PERMISSION_MODES: default|acceptEdits|plan
+  }));
+  // P30.C contract enforcement — validate every contract through the mounted
+  // seam (verdicts journaled; an invalid contract blocks the delegation honestly).
+  const enforcement = [];
+  try {
+    const { subagentEnforcement, initSubagentEnforcement } = await import('../wiring/phase31-subagent.js');
+    const enf = subagentEnforcement() || initSubagentEnforcement();
+    for (const spec of contracts) {
+      const v = enf.validate ? enf.validate(spec) : null;
+      const errors = v && Array.isArray(v.errors) ? v.errors : (v && v.valid === false ? [{ message: 'invalid' }] : []);
+      if (errors.length) {
+        enforcement.push({ id: spec.id, allowed: false, reason: errors.map((e) => e.message || e.code).join('; ').slice(0, 160) });
+      } else {
+        enforcement.push({ id: spec.id, allowed: true, permissionMode: spec.permissionMode, maxTurns: spec.maxTurns });
+      }
+    }
+  } catch (e) {
+    enforcement.push({ seam: 'unavailable', reason: String(e && e.message || e).slice(0, 120) });
+  }
+  if (enforcement.some((e) => e.allowed === false)) {
+    return { used: 0, aggregate: '', contracts, results: [], enforcement, durationMs: Date.now() - started, refused: true };
+  }
+  const { runSubagents } = await import('./SubagentRuntime.js');
+  const tasks = routes.map((route, i) => ({
+    name: contracts[i].id,
+    query: `${query}\n\n(Your single capability for this step: ${route}. ${CAPABILITY_CATALOG.find((c) => c.id === route)?.description || ''})`,
+  }));
+  const out = await runSubagents({ tasks, sendEvent: emit, opts: { depth: 1 } });
+  const children = (out && out.subagents) || [];
+  const results = children.map((c) => ({
+    name: c.name,
+    result: String(c.summary || c.answer || '').slice(0, 4000),
+    toolsUsed: c.toolCalls || 0,
+    cost: 0, // keyless sandbox — real metering rides RequestMeter when keyed
+    duration: c.durationMs || 0,
+    status: c.status,
+  }));
+  return {
+    used: results.length,
+    aggregate: String((out && out.aggregate) || '').slice(0, 8000),
+    contracts,
+    results,
+    enforcement,
+    durationMs: Date.now() - started,
+  };
+}
+
 export async function agenticTurn({ raw, effectiveQuery, sessionId = null, sendEvent } = {}) {
   const q = String(effectiveQuery || raw || '').trim();
   if (!q) return null;
@@ -703,6 +804,17 @@ export async function agenticTurn({ raw, effectiveQuery, sessionId = null, sendE
   });
   // Only the six concrete capabilities take this lane; 'none'/unknown falls through.
   if (!decision.ok || !RUNNERS[decision.route]) return null;
+
+  // PHASE 5 P5-7 — COMPOUND TURNS SPAWN REAL SUB-AGENTS: when the query
+  // carries evidence for ≥2 capabilities, each step is dispatched as a REAL
+  // child agent (own AgentLoop, own context) under a P30.C contract.
+  const compoundRoutes = detectCompoundRoutes(q);
+  let delegation = null;
+  if (compoundRoutes.length >= 2) {
+    emit('log', { agent: 'Decision', message: `🧩 compound turn (${compoundRoutes.join(' + ')}) — dispatching ${compoundRoutes.length} real sub-agents.` });
+    delegation = await dispatchSubagents(q, compoundRoutes, { sendEvent: emit, sessionId });
+  }
+
   const executed = await executePlan(decision, q, { sessionId, brainContext });
   if (!executed.success || !executed.summary) {
     // Honest handoff: this lane could not complete (keyless question with no
@@ -731,6 +843,15 @@ export async function agenticTurn({ raw, effectiveQuery, sessionId = null, sendE
         verification: verdict.ok ? 'pass' : 'fail',
         agentsUsed: 1,
         confidence: decision.confidence,
+        // PHASE 5 P5-7 — the real sub-agent dispatch record (contract +
+        // per-child {result, toolsUsed, cost, duration}).
+        ...(delegation ? {
+          subagentsUsed: delegation.used,
+          subagentContracts: delegation.contracts,
+          subagentResults: delegation.results,
+          subagentEnforcement: delegation.enforcement,
+          subagentDurationMs: delegation.durationMs,
+        } : {}),
       },
     },
     trace: executed.trace,
