@@ -59,7 +59,11 @@ TARGETS=("$@")
 if [ "${#TARGETS[@]}" -gt 0 ]; then
   BASELINE_FILES=""
   for t in "${TARGETS[@]}"; do
-    files="$(find "$t" -type f -name '*.md' | sort)"
+    # P11 A5 — the workforce tree's README files are baseline-exempt by the
+    # documented contract ("workforce tree (README.md excluded)"); the
+    # restructure moved them under agents/workforce/, so path-args mode
+    # excludes them the same way the no-args mode does.
+    files="$(find "$t" -type f -name '*.md' | sort | grep -v -E '^(agents/)?workforce/.*README\.md$' || true)"
     BASELINE_FILES="${BASELINE_FILES}${BASELINE_FILES:+
 }${files}"
   done
@@ -71,9 +75,14 @@ if [ "${#TARGETS[@]}" -gt 0 ]; then
   done
 else
   # Targets: tracked agent markdown + every SKILL.md (gitignore respected).
+  # P11 A5 — CI RED root cause: the dir restructure (900d0dd0) moved
+  # workforce/ under agents/, but this exclusion still matched only
+  # '^workforce/…README.md' — 7 agents/workforce/**/README.md files stopped
+  # being excluded and failed the baseline they never carry (the docstring
+  # contract "workforce tree (README.md excluded)"). Both layouts excluded.
   BASELINE_FILES="$(git ls-files \
     | grep -E '^(jexi-agents/|agents/|workforce/)[^ ]*\.md$|(^|/)SKILL\.md$' \
-    | grep -v '^workforce/.*README\.md$' \
+    | grep -v -E '^(agents/)?workforce/.*README\.md$' \
     | grep -v '^server/rules/')"
   # Extended canonical-format checks cover every *.agent.md under agents/
   # (filesystem discovery — untracked files are linted too).

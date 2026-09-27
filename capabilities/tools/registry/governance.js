@@ -35,8 +35,11 @@ import {
   listTools,
   getTool as registryGetTool,
   initFromEngineCatalog,
-} from '../../server/src/tools/registry/ToolRegistry.js';
-import { TOOL_REGISTRY as ENGINE_CATALOG } from '../../server/src/services/ToolRegistry.js';
+// P11 A5 — the dir restructure (900d0dd0) moved server/ to the repo root;
+// this relative path still assumed capabilities/server/ (ERR_MODULE_NOT_FOUND
+// in CI's Tool registry audit step). Anchored to the actual repo layout.
+} from '../../../server/src/tools/registry/ToolRegistry.js';
+import { TOOL_REGISTRY as ENGINE_CATALOG } from '../../../server/src/services/ToolRegistry.js';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
