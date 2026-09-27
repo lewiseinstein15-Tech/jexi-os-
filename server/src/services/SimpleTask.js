@@ -134,6 +134,30 @@ export async function runSimpleTask(plan, query, sendEvent, opts = {}) {
   const visionNote = image
     ? '\n\n[An image is attached to the user\'s message. Look at the ACTUAL image and ground your answer in what you truly see — real objects, colors, people, text, setting. If something is unclear or not visible, say exactly that. NEVER invent content that is not in the picture.]'
     : '';
+
+  // PHASE 5 P5-6 — memory_query turns are answered DETERMINISTICALLY from the
+  // user-fact store (no provider in the loop): recall is the one capability
+  // JEXI must never fail on just because every model is rate-limited. When
+  // the deterministic recall has nothing, the normal worker path takes over.
+  if (plan.intent === 'memory_query' && !image) {
+    try {
+      const { runMemoryRead } = await import('./AgenticDecision.js');
+      const mem = await runMemoryRead({ query }, opts);
+      if (mem && mem.ok && mem.output) {
+        appendEvent('orchestrator_decision', {
+          complexity: 'SIMPLE', intent: 'memory_query', classification: 'deterministic-recall',
+          coworkers: ['memory'], reasoning: 'deterministic recall from the user-fact store — provider-free', via: 'runSimpleTask',
+        }).catch?.(() => {});
+        return {
+          success: true,
+          summary: mem.output,
+          statistics: { executionTime: Date.now() - startTime, agentsUsed: 1, complexity: "SIMPLE", confidence: 1, writer: "memory-recall-deterministic", degraded: false },
+        };
+      }
+      emit('log', { agent: 'Memory', message: '💾 Deterministic recall found nothing stored — the normal worker path answers.' });
+    } catch { /* deterministic recall is best-effort — never breaks the lane */ }
+  }
+
   const prompt = `The user asked: "${query}"${visionNote}\n\n${ctx ? `Conversation context:\n${ctx.slice(0, 4000)}\n\n` : ''}${brainBlock ? `${brainBlock}\n\n` : ''}Answer directly and completely. ${FORMAT_RULES}`;
 
   // B157 — LIVE STREAMING + ANSWER PRESERVATION. Every token the coworker

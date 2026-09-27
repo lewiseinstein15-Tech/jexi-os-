@@ -487,7 +487,7 @@ async function runMemoryWrite(args, opts = {}) {
   };
 }
 
-async function runMemoryRead(args, opts = {}) {
+export async function runMemoryRead(args, opts = {}) {
   const { searchUserFacts, loadMemory } = await import('./MemoryManager.js');
   const q = String(args.query || '');
   let found = [];
