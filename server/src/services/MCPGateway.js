@@ -26,6 +26,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import * as mcpGrantGate from '../workforce/mcp-gate.js';
 
 const DEFAULT_REGISTRY_PATH = () => new URL('../../mcp/registry.json', import.meta.url).pathname;
@@ -266,10 +267,15 @@ function interpolateArg(a, wsDir) {
   const dataDir = process.env.DATA_DIR || './data';
   const dbPath = path.join(dataDir, 'mcp-sqlite.db');
   const duckPath = path.join(dataDir, 'mcp-duckdb.duckdb');
+  // FINAL GAP 2 — ${JEXI_SERVER_ROOT}: absolute path of the server/ directory
+  // (the local stdio bridges live in server/mcp/servers/ and must be spawnable
+  // from ANY cwd — mirrors the profileCoverage __dirname discipline).
+  const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
   return String(a)
     .replace(/\$\{JEXI_WORKSPACE\}/g, wsDir)
     .replace(/\$\{JEXI_SQLITE_DB\}/g, dbPath)
-    .replace(/\$\{JEXI_DUCKDB_DB\}/g, duckPath);
+    .replace(/\$\{JEXI_DUCKDB_DB\}/g, duckPath)
+    .replace(/\$\{JEXI_SERVER_ROOT\}/g, serverRoot);
 }
 
 /**

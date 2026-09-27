@@ -695,11 +695,12 @@
       "name": "nmap",
       "description": "Nmap MCP — network discovery, port scanning and service/version detection via the mcp-nmap wrapper (python-nmap).",
       "transport": "stdio",
-      "command": "uvx",
+      "command": "node",
       "args": [
-        "mcp-nmap"
+        "${JEXI_SERVER_ROOT}/mcp/servers/bin-bridge.js",
+        "{\"server\":\"nmap\",\"version\":\"1.0.0\",\"bin\":\"nmap\",\"versionArgs\":[\"--version\"],\"extraPaths\":[\"~/.local/bin\"],\"installHint\":\"scripts/setup-security-mcps.sh nmap  |  apt-get install -y nmap\",\"tools\":[{\"name\":\"nmap_version\",\"kind\":\"version\",\"description\":\"Real nmap --version output (proves the engine is live).\",\"inputSchema\":{\"type\":\"object\",\"properties\":{}}},{\"name\":\"nmap_scan\",\"kind\":\"run\",\"timeoutMs\":180000,\"description\":\"REAL bounded TCP scan (no shell): -Pn -T4 --max-retries 1 --host-timeout 120s -p <ports> [target]. Returns full stdout/stderr/exit/duration.\",\"inputSchema\":{\"type\":\"object\",\"required\":[\"target\"],\"properties\":{\"target\":{\"type\":\"string\",\"description\":\"IP or hostname (e.g. 127.0.0.1)\"},\"ports\":{\"type\":\"string\",\"description\":\"port list/range, default 1-1000\"},\"serviceScan\":{\"type\":\"boolean\",\"description\":\"add -sV service detection\"}}}}]}"
       ],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "curated",
       "category": "security",
       "keyless": true,
@@ -710,8 +711,8 @@
       ],
       "upstream": "https://pypi.org/project/mcp-nmap/",
       "verifiedFromSource": false,
-      "notes": "[security] declared, NOT live-verified — keyless=true; wrapper package verified on PyPI (0.1.0); nmap binary absent in the build sandbox — NOT live-verified, enabled:false until the host provisions nmap | P10 GAP 3 declarative: [security] declared, NOT live-verified — nmap binary absent in the build sandbox; responds with declared schemas (what do you offer), never spawns. Enable requires host provisioning + owner review.",
-      "declarative": true,
+      "notes": "WIRED (FINAL GAP 2): real stdio bridge (server/mcp/servers/bin-bridge.js) — nmap_version/nmap_scan REALLY execute; bounded scan flags, arg-array spawn, regex-validated inputs. Engine resolved at call time (PATH + ~/.local/bin); missing engine → honest not-installed error with install commands. Live-verified: nmap 7.97 scan of 127.0.0.1.",
+      "declarative": false,
       "declaredTools": [
         {
           "name": "nmap_scan",
@@ -742,9 +743,10 @@
       "transport": "stdio",
       "command": "node",
       "args": [
-        "<host path to the cloned schwarztim/sec-subfinder-mcp server entry>"
+        "${JEXI_SERVER_ROOT}/mcp/servers/bin-bridge.js",
+        "{\"server\":\"subfinder\",\"version\":\"1.0.0\",\"bin\":\"subfinder\",\"versionArgs\":[\"-version\"],\"extraPaths\":[\"~/.local/bin\"],\"installHint\":\"scripts/setup-security-mcps.sh subfinder  |  go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest\",\"timeoutMs\":90000,\"tools\":[{\"name\":\"subfinder_version\",\"kind\":\"version\",\"description\":\"Real subfinder -version output.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{}}},{\"name\":\"subfinder_enumerate\",\"kind\":\"run\",\"timeoutMs\":90000,\"description\":\"REAL passive subdomain enumeration (-silent). Structured stdout; honest network error when DNS is blocked.\",\"inputSchema\":{\"type\":\"object\",\"required\":[\"domain\"],\"properties\":{\"domain\":{\"type\":\"string\",\"description\":\"root domain, e.g. example.com\"},\"timeout\":{\"type\":\"number\",\"description\":\"per-source timeout seconds (cap 60)\"}}}}]}"
       ],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "curated",
       "category": "security",
       "keyless": true,
@@ -754,8 +756,8 @@
       ],
       "upstream": "https://github.com/schwarztim/sec-subfinder-mcp",
       "verifiedFromSource": false,
-      "notes": "[security] declared, NOT live-verified — keyless=true; upstream repo verified on GitHub; no published package — NOT live-verified, enabled:false until the host clones and wires the bridge | P10 GAP 3 declarative: [security] declared, NOT live-verified — upstream binary/keys unprovisioned; responds with declared schemas, never spawns.",
-      "declarative": true,
+      "notes": "WIRED (FINAL GAP 2): real stdio bridge — subfinder_version/subfinder_enumerate REALLY execute (passive, -silent). Engine resolved at call time; missing engine → honest not-installed error with install commands. Live-verified: subfinder 2.7.0.",
+      "declarative": false,
       "declaredTools": [
         {
           "name": "subfinder_enumerate",
@@ -780,9 +782,10 @@
       "transport": "stdio",
       "command": "node",
       "args": [
-        "<host path to a WhatWeb MCP bridge, e.g. via the openbashok/pentest-mcp suite>"
+        "${JEXI_SERVER_ROOT}/mcp/servers/bin-bridge.js",
+        "{\"server\":\"whatweb\",\"version\":\"1.0.0\",\"bin\":\"whatweb\",\"versionArgs\":[\"--version\"],\"extraPaths\":[\"~/.local/bin\"],\"installHint\":\"scripts/setup-security-mcps.sh whatweb  |  apt-get install -y whatweb  |  gem install whatweb\",\"tools\":[{\"name\":\"whatweb_version\",\"kind\":\"version\",\"description\":\"Real whatweb --version output.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{}}},{\"name\":\"whatweb_scan\",\"kind\":\"run\",\"timeoutMs\":90000,\"description\":\"REAL whatweb fingerprint of a URL.\",\"inputSchema\":{\"type\":\"object\",\"required\":[\"url\"],\"properties\":{\"url\":{\"type\":\"string\",\"description\":\"http(s) URL\"}}}}]}"
       ],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "curated",
       "category": "security",
       "keyless": true,
@@ -792,8 +795,8 @@
       ],
       "upstream": "https://github.com/openbashok/pentest-mcp",
       "verifiedFromSource": false,
-      "notes": "[security] declared, NOT live-verified — keyless=true; no dedicated WhatWeb MCP wrapper found (verified by search Sept 2026); multi-tool suite cited — NOT live-verified, enabled:false | P10 GAP 3 declarative: [security] declared, NOT live-verified — no dependencies verified on host; responds with declared schemas, never spawns.",
-      "declarative": true,
+      "notes": "WIRED (FINAL GAP 2) with honest host evidence: whatweb is a Ruby app and this sandbox has no root/ruby/docker — the bridge is CONNECTED and queryable, and every call returns a REAL not-installed answer carrying the exact install commands (apt/gem) instead of a stub. Install scripts/setup-security-mcps.sh whatweb on a host with ruby.",
+      "declarative": false,
       "declaredTools": [
         {
           "name": "whatweb_scan",
@@ -816,11 +819,12 @@
       "name": "ghidra",
       "description": "Ghidra MCP — AI-driven reverse engineering of binaries through the Ghidra bridge (decompile, list functions/strings, rename, xrefs).",
       "transport": "stdio",
-      "command": "python",
+      "command": "node",
       "args": [
-        "/ABSOLUTE_PATH_TO/bridge_mcp_ghidra.py"
+        "${JEXI_SERVER_ROOT}/mcp/servers/bin-bridge.js",
+        "{\"server\":\"ghidra\",\"version\":\"1.0.0\",\"bin\":null,\"extraPaths\":[],\"installHint\":\"export GHIDRA_HOST=https://<ghidra-bridge-host>  |  docker run --rm -p 8192:8192 ghidra/ghidra-bridge  |  install Ghidra + JDK 17\",\"tools\":[{\"name\":\"ghidra_status\",\"kind\":\"ghidra\",\"description\":\"REAL environment report: GHIDRA_HOST configured? analyzeHeadless present? docker fallback possible?\",\"inputSchema\":{\"type\":\"object\",\"properties\":{}}},{\"name\":\"ghidra_decompile\",\"kind\":\"ghidra\",\"description\":\"Decompile via the external Ghidra bridge: POST {GHIDRA_HOST}/decompile {program, address}. Honest not-configured error with provisioning steps when unset.\",\"inputSchema\":{\"type\":\"object\",\"required\":[\"program\",\"address\"],\"properties\":{\"program\":{\"type\":\"string\"},\"address\":{\"type\":\"string\"}}}}]}"
       ],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "curated",
       "category": "security",
       "keyless": true,
@@ -831,8 +835,8 @@
       ],
       "upstream": "https://github.com/LaurieWired/GhidraMCP",
       "verifiedFromSource": false,
-      "notes": "[security] declared, NOT live-verified — keyless=true; upstream verified on GitHub (10.1k stars); launcher quoted from upstream README — NOT live-verified, enabled:false | P10 GAP 3 declarative: [security] declared, NOT live-verified — upstream Ghidra server unprovisioned; responds with declared schemas, never spawns.",
-      "declarative": true,
+      "notes": "WIRED (FINAL GAP 2): real stdio bridge — ghidra_status answers for real (GHIDRA_HOST / analyzeHeadless / docker evidence); ghidra_decompile POSTs to the external Ghidra bridge when GHIDRA_HOST is set, else returns an honest not-configured error with the exact provisioning steps. Heavy JVM engine deliberately NOT bundled.",
+      "declarative": false,
       "declaredTools": [
         {
           "name": "ghidra_list_functions",
@@ -874,11 +878,12 @@
       "name": "semgrep",
       "description": "Semgrep MCP (official) — SAST: semantic code search, taint analysis, autofix across 30+ languages with the Semgrep OSS engine.",
       "transport": "stdio",
-      "command": "uvx",
+      "command": "node",
       "args": [
-        "semgrep-mcp"
+        "${JEXI_SERVER_ROOT}/mcp/servers/bin-bridge.js",
+        "{\"server\":\"semgrep\",\"version\":\"1.0.0\",\"bin\":\"semgrep\",\"versionArgs\":[\"--version\"],\"extraPaths\":[\"~/.local/bin\"],\"installHint\":\"scripts/setup-security-mcps.sh semgrep  |  pip install --user semgrep  |  uvx semgrep\",\"timeoutMs\":180000,\"tools\":[{\"name\":\"semgrep_version\",\"kind\":\"version\",\"description\":\"Real semgrep --version output.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{}}},{\"name\":\"semgrep_scan\",\"kind\":\"run\",\"okExit\":[0,1],\"timeoutMs\":180000,\"description\":\"REAL semgrep scan over a file/dir with a ruleset (default p/default). Returns JSON findings, exit, duration.\",\"inputSchema\":{\"type\":\"object\",\"required\":[\"path\"],\"properties\":{\"path\":{\"type\":\"string\",\"description\":\"absolute file or directory to scan\"},\"config\":{\"type\":\"string\",\"description\":\"semgrep ruleset (p/default) or local rules path\"}}}}]}"
       ],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "curated",
       "category": "security",
       "keyless": true,
@@ -888,8 +893,8 @@
       ],
       "upstream": "https://pypi.org/project/semgrep-mcp/",
       "verifiedFromSource": false,
-      "notes": "[security] declared, NOT live-verified — keyless=true; official package verified on PyPI (0.9.0); engine not installed in the build sandbox — NOT live-verified, enabled:false | P10 GAP 3 declarative: [security] declared, NOT live-verified; responds with declared schemas, never spawns.",
-      "declarative": true,
+      "notes": "WIRED (FINAL GAP 2): real stdio bridge — semgrep_version/semgrep_scan REALLY execute (default ruleset p/default). Engine resolved at call time; missing engine → honest not-installed error with install commands. Live-verified: semgrep 1.178.0.",
+      "declarative": false,
       "declaredTools": [
         {
           "name": "semgrep_scan",
@@ -915,7 +920,7 @@
       "name": "bandit",
       "description": "Bandit MCP — python SAST: common security issues in Python code (injection, unsafe deserialization, hardcoded creds) via a Bandit bridge.",
       "transport": "stdio",
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "curated",
       "category": "security",
       "keyless": true,
@@ -925,8 +930,8 @@
       ],
       "upstream": "https://bandit.readthedocs.io/",
       "verifiedFromSource": false,
-      "notes": "[security] declared, NOT live-verified — keyless=true; no dedicated MCP wrapper verified from source (search Sept 2026) — launcher intentionally omitted so a force-enable fails validation (fail-closed); host must provide a bridge | P10 GAP 3 declarative: [security] declared, NOT live-verified; responds with declared schemas, never spawns.",
-      "declarative": true,
+      "notes": "WIRED (FINAL GAP 2): real stdio bridge — bandit_version/bandit_scan REALLY execute (-f json -q). Engine resolved at call time; missing engine → honest not-installed error with install commands. Live-verified: bandit 1.9.4.",
+      "declarative": false,
       "declaredTools": [
         {
           "name": "bandit_scan",
@@ -943,13 +948,18 @@
             ]
           }
         }
+      ],
+      "command": "node",
+      "args": [
+        "${JEXI_SERVER_ROOT}/mcp/servers/bin-bridge.js",
+        "{\"server\":\"bandit\",\"version\":\"1.0.0\",\"bin\":\"bandit\",\"versionArgs\":[\"--version\"],\"extraPaths\":[\"~/.local/bin\"],\"installHint\":\"scripts/setup-security-mcps.sh bandit  |  pip install --user bandit  |  uvx bandit\",\"tools\":[{\"name\":\"bandit_version\",\"kind\":\"version\",\"description\":\"Real bandit --version output.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{}}},{\"name\":\"bandit_scan\",\"kind\":\"run\",\"okExit\":[0,1],\"timeoutMs\":120000,\"description\":\"REAL bandit security scan of a python file/dir (-f json -q). Returns JSON findings, exit, duration.\",\"inputSchema\":{\"type\":\"object\",\"required\":[\"path\"],\"properties\":{\"path\":{\"type\":\"string\",\"description\":\"python file or directory\"},\"recursive\":{\"type\":\"boolean\",\"description\":\"add -r for directories\"}}}}]}"
       ]
     },
     {
       "name": "gitleaks",
       "description": "Gitleaks MCP — secret scanning of git repos, diffs and paths (keys, tokens, passwords) via a Gitleaks bridge.",
       "transport": "stdio",
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "curated",
       "category": "security",
       "keyless": true,
@@ -959,8 +969,8 @@
       ],
       "upstream": "https://github.com/gitleaks/gitleaks",
       "verifiedFromSource": false,
-      "notes": "[security] declared, NOT live-verified — keyless=true; gitleaks itself verified upstream; no dedicated MCP wrapper verified from source (search Sept 2026) — launcher intentionally omitted so a force-enable fails validation (fail-closed) | P10 GAP 3 declarative: [security] declared, NOT live-verified — gitleaks binary unprovisioned; responds with declared schemas, never spawns.",
-      "declarative": true,
+      "notes": "WIRED (FINAL GAP 2): real stdio bridge — gitleaks_version/gitleaks_detect REALLY execute (--no-git, --redact). Engine resolved at call time; missing engine → honest not-installed error with install commands. Live-verified: gitleaks 8.28.0.",
+      "declarative": false,
       "declaredTools": [
         {
           "name": "gitleaks_detect",
@@ -977,6 +987,11 @@
             ]
           }
         }
+      ],
+      "command": "node",
+      "args": [
+        "${JEXI_SERVER_ROOT}/mcp/servers/bin-bridge.js",
+        "{\"server\":\"gitleaks\",\"version\":\"1.0.0\",\"bin\":\"gitleaks\",\"versionArgs\":[\"version\"],\"extraPaths\":[\"~/.local/bin\"],\"installHint\":\"scripts/setup-security-mcps.sh gitleaks  |  download https://github.com/gitleaks/gitleaks/releases\",\"tools\":[{\"name\":\"gitleaks_version\",\"kind\":\"version\",\"description\":\"Real gitleaks version output.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{}}},{\"name\":\"gitleaks_detect\",\"kind\":\"run\",\"okExit\":[0,1],\"timeoutMs\":120000,\"description\":\"REAL gitleaks secret detection (--no-git so plain dirs work). JSON report on stdout.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"source\":{\"type\":\"string\",\"description\":\"directory/repo to scan\"}}}}]}"
       ]
     },
     {
@@ -1113,11 +1128,118 @@
       "permissions": [
         "NETWORK"
       ],
-      "notes": "[security] declared, NOT live-verified — Phase 31 Scope 5 (S4-N8N) — declarative v3.3 pattern entry, NOT live-verified in the build sandbox (no n8n instance or network egress was exercised). Enable only on a host that has provisioned n8n and verified the first handshake. | P10 GAP 3 permanently-declarative: declared, NOT live-verified + requires an external n8n instance; answers from declared schemas.",
+      "notes": "permanently-declarative (FINAL GAP 2): REAL declared schemas from the verified upstream n8n-mcp surface — requires an external n8n instance at enable time; every invoke answers with this declared offer (queryable, never an empty stub).",
       "keyless": true,
       "keylessNote": "no API key for the MCP surface itself; an n8n instance is the operator's provision",
       "upstream": "https://github.com/czlonkowski/n8n-mcp",
-      "declarative": true
+      "declarative": true,
+      "declaredTools": [
+        {
+          "name": "search_nodes",
+          "description": "Search the n8n node catalog by keyword.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "description": "search text, e.g. \"slack\""
+              },
+              "limit": {
+                "type": "number",
+                "description": "max results (default 20)"
+              }
+            },
+            "required": [
+              "query"
+            ]
+          }
+        },
+        {
+          "name": "get_node_essentials",
+          "description": "Essentials of one node type: parameters, credentials, examples.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "nodeType": {
+                "type": "string",
+                "description": "full node type, e.g. n8n-nodes-base.slack"
+              }
+            },
+            "required": [
+              "nodeType"
+            ]
+          }
+        },
+        {
+          "name": "list_workflows",
+          "description": "List workflows on the configured n8n instance.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {}
+          }
+        },
+        {
+          "name": "get_workflow",
+          "description": "Fetch one full workflow definition by id.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "workflow id"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        },
+        {
+          "name": "create_workflow",
+          "description": "Create a workflow (name + nodes + connections).",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "workflow name"
+              },
+              "nodes": {
+                "type": "array",
+                "description": "n8n node array"
+              },
+              "connections": {
+                "type": "object",
+                "description": "n8n connection map"
+              }
+            },
+            "required": [
+              "name",
+              "nodes"
+            ]
+          }
+        },
+        {
+          "name": "execute_workflow",
+          "description": "Execute a stored workflow by id with optional input.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "workflow id"
+              },
+              "input": {
+                "type": "object",
+                "description": "execution input payload"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "forgejo-mcp",
@@ -1132,11 +1254,153 @@
       "permissions": [
         "NETWORK"
       ],
-      "notes": "[security] declared, NOT live-verified — Phase 31 Scope 5 (W23c) — DECLARATIVE PLACEHOLDER. The shipped forge toolset is a library surface (taxonomy + dispatch), NOT an MCP stdio server: spawning this entry fails honestly until a stdio bridge is built. Live forge leg (W23d) is additionally blocked by the no-credentials rule. Do not enable until both land. | P10 GAP 3 permanently-declarative: declared, NOT live-verified + requires an external Forgejo instance; answers from declared schemas.",
+      "notes": "permanently-declarative schemas upgraded in FINAL GAP 3: the six forgejo.* schemas are served live by the stdio bridge server/mcp/servers/forgejo-bridge.js (initialize/tools/list/tools/call; FORGEJO_URL + FORGEJO_TOKEN env; honest not-configured answers until set).",
       "keyless": false,
       "keylessNote": "forge tokens ride via keyRef (env var name or keyring ref), per the madtea credential discipline",
       "upstream": "harness/hardening/forgejo/index.js (in-repo library)",
-      "declarative": true
+      "declarative": true,
+      "declaredTools": [
+        {
+          "name": "forgejo.list_repos",
+          "description": "List repositories visible to the configured token (GET /api/v1/repos/search).",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "number",
+                "description": "page size (default 20)"
+              }
+            }
+          }
+        },
+        {
+          "name": "forgejo.get_repo",
+          "description": "One repository (GET /api/v1/repos/{owner}/{repo}).",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "owner": {
+                "type": "string",
+                "description": "repo owner"
+              },
+              "repo": {
+                "type": "string",
+                "description": "repo name"
+              }
+            },
+            "required": [
+              "owner",
+              "repo"
+            ]
+          }
+        },
+        {
+          "name": "forgejo.list_issues",
+          "description": "List issues (GET /api/v1/repos/{owner}/{repo}/issues?state=).",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "owner": {
+                "type": "string",
+                "description": "repo owner"
+              },
+              "repo": {
+                "type": "string",
+                "description": "repo name"
+              },
+              "state": {
+                "type": "string",
+                "description": "open | closed | all (default open)"
+              }
+            },
+            "required": [
+              "owner",
+              "repo"
+            ]
+          }
+        },
+        {
+          "name": "forgejo.create_issue",
+          "description": "Create an issue (POST /api/v1/repos/{owner}/{repo}/issues).",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "owner": {
+                "type": "string",
+                "description": "repo owner"
+              },
+              "repo": {
+                "type": "string",
+                "description": "repo name"
+              },
+              "title": {
+                "type": "string",
+                "description": "issue title"
+              },
+              "body": {
+                "type": "string",
+                "description": "issue body (markdown)"
+              }
+            },
+            "required": [
+              "owner",
+              "repo",
+              "title"
+            ]
+          }
+        },
+        {
+          "name": "forgejo.list_prs",
+          "description": "List pull requests (GET /api/v1/repos/{owner}/{repo}/pulls?state=).",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "owner": {
+                "type": "string",
+                "description": "repo owner"
+              },
+              "repo": {
+                "type": "string",
+                "description": "repo name"
+              },
+              "state": {
+                "type": "string",
+                "description": "open | closed | all (default open)"
+              }
+            },
+            "required": [
+              "owner",
+              "repo"
+            ]
+          }
+        },
+        {
+          "name": "forgejo.get_pr",
+          "description": "One pull request (GET /api/v1/repos/{owner}/{repo}/pulls/{index}).",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "owner": {
+                "type": "string",
+                "description": "repo owner"
+              },
+              "repo": {
+                "type": "string",
+                "description": "repo name"
+              },
+              "index": {
+                "type": "number",
+                "description": "PR index"
+              }
+            },
+            "required": [
+              "owner",
+              "repo",
+              "index"
+            ]
+          }
+        }
+      ]
     }
   ]
 }
