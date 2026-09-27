@@ -558,7 +558,20 @@ async function tryOpenAICompat({ key, baseUrl, models, label, providerKey = '' }
           errors.push(`${label}(${model}): HTTP ${res.status} ${body.slice(0, 120)}`);
           continue;
         }
-        const data = await res.json();
+        const data = await res.json().catch(() => null);
+        // FINAL GAP-1f — a HTTP 200 carrying an ERROR body is a FAILURE, never
+        // an answer. The Pollinations closed anonymous tier answers exactly
+        // like this: HTTP 200 with {"success":false,"error":{"code":
+        // "UNAUTHORIZED",…},"status":401}. Counting that as a healthy keyless
+        // lane (or even as "empty response") lied about keyless availability.
+        if (data && (data.error || data.success === false || (typeof data.status === 'number' && data.status >= 400))) {
+          const inner = (data.error && (data.error.code || data.error.message)) || `embedded status ${data.status}`;
+          errors.push(`${label}(${model}): HTTP 200 with error body (${String(inner).slice(0, 140)})`);
+          // An embedded 401/403 means THIS key (or the keyless tier) cannot
+          // serve this provider — park it like a real HTTP 401 would.
+          if ((typeof data.status === 'number' && (data.status === 401 || data.status === 403)) && providerKey) markProviderUnavailable(providerKey, 60);
+          continue;
+        }
         const text = data?.choices?.[0]?.message?.content || '';
         if (text) return text.trim();
         errors.push(`${label}(${model}) returned an empty response`);
