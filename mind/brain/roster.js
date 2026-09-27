@@ -110,11 +110,15 @@ async function mcpsSection() {
   const gw = await softImport('src/services/MCPGateway.js');
   if (gw.__error) return { error: gw.__error };
   try {
+    // P10 GAP 3 — three-state self-knowledge: connected / declarative / disabled.
+    // `report` is the same three-state classification /api/mcps serves; every
+    // declarative entry answers "what do you offer" (declared schemas).
+    const report = gw.mcpStateReport ? gw.mcpStateReport() : null;
     const rows = gw.mcpServerHealth() || [];
     const connected = rows.filter((r) => r.status === 'connected');
     const ready = rows.filter((r) => r.enabled && r.status !== 'connected' && r.status !== 'disabled');
     const disabled = rows.filter((r) => !r.enabled);
-    return {
+    const out = {
       enabled: rows.filter((r) => r.enabled).length,
       connected: connected.length,
       dormant: ready.length,
@@ -122,6 +126,12 @@ async function mcpsSection() {
       connectedNames: connected.map((r) => r.name),
       dormantNames: ready.map((r) => r.name),
     };
+    if (report && report.ok) {
+      out.states = report.summary; // { connected, declarative, disabled, total }
+      out.stateModel = 'connected / declarative / disabled — every server is exactly one; declarative servers answer "what do you offer" with declared schemas (connectable ones lazy-wake on first invoke)';
+      out.declarativeNames = (report.servers || []).filter((s) => s.state === 'declarative' && s.declarativeByDesign).map((s) => s.name).slice(0, 20);
+    }
+    return out;
   } catch (e) { return { error: String(e && e.message || e) }; }
 }
 
@@ -315,9 +325,13 @@ export async function answerCapabilityQuestion(rawQuery) {
 
   if (mcpRe) {
     const m = r.mcps || {};
+    const st = m.states || null;
+    const statesLine = st
+      ? `Every one of my **${fmt(st.total)}** MCP servers is exactly one of three states right now: **${fmt(st.connected)} connected**, **${fmt(st.declarative)} declarative** (answer "what do you offer" with declared schemas${Array.isArray(m.declarativeNames) && m.declarativeNames.length ? ` — e.g. ${m.declarativeNames.slice(0, 5).join(', ')}` : ''}), **${fmt(st.disabled)} disabled**.`
+      : '';
     return {
       handled: true,
-      answer: `**${fmt(m.enabled)} MCP servers** are enabled in my gateway — **${fmt(m.connected)} connected** right now${Array.isArray(m.connectedNames) && m.connectedNames.length ? ` (${m.connectedNames.slice(0, 6).join(', ')})` : ''}, **${fmt(m.dormant)} dormant** (lazy-wake on demand; I don't hold them all open). Every connected MCP tool is callable through the same gated tool runtime.`,
+      answer: `**${fmt(m.enabled)} MCP servers** are enabled in my gateway — **${fmt(m.connected)} connected** right now${Array.isArray(m.connectedNames) && m.connectedNames.length ? ` (${m.connectedNames.slice(0, 6).join(', ')})` : ''}, **${fmt(m.dormant)} dormant** (lazy-wake on demand; I don't hold them all open). ${statesLine} Every connected MCP tool is callable through the same gated tool runtime.`.trim(),
     };
   }
 

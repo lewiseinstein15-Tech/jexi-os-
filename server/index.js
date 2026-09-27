@@ -86,7 +86,7 @@ import { resolveModelConfig, validateModelConfig, mergeUnifiedConfig, maskConfig
 import { probeConfig } from './src/services/providers/unified.js';
 import { capabilitiesFor } from './src/services/providers/capabilities.js';
 import { MCP_PORT, MCP_TOOL_ALLOWLIST, listMcpTools } from './mcp-server.js';
-import { enableMcpServer, disableMcpServer, connectGatewayServer, disconnectGatewayServer, connectEnabledMcpServers, startIdleSweeper, invokeMcpTool, mcpServerHealth, mcpToolsUnified } from './src/services/MCPGateway.js';
+import { enableMcpServer, disableMcpServer, connectGatewayServer, disconnectGatewayServer, connectEnabledMcpServers, startIdleSweeper, invokeMcpTool, mcpServerHealth, mcpToolsUnified, mcpStateReport, describeMcpServer } from './src/services/MCPGateway.js';
 import { unifiedToolCatalog, invokeUnifiedTool } from './src/services/UnifiedTools.js';
 import {
   registerConnectors, getConnectorStatus, saveConnectorConfig, callConnector, handleConnectorWebhook, getConnectorToolSchemas, setInboundReplyGenerator,
@@ -1022,6 +1022,22 @@ app.get('/api/mcp/status', (req, res) => {
 // === MCP GATEWAY (AGI Phase 2, live Sept 2026) — external MCP servers ===
 // Lewis's switches. Enabled servers connect lazily/on demand; toggling from the
 // UI connects or disconnects immediately so the status shown is the real one.
+// P10 GAP 3 — the three-state MCP surface: every registry server is exactly
+// one of connected | declarative | disabled; declarative ones answer "what
+// do you offer" with their declared schemas (see describeMcpServer).
+app.get('/api/mcps', (req, res) => {
+  try {
+    const report = mcpStateReport();
+    if (req.query.server) {
+      const d = describeMcpServer(String(req.query.server));
+      return res.json({ ...report, describe: d });
+    }
+    res.json(report);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: (e && e.message) || String(e) });
+  }
+});
+
 app.get('/api/mcp/servers', async (req, res) => {
   try {
     const rows = mcpServerHealth();

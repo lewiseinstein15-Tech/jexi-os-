@@ -96,13 +96,13 @@
         "-y",
         "@mate-tools/mcp-server"
       ],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "community",
       "permissions": [
         "READ_ONLY",
         "NETWORK"
       ],
-      "notes": "MIT, zero deps, no key, no telemetry. Reviewed + live-tested by JEXI Sept 2026."
+      "notes": "MIT, zero deps, no key, no telemetry. Reviewed + live-tested by JEXI Sept 2026. | P10 GAP 3 wire-now: reviewed + live-tested Sept 2026, READ_ONLY/NETWORK, npx-only — connectable (lazy-wake)."
     },
     {
       "name": "wikipedia-js",
@@ -113,13 +113,13 @@
         "-y",
         "wikipedia-mcp-server"
       ],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "community",
       "permissions": [
         "READ_ONLY",
         "NETWORK"
       ],
-      "notes": "Free public API. Reviewed + live-tested Sept 2026."
+      "notes": "Free public API. Reviewed + live-tested Sept 2026. | P10 GAP 3 wire-now: reviewed + live-tested Sept 2026, READ_ONLY/NETWORK — connectable (lazy-wake)."
     },
     {
       "name": "qrcode",
@@ -130,12 +130,12 @@
         "-y",
         "mcp-server-qrcode"
       ],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "community",
       "permissions": [
         "READ_ONLY"
       ],
-      "notes": "No network, no key. Reviewed + live-tested Sept 2026. Needs the qrencode binary on the host (installed in the JEXI brain image; absent in some sandboxes — connect+list verified there, full generation verified on the brain)."
+      "notes": "No network, no key. Reviewed + live-tested Sept 2026. Needs the qrencode binary on the host (installed in the JEXI brain image; absent in some sandboxes — connect+list verified there, full generation verified on the brain). | P10 GAP 3 wire-now: reviewed + live-tested Sept 2026, READ_ONLY, no network — connectable (lazy-wake)."
     },
     {
       "name": "fetch",
@@ -194,12 +194,12 @@
       "args": [
         "mcp-server-calculator"
       ],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "community",
       "permissions": [
         "READ_ONLY"
       ],
-      "notes": "MIT. Reviewed + live-tested Sept 2026."
+      "notes": "MIT. Reviewed + live-tested Sept 2026. | P10 GAP 3 wire-now: reviewed + live-tested Sept 2026, READ_ONLY — connectable (lazy-wake)."
     },
     {
       "name": "wikipedia-py",
@@ -215,7 +215,8 @@
         "READ_ONLY",
         "NETWORK"
       ],
-      "notes": "Runs via uvx. Reviewed + live-tested Sept 2026."
+      "notes": "Runs via uvx. Reviewed + live-tested Sept 2026. | P10 GAP 3 permanently-declarative: needs a uvx python runtime and duplicates the wikipedia-js surface (wire-now); answers from declared schemas, never spawns.",
+      "declarative": true
     },
     {
       "name": "arxiv",
@@ -225,13 +226,13 @@
       "args": [
         "arxiv-mcp-server"
       ],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "community",
       "permissions": [
         "READ_ONLY",
         "NETWORK"
       ],
-      "notes": "Free arXiv API. Reviewed + live-tested Sept 2026."
+      "notes": "Free arXiv API. Reviewed + live-tested Sept 2026. | P10 GAP 3 wire-now: reviewed + live-tested Sept 2026, READ_ONLY/NETWORK — connectable (lazy-wake)."
     },
     {
       "name": "markitdown",
@@ -279,13 +280,13 @@
         "mcp<2",
         "osm-mcp-server"
       ],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "community",
       "permissions": [
         "READ_ONLY",
         "NETWORK"
       ],
-      "notes": "Free OSM/Nominatim APIs. Reviewed + live-tested Sept 2026."
+      "notes": "Free OSM/Nominatim APIs. Reviewed + live-tested Sept 2026. | P10 GAP 3 wire-now: reviewed + live-tested Sept 2026, READ_ONLY/NETWORK — connectable (lazy-wake)."
     },
     {
       "name": "rss",
@@ -297,13 +298,13 @@
         "mcp<2",
         "mcp-server-rss"
       ],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "community",
       "permissions": [
         "READ_ONLY",
         "NETWORK"
       ],
-      "notes": "Reviewed + live-tested Sept 2026."
+      "notes": "Reviewed + live-tested Sept 2026. | P10 GAP 3 wire-now: reviewed + live-tested Sept 2026, READ_ONLY/NETWORK — connectable (lazy-wake)."
     },
     {
       "name": "context7-remote",
@@ -336,13 +337,13 @@
       "description": "GitMCP (hosted) — instant documentation/context server for GitHub repositories.",
       "transport": "streamable-http",
       "url": "https://gitmcp.io/docs",
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "community",
       "permissions": [
         "READ_ONLY",
         "NETWORK"
       ],
-      "notes": "Free hosted endpoint. Reviewed + live-tested Sept 2026."
+      "notes": "Free hosted endpoint. Reviewed + live-tested Sept 2026. | P10 GAP 3 wire-now: reviewed + live-tested Sept 2026, hosted READ_ONLY — connectable (lazy-wake)."
     },
     {
       "name": "chroma",
@@ -360,7 +361,8 @@
         "READ_ONLY",
         "LOCAL_WRITE"
       ],
-      "notes": "Local-only vector store, no key. Reviewed + live-tested Sept 2026."
+      "notes": "Local-only vector store, no key. Reviewed + live-tested Sept 2026. | P10 GAP 3 permanently-declarative: needs a local Chroma vector DB and holds LOCAL_WRITE; answers from declared schemas, never spawns.",
+      "declarative": true
     },
     {
       "name": "mermaid",
@@ -372,12 +374,12 @@
         "mcp<2",
         "mcp-mermaid"
       ],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "community",
       "permissions": [
         "READ_ONLY"
       ],
-      "notes": "Local rendering. Reviewed + live-tested Sept 2026."
+      "notes": "Local rendering. Reviewed + live-tested Sept 2026. | P10 GAP 3 wire-now: reviewed + live-tested Sept 2026, local rendering — connectable (lazy-wake)."
     },
     {
       "name": "fs-alt",
@@ -395,7 +397,8 @@
         "READ_ONLY",
         "LOCAL_WRITE"
       ],
-      "notes": "Reviewed + live-tested by JEXI Sept 2026. Same workspace boundary as the official one."
+      "notes": "Reviewed + live-tested by JEXI Sept 2026. Same workspace boundary as the official one. | P10 GAP 3 permanently-declarative: duplicate filesystem surface (fs_read/fs_write) — a second write boundary over the same roots is refused by design; answers from declared schemas.",
+      "declarative": true
     },
     {
       "name": "playwright-ea",
@@ -413,20 +416,21 @@
         "NETWORK",
         "EXECUTION"
       ],
-      "notes": "Same browser-binary requirement. Reviewed + live-tested Sept 2026. Needs a browser with system deps on the host. Connect+list verified here; navigation needs the host browser. We WILL find a way to give these a browser — see docs/BROWSER-PLAN.md (free hosted browser / full image on a 2GB machine / plan upgrade / phone-browser idea)."
+      "notes": "Same browser-binary requirement. Reviewed + live-tested Sept 2026. Needs a browser with system deps on the host. Connect+list verified here; navigation needs the host browser. We WILL find a way to give these a browser — see docs/BROWSER-PLAN.md (free hosted browser / full image on a 2GB machine / plan upgrade / phone-browser idea). | P10 GAP 3 permanently-declarative: EXECUTION grant + browser-binary requirement (the main playwright entry is the wired surface); answers from declared schemas.",
+      "declarative": true
     },
     {
       "name": "mcpqueen",
       "description": "MCPQueen (hosted) — the graded MCP registry: live-probed grades for remote MCP servers, searchable.",
       "transport": "streamable-http",
       "url": "https://mcpqueen.com/mcp",
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "community",
       "permissions": [
         "READ_ONLY",
         "NETWORK"
       ],
-      "notes": "Free hosted endpoint. Reviewed + live-tested Sept 2026."
+      "notes": "Free hosted endpoint. Reviewed + live-tested Sept 2026. | P10 GAP 3 wire-now: reviewed + live-tested Sept 2026, hosted READ_ONLY — connectable (lazy-wake)."
     },
     {
       "name": "pandoc",
@@ -444,7 +448,8 @@
         "READ_ONLY",
         "LOCAL_WRITE"
       ],
-      "notes": "Needs pandoc binary availability where it runs. Reviewed + live-tested Sept 2026. Needs the pandoc binary on the host (installed in the JEXI brain image). Connect+list verified everywhere; conversion verified on the brain."
+      "notes": "Needs pandoc binary availability where it runs. Reviewed + live-tested Sept 2026. Needs the pandoc binary on the host (installed in the JEXI brain image). Connect+list verified everywhere; conversion verified on the brain. | P10 GAP 3 permanently-declarative: needs the pandoc binary on the host; answers from declared schemas, never spawns.",
+      "declarative": true
     },
     {
       "name": "mslearn",
@@ -705,7 +710,31 @@
       ],
       "upstream": "https://pypi.org/project/mcp-nmap/",
       "verifiedFromSource": false,
-      "notes": "[security] declared, NOT live-verified — keyless=true; wrapper package verified on PyPI (0.1.0); nmap binary absent in the build sandbox — NOT live-verified, enabled:false until the host provisions nmap"
+      "notes": "[security] declared, NOT live-verified — keyless=true; wrapper package verified on PyPI (0.1.0); nmap binary absent in the build sandbox — NOT live-verified, enabled:false until the host provisions nmap | P10 GAP 3 declarative: [security] declared, NOT live-verified — nmap binary absent in the build sandbox; responds with declared schemas (what do you offer), never spawns. Enable requires host provisioning + owner review.",
+      "declarative": true,
+      "declaredTools": [
+        {
+          "name": "nmap_scan",
+          "description": "Declared (schema-only): run an nmap discovery/scan for a target.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "target": {
+                "type": "string"
+              },
+              "ports": {
+                "type": "string"
+              },
+              "arguments": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "target"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "subfinder",
@@ -725,7 +754,25 @@
       ],
       "upstream": "https://github.com/schwarztim/sec-subfinder-mcp",
       "verifiedFromSource": false,
-      "notes": "[security] declared, NOT live-verified — keyless=true; upstream repo verified on GitHub; no published package — NOT live-verified, enabled:false until the host clones and wires the bridge"
+      "notes": "[security] declared, NOT live-verified — keyless=true; upstream repo verified on GitHub; no published package — NOT live-verified, enabled:false until the host clones and wires the bridge | P10 GAP 3 declarative: [security] declared, NOT live-verified — upstream binary/keys unprovisioned; responds with declared schemas, never spawns.",
+      "declarative": true,
+      "declaredTools": [
+        {
+          "name": "subfinder_enumerate",
+          "description": "Declared (schema-only): enumerate subdomains for a domain.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "domain": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "domain"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "whatweb",
@@ -745,7 +792,25 @@
       ],
       "upstream": "https://github.com/openbashok/pentest-mcp",
       "verifiedFromSource": false,
-      "notes": "[security] declared, NOT live-verified — keyless=true; no dedicated WhatWeb MCP wrapper found (verified by search Sept 2026); multi-tool suite cited — NOT live-verified, enabled:false"
+      "notes": "[security] declared, NOT live-verified — keyless=true; no dedicated WhatWeb MCP wrapper found (verified by search Sept 2026); multi-tool suite cited — NOT live-verified, enabled:false | P10 GAP 3 declarative: [security] declared, NOT live-verified — no dependencies verified on host; responds with declared schemas, never spawns.",
+      "declarative": true,
+      "declaredTools": [
+        {
+          "name": "whatweb_scan",
+          "description": "Declared (schema-only): fingerprint a target URL (whatweb).",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "target": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "target"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "ghidra",
@@ -766,7 +831,44 @@
       ],
       "upstream": "https://github.com/LaurieWired/GhidraMCP",
       "verifiedFromSource": false,
-      "notes": "[security] declared, NOT live-verified — keyless=true; upstream verified on GitHub (10.1k stars); launcher quoted from upstream README — NOT live-verified, enabled:false"
+      "notes": "[security] declared, NOT live-verified — keyless=true; upstream verified on GitHub (10.1k stars); launcher quoted from upstream README — NOT live-verified, enabled:false | P10 GAP 3 declarative: [security] declared, NOT live-verified — upstream Ghidra server unprovisioned; responds with declared schemas, never spawns.",
+      "declarative": true,
+      "declaredTools": [
+        {
+          "name": "ghidra_list_functions",
+          "description": "Declared (schema-only): list functions in a Ghidra program.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "binary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "binary"
+            ]
+          }
+        },
+        {
+          "name": "ghidra_decompile",
+          "description": "Declared (schema-only): decompile a function by address.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "binary": {
+                "type": "string"
+              },
+              "address": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "binary",
+              "address"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "semgrep",
@@ -786,7 +888,28 @@
       ],
       "upstream": "https://pypi.org/project/semgrep-mcp/",
       "verifiedFromSource": false,
-      "notes": "[security] declared, NOT live-verified — keyless=true; official package verified on PyPI (0.9.0); engine not installed in the build sandbox — NOT live-verified, enabled:false"
+      "notes": "[security] declared, NOT live-verified — keyless=true; official package verified on PyPI (0.9.0); engine not installed in the build sandbox — NOT live-verified, enabled:false | P10 GAP 3 declarative: [security] declared, NOT live-verified; responds with declared schemas, never spawns.",
+      "declarative": true,
+      "declaredTools": [
+        {
+          "name": "semgrep_scan",
+          "description": "Declared (schema-only): static scan of a path with rules.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "rules": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "bandit",
@@ -802,7 +925,25 @@
       ],
       "upstream": "https://bandit.readthedocs.io/",
       "verifiedFromSource": false,
-      "notes": "[security] declared, NOT live-verified — keyless=true; no dedicated MCP wrapper verified from source (search Sept 2026) — launcher intentionally omitted so a force-enable fails validation (fail-closed); host must provide a bridge"
+      "notes": "[security] declared, NOT live-verified — keyless=true; no dedicated MCP wrapper verified from source (search Sept 2026) — launcher intentionally omitted so a force-enable fails validation (fail-closed); host must provide a bridge | P10 GAP 3 declarative: [security] declared, NOT live-verified; responds with declared schemas, never spawns.",
+      "declarative": true,
+      "declaredTools": [
+        {
+          "name": "bandit_scan",
+          "description": "Declared (schema-only): python security lint of a path.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "gitleaks",
@@ -818,7 +959,25 @@
       ],
       "upstream": "https://github.com/gitleaks/gitleaks",
       "verifiedFromSource": false,
-      "notes": "[security] declared, NOT live-verified — keyless=true; gitleaks itself verified upstream; no dedicated MCP wrapper verified from source (search Sept 2026) — launcher intentionally omitted so a force-enable fails validation (fail-closed)"
+      "notes": "[security] declared, NOT live-verified — keyless=true; gitleaks itself verified upstream; no dedicated MCP wrapper verified from source (search Sept 2026) — launcher intentionally omitted so a force-enable fails validation (fail-closed) | P10 GAP 3 declarative: [security] declared, NOT live-verified — gitleaks binary unprovisioned; responds with declared schemas, never spawns.",
+      "declarative": true,
+      "declaredTools": [
+        {
+          "name": "gitleaks_detect",
+          "description": "Declared (schema-only): detect secrets in a repo path.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "sliver-c2",
@@ -839,7 +998,18 @@
       ],
       "upstream": "https://github.com/schwarztim/sec-sliver-c2-mcp",
       "verifiedFromSource": false,
-      "notes": "[security] declared, NOT live-verified — keyless=false; upstream verified on GitHub; requires a live Sliver server — NOT live-verified, enabled:false"
+      "notes": "[security] declared, NOT live-verified — keyless=false; upstream verified on GitHub; requires a live Sliver server — NOT live-verified, enabled:false | P10 GAP 3 declarative: [security] declared, NOT live-verified (C2 framework — by design never auto-enabled); responds with declared schemas, never spawns.",
+      "declarative": true,
+      "declaredTools": [
+        {
+          "name": "sliver_session_list",
+          "description": "Declared (schema-only): list known Sliver sessions (read-only view).",
+          "inputSchema": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      ]
     },
     {
       "name": "bloodhound-ce",
@@ -860,7 +1030,25 @@
       ],
       "upstream": "https://github.com/MorDavid/BloodHound-MCP-AI",
       "verifiedFromSource": false,
-      "notes": "[security] declared, NOT live-verified — keyless=false; upstream verified on GitHub (376 stars); requires a reachable BloodHound CE instance — NOT live-verified, enabled:false"
+      "notes": "[security] declared, NOT live-verified — keyless=false; upstream verified on GitHub (376 stars); requires a reachable BloodHound CE instance — NOT live-verified, enabled:false | P10 GAP 3 declarative: [security] declared, NOT live-verified + needs a BloodHound CE instance; responds with declared schemas, never spawns.",
+      "declarative": true,
+      "declaredTools": [
+        {
+          "name": "bloodhound_query",
+          "description": "Declared (schema-only): query the BloodHound CE graph.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "query"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "codegraph-mcp",
@@ -925,10 +1113,11 @@
       "permissions": [
         "NETWORK"
       ],
-      "notes": "[security] declared, NOT live-verified — Phase 31 Scope 5 (S4-N8N) — declarative v3.3 pattern entry, NOT live-verified in the build sandbox (no n8n instance or network egress was exercised). Enable only on a host that has provisioned n8n and verified the first handshake.",
+      "notes": "[security] declared, NOT live-verified — Phase 31 Scope 5 (S4-N8N) — declarative v3.3 pattern entry, NOT live-verified in the build sandbox (no n8n instance or network egress was exercised). Enable only on a host that has provisioned n8n and verified the first handshake. | P10 GAP 3 permanently-declarative: declared, NOT live-verified + requires an external n8n instance; answers from declared schemas.",
       "keyless": true,
       "keylessNote": "no API key for the MCP surface itself; an n8n instance is the operator's provision",
-      "upstream": "https://github.com/czlonkowski/n8n-mcp"
+      "upstream": "https://github.com/czlonkowski/n8n-mcp",
+      "declarative": true
     },
     {
       "name": "forgejo-mcp",
@@ -943,10 +1132,11 @@
       "permissions": [
         "NETWORK"
       ],
-      "notes": "[security] declared, NOT live-verified — Phase 31 Scope 5 (W23c) — DECLARATIVE PLACEHOLDER. The shipped forge toolset is a library surface (taxonomy + dispatch), NOT an MCP stdio server: spawning this entry fails honestly until a stdio bridge is built. Live forge leg (W23d) is additionally blocked by the no-credentials rule. Do not enable until both land.",
+      "notes": "[security] declared, NOT live-verified — Phase 31 Scope 5 (W23c) — DECLARATIVE PLACEHOLDER. The shipped forge toolset is a library surface (taxonomy + dispatch), NOT an MCP stdio server: spawning this entry fails honestly until a stdio bridge is built. Live forge leg (W23d) is additionally blocked by the no-credentials rule. Do not enable until both land. | P10 GAP 3 permanently-declarative: declared, NOT live-verified + requires an external Forgejo instance; answers from declared schemas.",
       "keyless": false,
       "keylessNote": "forge tokens ride via keyRef (env var name or keyring ref), per the madtea credential discipline",
-      "upstream": "harness/hardening/forgejo/index.js (in-repo library)"
+      "upstream": "harness/hardening/forgejo/index.js (in-repo library)",
+      "declarative": true
     }
   ]
 }

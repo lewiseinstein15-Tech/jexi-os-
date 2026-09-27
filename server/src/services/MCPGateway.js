@@ -69,6 +69,10 @@ export function loadRegistry(registryPath = DEFAULT_REGISTRY_PATH()) {
       trustLevel: s.trustLevel === 'community' ? 'community' : 'curated',
       permissions: perms.length ? perms : ['READ_ONLY'], // least privilege when unspecified
       notes: s.notes || '',
+      // P10 GAP 3 — three-state classification fields (additive):
+      category: typeof s.category === 'string' ? s.category : null,
+      declarative: s.declarative === true, // never spawns; answers with declared schemas
+      declaredTools: Array.isArray(s.declaredTools) ? s.declaredTools : null, // declared schema-only offer
     });
   }
   return { version: raw.version || 1, servers };
@@ -78,6 +82,87 @@ export function loadRegistry(registryPath = DEFAULT_REGISTRY_PATH()) {
 function loadState() {
   try { return JSON.parse(fs.readFileSync(STATE_FILE(), 'utf8')); } catch { return {}; }
 }
+
+/**
+ * P10 GAP 3 — THREE-STATE classification for every MCP server:
+ *   connected   — a live gateway connection exists (tools callable now)
+ *   declarative — no live process, but the server ANSWERS "what do you
+ *                 offer" honestly: declarative-by-design entries serve their
+ *                 declared schemas (registry declaredTools / verified tool
+ *                 directory); enabled-but-asleep entries serve the verified
+ *                 directory schemas and lazy-wake on first invoke
+ *   disabled    — not enabled and not declarative (nothing to offer yet)
+ * `connectable` keeps the honest detail: only enabled entries can wake.
+ */
+function stateFor(entry) {
+  if (connections.has(entry.name)) return 'connected';
+  if (entry.enabled || entry.declarative) return 'declarative';
+  return 'disabled';
+}
+
+/** "What do you offer?" — every server answers honestly in all three states. */
+export function describeMcpServer(name) {
+  const entry = effectiveRegistry().servers.find((s) => s.name === name);
+  if (!entry) return { ok: false, error: `unknown server '${name}'` };
+  const live = connections.get(name);
+  if (live) {
+    return {
+      ok: true, name, state: 'connected', live: true, connectable: true,
+      description: entry.description, permissions: entry.permissions,
+      tools: live.tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema })),
+      note: 'live gateway connection — tools callable now',
+    };
+  }
+  if (!entry.enabled && !entry.declarative) {
+    return { ok: false, name, state: 'disabled', error: `'${name}' is disabled and offers nothing (not classified declarative)`, description: entry.description };
+  }
+  const dir = loadToolDirectory()[name];
+  const dirTools = (dir && Array.isArray(dir.tools)) ? dir.tools : [];
+  const source = (Array.isArray(entry.declaredTools) && entry.declaredTools.length) ? 'registry-declared' : (dirTools.length ? 'tool-directory (verified live previously)' : 'description only');
+  const tools = (Array.isArray(entry.declaredTools) && entry.declaredTools.length) ? entry.declaredTools : dirTools;
+  return {
+    ok: true, name, state: 'declarative', live: false, connectable: entry.enabled === true,
+    declarativeByDesign: entry.declarative === true,
+    description: entry.description, permissions: entry.permissions,
+    offerSource: source,
+    tools: tools.map((t) => ({ name: t.name || t.tool, description: t.description || '', inputSchema: t.inputSchema || t.args || null, declaredSchemaOnly: true })),
+    note: entry.declarative
+      ? 'declarative by design — responds with declared schemas; no live process is ever spawned (reason in registry notes)'
+      : 'enabled and asleep — offering previously-verified schemas; wakes on first invoke',
+  };
+}
+
+/** P10 GAP 3 — full three-state report (the /api/mcps surface). */
+export function mcpStateReport() {
+  const reg = effectiveRegistry();
+  const servers = reg.servers.map((s) => {
+    const state = stateFor(s);
+    const desc = state === 'declarative' ? describeMcpServer(s.name) : null;
+    const live = connections.get(s.name);
+    return {
+      name: s.name,
+      state,
+      connectable: s.enabled === true,
+      declarativeByDesign: s.declarative === true,
+      enabled: s.enabled === true,
+      transport: s.transport,
+      trustLevel: s.trustLevel,
+      category: s.category || null,
+      permissions: s.permissions,
+      tools: state === 'connected' ? live.tools.length : (desc ? desc.tools.length : 0),
+      description: s.description,
+      note: s.notes || '',
+    };
+  });
+  const summary = {
+    connected: servers.filter((s) => s.state === 'connected').length,
+    declarative: servers.filter((s) => s.state === 'declarative').length,
+    disabled: servers.filter((s) => s.state === 'disabled').length,
+    total: servers.length,
+  };
+  return { ok: true, summary, servers };
+}
+
 function saveState(state) {
   try {
     fs.mkdirSync(path.dirname(STATE_FILE()), { recursive: true });
@@ -706,6 +791,21 @@ export async function invokeMcpTool({ server, tool, args = {}, authorized = fals
     audit({ type: 'MCP_BREAKER_OPEN', server, tool, reason: 'circuit open after repeated failures' });
     return { ok: false, error: `server '${server}' is in a failure cooldown (circuit breaker) — try again in a few minutes`, circuitOpen: true };
   }
+  // P10 GAP 3 — declarative servers DO respond: the honest answer to an
+  // invoke is the server's declared offer (schemas + note) — never a live
+  // spawn (declarative-by-design means no process, no execution).
+  {
+    const entry = effectiveRegistry().servers.find((s) => s.name === server);
+    if (entry && !entry.enabled && entry.declarative === true) {
+      const d = describeMcpServer(server);
+      audit({ type: 'MCP_DECLARED_INVOKE', server, tool, note: 'declarative server answered with its declared offer' });
+      return {
+        ok: true,
+        declarative: true,
+        result: { content: [{ type: 'text', text: JSON.stringify({ server, state: 'declarative', requestedTool: tool, offeredTools: (d.tools || []).map((t) => t.name), note: d.note, description: d.description }) }] },
+      };
+    }
+  }
   let conn = connections.get(server);
   if (!conn) {
     // Lazy connect: an enabled server spins up on first real use (idle servers cost no memory).
@@ -778,7 +878,8 @@ export function gatewayServerTools(name) {
   return c ? c.tools.map((t) => ({ name: t.name, description: String(t.description || '').slice(0, 220), inputSchema: t.inputSchema || null })) : null;
 }
 
-/** Server health snapshot (spec §17: server health + lifecycle). */
+/** Server health snapshot (spec §17: server health + lifecycle).
+ *  P10 GAP 3 — every row carries the three-state `state` field. */
 export function mcpServerHealth() {
   const reg = effectiveRegistry();
   const rows = reg.servers.map((s) => {
@@ -789,9 +890,11 @@ export function mcpServerHealth() {
     return {
       name: s.name,
       enabled: s.enabled,
+      state: stateFor(s), // P10 GAP 3 — connected | declarative | disabled
+      declarativeByDesign: s.declarative === true,
       trustLevel: s.trustLevel,
       permissions: s.permissions,
-      status: !s.enabled ? 'disabled' : breakerOpen(s.name) ? 'cooldown' : c ? (c.failures > 0 && !c.lastSuccessAt ? 'error' : 'connected') : idleStatus,
+      status: !s.enabled ? (s.declarative ? 'declarative' : 'disabled') : breakerOpen(s.name) ? 'cooldown' : c ? (c.failures > 0 && !c.lastSuccessAt ? 'error' : 'connected') : idleStatus,
       circuit: breakerOpen(s.name) ? 'open' : 'closed',
       tools: c ? c.tools.length : ((loadToolDirectory()[s.name] || {}).tools || []).length,
       live: !!c,
