@@ -95,6 +95,10 @@ console.log('\n== 3. Gateway client (api/gateway client mirror) ==');
       return;
     }
     if (req.url === '/boom') { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'bad thing' })); return; }
+    if (req.url === '/slow') { // responds AFTER any sane timeout — makes the timeout test deterministic under suite load (a 1ms race against a live localhost response could win on a loaded runner)
+      setTimeout(() => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, sawKey })); }, 400);
+      return;
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, sawKey }));
   });
@@ -110,7 +114,7 @@ console.log('\n== 3. Gateway client (api/gateway client mirror) ==');
   try { await gatewayFetch(`${base}/boom`, { retries: 0 }); } catch (e) { boomErr = e; }
   ok('4xx surfaces normalized GatewayError', boomErr instanceof GatewayError && boomErr.status === 400 && boomErr.data.error === 'bad thing');
   let timeoutErr = null;
-  try { await gatewayFetch(`${base}/ok`, { timeoutMs: 1, retries: 0, signal: AbortSignal.timeout(5) }); } catch (e) { timeoutErr = e; }
+  try { await gatewayFetch(`${base}/slow`, { timeoutMs: 50, retries: 0, signal: AbortSignal.timeout(5) }); } catch (e) { timeoutErr = e; }
   ok('timeout → GatewayError code TIMEOUT or NETWORK', timeoutErr instanceof GatewayError && (timeoutErr.code === 'TIMEOUT' || timeoutErr.code === 'NETWORK'));
   // Full deterministic teardown of the local listener (consolidated cleanup:
   // the historical flake was lingering keep-alive sockets after close() —
