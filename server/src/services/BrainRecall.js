@@ -34,6 +34,13 @@ const GRAPH_MAX_NODES = 4;
 export const BRAIN_BUDGETS = { hot: 400, hybrid: 500, semantica: 300, instincts: 300 };
 export const BRAIN_TOTAL_BUDGET = 1500;
 
+// ui/decision-layer-rendering (Part 2) — hot-turn durability needs fs + the
+// data dir. Static imports are safe here: config.js has no cycle with this
+// module, and node:fs/node:path are builtins.
+import fs from 'node:fs';
+import path from 'node:path';
+import { DATA_DIR } from '../config.js';
+
 function clip(text, n) {
   const s = String(text || '').replace(/\s+/g, ' ').trim();
   return s.length > n ? `${s.slice(0, n - 1)}…` : s;
@@ -131,7 +138,58 @@ async function instinctLines(query) {
  * fact id is content+sequence addressed, so a retried identical write is a
  * no-op. Fail-soft: a failed write logs a warning and returns false — it
  * must never fail the turn.
+ *
+ * ui/decision-layer-rendering (Part 2) — two upgrades:
+ *   1. STRUCTURED TURN: the record carries the full {user, assistant, ts,
+ *      sessionId} payload alongside the composed fact, so consumers read the
+ *      real turn shape instead of parsing "User: X — JEXI: Y".
+ *   2. DURABILITY: every chat turn is appended to DATA_DIR/brain-hot-chat.jsonl
+ *      (fail-soft, best-effort) and replayed into the in-memory hot store on
+ *      first write after a restart. Before this, brain.hot was RAM-only and a
+ *      server restart silently lost every recorded conversation turn.
  */
+const HOT_PERSIST_LOCK = { replayed: false };
+
+function hotPersistPath() {
+  return path.join(DATA_DIR, 'brain-hot-chat.jsonl');
+}
+
+/** Replay persisted chat turns into the fresh in-memory hot store (idempotent:
+ * content-addressed ids make every replayed record a no-op if already present). */
+async function replayHotPersistence(wiring) {
+  if (HOT_PERSIST_LOCK.replayed) return;
+  HOT_PERSIST_LOCK.replayed = true;
+  try {
+    const file = hotPersistPath();
+    if (!fs.existsSync(file)) return;
+    const lines = fs.readFileSync(file, 'utf-8').split('\n').filter(Boolean);
+    let maxSeq = __hotOpSeq;
+    let restored = 0;
+    for (const line of lines.slice(-500)) { // bounded replay — last 500 turns
+      let row;
+      try { row = JSON.parse(line); } catch { continue; } // skip torn tail lines
+      if (!row || !row.fact || row.sourceId !== HOT_SOURCE_ID) continue;
+      try {
+        await wiring.hot.record({
+          fact: row.fact,
+          kind: 'event',
+          sourceId: HOT_SOURCE_ID,
+          sessionId: row.sessionId || 'default',
+          opSeq: Number(row.opSeq) || 0,
+          evidence: row.evidence || row.fact,
+          ...(row.turn ? { turn: row.turn } : {}),
+        });
+        restored++;
+        if (Number(row.opSeq) > maxSeq) maxSeq = Number(row.opSeq);
+      } catch { /* skip a bad row — never break the bridge */ }
+    }
+    __hotOpSeq = maxSeq;
+    if (restored) console.log(`[brain] hot persistence: replayed ${restored} chat turn(s) from brain-hot-chat.jsonl`);
+  } catch (e) {
+    try { console.warn(`[brain] hot replay failed (fail-soft): ${String((e && e.message) || e).slice(0, 120)}`); } catch { /* logging never throws */ }
+  }
+}
+
 export async function brainHotWriteTurn({ sessionId = null, userMessage = '', assistantAnswer = '' } = {}) {
   try {
     const { wiring } = await import('../wiring/phase31-bootstrap.js');
@@ -139,14 +197,30 @@ export async function brainHotWriteTurn({ sessionId = null, userMessage = '', as
     const u = clip(userMessage, 200);
     const a = clip(assistantAnswer, 200);
     if (!u && !a) return false;
+    await replayHotPersistence(wiring); // one-shot per process; no-op afterwards
+    const ts = new Date().toISOString();
+    const opSeq = ++__hotOpSeq;
     wiring.hot.record({
       fact: clip(`User: ${u} — JEXI: ${a}`, 400),
       kind: 'event',
       sourceId: HOT_SOURCE_ID,
       sessionId: sessionId || 'default',
-      opSeq: ++__hotOpSeq,
+      opSeq,
       evidence: u || a,
+      turn: { user: u, assistant: a, ts, sessionId: sessionId || 'default' },
     });
+    // DURABILITY — append the structured turn to the JSONL log (fail-soft:
+    // a full disk or read-only fs must never fail the chat turn).
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.appendFileSync(
+        hotPersistPath(),
+        JSON.stringify({ fact: clip(`User: ${u} — JEXI: ${a}`, 400), sourceId: HOT_SOURCE_ID, sessionId: sessionId || 'default', opSeq, ts, user: u, assistant: a, turn: { user: u, assistant: a, ts, sessionId: sessionId || 'default' } }) + '\n',
+        'utf-8',
+      );
+    } catch (e) {
+      try { console.warn(`[brain] hot persistence skipped (fail-soft): ${String((e && e.message) || e).slice(0, 120)}`); } catch { /* logging never throws */ }
+    }
     return true;
   } catch (e) {
     try { console.warn(`[brain] hot write failed (fail-soft): ${String((e && e.message) || e).slice(0, 160)}`); } catch { /* logging never throws */ }
