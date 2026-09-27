@@ -359,6 +359,7 @@ app.use(['/api/chat', '/api/vision', '/api/knowledge/search', '/api/agent'], aiL
 // ARENA PHASE 1 — the Executive Kernel fast path (small talk must never pay
 // the full pipeline) and per-request model-call accounting.
 import { kernelTurn, kernelGate, kernelIntentGate, runLeanAnswer, startMeter, meterStage, meterReport } from './src/services/JexiKernel.js';
+import { IDENTITY_LEAK_QUESTION_RE, JEXI_IDENTITY_FILTER_ANSWER, sanitizeIdentityLeak } from './src/services/IdentityGuard.js'; // PHASE 3 — identity leak question gate + terminal post-filter
 import { meterEnter, meterLap, meterFreeze, requestMeterReport } from './src/services/RequestMeter.js'; // ARENA — per-turn model-call meter, all lanes
 import { browserRouter, registerDesktopWorker, registerAndroidWorker } from './src/services/BrowserRouter.js'; // ARENA Phase 3 — browser router (workers + policy + audit)
 import { lifecycleScan, lastLifecycleReport } from './src/services/MemoryLifecycle.js'; // ARENA Phase 4 — memory vault lifecycle
@@ -1766,6 +1767,10 @@ app.post('/api/chat', async (req, res) => {
     if (payload && typeof payload === 'object' && typeof payload.summary === 'string') {
       try {
         let sum = payload.summary;
+        // PHASE 3 — IDENTITY POST-FILTER: no sentence that names a base model
+        // or provider leaves the terminal choke point. Replaced with the
+        // canned JEXI identity answer (fail-soft, idempotent).
+        try { sum = sanitizeIdentityLeak(sum); } catch { /* never block the answer */ }
         if (/localhost|127\.0\.0\.1|192\.168\.|10\.\d+\./i.test(sum)) sum = sanitizeOutgoingLinks(sum, PUBLIC_BASE);
         // a bare/pathless brain link next to "preview" wording is useless —
         // point it at the actual workspace preview file when one exists.
@@ -2238,6 +2243,17 @@ app.post('/api/chat', async (req, res) => {
           // small model call — never the planner→director→agent pipeline.
           // Runs AFTER mission steering (an active mission owns the turn)
           // and BEFORE the Director. Real work always passes through.
+          // PHASE 3 — IDENTITY LEAK GATE: "are you GPT?"-style probes are
+          // answered deterministically (canned JEXI identity answer, zero
+          // model calls, key or no key) BEFORE any lane can improvise.
+          try {
+            if (IDENTITY_LEAK_QUESTION_RE.test(String(raw || '').trim())) {
+              sendEvent('agent.done', { answer: JEXI_IDENTITY_FILTER_ANSWER });
+              done({ success: true, query, summary: JEXI_IDENTITY_FILTER_ANSWER, statistics: { fastPath: true, identityGate: true, modelCalls: 0, agentsUsed: 0, confidence: 1 } });
+              finish();
+              return;
+            }
+          } catch { /* identity gate must never break the turn */ }
           try {
             const activeMissionFlag = (() => {
               try { return Boolean(activeMissionFor(convId)); } catch { return false; }

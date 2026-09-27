@@ -31,6 +31,7 @@
 
 import { canChat } from '../providers/index.js';
 import { generateContent } from '../providers/runtime/LLMClient.js';
+import { CORE_IDENTITY_BLOCK } from './IdentityGuard.js'; // PHASE 3 — agentic direct answers carry the identity block too
 import { WORKSPACE_DIR } from '../config.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -282,7 +283,7 @@ async function runDirectAnswer(args, opts = {}) {
   if (canChat()) {
     try {
       const brainNote = opts.brainContext ? `\n\n${String(opts.brainContext).slice(0, 1500)}` : '';
-      const out = await generateContent(q, `Answer the user directly and completely. Use markdown. For math use LaTeX ($inline$, $$block$$).${brainNote}`, null, { temperature: 0.3 });
+      const out = await generateContent(q, `${CORE_IDENTITY_BLOCK}\n\nAnswer the user directly and completely. Use markdown. For math use LaTeX ($inline$, $$block$$).${brainNote}`, null, { temperature: 0.3 });
       if (out && String(out).trim()) {
         return { ok: true, output: String(out).trim(), observation: 'direct answer via model', meta: { writer: 'model' } };
       }

@@ -25,6 +25,7 @@
 import { AGENT_ROSTER, SKILL_REGISTRY, ROSTER_COUNT, SKILL_COUNT } from '../workforce/registry/index.js';
 import { TOOL_REGISTRY } from './ToolRegistry.js';
 import { classifyRisk } from './RiskGuard.js';
+import { CORE_IDENTITY_BLOCK } from './IdentityGuard.js'; // Phase 3 — non-removable identity block (every system prompt)
 import { facts as selfFacts, identityBlock as selfIdentityBlock } from '../../../mind/brain/self/index.js'; // Phase 31 Scope 19 — canonical self (brain/self/core.md)
 
 /**
@@ -105,7 +106,9 @@ export function buildLimitationLines() {
 export function buildIdentityPrompt() {
   const caps = buildCapabilityLines().join('\n');
   const limits = buildLimitationLines().join('\n');
-  return `${selfIdentityBlock()}
+  return `${CORE_IDENTITY_BLOCK}
+
+${selfIdentityBlock()}
 
 You are **${JEXI_IDENTITY.fullName}** v${JEXI_IDENTITY.version} — ${JEXI_IDENTITY.tagline}.
 

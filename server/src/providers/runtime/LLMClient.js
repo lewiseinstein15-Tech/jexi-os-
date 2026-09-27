@@ -13,6 +13,7 @@ import { noteMeterModelCall } from '../../services/RequestMeter.js'; // ARENA �
 import { tryUnified, unifiedToolConfig, unifiedAnthropicToolRound, configForCall } from '../../services/providers/unified.js'; // UNIFIED — one-secret model leg (provider + key + model + baseURL)
 import { OllamaAdapter } from '../adapters/ollama.js'; // ZONE-OWNER 2-COMPLETION — canonical Ollama exposure guard (item 2) for the runtime leg
 import { hudNoteSpend } from '../../kernel/hooks/hud-seam.js'; // Phase 7(F) — HUD cost feed (real call sizes)
+import { ensureIdentityBlock } from '../../services/IdentityGuard.js'; // PHASE 3 — non-removable identity block on EVERY system prompt (provider bridge)
 // ZONE-OWNER ITEM 5 (Phase 9 E seam): cost caps are consulted on the LIVE
 // model-call path. providers/cost/caps.js README: "check({ spendUsd }) … is
 // the pre-call gate a provider bridge uses BEFORE a model call."
@@ -829,6 +830,7 @@ async function streamPlainText(prompt, system, opts, onDelta) {
 
 export async function generateContent(prompt, systemInstruction = '', imageBase64 = null, opts = {}) {
   systemInstruction = appendTimeContext(systemInstruction); // B104 — time context on every call
+  systemInstruction = ensureIdentityBlock(systemInstruction); // PHASE 3 — JEXI identity is prepended to EVERY system prompt, non-removable
 
   // AGI Phase 1 — REQUEST ECONOMY (spec §13/§15/§16):
   //   budget gate → opt-in response cache → in-flight deduplication.
@@ -869,7 +871,7 @@ async function __generateWalk(prompt, systemInstruction, imageBase64, opts) {
     if (streamed) return streamed;
   }
   const errors = [];
-  const system = systemInstruction || 'You are JEXI OS, an expert AI operating system.';
+  const system = ensureIdentityBlock(systemInstruction) || 'You are JEXI OS, an expert AI operating system.'; // PHASE 3 — fallback default also carries the identity block
 
   const prefer = opts.prefer || (imageBase64 ? 'gemini' : '');
   const order = opts.provider ? [opts.provider] : providerOrder(prefer);
@@ -1311,7 +1313,7 @@ export async function generateWithToolsLoop(prompt, systemInstruction = '', tool
   systemInstruction = appendTimeContext(systemInstruction); // B104 — time context on every call
   tools = normalizeTools(tools); // B105 — def-shaped tool lists become provider-ready schemas
   const errors = [];
-  const system = systemInstruction || 'You are JEXI OS, an expert AI operating system.';
+  const system = ensureIdentityBlock(systemInstruction) || 'You are JEXI OS, an expert AI operating system.'; // PHASE 3 — fallback default also carries the identity block
 
   if (Array.isArray(opts.__mockCompletions) && opts.__mockCompletions.length) {
     const allCalls = [];
