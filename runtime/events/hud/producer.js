@@ -403,10 +403,18 @@ export async function publish(reason = 'manual') {
   state.publishedAt = nowIso();
   state.lastReason = reason;
   state.revision += 1;
+  // P11 A5 (CI RED root cause 3) — an EXPLICIT publish is the coalescing
+  // point: it always fans out to subscribers. Gating the fan-out on
+  // `changed` meant an explicit publish with a byte-identical payload never
+  // notified anyone (live CI failure: "consumer fan-out received the
+  // publish" — the two test publishes carried identical payloads, while
+  // locally timing noise made them differ and masked the bug). Consumers
+  // asked for THIS publish; they get it. The observer emit stays
+  // change-gated (a no-op payload change is not bus news).
+  for (const fn of subscribers) {
+    try { fn(state.revision, payload); } catch { /* a bad consumer never breaks the producer */ }
+  }
   if (changed) {
-    for (const fn of subscribers) {
-      try { fn(state.revision, payload); } catch { /* a bad consumer never breaks the producer */ }
-    }
     try {
       const obs = await S.observer();
       obs?.emit?.('hud.updated', {
