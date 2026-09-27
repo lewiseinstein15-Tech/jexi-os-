@@ -55,12 +55,24 @@ async function agentsSection() {
     for (const [cap, n] of Object.entries(stats.byCapability || {})) tiers[cap] = n;
     const top = Object.entries(tiers).sort((a, b) => b[1] - a[1]).slice(0, 6)
       .map(([cap, n]) => `${cap}: ${n}`).join(', ');
+    // P10 GAP 6 — planner specs are ROLE specifications, not live agents;
+    // carried here so self-awareness can state the distinction with real
+    // numbers (read-only coverage check — never generates at query time).
+    let plannerSpecs = null;
+    const prof = await softImport('src/services/ProfileCompleteness.js');
+    if (!prof.__error) {
+      try {
+        const cov = prof.profileCoverage();
+        plannerSpecs = { named: (cov.named || []).length, roles: cov.deployedRoles, covered: cov.covered };
+      } catch { /* fail-soft */ }
+    }
     return {
       total: stats.agents,
       liveCoworkers: stats.count,
       byCapability: tiers,
       breakdown: top,
       samples: (reg.listAgents ? reg.listAgents() : []).slice(0, 8).map((a) => a.slug || a.name || String(a)),
+      plannerSpecs,
     };
   } catch (e) { return { error: String(e && e.message || e) }; }
 }
@@ -160,6 +172,27 @@ async function hooksSection() {
   } catch (e) { return { error: String(e && e.message || e) }; }
 }
 
+/**
+ * P10 GAP 6 — PERSONAS: named voice/flavor overlays (PersonaManager), loaded
+ * explicitly at boot and reported as their own population — distinct from
+ * planner specs (role specs) and from live agents (the roster).
+ */
+async function personasSection() {
+  const pm = await softImport('src/services/PersonaManager.js');
+  if (pm.__error) return { error: pm.__error };
+  try {
+    const st = pm.personaStatus();
+    const builtin = Object.keys(pm.BUILTIN_PERSONAS || {}).length;
+    return {
+      total: st.personas.length,
+      builtin,
+      user: Math.max(0, st.personas.length - builtin),
+      names: st.personas.map((p) => p.key).slice(0, 10),
+    };
+  } catch (e) { return { error: String(e && e.message || e) };
+  }
+}
+
 async function pluginsSection() {
   const reg = await softImport('src/services/PluginRegistry.js');
   if (reg.__error) return { error: reg.__error };
@@ -227,6 +260,7 @@ export async function roster({ refresh = false } = {}) {
     mcps: await mcpsSection(),
     hooks: await hooksSection(),
     plugins: await pluginsSection(),
+    personas: await personasSection(), // P10 GAP 6 — personas are their own population
     memory: await memorySection(),
     generatedAt: new Date().toISOString(),
   };
@@ -238,13 +272,13 @@ export async function roster({ refresh = false } = {}) {
 /** Compact prompt-injection block (budget-capped, ~600 chars). */
 export async function rosterSummary() {
   const r = await roster();
-  const a = r.agents || {}, s = r.skills || {}, t = r.tools || {}, m = r.mcps || {}, h = r.hooks || {}, p = r.plugins || {};
+  const a = r.agents || {}, s = r.skills || {}, t = r.tools || {}, m = r.mcps || {}, h = r.hooks || {}, p = r.plugins || {}, pe = r.personas || {};
   const lines = [
-    `ROSTER (live): ${a.total ?? '?'} specialist agents (${a.liveCoworkers ?? '?'} live coworkers; tiers: ${a.breakdown || 'n/a'}).`,
-    `SKILLS: ${s.registry ?? '?'} registry skills + ${s.library ?? '?'} library SKILL.md files. TOOLS: ${t.total ?? '?'} registered. PLUGINS: ${p.total ?? '?'}.`,
+    `ROSTER (live): ${a.total ?? '?'} specialist agents (${a.liveCoworkers ?? '?'} live coworkers; tiers: ${a.breakdown || 'n/a'})${a.plannerSpecs ? ` — DISTINCT from the ${a.plannerSpecs.roles} planner role-specs (+${a.plannerSpecs.named} named profiles)` : ''}.`,
+    `SKILLS: ${s.registry ?? '?'} registry skills + ${s.library ?? '?'} library SKILL.md files. TOOLS: ${t.total ?? '?'} registered. PLUGINS: ${p.total ?? '?'}. PERSONAS: ${pe.total ?? '?'} voice overlays.`,
     `MCPs: ${m.enabled ?? '?'} enabled — ${m.connected ?? '?'} connected, ${m.dormant ?? '?'} dormant (lazy-wake on demand). HOOKS: ${h.wired ?? '?'} wired / ${h.stubs ?? '?'} intentional stubs.`,
     `MEMORY: ${r.memory?.model || '4-source brain recall + session stores'}.`,
-    `When asked about your capabilities, answer from THESE numbers — never say you have none.`,
+    `When asked about your capabilities, answer from THESE numbers — never say you have none. "How many agents" = the ROSTER number, never the planner-spec count.`,
   ];
   return lines.join('\n');
 }
@@ -271,15 +305,17 @@ export async function answerCapabilityQuestion(rawQuery) {
   const fmt = (n) => (typeof n === 'number' ? String(n) : '?');
 
   if (canDoRe.test(q)) {
-    const a = r.agents || {}, s = r.skills || {}, t = r.tools || {}, m = r.mcps || {}, h = r.hooks || {}, p = r.plugins || {};
+    const a = r.agents || {}, s = r.skills || {}, t = r.tools || {}, m = r.mcps || {}, h = r.hooks || {}, p = r.plugins || {}, pe = r.personas || {};
+    const specBit = a.plannerSpecs ? ` plus ${a.plannerSpecs.named} named + ${a.plannerSpecs.roles} planner role-specs (specs, not live agents)` : '';
     return {
       handled: true,
       answer: [
         `I'm **JEXI OS** — an agentic operating system. Real, live numbers from my registries:`,
-        `- **Agents**: ${fmt(a.total)} specialist agents in the roster (${fmt(a.liveCoworkers)} live coworkers${a.breakdown ? `; top tiers: ${a.breakdown}` : ''}).`,
+        `- **Agents**: ${fmt(a.total)} specialist agents in the live roster (${fmt(a.liveCoworkers)} live coworkers${a.breakdown ? `; top tiers: ${a.breakdown}` : ''})${specBit}.`,
+        `- **Personas**: ${fmt(pe.total)} voice overlays (${fmt(pe.builtin)} builtin + ${fmt(pe.user)} user).`,
         `- **Skills**: ${fmt(s.registry)} registry skills + ${fmt(s.library)} library SKILL.md files.`,
         `- **Tools**: ${fmt(t.total)} registered tools, dispatchable through the gated tool runtime.`,
-        `- **MCPs**: ${fmt(m.enabled)} enabled — ${fmt(m.connected)} connected right now, ${fmt(m.dormant)} dormant (lazy-wake when a task needs them).`,
+        `- **MCPs**: ${m.states ? `${fmt(m.states.total)} servers — ${fmt(m.states.connected)} connected, ${fmt(m.states.declarative)} declarative, ${fmt(m.states.disabled)} disabled` : `${fmt(m.enabled)} enabled — ${fmt(m.connected)} connected right now, ${fmt(m.dormant)} dormant (lazy-wake when a task needs them).`}`,
         `- **Hooks**: ${fmt(h.wired)} wired into the live lifecycle, ${fmt(h.stubs)} intentional no-op stubs.`,
         `- **Plugins**: ${fmt(p.total)} loaded at boot.`,
         `- **Memory**: ${r.memory?.model || 'multi-source'}.`,
@@ -291,9 +327,14 @@ export async function answerCapabilityQuestion(rawQuery) {
 
   if (agentsRe.test(q)) {
     const a = r.agents || {};
+    const pe = r.personas || {};
+    // P10 GAP 6 — the answer is the ROSTER count; planner specs and personas
+    // are called out as the DIFFERENT populations they are.
+    const specLine = a.plannerSpecs ? ` (My **${a.plannerSpecs.named} named + ${a.plannerSpecs.roles} planner-roles** are planner role-specs — deployment specifications, NOT additional live agents.)` : '';
+    const personaLine = typeof pe.total === 'number' ? ` I also carry **${pe.total} personas** (${pe.builtin ?? '?'} builtin + ${pe.user ?? '?'} user) — voice overlays, again not agents.` : '';
     return {
       handled: true,
-      answer: `I have **${fmt(a.total)} specialist agents** in my roster (${fmt(a.liveCoworkers)} live coworkers in the active workforce). Breakdown by tier: ${a.breakdown || Object.entries(a.byCapability || {}).slice(0, 8).map(([k, v]) => `${k}: ${v}`).join(', ') || 'n/a'}. Each tier is staffed on demand — tell me the task and I'll compose the team.`,
+      answer: `I have **${fmt(a.total)} specialist agents** in my live roster (${fmt(a.liveCoworkers)} live coworkers in the active workforce). Breakdown by tier: ${a.breakdown || Object.entries(a.byCapability || {}).slice(0, 8).map(([k, v]) => `${k}: ${v}`).join(', ') || 'n/a'}.${specLine}${personaLine} Each tier is staffed on demand — tell me the task and I'll compose the team.`,
     };
   }
 
@@ -365,6 +406,10 @@ export async function answerCapabilityQuestion(rawQuery) {
 /** Boot-time load — pulls the first snapshot so it is warm in live context. */
 export async function warmRoster() {
   const r = await roster({ refresh: true });
-  const line = `[Roster] brain.roster() loaded: ${r.agents?.total ?? '?'} agents, ${r.skills?.registry ?? '?'} registry + ${r.skills?.library ?? '?'} library skills, ${r.tools?.total ?? '?'} tools, MCP ${r.mcps?.connected ?? '?'}/${r.mcps?.enabled ?? '?'} connected (+${r.mcps?.dormant ?? '?'} dormant), hooks ${r.hooks?.wired ?? '?'}/${r.hooks?.catalog ?? '?'} wired, ${r.plugins?.total ?? '?'} plugins.`;
+  // P10 GAP 6 — the boot line reports the three populations distinctly:
+  // live agents (roster), planner role-specs, and personas.
+  const ps = r.agents?.plannerSpecs;
+  const specBit = ps ? `, ${ps.covered} planner-role specs (planner specs, not agents; ${ps.named} named profiles on top)` : '';
+  const line = `[Roster] brain.roster() loaded: ${r.agents?.total ?? '?'} LIVE agents${specBit}, ${r.personas?.total ?? '?'} personas, ${r.skills?.registry ?? '?'} registry + ${r.skills?.library ?? '?'} library skills, ${r.tools?.total ?? '?'} tools, MCP ${r.mcps?.connected ?? '?'}/${r.mcps?.enabled ?? '?'} connected (+${r.mcps?.dormant ?? '?'} dormant), hooks ${r.hooks?.wired ?? '?'}/${r.hooks?.catalog ?? '?'} wired, ${r.plugins?.total ?? '?'} plugins.`;
   return { snapshot: r, line };
 }

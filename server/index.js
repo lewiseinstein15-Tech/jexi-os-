@@ -16,6 +16,7 @@ import { sanitizeOutgoingLinks, createLinkSafeStream } from './src/services/Form
 import { tryExecuteCommand, helpText, registerCommand } from './src/services/CommandRegistry.js'; // B167 — /watch + friends
 import { listProfiles, loadProfile, searchMemory, rememberFor } from './src/services/AgentProfiles.js'; // B180 — Hermes profiles
 import { profileCoverage, generateAllProfiles, ensureProfile } from './src/services/ProfileCompleteness.js'; // B191 — every agent profiled
+import { personaStatus, BUILTIN_PERSONAS } from './src/services/PersonaManager.js'; // P10 GAP 6 — personas are a separate boot-loaded population
 import { saveProject, listProjects, resumeBrief, updateProject, closeProject, findProject } from './src/services/ProjectMemory.js'; // B191 — project memory
 import { delegate, scheduleJob, dispatchJob, jobStatuses, cancelJob, startGateway, runAgentTask, parseNaturalSchedule } from './src/services/AgentGateway.js'; // B180 — gateway
 import { saveSkill, recallSkills, autoSkill } from './src/services/SkillLoop.js'; // B180 — skill loop
@@ -234,8 +235,23 @@ sweepWorkspace().then((r) => { if (r.cleared.length) console.log('[Workspace] sw
 try {
   const made = generateAllProfiles();
   const cov = profileCoverage();
-  console.log(`[Profiles] ${cov.named.length} named + ${made.length} generated = ${cov.covered}/${cov.coverable} agents profiled`);
+  // P10 GAP 6 — the OLD line ("...= 213/213 agents profiled") conflated
+  // planner ROLE specs with live agents. Three distinct populations:
+  //   planner specs (this line) — deployable role specifications
+  //   live agents               — the [Roster] line below (brain.roster())
+  //   personas                  — the [Personas] line: voice overlays
+  console.log(`[Profiles] ${cov.named.length} named + ${made.length} planner-roles = ${cov.named.length + made.length} planner-specs (role specs — NOT live agents; the live roster is the [Roster] line)`);
 } catch (e) { console.error('[Profiles] generation failed:', e.message); }
+
+// P10 GAP 6 — PERSONAS loaded explicitly at boot: named voice/flavor overlays
+// (PersonaManager) — a separate concept from planner specs and from live
+// agents, now counted distinctly and surfaced in brain.roster().
+try {
+  const pStatus = personaStatus();
+  const builtinCount = Object.keys(BUILTIN_PERSONAS).length;
+  const userCount = Math.max(0, pStatus.personas.length - builtinCount);
+  console.log(`[Personas] ${pStatus.personas.length} personas loaded (${builtinCount} builtin + ${userCount} user) — voice overlays on the active preset; distinct from planner-specs and the live agent roster`);
+} catch (e) { console.error('[Personas] load failed:', e.message); }
 
 // B189 — COLD-START WARMUP: the free instance restarts often; the first user
 // message used to pay 30-50s warming module caches + provider sockets. Warm
