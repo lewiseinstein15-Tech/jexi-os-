@@ -37,7 +37,7 @@ function fakeServer(tools, behavior = {}) {
 
 /* ═══ 1. the shipped registry ═══════════════════════════════════════════ */
 
-test('the shipped registry v3 is valid — live-verified servers proved by the tool directory, declared security servers shipped disabled', () => {
+test('the shipped registry v3 is valid — live-verified servers proved by the tool directory, wired bridges prove themselves, declared security servers shipped disabled', () => {
   const reg = loadRegistry(REGISTRY);
   assert.ok(reg.servers.length >= 30, `expected a big verified registry, got ${reg.servers.length}`);
   const directory = loadToolDirectory();
@@ -50,7 +50,14 @@ test('the shipped registry v3 is valid — live-verified servers proved by the t
     // sandbox (no host binaries/bridges) — they ship enabled:false and are
     // exempt from the tool-directory proof; the directory stays a
     // live-verification proof only, never a place for claimed tools.
-    const declared = String(s.notes || '').startsWith('[security] declared');
+    // FINAL GAP 2/3 exception: entries whose notes start with "WIRED (FINAL
+    // GAP" are connected through REAL stdio bridges (server/mcp/servers/
+    // bin-bridge.js / forgejo-bridge.js) — connect() spawns a real MCP server
+    // and tools/list serves real schemas, so their proof is the bridge itself
+    // (same exemption family as the declared entries).
+    const declared = String(s.notes || '').startsWith('[security] declared')
+      || String(s.notes || '').startsWith('permanently-declarative');
+    const wiredBridge = /^WIRED \(FINAL GAP \d/.test(String(s.notes || ''));
     assert.ok(s.permissions.length, `${s.name} needs an explicit permission boundary`);
     assert.ok(!s.permissions.includes('DESTRUCTIVE'), `${s.name} must not ship DESTRUCTIVE`);
     assert.ok(!s.permissions.includes('DEPLOYMENT'), `${s.name} must not ship DEPLOYMENT`);
@@ -58,6 +65,11 @@ test('the shipped registry v3 is valid — live-verified servers proved by the t
     assert.ok(s.notes && s.notes.length > 10, `${s.name} needs honest notes`);
     if (declared) {
       assert.ok(s.enabled === false, `${s.name} is declared-not-live and must ship enabled:false`);
+      continue;
+    }
+    if (wiredBridge) {
+      assert.ok(s.enabled === true, `${s.name} is wired through a real stdio bridge and must ship enabled:true`);
+      assert.ok(s.command === 'node' && (s.args || []).some((a) => /mcp\/servers\/[a-z-]+-bridge\.js$/.test(a)), `${s.name} must launch its real bridge (command=node, args=[…-bridge.js])`);
       continue;
     }
     assert.ok(directory[s.name] && Array.isArray(directory[s.name].tools) && directory[s.name].tools.length > 0, `${s.name} missing from the live-verified tool directory`);

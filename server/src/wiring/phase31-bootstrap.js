@@ -501,16 +501,16 @@ export function initPhase31Wiring(opts = {}) {
   });
   if (state.s4repo) log('W31 S4-REPOCTX: semantica/repo-map -> session bootstrap (source repo-map, bounded scan)');
 
-  // W23c — forgejo-mcp -> mcp/registry.json (declarative placeholder; the
-  // shipped toolset is a library, no stdio bridge; live forge leg W23d is
-  // blocked by the no-credentials rule).
+  // W23c — forgejo-mcp -> mcp/registry.json. FINAL GAP 3: the entry is a REAL
+  // stdio bridge now (server/mcp/servers/forgejo-bridge.js). The log reports
+  // the live registry truth instead of a stale hardcoded claim.
   soft('W23c', () => {
     const [forgejo] = mcpRegistryEntries(['forgejo-mcp']);
     if (!forgejo) throw Object.assign(new Error('forgejo-mcp entry missing'), { code: 'E_WIRING' });
     state.w23cEntry = forgejo;
     return `entry forgejo-mcp enabled=${!!forgejo.enabled}`;
   });
-  if (state.w23cEntry) log('W31 W23c: forgejo-mcp -> mcp registry (declarative placeholder, enabled:false — live forge leg blocked)');
+  if (state.w23cEntry) log(`W31 W23c: forgejo-mcp -> mcp registry (${state.w23cEntry.enabled === true ? 'WIRED — stdio bridge server/mcp/servers/forgejo-bridge.js (FINAL GAP 3)' : 'declarative placeholder, enabled:false — live forge leg blocked'})`);
 
   // W16 — Phase 12 gates loop call sites: LOCATED, NOT WIRED. The gates'
   // designated loop checkpoints live in server/src/services/CodingLoop.js and
