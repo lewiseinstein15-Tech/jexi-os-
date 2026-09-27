@@ -15,9 +15,13 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { DATA_DIR } from '../config.js';
 
-const PROFILES_DIR = path.join(process.cwd(), 'agents', 'profiles');
+// P11 A3 — module-anchored: <repo>/server/agents/profiles regardless of the
+// process cwd (was process.cwd(), which only resolved when cwd=server).
+const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url)); // server/src/services
+const PROFILES_DIR = path.resolve(MODULE_DIR, '..', '..', 'agents', 'profiles');
 const STATE_DIR = path.join(DATA_DIR, 'agent-profiles');
 
 /* ── tiny YAML-subset parser (key: value, nested one level, - lists) ── */

@@ -18,12 +18,31 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { fileURLToPath } from 'url';
 import { DATA_DIR } from '../config.js';
 import { loadProfile, listProfiles, parseSimpleYaml } from './AgentProfiles.js';
 import { AGENT_ROSTER } from '../workforce/registry/index.js';
 import { preferredLaneForRole } from '../providers/catalog/CapabilityLanes.js';
 
-const NAMED_DIR = path.join(process.cwd(), 'agents', 'profiles');
+/* P11 A3 — CWD-INDEPENDENT PATH RESOLUTION: every on-disk lookup in this
+ * module is anchored to the MODULE's own location (import.meta.url), never
+ * to process.cwd(). profileCoverage() used to read Planner.js via
+ * path.join(process.cwd(), 'src/services/Planner.js') — correct only when
+ * the process ran with cwd=server, silently degrading (fail-soft missing
+ * file) from the repo root or any other directory. The same module now
+ * resolves identically from repo root, server/, or anywhere else.
+ *
+ * Layout: this file is <repo>/server/src/services/ProfileCompleteness.js
+ *   MODULE_DIR      = <repo>/server/src/services
+ *   SERVER_ROOT     = <repo>/server
+ *   REPO_ROOT       = <repo>
+ */
+const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
+const SERVER_ROOT = path.resolve(MODULE_DIR, '..', '..');
+const REPO_ROOT = path.resolve(SERVER_ROOT, '..');
+const PLANNER_SOURCE = path.join(SERVER_ROOT, 'src', 'services', 'Planner.js');
+const NAMED_DIR = path.join(REPO_ROOT, 'agents', 'profiles');
+void NAMED_DIR; // kept for backward imports; the real named-profile lookup lives in AgentProfiles.js (also module-anchored now)
 const AUTO_DIR = path.join(DATA_DIR, 'agent-profiles', 'auto');
 
 /* ── roster metadata lookup (the roster is a list; index by slug) ── */
@@ -119,7 +138,7 @@ export function ensureProfile(role) {
 export function generateAllProfiles(deployedRoles = null) {
   let roles = deployedRoles;
   if (!roles) {
-    const src = fs.readFileSync(path.join(process.cwd(), 'src/services/Planner.js'), 'utf8');
+    const src = fs.readFileSync(PLANNER_SOURCE, 'utf8'); // P11 A3 — module-anchored (was process.cwd())
     const m = src.match(/export const TEAM_PLAN = \{([\s\S]*?)\n\};/);
     roles = [...m[1].matchAll(/'([a-z0-9-]+)'/g)].map((x) => x[1]);
   }
@@ -138,7 +157,9 @@ export function profileCoverage(deployedRoles = null) {
   let roles = deployedRoles;
   if (!roles) {
     // derive from the planner source (same as the audit tool)
-    const src = fs.readFileSync(path.join(process.cwd(), 'src/services/Planner.js'), 'utf8');
+    // P11 A3 — module-anchored read: identical from ANY cwd (was process.cwd(),
+    // which only worked when the server ran with cwd=server).
+    const src = fs.readFileSync(PLANNER_SOURCE, 'utf8');
     const m = src.match(/export const TEAM_PLAN = \{([\s\S]*?)\n\};/);
     roles = [...m[1].matchAll(/'([a-z0-9-]+)'/g)].map((x) => x[1]);
   }
