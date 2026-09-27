@@ -1,6 +1,6 @@
 {
   "_comment": "JEXI MCP server registry v3 (Sept 2026 — Lewis: connect them directly, no switches). Every server here was REALLY connected and tool-called by the live test (scripts/mcp-live-test.js, multiple rounds). No paid keys anywhere. uvx servers need Python+uv on the host; npx needs node; streamable-http needs only network. A memory-guarded few wake at boot; the rest connect lazily on first use — mcp/tool-directory.json lets the planner see every tool without holding 35 child processes. Phase 8 Scope F (Sept 2026): the 9 `category: security` additions (plus the security-marked `playwright`) are registered DECLARATIVELY from verified upstream sources — mcp-nmap and semgrep-mcp verified as published PyPI packages, the rest verified upstream GitHub repos. They are enabled:false (keyless where marked is a property of the tool, not an install claim) and were NOT live-verified in the build sandbox — enable only on a host that has provisioned the underlying tool.",
-  "version": 3.3,
+  "version": 3.4,
   "servers": [
     {
       "name": "filesystem",
@@ -209,13 +209,13 @@
       "args": [
         "mcp-server-wikipedia"
       ],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "community",
       "permissions": [
         "READ_ONLY",
         "NETWORK"
       ],
-      "notes": "Runs via uvx. Reviewed + live-tested Sept 2026. | P10 GAP 3 permanently-declarative: needs a uvx python runtime and duplicates the wikipedia-js surface (wire-now); answers from declared schemas, never spawns.",
+      "notes": "Runs via uvx. Reviewed + live-tested Sept 2026. | P10 GAP 3 permanently-declarative: needs a uvx python runtime and duplicates the wikipedia-js surface (wire-now); answers from declared schemas, never spawns. | P11 A2 enable-now: host runtime verified (2026-09-27) — enable + real connect + tools/list SUCCEEDED through MCPGateway; now a fully wired server (still reachable declaratively when disconnected).",
       "declarative": true
     },
     {
@@ -355,13 +355,13 @@
         "mcp<2",
         "chroma-mcp"
       ],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "community",
       "permissions": [
         "READ_ONLY",
         "LOCAL_WRITE"
       ],
-      "notes": "Local-only vector store, no key. Reviewed + live-tested Sept 2026. | P10 GAP 3 permanently-declarative: needs a local Chroma vector DB and holds LOCAL_WRITE; answers from declared schemas, never spawns.",
+      "notes": "Local-only vector store, no key. Reviewed + live-tested Sept 2026. | P10 GAP 3 permanently-declarative: needs a local Chroma vector DB and holds LOCAL_WRITE; answers from declared schemas, never spawns. | P11 A2 enable-now: host runtime verified (2026-09-27) — enable + real connect + tools/list SUCCEEDED through MCPGateway; now a fully wired server (still reachable declaratively when disconnected).",
       "declarative": true
     },
     {
@@ -442,13 +442,13 @@
         "mcp<2",
         "mcp-pandoc"
       ],
-      "enabled": false,
+      "enabled": true,
       "trustLevel": "community",
       "permissions": [
         "READ_ONLY",
         "LOCAL_WRITE"
       ],
-      "notes": "Needs pandoc binary availability where it runs. Reviewed + live-tested Sept 2026. Needs the pandoc binary on the host (installed in the JEXI brain image). Connect+list verified everywhere; conversion verified on the brain. | P10 GAP 3 permanently-declarative: needs the pandoc binary on the host; answers from declared schemas, never spawns.",
+      "notes": "Needs pandoc binary availability where it runs. Reviewed + live-tested Sept 2026. Needs the pandoc binary on the host (installed in the JEXI brain image). Connect+list verified everywhere; conversion verified on the brain. | P10 GAP 3 permanently-declarative: needs the pandoc binary on the host; answers from declared schemas, never spawns. | P11 A2 enable-now: host runtime verified (2026-09-27) — enable + real connect + tools/list SUCCEEDED through MCPGateway; now a fully wired server (still reachable declaratively when disconnected).",
       "declarative": true
     },
     {
