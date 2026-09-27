@@ -39,6 +39,15 @@
       "enabled": true
     },
     {
+      "id": "post.log-tool-result",
+      "event": "PostToolUse",
+      "matcher": "*",
+      "command": "node hooks/scripts/post-tool-use/log-tool-result.js",
+      "exitBehavior": "warn",
+      "timeout": 5000,
+      "enabled": true
+    },
+    {
       "id": "stop.evaluate-session",
       "event": "Stop",
       "matcher": null,

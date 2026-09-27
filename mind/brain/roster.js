@@ -126,25 +126,26 @@ async function mcpsSection() {
 }
 
 /**
- * Hooks — the Phase-30 catalog is a boot-asserted contract (30 events;
- * 5 wired: PreToolUse, Stop, SessionStart, PreCompact, SessionEnd; 25 stubs).
- * Wired set mirrors src/wiring/phase31-hooks.js; counts derive from the real
- * catalog so they can never drift from the code.
+ * Hooks — read from the Phase-30 catalog (harness/parity/hooks/catalog.js),
+ * which since P5-3 declares per-event wired / intentionalNoOp + noOpReason.
+ * WIRED = a real production emitter fires the event (PreToolUse/PostToolUse/
+ * Stop/PreCompact/SessionStart/SessionEnd). Everything else is a DECLARED
+ * intentional no-op (registered at boot, never fires logic, reason in-file).
  */
-const WIRED_HOOK_EVENTS = ['PreToolUse', 'PostToolUse', 'Stop', 'SessionStart', 'SessionEnd', 'PreCompact'];
 async function hooksSection() {
   const catPath = path.join(REPO_ROOT, 'harness', 'parity', 'hooks', 'catalog.js');
   try {
     const mod = await import(pathToFileUrl(catPath));
     const events = (mod.HOOK_CATALOG || []).map((h) => h.event || h.name || String(h));
-    const wired = events.filter((e) => WIRED_HOOK_EVENTS.includes(e));
-    const stubs = events.filter((e) => !WIRED_HOOK_EVENTS.includes(e));
+    const wired = events.filter((e) => mod.WIRED_HOOKS.includes(e));
+    const stubs = events.filter((e) => !mod.WIRED_HOOKS.includes(e));
     return {
       catalog: events.length,
       wired: wired.length,
       stubs: stubs.length,
       wiredEvents: wired,
-      note: `${wired.length} hooks are wired into the live lifecycle (${wired.join(', ')}); ${stubs.length} are intentional no-op stubs (registered, never fire logic).`,
+      noOpReasons: Object.fromEntries(stubs.map((e) => [e, mod.NO_OP_REASONS[e]]).filter(([, v]) => Boolean(v))),
+      note: `${wired.length} hooks are wired into the live lifecycle (${wired.join(', ')}); ${stubs.length} are declared intentional no-ops (reason recorded in-file).`,
     };
   } catch (e) { return { error: String(e && e.message || e) }; }
 }
