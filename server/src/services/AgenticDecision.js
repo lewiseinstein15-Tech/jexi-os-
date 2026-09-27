@@ -304,6 +304,27 @@ async function runDirectAnswer(args, opts = {}) {
       return { ok: true, output: note.answer, observation: 'answered from the built-in reference notes (keyless mode)', meta: { writer: 'reference' } };
     }
   }
+  // 3b) PHASE 5 P5-1 — the skills library is callable when a turn needs it:
+  // a strong library match answers how-to questions from the real skill body
+  // (progressive disclosure, invocation logged to DATA_DIR/skills-log.jsonl).
+  try {
+    const { findLibrarySkill, invokeLibrarySkill } = await import('../skills/library-registry.js');
+    const skill = findLibrarySkill(q);
+    if (skill) {
+      const inv = await invokeLibrarySkill(q);
+      if (inv.ok) {
+        const content = inv.mode === 'steps'
+          ? (inv.steps || []).map((s) => `- ${s.step} → tool \`${s.tool}\` ✓`).join('\n')
+          : String(inv.body || '').slice(0, 2500);
+        return {
+          ok: true,
+          output: `**${inv.slug}** (from my skills library — ${inv.mode} invocation)\n\n${content}`,
+          observation: `answered from skills library: ${inv.slug} (${inv.mode})`,
+          meta: { writer: 'skills-library', skill: inv.slug, mode: inv.mode },
+        };
+      }
+    }
+  } catch { /* library dispatch must never break the direct answer */ }
   // 4) honest keyless failure — never a fabricated answer
   return { ok: false, output: '', observation: 'no provider key configured and no deterministic path for this question', meta: { writer: 'none' } };
 }

@@ -268,6 +268,14 @@ loadPlugins({ services: {} }).then(({ ctx }) => {
   try { startSkillWatcher(); } catch { /* optional */ }
 }).catch((e) => recordError('plugins', e.message));
 
+// PHASE 5 P5-1 — skills/library discovery at boot (frontmatter index only —
+// progressive disclosure). Skills become callable via invokeLibrarySkill.
+try {
+  const { registerLibrarySkills } = await import('./src/skills/library-registry.js');
+  const reg = registerLibrarySkills();
+  if (reg.line) console.log(reg.line);
+} catch (e) { console.log(`[Skills] library registration failed: ${String(e && e.message || e).slice(0, 120)}`); }
+
 // Goal jobs: inject real planner/orchestrator and resume after restart.
 goalEngine.planner = planner;
 goalEngine.orchestrator = orchestrator;
@@ -1318,6 +1326,22 @@ app.get('/api/knowledge/project', (req, res) => {
 app.get('/api/skills/search', (req, res) => {
   const q = String(req.query.q || '').toLowerCase();
   res.json({ results: q ? SKILL_REGISTRY.filter((s) => `${s.name} ${s.desc} ${s.slug} ${s.category}`.toLowerCase().includes(q)).slice(0, 30) : [] });
+});
+
+// PHASE 5 P5-1 — library skills are CALLABLE: machine-executable `## Steps`
+// run through the real skill executor + domain tools; prose skills return
+// their body honestly as a reference invocation. Every call is logged to
+// DATA_DIR/skills-log.jsonl (the raw tool log entry simulations assert on).
+app.post('/api/skills/library/invoke', async (req, res) => {
+  try {
+    const { query, args } = req.body || {};
+    if (!query) return res.status(400).json({ success: false, error: 'No query provided' });
+    const { invokeLibrarySkill, libraryStats } = await import('./src/skills/library-registry.js');
+    const result = await invokeLibrarySkill(query, args || {});
+    res.json({ success: result.ok !== false, library: libraryStats(), ...result });
+  } catch (e) {
+    res.status(500).json({ success: false, error: String(e && e.message || e).slice(0, 200) });
+  }
 });
 
 app.post('/api/skills/invoke', async (req, res) => {
