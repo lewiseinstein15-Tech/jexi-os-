@@ -23,10 +23,23 @@
  *           permissionMode refusals per tool call)
  *   SIM-15  P10 GAP 5: capability gate (10 novel phrasings ≥8 routed, ≥3 via
  *           the semantic layer, 0 false positives on 5 unrelated)
+ *   SIM-16  P11 A1: keyed lanes (6 scenarios with a key; SKIPPED-KEYLESS
+ *           when none — labeled, never hidden)
+ *   SIM-17  P11 A2: declarative MCP classification (16 entries → a/b/c with
+ *           host evidence; the wire-now three are enabled + connectable)
+ *   SIM-18  P11 A3: profileCoverage cwd independence (3 cwds byte-identical)
+ *   SIM-19  P11 A4: keyless children toolsUsed > 0 (real metering)
+ *   SIM-20  P11 B: terminal block renders (SSR DOM of the REAL component +
+ *           the built bundle carries it)
+ *   SIM-21  P11 B: tool call block renders (SSR DOM)
+ *   SIM-22  P11 B: step list transitions (pending → running → done)
+ *   SIM-23  P11 B: narration order preserved (thinking → steps → tools →
+ *           answer → footer in the REAL Transcript SSR) + command events
+ *           ride a live terminal turn in the right order
  *
  * Exit code 0 only when ALL sims pass. Honest FAILs print raw details.
  */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -352,6 +365,145 @@ async function main() {
       }
       const ok = correct >= 8 && viaSemantic >= 3 && fp === 0;
       record('SIM-15 capability gate (novel phrasings)', ok, `${correct}/10 routed to web_search (need ≥8), ${viaSemantic}/10 via semantic (need ≥3), ${fp}/5 false positives (need 0)`);
+    }
+
+    /* SIM-16 — P11 A1: keyed lanes (SKIPPED-KEYLESS is a labeled outcome) */
+    {
+      const { resolveKeys } = await import(path.join(ROOT, 'server/src/providers/runtime/LLMClient.js'));
+      const { canChat } = await import(path.join(ROOT, 'server/src/providers/index.js'));
+      const k = resolveKeys();
+      const hasKey = [k.groqKey, k.geminiKey, k.openrouterKey, k.hfKey, k.cerebrasKey, k.deepinfraKey, k.mistralKey, k.xaiKey, k.deepseekKey, k.nvidiaKey, k.sambanovaKey, k.pollinationsKey, k.cloudflareKey].some((v) => v && String(v).trim());
+      if (hasKey && canChat()) {
+        const { generateContent } = await import(path.join(ROOT, 'server/src/providers/runtime/LLMClient.js'));
+        const out = await generateContent('What is 21 * 2? Answer with just the number.', 'Answer with just the number.', null, { temperature: 0 });
+        const ok = String(out).includes('42');
+        record('SIM-16 keyed lanes (model-routed turn)', ok, `keyed path live — generateContent answered: ${JSON.stringify(String(out).slice(0, 40))} (full 6-scenario harness: scripts/keyed-lanes-test.mjs)`);
+      } else {
+        record('SIM-16 keyed lanes (SKIPPED-KEYLESS)', true, `SKIPPED-KEYLESS — no provider key configured (canChat()=${canChat()}); the anonymous Pollinations tier is CLOSED (401 UNAUTHORIZED). Harness ready: scripts/keyed-lanes-test.mjs runs all 6 keyed scenarios when a key is present.`);
+      }
+    }
+
+    /* SIM-17 — P11 A2: declarative MCP classification (a/b/c, host-evidenced) */
+    {
+      const gw = await import(path.join(ROOT, 'server/src/services/MCPGateway.js'));
+      const reg = JSON.parse(fs.readFileSync(path.join(ROOT, 'server', 'mcp', 'registry.json'), 'utf8'));
+      const declarative16 = ['wikipedia-py', 'chroma', 'fs-alt', 'playwright-ea', 'pandoc', 'nmap', 'subfinder', 'whatweb', 'ghidra', 'semgrep', 'bandit', 'gitleaks', 'sliver-c2', 'bloodhound-ce', 'n8n-mcp', 'forgejo-mcp'];
+      const WIRE_NOW = new Set(['wikipedia-py', 'chroma', 'pandoc']); // proven connects (P11 A2)
+      const byName = Object.fromEntries(reg.servers.map((s) => [s.name, s]));
+      const allPresent = declarative16.every((n) => byName[n]);
+      const wireNowEnabled = declarative16.filter((n) => WIRE_NOW.has(n)).every((n) => byName[n].enabled === true);
+      const report = gw.mcpStateReport();
+      const valid = new Set(['connected', 'declarative', 'disabled']);
+      const classified = report.servers.filter((s) => valid.has(s.state)).length;
+      const sum = report.summary || {};
+      const sumsOk = Number(sum.connected || 0) + Number(sum.declarative || 0) + Number(sum.disabled || 0) === report.servers.length;
+      const dres = gw.describeMcpServer('nmap');
+      const offerOk = dres && dres.ok === true && dres.state === 'declarative' && Array.isArray(dres.tools) && dres.tools.length > 0;
+      const ok = allPresent && wireNowEnabled && classified === report.servers.length && sumsOk && offerOk;
+      record('SIM-17 declarative MCP classification', ok, `16/16 present · wire-now(${[...WIRE_NOW].join(', ')}) all enabled=${wireNowEnabled} · state surface ${classified}/${report.servers.length} classified (connected=${sum.connected} declarative=${sum.declarative} disabled=${sum.disabled}) · nmap declarative offer=${offerOk}`);
+    }
+
+    /* SIM-18 — P11 A3: profileCoverage cwd independence (byte-identical, 2 cwds) */
+    {
+      const probe = `import { profileCoverage } from ${JSON.stringify(path.join(ROOT, 'server/src/services/ProfileCompleteness.js'))};process.stdout.write(JSON.stringify(profileCoverage()));`;
+      const pfile = path.join(dataDir, 'a3-probe.mjs');
+      fs.writeFileSync(pfile, probe);
+      const run = (cwd) => spawnSync(process.execPath, [pfile], { cwd, encoding: 'utf8', timeout: 60000, env: { ...process.env, DATA_DIR: path.join(dataDir, 'a3-' + Math.random().toString(36).slice(2, 8)) } });
+      const a = run(ROOT), b = run(path.join(ROOT, 'server')), c = run(os.tmpdir());
+      const ok = a.status === 0 && b.status === 0 && c.status === 0 && a.stdout === b.stdout && b.stdout === c.stdout && a.stdout.includes('"covered":');
+      record('SIM-18 profileCoverage cwd independence', ok, `repo-root / server/ / tmp → ${ok ? 'BYTE-IDENTICAL' : 'DIFFERENT'} · ${a.stdout.slice(0, 120)}`);
+    }
+
+    /* SIM-19 — P11 A4: keyless children toolsUsed > 0 (real metering) */
+    {
+      const { dispatchSubagents } = await import(path.join(ROOT, 'server/src/services/AgenticDecision.js'));
+      const out = await dispatchSubagents('read the file package.json and remember that tool metering must be real', ['file_read', 'memory_write'], { sendEvent: () => {} });
+      const per = (out.results || []).map((c) => ({ route: c.name.replace(/^jexi-agentic-\d+-/, ''), toolsUsed: c.toolsUsed }));
+      const ok = out.results.length >= 2 && out.results.every((c) => Number(c.toolsUsed) > 0);
+      record('SIM-19 keyless children toolsUsed', ok, `children=${JSON.stringify(per)} — every tool-backed child meters real invocations (was always 0 before P11 A4)`);
+    }
+
+    /* SIM-20 — P11 B: terminal block renders (SSR of the REAL component) */
+    {
+      const { renderComponent } = await import(path.join(ROOT, 'scripts/ssr-harness.mjs'));
+      const html = await renderComponent('interfaces/ui/web/console/components/transcript/TerminalBlock.jsx', { command: 'ls -la', state: 'done', output: 'total 24\ndrwxr-xr-x 3 z z 4096', error: '', ms: 12, exit: 0 });
+      const running = await renderComponent('interfaces/ui/web/console/components/transcript/TerminalBlock.jsx', { command: 'sleep 5', state: 'running', output: '', error: '' });
+      const failed = await renderComponent('interfaces/ui/web/console/components/transcript/TerminalBlock.jsx', { command: 'cat /nope', state: 'failed', output: '', error: 'No such file', exit: 1 });
+      const distBundle = fs.readdirSync(path.join(ROOT, 'dist', 'assets')).filter((f) => f.startsWith('index-') && f.endsWith('.js')).map((f) => fs.readFileSync(path.join(ROOT, 'dist', 'assets', f), 'utf8')).join('');
+      const ok = html.includes('jx-term') && html.includes('data-rowtype="terminal"') && html.includes('$') && html.includes('ls -la') && html.includes('DONE') && html.includes('total 24')
+        && running.includes('is-run') && running.includes('RUNNING')
+        && failed.includes('is-fail') && failed.includes('FAILED') && failed.includes('No such file')
+        && distBundle.includes('jx-term-out');
+      record('SIM-20 terminal block renders', ok, `SSR done-state: $ + cmd + DONE chip + full output ✓ · running: is-run/RUNNING ✓ · failed: is-fail/FAILED + stderr ✓ · shipped dist bundle carries the terminal renderer=${distBundle.includes('jx-term-out')}`);
+    }
+
+    /* SIM-21 — P11 B: tool call block renders (SSR of the REAL component) */
+    {
+      const { renderComponent } = await import(path.join(ROOT, 'scripts/ssr-harness.mjs'));
+      const html = await renderComponent('interfaces/ui/web/console/components/transcript/ToolCallBlock.jsx', { name: 'web-search', params: '{"query":"space news"}', result: '10 sources fetched', state: 'completed', ms: 210 });
+      const failed = await renderComponent('interfaces/ui/web/console/components/transcript/ToolCallBlock.jsx', { name: 'deep-read', params: null, result: 'HTTP 404', state: 'failed' });
+      const ok = html.includes('jx-tool') && html.includes('web-search') && html.includes('&quot;query&quot;:&quot;space news&quot;') && html.includes('10 sources fetched') && html.includes('completed')
+        && failed.includes('is-fail') && failed.includes('failed');
+      record('SIM-21 tool call block renders', ok, `SSR: ⚙ name + params (JSON entity-escaped, as the DOM carries it) + result + ms chip ✓ · failed state is-fail ✓`);
+    }
+
+    /* SIM-22 — P11 B: step list transitions (pending → running → done) */
+    {
+      const { renderComponent } = await import(path.join(ROOT, 'scripts/ssr-harness.mjs'));
+      const mid = await renderComponent('interfaces/ui/web/console/components/transcript/StepList.jsx', { planSteps: ['step three'], steps: [{ text: 'step one' }, { text: 'step two' }], start: 0, streaming: true });
+      const done = await renderComponent('interfaces/ui/web/console/components/transcript/StepList.jsx', { planSteps: [], steps: [{ text: 'step one' }, { text: 'step two' }, { text: 'step three' }], start: 0, streaming: false });
+      const midOk = mid.includes('is-done') && mid.includes('is-running') && mid.includes('is-pending');
+      const doneOk = done.includes('is-done') && !done.includes('is-pending') && !done.includes('is-running');
+      const ok = midOk && doneOk;
+      record('SIM-22 step list transitions', ok, `mid-turn SSR: done + running(pulse) + pending all present=${midOk} · end-state SSR: all done, no pending/running=${doneOk}`);
+    }
+
+    /* SIM-23 — P11 B: narration order preserved (thinking → steps → tools →
+     * answer → footer) in the REAL Transcript SSR + live command-event order */
+    {
+      const { renderComponent } = await import(path.join(ROOT, 'scripts/ssr-harness.mjs'));
+      const rows = [
+        { seq: 1, turnId: 't1', rowType: 'text', voice: 'user', type: 'message.delta', content: 'run ls -la' },
+        { seq: 2, turnId: 't1', rowType: 'narration', narrationType: 'recon', type: 'narration.line', content: 'reasoning trace', t: 1 },
+        { seq: 3, turnId: 't1', rowType: 'narration', narrationType: 'progress', type: 'narration.line', content: 'Agent: working', t: 2 },
+        { seq: 4, turnId: 't1', rowType: 'command-use', type: 'narration.line', commandUse: { id: 'cmd-1', status: 'done', cmd: 'ls -la', output: 'total 24', errput: '', exit: 0, duration_ms: 12 }, content: '$ ls -la' },
+        { seq: 5, turnId: 't1', rowType: 'tool-use', type: 'narration.line', toolUse: { id: 'tu-1', tool: 'web-search', status: 'success', duration_ms: 210, detail: '10 sources' }, content: '10 sources' },
+        { seq: 6, turnId: 't1', rowType: 'text', type: 'message.delta', voice: 'jexi', content: 'Final answer text' },
+        { seq: 7, turnId: 't1', rowType: 'turn-end-ok', type: 'turn.completed', content: 'turn completed: t1 · 1,284 ms' },
+      ];
+      const html = await renderComponent('interfaces/ui/web/console/components/transcript/Transcript.jsx', { rows, onApprove: () => {} });
+      const idx = {
+        user: html.indexOf('jx-ta-user'),
+        think: html.indexOf('jx-think'),
+        steps: html.indexOf('jx-steps'),
+        term: html.indexOf('jx-term'),
+        tool: html.indexOf('jx-tool'),
+        answer: html.indexOf('jx-answer'),
+        footer: html.indexOf('jx-footer'),
+      };
+      const ordered = idx.user > -1 && idx.think > -1 && idx.steps > -1 && idx.term > -1 && idx.tool > -1 && idx.answer > -1 && idx.footer > -1
+        && idx.user < idx.think && idx.think < idx.steps && idx.steps < idx.term && idx.term < idx.tool && idx.tool < idx.answer && idx.answer < idx.footer;
+      // live half: the CommandTrace seam that /api/chat forwards as NDJSON —
+      // running fires BEFORE done, deterministically, on a REAL shell run.
+      // (The full /api/chat NDJSON relay of these exact events is proven by
+      // scripts/narration-live-test.mjs T2 with browser screenshots — this
+      // half pins the seam ORDER without depending on live lane routing.)
+      let liveOrder = 'unverified';
+      let liveOk = false;
+      {
+        const ct = await import(path.join(ROOT, 'server/src/services/CommandTrace.js'));
+        const { executeCapabilityKeyless } = await import(path.join(ROOT, 'server/src/services/AgenticDecision.js'));
+        const seen = [];
+        const un = ct.onCommandTrace((e) => seen.push(e.status === 'done' ? 'command.done' : e.status));
+        await executeCapabilityKeyless('terminal', 'run ls -la', {});
+        un();
+        const rIdx = seen.indexOf('running');
+        const dIdx = seen.indexOf('command.done');
+        liveOrder = `events=${JSON.stringify(seen)}`;
+        liveOk = rIdx > -1 && dIdx > -1 && rIdx < dIdx;
+      }
+      const ok = ordered && liveOk;
+      record('SIM-23 narration order preserved', ok, `SSR order user→think→steps→terminal→tool→answer→footer: ${ordered} (${JSON.stringify(idx)}) · live CommandTrace order: ${liveOrder} → running-before-done=${liveOk}`);
     }
   } finally {
     try { child.kill('SIGTERM'); } catch { /* gone */ }

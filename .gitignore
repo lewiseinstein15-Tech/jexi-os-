@@ -44,3 +44,4 @@ infra/hooks/state/
 # Suite-runner scratch state (chunked test runner) — untracked by design;
 # listed here so probe zone checks (git status --porcelain) never see it.
 scripts/.chunked-state.json
+.ssr-cache/
