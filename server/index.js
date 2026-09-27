@@ -138,7 +138,7 @@ import { writeBootProfile } from './src/services/BootProfile.js';
 import { buildLaunchEnvironment, setLaunchEnvironment } from './src/services/LaunchEnvironment.js';
 import { initConfigSnapshot } from './src/services/ConfigReload.js';
 import { openSessionPersistence } from './src/services/SessionPersistenceSqlite.js';
-import { loadPlugins, setActivePluginContext } from './src/services/PluginContext.js';
+import { loadPlugins, setActivePluginContext, listPluginTools } from './src/services/PluginContext.js';
 import { startSkillWatcher } from './src/services/SkillDiscovery.js';
 import {
   listGrants, addGrant, removeGrant, resetGrants, recentDenied,
@@ -1144,6 +1144,9 @@ function maskConnectorAuth(auth = {}) {
 // === PLUGIN SYSTEM (roadmap stage 21 — feature bundles) ===
 // Built-in plugins contribute agents/skills/tools; toggle them at runtime.
 app.get('/api/plugins', (req, res) => res.json({ plugins: listRegistryPlugins() }));
+// PHASE 5 P5-4 — plugin-registered tools are observable: every tool mounted
+// by a plugin at boot (slug/name/owner), proving the plugin farm is live.
+app.get('/api/plugins/tools', (req, res) => res.json({ tools: listPluginTools().map(({ handler, ...rest }) => rest) }));
 // B162 — the named coworker roster (people names only; no raw model IDs).
 app.get('/api/team', (req, res) => res.json({ team: teamRoster() }));
 
