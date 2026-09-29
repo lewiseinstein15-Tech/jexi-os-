@@ -1,0 +1,28 @@
+================================================================
+TICKETS : JEXI-029 end-to-end planted pytest
+COMMAND : node --test tests/tickets/jexi-e2e-planted-pytest.test.js
+RUN AT  : 2026-09-29T16:40:10Z
+NODE    : v24.8.0
+================================================================
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+✔ JEXI-008/029 E2E: plant a failing pytest → the loop reads, edits, tests, and only then claims success (2315.363297ms)
+✔ JEXI-002/013: a FAILING suite injects evidence and blocks the success claim (388.478916ms)
+✔ JEXI-009: a non-coding turn is NOT gated by verification (0.351798ms)
+✔ JEXI-027: budgets are intent-based, not one flat pair of constants (0.95392ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3840.986078
+
+----------------------------------------------------------------
+EXIT CODE : 0
+PASSED    : 4
+FAILED    : 0

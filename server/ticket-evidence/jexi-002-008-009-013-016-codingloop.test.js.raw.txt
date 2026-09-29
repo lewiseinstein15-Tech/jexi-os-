@@ -1,0 +1,48 @@
+================================================================
+TICKETS : JEXI-002,008,009,013,016 coding loop
+COMMAND : node --test tests/tickets/jexi-002-008-009-013-016-codingloop.test.js
+RUN AT  : 2026-09-29T16:38:33Z
+NODE    : v24.8.0
+================================================================
+◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+✔ JEXI-008: edit → verify pass → success is allowed (1.292057ms)
+✔ JEXI-008: edit → verify fail → replan → verify pass → success (0.485289ms)
+✔ JEXI-008: the loop is bounded — it cannot spin on replan forever (0.39505ms)
+✔ JEXI-002: a mutating tool call is what triggers a real verification layer (0.194308ms)
+✔ JEXI-002: a FAILED mutating call does not claim an edit happened (0.18928ms)
+✔ JEXI-002: a verifier that THROWS is a failure, never a pass (0.341843ms)
+✔ JEXI-002: this module is wired to the REAL verifyAfterEdit (1.037287ms)
+✔ JEXI-009: a coding turn with no green verify is reported unverified (0.206838ms)
+✔ JEXI-009: a turn with no edits is not gated (asking a question is not coding) (0.233437ms)
+✔ JEXI-009: intent detection recognises a coding request (0.534685ms)
+✔ JEXI-009: test tools are recognised as verification-capable (0.135144ms)
+✔ JEXI-013: a failed verify injects structured evidence for the next turn (0.286865ms)
+✔ JEXI-013: a later pass clears the pending failure (0.215077ms)
+✔ JEXI-014: a long test result keeps its failure lines after truncation (0.790897ms)
+✔ JEXI-014: a short result is passed through untouched (0.130149ms)
+✔ JEXI-014: non-test truncation keeps head AND tail (0.093298ms)
+✔ JEXI-016: CodingLoop is a standalone unit with no AgentLoop import (0.299704ms)
+✔ JEXI-002: a red test run blocks the success claim even when nothing was edited (0.303202ms)
+✔ JEXI-002: a red test run with no edit and no verify call is still not success (0.197299ms)
+✔ JEXI-002: an errored test run blocks the success claim too (0.092351ms)
+✔ JEXI-002: a PASSING test run clears the red verdict and restores the gate (0.111151ms)
+✔ JEXI-002: a green suite followed by an edit and a real pass is a verified success (0.157553ms)
+✔ JEXI-002: a result with no status is not treated as a failure (0.073476ms)
+✔ JEXI-002: AgentLoop records the test verdict before the pass/fail branch (0.242593ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1393.074489
+
+----------------------------------------------------------------
+EXIT CODE : 0
+PASSED    : 24
+FAILED    : 0

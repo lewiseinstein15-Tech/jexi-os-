@@ -33,22 +33,40 @@ export function cleanupSandbox(dir) {
 /**
  * Decide the working directory for a real spawn.
  *
- * Default: run in the caller's cwd — a real spawn of the project's own
- * command needs its package.json + node_modules, so the sandbox is OFF by
- * default (the snapshot contract is honored at the evidence layer: every
- * evidence record pins the snapshotId, and FileStateVerifier byte-compares
- * against the frozen files).
+ * JEXI-007 — materialize by DEFAULT. It used to be opt-in:
  *
- * Strict mode: pass `materialize: true` to materialize the snapshot's files
- * into a fresh tempdir and run the command there (used by callers that need
- * byte-level isolation — the child process then sees exactly the frozen
- * bytes, never the live workspace).
+ *     if (hasFiles && options.materialize === true) { ... }
+ *     return { cwd: options.cwd || process.cwd(), sandbox: null };
+ *
+ * so the default for TestVerifier was the LIVE workspace — the one directory
+ * the claimant (the thing being verified) controls. A claimant could edit
+ * files between the snapshot being taken and the verifier reading them, and
+ * the "immutable snapshot contract" this module exists to enforce was opt-in
+ * rather than the default.
+ *
+ * Now, whenever the snapshot actually carries files, they are materialized
+ * into a fresh tempdir and the command runs THERE. Running against the live
+ * cwd is an explicit opt-out (`materialize: false`), for the real cases that
+ * need node_modules or a venv a snapshot cannot carry.
+ *
+ *   materialize (default)  → tempdir holding the frozen bytes
+ *   materialize:false      → live cwd (documented opt-out)
+ *   no files in snapshot   → live cwd (nothing to materialize)
  */
 export function verifyCwd(snapshot, options = {}) {
   const hasFiles = snapshot?.files && Object.keys(snapshot.files).length > 0;
-  if (hasFiles && options.materialize === true) {
-    const sandbox = materializeSnapshot(snapshot);
-    return { cwd: sandbox, sandbox };
+  const { materialize } = options;
+
+  // No files to freeze — there is nothing a claimant could tamper with.
+  if (!hasFiles) {
+    return { cwd: options.cwd || process.cwd(), sandbox: null, materialized: false, reason: 'snapshot carries no files' };
   }
-  return { cwd: options.cwd || process.cwd(), sandbox: null };
+
+  // Explicit opt-out, but ONLY when the caller says so and gave a cwd to use.
+  if (materialize === false && options.cwd) {
+    return { cwd: options.cwd, sandbox: null, materialized: false, reason: 'explicit opt-out (materialize:false) — live workspace' };
+  }
+
+  const sandbox = materializeSnapshot(snapshot);
+  return { cwd: sandbox, sandbox, materialized: true, reason: 'materialized from immutable snapshot' };
 }

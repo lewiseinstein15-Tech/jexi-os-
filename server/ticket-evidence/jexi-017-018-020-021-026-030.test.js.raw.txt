@@ -1,0 +1,42 @@
+================================================================
+TICKETS : JEXI-017,018,020,021,026,030 runtime
+COMMAND : node --test tests/tickets/jexi-017-018-020-021-026-030.test.js
+RUN AT  : 2026-09-29T16:40:06Z
+NODE    : v24.8.0
+================================================================
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+✔ JEXI-017: toolHasEngine agrees with what executeTool can actually dispatch (1153.423272ms)
+✔ JEXI-017: ZERO tools enter native schemas without a registered engine (1.318341ms)
+✔ JEXI-017: a schema the model can see is one executeTool will not refuse as Unknown (0.610116ms)
+✔ JEXI-018: chat and WorkGraph share ONE run-tests seam (0.439686ms)
+✔ JEXI-018: both entry points resolve to the same function identity (0.327147ms)
+✔ JEXI-020: published agent counts equal list().length of executable agents (109.110345ms)
+✔ JEXI-020: the published line names each population instead of conflating them (38.081609ms)
+✔ JEXI-020: a count derived from the code matches a freshly derived count (23.42486ms)
+✔ JEXI-021: a real pytest-repair skill exists with a declared closed tool set (3.798992ms)
+✔ JEXI-021: the active coding skill actually NARROWS the offered tool set (1.349444ms)
+✔ JEXI-021: a non-coding query activates no skill and keeps its full tool set (1.193618ms)
+✔ JEXI-026: near-duplicate calls produce ONE loop key, not a new one (0.677995ms)
+✔ JEXI-026: genuinely different calls still get different keys (0.30856ms)
+✔ JEXI-026: the normalized key actually trips the breaker (0.256312ms)
+✔ JEXI-026: normalizeCallArgs does not recurse forever on cyclic-ish input (0.142677ms)
+✔ JEXI-030: the coding tool set excludes search, MCP and non-coding tools (0.293937ms)
+✔ JEXI-030: the cap is a hard ceiling, and the cap is enforced on a wide catalogue (0.509607ms)
+✔ JEXI-030: a coding intent is recognised by plan or by its own words (0.511595ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1514.922828
+
+----------------------------------------------------------------
+EXIT CODE : 0
+PASSED    : 18
+FAILED    : 0

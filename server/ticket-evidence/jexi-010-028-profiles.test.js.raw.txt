@@ -1,0 +1,33 @@
+================================================================
+TICKETS : JEXI-010,028 permission profiles
+COMMAND : node --test tests/tickets/jexi-010-028-profiles.test.js
+RUN AT  : 2026-09-29T16:40:01Z
+NODE    : v24.8.0
+================================================================
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+✔ JEXI-010: domain dispatch is profile-gated by default, not allowAll (2255.131891ms)
+✔ JEXI-010: an ungranted tool is DENIED, not allowed by default (11.816302ms)
+✔ JEXI-010: the profiles are real and ordered by risk (0.460947ms)
+✔ JEXI-010: the coding profile edits a file inside the workspace (43.985497ms)
+✔ JEXI-010: readonly still blocks the SAME edit the coding profile allows (6.686247ms)
+✔ JEXI-028: a sandboxed edit + pytest run does NOT stall for approval (1708.14837ms)
+✔ JEXI-028: host-destructive work is NOT auto-approved by the coding profile (37.489605ms)
+✔ JEXI-028: the full profile is the only one that widens the ceiling (36.928879ms)
+✔ JEXI-010/028: an unknown profile fails closed to the safest thing (5.138305ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4197.929245
+
+----------------------------------------------------------------
+EXIT CODE : 0
+PASSED    : 9
+FAILED    : 0

@@ -45,3 +45,10 @@ infra/hooks/state/
 # listed here so probe zone checks (git status --porcelain) never see it.
 scripts/.chunked-state.json
 .ssr-cache/
+
+# ── live-model acceptance config (JEXI) ─────────────────────────────
+# Holds a REAL provider credential. The runnable template is
+# live-model.config.env.example, which must stay in the tree.
+server/live-model.config.env
+*.config.env
+!*.config.env.example

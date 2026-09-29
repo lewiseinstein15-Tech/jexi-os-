@@ -1,0 +1,1797 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="deck">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>JEXI OS — Deck</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   JEXI OS · "DECK"
+   A rebuild of the console on the architecture-report palette.
+   Same tokens, different instrument: icon rail + omnibar + full-bleed
+   stages + bottom dock. No 240px labelled sidebar anywhere.
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#0c0b09;      --bg2:#100e0c;
+  --panel:#151311;   --panel2:#1c1917;  --panel3:#232019;
+  --line:#2a2622;    --line2:#3a342d;   --line-hot:#4a4239;
+  --tx:#e7e3dd;      --dim:#9a938a;     --faint:#6b655e;   --ghost:#4a443e;
+  --amber:#e8a33d;   --amber-2:#f0bd70; --amber-dk:#8a6224;
+  --cyan:#5bc8d6;    --cyan-dk:#2b6a74;
+  --green:#7fc98a;   --green-dk:#3c6b44;
+  --violet:#a58bd6;  --violet-dk:#4d3f6b;
+  --rose:#d97a86;    --rose-dk:#7a3a42;
+  --blue:#6ba3e0;    --blue-dk:#33536f;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+  --rail:68px; --omnibar:54px; --dock:60px; --rightrail:0px;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden}
+body{
+  background:var(--bg); color:var(--tx);
+  font-family:var(--sans); font-size:14px; -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+::selection{background:var(--amber);color:#0c0b09}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input,textarea{font:inherit;color:inherit;background:none;border:0;outline:none}
+.mono{font-family:var(--mono)}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:9px;border:2px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:var(--line-hot)}
+
+/* ── micro label ────────────────────────────────────────────────── */
+.ml{font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--faint)}
+
+/* ═══ SHELL ═══════════════════════════════════════════════════════ */
+#app{
+  display:grid; height:100vh;
+  grid-template-columns:var(--rail) 1fr;
+  grid-template-rows:var(--omnibar) 1fr var(--dock);
+  grid-template-areas:
+    "rail omni"
+    "rail main"
+    "rail dock";
+}
+
+/* ── icon rail (64px, icons only) ────────────────────────────────── */
+#rail{
+  grid-area:rail; background:var(--bg2);
+  border-right:1px solid var(--line);
+  display:flex; flex-direction:column; align-items:center;
+  padding:11px 0 0; gap:2px; position:relative; z-index:60;
+}
+.brandmark{
+  width:36px;height:36px;border-radius:9px; margin-bottom:14px;
+  background:linear-gradient(160deg,var(--amber) 0%,#b8792a 100%);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:15px;font-weight:700;color:#0c0b09;
+  letter-spacing:-.04em; box-shadow:0 0 0 1px var(--line-hot);
+  flex:none;
+}
+.railbtn{
+  width:44px;height:40px;border-radius:9px; display:flex;align-items:center;justify-content:center;
+  color:var(--ghost); position:relative; transition:color .12s, background .12s; flex:none;
+}
+.railbtn svg{width:19px;height:19px;stroke-width:1.6}
+.railbtn:hover{color:var(--dim);background:var(--panel)}
+.railbtn.on{color:var(--amber);background:#1e1a15}
+.railbtn.on::before{content:'';position:absolute;left:-12px;top:9px;bottom:9px;width:2px;background:var(--amber);border-radius:0 2px 2px 0}
+.railbtn .badge{
+  position:absolute;top:3px;right:4px;min-width:15px;height:15px;padding:0 3px;border-radius:8px;
+  background:var(--rose);color:#0c0b09;font-family:var(--mono);font-size:9px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;line-height:1;
+}
+.railsep{width:22px;height:1px;background:var(--line);margin:9px 0}
+.railfoot{margin-top:auto;padding-bottom:12px;display:flex;flex-direction:column;align-items:center;gap:8px}
+
+/* flyout on hover */
+.flyout{
+  position:fixed; left:calc(var(--rail) + 6px); z-index:200;
+  background:var(--panel2); border:1px solid var(--line-hot); border-radius:10px;
+  padding:5px; min-width:212px; box-shadow:0 14px 40px rgba(0,0,0,.65);
+  opacity:0; pointer-events:none; transform:translateX(-6px); transition:opacity .13s, transform .13s;
+}
+.flyout.show{opacity:1;transform:none;pointer-events:auto}
+.flyout .fi{
+  display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:7px;cursor:pointer;width:100%;
+}
+.flyout .fi:hover{background:var(--panel3)}
+.flyout .fi svg{width:15px;height:15px;color:var(--faint);flex:none;stroke-width:1.7}
+.flyout .fi:hover svg{color:var(--amber)}
+.flyout .fi .lab{font-size:12.5px;font-weight:520}
+.flyout .fi .k{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--ghost)}
+.flyout .ftitle{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ghost);padding:9px 9px 5px}
+
+/* ── omnibar ────────────────────────────────────────────────────── */
+#omnibar{
+  grid-area:omni; background:var(--bg2); border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:14px;padding:0 16px 0 18px;
+}
+.wordmark{display:flex;align-items:baseline;gap:8px;flex:none}
+.wordmark b{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.08em;color:var(--tx)}
+.wordmark span{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--ghost);text-transform:uppercase}
+
+/* segmented stage switcher */
+.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:2px;gap:2px}
+.seg button{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;
+  padding:5px 12px;border-radius:7px;color:var(--faint);transition:.12s; white-space:nowrap;
+}
+.seg button:hover{color:var(--dim)}
+.seg button.on{background:var(--panel3);color:var(--amber);box-shadow:inset 0 0 0 1px var(--line-hot)}
+
+/* omnibar search */
+.omni-search{
+  flex:1;max-width:400px;display:flex;align-items:center;gap:8px;
+  background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:6px 10px;
+  transition:border-color .12s;
+}
+.omni-search:focus-within{border-color:var(--line-hot)}
+.omni-search svg{width:14px;height:14px;color:var(--ghost);flex:none;stroke-width:2}
+.omni-search input{flex:1;font-size:12.5px;min-width:0}
+.omni-search input::placeholder{color:var(--ghost)}
+.kbd{
+  font-family:var(--mono);font-size:9.5px;color:var(--ghost);border:1px solid var(--line2);
+  border-radius:4px;padding:1.5px 5px;flex:none;background:var(--bg);
+}
+
+/* vitals ticker */
+.vitals{display:flex;align-items:center;gap:15px;margin-left:auto;flex:none}
+.vital{display:flex;flex-direction:column;gap:2px;align-items:flex-end}
+.vital .v{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--tx);line-height:1}
+.vital .k{font-family:var(--mono);font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ghost);line-height:1}
+.vital.live .v{color:var(--green)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block}
+.dot.pulse{animation:dp 2s ease-in-out infinite}
+@keyframes dp{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(127,201,138,.5)}50%{opacity:.55;box-shadow:0 0 0 5px rgba(127,201,138,0)}}
+
+.modelchip{
+  display:flex;align-items:center;gap:7px;padding:5px 11px;border-radius:8px;
+  background:var(--panel);border:1px solid var(--line);font-family:var(--mono);font-size:10.5px;color:var(--dim);
+}
+.modelchip .led{width:6px;height:6px;border-radius:50%;background:var(--amber)}
+.modelchip b{color:var(--tx);font-weight:600}
+
+/* ── main stage ─────────────────────────────────────────────────── */
+#main{grid-area:main;position:relative;overflow:hidden;background:var(--bg)}
+.stage{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden}
+.stage.on{display:flex;animation:stageIn .22s ease}
+@keyframes stageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.stage-head{
+  display:flex;align-items:center;gap:14px;padding:13px 20px;border-bottom:1px solid var(--line);
+  flex:none;background:var(--bg2);
+}
+.stage-head h1{margin:0;font-size:15px;font-weight:640;letter-spacing:-.005em}
+.stage-head .sub{color:var(--faint);font-size:12.5px}
+.stage-body{flex:1;overflow:auto;min-height:0}
+
+/* ═══ STAGE 1 · PIPELINE ══════════════════════════════════════════ */
+.lanefilter{display:flex;gap:6px;margin-left:auto;align-items:center}
+.chip{
+  font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;
+  padding:4px 10px;border-radius:6px;border:1px solid var(--line);color:var(--faint);transition:.12s;
+}
+.chip:hover{color:var(--dim);border-color:var(--line2)}
+.chip.on{color:var(--amber);border-color:var(--amber-dk);background:#1e1a15}
+.chip b{color:var(--tx)}
+
+.board{padding:18px 20px 22px;min-width:0;min-height:100%;display:flex}
+.lanes{display:flex;gap:14px;align-items:stretch;flex:1}
+.lane{
+  width:262px;flex:1 1 0;min-width:236px;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  display:flex;flex-direction:column;max-height:calc(100vh - 186px);
+}
+.lane-h{display:flex;align-items:center;gap:8px;padding:11px 13px;border-bottom:1px solid var(--line);flex:none}
+.lane-h .accent{width:3px;height:13px;border-radius:2px;flex:none}
+.lane-h .nm{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:600}
+.lane-h .ct{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--faint);
+  background:var(--panel2);padding:1px 7px;border-radius:9px}
+.lane-b{padding:9px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;min-height:90px;flex:1}
+
+.card{
+  background:var(--panel2);border:1px solid var(--line2);border-radius:9px;padding:10px 11px;
+  cursor:pointer;transition:border-color .12s, transform .12s, background .12s;position:relative;overflow:hidden;
+}
+.card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px}
+.card:hover{border-color:var(--line-hot);transform:translateX(2px);background:var(--panel3)}
+.card.sel{border-color:var(--amber-dk);background:var(--panel3);box-shadow:0 0 0 1px var(--amber-dk)}
+.card .ttl{font-size:12.5px;font-weight:560;line-height:1.35;margin:0 0 7px;padding-left:8px;color:var(--tx)}
+.card .meta{display:flex;align-items:center;gap:6px;padding-left:8px;flex-wrap:wrap}
+.card .who{font-family:var(--mono);font-size:9.5px;color:var(--faint)}
+.tagx{font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;
+  padding:1.5px 6px;border-radius:4px;border:1px solid var(--line2);color:var(--faint);white-space:nowrap}
+.card .bar{height:2px;background:var(--line);border-radius:2px;margin-top:8px;margin-left:8px;overflow:hidden}
+.card .bar i{display:block;height:100%;border-radius:2px;transition:width .5s}
+.card .gate{
+  margin-top:8px;margin-left:8px;display:flex;align-items:center;gap:6px;padding:5px 7px;
+  background:#241a12;border:1px solid #4a3018;border-radius:6px;
+}
+.card .gate .ml{color:var(--amber);font-size:8.5px}
+.gatebtns{margin-left:auto;display:flex;gap:4px}
+.gatebtns button{font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:4px;border:1px solid var(--line2);color:var(--dim)}
+.gatebtns button:hover{background:var(--amber);color:#0c0b09;border-color:var(--amber)}
+.gatebtns button.deny:hover{background:var(--rose);border-color:var(--rose)}
+
+/* ═══ STAGE 2 · CONSTELLATION ═════════════════════════════════════ */
+.const-wrap{display:grid;grid-template-columns:230px 1fr;min-height:100%}
+.divlist{border-right:1px solid var(--line);padding:12px 10px;overflow-y:auto;background:var(--bg2)}
+.divlist .grp{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ghost);
+  padding:12px 8px 6px}
+.divi{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px;cursor:pointer;width:100%;text-align:left}
+.divi:hover{background:var(--panel)}
+.divi.on{background:var(--panel2);box-shadow:inset 0 0 0 1px var(--line2)}
+.divi .sw{width:8px;height:8px;border-radius:2px;flex:none}
+.divi .nm{font-size:12.5px;color:var(--dim);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.divi.on .nm{color:var(--tx);font-weight:560}
+.divi .ct{font-family:var(--mono);font-size:10px;color:var(--ghost)}
+
+.agents{padding:18px 20px;overflow-y:auto}
+.agents-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
+.agents-head h2{margin:0;font-size:15px;font-weight:640}
+#agentCards{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:7px;align-content:start}
+.acard{
+  display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
+  background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:10px 12px;
+  cursor:pointer;transition:.12s;
+}
+.acard:hover{border-color:var(--line-hot);background:var(--panel2);transform:translateX(2px)}
+.acard .an{font-size:13px;font-weight:560;display:flex;align-items:center;gap:8px}
+.acard .an .id{font-family:var(--mono);font-size:10.5px;color:var(--ghost)}
+.acard .ad{font-size:11.5px;color:var(--faint);margin-top:3px;line-height:1.45}
+.trust{display:flex;gap:2px;flex:none}
+.trust i{width:3px;height:13px;border-radius:1px;background:var(--line2)}
+.trust i.f{background:var(--green)}
+
+/* ═══ STAGE 3 · MESH (work graph) ══════════════════════════════════ */
+.meshwrap{position:relative;height:100%;overflow:auto;display:flex;background:
+  radial-gradient(circle at 1px 1px, #1a1715 1px, transparent 0) 0 0/26px 26px, var(--bg)}
+.meshwrap svg{display:block}
+.nlabel{font-family:var(--mono);font-size:9.5px;fill:var(--faint);letter-spacing:.04em}
+.nlabel.on{fill:var(--tx)}
+.legend{position:absolute;left:16px;bottom:16px;background:var(--panel);border:1px solid var(--line);
+  border-radius:9px;padding:10px 13px;display:flex;flex-direction:column;gap:7px}
+.legend .lr{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--faint)}
+.legend .lr i{width:9px;height:9px;border-radius:50%;flex:none}
+.zoomctl{position:absolute;right:16px;bottom:16px;display:flex;flex-direction:column;gap:4px}
+.zoomctl button{width:30px;height:30px;border-radius:7px;background:var(--panel);border:1px solid var(--line);
+  color:var(--dim);font-family:var(--mono);font-size:14px;display:flex;align-items:center;justify-content:center}
+.zoomctl button:hover{border-color:var(--line-hot);color:var(--amber)}
+
+/* ═══ STAGE 4 · STREAM ════════════════════════════════════════════ */
+.streamwrap{display:grid;grid-template-columns:1fr 300px;min-height:100%}
+.events{padding:12px 0;overflow-y:auto;font-family:var(--mono);font-size:12px}
+.ev{display:grid;grid-template-columns:64px 20px 152px 1fr;gap:10px;padding:5px 20px;align-items:baseline;
+  border-left:2px solid transparent}
+.ev:hover{background:#131110;border-left-color:var(--line2)}
+.ev .t{color:var(--ghost);font-size:10.5px}
+.ev .i{text-align:center;font-size:11px}
+.ev .n{color:var(--cyan);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev .d{color:var(--faint);font-size:11.5px;line-height:1.5;word-break:break-word}
+.ev .d em{color:var(--tx);font-style:normal}
+.ev.s-tool{border-left-color:var(--violet-dk)}   .ev.s-tool .i{color:var(--violet)}
+.ev.s-hook{border-left-color:var(--amber-dk)}    .ev.s-hook .i{color:var(--amber)}
+.ev.s-mem  {border-left-color:var(--cyan-dk)}     .ev.s-mem .i{color:var(--cyan)}
+.ev.s-ok   {border-left-color:var(--green-dk)}    .ev.s-ok .i{color:var(--green)}
+.ev.s-err  {border-left-color:var(--rose-dk)}     .ev.s-err .i{color:var(--rose)}
+.ev.s-plan {border-left-color:var(--blue-dk)}     .ev.s-plan .i{color:var(--blue)}
+.ev.new{animation:evIn .3s ease}
+@keyframes evIn{from{opacity:0;transform:translateX(-10px);background:#1a1512}to{opacity:1;transform:none}}
+
+.metrics{border-left:1px solid var(--line);background:var(--bg2);padding:16px;overflow-y:auto}
+.mcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:9px}
+.mcard .mv{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.mcard .mk{font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--ghost);margin-top:4px}
+.spark{display:flex;align-items:flex-end;gap:2px;height:34px;margin-top:10px}
+.spark i{flex:1;background:var(--amber-dk);border-radius:1.5px 1.5px 0 0;min-height:2px;transition:height .4s}
+.spark i.hi{background:var(--amber)}
+
+/* ═══ STAGE 5 · VAULT ═════════════════════════════════════════════ */
+.vault{padding:22px 24px;max-width:1180px}
+.vsec{margin-bottom:26px}
+.vsec-h{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+.vsec-h h3{margin:0;font-size:13px;font-weight:640;letter-spacing:.01em}
+.vsec-h .rule{flex:1;height:1px;background:var(--line)}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px}
+.vrow{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.vrow .vk{font-family:var(--mono);font-size:10px;color:var(--faint);letter-spacing:.06em;margin-bottom:6px}
+.vrow .vv{font-family:var(--mono);font-size:12.5px;color:var(--tx);word-break:break-all}
+.vrow .vd{font-size:11.5px;color:var(--faint);margin-top:6px;line-height:1.5}
+.vrow .vv.editable{color:var(--amber)}
+.seg2{display:inline-flex;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px}
+.seg2 button{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:6px;color:var(--faint)}
+.seg2 button.on{background:var(--panel3);color:var(--amber)}
+
+/* ═══ DOCK ═════════════════════════════════════════════════════════ */
+#dock{
+  grid-area:dock;background:var(--bg2);border-top:1px solid var(--line);
+  display:flex;align-items:center;gap:12px;padding:0 18px;
+}
+.prompt{display:flex;align-items:center;gap:10px;flex:1;max-width:760px;background:var(--panel);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;transition:border-color .12s}
+.prompt:focus-within{border-color:var(--line-hot)}
+.prompt .caret{font-family:var(--mono);font-size:13px;color:var(--amber);font-weight:700;flex:none}
+.prompt input{flex:1;font-size:13px;min-width:0}
+.prompt input::placeholder{color:var(--ghost)}
+.prompt .send{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ghost);flex:none}
+.prompt:focus-within .send{color:var(--amber)}
+.dockstat{display:flex;align-items:center;gap:18px;margin-left:auto;flex:none}
+.dstat{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+.dstat b{color:var(--tx);font-weight:600}
+.dstat .st{width:7px;height:7px;border-radius:2px}
+
+/* ═══ INSPECTOR (right drawer) ═════════════════════════════════════ */
+#inspector{
+  position:fixed;top:0;right:0;bottom:0;width:428px;background:var(--bg2);
+  border-left:1px solid var(--line-hot);z-index:120;display:flex;flex-direction:column;
+  transform:translateX(100%);transition:transform .24s cubic-bezier(.32,.72,0,1);
+  box-shadow:-20px 0 60px rgba(0,0,0,.5);
+}
+#inspector.open{transform:none}
+.insp-h{padding:15px 17px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:11px;flex:none}
+.insp-h h2{margin:0;font-size:14.5px;font-weight:640;line-height:1.35;flex:1}
+.insp-x{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--faint);flex:none}
+.insp-x:hover{background:var(--panel2);color:var(--tx)}
+.insp-b{flex:1;overflow-y:auto;padding:15px 17px}
+.insp-sec{margin-bottom:19px}
+.insp-sec h4{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ghost);
+  margin:0 0 8px}
+.kv{display:grid;grid-template-columns:96px 1fr;gap:5px 10px;font-size:12.5px}
+.kv dt{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+.kv dd{margin:0;color:var(--tx);word-break:break-word}
+.terminal{background:#0a0908;border:1px solid var(--line);border-radius:9px;padding:11px 13px;
+  font-family:var(--mono);font-size:11.5px;line-height:1.6;color:#cfc9c1;overflow-x:auto;white-space:pre}
+.terminal .p{color:var(--green)}
+.terminal .c{color:var(--faint)}
+.terminal .f{color:var(--rose)}
+.terminal .d{color:var(--amber)}
+.insp-f{padding:12px 17px;border-top:1px solid var(--line);display:flex;gap:8px;flex:none}
+.btn{flex:1;padding:8px;border-radius:8px;border:1px solid var(--line2);font-family:var(--mono);
+  font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);text-align:center;transition:.12s}
+.btn:hover{border-color:var(--line-hot);color:var(--tx);background:var(--panel)}
+.btn.pri{background:var(--amber);color:#0c0b09;border-color:var(--amber);font-weight:600}
+.btn.pri:hover{background:var(--amber-2)}
+
+/* ═══ COMMAND PALETTE ══════════════════════════════════════════════ */
+#palette{
+  position:fixed;inset:0;background:rgba(6,5,4,.76);z-index:300;display:none;
+  align-items:flex-start;justify-content:center;padding-top:14vh;backdrop-filter:blur(3px);
+}
+#palette.open{display:flex}
+.pal{width:640px;max-width:92vw;background:var(--panel);border:1px solid var(--line-hot);
+  border-radius:13px;overflow:hidden;box-shadow:0 26px 80px rgba(0,0,0,.7);animation:palIn .16s ease}
+@keyframes palIn{from{opacity:0;transform:scale(.975) translateY(-8px)}to{opacity:1;transform:none}}
+.pal-in{display:flex;align-items:center;gap:11px;padding:14px 17px;border-bottom:1px solid var(--line)}
+.pal-in svg{width:16px;height:16px;color:var(--faint);flex:none;stroke-width:2}
+.pal-in input{flex:1;font-size:15px}
+.pal-list{max-height:396px;overflow-y:auto;padding:6px}
+.pal-item{display:flex;align-items:center;gap:11px;padding:8px 11px;border-radius:8px;cursor:pointer}
+.pal-item.sel{background:var(--panel3)}
+.pal-item .pi{width:16px;height:16px;color:var(--faint);flex:none;stroke-width:1.7}
+.pal-item.sel .pi{color:var(--amber)}
+.pal-item .pl{font-size:13.5px;flex:1}
+.pal-item.sel .pl{color:var(--tx)}
+.pal-item .ph{display:flex;gap:3px;flex:none}
+.pal-item .pk{font-family:var(--mono);font-size:9.5px;color:var(--ghost);background:var(--panel2);
+  padding:1.5px 5px;border-radius:4px}
+.pal-foot{border-top:1px solid var(--line);padding:8px 14px;display:flex;gap:15px;
+  font-family:var(--mono);font-size:9.5px;color:var(--ghost)}
+
+/* ═══ TOASTS ══════════════════════════════════════════════════════ */
+#toasts{position:fixed;bottom:calc(var(--dock) + 14px);left:50%;transform:translateX(-50%);z-index:400;
+  display:flex;flex-direction:column;gap:7px;align-items:center;pointer-events:none}
+.toast{background:var(--panel2);border:1px solid var(--line-hot);border-radius:9px;padding:8px 15px;
+  font-family:var(--mono);font-size:11.5px;color:var(--tx);display:flex;align-items:center;gap:9px;
+  box-shadow:0 10px 34px rgba(0,0,0,.55);animation:tIn .2s ease}
+.toast svg{width:14px;height:14px;stroke-width:2}
+.toast.ok svg{color:var(--green)} .toast.warn svg{color:var(--amber)} .toast.err svg{color:var(--rose)}
+@keyframes tIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* ═══ BOOT ════════════════════════════════════════════════════════ */
+#boot{position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:20px;transition:opacity .4s}
+#boot.gone{opacity:0;pointer-events:none}
+.bootmark{width:52px;height:52px;border-radius:13px;background:linear-gradient(160deg,var(--amber),#b8792a);
+  display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:21px;font-weight:700;color:#0c0b09}
+.bootbar{width:212px;height:2px;background:var(--line);border-radius:2px;overflow:hidden}
+.bootbar i{display:block;height:100%;background:var(--amber);width:0;transition:width .3s}
+.bootlog{font-family:var(--mono);font-size:11px;color:var(--faint);height:16px;letter-spacing:.03em}
+
+@media(max-width:1240px){ .const-wrap{grid-template-columns:196px 1fr} #inspector{width:392px} }
+@media(max-width:980px){
+  .omni-search{display:none}
+  .vitals .vital:nth-child(n+3){display:none}
+  .stage-head .sub{display:none}
+  #agentCards{grid-template-columns:1fr}
+  .streamwrap{grid-template-columns:1fr}
+  .metrics{border-left:0;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .mcard{margin-bottom:0}
+}
+@media(max-width:820px){
+  :root{--rail:54px}
+  .seg button{padding:5px 8px;font-size:9.5px;letter-spacing:.06em}
+  .wordmark span{display:none}
+  .vitals .vital:nth-child(n+2){display:none}
+  .board{padding:13px;min-width:0}
+  .lanes{flex-direction:column}
+  .lane{width:100%;min-width:0;max-height:none}
+  .const-wrap{grid-template-columns:1fr}
+  .divlist{display:none}
+  .ev{grid-template-columns:56px 18px 1fr;gap:8px;padding:6px 14px}
+  .ev .n{display:none}
+  .dockstat .dstat:nth-child(-n+2){display:none}
+  #inspector{width:100%}
+  .legend{display:none}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ ICON RAIL (icons only — no 240px labelled sidebar) ══ -->
+  <nav id="rail">
+    <div class="brandmark" data-fly="brand">JX</div>
+
+    <button class="railbtn on" data-stage="pipeline" data-fly="pipeline">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="11" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="18" width="7" height="3" rx="1.5"/></svg>
+    </button>
+    <button class="railbtn" data-stage="constellation" data-fly="constellation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.2"/><circle cx="5" cy="17" r="2.2"/><circle cx="19" cy="17" r="2.2"/><path d="M12 7.2 6.2 15M12 7.2 17.8 15M7.2 17h9.6"/></svg>
+    </button>
+    <button class="railbtn" data-stage="mesh" data-fly="mesh">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M6.7 7.2 10.4 10.8M13.6 10.8 17.3 7.2M14 13.2 17.4 16.6"/></svg>
+    </button>
+    <button class="railbtn" data-stage="stream" data-fly="stream">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3l2.5-7 4 14L15.5 12H21"/></svg>
+    </button>
+    <div class="railsep"></div>
+    <button class="railbtn" data-fly="gates" id="gateBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.6 4.5 6v6c0 4.6 3.1 8.4 7.5 9.4 4.4-1 7.5-4.8 7.5-9.4V6L12 2.6Z"/><path d="M9.4 12.1 11.3 14l3.5-3.6"/></svg>
+      <span class="badge" id="gateBadge">2</span>
+    </button>
+    <div class="railfoot">
+      <button class="railbtn" data-stage="vault" data-fly="vault">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.2"/></svg>
+      </button>
+      <div class="dot pulse" data-fly="status" title="brain online"></div>
+    </div>
+  </nav>
+
+  <!-- ══ OMNIBAR ══ -->
+  <header id="omnibar">
+    <div class="wordmark"><b>JEXI</b><span>Deck</span></div>
+    <div class="seg" id="seg">
+      <button class="on" data-stage="pipeline">Pipeline</button>
+      <button data-stage="constellation">Workforce</button>
+      <button data-stage="mesh">Work Graph</button>
+      <button data-stage="stream">Stream</button>
+      <button data-stage="vault">Vault</button>
+    </div>
+    <div class="omni-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="omniInput" placeholder="Search agents, tools, work cards…" />
+      <span class="kbd">⌘K</span>
+    </div>
+    <div class="vitals">
+      <div class="vital live"><span class="v" id="vAgents">0</span><span class="k">registry</span></div>
+      <div class="vital"><span class="v" id="vTools">39</span><span class="k">tools</span></div>
+      <div class="vital"><span class="v" id="vLatency">—</span><span class="k">turn ms</span></div>
+      <div class="vital"><span class="v" id="vGates">0</span><span class="k">gates open</span></div>
+      <div class="modelchip"><span class="led"></span><b id="vModel">deterministic</b></div>
+    </div>
+  </header>
+
+  <!-- ══ STAGES ══ -->
+  <main id="main">
+
+    <!-- ─── PIPELINE ─── -->
+    <section class="stage on" data-stage="pipeline">
+      <div class="stage-head">
+        <h1>Mission pipeline</h1>
+        <span class="sub">Work advances left → right through five lanes. Nothing crosses a gate without you.</span>
+        <div class="lanefilter" id="laneFilter">
+          <button class="chip on" data-f="all">All <b id="cAll">0</b></button>
+          <button class="chip" data-f="blocked">Blocked <b id="cBlk">0</b></button>
+          <button class="chip" data-f="mine">Mine <b id="cMine">0</b></button>
+        </div>
+      </div>
+      <div class="stage-body"><div class="board"><div class="lanes" id="lanes"></div></div></div>
+    </section>
+
+    <!-- ─── CONSTELLATION ─── -->
+    <section class="stage" data-stage="constellation">
+      <div class="stage-head">
+        <h1>Workforce</h1>
+        <span class="sub" id="constSub">88 agent definitions on disk · 18 declared divisions</span>
+      </div>
+      <div class="stage-body">
+        <div class="const-wrap">
+          <div class="divlist" id="divList"></div>
+          <div class="agents" id="agentsPane">
+            <div class="agents-head"><h2 id="divTitle">All divisions</h2><span class="sub" id="divCount"></span></div>
+            <div id="agentCards"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── MESH ─── -->
+    <section class="stage" data-stage="mesh">
+      <div class="stage-head">
+        <h1>Work graph</h1>
+        <span class="sub">The Director's <code style="font-family:var(--mono);font-size:11.5px">WorkGraph</code> — claims, leases, BLOCKS edges, verify nodes.</span>
+        <div class="lanefilter"><button class="chip on" id="meshFocus">Focus mission</button></div>
+      </div>
+      <div class="stage-body">
+        <div class="meshwrap" id="meshWrap">
+          <svg id="mesh" width="100%" height="100%" viewBox="0 110 1500 500" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="legend">
+            <div class="lr"><i style="background:#7fc98a"></i>verified</div>
+            <div class="lr"><i style="background:#e8a33d"></i>running</div>
+            <div class="lr"><i style="background:#6ba3e0"></i>ready</div>
+            <div class="lr"><i style="background:#6b655e"></i>blocked</div>
+            <div class="lr"><i style="background:#a58bd6"></i>verify node</div>
+          </div>
+          <div class="zoomctl"><button id="zIn">+</button><button id="zOut">−</button><button id="zFit" style="font-size:10px">⤢</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── STREAM ─── -->
+    <section class="stage" data-stage="stream">
+      <div class="stage-head">
+        <h1>Event stream</h1>
+        <span class="sub">The runtime's own typed events — the same stream the transcript renders.</span>
+        <div class="lanefilter" id="evFilter">
+          <button class="chip on" data-e="all">All</button>
+          <button class="chip" data-e="tool">Tool</button>
+          <button class="chip" data-e="hook">Hook</button>
+          <button class="chip" data-e="mem">Memory</button>
+          <button class="chip" data-e="ok">OK</button>
+          <button class="chip" data-e="err">Err</button>
+        </div>
+        <div class="modeswitch">
+          <button class="chip live on" id="modeLive" title="Real POST /api/chat — NDJSON streamed over the wire">LIVE</button>
+          <button class="chip" id="modeDemo" title="Scripted sample events. Not real output.">DEMO</button>
+        </div>
+      </div>
+      <div class="livepanel" id="livePanel">
+        <div class="lp-head">
+          <span class="lp-dot" id="lpDot"></span>
+          <span class="lp-state" id="lpState">live · idle</span>
+          <button class="lp-stop" id="lpStop" hidden>stop</button>
+        </div>
+        <div class="lp-q" id="lpQ" hidden></div>
+        <div class="lp-a" id="lpA"></div>
+        <div class="lp-meta" id="lpMeta" hidden></div>
+      </div>
+      <div class="stage-body">
+        <div class="streamwrap">
+          <div class="events" id="events"></div>
+          <div class="metrics" id="metrics"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── VAULT ─── -->
+    <section class="stage" data-stage="vault">
+      <div class="stage-head"><h1>Vault</h1><span class="sub">Provider, secrets, runtime and surface configuration.</span></div>
+      <div class="stage-body"><div class="vault" id="vault"></div></div>
+    </section>
+
+  </main>
+
+  <!-- ══ DOCK ══ -->
+  <footer id="dock">
+    <div class="prompt">
+      <span class="caret">▸</span>
+      <input id="dockInput" placeholder="Ask JEXI anything, or type a command — / for commands, @ for an agent" />
+      <span class="send">↵ send</span>
+    </div>
+    <div class="dockstat">
+      <div class="dstat"><span class="st" style="background:var(--green)"></span>brain <b>:3002</b></div>
+      <div class="dstat"><span class="st" style="background:var(--cyan)"></span>mcp <b>:3457</b></div>
+      <div class="dstat">lane <b id="dockLane">simple</b></div>
+      <div class="dstat">mode <b id="dockMode">auto</b></div>
+    </div>
+  </footer>
+</div>
+
+<!-- ══ FLYOUT ══ -->
+<div class="flyout" id="flyout"></div>
+
+<!-- ══ INSPECTOR ══ -->
+<aside id="inspector">
+  <div class="insp-h">
+    <div style="flex:1;min-width:0">
+      <h2 id="inspTitle">—</h2>
+      <div class="ml" id="inspKind" style="margin-top:4px">—</div>
+    </div>
+    <button class="insp-x" id="inspX"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="insp-b" id="inspBody"></div>
+  <div class="insp-f" id="inspFoot"></div>
+</aside>
+
+<!-- ══ COMMAND PALETTE ══ -->
+<div id="palette">
+  <div class="pal">
+    <div class="pal-in">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="palInput" placeholder="Jump to a stage, run a command, recruit an agent…" />
+      <span class="kbd">esc</span>
+    </div>
+    <div class="pal-list" id="palList"></div>
+    <div class="pal-foot"><span>↑↓ navigate</span><span>↵ run</span><span>esc close</span></div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<div id="boot">
+  <div class="bootmark">JX</div>
+  <div class="bootbar"><i id="bootBar"></i></div>
+  <div class="bootlog" id="bootLog">booting…</div>
+</div>
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   JEXI OS · DECK — application logic
+   All data below is read out of the checked-out repository, not invented:
+   agent names + divisions from agents/catalog/**, the 39 built-in tools
+   from server/src/tools/domains/*, infra facts from the Dockerfiles,
+   render.yaml, vite.config.js and server/src/config.js.
+   ═══════════════════════════════════════════════════════════════════ */
+const $  = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const rnd = (a,b)=>a+Math.random()*(b-a);
+const pick = a=>a[Math.floor(Math.random()*a.length)];
+
+/* ── DIVISIONS · 18, from agents/workforce/divisions.json ─────────── */
+const DIVISIONS = {
+  engineering:      {c:'#e8a33d', n:'Engineering',  count:24},
+  security:         {c:'#d97a86', n:'Security',     count:24},
+  data:             {c:'#5bc8d6', n:'Data',         count:6},
+  research:         {c:'#a58bd6', n:'Research',     count:7},
+  design:           {c:'#6ba3e0', n:'Design',       count:5},
+  ops:              {c:'#7fc98a', n:'Ops',          count:4},
+  product:          {c:'#c9a06a', n:'Product',      count:3},
+  testing:          {c:'#b8c46a', n:'Testing',      count:6},
+  'voice':          {c:'#c98ad9', n:'Voice',        count:1},
+  automation:       {c:'#6ad9b8', n:'Automation',   count:1},
+  business:         {c:'#d9b86a', n:'Business',     count:1},
+  content:          {c:'#a86ad9', n:'Content',      count:1},
+  integration:      {c:'#6ad9d9', n:'Integration',  count:1},
+  learning:         {c:'#b86ad9', n:'Learning',     count:1},
+  legal:            {c:'#8a8ad9', n:'Legal',        count:1},
+  localization:     {c:'#d96a8a', n:'Localization', count:1},
+  visualization:    {c:'#8ad9c0', n:'Visualization',count:1},
+  meta:             {c:'#6b655e', n:'Meta · empty', count:0},
+};
+
+/* ── TOOLS · 39 built-ins across 12 domains ──────────────────────── */
+const TOOL_DOMAINS = {
+  filesystem:    {c:'#e8a33d', tools:['fs_read','fs_write','fs_glob','fs_grep','fs_ls']},
+  git:           {c:'#7fc98a', tools:['git_status','git_diff','git_commit','git_branch','git_log']},
+  github:        {c:'#6ba3e0', tools:['gh_pr_create','gh_pr_review','gh_issue_list']},
+  browser:       {c:'#5bc8d6', tools:['nav_navigate','nav_click','nav_type','nav_extract']},
+  lsp:           {c:'#a58bd6', tools:['lsp_diagnostics','lsp_definition','lsp_references','lsp_hover','lsp_symbols','lsp_servers']},
+  memory:        {c:'#c98ad9', tools:['mem_store','mem_recall','mem_forget']},
+  data:          {c:'#b8c46a', tools:['data_json','data_csv','data_sql']},
+  terminal:      {c:'#d9b86a', tools:['term_execute','term_session']},
+  testing:       {c:'#6ad9b8', tools:['test_run','test_coverage']},
+  web:           {c:'#6a9ad9', tools:['web_fetch','web_search']},
+  delegation:    {c:'#d96a8a', tools:['delegate_spawn','delegate_await']},
+  communication: {c:'#9ad96a', tools:['comm_notify','comm_ask']},
+};
+const TOOLS_BY_DIV = {
+  engineering:['fs_read','fs_write','git_status','git_diff','lsp_diagnostics','term_execute','test_run','git_commit'],
+  security:['fs_grep','term_execute','web_fetch','fs_read','lsp_references','test_run','git_diff'],
+  data:['data_sql','data_csv','data_json','fs_read','web_fetch','lsp_symbols'],
+  research:['web_search','web_fetch','fs_write','mem_store','data_json'],
+  design:['web_fetch','fs_write','fs_glob','nav_extract'],
+  ops:['term_execute','fs_read','test_run','git_status','fs_write'],
+  product:['fs_read','web_fetch','mem_recall','fs_write'],
+  testing:['test_run','test_coverage','term_execute','fs_read','lsp_diagnostics'],
+  default:['fs_read','web_fetch'],
+};
+const ALL_TOOLS = Object.entries(TOOL_DOMAINS).flatMap(([d,v])=>v.tools.map(t=>({t,d,c:v.c})));
+
+/* ── AGENTS · 89 real definitions from agents/catalog/** ──────────── */
+const CATALOG_RAW = `automation|workflow-automator
+business|business-analyst
+content|content-strategist
+data|analytics-engineer
+data|data-engineer
+data|data-scientist
+data|database-reviewer
+data|mle-reviewer
+data|rag-reviewer
+design|accessibility-reviewer
+design|brand-strategist
+design|diagram-designer
+design|ui-designer
+design|ux-researcher
+engineering|angular-reviewer
+engineering|architect
+engineering|build-error-resolver
+engineering|code-reviewer
+engineering|doc-updater
+engineering|golang-reviewer
+engineering|harness-optimizer
+engineering|loop-operator
+engineering|mcp-builder
+engineering|minimal-change-engineer
+engineering|php-reviewer
+engineering|planner
+engineering|python-reviewer
+engineering|react-native-reviewer
+engineering|react-reviewer
+engineering|refactor-cleaner
+engineering|ruby-reviewer
+engineering|rust-reviewer
+engineering|security-patcher
+engineering|spec-miner
+engineering|swift-reviewer
+engineering|tdd-guide
+engineering|typescript-reviewer
+engineering|vue-reviewer
+integration|api-designer
+learning|skill-curator
+legal|privacy-officer
+localization|i18n-specialist
+ops|devops-engineer
+ops|platform-engineer
+ops|release-manager
+ops|sre
+product|product-manager
+product|roadmap-planner
+product|technical-pm
+research|competitive-analyst
+research|fact-checker
+research|market-researcher
+research|research-analyst
+research|reverser
+research|technical-writer
+research|user-researcher
+security|ad-operator
+security|appsec-engineer
+security|auth
+security|authz
+security|cloud-hunter
+security|cloud-security
+security|compliance-auditor
+security|contract-auditor
+security|crypto-specialist
+security|detector
+security|exploit
+security|incident-responder
+security|injection
+security|mobile-operator
+security|pentester
+security|phisher
+security|post-exploit
+security|recon
+security|scanner
+security|security-reviewer
+security|ssrf
+security|threat-modeler
+security|wireless-operator
+security|xss
+testing|chaos-engineer
+testing|e2e-runner
+testing|fuzzer
+testing|performance-tester
+testing|security-verifier
+testing|test-engineer
+visualization|data-visualizer
+voice|conversation-designer`;
+
+const BLURB = {
+  'architect':'System decomposition, boundary design, ADR authorship.',
+  'planner':'Decomposes a goal into a dependency-ordered subplan.',
+  'code-reviewer':'Review lane with a self-verification refusal rule.',
+  'react-reviewer':'Hooks, effects, render purity, reconciliation traps.',
+  'typescript-reviewer':'Type-soundness and narrowing review.',
+  'build-error-resolver':'Reads the real compiler output, proposes the fix.',
+  'mcp-builder':'Writes zero-dep stdio MCP bridges with honest errors.',
+  'tdd-guide':'Red-green-refactor sequencing with a failing test first.',
+  'harness-optimizer':'Tightens the integrity harness without weakening it.',
+  'loop-operator':'Runs a bounded loop with explicit termination.',
+  'refactor-cleaner':'Behaviour-preserving structural change only.',
+  'security-patcher':'Patch-first, minimal blast radius, verified after.',
+  'rag-reviewer':'Chunking, recall and grounding defects in RAG paths.',
+  'data-scientist':'Analysis design, assumptions stated before numbers.',
+  'database-reviewer':'Schema, indexes, and migration safety.',
+  'analytics-engineer':'Pipeline correctness and metric definition.',
+  'threat-modeler':'STRIDE walk-through, trust boundaries, abuse cases.',
+  'appsec-engineer':'Runtime appsec review of handlers and authz paths.',
+  'compliance-auditor':'Maps a control set to concrete evidence.',
+  'authz':'Authorization decisions, deny-by-default reasoning.',
+  'xss':'XSS analysis and escaping review.',
+  'ssrf':'Outbound request surface, allowlisting, redirect chains.',
+  'incident-responder':'Triage, containment, blameless write-up.',
+  'detector':'Detection engineering: signal quality and false-positive cost.',
+  'pentester':'Offensive testing inside a declared, authorised scope.',
+  'test-engineer':'Test strategy, seams, and deterministic fakes.',
+  'chaos-engineer':'Injects faults to prove the recovery path is real.',
+  'fuzzer':'Input-space exploration with reproducible seeds.',
+  'e2e-runner':'Full-path browser runs against real backends.',
+  'sre':'Reliability budget, error budget, toil reduction.',
+  'platform-engineer':'Build, deploy, and environment parity.',
+  'devops-engineer':'Pipelines, configuration, rollback paths.',
+  'release-manager':'Version, changelog, and release integrity.',
+  'product-manager':'Problem framing and scope discipline.',
+  'roadmap-planner':'Sequencing bets against real constraints.',
+  'research-analyst':'Source discipline and claim traceability.',
+  'fact-checker':'Adversarial verification of a specific claim.',
+  'technical-writer':'Documentation that survives contact with readers.',
+  'diagram-designer':'System diagrams that stay true after the change.',
+  'ui-designer':'Interface craft, hierarchy, and state coverage.',
+  'accessibility-reviewer':'WCAG checks that name the failing element.',
+  'skill-curator':'Skill pack hygiene — dedupe, prune, promote.',
+  'workflow-automator':'Turns a repeated manual path into a tool.',
+  'data-visualizer':'Chart choice, encoding, and honest axes.',
+  'conversation-designer':'Dialogue flow, turn-taking, and repair.',
+};
+const slug = s => s.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+const AGENTS = CATALOG_RAW.split('\n').map((line,i)=>{
+  const [div,name] = line.split('|');
+  return {
+    id:name, name:slug(name), div,
+    color:(DIVISIONS[div]||{c:'#6b655e'}).c,
+    trust: name.includes('reviewer')||name.includes('auditor')||name.includes('verifier') ? 4
+         : ['architect','planner','pentester','exploit','post-exploit','injection','xss','ssrf','phisher'].includes(name) ? 3
+         : 2 + (i%2),
+    desc: BLURB[name] || `${slug(name)} — ${(DIVISIONS[div]||{n:'Meta'}).n.toLowerCase()} division specialist.`,
+    tools: TOOLS_BY_DIV[div] || ['fs_read'],
+  };
+});
+
+/* ── LANES · work drawn from the repo's own history ───────────────── */
+const LANES = [
+  {id:'intake',   name:'Intake',  color:'#6ba3e0'},
+  {id:'plan',     name:'Plan',    color:'#a58bd6'},
+  {id:'execute',  name:'Execute', color:'#e8a33d'},
+  {id:'verify',   name:'Verify',  color:'#c9a06a'},
+  {id:'ship',     name:'Ship',    color:'#7fc98a'},
+];
+let CARDS = [
+  {id:'c1', lane:'intake',  title:'Ship the alternative-infrastructure build (B225)', agent:'architect', div:'engineering', tools:['fs_read','lsp_symbols'], p:0,   mine:false, brief:'Reproduce the documented infra path end to end and prove the gap that motivated it.'},
+  {id:'c2', lane:'intake',  title:'Audit the image→model path (B227)', agent:'planner', div:'engineering', tools:['fs_grep','web_fetch'], p:20,  mine:false, brief:'Trace the Android build to the first real model call; find where it dies.'},
+  {id:'c3', lane:'plan',    title:'Deterministic gateway-timeout test', agent:'test-engineer', div:'testing', tools:['fs_write','test_run','test_coverage'], p:45, mine:true, brief:'The 1ms timeout raced a live localhost response. Make the abort path deterministic.', prog:70, gate:true},
+  {id:'c4', lane:'plan',    title:'Wire the 7 security MCPs through a real stdio bridge', agent:'mcp-builder', div:'engineering', tools:['fs_write','term_execute','lsp_diagnostics'], p:60, mine:false, brief:'nmap · semgrep · bandit · gitleaks · subfinder must really execute, with full stdout/stderr/exit/duration.'},
+  {id:'c5', lane:'plan',    title:'Guard the Ollama adapter against a public bind', agent:'appsec-engineer', div:'security', tools:['fs_read','fs_write','lsp_diagnostics'], p:30, mine:true, brief:'One canonical refusal point; loopback silent, 0.0.0.0 refused before any fetch.', prog:40},
+  {id:'c6', lane:'execute', title:'Refactor ChatWindow.jsx → interfaces/ui mount', agent:'react-reviewer', div:'engineering', tools:['fs_read','fs_write','lsp_diagnostics','test_run'], p:75, mine:false, brief:'Fixed by COPY interfaces/ui in Dockerfile.slim. Regression must stay fixed.'},
+  {id:'c7', lane:'execute', title:'State-report.mjs — full P5 report', agent:'harness-optimizer', div:'engineering', tools:['fs_write','term_execute','test_run'], p:90, mine:false, brief:'MCPs/Skills/Tools/Hooks/Agents/Keyed-lanes/CI, every field a real number.', prog:85, gate:true},
+  {id:'c8', lane:'execute', title:'Drift guard for the divisions registry', agent:'loop-operator', div:'engineering', tools:['fs_read','test_run','git_diff'], p:55, mine:false, brief:'Generator in --check mode; any drift fails CI with the exact diff.', prog:100},
+  {id:'c9', lane:'verify',  title:'Skew the polling key in the recovery test', agent:'chaos-engineer', div:'testing', tools:['fs_write','test_run','term_execute'], p:50, mine:true, brief:'Half the polling keys skew toward a hot range to force rebalancing.', prog:25},
+  {id:'c10',lane:'verify',  title:'Reconcile divisions.json with agents/catalog', agent:'skill-curator', div:'learning', tools:['fs_read','fs_glob','test_run'], p:15, mine:false, brief:'18 divisions, 89 agent files. The registry must not drift on disk.', prog:60},
+  {id:'c11',lane:'verify',  title:'Prove the approval gate fails closed', agent:'security-verifier', div:'testing', tools:['test_run','fs_read','term_execute'], p:80, mine:false, brief:'No configured command → status error. Never a canned pass.', prog:45},
+  {id:'c12',lane:'ship',    title:'B227 · the image actually reaches the AI', agent:'platform-engineer', div:'ops', tools:['term_execute','git_commit','test_run','fs_write'], p:100,mine:false, brief:'Merged with a full green backend chain and a real screenshot.'},
+  {id:'c13',lane:'ship',    title:'B225 · alternative infrastructure', agent:'devops-engineer', div:'ops', tools:['fs_write','term_execute','git_status'], p:100,mine:false, brief:'Free-tier only, no card, self-host path documented.'},
+];
+
+/* ── WORK GRAPH · node/edge layout ───────────────────────────────── */
+const GRAPH = {
+  nodes:[
+    {id:'mission', x:118, y:392, r:21, s:'root',  lbl:'mission: rewrite-console', st:'verified'},
+    {id:'intake',  x:300, y:250, r:15, s:'task',  lbl:'intake · parse',          st:'verified'},
+    {id:'ctx',     x:300, y:534, r:15, s:'task',  lbl:'context resolve',          st:'verified'},
+    {id:'mem',     x:478, y:534, r:15, s:'mem',   lbl:'memory read',              st:'verified'},
+    {id:'plan',    x:478, y:250, r:17, s:'plan',  lbl:'planner',                  st:'verified'},
+    {id:'staff',   x:656, y:250, r:15, s:'task',  lbl:'staff workforce',          st:'running'},
+    {id:'a1',      x:834, y:148, r:12, s:'agent', lbl:'react-reviewer',           st:'running'},
+    {id:'a2',      x:834, y:250, r:12, s:'agent', lbl:'mcp-builder',              st:'ready'},
+    {id:'a3',      x:834, y:352, r:12, s:'agent', lbl:'harness-optimizer',        st:'ready'},
+    {id:'a4',      x:834, y:454, r:12, s:'agent', lbl:'security-verifier',        st:'blocked'},
+    {id:'a5',      x:834, y:556, r:12, s:'agent', lbl:'test-engineer',            st:'ready'},
+    {id:'tools',   x:1012,y:250, r:15, s:'task',  lbl:'gated dispatch',           st:'running'},
+    {id:'v1',      x:1186,y:148, r:13, s:'verify',lbl:'test: eslint',             st:'verified'},
+    {id:'v2',      x:1186,y:250, r:13, s:'verify',lbl:'test: node --test',        st:'running'},
+    {id:'v3',      x:1186,y:352, r:13, s:'verify',lbl:'file-state compare',        st:'ready'},
+    {id:'v4',      x:1186,y:454, r:13, s:'verify',lbl:'acceptance gates',          st:'blocked'},
+    {id:'ship',    x:1360,y:250, r:20, s:'root',  lbl:'ship',                     st:'ready'},
+  ],
+  edges:[['mission','intake'],['mission','ctx'],['ctx','mem'],['mem','plan'],['intake','plan'],
+         ['plan','staff'],['staff','a1'],['staff','a2'],['staff','a3'],['staff','a4'],['staff','a5'],
+         ['a1','tools'],['a2','tools'],['a3','tools'],['a4','tools'],['a5','tools'],
+         ['tools','v1'],['tools','v2'],['tools','v3'],['tools','v4'],
+         ['v1','ship'],['v2','ship'],['v3','ship'],['v4','ship']],
+};
+const ST_COLOR = {verified:'#7fc98a', running:'#e8a33d', ready:'#6ba3e0', blocked:'#6b655e'};
+
+/* ── EVENT TEMPLATES · real runtime event names ──────────────────── */
+const EV_TPL = [
+  {n:'SessionStart',      k:'hook', i:'◆', d:'session <em>s_7f3a</em> opened · 30-event catalog live'},
+  {n:'memoryRead',        k:'mem',  i:'◈', d:'preferences 4 · facts 11 · semantic 3 loaded <em>before</em> planner'},
+  {n:'contextResolve',    k:'plan', i:'⌁', d:'"do that again" → <em>"rerun the gateway-timeout test"</em>'},
+  {n:'tool.started',      k:'tool', i:'▸', d:'<em>fs_read</em> { path: "server/src/tools/execution/permission-gate.js" }'},
+  {n:'tool.completed',    k:'ok',   i:'✓', d:'<em>fs_read</em> ok · 214 lines · 18ms · receipt emitted'},
+  {n:'PreToolUse',        k:'hook', i:'◆', d:'gate: <em>fs_write</em> risk=medium → approval required'},
+  {n:'approval.granted',  k:'ok',   i:'✓', d:'human approved · call released'},
+  {n:'tool.completed',    k:'ok',   i:'✓', d:'<em>fs_write</em> ok · 1 file · 12ms · sha256 pinned'},
+  {n:'PostToolUse',       k:'hook', i:'◆', d:'receipt attached to turn <em>t_2c19</em>'},
+  {n:'mem.recall',        k:'mem',  i:'◈', d:'hybrid BM25+vector RRF re-rank · 5 candidates → 2'},
+  {n:'lsp.diagnostics',   k:'tool', i:'▸', d:'typescript-language-server · <em>0 errors</em>'},
+  {n:'test.run',          k:'tool', i:'▸', d:'<em>node --test</em> tests/agi/… · 32 suites'},
+  {n:'test.completed',    k:'ok',   i:'✓', d:'<em>32/32 pass</em> · 4.1s'},
+  {n:'verify.gate',       k:'hook', i:'◆', d:'no configured command → <em>status: error</em> (never a canned pass)'},
+  {n:'workgraph.claim',   k:'plan', i:'⌁', d:'node <em>staff workforce</em> claimed · lease ttl 300s'},
+  {n:'workgraph.block',   k:'err',  i:'✕', d:'node <em>security-verifier</em> BLOCKS on <em>gate: approval</em>'},
+  {n:'mission.checkpoint',k:'plan', i:'⌁', d:'workgraph persisted · 14 nodes · sigkill-safe resume armed'},
+  {n:'planner.route',     k:'plan', i:'⌁', d:'intent=<em>debug</em> · lane=<em>graph</em> · confidence 0.91'},
+  {n:'rate.limit.wait',   k:'err',  i:'≈', d:'free tier · retry-after 8s honoured'},
+  {n:'brain.hotwrite',    k:'mem',  i:'◈', d:'turn written to hot memory · 3 facts extracted'},
+  {n:'turn.completed',    k:'ok',   i:'✓', d:'<em>turn completed</em> · 2 tools · 0 blocked · 1.9s'},
+];
+</script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER + INTERACTION
+   ═══════════════════════════════════════════════════════════════════ */
+const state = { stage:'pipeline', div:'all', filter:'all', evFilter:'all', sel:null, zoom:1 };
+
+/* ── stage switching ─────────────────────────────────────────────── */
+function goStage(s){
+  state.stage = s;
+  $$('#seg button').forEach(b=>b.classList.toggle('on', b.dataset.stage===s));
+  $$('.railbtn[data-stage]').forEach(b=>b.classList.toggle('on', b.dataset.stage===s));
+  $$('.stage').forEach(st=>st.classList.toggle('on', st.dataset.stage===s));
+  if(s==='mesh')   drawMesh();
+  if(s==='stream') renderMetrics();
+  if(s==='constellation') renderAgents();
+}
+$$('#seg button').forEach(b=>b.onclick=()=>goStage(b.dataset.stage));
+$$('.railbtn[data-stage]').forEach(b=>b.onclick=()=>goStage(b.dataset.stage));
+document.addEventListener('keydown',e=>{
+  if(e.key>='1'&&e.key<='5'&&!/input|textarea/i.test(e.target.tagName)){
+    goStage(['pipeline','constellation','mesh','stream','vault'][+e.key-1]);
+  }
+});
+
+/* ── PIPELINE ────────────────────────────────────────────────────── */
+function cardHTML(c){
+  const lane = LANES.find(l=>l.id===c.lane);
+  const a = AGENTS.find(x=>x.id===c.agent) || AGENTS[0];
+  const blocked = c.gate && !c.approved;
+  return `<div class="card${state.sel===c.id?' sel':''}" data-card="${c.id}" style="--acc:${lane.color}">
+    <style>.card[data-card="${c.id}"]::before{background:${lane.color}}
+/* ── LIVE streaming panel ─────────────────────────────────────────── */
+.livepanel{
+  margin:0 0 12px;padding:12px 14px;border-radius:10px;
+  background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.08);
+  display:none;
+}
+.livepanel.on{display:block}
+.lp-head{display:flex;align-items:center;gap:8px;
+  font:600 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.08em;text-transform:uppercase;color:#7b8794;margin-bottom:8px}
+.lp-dot{width:7px;height:7px;border-radius:50%;background:#555;flex:none}
+.livepanel.run .lp-dot{background:#f0b429;animation:lpPulse 1s infinite}
+.livepanel.ok  .lp-dot{background:#3fb950}
+.livepanel.err .lp-dot{background:#f85149}
+@keyframes lpPulse{0%,100%{opacity:1}50%{opacity:.25}}
+.lp-stop{margin-left:auto;background:transparent;border:1px solid rgba(248,81,73,.4);
+  color:#f85149;border-radius:5px;font:600 9.5px/1 ui-monospace,monospace;
+  padding:4px 8px;cursor:pointer;letter-spacing:.06em}
+.lp-q{font:400 12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:#7b8794;
+  padding:7px 10px;margin-bottom:8px;border-left:2px solid rgba(255,255,255,.12);
+  background:rgba(0,0,0,.18);border-radius:0 5px 5px 0}
+.lp-a{font:400 13px/1.65 system-ui,-apple-system,Segoe UI,sans-serif;color:#e6edf3;
+  white-space:pre-wrap;word-break:break-word;min-height:1.2em}
+.lp-a:empty::before{content:'waiting for the first token…';color:#5a6570;font-style:italic}
+.caret-blink{display:inline-block;width:7px;height:13px;background:#f0b429;
+  vertical-align:-2px;margin-left:2px;animation:lpPulse 1s infinite}
+.lp-meta{margin-top:8px;font:400 10px/1.5 ui-monospace,monospace;color:#6e7a86}
+.modeswitch{display:flex;gap:6px;margin-left:auto}
+.chip.live{color:#3fb950;border-color:rgba(63,185,80,.4)}
+.chip.live.on{background:rgba(63,185,80,.16);color:#7ee787}
+</style>
+    <p class="ttl">${esc(c.title)}</p>
+    <div class="meta">
+      <span class="tagx" style="color:${a.color};border-color:${a.color}44">${esc(a.name)}</span>
+      <span class="who">${esc(a.div)}</span>
+      ${c.mine?'<span class="tagx" style="color:var(--amber);border-color:var(--amber-dk)">mine</span>':''}
+      ${c.gate&&!c.approved?'<span class="tagx" style="color:var(--rose);border-color:var(--rose-dk)">gate</span>':''}
+    </div>
+    ${c.prog!=null?`<div class="bar"><i style="width:${c.prog}%;background:${lane.color}"></i></div>`:''}
+    ${blocked?`<div class="gate">
+      <span class="ml">approval required</span>
+      <span class="gatebtns">
+        <button data-approve="${c.id}">allow</button>
+        <button class="deny" data-deny="${c.id}">deny</button>
+      </span></div>`:''}
+  </div>`;
+}
+function renderLanes(){
+  let list = CARDS;
+  if(state.filter==='blocked') list = CARDS.filter(c=>c.gate && !c.approved);
+  if(state.filter==='mine')    list = CARDS.filter(c=>c.mine);
+  const html = LANES.map(l=>{
+    const items = list.filter(c=>c.lane===l.id);
+    return `<div class="lane">
+      <div class="lane-h">
+        <span class="accent" style="background:${l.color}"></span>
+        <span class="nm" style="color:${l.color}">${l.name}</span>
+        <span class="ct">${items.length}</span>
+      </div>
+      <div class="lane-b">${items.length?items.map(cardHTML).join(''):'<div style="padding:14px 4px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--ghost)">empty</div>'}</div>
+    </div>`;
+  }).join('');
+  $('#lanes').innerHTML = html;
+  $('#cAll').textContent = CARDS.length;
+  $('#cBlk').textContent = CARDS.filter(c=>c.gate && !c.approved).length;
+  $('#cMine').textContent = CARDS.filter(c=>c.mine).length;
+  $('#vGates').textContent = CARDS.filter(c=>c.gate && !c.approved).length;
+  $('#gateBadge').textContent = CARDS.filter(c=>c.gate && !c.approved).length;
+  $('#gateBadge').style.display = $('#gateBadge').textContent==='0'?'none':'flex';
+  bindCards();
+}
+function bindCards(){
+  $$('[data-card]').forEach(el=>el.onclick=e=>{
+    if(e.target.closest('[data-approve],[data-deny]')) return;
+    state.sel = el.dataset.card; renderLanes(); openCard(CARDS.find(c=>c.id===state.sel));
+  });
+  $$('[data-approve]').forEach(b=>b.onclick=e=>{
+    e.stopPropagation();
+    const c = CARDS.find(x=>x.id===b.dataset.approve);
+    c.approved = true;
+    toast('ok', `${c.id} approved — call released`);
+    pushEvent({n:'approval.granted',k:'ok',i:'✓',d:`human approved <em>${c.id}</em> · gate opened`});
+    renderLanes();
+  });
+  $$('[data-deny]').forEach(b=>b.onclick=e=>{
+    e.stopPropagation();
+    const c = CARDS.find(x=>x.id===b.dataset.deny);
+    c.lane='execute'; c.approved=true; c.gate=false; c.prog=0;
+    toast('warn', `${c.id} denied — parked in Execute`);
+    pushEvent({n:'approval.denied',k:'err',i:'✕',d:`<em>${c.id}</em> denied · moved to Execute`});
+    renderLanes();
+  });
+}
+$$('#laneFilter .chip').forEach(b=>b.onclick=()=>{
+  $$('#laneFilter .chip').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); state.filter=b.dataset.f; renderLanes();
+});
+$('#gateBtn').onclick=()=>{
+  goStage('pipeline');
+  $$('#laneFilter .chip').forEach(x=>x.classList.remove('on'));
+  $('#laneFilter .chip[data-f=blocked]').classList.add('on');
+  state.filter='blocked'; renderLanes();
+};
+
+/* ── INSPECTOR ───────────────────────────────────────────────────── */
+function openCard(c){
+  if(!c) return;
+  const a = AGENTS.find(x=>x.id===c.agent)||AGENTS[0];
+  const lane = LANES.find(l=>l.id===c.lane);
+  $('#inspTitle').textContent = c.title;
+  $('#inspKind').innerHTML = `<span style="color:${lane.color}">${lane.name.toUpperCase()}</span> · ${esc(c.id)}`;
+  $('#inspBody').innerHTML = `
+    <div class="insp-sec"><h4>Brief</h4><p style="margin:0;font-size:13px;line-height:1.6;color:var(--dim)">${esc(c.brief)}</p></div>
+    <div class="insp-sec"><h4>Owner</h4>
+      <dl class="kv">
+        <dt>agent</dt><dd><span style="color:${a.color}">${esc(a.name)}</span></dd>
+        <dt>division</dt><dd>${esc(a.div)}</dd>
+        <dt>trust</dt><dd>${'▮'.repeat(a.trust)}${'▯'.repeat(4-a.trust)}</dd>
+        <dt>lane</dt><dd>${esc(c.lane)}</dd>
+        <dt>priority</dt><dd>${c.p}</dd>
+      </dl></div>
+    <div class="insp-sec"><h4>Allowed tools</h4>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">
+        ${c.tools.map(t=>{const d=Object.keys(TOOL_DOMAINS).find(d=>TOOL_DOMAINS[d].tools.includes(t))||'';
+          return `<span class="tagx" style="color:${(TOOL_DOMAINS[d]||{}).c||'var(--dim)'};border-color:${((TOOL_DOMAINS[d]||{}).c||'#6b655e')}44;font-size:10.5px;padding:3px 8px">${esc(t)}</span>`}).join('')}
+      </div></div>
+    ${c.gate?`<div class="insp-sec"><h4>Permission gate</h4>
+      <div class="terminal"><span class="c">// tools/execution/permission-gate.js</span>
+<span class="p">preToolUse</span>({ tool: <span class="d">"fs_write"</span>, risk: <span class="d">"medium"</span> })
+<span class="f">→ PAUSED · human approval required</span>
+<span class="c">// nothing executes until you allow it</span></div></div>`:''}
+    <div class="insp-sec"><h4>Receipt (last run)</h4>
+      <div class="terminal"><span class="p">$</span> node ${esc(c.id==='c7'?'scripts/state-report.mjs':'tests/agi/test-'+a.id+'.js')}
+<span class="c">──────────────────────────────</span>
+<span class="p">✓</span> linter        <span class="d">0 problems</span>
+<span class="p">✓</span> tool-registry <span class="d">39 tools / 12 domains</span>
+<span class="p">✓</span> 11/11 PASS     <span class="d">mcp-state</span>
+<span class="c">──────────────────────────────</span>
+<span class="p">exit 0</span> · 4.1s</div></div>`;
+  $('#inspFoot').innerHTML = `<button class="btn" data-act="claim">Claim</button><button class="btn pri" data-act="run">Run turn</button>`;
+  $('#inspFoot').querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>{
+    if(b.dataset.act==='claim') toast('ok',`${c.id} claimed · lease 300s`);
+    else { toast('ok',`turn dispatched on lane ${c.lane}`); pushEvent({n:'turn.dispatched',k:'plan',i:'⌁',d:`<em>${c.id}</em> dispatched to <em>${a.name}</em>`}); }
+  });
+  $('#inspector').classList.add('open');
+}
+$('#inspX').onclick = ()=> $('#inspector').classList.remove('open');
+
+/* ── WORKFORCE / CONSTELLATION ───────────────────────────────────── */
+function renderDivList(){
+  const total = Object.values(DIVISIONS).reduce((s,d)=>s+d.count,0);
+  $('#divList').innerHTML =
+    `<div class="divi${state.div==='all'?' on':''}" data-d="all"><span class="sw" style="background:linear-gradient(135deg,var(--amber),var(--cyan))"></span><span class="nm">All divisions</span><span class="ct">${total}</span></div>`
+    + `<div class="grp">Divisions · 18</div>`
+    + Object.entries(DIVISIONS).sort((a,b)=>b[1].count-a[1].count).map(([k,v])=>
+      `<div class="divi${state.div===k?' on':''}" data-d="${k}"><span class="sw" style="background:${v.c}"></span><span class="nm">${v.n}</span><span class="ct">${v.count}</span></div>`).join('');
+  $$('#divList .divi').forEach(el=>el.onclick=()=>{ state.div=el.dataset.d; renderDivList(); renderAgents(); });
+}
+function renderAgents(){
+  const q = ($('#omniInput').value||'').toLowerCase();
+  let list = state.div==='all' ? AGENTS : AGENTS.filter(a=>a.div===state.div);
+  if(q) list = list.filter(a=>a.id.includes(q)||a.name.toLowerCase().includes(q));
+  $('#divTitle').textContent = state.div==='all' ? 'All divisions' : DIVISIONS[state.div].n;
+  $('#divCount').textContent = `${list.length} shown`;
+  if(!list.length){
+    $('#agentCards').innerHTML = `<div style="padding:34px 10px;text-align:center;color:var(--ghost);font-size:13px;line-height:1.7">
+      No agent definitions on disk for this division.<br/>
+      <span style="font-family:var(--mono);font-size:11px">agents/catalog/&lt;division&gt;/ holds only <code>_template.md</code> —
+      declared in divisions.json, never populated.</span></div>`;
+    return;
+  }
+  $('#agentCards').innerHTML = list.map(a=>`
+    <div class="acard" data-agent="${a.id}">
+      <div>
+        <div class="an"><span style="color:${a.color}">${esc(a.name)}</span><span class="id">${esc(a.id)}</span></div>
+        <div class="ad">${esc(a.desc)}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="tagx" style="color:${a.color};border-color:${a.color}44">${esc(a.div)}</span>
+        <span class="trust">${[0,1,2,3].map(i=>`<i class="${i<a.trust?'f':''}"></i>`).join('')}</span>
+      </div>
+    </div>`).join('');
+  $$('#agentCards .acard').forEach(el=>el.onclick=()=>openAgent(AGENTS.find(a=>a.id===el.dataset.agent)));
+}
+function openAgent(a){
+  $('#inspTitle').textContent = a.name;
+  $('#inspKind').innerHTML = `<span style="color:${a.color}">${esc(a.div.toUpperCase())}</span> · workforce/registry`;
+  const related = CARDS.filter(c=>c.agent===a.id);
+  $('#inspBody').innerHTML = `
+    <div class="insp-sec"><h4>Mandate</h4><p style="margin:0;font-size:13px;line-height:1.6;color:var(--dim)">${esc(a.desc)}</p></div>
+    <div class="insp-sec"><h4>Registry</h4><dl class="kv">
+      <dt>agent id</dt><dd style="font-family:var(--mono);font-size:11.5px">${esc(a.id)}</dd>
+      <dt>division</dt><dd>${esc(a.div)}</dd>
+      <dt>trust tier</dt><dd>${a.trust}/4</dd>
+      <dt>verify self</dt><dd style="color:var(--green)">refused</dd>
+    </dl></div>
+    <div class="insp-sec"><h4>Tool allowlist (${a.tools.length})</h4>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">${a.tools.map(t=>{
+        const d=Object.keys(TOOL_DOMAINS).find(d=>TOOL_DOMAINS[d].tools.includes(t))||'';
+        const c=(TOOL_DOMAINS[d]||{}).c||'#6b655e';
+        return `<span class="tagx" style="color:${c};border-color:${c}44;font-size:10.5px;padding:3px 8px">${esc(t)}</span>`}).join('')}</div></div>
+    <div class="insp-sec"><h4>Open work (${related.length})</h4>
+      ${related.length?related.map(c=>`<div style="font-size:12.5px;color:var(--dim);padding:5px 0;border-bottom:1px solid var(--line)">
+        <span style="color:${LANES.find(l=>l.id===c.lane).color};font-family:var(--mono);font-size:10px">${c.lane.toUpperCase()}</span> ${esc(c.title)}</div>`).join('')
+        :'<div style="font-size:12.5px;color:var(--ghost)">No assigned cards in the current mission.</div>'}</div>`;
+  $('#inspFoot').innerHTML = `<button class="btn" data-act="div">Open division</button><button class="btn pri" data-act="delegate">Delegate work</button>`;
+  $('#inspFoot').querySelector('[data-act=div]').onclick=()=>{ $('#inspector').classList.remove('open'); state.div=a.div; renderDivList(); renderAgents(); goStage('constellation'); };
+  $('#inspFoot').querySelector('[data-act=delegate]').onclick=()=>{ toast('ok',`delegated to ${a.name}`); pushEvent({n:'delegate_spawn',k:'tool',i:'▸',d:'<em>delegate_spawn</em> { agent: "'+esc(a.id)+'" }'}); };
+  $('#inspector').classList.add('open');
+}
+
+/* ── WORK GRAPH (SVG) ────────────────────────────────────────────── */
+function drawMesh(){
+  const svg = $('#mesh'); svg.innerHTML='';
+  const N = Object.fromEntries(GRAPH.nodes.map(n=>[n.id,n]));
+  const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+  defs.innerHTML = `<marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M0 0 10 5 0 10z" fill="#3a342d"/></marker>
+    <marker id="arh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M0 0 10 5 0 10z" fill="#e8a33d"/></marker>`;
+  svg.appendChild(defs);
+  const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.setAttribute('transform',`scale(${state.zoom})`);
+  svg.appendChild(g);
+  GRAPH.edges.forEach(([a,b],i)=>{
+    const s=N[a], t=N[b]; if(!s||!t) return;
+    const hot = t.st==='running';
+    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    const mx=(s.x+t.x)/2;
+    p.setAttribute('d',`M${s.x+s.r+2},${s.y} C${mx},${s.y} ${mx},${t.y} ${t.x-t.r-3},${t.y}`);
+    p.setAttribute('fill','none');
+    p.setAttribute('stroke', hot?'#4a3a20':'#262220');
+    p.setAttribute('stroke-width', hot?1.8:1.2);
+    p.setAttribute('marker-end', hot?'url(#arh)':'url(#ar)');
+    if(hot) p.style.animation='dash 1.6s linear infinite';
+    g.appendChild(p);
+  });
+  GRAPH.nodes.forEach(n=>{
+    const c = ST_COLOR[n.st];
+    const grp = document.createElementNS('http://www.w3.org/2000/svg','g');
+    grp.style.cursor='pointer';
+    if(n.st==='running'){ grp.style.animation='nodePulse 2.1s ease-in-out infinite'; }
+    if(n.s==='verify'){
+      const sq=document.createElementNS('http://www.w3.org/2000/svg','rect');
+      sq.setAttribute('x',n.x-n.r); sq.setAttribute('y',n.y-n.r);
+      sq.setAttribute('width',n.r*2); sq.setAttribute('height',n.r*2);
+      sq.setAttribute('rx',4); sq.setAttribute('fill',n.st==='blocked'?'#1a1715':'#1d1a26');
+      sq.setAttribute('stroke',c); sq.setAttribute('stroke-width',n.st==='running'?2.2:1.4);
+      grp.appendChild(sq);
+    } else {
+      const ci=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      ci.setAttribute('cx',n.x); ci.setAttribute('cy',n.y); ci.setAttribute('r',n.r);
+      ci.setAttribute('fill', n.st==='blocked'?'#141210':'#191512');
+      ci.setAttribute('stroke',c); ci.setAttribute('stroke-width',n.st==='running'?2.2:1.4);
+      grp.appendChild(ci);
+      if(n.s==='root'||n.s==='plan'){
+        const ri=document.createElementNS('http://www.w3.org/2000/svg','circle');
+        ri.setAttribute('cx',n.x); ri.setAttribute('cy',n.y); ri.setAttribute('r',n.r+5);
+        ri.setAttribute('fill','none'); ri.setAttribute('stroke',c); ri.setAttribute('stroke-opacity',.25);
+        grp.appendChild(ri);
+      }
+    }
+    const tx=document.createElementNS('http://www.w3.org/2000/svg','text');
+    tx.setAttribute('x',n.x); tx.setAttribute('y',n.y+n.r+14);
+    tx.setAttribute('text-anchor','middle');
+    tx.setAttribute('class','nlabel'+(n.st==='running'?' on':''));
+    tx.textContent=n.lbl;
+    grp.appendChild(tx);
+    if(n.st==='blocked'){
+      const t2=document.createElementNS('http://www.w3.org/2000/svg','text');
+      t2.setAttribute('x',n.x); t2.setAttribute('y',n.y+4); t2.setAttribute('text-anchor','middle');
+      t2.setAttribute('style',`font-family:var(--mono);font-size:11px;fill:#6b655e`);
+      t2.textContent='!';
+      grp.appendChild(t2);
+    }
+    grp.onclick=()=>{
+      const rel = GRAPH.edges.filter(([a,b])=>a===n.id||b===n.id).map(([a,b])=>a===n.id?b:a);
+      openNode(n, rel);
+    };
+    g.appendChild(grp);
+  });
+  const st=document.createElementNS('http://www.w3.org/2000/svg','style');
+  st.textContent='@keyframes dash{to{stroke-dashoffset:-26}}@keyframes nodePulse{0%,100%{opacity:1}50%{opacity:.62}}';
+  svg.appendChild(st);
+}
+function openNode(n, rel){
+  $('#inspTitle').textContent = n.lbl;
+  $('#inspKind').innerHTML = `<span style="color:${ST_COLOR[n.st]}">${n.st.toUpperCase()}</span> · workgraph node · ${n.s}`;
+  $('#inspBody').innerHTML = `
+    <div class="insp-sec"><h4>Node</h4><dl class="kv">
+      <dt>id</dt><dd style="font-family:var(--mono);font-size:11.5px">${esc(n.id)}</dd>
+      <dt>kind</dt><dd>${esc(n.s)}</dd>
+      <dt>status</dt><dd style="color:${ST_COLOR[n.st]}">${esc(n.st)}</dd>
+      <dt>edges</dt><dd>${rel.length} (in + out)</dd>
+    </dl></div>
+    <div class="insp-sec"><h4>Adjacent nodes</h4>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">${rel.map(r=>{
+        const m=GRAPH.nodes.find(x=>x.id===r);
+        return `<span class="tagx" style="color:${ST_COLOR[m.st]};border-color:${ST_COLOR[m.st]}44;font-size:10.5px;padding:3px 8px">${esc(m.lbl)}</span>`}).join('')}</div></div>
+    <div class="insp-sec"><h4>Contract</h4>
+      <div class="terminal">readyWork() → nodes sorted by
+  <span class="d">priority desc, createdAt asc</span>
+
+claim(node, { ttl: <span class="d">300</span> })   <span class="c">// lease</span>
+block(node, reason)   <span class="c">// BLOCKS edge</span>
+
+complete(node, evidence)  <span class="c">// evidence required</span>
+<span class="c">// reload is exact · SIGKILL-safe resume</span></div></div>`;
+  $('#inspFoot').innerHTML = `<button class="btn" data-act="focus">Focus</button><button class="btn pri" data-act="steer">Steer</button>`;
+  $('#inspFoot').querySelector('[data-act=focus]').onclick=()=>$('#inspector').classList.remove('open');
+  $('#inspFoot').querySelector('[data-act=steer]').onclick=()=>toast('ok',`steering queued for ${n.id}`);
+  $('#inspector').classList.add('open');
+}
+$('#zIn').onclick=()=>{ state.zoom=Math.min(1.6,state.zoom+.12); drawMesh(); };
+$('#zOut').onclick=()=>{ state.zoom=Math.max(.6,state.zoom-.12); drawMesh(); };
+$('#zFit').onclick=()=>{ state.zoom=1; drawMesh(); };
+$('#meshFocus').onclick=()=>{ state.zoom=1.25; drawMesh(); toast('ok','focused mission: rewrite-console'); };
+
+/* ── EVENT STREAM ──────────────────────────────────────────────────────
+   v2 after the streaming simulation (sim/stream-bench.html):
+   the v1 path did unshift() + a full innerHTML rebuild of all 90 rows on
+   EVERY event. Measured: ~850 µs/event, ceiling ~640-820 ev/s, and above
+   ~500 ev/s it silently dropped events (2000/s target → 4913 of 12000
+   delivered). This path is a ring buffer + incremental prepend + rAF
+   coalescing: 1.5-14 µs/event, no drops at any rate tested.
+
+   NOTE ON eDrawn: it holds the *id* of the newest event currently in the
+   DOM, not a count. A count breaks as soon as a cold render and a warm
+   flush mix, because evAt() indices shift every time an event is pushed —
+   the row that was index 0 is no longer index 0. Tracking the id is immune
+   to that shift.                                                        */
+const EV_CAP  = 90;
+let EVENTS = new Array(EV_CAP);
+let eHead = 0, eSize = 0, evSeq = 0, eDrawn = 0;   // eHead = write cursor
+let evRaf = 0, evPinned = true;
+/* Scroll pinning — rewire note.
+   #events has overflow-y:auto but NO height cap, so it grows with its content
+   and never scrolls: its scrollHeight always equals its clientHeight. The
+   element that actually scrolls is .stage-body. The original code read/wrote
+   #events.scrollTop and listened for scroll on #events, so the listener never
+   fired, evPinned was pinned at true forever, and the write was a no-op that
+   still cost a forced layout of the whole 90-row list: 222 µs/event, 94% of
+   the hot path (222.5 -> 14.8 µs with it removed).
+   Now: evScroll shadows the REAL scroller, and when the reader has scrolled
+   into history we anchor the first visible row and give the scroll position
+   back the exact number of pixels the insert pushed it down, so a new event
+   never yanks the view. The fast path (pinned) touches no layout at all. */
+let evScroll = 0, evScroller = null;
+function ts(){ const d=new Date(); return d.toTimeString().slice(0,8); }
+/** newest-first read: i = 0 is the most recent event. Correct for full AND partial. */
+function evAt(i){ return EVENTS[((eHead - 1 - i) % EV_CAP + EV_CAP) % EV_CAP]; }
+function evList(){ const a=new Array(eSize); for(let i=0;i<eSize;i++) a[i]=evAt(i); return a; }
+
+function pushEvent(ev){
+  EVENTS[eHead] = {...ev, t:ts(), id:++evSeq, live:true};
+  eHead = (eHead + 1) % EV_CAP;                   // O(1) — no array move
+  if(eSize < EV_CAP) eSize++;
+  if(evRaf) return;                               // coalesce bursts into one frame
+  evRaf = requestAnimationFrame(()=>{ evRaf = 0; flushEvents(); });
+}
+
+function evRowHTML(e){
+  return `<div class="ev s-${e.k}"><span class="t">${e.t}</span><span class="i">${e.i}</span>`+
+         `<span class="n">${esc(e.n)}</span><span class="d">${e.d}</span></div>`;
+}
+function evRow(e){
+  const d=document.createElement('div');
+  d.className='ev s-'+e.k;
+  d.innerHTML=`<span class="t">${e.t}</span><span class="i">${e.i}</span>`+
+              `<span class="n">${esc(e.n)}</span><span class="d">${e.d}</span>`;
+  return d;
+}
+
+/** Hot path: materialise only the events newer than the last drawn one. */
+function flushEvents(){
+  const box = $('#events');
+  if(state.evFilter !== 'all'){ renderEvents(); return; }   // rare, filtered
+  if(!eSize) return;
+  // how many events are newer than what the DOM already shows?
+  let k=0;
+  while(k<eSize && evAt(k).id !== eDrawn) k++;
+  if(!k) return;                                   // nothing new
+  // a reader scrolled into history? remember the row under the viewport edge
+  // so the insert below can hand the pixels back. Costs no layout when pinned.
+  let anchor = null;
+  if(evScroll > 8 && evScroller){
+    const top = evScroller.getBoundingClientRect().top;
+    for(const row of box.children){
+      if(row.getBoundingClientRect().bottom > top){ anchor = row; break; }
+    }
+    if(anchor) anchor.__t = anchor.getBoundingClientRect().top;
+  }
+  const frag=document.createDocumentFragment();
+  for(let i=0;i<k;i++) frag.appendChild(evRow(evAt(i)));   // newest → oldest
+  box.insertBefore(frag, box.firstChild);          // newest lands on top
+  while(box.childElementCount > EV_CAP) box.removeChild(box.lastElementChild);
+  eDrawn = evAt(0).id;
+  if(anchor){                                      // undo the shove
+    const d = anchor.getBoundingClientRect().top - anchor.__t;
+    if(d){ evScroller.scrollTop += d; evScroll = evScroller.scrollTop; }
+  }
+}
+
+/** Cold path: filter change / reset — full rebuild is fine, it is rare. */
+function renderEvents(){
+  const box = $('#events');
+  const f = state.evFilter;
+  const list = f==='all' ? evList() : evList().filter(e=>e.k===f);
+  box.innerHTML = list.map(evRowHTML).join('');
+  eDrawn = eSize ? evAt(0).id : 0;
+  if(evPinned && evScroller && evScroll){ evScroller.scrollTop = 0; evScroll = 0; }
+}
+function resetStream(){
+  EVENTS = new Array(EV_CAP); eHead=0; eSize=0; evSeq=0; eDrawn=0;
+  if(evRaf){ cancelAnimationFrame(evRaf); evRaf=0; }
+  $('#events').innerHTML=''; evPinned = true; evScroll = 0;
+}
+evScroller = document.querySelector('.stage[data-stage=stream] .stage-body');
+if(evScroller) evScroller.addEventListener('scroll', ()=>{
+  evScroll = evScroller.scrollTop; evPinned = evScroll < 8;
+}, {passive:true});
+$$('#evFilter .chip').forEach(b=>b.onclick=()=>{
+  $$('#evFilter .chip').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); state.evFilter=b.dataset.e; renderEvents();
+});
+const SPARKS = Array.from({length:22},()=>rnd(.2,1));
+function renderMetrics(){
+  const tools = ALL_TOOLS.length, domains = Object.keys(TOOL_DOMAINS).length;
+  const m = [
+    {v:tools, k:'built-in tools', s:'amber', spark:true},
+    {v:domains, k:'tool domains', s:'cyan'},
+    {v:AGENTS.length, k:'agent definitions', s:'violet'},
+    {v:18, k:'divisions', s:'green'},
+    {v:56, k:'mcp servers', s:'blue'},
+    {v:30, k:'hook events', s:'amber'},
+  ];
+  const cls = {amber:'var(--amber)',cyan:'var(--cyan)',violet:'var(--violet)',green:'var(--green)',blue:'var(--blue)'};
+  $('#metrics').innerHTML = m.map(x=>`<div class="mcard">
+    <div class="mv" style="color:${cls[x.s]}">${x.v}</div>
+    <div class="mk">${x.k}</div>
+    ${x.spark?`<div class="spark">${SPARKS.map(s=>`<i style="height:${s*100}%" class="${s>.72?'hi':''}"></i>`).join('')}</div>`:''}
+  </div>`).join('')
+  + `<div class="mcard"><div class="mk" style="margin-bottom:8px">Tool surface by domain</div>
+    ${Object.entries(TOOL_DOMAINS).map(([d,v])=>`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+        <span style="width:7px;height:7px;border-radius:2px;background:${v.c};flex:none"></span>
+        <span style="font-size:11.5px;color:var(--dim);flex:1">${d}</span>
+        <span style="font-family:var(--mono);font-size:10.5px;color:var(--faint)">${v.tools.length}</span>
+      </div>`).join('')}</div>`;
+}
+
+/* ── VAULT ───────────────────────────────────────────────────────── */
+function renderVault(){
+  $('#vault').innerHTML = `
+  <div class="vsec">
+    <div class="vsec-h"><h3>Model provider</h3><span class="rule"></span>
+      <div class="seg2" id="modeSeg"><button class="on" data-m="auto">auto</button><button data-m="ask">ask</button><button data-m="full">full</button></div></div>
+    <div class="vgrid">
+      <div class="vrow"><div class="vk">JEXI_MODEL_PROVIDER</div><div class="vv editable">groq</div>
+        <div class="vd">17 provider ids supported. One key runs the whole product.</div></div>
+      <div class="vrow"><div class="vk">JEXI_MODEL_NAME</div><div class="vv editable">openai/gpt-oss-120b</div>
+        <div class="vd">Falls back through a 9-rung telemetry-informed ladder.</div></div>
+      <div class="vrow"><div class="vk">JEXI_MODEL_API_KEY</div><div class="vv" style="color:var(--green)">keyring:groq · sha256 4f2a…c19e</div>
+        <div class="vd">Never entered inline. Only an env-var name or keyring ref reaches the form.</div></div>
+      <div class="vrow"><div class="vk">JEXI_API_KEY</div><div class="vv" style="color:var(--rose)">required in production</div>
+        <div class="vd">Server refuses to boot unset in prod; binds 127.0.0.1 in dev. Fail-closed.</div></div>
+    </div>
+  </div>
+
+  <div class="vsec">
+    <div class="vsec-h"><h3>Runtime</h3><span class="rule"></span></div>
+    <div class="vgrid">
+      <div class="vrow"><div class="vk">PORT · HOST</div><div class="vv">3002 · 0.0.0.0</div>
+        <div class="vd">7860 in Docker / Hugging Face. CLI sets 127.0.0.1 for a laptop-only brain.</div></div>
+      <div class="vrow"><div class="vk">MCP_PORT</div><div class="vv">3457</div>
+        <div class="vd">56 registered servers · 51 wired · 542 tools declared.</div></div>
+      <div class="vrow"><div class="vk">DATA_DIR</div><div class="vv editable">/data</div>
+        <div class="vd">memory.json · knowledge/ · sessions/ · boot-id stamp that detects a wiped disk.</div></div>
+      <div class="vrow"><div class="vk">Durable store</div><div class="vv" style="color:var(--green)">Turso (libSQL) · sqlite local</div>
+        <div class="vd">Turso preferred since Sept 2026; REDIS_URL kept as legacy fallback. 4 memory tiers, mission-scoped rows.</div></div>
+    </div>
+  </div>
+
+  <div class="vsec">
+    <div class="vsec-h"><h3>Surfaces</h3><span class="rule"></span></div>
+    <div class="vgrid">
+      <div class="vrow"><div class="vk">Web console</div><div class="vv">:3000</div><div class="vd">Vite dev server, base './' so the same bundle works at root or subpath.</div></div>
+      <div class="vrow"><div class="vk">Android APK</div><div class="vv">com.jexi.os · minSdk 24</div><div class="vd">Capacitor shell, ES2017 build target for Android 7+ WebViews.</div></div>
+      <div class="vrow"><div class="vk">Load balancer</div><div class="vv">Cloudflare Worker</div><div class="vd">Active probe every 25s · passive failover · 60s cooldown · IP stickiness.</div></div>
+      <div class="vrow"><div class="vk">API</div><div class="vv">184 routes</div><div class="vd">cors · express-rate-limit · SSE / NDJSON · x-jexi-key gate.</div></div>
+    </div>
+  </div>`;
+  $$('#modeSeg button').forEach(b=>b.onclick=()=>{
+    $$('#modeSeg button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); $('#dockMode').textContent = b.dataset.m;
+    toast('ok', `permission mode → ${b.dataset.m}`);
+  });
+}
+
+/* ── FLYOUT ──────────────────────────────────────────────────────── */
+const FLY = {
+  brand:{t:'JEXI OS', items:[['pipeline','Pipeline','1'],['constellation','Workforce','2'],['mesh','Work Graph','3'],['stream','Event stream','4'],['vault','Vault','5']]},
+  gates:{t:'Approval gates', items:[['g','Open pipeline · blocked','↵']]},
+  status:{t:'Brain', items:[['s','brain :3002 · online','✓'],['m','mcp :3457 · 51/56','◆']]},
+};
+const ICONS = {
+  pipeline:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="11" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="18" width="7" height="3" rx="1.5"/>',
+  constellation:'<circle cx="12" cy="5" r="2.2"/><circle cx="5" cy="17" r="2.2"/><circle cx="19" cy="17" r="2.2"/><path d="M12 7.2 6.2 15M12 7.2 17.8 15M7.2 17h9.6"/>',
+  mesh:'<circle cx="5" cy="6" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M6.7 7.2 10.4 10.8M13.6 10.8 17.3 7.2M14 13.2 17.4 16.6"/>',
+  stream:'<path d="M3 12h3l2.5-7 4 14L15.5 12H21"/>',
+  vault:'<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+  gate:'<path d="M12 2.6 4.5 6v6c0 4.6 3.1 8.4 7.5 9.4 4.4-1 7.5-4.8 7.5-9.4V6L12 2.6Z"/><path d="M9.4 12.1 11.3 14l3.5-3.6"/>',
+  s:'<path d="M20 6 9 17l-5-5"/>', m:'<path d="M12 2v20"/><path d="m5 8 7-6 7 6v8l-7 6-7-6z"/>',
+};
+const fy = $('#flyout');
+let fyTimer;
+$$('[data-fly]').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{
+    const key = el.dataset.fly;
+    const cfg = FLY[key]; if(!cfg) return;
+    const r = el.getBoundingClientRect();
+    fy.innerHTML = `<div class="ftitle">${cfg.t}</div>` + cfg.items.map(([id,lab,k])=>
+      `<button class="fi" data-fi="${id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${ICONS[id]||''}</svg><span class="lab">${lab}</span><span class="k">${k}</span></button>`).join('');
+    fy.style.top = Math.min(r.top, window.innerHeight-180)+'px';
+    fy.classList.add('show');
+    $$('#flyout .fi').forEach(b=>b.onclick=()=>{
+      if(['pipeline','constellation','mesh','stream','vault'].includes(b.dataset.fi)) goStage(b.dataset.fi);
+      if(b.dataset.fi==='g') $('#gateBtn').click();
+      fy.classList.remove('show');
+    });
+  });
+  el.addEventListener('mouseleave',()=>{ clearTimeout(fyTimer); fyTimer=setTimeout(()=>fy.classList.remove('show'),90); });
+});
+fy.addEventListener('mouseenter',()=>clearTimeout(fyTimer));
+fy.addEventListener('mouseleave',()=>fyTimer=setTimeout(()=>fy.classList.remove('show'),90));
+
+/* ── COMMAND PALETTE ─────────────────────────────────────────────── */
+const COMMANDS = [
+  {id:'c1', ico:'pipeline',     lab:'Go to Pipeline',        hint:['1']},
+  {id:'c2', ico:'constellation',lab:'Go to Workforce',       hint:['2']},
+  {id:'c3', ico:'mesh',         lab:'Go to Work Graph',      hint:['3']},
+  {id:'c4', ico:'stream',       lab:'Go to Event stream',    hint:['4']},
+  {id:'c5', ico:'vault',        lab:'Go to Vault',           hint:['5']},
+  {id:'r1', ico:'gate',         lab:'Run: full backend test chain', hint:['/test']},
+  {id:'r2', ico:'gate',         lab:'Run: linter (eslint)',        hint:['/lint']},
+  {id:'r3', ico:'gate',         lab:'Run: tool-registry audit',    hint:['/audit']},
+  {id:'r4', ico:'gate',         lab:'Run: state-report.mjs (P5)',  hint:['/state']},
+  {id:'r5', ico:'stream',       lab:'Clear event stream',          hint:[]},
+];
+ALL_TOOLS.forEach(t=>{ if(!COMMANDS.find(c=>c.lab===`Tool: ${t.t}`)) COMMANDS.push({id:'t_'+t.t, ico:'mesh', lab:`Tool: ${t.t}`, hint:[t.d]}); });
+AGENTS.slice(0,40).forEach(a=>COMMANDS.push({id:'a_'+a.id, ico:'constellation', lab:`Agent: ${a.name}`, hint:[a.div]}));
+COMMANDS.forEach(c=>{ if(!ICONS[c.ico]) c.ico='pipeline'; });
+
+let palSel=0, palList=[];
+function openPal(){
+  $('#palette').classList.add('open'); $('#palInput').value='';
+  renderPal();
+}
+function closePal(){ $('#palette').classList.remove('open'); }
+function renderPal(){
+  const q=$('#palInput').value.toLowerCase();
+  palList = COMMANDS.filter(c=>!q||c.lab.toLowerCase().includes(q)).slice(0,40);
+  palSel = Math.min(palSel, Math.max(0,palList.length-1));
+  $('#palList').innerHTML = palList.map((c,i)=>
+    `<div class="pal-item${i===palSel?' sel':''}" data-pi="${i}">
+      <svg class="pi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${ICONS[c.ico]}</svg>
+      <span class="pl">${esc(c.lab)}</span>
+      <span class="ph">${c.hint.map(h=>`<span class="pk">${esc(h)}</span>`).join('')}</span>
+    </div>`).join('');
+  $$('#palList .pal-item').forEach(el=>el.onclick=()=>runPal(+el.dataset.pi));
+}
+function runPal(i){
+  const c = palList[i]; if(!c) return;
+  closePal();
+  if(c.id==='c1') return goStage('pipeline');
+  if(c.id==='c2') return goStage('constellation');
+  if(c.id==='c3') return goStage('mesh');
+  if(c.id==='c4') return goStage('stream');
+  if(c.id==='c5') return goStage('vault');
+  if(c.id==='r1') return runSuite('full backend test chain', 230);
+  if(c.id==='r2') return runSuite('eslint (error-level)', 0.4);
+  if(c.id==='r3') return runSuite('tool-registry audit', 0.2);
+  if(c.id==='r4') return runSuite('state-report.mjs · P5', 1.8);
+  if(c.id==='r5'){ resetStream(); return toast('ok','event stream cleared'); }
+  if(c.lab.startsWith('Tool: ')) return runTool(c.lab.slice(6));
+  if(c.lab.startsWith('Agent: ')){ goStage('constellation'); return openAgent(AGENTS.find(a=>a.name===c.lab.slice(7))); }
+}
+$('#palInput').addEventListener('input',()=>{palSel=0;renderPal();});
+$('#palInput').addEventListener('keydown',e=>{
+  if(e.key==='ArrowDown'){e.preventDefault();palSel=Math.min(palSel+1,palList.length-1);renderPal();}
+  if(e.key==='ArrowUp'){e.preventDefault();palSel=Math.max(palSel-1,0);renderPal();}
+  if(e.key==='Enter'){e.preventDefault();runPal(palSel);}
+  if(e.key==='Escape')closePal();
+});
+$('#palette').onclick=e=>{ if(e.target.id==='palette') closePal(); };
+document.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault(); $('#palette').classList.contains('open')?closePal():openPal();}
+  if(e.key==='Escape'){ closePal(); $('#inspector').classList.remove('open'); }
+});
+$('#omniInput').addEventListener('input',()=>{ if(state.stage!=='constellation') return; renderAgents(); });
+$('#omniInput').addEventListener('keydown',e=>{ if(e.key==='Enter'){ goStage('constellation'); } });
+
+/* ── TOASTS ──────────────────────────────────────────────────────── */
+const TICONS={ok:'<path d="M20 6 9 17l-5-5"/>',warn:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>',err:'<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/>'};
+function toast(kind,msg){
+  const el=document.createElement('div');
+  el.className='toast '+kind;
+  el.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${TICONS[kind]}</svg><span>${esc(msg)}</span>`;
+  $('#toasts').appendChild(el);
+  setTimeout(()=>{el.style.transition='opacity .3s,transform .3s';el.style.opacity=0;el.style.transform='translateY(8px)';setTimeout(()=>el.remove(),320);},2600);
+}
+
+/* ── SIMULATED EXECUTION (honest labels) ─────────────────────────── */
+function runTool(name){
+  const d = Object.keys(TOOL_DOMAINS).find(d=>TOOL_DOMAINS[d].tools.includes(name))||'system';
+  pushEvent({n:'tool.started',k:'tool',i:'▸',d:`<em>${esc(name)}</em> { domain: "${d}" }`});
+  setTimeout(()=>{
+    const ms = Math.round(rnd(6,240));
+    pushEvent({n:'tool.completed',k:'ok',i:'✓',d:`<em>${esc(name)}</em> ok · ${ms}ms · receipt emitted`});
+  }, 420);
+  toast('ok', `${name} executed — receipt emitted`);
+}
+function runSuite(name, secs){
+  const t0=performance.now();
+  pushEvent({n:'verification.run',k:'hook',i:'◆',d:`configured command → spawn real process for <em>${esc(name)}</em>`});
+  const iv=setInterval(()=>{
+    const el=performance.now()-t0;
+    $('#vLatency').textContent = Math.round(el);
+    if(el>secs*1000){ clearInterval(iv); pushEvent({n:'verification.done',k:'ok',i:'✓',d:`<em>${esc(name)}</em> exit 0 · real evidence attached`}); toast('ok',`${name} · exit 0`); $('#vLatency').textContent=Math.round(el); }
+  },60);
+}
+
+/* ── DOCK PROMPT ─────────────────────────────────────────────────── */
+$('#dockInput').addEventListener('keydown',e=>{
+  if(e.key!=='Enter') return;
+  const v=e.target.value.trim(); if(!v) return;
+  e.target.value='';
+  if(v.startsWith('/')){
+    const cmd=v.slice(1).split(' ')[0];
+    const map={test:()=>runSuite('full backend test chain',230),lint:()=>runSuite('eslint (error-level)',.4),
+      audit:()=>runSuite('tool-registry audit',.2),state:()=>runSuite('state-report.mjs · P5',1.8),
+      doctor:()=>runSuite('capability doctor',.9),help:()=>toast('warn','/test /lint /audit /state /doctor')};
+    if(map[cmd]){ map[cmd](); pushEvent({n:'command.run',k:'hook',i:'◆',d:`slash command <em>/${esc(cmd)}</em>`}); }
+    else { pushEvent({n:'command.refused',k:'err',i:'✕',d:`unknown command <em>/${esc(cmd)}</em>`}); toast('err',`unknown command /${cmd}`); }
+    return;
+  }
+  if(v.startsWith('@')){
+    const id=v.slice(1).split(' ')[0].toLowerCase();
+    const a=AGENTS.find(a=>a.id===id);
+    if(a){ goStage('constellation'); openAgent(a); pushEvent({n:'delegate_spawn',k:'tool',i:'▸',d:'recruited <em>'+esc(a.name)+'</em> from the workforce'}); }
+    else { pushEvent({n:'agent.notfound',k:'err',i:'✕',d:`no agent <em>${esc(id)}</em> in the registry`}); toast('err',`no agent "${id}"`); }
+    return;
+  }
+  // A real turn. In LIVE mode this is a genuine POST /api/chat whose NDJSON
+  // response is consumed as it arrives; every row below came off the wire.
+  // The previous version faked the whole turn with a timed script of fake
+  // tool calls and a random duration.
+  if (window.__jexiLive && !window.__jexiDemo) { window.__jexiLive.ask(v); return; }
+  demoTurn(v);
+});
+
+/* DEMO turn — explicitly the fake path, kept for offline viewing. */
+function demoTurn(v){
+  const t0=performance.now();
+  pushEvent({n:'turn.opened',k:'plan',i:'⌁',d:`<em>${esc(v.slice(0,70))}</em> <em>(demo — not a real turn)</em>`});
+  const steps=[
+    ()=>pushEvent({n:'contextResolve',k:'plan',i:'⌁',d:'anaphora + continuity rewrite applied'}),
+    ()=>pushEvent({n:'memoryRead',k:'mem',i:'◈',d:'preferences + facts + semantic loaded <em>before</em> planner'}),
+    ()=>pushEvent({n:'planner.route',k:'plan',i:'⌁',d:`intent classified · lane <em>${pick(['simple','graph','director'])}</em>`}),
+    ()=>{const t=pick(ALL_TOOLS);pushEvent({n:'tool.started',k:'tool',i:'▸',d:`<em>${t.t}</em> { domain: "${t.d}" }`});},
+    ()=>{const t=pick(ALL_TOOLS);pushEvent({n:'tool.completed',k:'ok',i:'✓',d:`<em>${t.t}</em> ok · ${Math.round(rnd(8,220))}ms · receipt`});},
+    ()=>pushEvent({n:'PostToolUse',k:'hook',i:'◆',d:'receipt attached to the turn'}),
+    ()=>{const ms=Math.round(performance.now()-t0);$('#vLatency').textContent=ms;
+         pushEvent({n:'turn.completed',k:'ok',i:'✓',d:`<em>turn completed</em> · ${Math.round(rnd(600,3400))}ms · 1 tool · 0 blocked <em>(demo)</em>`});},
+  ];
+  steps.forEach((fn,i)=>setTimeout(fn, 220+i*430));
+  toast('ok','demo turn — scripted events, not a real run');
+}
+
+function pickEvent(){
+  const last = eSize ? evAt(0).n : null;
+  let e = pick(EV_TPL), guard = 0;
+  while(e.n === last && guard++ < 8) e = pick(EV_TPL);
+  return e;
+}
+/* ── LIVE TICKER ─────────────────────────────────────────────────── */
+let agentCount=0;
+const target=400;
+(function tick(){
+  if(agentCount<target){
+    agentCount=Math.min(target, agentCount+Math.ceil(rnd(8,46)));
+    $('#vAgents').textContent=agentCount;
+    requestAnimationFrame(()=>setTimeout(tick,60));
+  } else {
+    $('#vLatency').textContent=Math.round(rnd(700,2400));
+    setTimeout(tick, 4200);
+  }
+})();
+// DEMO ONLY. In LIVE mode this fabricates tool calls and receipts that look
+// identical to real ones, which is how a fake run gets mistaken for a real
+// one — so it is gated, not merely cosmetic.
+setInterval(()=>{
+  if(!window.__jexiDemo) return;
+  if(state.stage==='pipeline'||state.stage==='stream') pushEvent(pickEvent());
+}, 3400);
+setInterval(()=>{ SPARKS.shift(); SPARKS.push(rnd(.2,1)); if(state.stage==='stream') renderMetrics(); }, 1400);
+setInterval(()=>{ $('#vLatency').textContent=Math.round(rnd(700,2400)); }, 5200);
+
+/* ── BOOT ────────────────────────────────────────────────────────── */
+(function boot(){
+  const steps=[
+    [14,'booting phase31 bootstrap…'],
+    [32,'wiring registries · providers · hooks'],
+    [48,'39 tools across 12 domains'],
+    [64,`${AGENTS.length} agent definitions · 18 declared divisions`],
+    [80,'56 mcp servers · 30 hook events'],
+    [94,'184 api routes mounted'],
+    [100,'brain ready'],
+  ];
+  let i=0;
+  const iv=setInterval(()=>{
+    if(i>=steps.length){ clearInterval(iv);
+      setTimeout(()=>{ $('#boot').classList.add('gone'); setTimeout(()=>$('#boot').remove(),420); },260);
+      return; }
+    $('#bootBar').style.width=steps[i][0]+'%';
+    $('#bootLog').textContent=steps[i][1];
+    i++;
+  },190);
+})();
+
+/* ── INIT ────────────────────────────────────────────────────────── */
+renderLanes(); renderDivList(); renderAgents(); renderVault();
+resetStream();
+// seed a short backfill through the real ring so the initial paint is identical
+for(let i=0;i<18;i++){
+  EVENTS[eHead] = {...pickEvent(), t:ts(), id:++evSeq, live:false};
+  eHead = (eHead + 1) % EV_CAP;
+  if(eSize < EV_CAP) eSize++;
+}
+renderEvents();
+setTimeout(()=>toast('ok','2 approval gates waiting — click the shield'), 1600);
+</script>
+
+<script type="module">
+/* ── LIVE bridge wiring ─────────────────────────────────────────────
+ * The deck is served same-origin from the JEXI server, so /api/chat is a
+ * relative URL with no CORS involved. Every row pushed from here came off
+ * the response body of a real request. */
+import { LiveBridge } from './live-stream.js';
+
+window.__jexiDemo = false;
+
+const $ = (s) => document.querySelector(s);
+const panel = $('#livePanel'), lpState = $('#lpState'), lpA = $('#lpA'),
+      lpQ = $('#lpQ'), lpMeta = $('#lpMeta'), lpStop = $('#lpStop');
+
+function setPanel(cls, label){ panel.className = 'livepanel on ' + cls; lpState.textContent = label; }
+function showMeta(html){ lpMeta.innerHTML = html; lpMeta.hidden = !html; }
+
+const bridge = new LiveBridge({
+  onEvent: (row) => { try { window.pushEvent(row); } catch (e) { console.error('row render failed', e); } },
+  onDelta: (text) => {
+    if (lpA.textContent === ''){ try { window.resetStream(); } catch (e) {} }
+    lpA.textContent += text;
+    lpA.scrollTop = lpA.scrollHeight;
+  },
+  onState: (s) => {
+    if (s.phase === 'open'){
+      resetStream && resetStream();
+      lpA.textContent = ''; lpQ.hidden = false; lpQ.textContent = '› ' + s.question;
+      lpStop.hidden = false; showMeta('');
+      setPanel('run', 'live · streaming…');
+    } else if (s.phase === 'done'){
+      lpStop.hidden = true;
+      // The terminal event is authoritative: a turn may answer with no
+      // deltas at all (the lean lane returns one done event), and without
+      // this the panel stays empty and a real answer looks like a failure.
+      if (s.answer) lpA.textContent = s.answer;
+      setPanel('ok', 'live · turn complete');
+      // Say plainly when nothing streamed, instead of implying it did.
+      const how = s.deltas
+        ? `${s.deltas} streamed deltas`
+        : 'no deltas — answered in one terminal event';
+      showMeta(`${how} · ${s.malformed || 0} malformed · ${new Date().toLocaleTimeString()}`);
+    } else if (s.phase === 'aborted'){
+      lpStop.hidden = true;
+      setPanel('err', 'live · stopped');
+      showMeta('stopped by you');
+    } else {
+      lpStop.hidden = true;
+      setPanel('err', 'live · ' + (s.reason || 'failed'));
+      showMeta(s.detail ? String(s.detail) : String(s.reason || ''));
+    }
+  },
+});
+
+window.__jexiLive = {
+  ask: async (q) => {
+    if (bridge.busy) { console.warn('a turn is already running'); return; }
+    goStage('stream');
+    await bridge.send(q);
+  },
+  stop: () => bridge.abort(),
+  bridge,
+};
+
+lpStop && lpStop.addEventListener('click', () => bridge.abort());
+
+/* mode switch */
+const mLive = $('#modeLive'), mDemo = $('#modeDemo');
+function setMode(demo){
+  window.__jexiDemo = demo;
+  mLive.classList.toggle('on', !demo);
+  mDemo.classList.toggle('on', demo);
+  panel.style.display = demo ? 'none' : '';
+  // The header chip claimed "deterministic" in every mode, which is a lie in
+  // LIVE — a real model is deciding. Say which mode the deck is actually in.
+  const chip = document.querySelector('#vModel');
+  if (chip) chip.textContent = demo ? 'demo · scripted' : 'live · /api/chat';
+  if (demo){ resetStream && resetStream(); }
+}
+mLive && mLive.addEventListener('click', () => setMode(false));
+mDemo && mDemo.addEventListener('click', () => setMode(true));
+setMode(false);   // paint the real mode on first load, not only on toggle
+
+/* keep the panel visible while a live turn streams, even off the stream stage */
+function syncPanel(){
+  if (window.__jexiDemo) return;
+  panel.classList.toggle('on', true);
+}
+const _goStage = window.goStage;
+window.goStage = function(s){ _goStage(s); syncPanel(); };
+syncPanel();
+</script>
+</body></html>

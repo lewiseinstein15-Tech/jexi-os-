@@ -236,12 +236,17 @@ sweepWorkspace().then((r) => { if (r.cleared.length) console.log('[Workspace] sw
 try {
   const made = generateAllProfiles();
   const cov = profileCoverage();
-  // P10 GAP 6 — the OLD line ("...= 213/213 agents profiled") conflated
-  // planner ROLE specs with live agents. Three distinct populations:
-  //   planner specs (this line) — deployable role specifications
-  //   live agents               — the [Roster] line below (brain.roster())
-  //   personas                  — the [Personas] line: voice overlays
-  console.log(`[Profiles] ${cov.named.length} named + ${made.length} planner-roles = ${cov.named.length + made.length} planner-specs (role specs — NOT live agents; the live roster is the [Roster] line)`);
+  // Three distinct populations, each counted from the code rather than typed
+  // in — a planner ROLE spec, a live agent, and a persona overlay are not the
+  // same thing, and printing one number for all three was how "213 agents"
+  // came to mean nothing checkable.
+  console.log(`[Profiles] ${cov.named.length} named + ${made.length} planner-roles = ${cov.named.length + made.length} planner-specs (role specs — NOT live agents)`);
+  // The live-agent count, derived from the agent definitions that actually
+  // load. This is the only count that answers "how many agents can run".
+  try {
+    const { publishedAgentLine } = await import('./src/services/AgentDefinitions.js');
+    console.log(await publishedAgentLine());
+  } catch (e) { console.error('[Agents] count failed:', e.message); }
 } catch (e) { console.error('[Profiles] generation failed:', e.message); }
 
 // P10 GAP 6 — PERSONAS loaded explicitly at boot: named voice/flavor overlays
@@ -2873,6 +2878,17 @@ app.get('/api/metrics', (req, res) => {
 // === SELF-MONITORING (JEXI diagnoses her own system + reads her own source) ===
 app.get('/api/self/status', (req, res) => res.json(collectSystemStatus()));
 app.get('/api/self/source', (req, res) => res.json(readSourceFile(req.query.path || '')));
+
+// === THE DECK (live event stream UI) ===
+// Served from its own route rather than from `public`, which is a SYMLINK to
+// the built frontend (../dist) in this repo. Writing the deck into public/ would
+// replace that symlink and silently take over the single-container root route.
+// Same origin as /api/chat, so the stream needs no CORS.
+const deckDir = path.join(SERVER_ROOT, '..', 'interfaces', 'deck');
+if (fs.existsSync(deckDir)) {
+  app.use('/deck', express.static(deckDir));
+  app.get('/deck', (req, res) => res.sendFile(path.join(deckDir, 'index.html')));
+}
 
 // === SINGLE-CONTAINER MODE ===
 // When the frontend is built into server/public (Hugging Face Spaces Docker image),

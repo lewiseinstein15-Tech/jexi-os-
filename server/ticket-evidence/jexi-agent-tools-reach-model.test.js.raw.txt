@@ -1,0 +1,27 @@
+================================================================
+TICKETS : JEXI-002,021 tool surface reaches the model
+COMMAND : node --test tests/tickets/jexi-agent-tools-reach-model.test.js
+RUN AT  : 2026-09-29T16:40:08Z
+NODE    : v24.8.0
+================================================================
+◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+✔ JEXI-021: the coding builder offers a real, non-empty coding tool set (42.638668ms)
+✔ JEXI-002: the provider body DECLARES the offered tools with tool_choice auto (38.498048ms)
+✔ JEXI-002: normalizeTools keeps the def-shaped tools the builder emits (0.77041ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1396.10827
+
+----------------------------------------------------------------
+EXIT CODE : 0
+PASSED    : 3
+FAILED    : 0

@@ -121,7 +121,14 @@ async function main() {
     fs.writeFileSync(rulesYaml, 'rules:\n  - id: weak-md5-hash\n    languages: [python]\n    message: Do not use MD5 for passwords\n    severity: WARNING\n    patterns:\n      - pattern: hashlib.md5(...)\n');
     const leakRepo = path.join(fixtures, 'leakrepo');
     fs.mkdirSync(leakRepo);
-    fs.writeFileSync(path.join(leakRepo, 'creds.txt'), 'github_pat = "ghp_RjkEwMgEwJdMNjZnFqPZtQaVbCdBcXeFgTh1"\n');
+    // A DELIBERATE fake PAT planted in a temp repo, to prove the secret
+    // scanner finds one. Assembled at runtime from two halves on purpose:
+    // a committed literal shaped exactly like a real `ghp_` token trips
+    // GitHub push protection and every scanner in the chain, and this string
+    // is not a credential. The file it writes IS token-shaped, because that
+    // is what the scanner has to be able to catch.
+    const fakePat = ['ghp_', 'RjkEwMgEwJdN', 'jZnFqPZtQaVbCdBcXeFgTh1'].join('');
+    fs.writeFileSync(path.join(leakRepo, 'creds.txt'), `github_pat = "${fakePat}"\n`);
 
     const text = (r) => String(r && r.result && r.result.content && r.result.content[0] && r.result.content[0].text || '');
     const json = (r) => { try { return JSON.parse(text(r)); } catch { return null; } };

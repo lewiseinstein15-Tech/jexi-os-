@@ -1,0 +1,23 @@
+================================================================
+TICKETS : RELEVANCE skills library match floor
+COMMAND : node --test tests/tickets/jexi-skill-relevance-floor.test.js
+RUN AT  : 2026-09-29T16:40:10Z
+NODE    : v24.8.0
+================================================================
+✔ RELEVANCE: a generic word that is only a name suffix does not qualify (265.745541ms)
+✔ RELEVANCE: an off-domain question matches nothing at all (17.309684ms)
+✔ RELEVANCE: a real, on-topic query still resolves (17.513039ms)
+✔ RELEVANCE: an empty or stopword-only query matches nothing (0.186811ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 373.749153
+
+----------------------------------------------------------------
+EXIT CODE : 0
+PASSED    : 4
+FAILED    : 0

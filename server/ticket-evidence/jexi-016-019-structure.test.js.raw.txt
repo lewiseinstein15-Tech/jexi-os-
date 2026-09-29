@@ -1,0 +1,34 @@
+================================================================
+TICKETS : JEXI-016,019 structure
+COMMAND : node --test tests/tickets/jexi-016-019-structure.test.js
+RUN AT  : 2026-09-29T16:40:05Z
+NODE    : v24.8.0
+================================================================
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+✔ JEXI-016: AgentLoop is under a size budget (1.099971ms)
+✔ JEXI-016: the extracted modules exist and are real files (0.498258ms)
+✔ JEXI-016: AgentLoop orchestrates — it does not re-implement the parts (0.601078ms)
+✔ JEXI-016: each module is unit-testable in isolation (pure exports, no loop needed) (1065.890212ms)
+✔ JEXI-016: the ToolSetBuilder rules run in a stated order and each one applies (65.011573ms)
+✔ JEXI-016: a non-coding turn is not silently narrowed by the coding rules (2.24941ms)
+✔ JEXI-019: the core agent modules carry no phase or ticket archaeology (3.099747ms)
+✔ JEXI-019: a comment states the reason, not the history (0.446899ms)
+✔ JEXI-019: every core module opens with a comment that explains itself (0.613343ms)
+✔ JEXI-019: the split did not reduce coverage — the modules are all imported (1.194347ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1224.730393
+
+----------------------------------------------------------------
+EXIT CODE : 0
+PASSED    : 10
+FAILED    : 0

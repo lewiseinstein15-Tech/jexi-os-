@@ -13,7 +13,12 @@
  */
 
 import { LintVerifier } from '../verifiers/LintVerifier.js';
-import { TestVerifier } from '../verifiers/TestVerifier.js';
+import { TestVerifier, runTestEvidence } from '../verifiers/TestVerifier.js';
+
+// JEXI-018 — re-exported, not re-implemented. A caller that imports the seam
+// from either entry point gets the SAME function, so the chat path and the
+// WorkGraph path cannot drift apart again.
+export { runTestEvidence };
 import { BuildVerifier } from '../verifiers/BuildVerifier.js';
 import { AgentVerifier } from '../verifiers/AgentVerifier.js';
 
@@ -92,13 +97,19 @@ export async function realVerifyLayer(layer, ctx = {}) {
  * Hook for the edit path: after a file edit, run autoVerify and return
  * structured failure context that gets injected into the next agent turn.
  *
- * REAL HOOK (Phase 5 Scope B): `real` lists layers to run through the REAL
- * verifiers (real spawn). When no injected layers are given at all, the
- * cheapest real layer ('lint') is run against the edited files by default, so
- * an ordinary edit path gets immediate real verification. The loop stops at
- * the first non-pass; the structured failure (with real output) is injected
- * back as `context.injectedFailure`.
+ * REAL HOOK: `real` lists layers to run through the REAL verifiers (real
+ * spawn). When no injected layers are given at all, the default real layers
+ * are ['lint', 'unit'] (JEXI-025).
+ *
+ * JEXI-025 — the default used to be `['lint']`, which means an ordinary edit
+ * that compiles fine and breaks every test in the suite still came back
+ * `ok: true`. Lint catches syntax, not behaviour. The default now runs lint
+ * AND the real unit/TestVerifier layer, so a broken test suite is caught at
+ * the edit that broke it instead of at the end of the turn. Callers that
+ * genuinely only want a syntax check pass `{ real: ['lint'] }` explicitly.
  */
+export const DEFAULT_REAL_LAYERS = ['lint', 'unit'];
+
 export async function verifyAfterEdit(ctx, layers = {}, { real = null } = {}) {
   const steps = [
     { name: 'lint', verifier: LintVerifier },
@@ -117,7 +128,7 @@ export async function verifyAfterEdit(ctx, layers = {}, { real = null } = {}) {
   }
 
   // Real-spawn layers (cheapest first): only reached if injected layers pass.
-  const realLayers = real ?? (Object.keys(layers).length === 0 ? ['lint'] : []);
+  const realLayers = real ?? (Object.keys(layers).length === 0 ? DEFAULT_REAL_LAYERS : []);
   for (const layer of realLayers) {
     const res = await realVerifyLayer(layer, ctx);
     results.push(res);

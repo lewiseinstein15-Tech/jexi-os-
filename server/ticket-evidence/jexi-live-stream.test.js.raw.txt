@@ -1,0 +1,43 @@
+================================================================
+TICKETS : STREAM live bridge — NDJSON transport
+COMMAND : node --test tests/tickets/jexi-live-stream.test.js
+RUN AT  : 2026-09-29T16:40:09Z
+NODE    : v24.8.0
+================================================================
+✔ STREAM: a line split across chunks is reassembled, not dropped (1.651712ms)
+✔ STREAM: several lines in one chunk all come out (0.199292ms)
+✔ STREAM: blank lines are ignored, not emitted as empty events (0.162832ms)
+✔ STREAM: a trailing partial line is recoverable on flush (0.293658ms)
+✔ STREAM: every terminal type is recognised (0.168861ms)
+✔ STREAM: the terminal answer is read from either wire shape (0.172631ms)
+✔ STREAM: an unknown event type still renders — it is never dropped (0.29772ms)
+✔ STREAM: detail is HTML-escaped so a stream cannot inject markup (0.149794ms)
+✔ STREAM: a non-zero command exit maps to an error row (0.140222ms)
+✔ STREAM: a full turn streams its answer and reports done (1.587384ms)
+✔ STREAM: the answer survives a chunk boundary mid-sentence (1.883519ms)
+✔ STREAM: a malformed line is counted and the stream continues (0.529237ms)
+✔ STREAM: a stream with no terminal event is NOT reported as success (0.41535ms)
+✔ STREAM: a stream that ends with a trailing partial line still resolves (0.266207ms)
+✔ STREAM: HTTP failure surfaces the status and the server body (0.170872ms)
+✔ STREAM: a response with no body is an error, not an empty success (0.155258ms)
+✔ STREAM: an abort is reported as aborted, not as an error (0.203606ms)
+✔ STREAM: a real network failure is not mislabelled as an abort (0.148696ms)
+✔ STREAM: a second send while busy is refused instead of interleaving (0.300108ms)
+✔ STREAM: an empty question is refused without a request (0.086815ms)
+✔ STREAM: state does not leak between turns (0.354063ms)
+✔ STREAM: a partial line is never flushed early just because more chunks came (0.418511ms)
+✔ STREAM: a genuinely malformed line is still counted exactly once (0.405101ms)
+✔ STREAM: many small chunks still produce the whole answer (1.205185ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 87.332903
+
+----------------------------------------------------------------
+EXIT CODE : 0
+PASSED    : 24
+FAILED    : 0

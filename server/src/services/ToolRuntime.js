@@ -449,6 +449,63 @@ export function validateToolOutput(slug, result) {
  * schema (registry-only, no executable engine) are omitted — offering them
  * would just give the model routing dead-ends.
  */
+/* Self-publish so the domain executor can register its probe (JEXI-017). */
+if (typeof globalThis !== 'undefined') globalThis.__jexiToolRuntime = { registerDomainProbe };
+
+/**
+ * JEXI-017 — could `executeTool` actually dispatch this slug?
+ *
+ * Derived from the SAME four seams `executeToolInner` resolves in, in the
+ * same order, so the two can never disagree about what is runnable:
+ *
+ *   mcp__*        → the MCP gateway
+ *   getTool()     → the static ToolRegistry
+ *   getPluginTool → the plugin context
+ *   hasDomainTool → the domain registry
+ *
+ * Anything else ends at `Unknown tool: <slug>`.
+ */
+export function toolHasEngine(slug) {
+  const s = String(slug || '').trim();
+  if (!s) return false;
+  if (s.startsWith('mcp__')) return true;   // routed names are dispatched by the gateway
+  if (getTool(s)) return true;
+  try { if (getPluginTool(s)) return true; } catch { /* no plugin context */ }
+  try {
+    // eslint-disable-next-line no-undef
+    const { hasDomainTool } = globalThis.__jexiDomainExecutor || {};
+    if (hasDomainTool && hasDomainTool(s)) return true;
+  } catch { /* domains not loaded yet */ }
+  return false;
+}
+
+/** A sync best-effort: the executor module may not be loaded in this tick. */
+export function registerDomainProbe(mod) { globalThis.__jexiDomainExecutor = mod || null; }
+
+/**
+ * Resolve a slug to a tool definition, across ALL four sources.
+ *
+ * JEXI-017 asked for one registry. The inverse half of the same bug is worse:
+ * `getTool('fs_read')` returns null, because `fs_read` lives in the DOMAIN
+ * registry and not the static TOOL_REGISTRY — so a planner that correctly chose
+ * `fs_read` had it silently filtered out, and the model was offered
+ * `ask_user_question` in a turn whose whole job was editing a file. Nothing
+ * errored; the tool just never appeared.
+ *
+ * The sources are tried in the same order `executeToolInner` dispatches them,
+ * so a definition here always corresponds to something that can actually run.
+ */
+export function resolveToolDef(slug) {
+  const s = String(slug || '').trim();
+  if (!s) return null;
+  const reg = getTool(s);
+  if (reg) return reg;
+  try { const pt = getPluginTool(s); if (pt) return { slug: s, name: pt.name || s, desc: pt.desc || 'plugin tool', permission: pt.permission || 'medium' }; } catch { /* no plugin context */ }
+  const probe = globalThis.__jexiDomainExecutor;
+  if (probe?.hasDomainTool?.(s)) return { slug: s, name: s, desc: `domain tool ${s}`, permission: 'medium' };
+  return null;
+}
+
 export function buildNativeSchemas(defs) {
   return (defs || [])
     .map((t) => {
@@ -473,7 +530,13 @@ export function buildNativeSchemas(defs) {
         },
       };
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    // JEXI-017 — only tools with a registered engine reach the model. The
+    // old comment here promised plugin tools are "ALWAYS visible"; the price
+    // was that a schema with no engine behind it could be offered, and the
+    // model would call it and get `Unknown tool`. Offering a tool that cannot
+    // run is worse than not offering it.
+    .filter((sc) => toolHasEngine(sc.function.name));
 }
 
 /* ------------------------------------------------------------------ */
@@ -582,6 +645,13 @@ export const TOOL_PROFILES = {
   readonly: { label: 'Read-only', desc: 'Run reads only; writes, code execution and external actions are blocked', allow: ['safe'] },
   auto: { label: 'Standard', desc: 'Auto-run safe + medium tools; risky tools are blocked', allow: ['safe', 'medium'] },
   full: { label: 'Full', desc: 'Auto-run everything including code execution', allow: ['safe', 'medium', 'risky'] },
+  // JEXI-028 — the "fix the failing test" profile. Same tier ceiling as
+  // `auto` (safe + medium), but the domain layer additionally auto-approves
+  // the sandboxed edit/test set (see CODING_AUTO_APPROVED in
+  // tools/domains/executor.js) so a coding loop is not interrupted to ask
+  // permission for every fs_edit. Host-destructive tools (git_push,
+  // fs_delete, term_execute) are NOT in that set and still need approval.
+  coding: { label: 'Coding (sandboxed)', desc: 'Auto-run sandboxed file edits and test runs; destructive host actions still need approval', allow: ['safe', 'medium'] },
 };
 
 export function activeToolProfile() {
@@ -1319,6 +1389,10 @@ async function runEngine(slug, args, opts = {}) {
             owner: opts.spillOwner || 'runtime',
             signal: opts.signal,
             maxChars: 8000,
+            // JEXI-010 — the active profile must reach the domain layer too,
+            // otherwise domain tools are the one place allowAll still applies.
+            // runEngine's third argument carries the resolved profile.
+            profile: (opts && opts.profile) || activeToolProfile(),
           };
           const r = await domainDispatch(slug, args, ctx);
           if (r && r.ok) return { ok: true, domain: slug, result: r.result ?? r };

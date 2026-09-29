@@ -1,0 +1,25 @@
+================================================================
+TICKETS : STREAM lean lane streams deltas
+COMMAND : node --test tests/tickets/jexi-lean-lane-streaming.test.js
+RUN AT  : 2026-09-29T16:40:10Z
+NODE    : v24.8.0
+================================================================
+✔ STREAM: the lean lane forwards every delta as a `stream` event (2.235978ms)
+✔ STREAM: the lean lane still answers when a provider streams but returns nothing (0.256753ms)
+✔ STREAM: the lean lane still works on a provider that does not stream (0.219786ms)
+✔ STREAM: an empty delta is never forwarded as an event (0.227473ms)
+✔ STREAM: a throwing sendEvent cannot break the answer (0.304886ms)
+✔ STREAM: the lean lane passes an onToken callback at all (0.282051ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 75.890767
+
+----------------------------------------------------------------
+EXIT CODE : 0
+PASSED    : 6
+FAILED    : 0

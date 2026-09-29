@@ -1,0 +1,37 @@
+================================================================
+TICKETS : JEXI-007,024,025 verification
+COMMAND : node --test tests/tickets/jexi-007-024-025-verify.test.js
+RUN AT  : 2026-09-29T16:38:58Z
+NODE    : v24.8.0
+================================================================
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+✔ JEXI-007: a snapshot with files is materialized BY DEFAULT (1.258132ms)
+✔ JEXI-007: the claimant cannot change what the verifier reads (0.376667ms)
+✔ JEXI-007: live cwd is an explicit, documented opt-out (0.229531ms)
+✔ JEXI-007: an empty snapshot falls back to cwd (nothing to freeze) (0.11318ms)
+✔ JEXI-007: TestVerifier evidence records sandboxed:true by default (324.81946ms)
+✔ JEXI-024: exit code 0 with ZERO tests is an error, not a pass (29.854934ms)
+✔ JEXI-024: allowEmpty:true is the documented escape hatch for a repo with no tests (22.953786ms)
+✔ JEXI-024: a genuinely failing pytest run is a fail with the failing test named (323.555097ms)
+✔ JEXI-025: the default real layers are lint AND unit, not lint alone (0.964975ms)
+✔ JEXI-025: with no injected layers the real lint AND unit layers both run (25.74998ms)
+✔ JEXI-025: injected layers still suppress the real ones (test seam preserved) (0.37737ms)
+✔ JEXI-025: a failing unit layer produces injectedFailure, not a silent ok (0.294035ms)
+✔ JEXI-025: callers can still opt into lint-only explicitly (60345.507499ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 62361.266365
+
+----------------------------------------------------------------
+EXIT CODE : 0
+PASSED    : 13
+FAILED    : 0

@@ -1,0 +1,32 @@
+================================================================
+TICKETS : JEXI-006,014,024 test execution
+COMMAND : node --test tests/tickets/jexi-006-024-014-testing.test.js
+RUN AT  : 2026-09-29T16:38:35Z
+NODE    : v24.8.0
+================================================================
+✔ JEXI-006: a pyproject + tests/ project is detected as pytest (1.236708ms)
+✔ JEXI-006: a package.json project is still detected as node (1.044524ms)
+✔ JEXI-006: an empty directory is honestly "no test project" (0.577106ms)
+✔ JEXI-006: a failing pytest returns a structured fail + the failure list (1270.192174ms)
+✔ JEXI-014: the failing assertion line survives into the tool result (1204.255328ms)
+✔ JEXI-006: after the fix the SAME tool returns pass with tests > 0 (1180.336168ms)
+✔ JEXI-006: test_run auto-detects and routes to pytest for this project (1223.844138ms)
+✔ JEXI-024: a suite that collects nothing is an ERROR, not a pass (0.398747ms)
+✔ JEXI-024: exit 0 with zero tests parsed is never "pass" (0.201383ms)
+✔ JEXI-024: a collection error is an error, not a pass (1331.897369ms)
+✔ JEXI-024: a real run of an empty suite is reported as error with tests=0 (1176.063766ms)
+✔ JEXI-014: elided output keeps the head AND the failure tail (1477.727545ms)
+✔ a run NEVER reports pass on source that is still broken (stale .pyc) (14560.282941ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 23501.002425
+
+----------------------------------------------------------------
+EXIT CODE : 0
+PASSED    : 13
+FAILED    : 0

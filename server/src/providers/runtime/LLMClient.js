@@ -78,6 +78,11 @@ export function resolveKeys() {
     pollinationsKey: process.env.POLLINATIONS_API_KEY || settings.pollinationsKey || '',
     cloudflareKey: process.env.CLOUDFLARE_API_TOKEN || settings.cloudflareKey || '',
     cloudflareAccount: process.env.CLOUDFLARE_ACCOUNT_ID || settings.cloudflareAccount || '',
+    // Any OpenAI-compatible endpoint, configured by env. Used for gateways
+    // (dahl and friends) that serve a model JEXI has no built-in provider for.
+    // ARCEN_MODEL_* is the name the arcen toolchain exports; the MODEL_* names
+    // are accepted too so an existing .env does not have to be rewritten.
+    customKey: process.env.ARCEN_MODEL_API_KEY || process.env.CUSTOM_API_KEY || settings.customKey || '',
   };
 }
 
@@ -766,6 +771,17 @@ const PROVIDER_CALLS = {
   vllm: tryVllm,
   cloudflare: tryCloudflare,
   pollinations: tryPollinations,
+  // A custom OpenAI-compatible gateway (dahl, vLLM, or anything else that
+  // speaks /v1/chat/completions). Configured entirely by env, so adding an
+  // endpoint is not a code change.
+  custom: (p, s, img, o, e) => {
+    const lane = providerLanes(o.provider || 'custom');
+    if (!lane || !lane.key || !lane.baseUrl) return null;
+    return tryOpenAICompat(
+      { key: lane.key, baseUrl: lane.baseUrl, models: lane.models, label: 'Custom', providerKey: 'custom' },
+      p, s, img, o, e,
+    );
+  },
 };
 
 /**
@@ -1040,6 +1056,16 @@ function providerToolConfig(provider, opts) {
       baseUrl: `${String(process.env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/+$/, '')}/v1`,
       models: [opts.model || process.env.MODEL_NAME || process.env.OLLAMA_MODEL || 'qwen3'],
     },
+    /* A custom OpenAI-compatible gateway. Everything about it is env-driven
+       so pointing JEXI at a new endpoint is configuration, not a code change.
+       The base URL is normalised: gateways are published with and without a
+       trailing /v1, and a doubled suffix is a 404 that looks like a bad key. */
+    custom: (() => {
+      const raw = process.env.ARCEN_MODEL_BASE_URL || process.env.CUSTOM_BASE_URL || process.env.MODEL_BASE_URL || '';
+      const baseUrl = raw.replace(/\/+$/, '').replace(/\/v1$/, '') + '/v1';
+      const models = [opts.model || process.env.ARCEN_MODEL_NAME || process.env.CUSTOM_MODEL || process.env.MODEL_NAME || 'deepseek-ai/DeepSeek-V4-Flash-0731'];
+      return { key: keys.customKey, baseUrl: raw ? baseUrl : '', models };
+    })(),
   }[provider];
 }
 

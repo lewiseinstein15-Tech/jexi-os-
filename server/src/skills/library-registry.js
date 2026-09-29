@@ -98,18 +98,30 @@ export function findLibrarySkill(query) {
   // Hyphens split: "pre-commit hooks" → [pre, commit, hooks] — each word can
   // hit the name's own segments or the description text.
   const words = q.split(/[^a-z0-9]+/).filter((t) => t.length > 2 && !SKILL_MATCH_STOPWORDS.has(t));
-  let best = null, bestScore = 0;
+  if (!words.length) return null;
+  let best = null, bestScore = 0, bestNameHit = 0;
   for (const s of librarySkillIndex()) {
     const name = String(s.name || '').toLowerCase();
     const desc = String(s.description || '').toLowerCase();
     let score = 0;
+    let nameHit = 0;
     if (q === name) score += 100;
     for (const w of words) {
-      if (nameSegmentHit(name, w)) score += 10;
+      if (nameSegmentHit(name, w)) { score += 10; nameHit += 1; }
       if (desc.includes(w)) score += 2;
     }
     if (s.hasSteps) score += 6; // P10 GAP 2 — prefer executable over prose
-    if (score > bestScore) { best = s; bestScore = score; }
+    // RELEVANCE FLOOR. A description is prose: any single shared word ("test",
+    // "scan", "file") hits hundreds of skills. Scoring one 2-point description
+    // match and letting the +6 executable bonus promote it meant a real
+    // question ("what makes a test suite trustworthy?") was confidently
+    // answered with a wireless-penetration document — that skill's name simply
+    // ENDS in "test". So a match must either hit the name several times, hit
+    // a short name outright, or be the exact name. One stray generic segment in
+    // a long name is not evidence of anything.
+    const segments = name.split(/[^a-z0-9]+/).filter(Boolean).length;
+    const qualifies = q === name || nameHit >= 2 || (nameHit >= 1 && segments <= 3);
+    if (qualifies && score > bestScore) { best = s; bestScore = score; bestNameHit = nameHit; }
   }
   return bestScore > 0 ? best : null;
 }

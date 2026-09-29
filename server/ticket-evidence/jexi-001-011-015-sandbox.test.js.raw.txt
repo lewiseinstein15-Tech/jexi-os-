@@ -1,0 +1,34 @@
+================================================================
+TICKETS : JEXI-001,011,015 sandbox + terminal
+COMMAND : node --test tests/tickets/jexi-001-011-015-sandbox.test.js
+RUN AT  : 2026-09-29T16:38:32Z
+NODE    : v24.8.0
+================================================================
+✔ JEXI-001: backend is selected from what the host actually provides (1.355893ms)
+✔ JEXI-001: an explicit docker request FAILS LOUD when docker is absent (no silent downgrade) (0.529608ms)
+✔ JEXI-001: describe() states guarantees and never overclaims (0.47078ms)
+✔ JEXI-001: a command CAN read and write inside the workspace (111.322677ms)
+✔ JEXI-001: PATH ESCAPE IS REFUSED — the host filesystem is not reachable (150.400221ms)
+✔ JEXI-001: a write attempt outside the workspace does not land on the host (51.061759ms)
+✔ JEXI-001: a chrooted backend cannot even SEE outside the workspace (52.290628ms)
+✔ JEXI-001: the network is cut (namespace backend) (49.874056ms)
+✔ JEXI-001: the host environment is NOT inherited (no API keys in the sandbox) (51.354779ms)
+✔ JEXI-001: the docker backend is built with no network, no host binds, no socket, capped (1.958051ms)
+✔ JEXI-011: the tool description no longer claims unconditional "in the sandbox" (0.274973ms)
+✔ JEXI-015: a simple command runs argv-only, with no shell (50.751621ms)
+✔ JEXI-015: shell form is opt-in via shell:true (10.037156ms)
+✔ JEXI-015: an explicit argv array bypasses parsing entirely (3.25201ms)
+✔ JEXI-001 + JEXI-011: the tool result records the real backend, degraded flag included (45.923528ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 703.761837
+
+----------------------------------------------------------------
+EXIT CODE : 0
+PASSED    : 15
+FAILED    : 0

@@ -1,0 +1,25 @@
+================================================================
+PER-TICKET ACCEPTANCE EVIDENCE
+Generated : 2026-09-29T16:40:14Z
+Node      : v24.8.0
+================================================================
+
+JEXI-001,011,015 sandbox + terminal :: exit=0 pass=15 fail=0 :: PROVEN
+JEXI-002,008,009,013,016 coding loop :: exit=0 pass=24 fail=0 :: PROVEN
+JEXI-003,004,005,012,023 filesystem :: exit=0 pass=19 fail=0 :: PROVEN
+JEXI-005 path confinement :: exit=0 pass=9 fail=0 :: PROVEN
+JEXI-006,014,024 test execution :: exit=0 pass=13 fail=0 :: PROVEN
+JEXI-007,024,025 verification :: exit=0 pass=13 fail=0 :: PROVEN
+JEXI-010,028 permission profiles :: exit=0 pass=9 fail=0 :: PROVEN
+JEXI-016,019 structure :: exit=0 pass=10 fail=0 :: PROVEN
+JEXI-017,018,020,021,026,030 runtime :: exit=0 pass=18 fail=0 :: PROVEN
+JEXI-002,021 tool surface reaches the model :: exit=0 pass=3 fail=0 :: PROVEN
+STREAM live bridge — NDJSON transport :: exit=0 pass=24 fail=0 :: PROVEN
+STREAM lean lane streams deltas :: exit=0 pass=6 fail=0 :: PROVEN
+RELEVANCE skills library match floor :: exit=0 pass=4 fail=0 :: PROVEN
+JEXI-029 end-to-end planted pytest :: exit=0 pass=4 fail=0 :: PROVEN
+
+TOTAL: pass=171 fail=0
+RESULT: ALL TICKET FILES PROVEN (exit 0, zero failures).
+
+Raw per-file output: /home/user/jexi-os-/server/ticket-evidence/*.raw.txt

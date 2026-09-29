@@ -154,31 +154,56 @@ export function kernelIntentGate(raw, { activeMission = false } = {}) {
  * back honestly: on failure the turn returns to the normal lanes, never a
  * fabricated answer. Budget-capped so a stalling provider can't eat minutes.
  */
-export async function runLeanAnswer({ query, sendEvent = () => {}, budgetMs = 30_000 }) {
+export async function runLeanAnswer({ query, sendEvent = () => {}, budgetMs = 30_000, generate = null } = {}) {
   const t0 = Date.now();
-  const { generateContent } = await import('../providers/runtime/LLMClient.js'); // late import: no cycle at load
+  // Late import by default; `generate` is a test seam so the STREAMING wiring
+  // can be asserted without a live provider (this path was previously only
+  // observable with a real model call, so the regression went unnoticed).
+  const gen = generate || (await import('../providers/runtime/LLMClient.js')).generateContent;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), budgetMs);
   try {
-    sendEvent('log', { agent: 'JEXI', message: '⚡ Lean lane — one direct call, no pipeline.' });
+    // Every sendEvent here is guarded: a client that disconnected mid-turn
+    // must not take the answer down with it. The delta forwarder is guarded
+    // for the same reason.
+    try { sendEvent('log', { agent: 'JEXI', message: '⚡ Lean lane — one direct call, no pipeline.' }); }
+    catch { /* stream closed — the answer still matters */ }
     // airtight budget: race the call against the abort. Providers that honor
     // the signal cancel cleanly; providers that don't get abandoned at the
     // budget — the user's turn NEVER waits past it either way.
     const budgetExceeded = new Promise((_, rej) => {
       ctrl.signal.addEventListener('abort', () => rej(new Error(`lean budget of ${budgetMs}ms exceeded — providers too slow just now`)), { once: true });
     });
+    // STREAMING. Without onToken the whole answer is withheld until the
+    // provider returns it in one piece, so the common case (a simple
+    // question takes the lean lane) showed a blank panel for the entire
+    // model call and then snapped to the finished text. Deltas are forwarded
+    // as they arrive; the returned text stays authoritative.
+    let streamed = '';
     const answer = await Promise.race([
-      generateContent(
+      gen(
         `${query}\n\nAnswer directly and concisely (1-4 sentences). If you are not sure, say so plainly — never invent facts.`,
         'You are JEXI OS, an expert AI executive. You answer simple factual questions accurately and briefly, in your own warm voice. No preamble, no filler, no "As an AI" talk. If a question needs live/current data you do not have, say exactly that.',
         null,
-        { temperature: 0.3, signal: ctrl.signal },
+        {
+          temperature: 0.3,
+          signal: ctrl.signal,
+          onToken: (t) => {
+            const d = String(t ?? '');
+            if (!d) return;
+            streamed += d;
+            try { sendEvent('stream', { text: d }); } catch { /* stream closed */ }
+          },
+        },
       ),
       budgetExceeded,
     ]);
-    const text = String(answer || '').trim();
+    // A provider that streams can return an empty string with deltas already
+    // sent; the deltas are then the answer, and discarding them would show
+    // the user nothing at all.
+    const text = String(answer || streamed || '').trim();
     if (text) {
-      return { handled: true, answer: text, stats: { leanPath: true, modelCalls: 1, durationMs: Date.now() - t0 } };
+      return { handled: true, answer: text, streamed: streamed.length > 0, stats: { leanPath: true, modelCalls: 1, durationMs: Date.now() - t0 } };
     }
     return { handled: false, reason: 'empty answer', stats: { leanPath: true, modelCalls: 1, durationMs: Date.now() - t0 } };
   } catch (e) {

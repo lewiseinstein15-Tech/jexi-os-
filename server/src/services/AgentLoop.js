@@ -1,10 +1,10 @@
 /**
- * JEXI OS — Agent Loop (roadmap stage 12: Orchestrator v2 — tool-calling loop).
+ * JEXI OS — Agent Loop (the tool-calling loop).
  *
- * B67 — this loop now uses REAL native function calling. The old version made
+ * This loop uses real native function calling. An earlier version made
  * the model emit ```json {"tool": ...} blocks in prose and JEXI parsed them
  * with extractToolCalls — fragile, provider-dependent, and unlike every modern
- * agent runtime. The B67 loop drives the provider's NATIVE tool_calls API
+ * agent runtime. The loop drives the provider's NATIVE tool_calls API
  * (Groq / OpenRouter / DeepSeek / xAI / Cerebras / DeepInfra / Mistral) and
  * executes the declared calls through the same gated ToolRuntime:
  *
@@ -33,69 +33,30 @@ import { buildNativeSchemas, executeTool, activeToolProfile, TOOL_PROFILES, isTo
 import { selectMcpToolset } from './CapabilityRouter.js';
 import { generateWithToolsLoop, generateContent } from '../providers/runtime/LLMClient.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
-import { buildSkillCatalog } from './SkillDiscovery.js'; // B98 — dsh-style available-skills catalog (metadata only)
-import { listPluginTools } from './PluginContext.js'; // B105 — plugin tools are visible to the model (weather-now etc.)
+import { buildSkillCatalog } from './SkillDiscovery.js'; // available-skills catalog (metadata only)
+import { listPluginTools } from './PluginContext.js'; // plugin tools are visible to the model (weather-now etc.)
 import { preferencesBlock } from './PreferenceLearner.js';
-import { assemblePrompt } from './PromptAssembly.js'; // B119 — dsh systemPrompt.assemble mirror
-import { coworkerName } from '../providers/catalog/ModelCoworkers.js'; // B162 — named model coworkers
-import { lifecycleTurnStart, lifecycleStepStart, lifecycleToolCall, lifecycleToolResult, lifecycleStepEnd, lifecycleTurnEnd } from './SessionLifecycle.js'; // B119 — dsh session-event vocabulary
+import { assemblePrompt } from './PromptAssembly.js'; 
+import { coworkerName } from '../providers/catalog/ModelCoworkers.js'; // named model coworkers
+import { lifecycleTurnStart, lifecycleStepStart, lifecycleToolCall, lifecycleToolResult, lifecycleStepEnd, lifecycleTurnEnd } from './SessionLifecycle.js'; 
 import { providerPreferenceForIntent } from '../providers/catalog/ModelRouting.js';
-import { canChat } from '../providers/index.js'; // P10 GAP 1 — keyless child brain gate
-import { REPORT_GUIDANCE } from './SubagentReport.js'; // B137 — dsh tool-subagent-report guidance for children
+import { canChat } from '../providers/index.js'; // keyless child brain gate
+import { REPORT_GUIDANCE } from './SubagentReport.js'; // report guidance for children
+import { CodingLoop, isCodingIntent, shapeToolResult, TEST_TOOLS, isCodingToolSchema } from './agent/CodingLoop.js';
+import { INTENT_BUDGETS, budgetForIntent, activeCodingSkill } from './agent/IntentRouter.js';
+import { LOOP_BREAKER_LIMIT, loopKeyFor, loopBreakerTrips, loopBreakerMessage, repeatReminderFor } from './agent/LoopBreaker.js';
+import { checkToolAgainstContract } from './agent/ContractGate.js';
+import { buildOfferedTools } from './agent/ToolSetBuilder.js';
+import { verifyAfterEdit } from '../verification/loop/auto-verify.js'; // JEXI-002 — the REAL verification subsystem
 
-// B96 — DeepSeek-Harness-style loop: more steps per turn (the rate limiter
-// protects free tiers), with turn/step events streamed like dsh's event log.
-const MAX_ITERATIONS = 10;
-const MAX_TOOL_CALLS = 20;
-
-/**
- * B106 — repeat-tool-reminder (dsh guard/repeat-tool-reminder mirror):
- * consecutive identical calls are tracked; at thresholds 3/5/8 the loop
- * injects an advisory reminder instead of silently repeating.
- */
-export function repeatReminderFor(key, count) {
-  if (count === 3) return `[Reminder: you have called the same tool with the same arguments ${count} times in a row. The result has not changed — stop repeating. Change your approach: different arguments, another tool, or answer from what you already have.]`;
-  if (count === 5) return `[Reminder: this is the ${count}th identical call. Repeating it again will not produce a different result. Try a different tool or answer directly.]`;
-  if (count === 8) return `[Reminder: ${count} identical calls in a row — the loop will cap tool calls soon. Do NOT call \"${String(key).split('|')[0]}\" again; synthesize an answer from the evidence you have.]`;
-  return null;
-}
-
-/**
- * FINAL F4 — doom-loop hard breaker (OpenCode rule: the same tool with the
- * same arguments must never execute forever). The advisory reminders above
- * stay, but at LOOP_BREAKER_LIMIT identical consecutive calls the loop
- * STOPS EXECUTING that call and feeds back a breaker message instead: no
- * side effects, no budget burn, and the turn iteration cap still bounds
- * a model that refuses to change approach.
- */
-export const LOOP_BREAKER_LIMIT = 5;
-
-export function loopBreakerMessage(tool, count) {
-  return `[LOOP BREAKER: \"${tool}\" with identical arguments was blocked after ${count} consecutive identical calls. It did NOT execute. Do NOT call it again with these arguments — use different arguments, another tool, or answer from the evidence you already have.]`;
-}
-
-export function loopBreakerTrips(repeatCount) {
-  return Number(repeatCount) >= LOOP_BREAKER_LIMIT;
-}
-
-// P10 GAP 4 — mounted P30.C enforcement seam (dynamic import: the wiring
-// module composes the Phase 30 primitive; no static cycle). Used by the
-// child contract gate below — EVERY tool call a contract-bound child makes
-// is checked against {allowedTools, maxTurns, permissionMode} BEFORE
-// execution; refusals are fail-closed (E_TOOL_NOT_ALLOWED / E_MAX_TURNS /
-// E_INVALID_SPEC) and the tool never runs.
-let __contractEnf = null;
-async function getContractEnforcement() {
-  if (__contractEnf) return __contractEnf;
-  try {
-    const m = await import('../wiring/phase31-subagent.js');
-    __contractEnf = { enf: m.subagentEnforcement() || m.initSubagentEnforcement(), normalize: m.normalizeContract || ((s) => s) };
-  } catch {
-    __contractEnf = { enf: null, normalize: (s) => s };
-  }
-  return __contractEnf;
-}
-
+// DeepSeek-Harness-style loop: more steps per turn (the rate limiter
+// protects free tiers), with turn/step events streamed like a session event log.
+//
+// JEXI-027 — budgets are now INTENT-BASED instead of two flat constants.
+// "Fix the failing test" genuinely needs more room than a one-line answer,
+// and a DIRECT answer does not need 20 tool calls. One flat pair of constants
+// applied to every turn is what let aimless loops run to the cap while short
+// questions burned the same allowance.
 /** planner.analyzeIntent returns a plan (intent/teamSlugs/steps/tools/toolsLine). */
 async function safePlan(query, image) {
   try {
@@ -105,11 +66,18 @@ async function safePlan(query, image) {
   }
 }
 
+/* Re-exported: these live in their own modules now, but they have always been
+   part of this file's public surface and callers import them from here. */
+export { INTENT_BUDGETS, budgetForIntent, activeCodingSkill, isCodingIntent } from './agent/IntentRouter.js';
+export { LOOP_BREAKER_LIMIT, loopKeyFor, loopBreakerTrips, loopBreakerMessage, repeatReminderFor, normalizeCallArgs } from './agent/LoopBreaker.js';
+
 /**
  * Run the native tool-calling loop. Streams events via sendEvent (see the
  * stream contract at the top). Keeps its call signature — SubagentRuntime
  * and /api/agent call it with { query, image, sendEvent, opts }.
  */
+const schemaNameOf = (sc) => String(sc?.name || sc?.function?.name || '').toLowerCase();
+
 export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   const start = Date.now();
   if (typeof sendEvent !== 'function') sendEvent = () => {};
@@ -181,8 +149,11 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   // needed) so isolation/loop behaviour is provable without network calls.
   if (opts.__mockAnswer !== undefined) {
     const mock = String(opts.__mockAnswer);
-    emit('agent.done', { answer: mock, stats: { iterations: 1, toolCalls: 0, tools: 0, durationMs: Date.now() - start } });
-    return { answer: mock, stats: { toolCalls: 0, tools: 0, durationMs: Date.now() - start } };
+    // No tools ran, so the verification gate is not applicable — but the
+    // verdict still ships, so callers can rely on one shape.
+    const verification = { status: 'not_applicable', canClaimSuccess: true, reason: 'no mutating tool call in this turn', rounds: 0, layers: [] };
+    emit('agent.done', { answer: mock, verification, stats: { iterations: 1, toolCalls: 0, tools: 0, durationMs: Date.now() - start } });
+    return { answer: mock, verification, stats: { toolCalls: 0, tools: 0, durationMs: Date.now() - start } };
   }
   const checkCancelled = () => {
     if (opts.signal && opts.signal.aborted) {
@@ -194,48 +165,28 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
 
   const plan = await safePlan(query, image);
   const team = plan.teamSlugs || [];
-  // Only tools with a real executable engine (TOOL_SCHEMAS entry) are offered —
-  // buildNativeSchemas drops registry-only tools instead of giving the model
-  // routing dead-ends.
-  const toolDefs = (plan.tools || []).map((slug) => getTool(slug)).filter(Boolean).slice(0, 12);
-  // B105 — PLUGIN TOOLS ARE FIRST-CLASS: every mounted plugin tool joins the
-  // offered set (they have no registry entry, so the planner never sees them).
-  const pluginTools = (() => { try { return listPluginTools(); } catch { return []; } })()
-    .filter((p) => p && p.slug && !toolDefs.some((t) => t.slug === p.slug));
-  if (pluginTools.length) toolDefs.push(...pluginTools.slice(0, 8));
-  // B110/B115 — the model can always ask the user, present a plan, run a
-  // workflow, or control background subagents.
-  for (const slug of ['ask_user_question', 'exit_plan_mode', 'workflow', 'send_message', 'interrupt_agent', 'get_goal', 'create_goal', 'update_goal']) {
-    if (!toolDefs.some((t) => t.slug === slug)) {
-      const def = getTool(slug);
-      if (def) toolDefs.push(def);
-    }
-  }
-  let schemas = buildNativeSchemas(toolDefs);
-  // CAPABILITY ROUTER (Ultimate Upgrade §7/§11): the MINIMUM useful MCP tools
-  // join the offered set — routed by intent + query keywords (e.g. a weather
-  // question gets the weather server, a paper search gets arxiv), never all
-  // 515. Dispatch goes through executeTool's mcp__ gateway seam.
-  try {
-    const sel = selectMcpToolset(query, plan);
-    if (sel.schemas.length) {
-      schemas = [...schemas, ...sel.schemas];
-      emit('agent.log', { message: `🔌 Capability routing: ${sel.reason} → offering ${sel.schemas.length} MCP tools (${sel.servers.join(', ')}).` });
-    }
-  } catch { /* MCP routing is additive — never break the loop */ }
+  // JEXI-027 — intent-based budgets, resolved once per turn.
+  const budget = budgetForIntent(plan.intent, query);
+  const MAX_ITERATIONS = budget.iterations;
+  const MAX_TOOL_CALLS = budget.toolCalls;
+  // Which tools this turn may offer is decided in one place, in a documented
+  // order (plan → control plane → engine filter → MCP routing → skill → cap →
+  // code mode). It used to be four filters interleaved in this function, which
+  // is how a coding turn could end up offering the whole catalogue.
+  const offered = await buildOfferedTools({ plan, query, emit });
+  let schemas = offered.schemas;
+  const toolDefs = offered.toolDefs;
   const profile = opts.profile || activeToolProfile();
-  const prefer = providerPreferenceForIntent(plan.intent); // stage 24: per-domain model routing
-  // B99 — CODE MODE (PTC): when enabled, the model may write ONE TypeScript
-  // program via run_code that composes these same tools (dsh `code` preset).
-  // The SDK section is generated from the SAME pruned set (never the whole
-  // catalog) and run_code's sub-dispatch is capped to that set.
+  // Per-domain model routing: a planning turn and a writing turn want
+  // different models, and the turn below hands this to the provider.
+  const prefer = providerPreferenceForIntent(plan.intent);
   const codeMode = !!opts.codeMode && schemas.length > 0;
   let codeTools = toolDefs;
   if (codeMode) {
     const { renderToolsSdk, buildRunCodeSchema } = await import('./CodeModeRuntime.js');
     schemas = [...schemas, buildRunCodeSchema()];
     codeTools = [...toolDefs];
-    try { emit('agent.log', { message: `🧮 Code Mode (PTC) active — the model may compose these ${codeTools.length} tools into one TypeScript program via run_code.` }); } catch { /* noop */ }
+    try { emit('agent.log', { message: `🧮 Code Mode active — the model may compose these ${codeTools.length} tools into one TypeScript program via run_code.` }); } catch { /* noop */ }
   }
 
   emit('agent.plan', {
@@ -248,57 +199,74 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   emit('agent.log', { message: `🧠 Plan: ${plan.planSummary || plan.intent}. Native tool-calling loop with ${schemas.length} executable tools (profile: ${profile}).` });
 
   const toolContext = [];   // {tool, args, result} evidence (for the synthesis fallback)
+
+  /* JEXI-002 / JEXI-008 — the closed coding loop.
+     This is the wiring that did not exist: verifyAfterEdit was implemented and
+     correct, and nothing in this file ever called it. A mutating tool call now
+     triggers a real verification layer, a failure injects structured evidence
+     into the next model turn, and the success gate decides whether this turn
+     is allowed to claim the work is done. */
+  const codingIntent = isCodingIntent(plan, query);
+  const coding = new CodingLoop({
+    maxVerifyRounds: budget.verifyRounds,
+    send: emit,
+    runVerify: async ({ reason }) => {
+      if (opts.__verify) return opts.__verify({ reason });          // test seam
+      return verifyAfterEdit(
+        {
+          nodeId: opts.missionId || 'chat-turn',
+          snapshotId: `turn-${start}`,
+          snapshot: opts.__snapshot || null,
+          acceptanceCriteria: query,
+          claimantAcbId: opts.missionId || 'chat',
+          options: { cwd: opts.root || process.env.WORKSPACE_DIR || process.cwd() },
+        },
+        {},
+        { real: codingIntent ? ['lint', 'unit'] : ['lint'] },
+      );
+    },
+  });
+  if (codingIntent) emit('agent.log', { message: `🔎 coding intent "${plan.intent}" — closed loop armed: edit → verify → replan (up to ${budget.verifyRounds} rounds, ${budget.toolCalls} tool calls).` });
+
   let callsMade = 0;
   let finalText = '';
-  // B106 — repeat-tool-reminder state (consecutive identical calls).
+  // repeat-tool-reminder state (consecutive identical calls).
   let lastCallKey = null;
   let repeatCount = 0;
-  // P10 GAP 4 — child contract state (validated once; refusals recorded).
+  // child contract state (validated once; refusals recorded).
   const contract = opts.subagentContract || null;
   let contractVerdict = null;
   const contractViolations = [];
 
   if (checkCancelled()) return { answer: '', cancelled: true, stats: { cancelled: true, toolCalls: 0, tools: schemas.length, durationMs: Date.now() - start } };
 
-  // B119 — dsh lifecycle: the whole turn is replayable from the session log.
+  // the whole turn is replayable from the session log.
   const convId = opts.spillOwner || null;
-  let announcedWriter = false; // B162 — one '✍️ writing…' step per answer
+  let announcedWriter = false; // one '✍️ writing…' step per answer
   try { lifecycleTurnStart(convId, 1); } catch { /* noop */ }
 
   /**
-   * P10 GAP 4 — the ONE tool-call execution path for this loop. The model's
+   * the ONE tool-call execution path for this loop. The model's
    * native tool calls AND the deterministic scripted seam both flow through
    * here, so a contract-bound child is enforced identically either way.
-   * Gate order (fail-closed): P30.C contract → budget → loop breaker → real
+   * Gate order (fail-closed): contract → budget → loop breaker → real
    * gated execution.
    */
   const runToolCalls = async (calls) => {
     const results = [];
-    const enforcement = contract ? await getContractEnforcement() : null;
     for (const call of calls) {
-      // ═══ P30.C CONTRACT GATE — before EVERY tool call a child makes ═══
+      // ── contract gate: checked before EVERY tool call a child makes ──
       if (contract) {
         const turn = callsMade + 1; // each tool-call step is one enforced turn
-        try {
-          if (!enforcement || !enforcement.enf) throw Object.assign(new Error('P30.C enforcement seam unavailable — fail-closed'), { code: 'E_INVALID_SPEC' });
-          const normalized = enforcement.normalize(contract);
-          if (!contractVerdict) {
-            const v = enforcement.enf.validate ? enforcement.enf.validate(normalized) : { valid: true };
-            contractVerdict = (v && v.valid === false) ? { ok: false, errors: v.errors } : { ok: true };
-          }
-          if (!contractVerdict.ok) {
-            const detail = contractVerdict.errors.map((er) => er.message || er.code || 'invalid').join('; ').slice(0, 160);
-            throw Object.assign(new Error(`E_INVALID_SPEC: child contract is invalid — ${detail}`), { code: 'E_INVALID_SPEC' });
-          }
-          enforcement.enf.dispatch(normalized, { tool: call.name, turn });
-        } catch (e) {
-          const code = (e && e.code) || 'E_ENFORCE';
-          const reason = String((e && e.message) || e).slice(0, 200);
-          contractViolations.push({ tool: call.name, code, turn, reason });
+        const verdict = await checkToolAgainstContract({ contract, tool: call.name, turn, verdict: contractVerdict });
+        if (!verdict.ok) {
+          const reason = verdict.reason;
+          contractVerdict = { ok: false };
+          contractViolations.push({ tool: call.name, code: verdict.code, turn, reason });
           try { emit('tool/call', { callId: call.id, name: call.name, arguments: JSON.stringify(call.arguments || {}).slice(0, 300), contractRefused: true }); } catch (e2) {}
-          emit('agent.log', { message: `⛔ P30.C contract refusal (${code}) — "${call.name}" did NOT execute: ${reason.slice(0, 150)}` });
-          toolContext.push({ tool: call.name, args: call.arguments || {}, ok: false, done: false, blocked: true, contractRefused: true, error: code });
-          results.push({ tool_call_id: call.id, content: `ERROR: ${code}: ${reason}` });
+          emit('agent.log', { message: `⛔ contract refusal (${verdict.code}) — "${call.name}" did NOT execute: ${reason.slice(0, 150)}` });
+          toolContext.push({ tool: call.name, args: call.arguments || {}, ok: false, done: false, blocked: true, contractRefused: true, error: verdict.code });
+          results.push({ tool_call_id: call.id, content: `ERROR: ${verdict.code}: ${reason}` });
           continue;
         }
       }
@@ -306,9 +274,9 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         results.push({ tool_call_id: call.id, content: 'ERROR: tool-call budget exhausted for this task.' });
         continue;
       }
-      // FINAL F4 — the breaker is checked BEFORE execution (and before the
+      // the breaker is checked BEFORE execution (and before the
       // budget counter moves): a tripped call never runs and burns nothing.
-      const preKey = `${call.name}|${JSON.stringify(call.arguments || {})}`;
+      const preKey = loopKeyFor(call.name, call.arguments);
       const preCount = preKey === lastCallKey ? repeatCount + 1 : 1;
       if (loopBreakerTrips(preCount)) {
         lastCallKey = preKey; repeatCount = preCount;
@@ -320,10 +288,10 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         continue;
       }
       callsMade++;
-      // B96 — dsh-style step events: tool/call + tool/result on the wire.
+      // step events: tool/call + tool/result on the wire.
       try { emit('step/start', { turn: 1, step: callsMade }); } catch (e) {}
       try { emit('tool/call', { callId: call.id, name: call.name, arguments: JSON.stringify(call.arguments || {}).slice(0, 500) }); } catch (e) {}
-      // B119 — durable lifecycle events (dsh session-event vocabulary).
+      // durable lifecycle events (session-event vocabulary).
       try { lifecycleStepStart(convId, 1, callsMade); lifecycleToolCall(convId, 1, callsMade, call.id, call.name, call.arguments || {}); } catch { /* noop */ }
       const r = await executeTool({ slug: call.name, args: call.arguments || {}, profile, sendEvent: emit, confirm: opts.confirm, codeTools: codeMode ? codeTools : undefined, spillOwner: opts.spillOwner, ...(opts.subagentId ? { subagentId: opts.subagentId } : {}) });
       try { emit('tool/result', { callId: call.id, name: call.name, ok: !!r.ok, error: r.error || null }); } catch (e) {}
@@ -332,17 +300,47 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
       try { lifecycleStepEnd(convId, 1, callsMade); } catch { /* noop */ }
       const done = isToolDone(r);
       toolContext.push({ tool: call.name, args: call.arguments || {}, ok: r.ok, done, error: r.error, result: r.result, paused: r.paused === true || r.approvalRequired === true, blocked: r.blocked === true });
-      // B106 — repeat-tool-reminder: identical consecutive calls get an
+
+      /* JEXI-002 — a mutating call now triggers a real verification layer.
+         This is the call the old loop never made: the edit lands, the verifier
+         runs, and the result decides whether this turn may continue as if it
+         were working. A test tool that passed counts as verification too —
+         running the tests IS the verification for a test fix. */
+      coding.noteToolCall(call.name, r.ok);
+      // JEXI-002 — a test tool's VERDICT is evidence even when no edit
+      // followed it. Record it before the pass/fail branch so a red suite
+      // still reaches the success gate.
+      if (r.ok && r.result && typeof r.result === 'object' && TEST_TOOLS.has(call.name)) {
+        coding.noteTestResult(call.name, r.result);
+      }
+      if (r.ok && !r.paused && !r.approvalRequired) {
+        const isMutating = coding.editSeen && !TEST_TOOLS.has(call.name);
+        const isPassingTest = TEST_TOOLS.has(call.name) && r.ok && r.result && r.result.status === 'pass';
+        if (isMutating || isPassingTest) {
+          if (isPassingTest) { coding.verified = true; coding.pendingFailure = null; }
+          else await coding.verify(`${call.name} on ${JSON.stringify(call.arguments || {}).slice(0, 120)}`);
+        }
+      }
+      // repeat-tool-reminder: identical consecutive calls get an
       // advisory note in the result fed back to the model.
-      const callKey = `${call.name}|${JSON.stringify(call.arguments || {})}`;
+      const callKey = loopKeyFor(call.name, call.arguments);
       if (callKey === lastCallKey) repeatCount += 1;
       else { lastCallKey = callKey; repeatCount = 1; }
-      // FINAL F4 — TDZ fix: content is declared BEFORE the reminder
+      // TDZ fix: content is declared BEFORE the reminder
       // appends to it (previously the 3rd identical call crashed the
       // whole turn with "Cannot access 'content' before initialization").
-      let content = r.ok && r.result ? String(r.result).slice(0, 6000) : `ERROR: ${r.error || 'tool returned no output'}`;
+      // JEXI-014 — the old flat .slice(0, 6000) cut the pytest traceback
+      // (always at the END of the output) exactly when it mattered.
+      let content = r.ok && r.result
+        ? shapeToolResult(String(r.result), { maxChars: 6000, isTestResult: TEST_TOOLS.has(call.name) })
+        : `ERROR: ${r.error || 'tool returned no output'}`;
       const reminder = repeatReminderFor(callKey, repeatCount);
       if (reminder) content = `${content}\n\n${reminder}`;
+      // JEXI-013 — the structured failure is appended here, where the model
+      // will actually read it. Previously verifyAfterEdit's injectedFailure was
+      // computed and then thrown away by this file.
+      const failMsg = coding.pendingFailure ? coding.failureMessage() : null;
+      if (failMsg) content = `${content}\n\n${failMsg}`;
       if (r.paused || r.approvalRequired) {
         emit('agent.log', { message: `⏸ ${call.name} is an external action and needs your approval (real finalized details shown) — waiting for your yes/no before it can run.` });
       }
@@ -358,7 +356,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   };
 
   try {
-    // P10 GAP 4 — DETERMINISTIC SCRIPTED SEAM (test seam, mirrors __mockAnswer):
+    // DETERMINISTIC SCRIPTED SEAM (test seam, mirrors __mockAnswer):
     // scripted tool calls run through the SAME runToolCalls path (contract
     // gate included) and the SAME real gated executeTool — no model key
     // needed, so contract enforcement is provable keylessly.
@@ -369,7 +367,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         ? toolContext.map((c) => `## Tool: ${c.tool}\n${c.error ? `${c.contractRefused ? 'REFUSED' : 'ERROR'}: ${c.error}` : String(c.result).slice(0, 2000)}`).join('\n\n')
         : '';
     }
-    // P10 GAP 1 — KEYLESS CHILD BRAIN: a sub-agent child with no model key
+    // KEYLESS CHILD BRAIN: a sub-agent child with no model key
     // still does REAL work. When the caller declared this child's capability
     // route (opts.subagentCapability, set by the sub-agent coordinator), the
     // child executes its own capability runner — live web search, real memory
@@ -395,7 +393,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         emit('agent.log', { message: `⚠ keyless child brain failed: ${String((e && e.message) || e).slice(0, 110)}.` });
       }
     }
-    // B227 — VISION: a turn with an image goes to a DIRECT vision call. The
+    // VISION: a turn with an image goes to a DIRECT vision call. The
     // native-tools loop cannot carry images, and the old text-only note
     // ("an image was provided — analyze it.") never showed the model the
     // actual picture, so it guessed. The photo is attached for real now.
@@ -409,7 +407,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
           codeTools,
           presetFlavor: opts.presetFlavor || '',
           base: opts.systemPromptOverride || null,
-          userText: query, // B160 — @file mentions → file references
+          userText: query, // @file mentions → file references
         }) + (opts.subagentId ? `\n\n[You are a subagent. ${REPORT_GUIDANCE}]` : ''),
         image,
         {
@@ -431,7 +429,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         }
       );
     } else if (!finalText) {
-    // P10 GAP 1 — the model loop runs only when the keyless child brain or
+    // the model loop runs only when the keyless child brain or
     // the scripted seam did not already produce this child's real answer
     // (keyed children always reach the model loop).
     const res = await generateWithToolsLoop(
@@ -442,7 +440,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         codeTools,
         presetFlavor: opts.presetFlavor || '',
         base: opts.systemPromptOverride || null,
-        userText: query, // B160 — @file mentions → file references
+        userText: query, // @file mentions → file references
       }) + (opts.subagentId ? `\n\n[You are a subagent. ${REPORT_GUIDANCE}]` : ''),
       schemas,
       {
@@ -450,9 +448,9 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         prefer,
         signal: opts.signal,
         maxIterations: MAX_ITERATIONS,
-        // B150 — live answer typing (dsh llm/stream). B162 — deltas name the
+        // live answer typing . deltas name the
         // coworker writing them; a visible "✍️ <name> is writing…" step runs once.
-        // B173 — reasoning streams into its own channel (dsh ReasoningRow)
+        // reasoning streams into its own channel (the reasoning row)
         onThink: (t, meta) => {
           const by = meta ? coworkerName(meta.provider, meta.model) : undefined;
           emit('think', { text: t, ...(by ? { by } : {}) });
@@ -467,7 +465,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         },
         // Execute the model's native tool calls through the gated runtime —
         // the same permission/risk/approval path as every other tool call.
-        // P10 GAP 4 — runToolCalls now ALSO carries the child contract gate.
+        // runToolCalls now ALSO carries the child contract gate.
         executeToolCalls: runToolCalls,
       }
     );
@@ -496,20 +494,38 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
 
   finalText = String(finalText || 'I gathered tool results but could not produce a final answer.').trim();
 
+  /* JEXI-009 — final success used to be whatever the model wrote. `agent.done`
+     carried no gate at all: a turn that edited a file and never ran a single
+     test could end with "the suite is green" and nothing would contradict it.
+     Now the gate is the verification state, and when it is not verified the
+     answer says so in the answer text itself, not only in a stat. */
+  const gate = coding.successGate();
+  if (!gate.canClaimSuccess) {
+    finalText = `${finalText}\n\n${gate.annotation}\n\nVerification state: ${gate.status} — ${gate.reason}.`;
+  }
+
   emit('agent.done', {
     answer: finalText,
+    verification: {
+      status: gate.status,
+      canClaimSuccess: gate.canClaimSuccess,
+      reason: gate.reason,
+      rounds: coding.rounds.length,
+      layers: coding.rounds.map((r) => ({ layer: r.layer, status: r.status })),
+    },
     stats: {
+      ...(gate.status !== 'not_applicable' ? { verification: gate.status } : {}),
       iterations: Math.min(MAX_ITERATIONS, callsMade ? MAX_ITERATIONS : 1),
       toolCalls: callsMade,
       tools: schemas.length,
       durationMs: Date.now() - start,
       profile,
-      // P10 GAP 4 — the per-tool-call enforcement record for contract-bound
+      // the per-tool-call enforcement record for contract-bound
       // children: every refusal (code, tool, turn) is visible to the caller.
       ...(contract ? { contract: { id: contract.id, allowedTools: contract.allowedTools, maxTurns: contract.maxTurns, permissionMode: contract.permissionMode }, contractViolations } : {}),
     },
   });
 
   try { lifecycleTurnEnd(convId, 1, finalText ? 'completed' : 'error'); } catch { /* noop */ }
-  return { answer: finalText, stats: { toolCalls: callsMade, tools: schemas.length, durationMs: Date.now() - start, ...(contract ? { contract: { id: contract.id, allowedTools: contract.allowedTools, maxTurns: contract.maxTurns, permissionMode: contract.permissionMode }, contractViolations } : {}) } };
+  return { answer: finalText, verification: { status: gate.status, canClaimSuccess: gate.canClaimSuccess, reason: gate.reason }, stats: { toolCalls: callsMade, tools: schemas.length, durationMs: Date.now() - start, ...(gate.status !== 'not_applicable' ? { verification: gate.status } : {}), ...(contract ? { contract: { id: contract.id, allowedTools: contract.allowedTools, maxTurns: contract.maxTurns, permissionMode: contract.permissionMode }, contractViolations } : {}) } };
 }

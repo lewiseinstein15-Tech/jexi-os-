@@ -1,0 +1,28 @@
+================================================================
+TICKETS : JEXI-005 path confinement
+COMMAND : node --test tests/tickets/jexi-005-path-confinement.test.js
+RUN AT  : 2026-09-29T16:38:35Z
+NODE    : v24.8.0
+================================================================
+✔ JEXI-005 evidence: the old startsWith check accepted a sibling tree (2.020428ms)
+✔ JEXI-022: root /tmp/a vs /tmp/ab is denied (0.431287ms)
+✔ JEXI-022: ../ escape is denied (0.394035ms)
+✔ JEXI-022: legitimate paths under root are allowed (0.792505ms)
+✔ JEXI-022: symlink escape is denied (0.445636ms)
+✔ JEXI-022: a symlink that stays inside root is still allowed (0.429414ms)
+✔ a path that does not exist yet is still validatable (edit needs this) (0.449093ms)
+✔ NUL byte in a path is refused as a truncation attempt (0.197296ms)
+✔ mustExist is enforced when asked (0.569875ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 81.01054
+
+----------------------------------------------------------------
+EXIT CODE : 0
+PASSED    : 9
+FAILED    : 0

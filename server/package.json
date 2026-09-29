@@ -11,8 +11,10 @@
   "//": "PHASE 31 SCOPE 7 (S5-CHAIN) RETIRED FROM THE TEST CHAIN: 'node test-commands.js' and 'node test-b227.js'. The file references are NOT deleted - both files remain on disk and tracked; both entries were failing the chunked regression run (exit 1 each) and are pruned from scripts.test only. Do not re-add without fixing them first.",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@libsql/client": "^0.18.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@mozilla/readability": "^0.6.0",
+    "@upstash/redis": "^1.34.0",
     "axios": "^1.19.0",
     "cheerio": "^1.0.0-rc.12",
     "cors": "^2.8.5",
@@ -29,9 +31,7 @@
     "unpdf": "^1.8.0",
     "web-push": "^3.6.7",
     "youtube-transcript": "^1.3.1",
-    "zod": "^4.4.3",
-    "@upstash/redis": "^1.34.0",
-    "@libsql/client": "^0.18.0"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

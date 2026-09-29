@@ -83,6 +83,46 @@ export function listAgentDefinitions() {
     .sort();
 }
 
+/**
+ * The published agent counts, derived from the code rather than typed in.
+ *
+ * The boot log used to print a number that conflated three different
+ * populations — role specifications, live agents, and persona overlays — so
+ * "213 agents" meant nothing you could check. Each population is counted
+ * separately here, and each count is a length of a real list, so a number in
+ * the log can always be traced to the code that produced it.
+ */
+export async function agentCounts() {
+  const definitions = listAgentDefinitions();
+  const executable = definitions.filter((slug) => {
+    const d = loadAgentDefinition(slug);
+    return !!d && typeof d.systemPrompt === 'string' && d.systemPrompt.length > 0;
+  });
+  let plannerRoles = 0;
+  try {
+    // The profile layer is optional: a JEXI install without it still reports
+    // an honest executable-agent count, just with no planner specs to add.
+    const mod = await import('./ProfileCompleteness.js');
+    plannerRoles = mod.profileCoverage().named.length + mod.generateAllProfiles().length;
+  } catch { plannerRoles = 0; }
+  return {
+    agentDefinitions: definitions.length,
+    executableAgents: executable.length,
+    plannerSpecs: plannerRoles,
+    slugs: executable,
+  };
+}
+
+/**
+ * A single line stating the counts, with each population named. This is what
+ * the boot log prints, so what is published and what is derived cannot differ.
+ */
+export async function publishedAgentLine() {
+  const c = await agentCounts();
+  return `[Agents] ${c.executableAgents} executable agent(s) of ${c.agentDefinitions} definition(s)`
+    + ` (${c.plannerSpecs} planner role spec(s) — role specs, not live agents; persona overlays counted separately)`;
+}
+
 /** Load an agent definition by slug → { slug, meta, systemPrompt }. Null if absent. */
 export function loadAgentDefinition(slug) {
   const safe = String(slug || '').replace(/[^a-zA-Z0-9_-]/g, '');

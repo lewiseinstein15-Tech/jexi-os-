@@ -1,0 +1,38 @@
+================================================================
+TICKETS : JEXI-003,004,005,012,023 filesystem
+COMMAND : node --test tests/tickets/jexi-003-004-005-012-023-fs.test.js
+RUN AT  : 2026-09-29T16:38:35Z
+NODE    : v24.8.0
+================================================================
+✔ JEXI-003: fs_edit changes one line and leaves the rest byte-identical (1.469958ms)
+✔ JEXI-003: a missing needle errors and writes NOTHING (0.947262ms)
+✔ JEXI-003: an ambiguous needle is refused, not guessed (0.565502ms)
+✔ JEXI-003: count=1 disambiguates and replaces exactly one (1.484076ms)
+✔ JEXI-003: count above the real occurrences is refused, file untouched (0.392471ms)
+✔ JEXI-003: an empty needle is rejected (would match everywhere) (0.258672ms)
+✔ JEXI-003: editing a missing file reports ENOENT, not a silent create (0.281482ms)
+✔ JEXI-003: fs_edit is registered as a real tool with a schema (0.7353ms)
+✔ JEXI-004: fs_glob is a real engine, not a stub that throws (1.11952ms)
+✔ JEXI-004: fs_grep returns file, line and text (0.990114ms)
+✔ JEXI-004: grep honours maxMatches and rejects a bad regex (0.528475ms)
+✔ JEXI-004: node_modules and .git are not walked by default (0.742813ms)
+✔ JEXI-005: every fs engine refuses a sibling-directory escape (1.73048ms)
+✔ JEXI-005: symlink escape is refused through the real engines (1.035121ms)
+✔ JEXI-012: no tool that writes host state claims ring 0 ("no host state") (0.231024ms)
+✔ JEXI-012: every declared fs tool actually has an engine (no dead tools) (0.104139ms)
+✔ JEXI-023: fs_append creates then appends (0.392027ms)
+✔ JEXI-023: fs_delete removes a file, and refuses a non-empty dir without recursive (0.584788ms)
+✔ JEXI-023: fs_delete refuses the workspace root and honours confirm() (0.470488ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 95.569339
+
+----------------------------------------------------------------
+EXIT CODE : 0
+PASSED    : 19
+FAILED    : 0
