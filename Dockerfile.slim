@@ -5,7 +5,11 @@
 # Browser-control is off (JEXI_NO_BROWSER=1 default) — search, research,
 # math, coding, /watch (ffmpeg+yt-dlp included) and vision all work.
 
-FROM node:24-slim
+# via `mirror.gcr.io` (Google's Docker Hub mirror): anonymous pulls from
+# registry-1.docker.io are rate-limited (HTTP 429) on shared CI egress
+# IPs, which broke every push build. The mirror serves the same official
+# image with no auth and no per-IP quota.
+FROM mirror.gcr.io/library/node:24-slim
 
 # ffmpeg (video frames/audio) + python3/pip (yt-dlp) for /watch
 # qrencode + pandoc: binaries the qrcode/pandoc MCP servers shell out to.

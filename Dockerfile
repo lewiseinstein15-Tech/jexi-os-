@@ -6,7 +6,11 @@
 # Hugging Face Spaces (free, no credit card): create a Space with SDK "Docker"
 # and push this repo — HF runs this Dockerfile as root, so everything installs.
 
-FROM node:24-slim
+# via `mirror.gcr.io` (Google's Docker Hub mirror): anonymous pulls from
+# registry-1.docker.io are rate-limited (HTTP 429) on shared CI egress
+# IPs, which broke every push build. The mirror serves the same official
+# image with no auth and no per-IP quota.
+FROM mirror.gcr.io/library/node:24-slim
 
 # Chromium system dependencies (Playwright — JEXI's eyes)
 # ── Optional heavy tooling — OFF by default (see server/Dockerfile) ─────────

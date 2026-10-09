@@ -4,7 +4,11 @@
 # the boot-chain trees at /app/<tree>. server/src/... resolves them via `../..`
 # (up to /app); with the old context=server/ layout the server tree sat at /app
 # and every such import escaped to /<tree>, crashing ESM link at boot.
-FROM node:22-bookworm-slim
+# via `mirror.gcr.io` (Google's Docker Hub mirror): anonymous pulls from
+# registry-1.docker.io are rate-limited (HTTP 429) on shared CI egress
+# IPs, which broke every push build. The mirror serves the same official
+# image with no auth and no per-IP quota.
+FROM mirror.gcr.io/library/node:22-bookworm-slim
 
 # ── Optional heavy tooling — OFF by default ────────────────────────────────
 # Boot needs none of it: JEXI_NO_BROWSER=1 short-circuits the browser paths
