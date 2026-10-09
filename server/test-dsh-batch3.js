@@ -54,8 +54,13 @@ const t3 = terminalOpen({ type: 'bogus' });
 ok(t3.ok === false && /shell/.test(t3.error), 'unsupported backend fails honestly');
 const snd = terminalSend(t.sessionId, 'echo hello-from-term');
 ok(snd.ok === true, 'terminal_send writes stdin');
-await new Promise((r) => setTimeout(r, 400));
-const rd = terminalRead(t.sessionId);
+// Poll until the echo lands — a fixed sleep is flaky on hosts whose
+// shell startup is slower than the wait (observed: ~1.2s vs 400ms).
+let rd = terminalRead(t.sessionId);
+for (let waited = 0; waited < 5000 && !(rd.ok === true && /hello-from-term/.test(rd.output)); waited += 100) {
+  await new Promise((r) => setTimeout(r, 100));
+  rd = terminalRead(t.sessionId);
+}
 ok(rd.ok === true && /hello-from-term/.test(rd.output), 'terminal_read drains real output');
 const sig = terminalSignal(t.sessionId, 'SIGINT');
 ok(sig.ok === true && sig.accepted === true, 'terminal_signal accepted');

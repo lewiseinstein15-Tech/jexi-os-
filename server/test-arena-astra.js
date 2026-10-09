@@ -4,6 +4,19 @@
  */
 import assert from 'node:assert';
 
+// Hermetic: the header promises "no model calls", but the
+// ReasoningEngine ladder walk dials every CONFIGURED provider
+// and pays each leg's full timeout when the host ships dead
+// keys — slow enough to hang the suite. Scrub the provider
+// environment so the walk fails fast and deterministically.
+const SCRUB_KEYS = [
+  'GROQ_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'HF_TOKEN',
+  'MISTRAL_API_KEY', 'NVIDIA_API_KEY', 'CLOUDFLARE_API_KEY',
+  'POLLINATIONS_API_KEY', 'CEREBRAS_API_KEY', 'DEEPINFRA_API_KEY',
+  'VLLM_API_KEY', 'VLLM_BASE_URL', 'JEXI_MODEL_PROVIDER', 'JEXI_MODEL_API_KEY', 'JEXI_MODEL_NAME', 'JEXI_MODEL_BASE_URL',
+];
+for (const k of SCRUB_KEYS) delete process.env[k];
+
 let passed = 0;
 const ok = (name) => { passed += 1; console.log(`  ✓ ${name}`); };
 

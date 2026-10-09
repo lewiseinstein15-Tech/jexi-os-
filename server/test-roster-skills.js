@@ -1,5 +1,23 @@
 // Regression tests: Agent Roster (60+ specialists), Skill Registry (100+ skills),
 // Provider Router (health-aware fallback), and VerificationLoop (no-key safety).
+// Self-isolating: a FRESH temp DATA_DIR (never the real settings) and a
+// scrubbed provider environment, so host keys can never skew the keyless
+// assertions below (the router/verify tests are written against the
+// keyless baseline — same hermetic contract as test-chat-books.js).
+process.env.DATA_DIR = `/tmp/jexi-roster-unit-${Date.now()}`;
+const SCRUB_KEYS = [
+  'GROQ_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'HF_TOKEN',
+  'CEREBRAS_API_KEY', 'DEEPINFRA_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY',
+  'DEEPSEEK_API_KEY', 'NVIDIA_API_KEY', 'SAMBANOVA_API_KEY', 'POLLINATIONS_API_KEY',
+  'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'DAHL_API_KEY',
+  'JEXI_MODEL_PROVIDER', 'JEXI_MODEL_API_KEY', 'JEXI_MODEL_NAME', 'JEXI_MODEL_BASE_URL',
+  'ARCEN_MODEL_API_KEY', 'ARCEN_MODEL_BASE_URL', 'ARCEN_MODEL_NAME',
+  'CUSTOM_API_KEY', 'CUSTOM_BASE_URL', 'CUSTOM_MODEL',
+  'MODEL_PROVIDER', 'MODEL_NAME', 'MODEL_BASE_URL',
+  'OLLAMA_HOST', 'OLLAMA_API_KEY', 'OLLAMA_MODEL',
+];
+for (const k of SCRUB_KEYS) delete process.env[k];
+
 import { AGENT_ROSTER, SKILL_REGISTRY, composeTeam, skillsForTeam, rosterSummary, rosterStats, rosterFor, skillsFor, skillsLine, getAgent, getSkill } from './src/workforce/registry/index.js';
 import { providerOrder, recordProviderFailure, recordProviderSuccess, providerInCooldown, resetProviderHealth, providerHealthSnapshot } from './src/providers/runtime/ProviderRouter.js';
 import { verifyAnswer, shouldVerify } from './src/services/VerificationLoop.js';

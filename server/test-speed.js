@@ -13,6 +13,19 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Hermetic: a configured JEXI_MODEL_* "unified" provider always
+// leads the ladder (the user's explicit choice), which would bury
+// the groq/gemini/openrouter ordering these checks measure. Scrub
+// the provider environment so the legacy ladder stands alone.
+const SCRUB_KEYS = [
+  'JEXI_MODEL_PROVIDER', 'JEXI_MODEL_API_KEY', 'JEXI_MODEL_NAME', 'JEXI_MODEL_BASE_URL',
+  'GROQ_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'HF_TOKEN',
+  'MISTRAL_API_KEY', 'NVIDIA_API_KEY', 'CLOUDFLARE_API_KEY',
+  'POLLINATIONS_API_KEY', 'CEREBRAS_API_KEY', 'DEEPINFRA_API_KEY',
+  'VLLM_API_KEY', 'VLLM_BASE_URL', 'MODEL_PROVIDER',
+];
+for (const k of SCRUB_KEYS) delete process.env[k];
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 let failures = 0;

@@ -274,7 +274,9 @@ check('docker: workflows ship commands/ into the brain image', () => {
   const wf = fs.readFileSync(path.join(REPO_ROOT, '.github', 'workflows', 'docker-image.yml'), 'utf8');
   assert.ok(/Ship commands\/ into the server build context/.test(wf), 'docker-image.yml ships commands/');
   const slim = fs.readFileSync(path.join(REPO_ROOT, 'Dockerfile.slim'), 'utf8');
-  assert.ok(/COPY\s+commands/.test(slim), 'Dockerfile.slim copies commands/');
+  // commands/ reaches the image inside the staged server/commands copy
+  // (`COPY server ./server`) and/or the ECC source tree (`COPY capabilities`).
+  assert.ok(/COPY\s+server \.\/server/.test(slim) || /COPY\s+commands/.test(slim) || /COPY\s+capabilities/.test(slim), 'Dockerfile.slim copies commands/');
   assert.ok(slim.length > 0);
 });
 

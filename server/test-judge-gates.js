@@ -18,6 +18,18 @@ import os from 'os';
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'jexi-m6-'));
 process.env.DATA_DIR = path.join(TMP, 'data');
 process.env.WORKSPACE_DIR = path.join(TMP, 'ws');
+
+// Hermetic: the reviewer/security passes are "best-effort when a
+// model is reachable" — a configured provider that answers makes
+// the gate PASS instead of the offline UNKNOWN these checks
+// prove. Scrub the provider environment so the passes stay down.
+const SCRUB_KEYS = [
+  'GROQ_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'HF_TOKEN',
+  'MISTRAL_API_KEY', 'NVIDIA_API_KEY', 'CLOUDFLARE_API_KEY',
+  'POLLINATIONS_API_KEY', 'CEREBRAS_API_KEY', 'DEEPINFRA_API_KEY',
+  'VLLM_API_KEY', 'VLLM_BASE_URL', 'JEXI_MODEL_PROVIDER', 'JEXI_MODEL_API_KEY', 'JEXI_MODEL_NAME', 'JEXI_MODEL_BASE_URL',
+];
+for (const k of SCRUB_KEYS) delete process.env[k];
 delete process.env.GROQ_API_KEY;
 delete process.env.GEMINI_API_KEY;
 delete process.env.OPENROUTER_API_KEY;

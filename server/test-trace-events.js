@@ -40,7 +40,7 @@ const shapeOk = (e) =>
   ok(trace[0] && trace[0].status === 'running' && trace[1] && trace[1].status === 'error', 'refused tool: running FIRST, error AFTER');
   ok(trace[0] && trace[1] && trace[0].id === trace[1].id, 'running + completion share one id');
   ok(trace.every(shapeOk), 'refused tool events match the schema shape');
-  ok(trace[1].duration_ms >= 0 && /used (Bash|Read|Edit)/.test(trace[0].summary), 'completion carries duration_ms, summary reads "used <Tool>"');
+  ok(trace[1].duration_ms >= 0 && /used (bash|read|edit)/i.test(trace[0].summary), 'completion carries duration_ms, summary reads "used <Tool>"');
 }
 
 // 2. unknown tool: running → error (a gap here would strand a spinner)

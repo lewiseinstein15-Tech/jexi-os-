@@ -231,12 +231,22 @@ export class Orchestrator {
       return `## ${top.title}\n\n> ${top.content.slice(0, 2500)}`;
     }
 
-    const reply = await generateContent(
-      `The user asked: \"${query}\"\n\nThe passages below come from the user's OWN books and knowledge library — they are the authoritative source for this answer.\n\n${context}\n\nAnswer the question using ONLY these passages. Rules:\n- Structure the answer clearly (headings, numbered points, tables where helpful).\n- Cite the source book after each point, e.g. (From \"Title\").\n- If the passages do not contain the answer, say so honestly instead of guessing or inventing.\n- Do NOT go outside these passages.`,
-      JEXI_SYSTEM_PROMPT + preferencesBlock(),
-      null,
-      { temperature: 0.3 }
-    );
+    let reply;
+    try {
+      reply = await generateContent(
+        `The user asked: \"${query}\"\n\nThe passages below come from the user's OWN books and knowledge library — they are the authoritative source for this answer.\n\n${context}\n\nAnswer the question using ONLY these passages. Rules:\n- Structure the answer clearly (headings, numbered points, tables where helpful).\n- Cite the source book after each point, e.g. (From \"Title\").\n- If the passages do not contain the answer, say so honestly instead of guessing or inventing.\n- Do NOT go outside these passages.`,
+        JEXI_SYSTEM_PROMPT + preferencesBlock(),
+        null,
+        { temperature: 0.3 }
+      );
+    } catch (e) {
+      // Provider CONFIGURED but dead (bad key, quota, outage): the book
+      // is still the authoritative source. Serve the passage directly
+      // instead of failing the whole turn — same honesty as the
+      // keyless path above, never a canned pass.
+      const top = items[0];
+      return `## ${top.title}\n\n> ${top.content.slice(0, 2500)}`;
+    }
     // B51 P1 — no "FROM YOUR BOOKS" pipeline header; just the grounded answer.
     return reply;
   }
@@ -427,10 +437,22 @@ export class Orchestrator {
         results.statistics.confidence = 100;
         return results;
       }
-      let reply = await generateContent(
-        `The user just said: \"${query}\"\n\nRecent conversation:\n${ctx}\n\nRespond naturally as JEXI OS. If they ask who you are or who created you, answer: you are JEXI OS, a sophisticated multi-agent AI operating system built by Lewis Einstein (AI & ML Engineer) to run any task. Be warm and brief.`,
-        JEXI_SYSTEM_PROMPT + preferencesBlock()
-      );
+      let reply;
+      try {
+        reply = await generateContent(
+          `The user just said: \"${query}\"\n\nRecent conversation:\n${ctx}\n\nRespond naturally as JEXI OS. If they ask who you are or who created you, answer: you are JEXI OS, a sophisticated multi-agent AI operating system built by Lewis Einstein (AI & ML Engineer) to run any task. Be warm and brief.`,
+          JEXI_SYSTEM_PROMPT + preferencesBlock()
+        );
+      } catch (e) {
+        // Provider CONFIGURED but dead (bad key, quota, outage): the
+        // identity guarantee above is unconditional — "key or no key"
+        // must hold when the key DOESN'T WORK too, so a dead provider
+        // never costs JEXI her own name.
+        try { addChat('jexi', IDENTITY_ANSWER); } catch (e2) {}
+        results.summary = `### 🧠 JEXI OS\n\n${IDENTITY_ANSWER}`;
+        results.statistics.confidence = 100;
+        return results;
+      }
       // B48 P2a — GROUNDEDNESS CHECK (confabulation defense): any memory-claim
       // sentence must be grounded in the context ACTUALLY injected this turn.
       // Ungrounded claims are stripped and counted; narration phrases are

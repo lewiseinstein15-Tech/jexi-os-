@@ -54,51 +54,60 @@ export async function verifyAnswer({ query, draft, sources = [], sendEvent, opts
   let issues = [];
   let rounds = 0;
 
-  for (let r = 0; r < MAX_ROUNDS; r++) {
-    rounds = r + 1;
-    if (sendEvent) sendEvent('log', { agent: 'Fact Checker', message: `🔍 Verification pass ${rounds}/${MAX_ROUNDS} — auditing for unsupported claims…` });
+  // A provider outage (configured key, dead endpoint, quota hit) must
+  // never break the reply — the module contract. The draft ships
+  // untouched and the skip is reported honestly, never a throw.
+  try {
+    for (let r = 0; r < MAX_ROUNDS; r++) {
+      rounds = r + 1;
+      if (sendEvent) sendEvent('log', { agent: 'Fact Checker', message: `🔍 Verification pass ${rounds}/${MAX_ROUNDS} — auditing for unsupported claims…` });
 
-    // 1. CRITIQUE — strict, adversarial. It must say CLEAN or list problems.
-    const critique = await generateContent(
-      buildVerificationPrompt({
-        role: 'FACT CHECKER',
-        task: query,
-        sources: srcText ? (sources || []) : [],
-        draft: current,
-        rules: 'Your job is to catch hallucinations and unsupported claims — never to praise.',
-      }),
-      JEXI_SYSTEM_PROMPT + '\nYou are the Fact Checker agent. Be strict, precise, and brief. Output the JSON object only.',
-      null,
-      { temperature: 0.1 }
-    );
+      // 1. CRITIQUE — strict, adversarial. It must say CLEAN or list problems.
+      const critique = await generateContent(
+        buildVerificationPrompt({
+          role: 'FACT CHECKER',
+          task: query,
+          sources: srcText ? (sources || []) : [],
+          draft: current,
+          rules: 'Your job is to catch hallucinations and unsupported claims — never to praise.',
+        }),
+        JEXI_SYSTEM_PROMPT + '\nYou are the Fact Checker agent. Be strict, precise, and brief. Output the JSON object only.',
+        null,
+        { temperature: 0.1 }
+      );
 
-    const { clean: isClean, issues: parsedIssues } = parseVerificationVerdict(critique);
-    issues = parsedIssues;
+      const { clean: isClean, issues: parsedIssues } = parseVerificationVerdict(critique);
+      issues = parsedIssues;
 
-    if (isClean) {
-      if (sendEvent) sendEvent('log', { agent: 'Fact Checker', message: '✅ Verified — no unsupported claims found.' });
-      return { text: current, changed: current !== original, rounds, verdict: 'verified', issues };
+      if (isClean) {
+        if (sendEvent) sendEvent('log', { agent: 'Fact Checker', message: '✅ Verified — no unsupported claims found.' });
+        return { text: current, changed: current !== original, rounds, verdict: 'verified', issues };
+      }
+
+      if (sendEvent) sendEvent('log', { agent: 'Fact Checker', message: `⚠ Found ${issues.length} issue(s) — revising…` });
+
+      // 2. REVISE — rewrite fixing exactly the listed issues.
+      const revised = await generateContent(
+        buildRevisionPrompt({
+          task: query,
+          sources: srcText ? (sources || []) : [],
+          issues,
+          draft: current,
+        }),
+        JEXI_SYSTEM_PROMPT + '\nYou are the Fact Checker agent. Output only the corrected answer.',
+        null,
+        { temperature: 0.2 }
+      );
+
+      const next = String(revised || '').trim();
+      if (!next || next.length < 20) break;         // bad revision — keep the draft
+      if (next === current) break;                  // no change — stop looping
+      current = next;
     }
-
-    if (sendEvent) sendEvent('log', { agent: 'Fact Checker', message: `⚠ Found ${issues.length} issue(s) — revising…` });
-
-    // 2. REVISE — rewrite fixing exactly the listed issues.
-    const revised = await generateContent(
-      buildRevisionPrompt({
-        task: query,
-        sources: srcText ? (sources || []) : [],
-        issues,
-        draft: current,
-      }),
-      JEXI_SYSTEM_PROMPT + '\nYou are the Fact Checker agent. Output only the corrected answer.',
-      null,
-      { temperature: 0.2 }
-    );
-
-    const next = String(revised || '').trim();
-    if (!next || next.length < 20) break;         // bad revision — keep the draft
-    if (next === current) break;                  // no change — stop looping
-    current = next;
+  } catch (e) {
+    const reason = String((e && e.message) || e).slice(0, 120);
+    if (sendEvent) sendEvent('log', { agent: 'Fact Checker', message: `⚠ Verification skipped — provider unavailable: ${reason}` });
+    return { text: current, changed: false, rounds, verdict: 'skipped', issues: [`provider unavailable: ${reason}`] };
   }
 
   if (sendEvent) sendEvent('log', { agent: 'Fact Checker', message: `⚠ Reached the ${MAX_ROUNDS}-round cap — shipping best effort (grounded as much as possible).` });

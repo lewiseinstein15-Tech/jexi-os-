@@ -7,7 +7,25 @@ import { taskManager } from './src/services/TaskManager.js';
  * Uses only DETERMINISTIC intents (identity answers without any API key or
  * network). Each scheduled run launches a real background mission through
  * TaskManager — the same pipeline a user's schedule uses.
+ *
+ * Self-isolating: a FRESH temp DATA_DIR and a scrubbed provider
+ * environment, so host keys can never turn the keyless identity
+ * path into a live provider walk (hermetic contract, same as
+ * test-chat-books.js / test-roster-skills.js).
  */
+process.env.DATA_DIR = `/tmp/jexi-scheduler-unit-${Date.now()}`;
+const SCRUB_KEYS = [
+  'GROQ_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'HF_TOKEN',
+  'CEREBRAS_API_KEY', 'DEEPINFRA_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY',
+  'DEEPSEEK_API_KEY', 'NVIDIA_API_KEY', 'SAMBANOVA_API_KEY', 'POLLINATIONS_API_KEY',
+  'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'DAHL_API_KEY',
+  'JEXI_MODEL_PROVIDER', 'JEXI_MODEL_API_KEY', 'JEXI_MODEL_NAME', 'JEXI_MODEL_BASE_URL',
+  'ARCEN_MODEL_API_KEY', 'ARCEN_MODEL_BASE_URL', 'ARCEN_MODEL_NAME',
+  'CUSTOM_API_KEY', 'CUSTOM_BASE_URL', 'CUSTOM_MODEL',
+  'MODEL_PROVIDER', 'MODEL_NAME', 'MODEL_BASE_URL',
+  'OLLAMA_HOST', 'OLLAMA_API_KEY', 'OLLAMA_MODEL',
+];
+for (const k of SCRUB_KEYS) delete process.env[k];
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 

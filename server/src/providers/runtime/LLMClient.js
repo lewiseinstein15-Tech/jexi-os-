@@ -775,7 +775,7 @@ const PROVIDER_CALLS = {
   // speaks /v1/chat/completions). Configured entirely by env, so adding an
   // endpoint is not a code change.
   custom: (p, s, img, o, e) => {
-    const lane = providerLanes(o.provider || 'custom');
+    const lane = providerToolConfig('custom', o);
     if (!lane || !lane.key || !lane.baseUrl) return null;
     return tryOpenAICompat(
       { key: lane.key, baseUrl: lane.baseUrl, models: lane.models, label: 'Custom', providerKey: 'custom' },

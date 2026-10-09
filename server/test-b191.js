@@ -19,7 +19,10 @@ console.log('\n== 1. profile completeness (EVERY agent has a profile) ==');
   const again = PC.ensureProfile('qa');
   ok('idempotent (second call reads, not regenerates)', again.dir === qa.dir);
   const idx = fs.readFileSync('./index.js', 'utf-8');
-  ok('boot generates all + reports coverage', idx.includes('generateAllProfiles()') && idx.includes('agents profiled'));
+  // Boot generates every profile and reports the real coverage
+  // (named + planner-roles, derived from code — the log no longer
+  // prints a single uncheckable "agents profiled" number).
+  ok('boot generates all + reports coverage', idx.includes('generateAllProfiles()') && idx.includes('profileCoverage()') && idx.includes('[Profiles]'));
   ok('/api/agents/coverage exposed', idx.includes('/api/agents/coverage'));
 }
 

@@ -186,7 +186,7 @@ console.log('\n== 8. client/ui-reference + ui-renderer + ui-brand-official ==');
   ok('ui-brand-official: fills all 3 shipped slots', brand.includes("'sidebar.brand.mark'") && brand.includes("'sidebar.brand.name'") && brand.includes("'conversation.hero.brand.mark'"));
   const main = fs.readFileSync(path.join(ROOT, 'interfaces/console/main.jsx'), 'utf-8');
   ok('brand applied at boot', main.includes('applyOfficialBrand()'));
-  const app = fs.readFileSync(path.join(ROOT, 'src/App.jsx'), 'utf-8');
+  const app = fs.readFileSync(path.join(ROOT, 'interfaces/console/App.jsx'), 'utf-8');
   ok('sidebar renders brand occupants', app.includes('SidebarBrandMark') && app.includes('SidebarBrandName'));
   const indexHtml = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf-8');
   ok('B158 bootstrap guard present in index.html', indexHtml.includes('jexi-build') && indexHtml.includes('__jexiRecoveryShown'));

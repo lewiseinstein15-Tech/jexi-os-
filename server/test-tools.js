@@ -32,7 +32,10 @@ check('github-cli is risky', toolPermission('github-cli') === 'risky');
 check('memory-recall is safe', toolPermission('memory-recall') === 'safe');
 
 /* ---------------- Profiles ---------------- */
-check('three profiles exist', Object.keys(TOOL_PROFILES).length === 3);
+// FINAL F4 retired 'ask' → three honest modes; JEXI-028 later added
+// the sandboxed 'coding' profile on top — the three core profiles
+// must exist, extras may join them.
+check('three profiles exist', ['readonly', 'auto', 'full'].every((p) => p in TOOL_PROFILES));
 check('default profile is auto', ['auto', 'readonly', 'full'].includes(activeToolProfile())); // FINAL F4: 'ask' retired → 'readonly'
 setToolProfile('auto');
 check('profile can be set', activeToolProfile() === 'auto');
@@ -69,16 +72,26 @@ check('non-executable tool routes to its agents', routed.ok === true && routed.r
 const schemas = buildNativeSchemas([
   { slug: 'memory-recall', name: 'Memory Recall', desc: 'Recall facts', schema: { query: { type: 'string', required: true, desc: 'What to recall' }, limit: { type: 'number', desc: 'Max' } } },
   { slug: 'profile-read', name: 'Profile Read', desc: 'Read profile', schema: {} },
-  { slug: 'no-engine-tool', name: 'No Engine', desc: 'Registry-only', schema: null },
-  { slug: 'weather-now', name: 'Weather Now', desc: 'Plugin tool', args: { city: { type: 'string', required: true, desc: 'City' } } }, // plugin style (B105)
+  { slug: 'semantic-search', name: 'Semantic Search', desc: 'Schema-less engine tool', schema: null }, // engine-backed + schema-less → generic fallback
+  { slug: 'no-engine-tool', name: 'No Engine', desc: 'Registry-only', schema: null }, // no engine behind it → never offered
+  { slug: 'weather-now', name: 'Weather Now', desc: 'Plugin tool', args: { city: { type: 'string', required: true, desc: 'City' } } }, // plugin-style args, no plugin loaded → no engine
 ]);
-check('buildNativeSchemas emits OpenAI function shape', schemas.length === 4 && schemas.every((s) => s.type === 'function' && s.function && s.function.name && s.function.parameters));
+check('buildNativeSchemas emits OpenAI function shape', schemas.length === 3 && schemas.every((s) => s.type === 'function' && s.function && s.function.name && s.function.parameters));
 check('buildNativeSchemas marks required args', schemas[0].function.parameters.required.includes('query'));
 check('buildNativeSchemas types number args as number', schemas[0].function.parameters.properties.limit.type === 'number');
-// B105 — schema-less defs get a GENERIC schema (never silently dropped) and
-// plugin-style `args` become provider-ready parameters.
-check('buildNativeSchemas keeps schema-less defs (generic fallback)', schemas.some((s) => s.function.name === 'no-engine-tool' && s.function.parameters && s.function.parameters.type === 'object'));
-check('buildNativeSchemas accepts plugin-style args', schemas.some((s) => s.function.name === 'weather-now' && s.function.parameters.properties.city));
+// B105 — a schema-less def WITH an engine still reaches the model on
+// a GENERIC object schema (never silently dropped for lacking one).
+check('buildNativeSchemas keeps schema-less engine defs (generic fallback)', schemas.some((s) => s.function.name === 'semantic-search' && s.function.parameters && s.function.parameters.type === 'object'));
+// JEXI-017 — a def with NO registered engine is never offered to the
+// model: a schema with nothing behind it would be called and answered
+// with "Unknown tool", which is worse than not offering it.
+check('buildNativeSchemas drops engine-less defs (JEXI-017)', !schemas.some((s) => ['no-engine-tool', 'weather-now'].includes(s.function.name)));
+// B105 — plugin-style `args` become provider-ready parameters
+// (on an engine-backed slug, so the tool survives the JEXI-017 filter).
+const pluginSchemas = buildNativeSchemas([
+  { slug: 'memory-recall', name: 'Memory Recall', desc: 'Recall facts', args: { city: { type: 'string', required: true, desc: 'City' } } },
+]);
+check('buildNativeSchemas accepts plugin-style args', pluginSchemas.length === 1 && !!pluginSchemas[0].function.parameters.properties.city && pluginSchemas[0].function.parameters.required.includes('city'));
 
 // 2. The native loop executes declared tool calls through the injected
 //    executor and keeps looping until the model answers directly.

@@ -24,6 +24,7 @@ const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url)); // …/server/s
 const COMMANDS_CANDIDATES = [
   path.resolve(MODULE_DIR, '..', '..', 'commands', 'index.js'),   // dev: <root>/commands
   path.resolve(MODULE_DIR, '..', 'commands', 'index.js'),         // container: /app/commands
+  path.resolve(MODULE_DIR, '..', '..', 'capabilities', 'commands', 'index.js'), // dev ECC layout: <root>/capabilities/commands
 ];
 
 let _commands = null;

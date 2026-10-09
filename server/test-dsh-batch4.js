@@ -169,7 +169,9 @@ console.log('\n== 6. Persistent bash (dsh tool-bash-persistent) ==');
   const five = await runPersistentBash({ owner: 't-bash-1', command: 'echo after-failure', timeoutMs: 15000 });
   ok('shell survives a failing command', five.ok && five.output.includes('after-failure'));
   const six = await runPersistentBash({ owner: 't-bash-1', command: 'pwd', timeoutMs: 15000, reset: true });
-  ok('reset restarts from the workspace', six.ok && six.reset && !six.output.includes('/tmp'));
+  // Reset restarts the shell at the workspace — it must not still be
+  // on '/tmp' (the workspace itself may live under /tmp).
+  ok('reset restarts from the workspace', six.ok && six.reset && String(six.output || '').trim() !== '/tmp');
   const listed = listPersistentShells();
   ok('status lists live shells', listed.some((s) => s.owner === 't-bash-1'));
   const big = await runPersistentBash({ owner: 't-bash-1', command: 'seq 1 500', timeoutMs: 15000, maxOutputChars: 200 });
@@ -349,7 +351,10 @@ console.log('\n== 11. Registry ralph + persistent plugin bash ==');
   const p2 = await executeTool({ slug: 'bash', args: { command: 'pwd', description: 'pwd' }, spillOwner: 't-plug-bash' });
   ok('plugin bash state persists per conversation', p2.ok === true && String(parsed(p2).output || '').includes('/tmp'));
   const other = await executeTool({ slug: 'bash', args: { command: 'pwd', description: 'pwd' }, spillOwner: 't-plug-bash-other' });
-  ok('other conversation starts fresh (no cross-owner bleed)', other.ok === true && !String(parsed(other).output || '').includes('/tmp'));
+  // Fresh shell must NOT inherit the `cd /tmp` — assert it did not land
+  // on '/tmp' itself (the workspace may legitimately live under /tmp).
+  const fresh = String(parsed(other).output || '').trim();
+  ok('other conversation starts fresh (no cross-owner bleed)', other.ok === true && fresh !== '/tmp');
   const badBash = await executeTool({ slug: 'bash', args: { command: '(exit 7)', description: 'x' }, spillOwner: 't-plug-bash' });
   ok('plugin bash surfaces exit codes', badBash.ok === false && parsed(badBash).code === 7);
 }

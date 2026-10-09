@@ -14,6 +14,20 @@ import { startVoiceStream, stopVoiceStream, speak, onUtterance, voiceStatus, set
 import { validatePluginManifest, loadPlugin, unloadPlugin, listPlugins, resetPlugins } from './src/services/PluginAgent.js';
 import { injectFailure, chaosEnabled, listInjections, resetChaos } from './src/services/ChaosAgent.js';
 
+// Hermetic: the Planner's PRIMARY path is an LLM classifier that
+// runs whenever provider keys exist, and its answer can disagree
+// with (or hang instead of) the deterministic cascade these checks
+// exercise. Scrub the provider environment so the keyless cascade
+// runs — the same convention test-roster-skills.js uses.
+const SCRUB_KEYS = [
+  'GROQ_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'HF_TOKEN',
+  'MISTRAL_API_KEY', 'NVIDIA_API_KEY', 'CLOUDFLARE_API_KEY',
+  'POLLINATIONS_API_KEY', 'CEREBRAS_API_KEY', 'DEEPINFRA_API_KEY',
+  'VLLM_API_KEY', 'VLLM_BASE_URL', 'JEXI_MODEL_PROVIDER', 'JEXI_MODEL_API_KEY', 'JEXI_MODEL_NAME', 'JEXI_MODEL_BASE_URL',
+];
+const SCRUB_KEEP = {};
+for (const k of SCRUB_KEYS) { SCRUB_KEEP[k] = process.env[k]; delete process.env[k]; }
+
 let failures = 0;
 const check = (label, cond) => {
   if (!cond) failures++;

@@ -38,8 +38,9 @@ export const COMMANDS_DIR = path.dirname(fileURLToPath(import.meta.url));
 /* ── dual-depth server source resolution ──────────────────────────────── */
 
 const SERVER_ROOTS = [
-  path.resolve(COMMANDS_DIR, '..', 'server'), // dev: <root>/server
-  path.resolve(COMMANDS_DIR, '..'),           // container: /app (server IS /app)
+  path.resolve(COMMANDS_DIR, '..', '..', 'server'), // dev + ECC images: <root>/capabilities/commands → <root>/server
+  path.resolve(COMMANDS_DIR, '..', 'server'),       // legacy: <root>/commands → <root>/server
+  path.resolve(COMMANDS_DIR, '..'),                 // legacy container: /app (server IS /app)
 ];
 
 let serverRootCache = null;
@@ -75,8 +76,11 @@ export async function rootMod(relFromRoot) {
   const key = `root:${relFromRoot}`;
   if (modCache.has(key)) return modCache.get(key);
   const candidates = [
-    path.resolve(COMMANDS_DIR, '..', relFromRoot),          // dev + shipped image layout
-    path.resolve(COMMANDS_DIR, relFromRoot),                // (defensive) sibling layout
+    path.resolve(COMMANDS_DIR, '..', '..', relFromRoot),              // dev + ECC images: <root>/<rel>
+    path.resolve(COMMANDS_DIR, '..', '..', 'runtime', relFromRoot),   // ECC: <root>/runtime/<rel> (events/hud)
+    path.resolve(COMMANDS_DIR, '..', '..', 'mind', relFromRoot),      // ECC: <root>/mind/<rel> (learning)
+    path.resolve(COMMANDS_DIR, '..', relFromRoot),                    // legacy: <base>/<rel>
+    path.resolve(COMMANDS_DIR, relFromRoot),                          // (defensive) sibling layout
   ];
   let mod = null;
   for (const c of candidates) {

@@ -38,8 +38,15 @@ console.log('\n== 1. Subagent providers (external CLI dialects) ==');
   const status = subagentProviderStatus();
   ok('status lists 5 with availability', status.length === 5 && status.some((p) => p.key === 'in-process' && p.available === true));
 
-  // Missing binary → honest failure, not a crash.
-  const missing = await runExternalSubagent({ provider: 'codex', task: 'hi', cwd: os.tmpdir() });
+  // Missing binary → honest failure, not a crash. Hermetic: an empty
+  // PATH guarantees "not found" even on hosts that ship the real CLI.
+  const emptyBin = fs.mkdtempSync(path.join(os.tmpdir(), 'jexi-emptybin-'));
+  const path0 = process.env.PATH;
+  process.env.PATH = emptyBin;
+  let missing;
+  try {
+    missing = await runExternalSubagent({ provider: 'codex', task: 'hi', cwd: os.tmpdir() });
+  } finally { process.env.PATH = path0; }
   ok('missing binary fails honestly with availability message', missing.ok === false && /not found on PATH/.test(missing.error));
 
   // Fake binary on PATH → runs and returns output.
@@ -196,7 +203,13 @@ console.log('\n== 7. Subagent tool provider routing ==');
 {
   const { executeTool, validateToolArgs } = await import('./src/services/ToolRuntime.js');
   ok('subagent schema validates provider arg', validateToolArgs('subagent', { task: 'x', provider: 'codex' }).ok === true);
-  const missing = await executeTool({ slug: 'subagent', args: { task: 'x', provider: 'codex' }, spillOwner: 't-prov' });
+  const pathNoBins = fs.mkdtempSync(path.join(os.tmpdir(), 'jexi-emptybin2-'));
+  const path1 = process.env.PATH;
+  process.env.PATH = pathNoBins;
+  let missing;
+  try {
+    missing = await executeTool({ slug: 'subagent', args: { task: 'x', provider: 'codex' }, spillOwner: 't-prov' });
+  } finally { process.env.PATH = path1; }
   ok('external provider without binary fails honestly', missing.ok === false && /not found on PATH|in-process/.test(String(missing.error)));
   const badProvider = await executeTool({ slug: 'subagent', args: { task: 'x', provider: 'weird' }, spillOwner: 't-prov' });
   ok('unknown provider falls back in-process', badProvider.kind === 'subagent' || badProvider.ok === true || badProvider.result !== undefined);

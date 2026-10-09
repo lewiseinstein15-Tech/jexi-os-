@@ -17,7 +17,10 @@ let pass = 0, fail = 0;
 const ok = (c, n) => { if (c) { pass++; console.log(`  ✅ ${n}`); } else { fail++; console.log(`  ❌ ${n}`); } };
 
 console.log('\n== 1. Three honest profiles ==');
-ok(Object.keys(TOOL_PROFILES).length === 3, 'exactly three profiles exist');
+// F4 retired 'ask' → three honest modes; JEXI-028 later added the
+// sandboxed 'coding' profile on top — the three core profiles must
+// exist, extras may join them.
+ok(['readonly', 'auto', 'full'].every((p) => p in TOOL_PROFILES), 'exactly three profiles exist');
 ok(TOOL_PROFILES.readonly && TOOL_PROFILES.readonly.allow.join(',') === 'safe', 'readonly allows safe tools only');
 ok(TOOL_PROFILES.auto && TOOL_PROFILES.auto.allow.join(',') === 'safe,medium', 'standard(auto) allows safe+medium');
 ok(TOOL_PROFILES.full && TOOL_PROFILES.full.allow.join(',') === 'safe,medium,risky', 'full allows everything');
