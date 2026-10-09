@@ -95,9 +95,18 @@ export async function runCommand(commandSpec, { cwd = process.cwd(), timeoutMs =
   return new Promise((resolve) => {
     let child;
     try {
+      // A spawned verifier is an independent process, never a node:test
+      // child of the caller. Under `node --test` the parent env carries
+      // NODE_TEST_CONTEXT, and a `node --test` grandchild that inherits it
+      // reports through the parent's IPC channel instead of stdout — its
+      // output arrives empty, so the report parser sees "0 tests
+      // collected" and JEXI-024 correctly refuses the pass. Strip the
+      // context so the child always speaks on its own stdio.
+      const childEnv = { ...process.env, ...env };
+      delete childEnv.NODE_TEST_CONTEXT;
       child = spawn(command, args, {
         cwd,
-        env: { ...process.env, ...env },
+        env: childEnv,
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: false,
       });

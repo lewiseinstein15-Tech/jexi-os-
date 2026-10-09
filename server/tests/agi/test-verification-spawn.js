@@ -185,7 +185,10 @@ test('B7: work graph runVerificationNode — real failing test blocks, then pass
     options: {
       cwd: FIXTURE,
       command: process.execPath,
-      args: [path.join(FIXTURE, 'run-from-cwd.js')], // real child runs src/plain-sum.js from the sandbox cwd
+      // The REAL node:test file from the frozen snapshot — resolved
+      // inside the materialized sandbox cwd. (A plain script would
+      // collect 0 tests, which JEXI-024's judge correctly refuses.)
+      args: ['--test', 'src/add.test.js'],
       materialize: true, // run against the FROZEN bytes in a sandbox
     },
   });
@@ -213,7 +216,7 @@ test('B7: work graph runVerificationNode — real failing test blocks, then pass
     options: {
       cwd: FIXTURE,
       command: process.execPath,
-      args: [path.join(FIXTURE, 'run-from-cwd.js')],
+      args: ['--test', 'src/add.test.js'], // same real test file, now against the fixed bytes
       materialize: true,
     },
   });
