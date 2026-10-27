@@ -39,5 +39,44 @@ ok(router.includes("cloudflare: 'CLOUDFLARE_API_TOKEN'"), 'cloudflare in ENV_MAP
 // --- server/index.js: visible in settings status ---
 ok(index.includes('cloudflare: statusOf(') && index.includes('pollinations:'), 'both legs surface in /api/settings/status');
 
+// ---------------------------------------------------------------------------
+// B-KILO — Kilo Gateway (api.kilo.ai via github.com/AnganSamadder/openkilo).
+// Keyless AND tool-capable, which is what distinguishes it from Pollinations.
+// ---------------------------------------------------------------------------
+ok(llm.includes("kiloKey: process.env.KILO_API_KEY"), 'kilo key resolves (env/settings)');
+ok(llm.includes("const KILO_MODELS = ['kilo-auto/free'"), 'kilo models = live-verified free ids');
+ok(llm.includes("kilo: tryKilo"), 'kilo leg registered in PROVIDER_CALLS');
+ok(llm.includes('api.kilo.ai/api/openrouter'), 'kilo base URL is the gateway endpoint');
+// The keyless tier 401s on a dummy bearer, so the header must be OMITTED.
+ok(llm.includes('function authHeaders(key)'), 'kilo uses the omit-when-empty header helper');
+ok(llm.includes('allowEmptyKey'), 'kilo opts into the empty-key (keyless) path');
+ok(llm.includes("kilo: { key: keys.kiloKey"), 'kilo tool config carries the (possibly empty) key');
+ok(llm.includes('KILO_API_URL'), 'kilo base URL is overridable (test seam)');
+// The keyless floor must survive the STREAMING path too: streamPlainText is
+// what the TUI and chat use, and an unguarded `!cfg.key` skip there silently
+// dropped kilo from every streamed turn (found live, fixed here).
+const keylessGuards = llm.split("(!cfg.key && provider !== 'kilo')").length - 1;
+ok(keylessGuards >= 2, 'both the streaming and tool paths reach the keyless kilo leg (got ' + keylessGuards + ')');
+ok(!/if \(!cfg \|\| !cfg\.key\) continue;/.test(llm), 'no unguarded key-skip remains in the streaming path');
+ok(llm.includes('tried the keyless Kilo and Pollinations legs'), 'the honest failure message names both keyless legs');
+
+// Kilo must be TOOL_CAPABLE — this is its entire reason for existing here.
+const { TOOL_CAPABLE } = await import('./src/providers/runtime/LLMClient.js');
+ok(TOOL_CAPABLE.has('kilo'), 'kilo is tool-capable (native tool calls on the keyless tier)');
+ok(TOOL_CAPABLE.has('pollinations') === false, 'pollinations is still text-only (contrast)');
+
+// Ladder: kilo is keyless like pollinations, but sits ABOVE it (tools > text).
+ok(router.includes("'huggingface', 'kilo', 'pollinations'"), 'kilo rides just above pollinations on every ladder');
+ok(router.includes("if (!list.includes('kilo')) list.push('kilo')"), 'kilo always reported configured (keyless)');
+ok(router.includes("kilo: 'Kilo Gateway (keyless)'"), 'kilo has a health-view label');
+ok(index.includes('kilo: (process.env.KILO_API_KEY'), 'kilo surfaces in /api/settings/status');
+
+// WorkerRouter — the keyless fail-soft floor must contain kilo, ordered
+// before pollinations, and must never let either LEAD the chain.
+const wr = fs.readFileSync(new URL('./src/providers/catalog/WorkerRouter.js', import.meta.url), 'utf8');
+ok(wr.includes("if (k === 'kilo') return true;"), 'kilo leg is always considered configured');
+ok(/out\.push\(\{ key: 'kilo' \}\)[\s\S]{0,120}out\.push\(\{ key: 'pollinations' \}\)/.test(wr), 'kilo precedes pollinations on the keyless floor');
+ok(wr.includes("k !== 'pollinations' && k !== 'kilo'"), 'neither keyless leg can lead a worker chain');
+
 console.log(`\nONEKEY-PROVIDERS: ${pass} passed, ${fail} failed.`);
 process.exit(fail ? 1 : 0);

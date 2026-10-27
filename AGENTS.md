@@ -44,9 +44,56 @@ only, no prose narratives in commits.
   on fail/error. Task completion stays gated on `verification_pending` /
   `verification_no_evidence` until the verification node is completed.
 
+## TUI (`interfaces/cli/lib/tui`)
+
+- `jexi tui` opens a full-screen TUI; needs a TTY (refuses pipes with exit 2).
+- Layout is PURE: `render.composeView(t, {cols, rows, scroll, input, busy, model, header})`
+  returns exactly `rows` lines. All view math is testable without a TTY.
+- `rows.js` is the bridge between the backend's flat /api/chat vocabulary
+  (`stream`, `think`, `log`, `plan`, `tool_use`, `team`, `command`, `done`) and
+  the Phase 16 taxonomy (`message.delta`, `tool.started`, …). It accepts BOTH.
+- Tool rows merge IN PLACE by `id` (running → success/error is one row), which is
+  why `tool_use.id` must be forwarded unchanged.
+- `readKeys` buffers BYTES, not strings: a multi-byte char split across stdin
+  chunks is otherwise destroyed by per-chunk `toString`. Same for escape
+  sequences split across chunks.
+- Frame writer emits alt-screen + one home-cursor write inside a
+  synchronized-update block (`\x1b[?2026h…l`) with clear-to-EOL per line.
+  Never `stripAnsi` a frame — it would drop the theme colors.
+- No provider configured → the turn FAILS honestly (`turn-end-fail`). Never
+  substitute a canned answer.
+
+## Keyless gateway legs (provider ladder)
+
+- Two keyless legs sit at the very bottom of every ladder, above nothing:
+  `kilo` then `pollinations`. Both are always "configured"; neither may ever
+  LEAD a worker chain (`WorkerRouter.runtimeChain` filters them from `top`).
+- **Kilo Gateway** (`kilo`, B-KILO) — `https://api.kilo.ai/api/openrouter`,
+  the endpoint behind `github.com/AnganSamadder/openkilo`. Re-serves the
+  OpenRouter catalog; 400 models, 12 free, 11 of the free ones tool-capable
+  (context up to 1M). Live-verified 2026-10-27: keyless chat, native tool
+  calling, streaming, 5/5 parallel, no per-IP 30s limiter.
+  - **Quota**: the keyless tier is a *global per-IP* promotion limit
+    (`429 PROMOTION_MODEL_LIMIT_REACHED`), not per-model — exhausting it
+    blocks every model until it resets. Set `KILO_API_KEY` to lift it.
+  - **Load-bearing quirk**: the keyless tier REJECTS a dummy bearer
+    (`401 INVALID_TOKEN`). The `Authorization` header must be OMITTED, not
+    blanked — hence `authHeaders()` in LLMClient and `allowEmptyKey` on
+    `tryOpenAICompat`. `''` is a valid, intended key here. Every `!cfg.key`
+    guard on the ladder must exempt `kilo` (both the streaming and tool paths).
+  - This is why kilo sits ABOVE pollinations: pollinations is text-only
+    (`gen.pollinations.ai/v1` now 401s for tools), kilo is tool-capable.
+- `KILO_API_URL` / `KILO_API_KEY` are the env seams (base-URL override + an
+  optional key that only raises the rate limit).
+
 ## Testing
 
 - `tests/agi/test-verification-independence.js` — Scope D determinism suites.
+- `interfaces/cli/test-tui.js` — TUI suites (39 checks): ansi primitives, the
+  wire→row map for the real emitted vocabulary, the transcript reducer, frame
+  composition at four sizes, key decoding incl. split sequences, the frame
+  writer, and a full headless app loop over a fake backend + fake stdin.
+  Wired into `server/package.json` test chain after `test-cli.js`.
 - `tests/agi/test-verification-spawn.js` — Phase 5 Scope B REAL-spawn suites
   (uses `tests/agi/fixtures/verify-pkg`, a self-contained fixture package;
   `src/plain-sum.js` is a plain assertion script that exits nonzero — use it,

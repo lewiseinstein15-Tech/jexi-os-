@@ -109,8 +109,8 @@ ok(groqOnly.some((p) => TOOL_CAPABLE.has(p.key)),
 // --- B3: zero keys — fail-soft floor, never a hard failure ------------------
 const none = runtimeChain('memory', KEYS());
 console.log(`  memory runtimeChain (no keys): ${none.map((p) => p.key).join(' → ')}`);
-ok(none.length === 1 && none[0].key === 'pollinations',
-  'B3: with NO keys the chain still has the keyless pollinations rung (text answer, not E_TURN_FAILED)');
+ok(none.length === 2 && none[0].key === 'kilo' && none[1].key === 'pollinations',
+  'B3: with NO keys the chain keeps both keyless rungs, kilo first (tool-capable, then text-only)');
 
 // --- Static roster untouched (zero edits to COWORKERS) ----------------------
 ok(coworkerChain('memory')[0].key === 'gemini' && coworkerChain('memory')[0].model === 'gemini-3.6-flash',

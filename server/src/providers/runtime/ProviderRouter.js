@@ -31,7 +31,7 @@ const health = new Map();
  * provider is measured on THIS host, route by well-known tier speed —
  * Groq is the fastest free tier, Gemini next, OpenRouter free models are the
  * slowest lane. First call after a cold start no longer fumbles the order. */
-const LATENCY_PRIORS_MS = { unified: 1500, groq: 1200, gemini: 2500, openrouter: 8000, mistral: 4000, nvidia: 4000, sambanova: 3000, vllm: 3000, huggingface: 20000, cloudflare: 3500, pollinations: 6000 };
+const LATENCY_PRIORS_MS = { unified: 1500, groq: 1200, gemini: 2500, openrouter: 8000, mistral: 4000, nvidia: 4000, sambanova: 3000, vllm: 3000, huggingface: 20000, cloudflare: 3500, pollinations: 6000, kilo: 2000 };
 
 function h(key) {
   if (!health.has(key)) health.set(key, { fails: 0, lastFail: 0, cooldownUntil: 0, calls: 0, ok: 0, latencyEma: null, lastLatency: null });
@@ -178,7 +178,7 @@ export function providerOrder(prefer = '') {
   // (The unified leg above wins when configured — it is the explicit choice.)
   const ollamaFirst = unifiedHead.length === 0 && (process.env.MODEL_PROVIDER || '').toLowerCase() === 'ollama';
   const ollama = ollamaFirst ? ['ollama'] : [];
-  const TAIL = [...EXTRA_PROVIDERS, 'vllm', 'huggingface', 'pollinations'];
+  const TAIL = [...EXTRA_PROVIDERS, 'vllm', 'huggingface', 'kilo', 'pollinations'];
   let preferHead;
   if (prefer === 'gemini') preferHead = ['gemini', 'groq', 'openrouter', ...TAIL];
   else if (prefer === 'openrouter') preferHead = ['openrouter', 'groq', 'gemini', ...TAIL];
@@ -230,7 +230,9 @@ export function configuredProviders() {
   // ARENA Phase 6 — Ollama is "configured" when MODEL_PROVIDER=ollama (it
   // needs no key, only an endpoint). Reported honestly in health views.
   if (String(process.env.MODEL_PROVIDER || '').toLowerCase() === 'ollama' && !list.includes('ollama')) list.push('ollama');
-  // Pollinations is keyless: always available as the last-resort leg.
+  // Pollinations and Kilo are keyless: always available as last-resort legs.
+  // Kilo first — it is tool-capable, pollinations is text-only.
+  if (!list.includes('kilo')) list.push('kilo');
   if (!list.includes('pollinations')) list.push('pollinations');
   return list;
 }
@@ -245,6 +247,7 @@ export function providerHealthSnapshot() {
     vllm: 'vLLM (self-hosted)',
     cloudflare: 'Cloudflare Workers AI',
     pollinations: 'Pollinations (keyless)',
+    kilo: 'Kilo Gateway (keyless)',
     ollama: `Ollama (local, ${process.env.OLLAMA_HOST || 'http://127.0.0.1:11434'})`,
   };
   // B77 — compute the order ONCE (it rotates, so a second call could change
@@ -256,6 +259,10 @@ export function providerHealthSnapshot() {
     if (k === 'unified') {
       try { configured = isUnifiedConfigured(); } catch { configured = false; }
     }
+    // Keyless legs need no credential, so they are configured by definition —
+    // reporting false here would contradict both the label and
+    // configuredProviders(), which always lists them.
+    if (k === 'kilo' || k === 'pollinations') configured = true;
     return {
       provider: names[k] || k,
       key: k,

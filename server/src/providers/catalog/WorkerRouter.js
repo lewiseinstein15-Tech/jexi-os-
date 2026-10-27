@@ -136,9 +136,10 @@ export function coworkerChain(role) {
  *      are only attempted when their own key/env exists (lead rule B1:
  *      "never if no keys for them exist"). No more wasted 11.5s of
  *      guaranteed failures ahead of a working provider.
- *   3. KEYLESS FAIL-SOFT FLOOR — pollinations (keyless) is appended as
- *      the honest last resort so a conversational turn degrades to an
- *      answer instead of a hard failure (lead rule B3).
+ *   3. KEYLESS FAIL-SOFT FLOOR — kilo (keyless, tool-capable) then
+ *      pollinations (keyless, text-only) are appended as the honest last
+ *      resorts so a conversational turn degrades to an answer instead of a
+ *      hard failure (lead rule B3).
  * The head leg preserves the role's own model choice for that provider
  * when the chain has one (researcher keeps groq/gpt-oss-120b); otherwise
  * a live-verified default from HEAD_MODELS is used.
@@ -171,6 +172,7 @@ const HEAD_MODELS = {
 export function legConfigured(p, keys = resolveKeys()) {
   const k = String(p?.key || '');
   if (k === 'pollinations') return true; // keyless last resort — always reachable
+  if (k === 'kilo') return true; // B-KILO — keyless AND tool-capable; always reachable
   if (k === 'vllm') return !!process.env.VLLM_BASE_URL; // B74 — configured = base URL set
   if (k === 'ollama') return String(process.env.MODEL_PROVIDER || '').toLowerCase() === 'ollama'; // Phase 6
   if (k === 'unified') { try { return isUnifiedConfigured(); } catch { return false; } }
@@ -196,7 +198,7 @@ export function runtimeChain(role, keys = resolveKeys()) {
     const order = providerOrder();
     // configured = key resolves (env OR Settings) for keyed providers; the
     // unified/ollama pins are configured by definition when they appear.
-    top = order.find((k) => k !== 'pollinations' && (k === 'unified' || k === 'ollama' || legConfigured({ key: k }, keys))) || null;
+    top = order.find((k) => k !== 'pollinations' && k !== 'kilo' && (k === 'unified' || k === 'ollama' || legConfigured({ key: k }, keys))) || null;
   } catch { top = null; }
 
   const out = [];
@@ -216,6 +218,9 @@ export function runtimeChain(role, keys = resolveKeys()) {
   }
   // B3 — the keyless floor: a conversational turn must degrade to an answer,
   // never to a hard failure, even when every keyed provider dies mid-turn.
+  // B-KILO — Kilo sits just above pollinations because it accepts NATIVE TOOL
+  // CALLS on the keyless tier; pollinations serves plain text only.
+  if (!out.some((p) => p.key === 'kilo')) out.push({ key: 'kilo' });
   if (!out.some((p) => p.key === 'pollinations')) out.push({ key: 'pollinations' });
   return out;
 }

@@ -76,6 +76,8 @@ export function resolveKeys() {
     nvidiaKey: process.env.NVIDIA_API_KEY || settings.nvidiaKey || '',
     sambanovaKey: process.env.SAMBANOVA_API_KEY || settings.sambanovaKey || '',
     pollinationsKey: process.env.POLLINATIONS_API_KEY || settings.pollinationsKey || '',
+    // B-KILO — keyless by default ('' ⇒ no Authorization header at all).
+    kiloKey: process.env.KILO_API_KEY || settings.kiloKey || '',
     cloudflareKey: process.env.CLOUDFLARE_API_TOKEN || settings.cloudflareKey || '',
     cloudflareAccount: process.env.CLOUDFLARE_ACCOUNT_ID || settings.cloudflareAccount || '',
     // Any OpenAI-compatible endpoint, configured by env. Used for gateways
@@ -532,10 +534,20 @@ const tryCloudflare = (p, s, img, o, e) => {
  * Generic OpenAI-compatible chat-completions caller — Cerebras, DeepInfra and
  * Mistral all expose the same REST shape, so one helper serves all three.
  * Text-only (vision stays on Groq/Gemini/OpenRouter).
+ *
+ * Request headers: a keyless gateway (Kilo) must receive NO Authorization
+ * header at all — sending a dummy bearer there is a hard 401, so the header
+ * is omitted rather than blanked. `allowEmptyKey` opts such a leg in.
  */
-async function tryOpenAICompat({ key, baseUrl, models, label, providerKey = '' }, prompt, system, imageBase64, opts, errors) {
+function authHeaders(key) {
+  return key
+    ? { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }
+    : { 'Content-Type': 'application/json' };
+}
+
+async function tryOpenAICompat({ key, baseUrl, models, label, providerKey = '', allowEmptyKey = false }, prompt, system, imageBase64, opts, errors) {
   if (imageBase64) return null;
-  if (!key) return null;
+  if (!key && !allowEmptyKey) return null;
   for (const model of models) {
     try {
       const controller = new AbortController();
@@ -543,7 +555,7 @@ async function tryOpenAICompat({ key, baseUrl, models, label, providerKey = '' }
       try {
         const res = await fetch(`${baseUrl}/chat/completions`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+          headers: authHeaders(key),
           body: JSON.stringify({
             model,
             messages: [
@@ -590,6 +602,31 @@ async function tryOpenAICompat({ key, baseUrl, models, label, providerKey = '' }
   }
   return null;
 }
+
+/**
+ * B-KILO — ONE-KEY FREE GATEWAY (github.com/AnganSamadder/openkilo, MIT).
+ * Kilo Gateway (api.kilo.ai) re-serves OpenRouter's catalog; its free models
+ * need NO key at all and — unlike Pollinations — it accepts NATIVE TOOL
+ * CALLS on the keyless tier (live-verified 2026-10-27: chat, tools,
+ * streaming, 5/5 parallel, no 30s per-IP limiter).
+ *
+ * Two behaviours differ from every other leg and are load-bearing:
+ *  1. The keyless tier REJECTS a dummy bearer (HTTP 401 INVALID_TOKEN), so
+ *     an Authorization header must be OMITTED entirely — not sent empty.
+ *  2. An empty string is a valid, intended key here (it means "keyless"),
+ *     so the generic `if (!key) return null` guard must not apply.
+ */
+const KILO_BASE_URL = () => process.env.KILO_API_URL || 'https://api.kilo.ai/api/openrouter';
+const KILO_MODELS = ['kilo-auto/free', 'cohere/north-mini-code:free', 'nvidia/nemotron-3-ultra-550b-a55b:free'];
+
+const tryKilo = (p, s, img, o, e) => tryOpenAICompat({
+  key: resolveKeys().kiloKey, // '' ⇒ keyless — the header is simply omitted
+  baseUrl: KILO_BASE_URL(),
+  models: o.model ? [o.model] : KILO_MODELS,
+  label: 'Kilo',
+  providerKey: 'kilo',
+  allowEmptyKey: true,
+}, p, s, img, o, e);
 
 const tryCerebras = (p, s, img, o, e) =>
   tryOpenAICompat({ key: resolveKeys().cerebrasKey, baseUrl: 'https://api.cerebras.ai/v1', models: o.model ? [o.model] : CEREBRAS_MODELS, label: 'Cerebras', providerKey: 'cerebras' }, p, s, img, o, e);
@@ -771,6 +808,7 @@ const PROVIDER_CALLS = {
   vllm: tryVllm,
   cloudflare: tryCloudflare,
   pollinations: tryPollinations,
+  kilo: tryKilo, // B-KILO — keyless, and tool-capable (unlike pollinations)
   // A custom OpenAI-compatible gateway (dahl, vLLM, or anything else that
   // speaks /v1/chat/completions). Configured entirely by env, so adding an
   // endpoint is not a code change.
@@ -805,7 +843,10 @@ async function streamPlainText(prompt, system, opts, onDelta) {
   const order = opts.provider ? [opts.provider] : providerOrder(opts.prefer || '');
   for (const provider of order) {
     const cfg = providerToolConfig(provider, opts);
-    if (!cfg || !cfg.key) continue;
+    // A keyless leg (Kilo) carries an empty key by design — it streams with
+    // no Authorization header. Skipping it here would drop the keyless floor
+    // from every STREAMING call, which is the path the TUI and chat use.
+    if (!cfg || (!cfg.key && provider !== 'kilo')) continue;
     const base = cfg.baseUrl || (provider === 'groq' ? 'https://api.groq.com/openai/v1' : null);
     if (!base) continue;
     if (skipForNow(provider)) { errors.push(`${provider}: skipped (health: ${providerState(provider).state})`); continue; } // Phase 1 — sticky auth/cooldown skip
@@ -958,7 +999,7 @@ async function __generateWalk(prompt, systemInstruction, imageBase64, opts) {
   if (keys.length > 0) {
     throw new Error(`All AI providers failed. ${errors.join(' | ')}`);
   }
-  throw new Error('No AI provider answered (tried the keyless Pollinations leg too). Configure ONE model in Settings → Model (provider + key + model), or set JEXI_MODEL_PROVIDER + JEXI_MODEL_API_KEY + JEXI_MODEL_NAME in Render — legacy per-provider keys still work as fallback.');
+  throw new Error('No AI provider answered (tried the keyless Kilo and Pollinations legs too). Configure ONE model in Settings → Model (provider + key + model), or set JEXI_MODEL_PROVIDER + JEXI_MODEL_API_KEY + JEXI_MODEL_NAME in Render — legacy per-provider keys still work as fallback.');
 }
 
 /** Ask the LLM a yes/no or one-word verification question. */
@@ -1014,7 +1055,7 @@ export async function testAllProviders() {
 /* only here and are skipped for tool calling).                        */
 /* ------------------------------------------------------------------ */
 
-export const TOOL_CAPABLE = new Set(['unified', 'groq', 'openrouter', 'deepseek', 'xai', 'cerebras', 'deepinfra', 'mistral', 'ollama']); // ARENA — ollama speaks OpenAI tool-calling; UNIFIED — user-chosen model (OpenAI lane or native Anthropic)
+export const TOOL_CAPABLE = new Set(['unified', 'groq', 'openrouter', 'deepseek', 'xai', 'cerebras', 'deepinfra', 'mistral', 'ollama', 'kilo']); // ARENA — ollama speaks OpenAI tool-calling; UNIFIED — user-chosen model (OpenAI lane or native Anthropic); KILO — keyless AND tool-capable (live-verified)
 
 /**
  * Parse a provider's tool_calls into { id, name, arguments }. The id is
@@ -1045,6 +1086,10 @@ function providerToolConfig(provider, opts) {
     cerebras: { key: keys.cerebrasKey, baseUrl: 'https://api.cerebras.ai/v1', models: [opts.model || CEREBRAS_MODELS[0]] },
     deepinfra: { key: keys.deepinfraKey, baseUrl: 'https://api.deepinfra.com/v1/openai', models: [opts.model || DEEPINFRA_MODELS[0]] },
     mistral: { key: keys.mistralKey, baseUrl: 'https://api.mistral.ai/v1', models: [opts.model || MISTRAL_MODELS[0]] },
+    // B-KILO — keyless tool lane. key: '' is intentional: chatWithToolsOnce
+    // omits the Authorization header when the key is empty, which is exactly
+    // what Kilo's free tier requires (a dummy bearer is a 401).
+    kilo: { key: keys.kiloKey, baseUrl: KILO_BASE_URL(), models: [opts.model || KILO_MODELS[0]] },
     // B166 — the FREE DeepSeek lanes (email-only signup, no card). The coder
     // chain already leads with these; the tool loop can finally reach them.
     nvidia: { key: keys.nvidiaKey, baseUrl: process.env.NVIDIA_API_URL || 'https://integrate.api.nvidia.com/v1', models: [opts.model || NVIDIA_MODELS[0]] },
@@ -1092,7 +1137,7 @@ async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, te
   try {
     const res = await fetch(`${String(baseUrl).replace(/\/$/, '')}/chat/completions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      headers: authHeaders(key),
       body: JSON.stringify({
         model,
         messages,
@@ -1197,7 +1242,8 @@ async function __chatWithToolsOnce(provider, cfg, model, messages, tools, opts) 
   // path (every OpenAI-compatible provider, incl. Groq over REST).
   if (typeof opts.onToken === 'function') {
     const base = cfg.baseUrl || (provider === 'groq' ? 'https://api.groq.com/openai/v1' : null);
-    if (base && cfg.key) {
+    // `cfg.key || provider === 'kilo'` — the keyless lane streams with no header.
+    if (base && (cfg.key || provider === 'kilo')) {
       return streamOpenAICompletion({
         baseUrl: base, key: cfg.key, model, messages, tools,
         temperature: opts.temperature,
@@ -1223,7 +1269,7 @@ async function __chatWithToolsOnce(provider, cfg, model, messages, tools, opts) 
   try {
     const res = await withRetry(() => fetch(`${cfg.baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.key}` },
+      headers: authHeaders(cfg.key),
       body: JSON.stringify({ model, messages, tools, tool_choice: 'auto', temperature: opts.temperature ?? 0.3 }),
       signal: controller.signal,
     }), { attempts: 3 });
@@ -1249,7 +1295,9 @@ async function __chatWithToolsOnce(provider, cfg, model, messages, tools, opts) 
  */
 async function runToolLoopForProvider(provider, messages, tools, opts, errors) {
   const cfg = providerToolConfig(provider, opts);
-  if (!cfg || !cfg.key) return null;
+  // A keyless tool lane (Kilo) has an empty key by design — the empty string
+  // is not "unconfigured", it means "send no Authorization header".
+  if (!cfg || (!cfg.key && provider !== 'kilo')) return null;
   const maxIter = Math.max(1, opts.maxIterations || 6);
   let model = null;
   const allCalls = [];

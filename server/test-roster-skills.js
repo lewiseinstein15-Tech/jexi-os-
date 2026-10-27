@@ -70,7 +70,8 @@ check('gemini preference starts with gemini', providerOrder('gemini')[0] === 'ge
 check('openrouter preference starts with openrouter', providerOrder('openrouter')[0] === 'openrouter');
 check('free extra providers are in the order', ['mistral', 'nvidia'].every((k) => providerOrder().includes(k)));
 check('pollinations (keyless last resort) stays last', providerOrder()[providerOrder().length - 1] === 'pollinations');
-check('huggingface rides just before the keyless leg', providerOrder()[providerOrder().length - 2] === 'huggingface');
+check('kilo (keyless, tool-capable) rides above pollinations', providerOrder()[providerOrder().length - 2] === 'kilo');
+check('huggingface rides just before the keyless legs', providerOrder()[providerOrder().length - 3] === 'huggingface');
 check('together is removed from the router', !providerOrder().includes('together'));
 // B77 — payment-gated providers are never in the walk (never attempted).
 check('payment-gated providers removed from the walk', !['cerebras', 'deepinfra', 'xai', 'deepseek', 'sambanova'].some((k) => providerOrder().includes(k)));
@@ -92,9 +93,10 @@ check('groq back in the healthy head after recovery', providerOrder().slice(0, 3
 // Snapshot shape (no secrets).
 const snap = providerHealthSnapshot();
 // B77 — free-only walk, grown since: groq, gemini, openrouter, mistral,
-// nvidia, cloudflare (Workers AI free token), vllm, huggingface, pollinations
-// (keyless last resort); payment-gated ones stay out of the snapshot.
-check('snapshot lists all ' + snap.length + ' providers (got ' + snap.length + ')', snap.length === 9 && snap.some((p) => p.key === 'mistral') && snap.some((p) => p.key === 'nvidia') && snap.some((p) => p.key === 'vllm') && snap.some((p) => p.key === 'cloudflare') && snap.some((p) => p.key === 'pollinations') && !snap.some((p) => ['xai', 'deepseek', 'cerebras', 'deepinfra', 'sambanova'].includes(p.key)));
+// nvidia, cloudflare (Workers AI free token), vllm, huggingface, kilo
+// (keyless, tool-capable), pollinations (keyless last resort); payment-gated
+// ones stay out of the snapshot.
+check('snapshot lists all ' + snap.length + ' providers (got ' + snap.length + ')', snap.length === 10 && snap.some((p) => p.key === 'mistral') && snap.some((p) => p.key === 'nvidia') && snap.some((p) => p.key === 'vllm') && snap.some((p) => p.key === 'cloudflare') && snap.some((p) => p.key === 'kilo') && snap.some((p) => p.key === 'pollinations') && !snap.some((p) => ['xai', 'deepseek', 'cerebras', 'deepinfra', 'sambanova'].includes(p.key)));
 
 /* ---------------- Round 3: Tools, Critics, Memory, Guardrails ---------------- */
 

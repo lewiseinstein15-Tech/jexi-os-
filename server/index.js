@@ -713,6 +713,10 @@ app.get('/api/settings/status', (req, res) => {
     pollinations: (process.env.POLLINATIONS_API_KEY || settings.pollinationsKey)
       ? { configured: true, source: process.env.POLLINATIONS_API_KEY ? 'env-key' : 'settings-key' }
       : { configured: true, source: 'keyless' }, // always-on last resort
+    // B-KILO — keyless by default; a key only raises the rate limit.
+    kilo: (process.env.KILO_API_KEY || settings.kiloKey)
+      ? { configured: true, source: process.env.KILO_API_KEY ? 'env-key' : 'settings-key' }
+      : { configured: true, source: 'keyless' },
   });
 });
 
