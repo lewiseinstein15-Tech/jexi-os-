@@ -1,0 +1,358 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="2090" viewBox="0 0 1600 2090" role="img" aria-labelledby="title desc">
+<title id="title">JEXI OS architecture</title>
+<desc id="desc">A layered architecture: Surfaces, Executive Kernel, Orchestration and Work Graph, Agent Workforce, Brain and Mind, Tools and MCP, Runtimes. Commands flow down, evidence flows up; cross-cutting concerns span every layer.</desc>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+  <stop offset="0" stop-color="#08090e"/><stop offset="1" stop-color="#12101a"/>
+</linearGradient>
+<linearGradient id="bandg" x1="0" y1="0" x2="0" y2="1">
+  <stop offset="0" stop-color="#141722"/><stop offset="1" stop-color="#101219"/>
+</linearGradient>
+<linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+  <stop offset="0" stop-color="#8178ff"/><stop offset="1" stop-color="#ff7848"/>
+</linearGradient>
+<marker id="down" markerWidth="11" markerHeight="11" refX="8" refY="5.5" orient="auto">
+  <path d="M0 0L11 5.5L0 11Z" fill="#8178ff"/>
+</marker>
+<marker id="up" markerWidth="11" markerHeight="11" refX="8" refY="5.5" orient="auto">
+  <path d="M0 0L11 5.5L0 11Z" fill="#4fd1a5"/>
+</marker>
+<marker id="side" markerWidth="10" markerHeight="10" refX="7" refY="5" orient="auto">
+  <path d="M0 0L10 5L0 10Z" fill="#e8b04b"/>
+</marker>
+</defs>
+<rect width="1600" height="2090" fill="url(#bg)"/>
+<circle cx="330" cy="-120" r="420" fill="#6c63ff" opacity=".07"/>
+<circle cx="1450" cy="900" r="380" fill="#ff7848" opacity=".05"/>
+<text x="72" y="58" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="30" font-weight="800" letter-spacing="3">JEXI OS · SYSTEM ARCHITECTURE</text>
+<text x="74" y="86" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14">agentic operating system · Node.js 22 · local-first · v1.2.0</text>
+<rect x="72" y="100" width="150" height="4" rx="2" fill="url(#accent)"/>
+<text x="1560" y="58" fill="#8178ff" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="13" font-weight="700" text-anchor="end">commands ▼ · evidence ▲</text>
+<text x="1560" y="80" fill="#6f7582" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12" text-anchor="end">every tool call returns a receipt</text>
+<rect x="60" y="128" width="1150" height="208" rx="18" fill="url(#bandg)" stroke="#262a38" stroke-width="1.5"/>
+<rect x="60" y="128" width="5" height="208" rx="2.5" fill="#ff7848"/>
+<text x="86" y="162" fill="#ff7848" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="700" letter-spacing="2">01</text>
+<text x="122" y="163" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="19" font-weight="700" letter-spacing="1.2">SURFACES</text>
+<text x="122" y="184" fill="#6f7582" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5">clients that submit intent and render the event stream</text>
+<rect x="84.0" y="204" width="263.5" height="112" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="84.0" y="204" width="263.5" height="3" rx="1.5" fill="#ff7848" opacity=".85"/>
+<text x="100.0" y="232" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Web Console</text>
+<text x="100.0" y="254" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">React 18 + Vite SPA / PWA</text>
+<text x="100.0" y="271" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">chat · missions · graph</text>
+<text x="100.0" y="288" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">settings · memory · tools</text>
+<rect x="363.5" y="204" width="263.5" height="112" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="363.5" y="204" width="263.5" height="3" rx="1.5" fill="#ff7848" opacity=".85"/>
+<text x="379.5" y="232" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Android APK</text>
+<text x="379.5" y="254" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">Capacitor + Firebase FCM</text>
+<text x="379.5" y="271" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">phone-first surface</text>
+<text x="379.5" y="288" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">hamburger drawer nav</text>
+<rect x="643.0" y="204" width="263.5" height="112" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="643.0" y="204" width="263.5" height="3" rx="1.5" fill="#ff7848" opacity=".85"/>
+<text x="659.0" y="232" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">CLI</text>
+<text x="659.0" y="254" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">interfaces/cli/jexi.js</text>
+<text x="659.0" y="271" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">terminal-driven brain</text>
+<text x="659.0" y="288" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">install.sh / install.ps1</text>
+<rect x="922.5" y="204" width="263.5" height="112" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="922.5" y="204" width="263.5" height="3" rx="1.5" fill="#e8b04b" opacity=".85"/>
+<text x="938.5" y="232" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">API · MCP clients</text>
+<text x="938.5" y="254" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">open REST + SSE stream</text>
+<text x="938.5" y="271" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">external ask_jexi endpoint</text>
+<text x="938.5" y="288" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">mcp-server.js</text>
+<rect x="60" y="382" width="1150" height="208" rx="18" fill="url(#bandg)" stroke="#262a38" stroke-width="1.5"/>
+<rect x="60" y="382" width="5" height="208" rx="2.5" fill="#8178ff"/>
+<text x="86" y="416" fill="#8178ff" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="700" letter-spacing="2">02</text>
+<text x="122" y="417" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="19" font-weight="700" letter-spacing="1.2">EXECUTIVE KERNEL</text>
+<text x="122" y="438" fill="#6f7582" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5">one control layer: intent, policy, budgets, scheduling, recovery</text>
+<rect x="84.0" y="458" width="263.5" height="112" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="84.0" y="458" width="263.5" height="3" rx="1.5" fill="#8178ff" opacity=".85"/>
+<text x="100.0" y="486" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Turn Entry + Intent Gate</text>
+<text x="100.0" y="508" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">deterministic fast path first</text>
+<text x="100.0" y="525" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">regex cascade → 1 LLM classify</text>
+<text x="100.0" y="542" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">runtime/kernel · daemon</text>
+<rect x="363.5" y="458" width="263.5" height="112" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="363.5" y="458" width="263.5" height="3" rx="1.5" fill="#8178ff" opacity=".85"/>
+<text x="379.5" y="486" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Policy · Budgets · Admission</text>
+<text x="379.5" y="508" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">per-task call/token budgets</text>
+<text x="379.5" y="525" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">admission control, rate limits</text>
+<text x="379.5" y="542" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">destructive-op authorization</text>
+<rect x="643.0" y="458" width="263.5" height="112" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="643.0" y="458" width="263.5" height="3" rx="1.5" fill="#8178ff" opacity=".85"/>
+<text x="659.0" y="486" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Scheduling · Steering</text>
+<text x="659.0" y="508" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">bounded concurrency</text>
+<text x="659.0" y="525" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">mid-task replan + interrupt</text>
+<text x="659.0" y="542" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">recovery · retries · breakers</text>
+<rect x="922.5" y="458" width="263.5" height="112" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="922.5" y="458" width="263.5" height="3" rx="1.5" fill="#8178ff" opacity=".85"/>
+<text x="938.5" y="486" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Session + Lifecycle Hooks</text>
+<text x="938.5" y="508" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">30-event hook catalog (6 wired)</text>
+<text x="938.5" y="525" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">PreToolUse · PostToolUse · Stop</text>
+<text x="938.5" y="542" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">SessionStart · SessionEnd · Compact</text>
+<rect x="60" y="636" width="1150" height="306" rx="18" fill="url(#bandg)" stroke="#262a38" stroke-width="1.5"/>
+<rect x="60" y="636" width="5" height="306" rx="2.5" fill="#8178ff"/>
+<text x="86" y="670" fill="#8178ff" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="700" letter-spacing="2">03</text>
+<text x="122" y="671" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="19" font-weight="700" letter-spacing="1.2">ORCHESTRATION · WORK GRAPH</text>
+<text x="122" y="692" fill="#6f7582" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5">missions become graphs; nodes are executed, claimed, verified</text>
+<rect x="84.0" y="712" width="263.5" height="104" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="84.0" y="712" width="263.5" height="3" rx="1.5" fill="#8178ff" opacity=".85"/>
+<text x="100.0" y="740" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Director</text>
+<text x="100.0" y="762" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">interpret → plan → staff</text>
+<text x="100.0" y="779" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">delegate → supervise</text>
+<text x="100.0" y="796" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">verify → report</text>
+<rect x="363.5" y="712" width="263.5" height="104" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="363.5" y="712" width="263.5" height="3" rx="1.5" fill="#8178ff" opacity=".85"/>
+<text x="379.5" y="740" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Planner</text>
+<text x="379.5" y="762" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">schema-validated intent</text>
+<text x="379.5" y="779" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">team plan, subtasks</text>
+<text x="379.5" y="796" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">fast-path / fallback</text>
+<rect x="643.0" y="712" width="263.5" height="104" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="643.0" y="712" width="263.5" height="3" rx="1.5" fill="#8178ff" opacity=".85"/>
+<text x="659.0" y="740" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Orchestrator · Lanes</text>
+<text x="659.0" y="762" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">SimpleTask · Graph · Director</text>
+<text x="659.0" y="779" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">dispatch by intent</text>
+<text x="659.0" y="796" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">agent loop per node</text>
+<rect x="922.5" y="712" width="263.5" height="104" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="922.5" y="712" width="263.5" height="3" rx="1.5" fill="#ff7848" opacity=".85"/>
+<text x="938.5" y="740" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Capability Router</text>
+<text x="938.5" y="762" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">intent + query → min tools</text>
+<text x="938.5" y="779" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">capability-matched routing</text>
+<text x="938.5" y="796" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">no hardcoded mappings</text>
+<rect x="84.0" y="830" width="263.5" height="104" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="84.0" y="830" width="263.5" height="3" rx="1.5" fill="#8178ff" opacity=".85"/>
+<text x="100.0" y="858" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">WorkGraph</text>
+<text x="100.0" y="880" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">nodes · edges · dependsOn</text>
+<text x="100.0" y="897" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">claims + leases (TTL)</text>
+<text x="100.0" y="914" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">atomic persist · resume</text>
+<rect x="363.5" y="830" width="263.5" height="104" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="363.5" y="830" width="263.5" height="3" rx="1.5" fill="#8178ff" opacity=".85"/>
+<text x="379.5" y="858" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Scheduler</text>
+<text x="379.5" y="880" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">ready-work ordering</text>
+<text x="379.5" y="897" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">priority desc, createdAt asc</text>
+<text x="379.5" y="914" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">pause / resume</text>
+<rect x="643.0" y="830" width="263.5" height="104" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="643.0" y="830" width="263.5" height="3" rx="1.5" fill="#8178ff" opacity=".85"/>
+<text x="659.0" y="858" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">MissionRunner + Mission</text>
+<text x="659.0" y="880" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">state machine CREATED…DONE</text>
+<text x="659.0" y="897" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">budgets · steering queue</text>
+<text x="659.0" y="914" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">verification records</text>
+<rect x="922.5" y="830" width="263.5" height="104" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="922.5" y="830" width="263.5" height="3" rx="1.5" fill="#ff7848" opacity=".85"/>
+<text x="938.5" y="858" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Subagents · Swarm</text>
+<text x="938.5" y="880" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">SubagentRuntime dispatch</text>
+<text x="938.5" y="897" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">consensus · hive · topologies</text>
+<text x="938.5" y="914" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">per-turn narration</text>
+<rect x="60" y="988" width="1150" height="200" rx="18" fill="url(#bandg)" stroke="#262a38" stroke-width="1.5"/>
+<rect x="60" y="988" width="5" height="200" rx="2.5" fill="#4fd1a5"/>
+<text x="86" y="1022" fill="#4fd1a5" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="700" letter-spacing="2">04</text>
+<text x="122" y="1023" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="19" font-weight="700" letter-spacing="1.2">AGENT WORKFORCE</text>
+<text x="122" y="1044" fill="#6f7582" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5">400 agents across 18 divisions, resolved through one registry</text>
+<rect x="84.0" y="1064" width="263.5" height="112" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="84.0" y="1064" width="263.5" height="3" rx="1.5" fill="#4fd1a5" opacity=".85"/>
+<text x="100.0" y="1092" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Workforce Registry</text>
+<text x="100.0" y="1114" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">400 agents · 18 divisions</text>
+<text x="100.0" y="1131" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">capability inference</text>
+<text x="100.0" y="1148" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">trust levels</text>
+<rect x="363.5" y="1064" width="263.5" height="112" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="363.5" y="1064" width="263.5" height="3" rx="1.5" fill="#4fd1a5" opacity=".85"/>
+<text x="379.5" y="1092" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Registry Router</text>
+<text x="379.5" y="1114" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">resolveAgent by capability</text>
+<text x="379.5" y="1131" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">no hardcoded agent lists</text>
+<text x="379.5" y="1148" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">legacy roster fallback</text>
+<rect x="643.0" y="1064" width="263.5" height="112" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="643.0" y="1064" width="263.5" height="3" rx="1.5" fill="#8178ff" opacity=".85"/>
+<text x="659.0" y="1092" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Prompt Architecture</text>
+<text x="659.0" y="1114" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">layered constitution</text>
+<text x="659.0" y="1131" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">output-format contracts</text>
+<text x="659.0" y="1148" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">per-agent identity</text>
+<rect x="922.5" y="1064" width="263.5" height="112" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="922.5" y="1064" width="263.5" height="3" rx="1.5" fill="#4fd1a5" opacity=".85"/>
+<text x="938.5" y="1092" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Identity · Narration</text>
+<text x="938.5" y="1114" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">JEXI voice from real events</text>
+<text x="938.5" y="1131" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">subagent spawning</text>
+<text x="938.5" y="1148" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">prompt defense baseline</text>
+<rect x="60" y="1234" width="1150" height="292" rx="18" fill="url(#bandg)" stroke="#262a38" stroke-width="1.5"/>
+<rect x="60" y="1234" width="5" height="292" rx="2.5" fill="#e8b04b"/>
+<text x="86" y="1268" fill="#e8b04b" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="700" letter-spacing="2">05</text>
+<text x="122" y="1269" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="19" font-weight="700" letter-spacing="1.2">BRAIN · MIND</text>
+<text x="122" y="1290" fill="#6f7582" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5">reasoning, context, memory, and the provider fabric</text>
+<rect x="84.0" y="1310" width="263.5" height="96" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="84.0" y="1310" width="263.5" height="3" rx="1.5" fill="#e8b04b" opacity=".85"/>
+<text x="100.0" y="1338" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Model Router</text>
+<text x="100.0" y="1360" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">CapabilityRouter · TaskClass</text>
+<text x="100.0" y="1377" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">FallbackChain · CostOptimizer</text>
+<text x="100.0" y="1394" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">health-ordered walk</text>
+<rect x="363.5" y="1310" width="263.5" height="96" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="363.5" y="1310" width="263.5" height="3" rx="1.5" fill="#e8b04b" opacity=".85"/>
+<text x="379.5" y="1338" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Provider Adapters</text>
+<text x="379.5" y="1360" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">openai · anthropic · google</text>
+<text x="379.5" y="1377" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">groq · mistral · deepseek</text>
+<text x="379.5" y="1394" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">openrouter · ollama</text>
+<rect x="643.0" y="1310" width="263.5" height="96" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="643.0" y="1310" width="263.5" height="3" rx="1.5" fill="#e8b04b" opacity=".85"/>
+<text x="659.0" y="1338" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">LLMClient</text>
+<text x="659.0" y="1360" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">one generateContent() seam</text>
+<text x="659.0" y="1377" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">retry + backoff + jitter</text>
+<text x="659.0" y="1394" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">retry-after · quarantine</text>
+<rect x="922.5" y="1310" width="263.5" height="96" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="922.5" y="1310" width="263.5" height="3" rx="1.5" fill="#8178ff" opacity=".85"/>
+<text x="938.5" y="1338" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Provider Registry</text>
+<text x="938.5" y="1360" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">providers.yaml · models.yaml</text>
+<text x="938.5" y="1377" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">persistent health states</text>
+<text x="938.5" y="1394" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">structured telemetry</text>
+<rect x="84.0" y="1420" width="263.5" height="96" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="84.0" y="1420" width="263.5" height="3" rx="1.5" fill="#e8b04b" opacity=".85"/>
+<text x="100.0" y="1448" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Context Assembly</text>
+<text x="100.0" y="1470" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">task-scoped assembly</text>
+<text x="100.0" y="1487" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">compaction engine</text>
+<text x="100.0" y="1504" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">memory loadout</text>
+<rect x="363.5" y="1420" width="263.5" height="96" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="363.5" y="1420" width="263.5" height="3" rx="1.5" fill="#e8b04b" opacity=".85"/>
+<text x="379.5" y="1448" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Memory</text>
+<text x="379.5" y="1470" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">hot · knowledge graph</text>
+<text x="379.5" y="1487" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">hybrid search · vector</text>
+<text x="379.5" y="1504" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">conversations · projects</text>
+<rect x="643.0" y="1420" width="263.5" height="96" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="643.0" y="1420" width="263.5" height="3" rx="1.5" fill="#e8b04b" opacity=".85"/>
+<text x="659.0" y="1448" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Memory Protocol</text>
+<text x="659.0" y="1470" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">5 frozen verbs (v1.0)</text>
+<text x="659.0" y="1487" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">envelope · versioning</text>
+<text x="659.0" y="1504" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">conformance suite</text>
+<rect x="922.5" y="1420" width="263.5" height="96" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="922.5" y="1420" width="263.5" height="3" rx="1.5" fill="#8178ff" opacity=".85"/>
+<text x="938.5" y="1448" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Dream Cycle · Evals</text>
+<text x="938.5" y="1470" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">13 consolidation phases</text>
+<text x="938.5" y="1487" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">BrainBench P@5 / R@5</text>
+<text x="938.5" y="1504" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">self-model · instincts</text>
+<rect x="60" y="1572" width="1150" height="200" rx="18" fill="url(#bandg)" stroke="#262a38" stroke-width="1.5"/>
+<rect x="60" y="1572" width="5" height="200" rx="2.5" fill="#ff7848"/>
+<text x="86" y="1606" fill="#ff7848" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="700" letter-spacing="2">06</text>
+<text x="122" y="1607" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="19" font-weight="700" letter-spacing="1.2">TOOLS · MCP</text>
+<text x="122" y="1628" fill="#6f7582" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5">permission-gated capabilities that reach the world and return receipts</text>
+<rect x="84.0" y="1648" width="263.5" height="112" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="84.0" y="1648" width="263.5" height="3" rx="1.5" fill="#ff7848" opacity=".85"/>
+<text x="100.0" y="1676" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Tool Registry</text>
+<text x="100.0" y="1698" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">39 tools · 12 domains</text>
+<text x="100.0" y="1715" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">filesystem · terminal · git</text>
+<text x="100.0" y="1732" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">github · web · memory · lsp</text>
+<rect x="363.5" y="1648" width="263.5" height="112" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="363.5" y="1648" width="263.5" height="3" rx="1.5" fill="#ff7848" opacity=".85"/>
+<text x="379.5" y="1676" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Permission Gate</text>
+<text x="379.5" y="1698" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">profiles: auto/ask/full</text>
+<text x="379.5" y="1715" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">× safe/medium/risky</text>
+<text x="379.5" y="1732" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">destructive ops gated</text>
+<rect x="643.0" y="1648" width="263.5" height="112" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="643.0" y="1648" width="263.5" height="3" rx="1.5" fill="#e8b04b" opacity=".85"/>
+<text x="659.0" y="1676" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">MCP Gateway</text>
+<text x="659.0" y="1698" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">56 servers · 30 enabled</text>
+<text x="659.0" y="1715" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">542 directory tools</text>
+<text x="659.0" y="1732" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">breaker · lazy wake</text>
+<rect x="922.5" y="1648" width="263.5" height="112" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="922.5" y="1648" width="263.5" height="3" rx="1.5" fill="#4fd1a5" opacity=".85"/>
+<text x="938.5" y="1676" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Executor → Receipts</text>
+<text x="938.5" y="1698" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">schema-validated I/O</text>
+<text x="938.5" y="1715" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">tool.started / completed</text>
+<text x="938.5" y="1732" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">evidence + provenance</text>
+<rect x="60" y="1818" width="1150" height="196" rx="18" fill="url(#bandg)" stroke="#262a38" stroke-width="1.5"/>
+<rect x="60" y="1818" width="5" height="196" rx="2.5" fill="#ff7848"/>
+<text x="86" y="1852" fill="#ff7848" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="700" letter-spacing="2">07</text>
+<text x="122" y="1853" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="19" font-weight="700" letter-spacing="1.2">RUNTIMES · COMPUTER USE</text>
+<text x="122" y="1874" fill="#6f7582" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5">vision-grounded control of browser, desktop, and sandbox</text>
+<rect x="84.0" y="1894" width="263.5" height="108" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="84.0" y="1894" width="263.5" height="3" rx="1.5" fill="#ff7848" opacity=".85"/>
+<text x="100.0" y="1922" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Browser Runtime</text>
+<text x="100.0" y="1944" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">Playwright driver</text>
+<text x="100.0" y="1961" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">16-action vocabulary</text>
+<text x="100.0" y="1978" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">screenshot read-back</text>
+<rect x="363.5" y="1894" width="263.5" height="108" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="363.5" y="1894" width="263.5" height="3" rx="1.5" fill="#ff7848" opacity=".85"/>
+<text x="379.5" y="1922" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Desktop Runtime</text>
+<text x="379.5" y="1944" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">observe → act → verify</text>
+<text x="379.5" y="1961" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">window / input control</text>
+<text x="379.5" y="1978" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">honest degradation</text>
+<rect x="643.0" y="1894" width="263.5" height="108" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="643.0" y="1894" width="263.5" height="3" rx="1.5" fill="#8178ff" opacity=".85"/>
+<text x="659.0" y="1922" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Sandbox</text>
+<text x="659.0" y="1944" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">E2B isolated exec</text>
+<text x="659.0" y="1961" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">snapshot materialization</text>
+<text x="659.0" y="1978" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">fixture packages</text>
+<rect x="922.5" y="1894" width="263.5" height="108" rx="12" fill="#181b25" stroke="#2b3040" stroke-width="1.2"/>
+<rect x="922.5" y="1894" width="263.5" height="3" rx="1.5" fill="#ff7848" opacity=".85"/>
+<text x="938.5" y="1922" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="700">Android · Remote</text>
+<text x="938.5" y="1944" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">device bridge (ADB)</text>
+<text x="938.5" y="1961" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">remote worker channel</text>
+<text x="938.5" y="1978" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">FCM push</text>
+<line x1="530" y1="344" x2="530" y2="374" stroke="#8178ff" stroke-width="2.2" marker-end="url(#down)" opacity=".9"/>
+<line x1="620" y1="374" x2="620" y2="344" stroke="#4fd1a5" stroke-width="2.2" marker-end="url(#up)" opacity=".9"/>
+<text x="518" y="363.0" fill="#8178ff" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" text-anchor="end">dispatch</text>
+<text x="632" y="363.0" fill="#4fd1a5" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600">evidence</text>
+<line x1="530" y1="598" x2="530" y2="628" stroke="#8178ff" stroke-width="2.2" marker-end="url(#down)" opacity=".9"/>
+<line x1="620" y1="628" x2="620" y2="598" stroke="#4fd1a5" stroke-width="2.2" marker-end="url(#up)" opacity=".9"/>
+<text x="518" y="617.0" fill="#8178ff" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" text-anchor="end">dispatch</text>
+<text x="632" y="617.0" fill="#4fd1a5" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600">evidence</text>
+<line x1="530" y1="950" x2="530" y2="980" stroke="#8178ff" stroke-width="2.2" marker-end="url(#down)" opacity=".9"/>
+<line x1="620" y1="980" x2="620" y2="950" stroke="#4fd1a5" stroke-width="2.2" marker-end="url(#up)" opacity=".9"/>
+<text x="518" y="969.0" fill="#8178ff" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" text-anchor="end">dispatch</text>
+<text x="632" y="969.0" fill="#4fd1a5" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600">evidence</text>
+<line x1="530" y1="1196" x2="530" y2="1226" stroke="#8178ff" stroke-width="2.2" marker-end="url(#down)" opacity=".9"/>
+<line x1="620" y1="1226" x2="620" y2="1196" stroke="#4fd1a5" stroke-width="2.2" marker-end="url(#up)" opacity=".9"/>
+<text x="518" y="1215.0" fill="#8178ff" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" text-anchor="end">dispatch</text>
+<text x="632" y="1215.0" fill="#4fd1a5" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600">evidence</text>
+<line x1="530" y1="1534" x2="530" y2="1564" stroke="#8178ff" stroke-width="2.2" marker-end="url(#down)" opacity=".9"/>
+<line x1="620" y1="1564" x2="620" y2="1534" stroke="#4fd1a5" stroke-width="2.2" marker-end="url(#up)" opacity=".9"/>
+<text x="518" y="1553.0" fill="#8178ff" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" text-anchor="end">dispatch</text>
+<text x="632" y="1553.0" fill="#4fd1a5" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600">evidence</text>
+<line x1="530" y1="1780" x2="530" y2="1810" stroke="#8178ff" stroke-width="2.2" marker-end="url(#down)" opacity=".9"/>
+<line x1="620" y1="1810" x2="620" y2="1780" stroke="#4fd1a5" stroke-width="2.2" marker-end="url(#up)" opacity=".9"/>
+<text x="518" y="1799.0" fill="#8178ff" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" text-anchor="end">dispatch</text>
+<text x="632" y="1799.0" fill="#4fd1a5" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600">evidence</text>
+<rect x="1240" y="128" width="310" height="1886" rx="18" fill="#101219" stroke="#262a38" stroke-width="1.5" stroke-dasharray="6 5"/>
+<text x="1260" y="162" fill="#e8b04b" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="16" font-weight="800" letter-spacing="1.4">CROSS-CUTTING</text>
+<text x="1260" y="183" fill="#6f7582" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">spans every layer</text>
+<line x1="1260" y1="198" x2="1530" y2="198" stroke="#2b3040" stroke-width="1"/>
+<rect x="1258" y="220" width="274" height="108" rx="11" fill="#181b25" stroke="#2b3040" stroke-width="1.1"/>
+<rect x="1258" y="220" width="3" height="108" rx="1.5" fill="#ff7848"/>
+<text x="1274" y="244" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="13.5" font-weight="700">Verification</text>
+<text x="1274" y="263" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">Test / Build / Lint verifiers</text>
+<text x="1274" y="280" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">FileState byte compare</text>
+<text x="1274" y="297" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">AgentVerifier · auto-verify</text>
+<text x="1274" y="314" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">no evidence → no pass</text>
+<rect x="1258" y="552.0" width="274" height="108" rx="11" fill="#181b25" stroke="#2b3040" stroke-width="1.1"/>
+<rect x="1258" y="552.0" width="3" height="108" rx="1.5" fill="#4fd1a5"/>
+<text x="1274" y="576.0" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="13.5" font-weight="700">Evidence · Provenance</text>
+<text x="1274" y="595.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">a receipt per tool call</text>
+<text x="1274" y="612.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">HUD event taxonomy</text>
+<text x="1274" y="629.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">snapshot-pinned records</text>
+<text x="1274" y="646.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">claims vs. what happened</text>
+<rect x="1258" y="884.0" width="274" height="108" rx="11" fill="#181b25" stroke="#2b3040" stroke-width="1.1"/>
+<rect x="1258" y="884.0" width="3" height="108" rx="1.5" fill="#8178ff"/>
+<text x="1274" y="908.0" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="13.5" font-weight="700">Persistence</text>
+<text x="1274" y="927.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">DATA_DIR JSON (atomic)</text>
+<text x="1274" y="944.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">Upstash Redis mirror</text>
+<text x="1274" y="961.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">Firebase service account</text>
+<text x="1274" y="978.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">hydrate-retry on boot</text>
+<rect x="1258" y="1216.0" width="274" height="108" rx="11" fill="#181b25" stroke="#2b3040" stroke-width="1.1"/>
+<rect x="1258" y="1216.0" width="3" height="108" rx="1.5" fill="#ff7848"/>
+<text x="1274" y="1240.0" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="13.5" font-weight="700">Security</text>
+<text x="1274" y="1259.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">permission boundaries</text>
+<text x="1274" y="1276.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">exec-bridge · shield</text>
+<text x="1274" y="1293.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">scan pipeline</text>
+<text x="1274" y="1310.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">owner auth</text>
+<rect x="1258" y="1548.0" width="274" height="108" rx="11" fill="#181b25" stroke="#2b3040" stroke-width="1.1"/>
+<rect x="1258" y="1548.0" width="3" height="108" rx="1.5" fill="#e8b04b"/>
+<text x="1274" y="1572.0" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="13.5" font-weight="700">Harness</text>
+<text x="1274" y="1591.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">parity probes</text>
+<text x="1274" y="1608.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">30-event hooks catalog</text>
+<text x="1274" y="1625.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">forge · refine · hardening</text>
+<text x="1274" y="1642.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">immutable fixtures</text>
+<rect x="1258" y="1880.0" width="274" height="108" rx="11" fill="#181b25" stroke="#2b3040" stroke-width="1.1"/>
+<rect x="1258" y="1880.0" width="3" height="108" rx="1.5" fill="#4fd1a5"/>
+<text x="1274" y="1904.0" fill="#eef0f6" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="13.5" font-weight="700">Observability</text>
+<text x="1274" y="1923.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">SelfMonitor boot/chat</text>
+<text x="1274" y="1940.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">per-request metrics</text>
+<text x="1274" y="1957.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">provider health snapshot</text>
+<text x="1274" y="1974.0" fill="#8e94a3" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5">crash reports</text>
+<line x1="1214" y1="486" x2="1234" y2="486" stroke="#e8b04b" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#side)" opacity=".8"/>
+<line x1="1214" y1="1088" x2="1234" y2="1088" stroke="#e8b04b" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#side)" opacity=".8"/>
+<line x1="1214" y1="1672" x2="1234" y2="1672" stroke="#e8b04b" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#side)" opacity=".8"/>
+<text x="72" y="2040" fill="#6f7582" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">Flow: a surface submits intent → the kernel gates and schedules it → orchestration builds a work graph → agents reason through the brain and act through gated tools → runtimes touch the world → receipts and evidence return to the kernel and the transcript.</text>
+<text x="72" y="2062" fill="#6f7582" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">Counts are read from this repository: 400 agents · 18 divisions · 39 tools · 12 domains · 1,164 skills · 56 MCP servers · 30 hook events · 5 memory verbs · 13 dream-cycle phases.</text>
+</svg>
