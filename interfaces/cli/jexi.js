@@ -29,6 +29,7 @@ import { JexiApi } from './lib/api.js';
 import { runInitWizard } from './lib/wizard.js';
 import { runOneShot, runRepl, runMission } from './lib/repl.js';
 import { runDoctor, formatDoctor } from './lib/doctor.js';
+import { runTui } from './lib/tui/app.js';
 
 const err = (s) => process.stderr.write(`${s}\n`);
 const ok = (s) => process.stdout.write(`${s}\n`);
@@ -39,6 +40,7 @@ function help() {
 
   jexi init            first-run setup: provider + API key + model
   jexi                 interactive session in this directory
+  jexi tui             full-screen terminal UI (transcript + live tool cards)
   jexi "task"          one-shot task in this directory
   jexi run "goal"      persistent mission with live progress
   jexi missions        list missions on the local backend
@@ -143,6 +145,27 @@ async function cmdInit(args) {
     err(`  ✓ model live: ${pushed.active.provider} / ${pushed.active.model} (${pushed.probe ? `${pushed.probe.latencyMs}ms` : 'probed'})`);
   }
   ok(`\nReady. Run: jexi "your first task"`);
+}
+
+async function cmdTui() {
+  const cfg = loadConfig(HOME);
+  if (!cfg) return needInit();
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    err('jexi tui needs an interactive terminal (stdin/stdout must be a TTY).');
+    err('  For pipes or scripts use: jexi "task"  or  jexi');
+    process.exitCode = 2;
+    return;
+  }
+  const workspace = process.cwd();
+  const { api } = await withBackend(cfg, workspace);
+  // Best-effort model label for the status bar — never fatal.
+  const model = await api.providersActive()
+    .then((r) => {
+      const a = r && r.data && r.data.active;
+      return a && a.configured ? `${a.provider}/${a.model}` : '';
+    })
+    .catch(() => '');
+  await runTui({ api, model, workspace, baseUrl: api.baseUrl });
 }
 
 async function cmdChat(args) {
@@ -263,7 +286,7 @@ async function cmdUpdate() {
 
 async function main() {
   const [, , cmd, ...args] = process.argv;
-  if (!cmd || cmd.startsWith('-') || !['init', 'run', 'missions', 'models', 'doctor', 'stop', 'restart', 'logs', 'update', 'version', 'help'].includes(cmd)) {
+  if (!cmd || cmd.startsWith('-') || !['init', 'tui', 'run', 'missions', 'models', 'doctor', 'stop', 'restart', 'logs', 'update', 'version', 'help'].includes(cmd)) {
     if (cmd === '--version' || cmd === '-v') return ok(`jexi ${CLI_VERSION}`);
     if (cmd === '--help' || cmd === '-h') return help();
     // Default: REPL or one-shot. Everything is the query.
@@ -274,6 +297,7 @@ async function main() {
   if (cmd === 'help') return help();
   if (cmd === 'version') return ok(`jexi ${CLI_VERSION}`);
   if (cmd === 'init') return cmdInit(args);
+  if (cmd === 'tui') return cmdTui();
   if (cmd === 'run') return cmdRun(args);
   if (cmd === 'missions') return cmdMissions();
   if (cmd === 'models') return cmdModels();
