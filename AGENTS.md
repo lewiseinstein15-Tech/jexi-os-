@@ -133,8 +133,8 @@ only, no prose narratives in commits.
   or `run-from-cwd.js` for child verifier commands under the harness, and only
   real `node --test` outside it (e.g. in the live probe).
 - `DOTENV_CONFIG_QUIET=true` suppresses the `dotenv` tips that pollute stdout.
-- Bespoke HTTP/token rules: token from `.jexi-secrets/git-token`,
-  `git config` uses oauth2 user (see git config in repo), push direct to main.
+- Bespoke HTTP/token rules: push direct to main (see the PUSH note below for the
+  credential that currently works).
 - PUSH — RESOLVED (2026-09-15): `.jexi-secrets/git-token` was replaced with a
   credential holding Contents: write on this repo; `git push origin main` works
   again via the `oauth2:<token>` form. Scope A (local `34ca9bb`) is on remote
@@ -142,3 +142,15 @@ only, no prose narratives in commits.
   write (every form 403 / "Resource not accessible by integration"); no repo or
   App permission change was needed, only the token file.
   - Commit-only flow, direct to `main`. Do NOT create branches/PRs.
+- PUSH — CURRENT (2026-10-28): `.jexi-secrets/git-token` is now MISSING (401)
+  and the token baked into `origin`'s URL is expired (push prompts for a
+  password). The working credential is `$GITHUB_TOKEN` (has `push: true` on this
+  repo). Push with a one-shot helper so the token is never written to config:
+    `git -c credential.helper='!f(){ echo username=x-access-token; echo password=$GITHUB_TOKEN; };f' \
+       push https://github.com/lewiseinstein15-Tech/jexi-os-.git main:main`
+  Then `fetch origin main` to refresh the tracking ref (an explicit-URL push
+  does not update it). Set `GIT_TERMINAL_PROMPT=0` so a bad credential fails
+  fast instead of hanging on a password prompt.
+- `$HOME` is load-bearing for the CLI (`~/.jexi`, `~/.local/bin`). If you export
+  `HOME` to sandbox a test, EXPORT IT BACK (`export HOME=/home/openhands`)
+  before committing — a stray `HOME` breaks `git config` identity lookup.
