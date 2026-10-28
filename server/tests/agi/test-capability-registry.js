@@ -102,8 +102,12 @@ test('registry: state ordering is comparable', () => {
 test('registry: summary counts match the per-capability states', async () => {
   await primeCapabilities();
   const s = capabilitySummary();
-  const recomputed = s.capabilities.filter((c) => c.available).length;
-  assert.equal(s.available + s.registered + s.exists + s.succeeded, recomputed + s.succeeded);
+  /* Phase 2A — `available` now means "the active runtime guard permits it",
+     so the AVAILABLE bucket equals the executable set (a ring-blocked tool is
+     no longer counted). The buckets still partition the whole catalog. */
+  const exec = s.capabilities.filter((c) => c.executable).length;
+  assert.equal(s.available + s.succeeded, exec, 'AVAILABLE + SUCCEEDED must equal the executable set');
+  assert.equal(s.available + s.registered + s.exists + s.succeeded + s.unavailable, s.total);
   assert.equal(s.total, CAPABILITIES.length);
 });
 

@@ -75,7 +75,9 @@ export function registerCapabilityTools() {
           return {
             capability: id,
             available: Boolean(c?.available),
+            executable: Boolean(c?.executable),
             state: c?.state ?? null,
+            blockedBy: c?.blockedBy ?? [],
             reason: c?.reason ?? 'not_in_catalog',
             whenToUse: c?.whenToUse ?? null,
           };
@@ -108,17 +110,28 @@ export function registerCapabilityTools() {
         counts: {
           total: summary.total,
           available: summary.available,
+          // Phase 2A — `available` is the deprecated alias for "the runtime
+          // guard permits it". These two make the distinction explicit so a
+          // caller never reads a ring-blocked tool as runnable.
+          executable: summary.executable,
+          ringBlocked: summary.ringBlocked,
           registeredOnly: summary.registered,
           missing: summary.unavailable,
           succeeded: summary.succeeded,
         },
+        sandboxRing: summary.sandboxRing,
         capabilities: all.map((c) => ({
           id: c.id,
           title: c.title,
           whenToUse: c.whenToUse,
           state: c.state,
           available: c.available,
+          executable: c.executable,
+          reachable: c.reachable,
           registered: c.registered,
+          discoverable: c.discoverable,
+          permitted: c.permitted,
+          blockedBy: c.blockedBy,
           succeededThisSession: proven.has(c.id),
           refusedThisSession: refused.has(c.id),
           failedThisSession: broken.has(c.id),

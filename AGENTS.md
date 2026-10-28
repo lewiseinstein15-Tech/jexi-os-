@@ -118,10 +118,40 @@ only, no prose narratives in commits.
 
 ## Capability registry (`server/src/capability/registry`)
 
-- Four-state model: `exists` → `registered` → `available` → `succeeded`.
-  `available` = registered AND has an engine AND permitted by the ACTIVE profile;
-  `succeeded` = a real, non-refused success in the outcome ledger. Never assert a
-  state — derive it. `describeCapability(id, { profile })` returns the reason.
+- Six-state model (Phase 2A): `exists` → `registered` → `permitted` →
+  `reachable` → `executable` → `succeeded`.
+  - `registered` = a tool exists in the catalog and resolves.
+  - `permitted` = the ACTIVE profile's tier allows it.
+  - `reachable` = registered AND has an engine AND permitted (the OLD `available`).
+  - `executable` = `reachable` AND the runtime ring guard (`makeRiskGuard`) allows
+    it — the ring and the `sideEffects` acknowledgement.
+  - `succeeded` = a real, non-refused success in the outcome ledger.
+  - `available` is a DEPRECATED alias for `executable`. It used to ignore the
+    ring guard, so a `runtimeRing: 2` tool (term_execute, git_status…) reported
+    `available: true` while the executor refused it at the `container` ring. It
+    now equals `executable`, so that lie cannot recur. Prefer the explicit
+    fields; `blockedBy` names the gate (`runtime_ring` vs `permission_denied`).
+  - **`available + succeeded === executable` is CONDITIONAL (Phase 2B).** It
+    holds only while no capability is succeeded-but-currently-blocked. Success
+    is historical evidence and is never erased by the current gate, so a
+    capability that succeeded earlier (e.g. at the host ring) stays `state:
+    succeeded` while `executable: false`. The exact relation is
+    `available + succeeded - executable === (succeeded && !executable)`.
+    `capabilitySummary().ringBlocked` counts
+    `registered && !executable && blockedBy.includes('runtime_ring')` — the
+    `!executable` term keeps an executable MCP-backed capability (a ring-2
+    native provider plus an out-of-ring MCP provider) out of the blocked count.
+  - **The prompt states the gate that actually blocked a capability.** A
+    `runtime_ring` block always reports the execution ring and never the
+    permission profile, even for an id with a stale `UNMET_HINT` entry
+    (`terminal`), because the profile may permit it while the ring refuses it.
+  Never assert a state — derive it. `describeCapability(id, { profile, sandboxRing })`
+  returns the reason. `resolveSandboxRing()` mirrors the executor's
+  `ringForBackend()` so the report and the executor cannot drift.
+- `selection.js` offers tools on `reachable`, NOT `executable`: tool offering is
+  unchanged from before (a ring-blocked tool is still offered and refused
+  honestly at execute time, never silently withheld). Only the reported
+  `available`/`executable` flag became ring-aware.
 - `requirements.js` infers what the REQUEST needs from its own words, decoupled
   from `Planner._classify`. A requirement is `explicit` (from the request's
   words) or an intent default; only explicit ones outrank the coding cap and a
@@ -162,6 +192,32 @@ only, no prose narratives in commits.
 - **Mutation-test new checks.** A test that passes before and after a fix proves
   nothing. Break the fix, confirm the check fails, restore. The evaluation
   scenarios in `evaluation/capability-tasks.js` were validated this way.
+- **Two known registry gaps, out of scope for Phase 2B (follow-up).** (1) MCP
+  providers are not profile-gated: `docs_lookup`, `papers` and `encyclopedia`
+  report `executable: true` even under `readonly`, because the registry applies
+  `RISK_TO_TIER` to NATIVE tools only (MCP servers carry their own grants). (2)
+  `executable` reflects the ring plus the `sideEffects` DECLARATION, not a
+  runtime `confirm` callback; `wiring/phase31-registries.js` builds its executor
+  with no `confirm`, so a future caller that passes one could see
+  `executable: true` on a tool the user then declines. Neither weakens a control
+  today — close them if MCP gating or interactive confirmation becomes a
+  requirement.
+- **Intent classification is substring matching — bound every short token.**
+  Phase 2A: the `legal_task` rule matched the bare substring `lease`, so
+  "the latest Node.js re·lease" routed to the legal team and lost its web tool;
+  `DomainRegistry` had short bare alternatives (`ode` in applied-mathematics,
+  `wes` in genetics-genomics) that matched inside "Node" and "newest". Phase 2B
+  closed the last gap: seven digit-bearing tokens were still unbounded — `3dof`,
+  `4g`, `6dof`, `cas9`, `gsm8k`, `m2m`, `ss7` — so "a 4GB file" matched
+  telecommunications through `4g`. All depth-0 bare tokens of 2–5 chars in
+  `DomainRegistry` are now delimited: the Phase 2B set with a literal `\b`, and
+  ~198 older ones (e.g. `dsp`, `pon`, `mimo`) with a raw 0x08 byte the original
+  author used as a boundary. Both are inert against ordinary prose (the 0x08
+  form only matches a literal backspace, so those acronyms do not match plain
+  input — a latent defect, not a false positive). Use `\b`, do not add more
+  0x08 bytes; a scan for undelimited depth-0 alternatives returns zero.
+  Regression: `tests/agi/test-intent-classification.js` (both directions,
+  including "a 4GB file" must not match and genuine 4G/SS7/M2M/Cas9 still do).
 
 ## Evaluation
 
