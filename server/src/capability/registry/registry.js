@@ -28,6 +28,8 @@ import { resolveToolDef, toolHasEngine, activeToolProfile, TOOL_PROFILES } from 
 import { getTool as getRegisteredTool } from '../../tools/registry/ToolRegistry.js';
 import { loadToolDirectory, mcpServerHealth } from '../../services/MCPGateway.js';
 import { succeededCapabilities, recordOutcome as _recordOutcome } from './ledger.js';
+import { makeRiskGuard } from '../../tools/execution/risk-guard.js';
+import { detectSandboxBackends } from '../../services/Sandbox.js';
 
 /** The four states, in order of increasing strength. */
 export const STATES = Object.freeze({
@@ -46,9 +48,31 @@ export const REASONS = Object.freeze({
   NO_ENGINE: 'no_engine',
   SERVER_OFFLINE: 'server_offline',
   PERMISSION_DENIED: 'permission_denied',
+  RUNTIME_RING: 'runtime_ring',      // blocked by the execution ring, not the profile
   NEVER_INVOKED: 'never_invoked',
+  UNKNOWN: 'unknown',                // reachability could not be established
   OK: 'ok',
 });
+
+/**
+ * The execution ring the active runtime enforces.
+ *
+ * Mirrors `ringForBackend()` in `tools/domains/executor.js` so the capability
+ * report and the executor cannot drift: docker OR namespaces ⇒ `container`,
+ * nothing enforced ⇒ `host`. This is a *report* of the guard's input — it does
+ * not change what the guard allows. Callers may inject `opts.sandboxRing` to
+ * make the result deterministic in tests.
+ */
+export function resolveSandboxRing() {
+  try {
+    const caps = detectSandboxBackends();
+    if (caps?.docker?.available) return 'container';
+    if (caps?.namespaces) return 'container';
+    return 'host';
+  } catch {
+    return 'container'; // the guard's own default when detection is unavailable
+  }
+}
 
 /** rank(state) → index, so callers can compare ("is it at least available?"). */
 export function stateRank(state) {
@@ -144,28 +168,46 @@ export function describeCapability(id, opts = {}) {
   const tiers = PROFILE_TIERS[profile] || PROFILE_TIERS.auto;
   const mcp = opts.mcp || mcpSnapshot();
   const succeededSet = opts.succeeded || succeededCapabilities();
+  /* Phase 2A — the execution ring is a SEPARATE gate from the profile. Before
+     this, `available` was `registered && hasEngine && permitted` and never
+     consulted the guard, so a ring-2 tool (term_execute, git_status…) reported
+     `available: true` while the executor refused it at the container ring. */
+  const sandboxRing = opts.sandboxRing || resolveSandboxRing();
+  const guard = makeRiskGuard({ sandboxRing });
 
   const providers = [];
   let anyExists = false;
   let anyRegistered = false;
-  let anyAvailable = false;
+  let anyReachable = false;   // registered && engine && permitted — the OLD `available`
+  let anyExecutable = false;  // reachable && the guard allows it (ring + sideEffects)
   const reasons = new Set();
 
   for (const p of entry.providers) {
-    const rec = { ...p, exists: false, registered: false, available: false };
+    const rec = { ...p, exists: false, registered: false, reachable: false, executable: false, available: false };
 
     if (p.tool) {
       const def = resolveToolDef(p.tool);
+      const regDef = getRegisteredTool(p.tool); // carries runtimeRing / sideEffects / riskLevel
       rec.exists = Boolean(def);
       rec.registered = rec.exists;
       rec.hasEngine = toolHasEngine(p.tool);
       const tier = RISK_TO_TIER[riskLevelOf(p.tool)];
       rec.tier = tier;
       rec.permitted = tiers.includes(tier);
-      rec.available = rec.registered && rec.hasEngine && rec.permitted;
-      if (!rec.registered) reasons.add(REASONS.NOT_REGISTERED);
-      else if (!rec.hasEngine) reasons.add(REASONS.NO_ENGINE);
-      else if (!rec.permitted) reasons.add(REASONS.PERMISSION_DENIED);
+      rec.reachable = rec.registered && rec.hasEngine && rec.permitted;
+      // Executability runs the SAME guard the executor runs — no second policy.
+      const ringCheck = regDef ? guard.check(regDef) : { allowed: false };
+      rec.ringAllowed = ringCheck.allowed;
+      rec.executable = rec.reachable && ringCheck.allowed;
+      rec.available = rec.executable;
+
+      const blockedBy = [];
+      if (!rec.registered) blockedBy.push(REASONS.NOT_REGISTERED);
+      else if (!rec.hasEngine) blockedBy.push(REASONS.NO_ENGINE);
+      else if (!rec.permitted) blockedBy.push(REASONS.PERMISSION_DENIED);
+      else if (!ringCheck.allowed) blockedBy.push(REASONS.RUNTIME_RING);
+      rec.blockedBy = blockedBy;
+      for (const b of blockedBy) reasons.add(b);
     } else if (p.mcpServer) {
       const dirEntry = mcp.directory[p.mcpServer];
       const known = Boolean(dirEntry && Array.isArray(dirEntry.tools) && dirEntry.tools.length);
@@ -173,28 +215,43 @@ export function describeCapability(id, opts = {}) {
       rec.registered = rec.exists;
       rec.connected = mcp.live.has(p.mcpServer);
       rec.toolCount = known ? dirEntry.tools.length : 0;
-      // A sleeping server wakes on first call, so "known to the directory"
-      // counts as available; only an unknown server is offline.
-      rec.available = rec.exists;
+      /* An MCP tool runs inside its own server process, outside this sandbox
+         ring, so the ring guard does not apply to it. Reachability is NOT
+         probed here (that would be an unreviewed external call), so it is
+         marked unprobed rather than claimed as verified. */
+      rec.probed = false;
+      rec.reachable = rec.exists;
+      rec.executable = rec.exists;
+      rec.available = rec.executable;
+      rec.blockedBy = rec.exists ? [] : [REASONS.SERVER_OFFLINE];
       if (!rec.exists) reasons.add(REASONS.SERVER_OFFLINE);
     }
 
     if (rec.exists) anyExists = true;
     if (rec.registered) anyRegistered = true;
-    if (rec.available) anyAvailable = true;
+    if (rec.reachable) anyReachable = true;
+    if (rec.executable) anyExecutable = true;
     providers.push(rec);
   }
 
+  const toolProvs = providers.filter((p) => p.tool);
   const succeeded = succeededSet.has(id);
-  // `state` is the strongest claim the registry can make, and it is derived
-  // from the providers rather than asserted.
+  const discoverable = anyExists || anyRegistered;
+  const permitted = toolProvs.length ? toolProvs.some((p) => p.permitted) : anyExists;
+  // The ring allows the capability when at least one provider passes the ring
+  // gate (a profile denial is reported separately, so the two never blur).
+  const ringAllowed = providers.some((p) => (p.tool ? p.ringAllowed : true));
+  const blockedBy = [...new Set(providers.flatMap((p) => p.blockedBy || []))].sort();
+
+  // `state` is the strongest claim the registry can make, derived from the
+  // providers. Reachable-but-not-executable is only a REGISTERED claim.
   const state = succeeded ? STATES.SUCCEEDED
-    : anyAvailable ? STATES.AVAILABLE
+    : anyExecutable ? STATES.AVAILABLE
       : anyRegistered ? STATES.REGISTERED
         : anyExists ? STATES.EXISTS
           : null;
 
-  const reason = anyAvailable ? REASONS.OK
+  const reason = anyExecutable ? REASONS.OK
     : (reasons.size ? [...reasons].sort()[0] : REASONS.NOT_IN_CATALOG);
 
   return {
@@ -204,10 +261,21 @@ export function describeCapability(id, opts = {}) {
     state,
     exists: anyExists,
     registered: anyRegistered,
-    available: anyAvailable,
+    discoverable,
+    permitted,
+    reachable: anyReachable,
+    executable: anyExecutable,
+    // DEPRECATED alias. Historically it meant "registered + engine + profile
+    // permits". It now equals `executable`, so a capability the active runtime
+    // guard blocks can never be reported `available: true` again. Prefer the
+    // explicit fields above.
+    available: anyExecutable,
     succeeded,
     reason,
     reasons: [...reasons].sort(),
+    blockedBy,
+    ringAllowed,
+    sandboxRing,
     profile,
     providers,
   };
@@ -227,14 +295,19 @@ export function listCapabilityStates(opts = {}) {
 }
 
 /**
- * The tool slugs a capability would contribute, restricted to those actually
- * available. This is what the tool-set builder merges in, so the model is
- * never handed a slug that cannot run.
+ * The tool slugs a capability would contribute, restricted to those the runtime
+ * can actually REACH (registered + engine + profile permits).
+ *
+ * This is what the tool-set builder merges in, so the model is never handed a
+ * slug that cannot run. It deliberately uses `reachable`, not `executable`:
+ * reachability is the same predicate this function always used, so tool
+ * offering is unchanged. Whether the ring lets the tool EXECUTE is surfaced
+ * separately by `blockedBy` / the ledger, not by silently dropping the slug.
  */
 export function availableToolsFor(id, opts = {}) {
   const d = describeCapability(id, opts);
-  if (!d.available) return [];
-  return d.providers.filter((p) => p.available && p.tool).map((p) => p.tool);
+  if (!d.reachable) return [];
+  return d.providers.filter((p) => p.reachable && p.tool).map((p) => p.tool);
 }
 
 /** Summarise availability for diagnostics and the "can you X?" answer. */
@@ -251,6 +324,13 @@ export function capabilitySummary(opts = {}) {
   return {
     total: all.length,
     ...byState,
+    // Phase 2A — the honest split. `executable` = the runtime guard permits it
+    // right now; `ringBlocked` = registered and reachable but refused by the
+    // execution ring. `available` (above) is the deprecated alias for the
+    // SUCCEEDED-or-executable bucket and equals `executable` here.
+    executable: all.filter((c) => c.executable).length,
+    ringBlocked: all.filter((c) => c.registered && c.blockedBy.includes(REASONS.RUNTIME_RING)).length,
+    sandboxRing: all[0]?.sandboxRing ?? null,
     profile: all[0]?.profile ?? null,
     capabilities: all,
   };

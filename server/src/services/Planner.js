@@ -891,7 +891,10 @@ NEGATIVE EXAMPLES (do NOT confuse these pairs):\n- "build a study planner app" �
       [/(android|iphone|ios|react native|flutter|mobile app|app store|play store|publish (my|the) app)/i, { intent: 'mobile_app', tasks: ['mobile-engineer', 'ios-engineer', 'android-engineer', 'react-native-engineer'], reasoning: 'Mobile task — the mobile team builds for the platform.' }],
       [/game (design|mechanics|idea|concept|dev)|unity (game|project)|unreal (engine|game)|make (a |my )?game (better|more fun)|game developer/i, { intent: 'game_dev', tasks: ['game-developer', 'designer', 'coder'], reasoning: 'Game task — the game team designs and builds it.' }],
       [/decorate (my|the) (room|house|home|apartment)|interior design|organi[sz]e (my|the) (room|house|closet|garage)|declutter|home (setup|improvement)|gardening|garden (plan|ideas|design)/i, { intent: 'home_life', tasks: ['home-org', 'interior-designer', 'gardener'], reasoning: 'Home/life task — the home team plans the space.' }],
-      [/(legal|contract|agreement|terms of service|privacy policy|non[- ]disclosure|\bnda\b|lease|draft (a|an|my|the) (contract|agreement|lease|terms)|compliance review|intellectual property|trademark|copyright)/i, { intent: 'legal_task', tasks: ['legal-drafter', 'negotiator', 'legal'], reasoning: 'Legal task — the legal team drafts documents and gives plain-language guidance.' }],
+      // Phase 2A — `lease` was a bare substring, so "re·lease" ("the latest
+      // Node.js release") classified as a legal task and the web-search request
+      // was routed to the legal team with no search tool. The token is bounded.
+      [/(legal|contract|agreement|terms of service|privacy policy|non[- ]disclosure|\bnda\b|\blease\b|draft (a|an|my|the) (contract|agreement|lease|terms)|compliance review|intellectual property|trademark|copyright)/i, { intent: 'legal_task', tasks: ['legal-drafter', 'negotiator', 'legal'], reasoning: 'Legal task — the legal team drafts documents and gives plain-language guidance.' }],
     ];
     for (const [re, res] of rules) {
       if (re.test(q)) return res;

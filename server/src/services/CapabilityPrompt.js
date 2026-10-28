@@ -29,6 +29,15 @@ const UNMET_HINT = {
   testing: 'no test runner is available',
 };
 
+/** Phase 2A — why a capability the profile permits is still not runnable. */
+const BLOCKED_HINT = {
+  runtime_ring: 'blocked by the execution sandbox ring for this session (not a permission setting)',
+  permission_denied: 'denied by the active permission profile',
+  no_engine: 'no engine is attached to its tool',
+  not_registered: 'its tool is not registered in this session',
+  server_offline: 'its MCP server is not known to the directory',
+};
+
 /**
  * Build the capability guidance block. Returns '' when there is nothing useful
  * to say, so a turn is never padded with boilerplate.
@@ -72,8 +81,14 @@ export async function capabilityPromptBlock(opts = {}) {
     lines.push('');
     lines.push(`NOT available in this session (${unavailable.length}) — do not claim to have used these:`);
     for (const c of unavailable) {
-      const hint = UNMET_HINT[c.id] ? ` (${UNMET_HINT[c.id]})` : ` (${c.reason})`;
-      lines.push(`  - ${c.id}: ${c.title}${hint}`);
+      // Prefer a plain-English note: the specific capability hint first, then
+      // the reason the guard actually blocked it (ring vs profile), then the
+      // raw reason code.
+      let hint;
+      if (UNMET_HINT[c.id]) hint = UNMET_HINT[c.id];
+      else if (c.blockedBy?.length && BLOCKED_HINT[c.blockedBy[0]]) hint = BLOCKED_HINT[c.blockedBy[0]];
+      else hint = c.reason;
+      lines.push(`  - ${c.id}: ${c.title} (${hint})`);
     }
   }
 

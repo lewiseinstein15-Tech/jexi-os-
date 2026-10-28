@@ -55,7 +55,12 @@ export async function selectCapabilityTools({ query, plan = {}, profile, expandA
     const explicit = id !== 'coding-intent';
 
     const d = describeCapability(capability, profile ? { profile } : {});
-    if (!d.available) {
+    /* Phase 2A — offering keys on REACHABILITY (registered + engine + profile),
+       which is exactly the predicate this function has always used. The
+       execution ring is reported through `blockedBy` and enforced at execute
+       time, so a reachable-but-ring-blocked tool is still offered and refused
+       honestly rather than silently withheld. */
+    if (!d.reachable) {
       unavailable.push({ capability, reason: d.reason });
       continue;
     }
@@ -66,7 +71,7 @@ export async function selectCapabilityTools({ query, plan = {}, profile, expandA
        nobody asked for. The request's own words are the floor, not a licence to
        widen the surface. `expandAll` exists for callers that genuinely want
        the full set. */
-    const candidates = d.providers.filter((p) => p.available && p.tool && resolveToolDef(p.tool) && toolHasEngine(p.tool));
+    const candidates = d.providers.filter((p) => p.reachable && p.tool && resolveToolDef(p.tool) && toolHasEngine(p.tool));
     const chosen = expandAll ? candidates : candidates.slice(0, 1);
 
     let added = 0;
