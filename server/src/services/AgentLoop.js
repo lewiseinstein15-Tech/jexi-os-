@@ -47,6 +47,7 @@ import { INTENT_BUDGETS, budgetForIntent, activeCodingSkill } from './agent/Inte
 import { LOOP_BREAKER_LIMIT, loopKeyFor, loopBreakerTrips, loopBreakerMessage, repeatReminderFor } from './agent/LoopBreaker.js';
 import { checkToolAgainstContract } from './agent/ContractGate.js';
 import { buildOfferedTools } from './agent/ToolSetBuilder.js';
+import { recordOutcome as recordCapabilityOutcome } from '../capability/registry/ledger.js'; // capability evidence ledger
 import { verifyAfterEdit } from '../verification/loop/auto-verify.js'; // JEXI-002 — the REAL verification subsystem
 
 // DeepSeek-Harness-style loop: more steps per turn (the rate limiter
@@ -195,6 +196,12 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
     tools: toolDefs.map((t) => ({ slug: t.slug, name: t.name, type: t.type })),
     profile, profileLabel: TOOL_PROFILES[profile]?.label,
     codeMode,
+    /* The capabilities the REQUEST required, and any that were required but
+       unavailable. Published on the plan event so the stream (and the tests)
+       can see what the runtime believed it could do, separately from what the
+       classifier called the turn. */
+    requiredCapabilities: (offered.requiredTools || []).map((t) => t.capability),
+    unavailableCapabilities: (offered.capability?.unavailable || []).map((u) => u.capability),
   });
   emit('agent.log', { message: `🧠 Plan: ${plan.planSummary || plan.intent}. Native tool-calling loop with ${schemas.length} executable tools (profile: ${profile}).` });
 
@@ -294,6 +301,12 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
       // durable lifecycle events (session-event vocabulary).
       try { lifecycleStepStart(convId, 1, callsMade); lifecycleToolCall(convId, 1, callsMade, call.id, call.name, call.arguments || {}); } catch { /* noop */ }
       const r = await executeTool({ slug: call.name, args: call.arguments || {}, profile, sendEvent: emit, confirm: opts.confirm, codeTools: codeMode ? codeTools : undefined, spillOwner: opts.spillOwner, ...(opts.subagentId ? { subagentId: opts.subagentId } : {}) });
+      /* Capability ledger — record what actually happened, so "JEXI can do X"
+         is backed by evidence rather than by the tool being registered. A
+         refusal and a failure are recorded as distinct outcomes; a red test
+         verdict is not a success. Fail-soft: a ledger write must never break
+         the turn. */
+      try { recordCapabilityOutcome({ tool: call.name, result: r }); } catch { /* ledger is observational */ }
       try { emit('tool/result', { callId: call.id, name: call.name, ok: !!r.ok, error: r.error || null }); } catch (e) {}
       try { lifecycleToolResult(convId, 1, callsMade, call.id, call.name, !!r.ok, r.error, r.durationMs); } catch { /* noop */ }
       try { emit('step/end', { turn: 1, step: callsMade }); } catch (e) {}

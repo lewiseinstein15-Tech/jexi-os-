@@ -157,3 +157,8 @@ export const CATEGORIES = [
   { name: 'tool-discovery', label: 'Tool-discovery tasks', tasks: toolDiscovery },
   { name: 'memory-transfer', label: 'Memory-transfer tasks', tasks: memoryTransfer },
 ];
+
+// The agent-runtime mission's nine scenarios, as real checks against the
+// capability registry, tool-set builder, domain executor and verification loop.
+const { CAPABILITY_CATEGORY } = await import('./capability-tasks.js');
+CATEGORIES.push(CAPABILITY_CATEGORY);

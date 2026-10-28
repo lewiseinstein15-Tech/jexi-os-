@@ -19,6 +19,7 @@ import { registerDataTools } from './data/index.js';
 import { registerDelegationTools } from './delegation/index.js';
 import { registerLspTools } from './lsp/index.js';
 import { registerCommunicationTools } from './communication/index.js';
+import { registerCapabilityTools } from './capability/index.js';
 
 export function registerAllDomains(extras = {}) {
   const fs = registerFilesystemTools();
@@ -33,8 +34,9 @@ export function registerAllDomains(extras = {}) {
   const delegation = registerDelegationTools();
   const lsp = registerLspTools();
   const communication = registerCommunicationTools();
+  const capability = registerCapabilityTools();
   return {
-    unreg: () => { fs.unreg(); term.unreg(); web.unreg(); mem.unreg(); browser.unreg(); git.unreg(); github.unreg(); testing.unreg(); data.unreg(); delegation.unreg(); lsp.unreg(); communication.unreg(); },
+    unreg: () => { fs.unreg(); term.unreg(); web.unreg(); mem.unreg(); browser.unreg(); git.unreg(); github.unreg(); testing.unreg(); data.unreg(); delegation.unreg(); lsp.unreg(); communication.unreg(); capability.unreg(); },
     engines: {
       ...fs.engines,
       ...term.engines,
@@ -48,6 +50,7 @@ export function registerAllDomains(extras = {}) {
       ...delegation.engines,
       ...lsp.engines,
       ...communication.engines,
+      ...capability.engines,
       ...extras,
     },
   };

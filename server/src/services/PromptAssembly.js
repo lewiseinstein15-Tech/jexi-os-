@@ -209,6 +209,18 @@ export async function assemblePrompt({
     push('tools-sdk', renderToolsSdk(codeTools), true);
   }
 
+  // -45 capability guidance: what JEXI can actually do in THIS session.
+  // Derived from the live capability registry (registered + available + the
+  // evidence ledger), never from a static prompt. This is the prompt-side half
+  // of the capability fix: the tool MENU is fixed in ToolSetBuilder, and this
+  // tells the model which of those things are real, which are unavailable and
+  // must not be claimed, and what has actually worked so far.
+  try {
+    const { capabilityPromptBlock } = await import('./CapabilityPrompt.js');
+    const block = await capabilityPromptBlock();
+    if (block) push('capabilities', block, true);
+  } catch { /* capability guidance is best-effort — never break the prompt */ }
+
   // -30 preset flavor.
   if (presetFlavor) push('flavor', presetFlavor);
 

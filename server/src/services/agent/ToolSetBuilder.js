@@ -30,11 +30,16 @@ import { listPluginTools } from '../PluginContext.js';
 import { selectMcpToolset } from '../CapabilityRouter.js';
 import { isCodingIntent, isCodingToolSchema, CODING_TOOL_PREFIXES } from './CodingLoop.js';
 import { activeCodingSkill } from './IntentRouter.js';
+import { selectCapabilityTools } from '../../capability/registry/selection.js';
 
 /** Control-plane tools a model may always reach, whatever the plan says. */
 export const ALWAYS_AVAILABLE = [
   'ask_user_question', 'exit_plan_mode', 'workflow', 'send_message',
   'interrupt_agent', 'get_goal', 'create_goal', 'update_goal',
+  // Capability introspection is control-plane, not task work: the model must be
+  // able to ask what it can do in THIS session at any point, including when it
+  // is unsure whether a request is possible. Safe, read-only, idempotent.
+  'capability_check',
 ];
 
 const schemaNameOf = (sc) => String(sc?.name || sc?.function?.name || '').toLowerCase();
@@ -75,6 +80,40 @@ export async function buildOfferedTools({ plan, query, codeMode = false, emit = 
   // the static registry alone dropped every domain tool, which is to say all
   // of the ones a coding turn exists to call.
   const toolDefs = (plan.tools || []).map((slug) => resolveToolDef(slug)).filter(Boolean).slice(0, 12);
+
+  /* 1b — CAPABILITY REQUIREMENTS (the fix for "claims unavailable, works when
+     told"). `plan.tools` is derived from the classified intent, so a misroute
+     silently withholds the tools the request plainly asks for: measured, "run
+     ls -la in the terminal" classified as `learning_research` and was offered
+     36 tools with no terminal among them.
+
+     Infer the capabilities the REQUEST requires from its own words, verify each
+     against the live registry, and merge the resulting slugs in. This is
+     additive and never fatal — a failure here must not take the turn's own
+     tools down with it. */
+  const requiredTools = [];
+  let capabilityReport = null;
+  try {
+    const sel = await selectCapabilityTools({ query, plan });
+    capabilityReport = sel;
+    for (const t of sel.tools) {
+      if (toolDefs.some((d) => d.slug === t.slug)) continue;
+      const def = resolveToolDef(t.slug);
+      if (def) { toolDefs.push(def); requiredTools.push(t); }
+    }
+    if (requiredTools.length) {
+      emit('agent.log', {
+        message: `🧭 capability requirements: +${requiredTools.length} tool(s) the request needs (${[...new Set(requiredTools.map((t) => t.capability))].join(', ')}) — added regardless of the classified intent.`,
+      });
+    }
+    for (const u of sel.unavailable) {
+      emit('agent.log', {
+        message: `⛔ required capability "${u.capability}" is NOT available in this session (${u.reason}) — do not claim to have used it.`,
+      });
+    }
+  } catch (e) {
+    emit('agent.log', { message: `⚠ capability requirement check failed: ${e.message} — the offered set may miss required tools.` });
+  }
 
   // 2 — mounted plugin tools, which the planner has never seen
   let pluginTools = [];
@@ -144,7 +183,42 @@ export async function buildOfferedTools({ plan, query, codeMode = false, emit = 
       }
 
       const before = schemas.length;
-      schemas = schemas.filter((sc) => allow.has(schemaNameOf(sc)));
+      /* A skill bounds the turn — but only as far as its allowlist is real.
+         Some shipped skills declare prose instead of tool slugs: `debugging`
+         lists ["read","edit","terminal.execute","testing.run"], none of which
+         resolve. Intersecting against that removes every real tool the plan
+         asked for (observed: fs_read and pytest_run dropped, leaving a turn
+         that exists to run pytest with no test tool). Narrowing by a list that
+         does not correspond to the tool registry is not policy, it is a bug,
+         so an allowlist with no resolvable entry is not used to narrow at all.
+         The plan's tools and the request's explicit requirements stand. */
+      const resolvableAllow = [...allow].filter((s) => resolveToolDef(s));
+      if (resolvableAllow.length === 0) {
+        emit('agent.log', {
+          message: `⚠ skill "${skill.slug}" allowedTools (${[...allow].join(', ')}) names no real tool — NOT narrowing, so the turn keeps the plan's tools. Fix the skill's allowedTools.`,
+        });
+      } else {
+        // The user's own explicit request outranks a skill's declared list, so
+        // extend the allowlist with it BEFORE intersecting: the invariant
+        // "everything offered is inside allowedTools" then still holds, and the
+        // widening is visible rather than a silent exception to the rule.
+        const explicitSlugs = requiredTools.filter((t) => t.explicit).map((t) => t.slug);
+        const extended = explicitSlugs.filter((s) => !allow.has(s));
+        for (const s of extended) allow.add(s);
+        const effective = new Set([...resolvableAllow, ...extended]);
+        schemas = schemas.filter((sc) => effective.has(schemaNameOf(sc)));
+        if (extended.length) {
+          emit('agent.log', {
+            message: `🧩 skill "${skill.slug}" allowedTools extended with explicitly required tool(s): ${extended.join(', ')}.`,
+          });
+        }
+        const unresolved = [...allow].filter((s) => !resolveToolDef(s));
+        if (unresolved.length) {
+          emit('agent.log', {
+            message: `⚠ skill "${skill.slug}" allowedTools names ${unresolved.length} entry/entries that are not real tools (${unresolved.join(', ')}) — ignored for narrowing.`,
+          });
+        }
+      }
 
       // A skill that resolves to nothing is a bug, not a policy: the model
       // would silently degrade to prose. Say so loudly.
@@ -174,10 +248,18 @@ export async function buildOfferedTools({ plan, query, codeMode = false, emit = 
       if (isCodingToolSchema(sc)) kept.push(sc); else withheld.push(sc);
     }
     if (withheld.length) {
-      withheldCount = withheld.length;
-      schemas = kept;
+      /* The cap exists to stop a coding turn drowning in the catalogue. It must
+         NOT withhold a tool the request explicitly asked for — "fix the failing
+         test AND search the web for the error" is one turn that needs both, and
+         the requirement inference is what knows that. Re-add the explicit ones
+         and say so. */
+      const explicitSlugs = new Set(requiredTools.filter((t) => t.explicit).map((t) => t.slug));
+      const rescued = withheld.filter((sc) => explicitSlugs.has(schemaNameOf(sc)));
+      const stillWithheld = withheld.filter((sc) => !explicitSlugs.has(schemaNameOf(sc)));
+      schemas = [...kept, ...rescued];
+      withheldCount = stillWithheld.length;
       emit('agent.log', {
-        message: `🧰 coding tool set: ${kept.length} tools (fs / terminal / test / git), ${withheld.length} withheld from the ${kept.length + withheld.length} offered — say "search the web" to reach them.`,
+        message: `🧰 coding tool set: ${kept.length} tools (fs / terminal / test / git)${rescued.length ? ` + ${rescued.length} explicitly required (${rescued.map(schemaNameOf).join(', ')})` : ''}, ${stillWithheld.length} withheld from the ${schemas.length + stillWithheld.length} offered.`,
       });
     }
   }
@@ -193,5 +275,5 @@ export async function buildOfferedTools({ plan, query, codeMode = false, emit = 
     } catch { /* code mode is optional */ }
   }
 
-  return { schemas, toolDefs, skill, notes, withheldCount, mcpCount, coding, codeModeTools };
+  return { schemas, toolDefs, skill, notes, withheldCount, mcpCount, coding, codeModeTools, capability: capabilityReport, requiredTools };
 }
