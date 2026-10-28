@@ -1,6 +1,6 @@
 # JEXI — laptop installer (Windows PowerShell).
 #
-#   irm https://raw.githubusercontent.com/lewiseinstein15-Tech/jexi-os-/main/cli/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/lewiseinstein15-Tech/jexi-os-/main/interfaces/cli/install.ps1 | iex
 #
 # Installs: %USERPROFILE%\.jexi\repo + backend deps + `jexi` on PATH.
 # Then: jexi init
@@ -13,11 +13,16 @@ $BinDir = Join-Path $HOME ".jexi\bin"
 function Need($cmd, $hint) {
   if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) { throw "$cmd not found — $hint" }
 }
-Need node "install Node.js 20+ (https://nodejs.org), then re-run."
+Need node "install Node.js 22.5+ (https://nodejs.org), then re-run."
 Need git "install git (https://git-scm.com), then re-run."
 Need npm "install npm (ships with Node.js), then re-run."
-$nodeMajor = [int]((node -p "process.versions.node.split('.')[0]"))
-if ($nodeMajor -lt 20) { throw "node $(node --version) is too old — JEXI needs Node.js 20+." }
+$nodeParts = (node -p "process.versions.node").Split(".")
+$nodeMajor = [int]$nodeParts[0]
+$nodeMinor = [int]$nodeParts[1]
+# The backend uses node:sqlite (DatabaseSync), which landed in Node 22.5.
+if ($nodeMajor -lt 22 -or ($nodeMajor -eq 22 -and $nodeMinor -lt 5)) {
+  throw "node $(node --version) is too old — JEXI needs Node.js 22.5+ (for node:sqlite)."
+}
 
 if (Test-Path (Join-Path $Dest ".git")) {
   Write-Host "Updating $Dest…"
@@ -37,7 +42,7 @@ Pop-Location
 
 New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
 $shim = Join-Path $BinDir "jexi.cmd"
-"@echo off`r`nnode `"$Dest\cli\jexi.js`" %*" | Out-File -Encoding ascii $shim
+"@echo off`r`nnode `"$Dest\interfaces\cli\jexi.js`" %*" | Out-File -Encoding ascii $shim
 
 $path = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($path -notlike "*$BinDir*") {

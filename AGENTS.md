@@ -104,8 +104,29 @@ only, no prose narratives in commits.
   `DOTENV_CONFIG_QUIET=true node scripts/scope-b-probe.mjs` to silence dotenv
   tips. Do NOT run real `node --test` as a child under the test harness.
 
+## Installer (`interfaces/cli/install.sh`, `install.ps1`)
+
+- Installs to `~/.jexi/repo`, backend deps, and a `jexi` shim on PATH.
+- Node requirement is **22.5+**, not 20 — the backend imports `node:sqlite`
+  (`DatabaseSync`), which landed in 22.5. `install.sh`, `install.ps1`, and
+  `doctor.checkNodeVersion` all enforce the minor version.
+- The CLI lives at `interfaces/cli/`, so every installer path is
+  `interfaces/cli/jexi.js`. The documented one-liner URL and the symlink/shim
+  target must both use that prefix.
+- Verify a change with a throwaway HOME:
+  `HOME=$(mktemp -d) bash interfaces/cli/install.sh` then run the shim.
+
 ## Gotchas
 
+- **Never construct a `readline` interface on `process.stdin` at module load.**
+  The wizard did (`const _tty = … ? createPrompter() : null`), which opened a
+  handle that kept the event loop alive, so EVERY command (`jexi help`,
+  `jexi version`, `jexi tui`) printed its output and then hung until Ctrl-C
+  whenever stdin was a TTY. Build it lazily on first prompt instead. Piped
+  stdin hid the bug completely — it only reproduced on a real terminal.
+- To test a command that needs a TTY, use a pty and reap the child after EIO
+  (`python3 -c 'import pty; pty.fork()'` or `script`); a bare pipe or
+  `</dev/null` will silently pass the buggy path.
 - `node --test` recursion: a child `node --test` inside a parent `node --test`
   process exits 0 immediately (`node:test run() ... recursively ... skipping`),
   which would make a failing test look like a pass. Use plain assert scripts

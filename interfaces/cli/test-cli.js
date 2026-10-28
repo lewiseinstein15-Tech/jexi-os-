@@ -119,6 +119,29 @@ await ok('wizard: port validation', () => {
   assert.ok(!validPort('80') && !validPort('abc') && !validPort('99999'));
 });
 
+// Regression: importing the CLI must not open a handle on process.stdin.
+// The wizard used to build a readline interface at module load, which kept the
+// event loop alive forever, so every command (help, version, …) printed its
+// output and then hung until Ctrl-C whenever stdin was a TTY.
+// fd 0 is stdin; the stdout/stderr pipes (fd 1/2) are expected and harmless.
+// NOTE: this harness runs with piped stdin, so it catches the unconditional
+// variant of the bug. The TTY-only variant is covered by the real-tty run
+// (`node lib/tui/../jexi.js help` must exit, not hang).
+await ok('wizard: module import opens no stdin (fd 0) handle', () => {
+  const fds = (process._getActiveHandles() || [])
+    .map((h) => (h && typeof h.fd === 'number' ? h.fd : (h && h._handle && h._handle.fd)))
+    .filter((fd) => typeof fd === 'number');
+  assert.ok(!fds.includes(0), `a handle on stdin (fd 0) leaked: fds=${fds.join(',')}`);
+});
+
+await ok('doctor: node version requires >= 22.5 (node:sqlite)', () => {
+  assert.ok(doctor.checkNodeVersion('v22.5.0').ok);
+  assert.ok(doctor.checkNodeVersion('v24.0.0').ok);
+  assert.ok(!doctor.checkNodeVersion('v22.4.0').ok);
+  assert.ok(!doctor.checkNodeVersion('v20.1.0').ok);
+  assert.ok(!doctor.checkNodeVersion('v18.0.0').ok);
+});
+
 await ok('wizard: server validators load', async () => {
   const v = await importServerModule(findServerDir(), 'src/services/providers/modelConfig.js');
   const r = v.validateModelConfig({ provider: 'groq', apiKey: 'k', model: 'm' });
@@ -126,7 +149,7 @@ await ok('wizard: server validators load', async () => {
 });
 
 await ok('doctor: node/server/deps/browser shapes', () => {
-  assert.ok(doctor.checkNodeVersion('v20.1.0').ok);
+  assert.ok(doctor.checkNodeVersion('v22.5.0').ok);
   assert.ok(!doctor.checkNodeVersion('v18.0.0').ok);
   const dir = findServerDir();
   assert.ok(doctor.checkServerDir(dir).ok);

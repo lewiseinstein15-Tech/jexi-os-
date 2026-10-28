@@ -12,10 +12,13 @@ import { execFile } from 'node:child_process';
 export function checkNodeVersion(version = process.version) {
   const m = String(version).match(/^v(\d+)\.(\d+)/);
   const major = m ? Number(m[1]) : 0;
+  const minor = m ? Number(m[2]) : 0;
+  // The backend uses node:sqlite (DatabaseSync), which landed in Node 22.5.
+  const ok = major > 22 || (major === 22 && minor >= 5);
   return {
     name: 'node',
-    ok: major >= 20,
-    detail: major >= 20 ? `${version} (>= 20 required)` : `${version} — install Node.js 20+ (https://nodejs.org)`,
+    ok,
+    detail: ok ? `${version} (>= 22.5 required)` : `${version} — install Node.js 22.5+ (https://nodejs.org)`,
   };
 }
 

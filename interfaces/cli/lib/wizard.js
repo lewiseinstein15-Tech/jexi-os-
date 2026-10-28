@@ -83,17 +83,30 @@ export function createPrompter() {
 }
 
 // Back-compat singletons used by unit tests (TTY path).
-const _tty = process.stdin.isTTY ? createPrompter() : null;
+//
+// LAZY on purpose. Creating a readline interface on process.stdin at module
+// load opens a handle that keeps the event loop alive forever, so EVERY
+// command (`jexi help`, `jexi version`, …) printed its output and then hung
+// until Ctrl-C when stdin was a TTY. Build it on first use instead.
+let _tty = null;
+function ttyPrompter() {
+  if (!process.stdin.isTTY) return null;
+  if (!_tty) _tty = createPrompter();
+  return _tty;
+}
 export function prompt(question, opts) {
-  if (_tty) return _tty.prompt(question, opts);
+  const t = ttyPrompter();
+  if (t) return t.prompt(question, opts);
   return createPrompter().prompt(question, opts);
 }
 export function promptHidden(question) {
-  if (_tty) return _tty.promptHidden(question);
+  const t = ttyPrompter();
+  if (t) return t.promptHidden(question);
   return createPrompter().promptHidden(question);
 }
 export function closePrompts() {
   try { _tty?.close(); } catch {}
+  _tty = null;
 }
 
 export async function loadCatalog(serverDir) {
