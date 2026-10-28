@@ -116,8 +116,60 @@ only, no prose narratives in commits.
 - Verify a change with a throwaway HOME:
   `HOME=$(mktemp -d) bash interfaces/cli/install.sh` then run the shim.
 
+## Capability registry (`server/src/capability/registry`)
+
+- Four-state model: `exists` → `registered` → `available` → `succeeded`.
+  `available` = registered AND has an engine AND permitted by the ACTIVE profile;
+  `succeeded` = a real, non-refused success in the outcome ledger. Never assert a
+  state — derive it. `describeCapability(id, { profile })` returns the reason.
+- `requirements.js` infers what the REQUEST needs from its own words, decoupled
+  from `Planner._classify`. A requirement is `explicit` (from the request's
+  words) or an intent default; only explicit ones outrank the coding cap and a
+  skill's allowlist.
+- `selection.js` offers a MINIMAL set (one provider per capability) and only
+  slugs that resolve AND have an engine. `expandAll: true` for the full set.
+- `ledger.js` distinguishes `succeeded` / `refused` / `failed`. A transport-ok
+  result with a failing VERDICT is a failure; a refusal is not a failure.
+  Wired into `AgentLoop` right after `executeTool`.
+- `capabilityPromptBlock()` (`services/CapabilityPrompt.js`) generates the
+  prompt section; `capability_check` (control-plane, always reachable) answers
+  "can you do this?" from the runtime.
+
 ## Gotchas
 
+- **Tool discovery is a function of the request, not the classifier.**
+  `plan.tools` comes from the classified intent via `toolsForTeam`, so a misroute
+  silently withholds the right tools. `ToolSetBuilder` step 1b merges the
+  required capabilities in afterwards — if you remove that step, "run ls -la in
+  the terminal" is offered 36 tools with no terminal among them.
+- **`resolveToolDef` returns a probe stub WITHOUT `riskLevel` for domain tools**
+  (`{slug,name,desc,permission}`). `def.riskLevel ?? 'medium'` therefore maps
+  every domain tool to `medium` and `readonly` denies `fs_read` (declared
+  `'low'`). Read risk from `tools/registry/ToolRegistry.js` `getTool`, which is
+  the definition the domain executor actually gates on.
+- **Two tool registries.** `services/ToolRegistry.js` (legacy, `TOOL_REGISTRY`)
+  and `tools/registry/ToolRegistry.js` (domain). `resolveToolDef` consults the
+  legacy one and falls back to a domain probe. They disagree on shape — check
+  which one you need.
+- **`debugging` skill's `allowedTools` is prose, not slugs**
+  (`["read","edit","terminal.execute","testing.run"]`). `ToolSetBuilder` now
+  refuses to narrow by an allowlist with no resolvable entry and logs a warning.
+  The skill data is still wrong; fixing it is the right follow-up.
+- `term_execute` is DEGRADED in the dev container: `unshare: write failed
+  /proc/self/uid_map: Operation not permitted`. The engine reports the real
+  stderr and marks the sandbox `degraded` rather than faking success. Do not
+  write a test that assumes the command runs — assert the honesty instead.
+- **Mutation-test new checks.** A test that passes before and after a fix proves
+  nothing. Break the fix, confirm the check fails, restore. The evaluation
+  scenarios in `evaluation/capability-tasks.js` were validated this way.
+
+## Evaluation
+
+- `node evaluation/run.js` (from `server/`) — the full suite, gates at 0.90.
+  6 original categories plus `capability-runtime` (`evaluation/capability-tasks.js`,
+  13 scenarios covering the agent-runtime mission: task completion, tool
+  selection, execution success, verification quality, false-success claims).
+  Appends a dated row to `evaluation/RESULTS.md`.
 - **Never construct a `readline` interface on `process.stdin` at module load.**
   The wizard did (`const _tty = … ? createPrompter() : null`), which opened a
   handle that kept the event loop alive, so EVERY command (`jexi help`,
@@ -149,7 +201,10 @@ only, no prose narratives in commits.
     `git -c credential.helper='!f(){ echo username=x-access-token; echo password=$GITHUB_TOKEN; };f' \
        push https://github.com/lewiseinstein15-Tech/jexi-os-.git main:main`
   Then `fetch origin main` to refresh the tracking ref (an explicit-URL push
-  does not update it). Set `GIT_TERMINAL_PROMPT=0` so a bad credential fails
+  does not update it).
+  - CONFIRMED 2026-10-27: the inline-URL form works too and needs no helper:
+    `git push "https://oauth2:${GITHUB_TOKEN}@github.com/lewiseinstein15-Tech/jexi-os-.git" main`
+    followed by `git fetch <same-url> main:refs/remotes/origin/main`. Set `GIT_TERMINAL_PROMPT=0` so a bad credential fails
   fast instead of hanging on a password prompt.
 - `$HOME` is load-bearing for the CLI (`~/.jexi`, `~/.local/bin`). If you export
   `HOME` to sandbox a test, EXPORT IT BACK (`export HOME=/home/openhands`)
