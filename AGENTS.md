@@ -131,6 +131,20 @@ only, no prose narratives in commits.
     `available: true` while the executor refused it at the `container` ring. It
     now equals `executable`, so that lie cannot recur. Prefer the explicit
     fields; `blockedBy` names the gate (`runtime_ring` vs `permission_denied`).
+  - **`available + succeeded === executable` is CONDITIONAL (Phase 2B).** It
+    holds only while no capability is succeeded-but-currently-blocked. Success
+    is historical evidence and is never erased by the current gate, so a
+    capability that succeeded earlier (e.g. at the host ring) stays `state:
+    succeeded` while `executable: false`. The exact relation is
+    `available + succeeded - executable === (succeeded && !executable)`.
+    `capabilitySummary().ringBlocked` counts
+    `registered && !executable && blockedBy.includes('runtime_ring')` — the
+    `!executable` term keeps an executable MCP-backed capability (a ring-2
+    native provider plus an out-of-ring MCP provider) out of the blocked count.
+  - **The prompt states the gate that actually blocked a capability.** A
+    `runtime_ring` block always reports the execution ring and never the
+    permission profile, even for an id with a stale `UNMET_HINT` entry
+    (`terminal`), because the profile may permit it while the ring refuses it.
   Never assert a state — derive it. `describeCapability(id, { profile, sandboxRing })`
   returns the reason. `resolveSandboxRing()` mirrors the executor's
   `ringForBackend()` so the report and the executor cannot drift.
@@ -178,15 +192,32 @@ only, no prose narratives in commits.
 - **Mutation-test new checks.** A test that passes before and after a fix proves
   nothing. Break the fix, confirm the check fails, restore. The evaluation
   scenarios in `evaluation/capability-tasks.js` were validated this way.
+- **Two known registry gaps, out of scope for Phase 2B (follow-up).** (1) MCP
+  providers are not profile-gated: `docs_lookup`, `papers` and `encyclopedia`
+  report `executable: true` even under `readonly`, because the registry applies
+  `RISK_TO_TIER` to NATIVE tools only (MCP servers carry their own grants). (2)
+  `executable` reflects the ring plus the `sideEffects` DECLARATION, not a
+  runtime `confirm` callback; `wiring/phase31-registries.js` builds its executor
+  with no `confirm`, so a future caller that passes one could see
+  `executable: true` on a tool the user then declines. Neither weakens a control
+  today — close them if MCP gating or interactive confirmation becomes a
+  requirement.
 - **Intent classification is substring matching — bound every short token.**
   Phase 2A: the `legal_task` rule matched the bare substring `lease`, so
   "the latest Node.js re·lease" routed to the legal team and lost its web tool;
   `DomainRegistry` had short bare alternatives (`ode` in applied-mathematics,
-  `wes` in genetics-genomics) that matched inside "Node" and "newest". All
-  depth-0 bare tokens of 2–5 chars are now `\b…\b`-wrapped (the author already
-  did this for most acronyms — extend the convention, do not start a second
-  one). When adding a new rule, wrap any token that is not a deliberate prefix.
-  Regression: `tests/agi/test-intent-classification.js` (both directions).
+  `wes` in genetics-genomics) that matched inside "Node" and "newest". Phase 2B
+  closed the last gap: seven digit-bearing tokens were still unbounded — `3dof`,
+  `4g`, `6dof`, `cas9`, `gsm8k`, `m2m`, `ss7` — so "a 4GB file" matched
+  telecommunications through `4g`. All depth-0 bare tokens of 2–5 chars in
+  `DomainRegistry` are now delimited: the Phase 2B set with a literal `\b`, and
+  ~198 older ones (e.g. `dsp`, `pon`, `mimo`) with a raw 0x08 byte the original
+  author used as a boundary. Both are inert against ordinary prose (the 0x08
+  form only matches a literal backspace, so those acronyms do not match plain
+  input — a latent defect, not a false positive). Use `\b`, do not add more
+  0x08 bytes; a scan for undelimited depth-0 alternatives returns zero.
+  Regression: `tests/agi/test-intent-classification.js` (both directions,
+  including "a 4GB file" must not match and genuine 4G/SS7/M2M/Cas9 still do).
 
 ## Evaluation
 

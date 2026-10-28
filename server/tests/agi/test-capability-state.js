@@ -138,6 +138,80 @@ test('capability truth: the summary separates executable from ring-blocked', asy
   assert.equal(s.available + s.registered + s.exists + s.succeeded + s.unavailable, s.total);
 });
 
+/* ── Phase 2B F2: the ringBlocked metric is exactly its definition ───────── */
+
+test('capability truth: ringBlocked equals the registered, non-executable, ring-blocked count', async () => {
+  await primeCapabilities();
+  const s = await capabilitySummaryAsync({ sandboxRing: RING });
+  const expected = s.capabilities.filter(
+    (c) => c.registered && !c.executable && c.blockedBy.includes('runtime_ring'),
+  ).length;
+  assert.equal(s.ringBlocked, expected,
+    `ringBlocked (${s.ringBlocked}) must equal registered && !executable && runtime_ring (${expected})`);
+});
+
+test('capability truth: an executable MCP-backed capability is not counted ring-blocked', async () => {
+  await primeCapabilities();
+  // web_search has a ring-2 NATIVE provider AND MCP providers that run outside
+  // the ring, so the capability itself is executable. Its native provider is
+  // still ring-blocked — but the capability must NOT be counted as blocked.
+  const d = describeCapability('web_search', { sandboxRing: RING });
+  assert.equal(d.executable, true, 'web_search is executable through its MCP providers');
+  assert.ok(d.providers.some((p) => p.tool && p.blockedBy?.includes('runtime_ring')),
+    'its native provider is ring-blocked');
+  assert.equal(d.blockedBy.includes('runtime_ring'), true, 'blockedBy still names the native provider gate');
+
+  const s = await capabilitySummaryAsync({ sandboxRing: RING });
+  assert.equal(s.capabilities.find((c) => c.id === 'web_search').blockedBy.includes('runtime_ring'), true);
+  // The metric must exclude it: it is executable, so it is not "ring-blocked".
+  assert.equal(s.ringBlocked, s.capabilities.filter(
+    (c) => c.registered && !c.executable && c.blockedBy.includes('runtime_ring'),
+  ).length, 'the metric must not count an executable capability');
+});
+
+/* ── Phase 2B F3: the prompt states the RING, not the profile ───────────── */
+
+test('capability prompt: a ring-blocked terminal is reported as a ring limit, not a profile limit', async () => {
+  await primeCapabilities();
+  const { capabilityPromptBlock } = await import('../../src/services/CapabilityPrompt.js');
+  const block = await capabilityPromptBlock({ sandboxRing: RING });
+  assert.ok(block.includes('terminal'), 'the block must mention terminal');
+  // Find the terminal line and assert it names the ring, not the profile.
+  const line = block.split('\n').find((l) => l.trim().startsWith('- terminal:'));
+  assert.ok(line, `terminal must be listed as unavailable, block was:\n${block}`);
+  assert.match(line, /sandbox ring/i, `the terminal line must name the execution ring: ${line}`);
+  assert.doesNotMatch(line, /permission profile/i,
+    `the terminal line must NOT blame the permission profile: ${line}`);
+});
+
+/* ── Phase 2B F4: the available/executable/succeeded relationship ───────── */
+
+test('capability truth: a capability can hold historical success while currently blocked', async () => {
+  await primeCapabilities();
+  // `terminal` is ring-blocked at the container ring, but the ledger may record
+  // that it succeeded earlier (e.g. on a host-ring run). Historical success is
+  // preserved — it is NOT overwritten by the current gate — so the state is
+  // SUCCEEDED while `executable` is false. The summary invariant
+  // `available + succeeded === executable` therefore holds ONLY while no
+  // succeeded capability is currently non-executable.
+  const succeeded = new Set(['terminal']);
+  const d = describeCapability('terminal', { sandboxRing: RING, succeeded });
+  assert.equal(d.executable, false, 'terminal is ring-blocked right now');
+  assert.equal(d.succeeded, true, 'historical success must be preserved');
+  assert.equal(d.state, 'succeeded', 'the strongest historical claim is SUCCEEDED');
+  assert.equal(d.available, false, 'the deprecated alias reflects the CURRENT gate, not history');
+
+  const s = await capabilitySummaryAsync({ sandboxRing: RING, succeeded });
+  const exec = s.capabilities.filter((c) => c.executable).length;
+  const blockedButSucceeded = s.capabilities.filter((c) => c.succeeded && !c.executable).length;
+  assert.ok(blockedButSucceeded >= 1, 'terminal is succeeded-but-blocked');
+  // Pin the intended relationship: available + succeeded counts the succeeded
+  // bucket once, and the executable set excludes the blocked-but-succeeded
+  // capability, so the two differ by exactly that count.
+  assert.equal(s.available + s.succeeded - exec, blockedButSucceeded,
+    'available + succeeded - executable === succeeded-but-not-executable');
+});
+
 /* ── the tool surface the model sees (capability_check) ─────────────────── */
 
 test('capability truth: capability_check reports executability, not just availability', async () => {

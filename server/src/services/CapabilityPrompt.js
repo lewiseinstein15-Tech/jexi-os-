@@ -44,11 +44,20 @@ const BLOCKED_HINT = {
  *
  * @param {object} [opts]
  * @param {number} [opts.maxAvailable=24]
+ * @param {string} [opts.sandboxRing] override the execution ring (test seam)
+ * @param {Set<string>} [opts.succeeded] override the succeeded set (test seam)
  */
 export async function capabilityPromptBlock(opts = {}) {
   const maxAvailable = opts.maxAvailable ?? 24;
+  /* `opts.sandboxRing` / `opts.succeeded` pass through to the summary so a test
+     can pin a deterministic ring (e.g. a ring-blocked terminal) without
+     touching the live environment. In production they are undefined and the
+     registry resolves the live values. */
+  const summaryOpts = {};
+  if (opts.sandboxRing) summaryOpts.sandboxRing = opts.sandboxRing;
+  if (opts.succeeded) summaryOpts.succeeded = opts.succeeded;
   let summary;
-  try { summary = await capabilitySummaryAsync(); } catch { return ''; }
+  try { summary = await capabilitySummaryAsync(summaryOpts); } catch { return ''; }
   if (!summary || !summary.capabilities?.length) return '';
 
   const available = summary.capabilities.filter((c) => c.available);
@@ -81,11 +90,15 @@ export async function capabilityPromptBlock(opts = {}) {
     lines.push('');
     lines.push(`NOT available in this session (${unavailable.length}) — do not claim to have used these:`);
     for (const c of unavailable) {
-      // Prefer a plain-English note: the specific capability hint first, then
-      // the reason the guard actually blocked it (ring vs profile), then the
-      // raw reason code.
+      // Truthfulness first for the RING case. `UNMET_HINT.terminal` says
+      // "disabled by the active permission profile", which is wrong when the
+      // profile permits terminal and the execution ring is what refuses it, so
+      // a ring block always reports the ring. Every other case keeps the
+      // existing precedence (the specific capability hint, then the named gate,
+      // then the raw reason code) so no capability's guidance regresses.
       let hint;
-      if (UNMET_HINT[c.id]) hint = UNMET_HINT[c.id];
+      if (c.blockedBy?.includes('runtime_ring')) hint = BLOCKED_HINT.runtime_ring;
+      else if (UNMET_HINT[c.id]) hint = UNMET_HINT[c.id];
       else if (c.blockedBy?.length && BLOCKED_HINT[c.blockedBy[0]]) hint = BLOCKED_HINT[c.blockedBy[0]];
       else hint = c.reason;
       lines.push(`  - ${c.id}: ${c.title} (${hint})`);

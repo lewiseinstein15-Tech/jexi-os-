@@ -325,11 +325,14 @@ export function capabilitySummary(opts = {}) {
     total: all.length,
     ...byState,
     // Phase 2A — the honest split. `executable` = the runtime guard permits it
-    // right now; `ringBlocked` = registered and reachable but refused by the
-    // execution ring. `available` (above) is the deprecated alias for the
-    // SUCCEEDED-or-executable bucket and equals `executable` here.
+    // right now; `ringBlocked` = REGISTERED, NOT executable, and refused by the
+    // execution ring. The `!executable` term matters: a capability can be
+    // executable through an MCP provider (which runs outside the sandbox ring)
+    // while a native provider is ring-blocked — such a capability is NOT
+    // ring-blocked overall, so it must not be counted here. `available` (above)
+    // is the deprecated alias for the executable bucket and equals `executable`.
     executable: all.filter((c) => c.executable).length,
-    ringBlocked: all.filter((c) => c.registered && c.blockedBy.includes(REASONS.RUNTIME_RING)).length,
+    ringBlocked: all.filter((c) => c.registered && !c.executable && c.blockedBy.includes(REASONS.RUNTIME_RING)).length,
     sandboxRing: all[0]?.sandboxRing ?? null,
     profile: all[0]?.profile ?? null,
     capabilities: all,
