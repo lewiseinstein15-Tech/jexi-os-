@@ -13,6 +13,7 @@
 
 import { generateContent } from '../../providers/runtime/LLMClient.js';
 import { providerOrder, configuredProviders } from '../../providers/runtime/ProviderRouter.js';
+import { filterProvidersByPolicy } from '../NetworkPolicy.js'; // PHASE 3B — explicit remote-fallback policy
 import { parseModelJson } from './JsonRepair.js'; // B209 — salvage sloppy-but-complete model JSON
 import { executeTool } from '../ToolRuntime.js';
 
@@ -85,7 +86,10 @@ export function realLlmAdapter() {
 
       // Configured healthy providers in priority order (the ladder / health
       // state are the single source of truth; no provider is named in logic).
-      const altLanes = configuredProviders().filter((k) => providerOrder().includes(k));
+      // PHASE 3B — and permitted by the network policy: under `local-only` the
+      // fallback walk must not reach a remote lane. A local-lane failure may
+      // never widen the boundary.
+      const altLanes = filterProvidersByPolicy(configuredProviders().filter((k) => providerOrder().includes(k)), {});
       if (!parsed) {
         for (const alt of altLanes) {
           try {

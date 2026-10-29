@@ -59,7 +59,8 @@
         "--test-reporter=spec",
         "tests/agi/test-verification-independence.js",
         "tests/agi/test-verification-spawn.js",
-        "tests/agi/test-capability-registry.js"
+        "tests/agi/test-capability-registry.js",
+        "tests/agi/test-network-policy.js"
       ]
     }
   },

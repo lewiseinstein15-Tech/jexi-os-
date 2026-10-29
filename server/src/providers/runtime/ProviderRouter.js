@@ -20,6 +20,7 @@
  */
 
 import { isUnifiedConfigured } from '../../services/providers/modelConfig.js';
+import { filterProvidersByPolicy, isLocalOnly, isLocalProvider, networkPolicySnapshot, providerAllowed, resolveEffectivePolicy } from '../../services/NetworkPolicy.js'; // PHASE 3B — explicit remote-fallback policy
 
 const COOLDOWN_MS = 30_000;        // skip a provider for 30s after a failure
 const CONSECUTIVE_COOLDOWN = 3;    // 3 consecutive failures → cooldown
@@ -232,9 +233,12 @@ export function configuredProviders() {
   if (String(process.env.MODEL_PROVIDER || '').toLowerCase() === 'ollama' && !list.includes('ollama')) list.push('ollama');
   // Pollinations and Kilo are keyless: always available as last-resort legs.
   // Kilo first — it is tool-capable, pollinations is text-only.
+  // PHASE 3B — BUT they are keyless AND REMOTE. Under `local-only` they must
+  // never appear (they were the exact leak the Phase 3A audit proved), and no
+  // provider that is not provably on-machine may appear either.
   if (!list.includes('kilo')) list.push('kilo');
   if (!list.includes('pollinations')) list.push('pollinations');
-  return list;
+  return filterProvidersByPolicy(list, {});
 }
 
 /** Snapshot for /api/health and the self-check (never leaks key material). */
@@ -263,11 +267,18 @@ export function providerHealthSnapshot() {
     // reporting false here would contradict both the label and
     // configuredProviders(), which always lists them.
     if (k === 'kilo' || k === 'pollinations') configured = true;
+    // PHASE 3B — `configured` (has a key / keyless) and `local` (on-machine
+    // endpoint) are DIFFERENT facts. A keyless remote provider is configured
+    // AND remote. `allowed` says whether the active network policy permits it.
+    const local = isLocalProvider(k);
+    const allowed = providerAllowed(k, { policy: resolveEffectivePolicy({}) }).allowed;
     return {
       provider: names[k] || k,
       key: k,
       order: order.indexOf(k) + 1,
       configured,
+      local,
+      allowed,
       calls: s.calls,
       ok: s.ok,
       fails: s.fails,
@@ -275,4 +286,24 @@ export function providerHealthSnapshot() {
       cooldownLeftSec: Math.max(0, Math.round((s.cooldownUntil - now) / 1000)),
     };
   });
+}
+
+/**
+ * PHASE 3B — the active network policy for /api/health and diagnostics.
+ * Reports the policy, its source, and whether remote providers are permitted.
+ */
+export function providerNetworkSummary() {
+  const snap = networkPolicySnapshot();
+  return {
+    policy: snap.policy,
+    env: snap.env,
+    source: snap.source,
+    localOnly: snap.localOnly,
+    remoteAllowed: !snap.localOnly,
+  };
+}
+
+/** PHASE 3B — true when the active policy forbids remote provider dials. */
+export function networkIsLocalOnly() {
+  return isLocalOnly();
 }

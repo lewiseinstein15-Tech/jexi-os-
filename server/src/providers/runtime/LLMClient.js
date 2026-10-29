@@ -14,6 +14,7 @@ import { tryUnified, unifiedToolConfig, unifiedAnthropicToolRound, configForCall
 import { OllamaAdapter } from '../adapters/ollama.js'; // ZONE-OWNER 2-COMPLETION — canonical Ollama exposure guard (item 2) for the runtime leg
 import { hudNoteSpend } from '../../kernel/hooks/hud-seam.js'; // Phase 7(F) — HUD cost feed (real call sizes)
 import { ensureIdentityBlock } from '../../services/IdentityGuard.js'; // PHASE 3 — non-removable identity block on EVERY system prompt (provider bridge)
+import { beginProviderAttempt } from '../../services/NetworkPolicy.js'; // PHASE 3B — explicit remote-fallback policy: every provider dial passes the network boundary first
 // ZONE-OWNER ITEM 5 (Phase 9 E seam): cost caps are consulted on the LIVE
 // model-call path. providers/cost/caps.js README: "check({ spendUsd }) … is
 // the pre-call gate a provider bridge uses BEFORE a model call."
@@ -849,6 +850,8 @@ async function streamPlainText(prompt, system, opts, onDelta) {
     if (!cfg || (!cfg.key && provider !== 'kilo')) continue;
     const base = cfg.baseUrl || (provider === 'groq' ? 'https://api.groq.com/openai/v1' : null);
     if (!base) continue;
+    const gate = netGate(provider, opts); // PHASE 3B — streaming dials pass the network boundary too
+    if (!gate.allowed) { errors.push(`${provider}: ${gate.reason}`); continue; }
     if (skipForNow(provider)) { errors.push(`${provider}: skipped (health: ${providerState(provider).state})`); continue; } // Phase 1 — sticky auth/cooldown skip
     costGate(opts, provider); // ZONE-OWNER ITEM 5 — cap refusal BEFORE the model call; terminal, propagates (no ladder slide)
     const slot = await takeSlot(provider);
@@ -928,6 +931,17 @@ export async function generateContent(prompt, systemInstruction = '', imageBase6
   return __generateWalk(prompt, systemInstruction, imageBase64, opts);
 }
 
+/**
+ * PHASE 3B — the network boundary, consulted immediately before ANY provider
+ * dial (stream, text walk, tool loop, plain-text fallback). Returns the
+ * decision record; the caller skips + records the reason when `!allowed`.
+ * The policy is fixed for the whole walk, so a provider FAILURE can never
+ * widen it — only a passing provider ever reaches the HTTP call.
+ */
+function netGate(provider, opts) {
+  return beginProviderAttempt(provider, opts || {});
+}
+
 /** The actual provider walk (B220 health-aware, Phase 1 health-skips). */
 async function __generateWalk(prompt, systemInstruction, imageBase64, opts) {
   // B150 — live token streaming when requested (the UI shows the answer as
@@ -949,6 +963,8 @@ async function __generateWalk(prompt, systemInstruction, imageBase64, opts) {
   for (const provider of order) {
     const call = PROVIDER_CALLS[provider];
     if (!call) continue;
+    const gate = netGate(provider, opts); // PHASE 3B — the network policy is consulted BEFORE any dial
+    if (!gate.allowed) { errors.push(`${provider}: ${gate.reason}`); continue; }
     if (skipForNow(provider)) { errors.push(`${provider}: skipped (health: ${providerState(provider).state})`); continue; } // Phase 1 — sticky auth/cooldown skip
     costGate(opts, provider); // ZONE-OWNER ITEM 5 — cap refusal BEFORE the model call; terminal, propagates (no ladder slide)
     // Free-tier pacing: wait for the provider's rate slot (bounded). When
@@ -999,6 +1015,12 @@ async function __generateWalk(prompt, systemInstruction, imageBase64, opts) {
   if (keys.length > 0) {
     throw new Error(`All AI providers failed. ${errors.join(' | ')}`);
   }
+  const refusedRemote = errors.filter((e) => e.includes('network policy "local-only"'));
+  if (refusedRemote.length) {
+    // PHASE 3B — under local-only, remote rungs were not tried. Say so plainly
+    // (never imply a remote attempt happened) and never fake an answer.
+    throw new Error(`No local provider answered under network policy "local-only"; remote providers were not attempted (${refusedRemote.length} refused at the network boundary). ${errors.join(' | ')}`);
+  }
   throw new Error('No AI provider answered (tried the keyless Kilo and Pollinations legs too). Configure ONE model in Settings → Model (provider + key + model), or set JEXI_MODEL_PROVIDER + JEXI_MODEL_API_KEY + JEXI_MODEL_NAME in Render — legacy per-provider keys still work as fallback.');
 }
 
@@ -1016,17 +1038,24 @@ export async function verifyWithLLM(prompt) {
  * LIVE provider test — fire one tiny request through a SINGLE provider and
  * report whether the key actually works end-to-end (configured ≠ working).
  * Never falls through to other providers: this is a direct probe.
+ *
+ * PHASE 3B (F2) — this is a REAL dial, so it passes the network boundary
+ * first: under `local-only` a remote provider is refused honestly instead of
+ * being contacted. The gate is the same choke point the walk uses, so a
+ * provider test can never be a remote-egress backdoor.
  */
-export async function testProvider(providerKey) {
+export async function testProvider(providerKey, opts = {}) {
   const call = PROVIDER_CALLS[providerKey];
   if (!call) return { provider: providerKey, ok: false, error: 'Unknown provider' };
+  const gate = netGate(providerKey, opts);
+  if (!gate.allowed) return { provider: providerKey, ok: false, blocked: true, error: gate.reason };
   const errors = [];
   try {
     const text = await call(
       'Reply with exactly one word: OK',
       'You are a connectivity test. Reply with exactly one word: OK.',
       null,
-      { temperature: 0 },
+      { ...opts, temperature: 0 },
       errors
     );
     if (text) return { provider: providerKey, ok: true, error: '' };
@@ -1424,6 +1453,8 @@ export async function generateWithToolsLoop(prompt, systemInstruction = '', tool
   const messages = [{ role: 'system', content: system }, { role: 'user', content: prompt }];
   for (const provider of order) {
     if (!TOOL_CAPABLE.has(provider)) continue;
+    const gate = netGate(provider, opts); // PHASE 3B — tool-lane dials pass the network boundary
+    if (!gate.allowed) { errors.push(`${provider}: ${gate.reason}`); continue; }
     costGate(opts, provider); // ZONE-OWNER ITEM 5 — cap refusal BEFORE the model call; terminal
     // Free-tier pacing (same as generateContent).
     const slot = await takeSlot(provider);
@@ -1455,6 +1486,8 @@ export async function generateWithToolsLoop(prompt, systemInstruction = '', tool
     for (const provider of order) {
       const call = PROVIDER_CALLS[provider];
       if (!call) continue;
+      const gate = netGate(provider, opts); // PHASE 3B — the plain-text fallback leg passes the boundary too
+      if (!gate.allowed) { fallbackErrors.push(`${provider}: ${gate.reason}`); continue; }
       costGate(opts, provider); // ZONE-OWNER ITEM 5 — the fallback leg is a model call too
       const slot = await takeSlot(provider);
       if (!slot.ok) { fallbackErrors.push(`${provider}: ${slot.reason} (rate limiter)`); continue; }
