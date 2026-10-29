@@ -295,6 +295,14 @@ only, no prose narratives in commits.
   or `run-from-cwd.js` for child verifier commands under the harness, and only
   real `node --test` outside it (e.g. in the live probe).
 - `DOTENV_CONFIG_QUIET=true` suppresses the `dotenv` tips that pollute stdout.
+- Non-hermetic suites: scrubbing `*_API_KEY` is NOT enough to force the
+  "no provider answered" path. The keyless remote legs (kilo, pollinations) are
+  always "configured", so on a runner WITH egress the model call succeeds and a
+  test that proves an honest no-model outcome sees a fake success (e.g.
+  `test-judge-gates` gate PASS instead of UNKNOWN; `test-intent-lean` dead
+  provider answered; `test-arena-astra` ladder returned `remote`;
+  `test-request-economy` no longer rejected). Pin `JEXI_NETWORK_POLICY=local-only`
+  at the top of such a suite — loopback mocks keep working.
 - Bespoke HTTP/token rules: push direct to main (see the PUSH note below for the
   credential that currently works).
 - PUSH — RESOLVED (2026-09-15): `.jexi-secrets/git-token` was replaced with a
