@@ -23,6 +23,13 @@ process.env.WORKSPACE_DIR = path.join(TMP, 'ws');
 // model is reachable" — a configured provider that answers makes
 // the gate PASS instead of the offline UNKNOWN these checks
 // prove. Scrub the provider environment so the passes stay down.
+//
+// Scrubbing API keys is NOT enough: the keyless remote legs (kilo,
+// pollinations) are always "configured", so a runner WITH egress still
+// answers the reviewer and turns the gate PASS. Pin the network boundary to
+// local-only (the Phase 3B policy) so no remote leg can answer regardless of
+// the runner's connectivity — the offline UNKNOWN these checks prove.
+process.env.JEXI_NETWORK_POLICY = 'local-only';
 const SCRUB_KEYS = [
   'GROQ_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'HF_TOKEN',
   'MISTRAL_API_KEY', 'NVIDIA_API_KEY', 'CLOUDFLARE_API_KEY',

@@ -9,6 +9,12 @@ import assert from 'node:assert';
 // and pays each leg's full timeout when the host ships dead
 // keys — slow enough to hang the suite. Scrub the provider
 // environment so the walk fails fast and deterministically.
+// Scrubbing keys is NOT enough: the keyless remote legs (kilo,
+// pollinations) stay "configured" and answer when the runner has egress, so the
+// ladder returns a remote answer instead of falling to the registered fake
+// provider. Pin the network boundary to local-only (Phase 3B policy) so no
+// remote leg can answer and the deterministic fake-provider walk is proven.
+process.env.JEXI_NETWORK_POLICY = 'local-only';
 const SCRUB_KEYS = [
   'GROQ_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'HF_TOKEN',
   'MISTRAL_API_KEY', 'NVIDIA_API_KEY', 'CLOUDFLARE_API_KEY',

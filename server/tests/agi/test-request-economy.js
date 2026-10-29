@@ -7,6 +7,13 @@ import assert from 'node:assert/strict';
 
 process.env.DATA_DIR = './data/test-agi-economy';
 
+// Hermetic: the integration check below proves the wrapper surfaces the true
+// no-provider error. Scrubbing keys is not enough — the keyless remote legs
+// (kilo, pollinations) answer whenever the runner has egress, so the call
+// succeeds instead of rejecting. Pin the network boundary to local-only
+// (Phase 3B policy) so no provider can answer.
+process.env.JEXI_NETWORK_POLICY = 'local-only';
+
 const { TaskBudget, withBudget } = await import('../../src/services/RequestBudget.js');
 const { cacheKey, cacheGet, cacheSet, cacheInvalidate, cacheStats, __resetCache } = await import('../../src/services/ResponseCache.js');
 const { dedupeInflight, requestIdentity, dedupStats, __resetDedup } = await import('../../src/services/RequestDedup.js');
@@ -145,7 +152,7 @@ test('the economy layer never changes the honest no-keys failure', async () => {
   // no keys in this environment → the wrapper must still surface the true error
   await assert.rejects(
     generateContent('hello', 'system', null, { cache: true }),
-    (e) => /No AI provider answered|No API keys configured|All AI providers failed/.test(e.message),
+    (e) => /No AI provider answered|No API keys configured|All AI providers failed|No local provider answered/.test(e.message),
   );
   // and a budget that is already exhausted refuses BEFORE any provider walk
   const b = new TaskBudget({ maxModelCalls: 0, label: 'pre-exhausted' });

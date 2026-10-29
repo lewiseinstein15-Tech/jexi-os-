@@ -19,6 +19,14 @@ import path from 'node:path';
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'arena-intent-'));
 process.env.DATA_DIR = TMP;
 
+// Hermetic: the "dead provider" checks below prove the lean lane fails through
+// honestly when no model answers. Scrubbing keys is not enough — the keyless
+// remote legs (kilo, pollinations) always answer when the runner has egress,
+// turning the honest failure into a fake success. Pin the network boundary to
+// local-only (Phase 3B policy) so only on-machine (loopback) providers can
+// answer; the loopback mock server below still works.
+process.env.JEXI_NETWORK_POLICY = 'local-only';
+
 const { kernelIntentGate, runLeanAnswer, kernelGate } = await import('../../src/services/JexiKernel.js');
 
 function startMock(delayMs = 0) {
