@@ -32,6 +32,7 @@ const {
   autoVerify,
   verifyAfterEdit,
   runVerification,
+  VERIFIERS,
 } = await import('../../src/verification/index.js');
 
 const {
@@ -127,6 +128,35 @@ test('verification failure blocks work-graph completion', async () => {
   const blocked = await g.complete('task', { owner: 'agent-a', now: 2 });
   assert.equal(blocked.ok, false);
   assert.equal(blocked.reason, 'verification_pending');
+});
+
+test('a pass with no evidence is an honest failure, not a false success (livelock guard)', async () => {
+  // A verifier that reports pass but attaches NO evidence. completeVerification
+  // refuses with 'no_evidence', so runVerificationNode must surface an error
+  // (and inject a failure) instead of reporting ok:true while the node stays
+  // pending and the task is gated forever.
+  VERIFIERS.PassNoEvidence = { name: 'PassNoEvidence', verify: async () => ({ status: 'pass', evidence: [], reason: undefined, durationMs: 0 }) };
+  try {
+    const g = stageGraph();
+    g.addNode(createTaskNode({ id: 'task', objective: 'build' }));
+    g.addNode(createVerificationNode({ id: 'verify', verifiesNodeId: 'task', dependencies: ['task'] }));
+    g.byId('task').verificationNodeId = 'verify';
+    await g.claim('task', 'agent-a', { now: 0 });
+    await g.claim('verify', 'agent-b', { now: 1 });
+
+    const out = await g.runVerificationNode('verify', { owner: 'agent-b', verifier: 'PassNoEvidence', context: { snapshot: {} }, now: 2 });
+    assert.equal(out.ok, false, 'an evidence-free pass must NOT report success');
+    assert.equal(out.status, 'error');
+    assert.match(out.reason, /no_evidence/);
+    assert.ok(out.injectedFailure, 'the failure is injectable back into the loop');
+    assert.equal(out.injectedFailure.layer, 'PassNoEvidence');
+    assert.equal(g.byId('verify').status, 'failed', 'the node is marked failed, not left pending');
+    const blocked = await g.complete('task', { owner: 'agent-a', now: 3 });
+    assert.equal(blocked.ok, false, 'the task stays gated');
+    assert.equal(blocked.reason, 'verification_pending');
+  } finally {
+    delete VERIFIERS.PassNoEvidence;
+  }
 });
 
 test('auto-verify runs after edit and injects failure context', async () => {

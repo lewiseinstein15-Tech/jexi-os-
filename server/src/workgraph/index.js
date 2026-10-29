@@ -298,8 +298,31 @@ export function createWorkGraph({ file } = {}) {
     });
 
     if (result.status === 'pass') {
-      await completeVerification(nodeId, { owner, now, evidence: result.evidence ?? [] });
-      return { ok: true, status: 'pass', result, node: byId(nodeId) };
+      // A pass is only a pass if it carries evidence: an evidence-free pass
+      // cannot complete the node (completeVerification refuses with
+      // 'no_evidence'). Reporting ok:true here would be a false success AND a
+      // livelock — the task stays gated forever with no failure to inject back.
+      const done = await completeVerification(nodeId, { owner, now, evidence: result.evidence ?? [] });
+      if (done.ok) return { ok: true, status: 'pass', result, node: byId(nodeId) };
+      n.evidence.push(...(result.evidence ?? []));
+      n.status = 'failed';
+      releaseLease(n);
+      await checkpoint();
+      recomputeStatuses();
+      const reason = `verification reported pass but could not complete: ${done.reason}`;
+      return {
+        ok: false,
+        status: 'error',
+        reason,
+        result,
+        injectedFailure: {
+          layer: verifier,
+          reason,
+          evidence: result.evidence ?? [],
+          nodeId,
+        },
+        node: byId(nodeId),
+      };
     }
 
     // 'fail' / 'error' — the node stays incomplete and the task stays gated.
