@@ -28,13 +28,14 @@ process.env.DATA_DIR = './data/test-agi-network-policy';
 const {
   NETWORK_POLICIES, getNetworkPolicy, networkPolicySnapshot, isLocalOnly,
   isLoopbackUrl, classifyProvider, isLocalProvider, providerAllowed,
-  resolveEffectivePolicy, filterProvidersByPolicy,
+  resolveEffectivePolicy, filterProvidersByPolicy, providerKeyOf,
   beginProviderAttempt, attemptedProviders, refusedProviders, policyAuditLog,
   __setProviderAttemptHook, __resetPolicyAudit,
 } = await import('../../src/services/NetworkPolicy.js');
 
-const { generateContent, generateContentSafe, generateWithToolsLoop } = await import('../../src/providers/runtime/LLMClient.js');
+const { generateContent, generateContentSafe, generateWithToolsLoop, testProvider } = await import('../../src/providers/runtime/LLMClient.js');
 const { configuredProviders, providerHealthSnapshot, providerNetworkSummary, resetProviderHealth } = await import('../../src/providers/runtime/ProviderRouter.js');
+const { runtimeChain } = await import('../../src/providers/catalog/WorkerRouter.js');
 
 /* ── env hygiene: never let the host's policy leak into the run ─────────── */
 const SAVED = { ...process.env };
@@ -405,3 +406,122 @@ test('the policy layer does not consult or alter tool permissions', () => {
   assert.ok(narrow.length <= wide.length);
   assert.deepEqual([...new Set(narrow)], narrow, 'no duplicates invented');
 });
+
+/* ═══ 7. F1 — the lane-object shape must be classified by KEY ═════════════ */
+
+test('F1: filterProvidersByPolicy classifies {key,model} lane objects by their key', () => {
+  // runtimeChain() hands out lane OBJECTS, not id strings. The old filter
+  // stringified them ("[object Object]" → unknown) and dropped even the local
+  // lane under local-only. Classification must read the real provider id.
+  assert.equal(providerKeyOf({ key: 'ollama', model: 'qwen3' }), 'ollama');
+  assert.equal(providerKeyOf({ provider: 'kilo' }), 'kilo');
+  assert.equal(providerKeyOf({ id: 'pollinations' }), 'pollinations');
+  assert.equal(providerKeyOf('groq'), 'groq');
+
+  const lanes = [{ key: 'ollama', model: 'qwen3' }, { key: 'kilo' }, { key: 'pollinations', model: 'openai' }];
+  // allow-remote: untouched, original objects preserved
+  const wide = filterProvidersByPolicy(lanes, { env: {} });
+  assert.deepEqual(wide, lanes);
+  // local-only: the local lane survives WITH its model; remotes are removed
+  const narrow = filterProvidersByPolicy(lanes, { env: { JEXI_NETWORK_POLICY: 'local-only' } });
+  assert.deepEqual(narrow, [{ key: 'ollama', model: 'qwen3' }]);
+  // an unidentifiable entry is refused (fail-safe), never treated as local
+  const unknown = filterProvidersByPolicy([{ model: 'x' }], { env: { JEXI_NETWORK_POLICY: 'local-only' } });
+  assert.deepEqual(unknown, []);
+});
+
+test('F1: runtimeChain keeps the local leg and drops remotes under local-only', () => {
+  process.env.MODEL_PROVIDER = 'ollama';
+  process.env.OLLAMA_HOST = 'http://127.0.0.1:11434';
+  clearPolicy();
+  try {
+    const wide = runtimeChain('coder');
+    assert.ok(wide.length > 0, 'the chain is non-empty by default');
+    assert.ok(wide.every((l) => l && typeof l === 'object' && l.key), 'lanes are {key,...} objects');
+    assert.ok(wide.some((l) => l.key === 'kilo'), 'keyless remote floor present by default');
+
+    process.env.JEXI_NETWORK_POLICY = 'local-only';
+    const narrow = runtimeChain('coder');
+    assert.ok(narrow.length > 0, 'the LOCAL leg must survive local-only (the F1 regression)');
+    assert.ok(narrow.some((l) => l.key === 'ollama'), 'ollama stays in the chain');
+    assert.ok(!narrow.some((l) => l.key === 'kilo'), 'kilo removed');
+    assert.ok(!narrow.some((l) => l.key === 'pollinations'), 'pollinations removed');
+    for (const l of narrow) assert.equal(isLocalProvider(l.key), true, `${l.key} must be local`);
+  } finally {
+    delete process.env.MODEL_PROVIDER; delete process.env.OLLAMA_HOST; clearPolicy();
+  }
+});
+
+/* ═══ 8. F2 — testProvider() is a real dial and must pass the boundary ════ */
+
+test('F2: testProvider() refuses a remote provider under local-only (no dial)', { timeout: 60_000 }, async () => {
+  process.env.JEXI_NETWORK_POLICY = 'local-only';
+  __resetPolicyAudit();
+  installAttemptGuard();
+  try {
+    const r = await testProvider('kilo');
+    assert.equal(r.ok, false, 'a remote provider test cannot succeed under local-only');
+    assert.equal(r.blocked, true, 'the refusal is explicit, not a generic failure');
+    assert.match(String(r.error), /local-only/, 'the reason names the policy');
+    assert.deepEqual(remoteAttempts, [], 'testProvider must not dial a remote endpoint');
+    assert.equal(attemptedProviders().includes('kilo'), false, 'no permitted attempt was recorded');
+  } finally {
+    clearPolicy();
+  }
+});
+
+test('F2: testProvider() still dials a permitted LOCAL provider under local-only', { timeout: 60_000 }, async () => {
+  const { server, port, seen } = await startLocalModel();
+  process.env.MODEL_PROVIDER = 'ollama';
+  process.env.OLLAMA_HOST = `http://127.0.0.1:${port}`;
+  process.env.MODEL_NAME = 'local-model';
+  process.env.JEXI_NETWORK_POLICY = 'local-only';
+  resetProviderHealth('ollama');
+  try {
+    const r = await testProvider('ollama');
+    assert.equal(r.ok, true, `the local provider test must work, got: ${JSON.stringify(r)}`);
+    assert.notEqual(r.blocked, true);
+    assert.ok(seen.chats >= 1, 'the loopback endpoint was actually dialed');
+    assert.deepEqual(remoteAttempts, [], 'no remote egress');
+  } finally {
+    server.close();
+    delete process.env.MODEL_PROVIDER; delete process.env.OLLAMA_HOST; delete process.env.MODEL_NAME; clearPolicy();
+  }
+});
+
+test('F2: testProvider() under allow-remote is gated only by the boundary, not blocked', { timeout: 60_000 }, async () => {
+  clearPolicy(); // allow-remote
+  __resetPolicyAudit();
+  try {
+    const r = await testProvider('kilo');
+    // allowed by POLICY → the dial is attempted; our egress guard stops it and
+    // the failure is a network error, NOT a policy refusal.
+    assert.notEqual(r.blocked, true, 'allow-remote must not set the blocked flag');
+    assert.ok(remoteAttempts.length >= 1, 'the remote dial was attempted under allow-remote');
+    assert.equal(attemptedProviders().includes('kilo'), true, 'the attempt was recorded as permitted');
+  } finally {
+    remoteAttempts.length = 0;
+  }
+});
+
+/* ═══ 9. F3 — generateContentSafe → OfflineAgent → queryLocalLLM ═════════ */
+
+test('F3: the degraded local path cannot reach a non-loopback endpoint without the explicit exposure opt-in', { timeout: 60_000 }, async () => {
+  // The pre-existing exposure guard (OllamaAdapter.checkBind →
+  // OllamaExposureError) is the control here: a non-loopback "local" bind is
+  // refused unless ALLOW_OLLAMA_EXPOSED=1. This test pins that control so a
+  // future change cannot silently turn the local fallback into remote egress.
+  delete process.env.ALLOW_OLLAMA_EXPOSED;
+  const { OllamaAdapter } = await import('../../src/providers/adapters/ollama.js');
+  const adapter = new OllamaAdapter({ baseUrl: 'http://192.168.1.50:11434' }, {});
+  assert.equal(adapter.baseUrl, 'http://192.168.1.50:11434');
+  const exposure = adapter.exposure();
+  assert.equal(exposure.exposed, true, 'the guard SEES the non-loopback bind');
+  await assert.rejects(
+    () => adapter.chat({ messages: [{ role: 'user', content: 'hi' }], model: 'x', timeoutMs: 3000 }),
+    (e) => e && e.code === 'E_OLLAMA_EXPOSED',
+    'a non-loopback local bind is refused without ALLOW_OLLAMA_EXPOSED=1',
+  );
+  assert.deepEqual(remoteAttempts, [], 'no dial reached the non-loopback endpoint');
+});
+

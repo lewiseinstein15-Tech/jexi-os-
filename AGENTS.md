@@ -96,18 +96,25 @@ only, no prose narratives in commits.
   - Per-call `opts.networkPolicy` may only TIGHTEN. `beginProviderAttempt()` is
     the single choke point before every dial (audit log + `__setProviderAttemptHook`
     guard seam). Enforced in `configuredProviders()`, `runtimeChain()`,
-    `RealAdapters` altLanes, and LLMClient `netGate` (stream / walk / tool /
-    plain-text fallback).
+    `RealAdapters` altLanes, LLMClient `netGate` (stream / walk / tool /
+    plain-text fallback) AND `testProvider()` (the live per-provider probe —
+    previously an ungated remote dial). `filterProvidersByPolicy()` classifies
+    each entry by its REAL provider id (`providerKeyOf()`), so `runtimeChain()`'s
+    `{key, model}` lanes are filtered correctly instead of being stringified to
+    `unknown` and dropped.
   - `providerHealthSnapshot()` rows now carry `local` + `allowed` alongside
     `configured`; `providerNetworkSummary()` reports the active policy.
 
 ## Testing
 
-- `tests/agi/test-network-policy.js` — Phase 3B remote-fallback policy (14
+- `tests/agi/test-network-policy.js` — Phase 3B remote-fallback policy (20
   tests). Installs a `globalThis.fetch` EGRESS GUARD that throws on any
   non-loopback dial, so a regression that leaks a remote request is a loud
   failure, not silent egress. Uses loopback fixtures only (`http.createServer`
-  on `127.0.0.1:0`). Mutation-verified: reverting any guard makes suites fail.
+  on `127.0.0.1:0`; every fixture is `close()`d or the process hangs). Covers
+  the F1 lane-object filter (`{key, model}` classified by key), the F2 ungated
+  `testProvider()` probe, and the F3 local-fallback exposure control.
+  Mutation-verified: reverting any guard makes suites fail.
 - `tests/agi/test-verification-independence.js` — Scope D determinism suites.
 - `interfaces/cli/test-tui.js` — TUI suites (39 checks): ansi primitives, the
   wire→row map for the real emitted vocabulary, the transcript reducer, frame
@@ -187,6 +194,14 @@ only, no prose narratives in commits.
 
 ## Gotchas
 
+- **A local test run can hang on an untracked artifact, not the code.**
+  `server/jexi-workspace/` (gitignored) holds a real project tree; when it
+  contains a `.ts` file, `AgentLoop`'s LSP wiring spawns
+  `typescript-language-server --stdio` and leaks the child + its sockets, so a
+  suite that never closes them never exits (`node --test` passes but the
+  process hangs, e.g. `test-observer-chat-events.js`). CI is unaffected — the
+  tree is not checked out there. Reproduce on a clean `git worktree` before
+  blaming the change: same commit passes in a fresh worktree and hangs here.
 - **Tool discovery is a function of the request, not the classifier.**
   `plan.tools` comes from the classified intent via `toolsForTeam`, so a misroute
   silently withholds the right tools. `ToolSetBuilder` step 1b merges the

@@ -1038,17 +1038,24 @@ export async function verifyWithLLM(prompt) {
  * LIVE provider test — fire one tiny request through a SINGLE provider and
  * report whether the key actually works end-to-end (configured ≠ working).
  * Never falls through to other providers: this is a direct probe.
+ *
+ * PHASE 3B (F2) — this is a REAL dial, so it passes the network boundary
+ * first: under `local-only` a remote provider is refused honestly instead of
+ * being contacted. The gate is the same choke point the walk uses, so a
+ * provider test can never be a remote-egress backdoor.
  */
-export async function testProvider(providerKey) {
+export async function testProvider(providerKey, opts = {}) {
   const call = PROVIDER_CALLS[providerKey];
   if (!call) return { provider: providerKey, ok: false, error: 'Unknown provider' };
+  const gate = netGate(providerKey, opts);
+  if (!gate.allowed) return { provider: providerKey, ok: false, blocked: true, error: gate.reason };
   const errors = [];
   try {
     const text = await call(
       'Reply with exactly one word: OK',
       'You are a connectivity test. Reply with exactly one word: OK.',
       null,
-      { temperature: 0 },
+      { ...opts, temperature: 0 },
       errors
     );
     if (text) return { provider: providerKey, ok: true, error: '' };

@@ -134,12 +134,27 @@ const ENDPOINT_OVERRIDES = Object.freeze({
 });
 
 /**
+ * The provider id behind a lane entry. Accepts a bare id string OR a lane
+ * object (`{ key, model }`, as `runtimeChain()` / WorkerRouter hand out), so a
+ * caller that passes shaped lanes is classified by the REAL provider rather
+ * than stringified to "[object Object]" (which classifies as `unknown` and
+ * would silently drop a permitted local lane under `local-only`).
+ */
+export function providerKeyOf(provider) {
+  if (provider && typeof provider === 'object') {
+    const k = provider.key ?? provider.provider ?? provider.id;
+    return k == null ? '' : String(k);
+  }
+  return String(provider ?? '');
+}
+
+/**
  * Resolve the endpoint a provider would actually be dialed at. Returns
  * `{ baseUrl, source }` or `null` when no endpoint can be determined.
  * `opts.unified` (a per-call override) takes precedence for `unified`.
  */
 export function resolveProviderEndpoint(provider, opts = {}, env = process.env) {
-  const key = String(provider || '');
+  const key = providerKeyOf(provider);
   if (key === 'unified') {
     try {
       const cfg = resolveModelConfig({ opts: opts && opts.unified ? { unified: opts.unified } : null, env });
@@ -209,7 +224,7 @@ export function providerAllowed(provider, { policy, providerEndpoint, env = proc
       return { allowed: true, reason: '', policy: effective };
     }
     const why = endpoint && endpoint.baseUrl ? 'not on-machine' : 'endpoint unknown';
-    return { allowed: false, reason: `network policy "local-only" prohibits remote provider "${provider}" (${why})`, policy: effective };
+    return { allowed: false, reason: `network policy "local-only" prohibits remote provider "${providerKeyOf(provider)}" (${why})`, policy: effective };
   }
   return { allowed: true, reason: '', policy: effective };
 }
@@ -227,11 +242,16 @@ export function resolveEffectivePolicy(opts = {}, env = process.env) {
   return envPolicy;
 }
 
-/** Filter a provider list down to what the policy permits (order preserved). */
+/**
+ * Filter a provider list down to what the policy permits (order preserved).
+ * Entries may be bare id strings OR lane objects (`{ key, model }`): each is
+ * classified by its REAL provider id and the ORIGINAL entry is preserved, so a
+ * permitted local lane survives `local-only` with its model intact.
+ */
 export function filterProvidersByPolicy(list, { opts = {}, env = process.env } = {}) {
   const policy = resolveEffectivePolicy(opts, env);
   if (policy !== NETWORK_POLICIES.LOCAL_ONLY) return [...(list || [])];
-  return (list || []).filter((k) => isLocalProvider(k, opts, env));
+  return (list || []).filter((entry) => isLocalProvider(providerKeyOf(entry), opts, env));
 }
 
 /* ── attempt accounting + the test/guard seam ────────────────────────────── */
@@ -275,14 +295,16 @@ export function __resetPolicyAudit() {
  */
 export function beginProviderAttempt(provider, opts = {}, env = process.env) {
   const policy = resolveEffectivePolicy(opts, env);
+  const key = providerKeyOf(provider);
   const endpoint = resolveProviderEndpoint(provider, opts, env);
   const verdict = providerAllowed(provider, { policy, providerEndpoint: endpoint && endpoint.baseUrl, env, opts });
   const rec = {
-    provider: String(provider || ''),
+    provider: key,
     policy,
     allowed: verdict.allowed,
     reason: verdict.reason,
     endpoint: (endpoint && endpoint.baseUrl) || null,
+    local: endpoint ? isLoopbackUrl(endpoint.baseUrl) : false,
   };
   policyAudit.push(rec);
   if (rec.allowed && typeof attemptHook === 'function') attemptHook(rec);
