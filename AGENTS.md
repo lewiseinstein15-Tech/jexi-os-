@@ -192,6 +192,25 @@ only, no prose narratives in commits.
   prompt section; `capability_check` (control-plane, always reachable) answers
   "can you do this?" from the runtime.
 
+## Prompt assembly budget (`services/PromptAssembly.js` + `ContextEngine.js`)
+
+- `assemblePrompt()` builds ordered sections, then `compileSections()` enforces
+  the total budget. Sections marked `keep: true` (persona, instructions,
+  tool-SDK, policy, capabilities, and the conversation **thread**) are dropped
+  LAST, never first.
+- The default budget is **32000 chars / 8000 tokens**. The mandatory floor —
+  the persona (`JEXI_SYSTEM_PROMPT`, ~23k) plus the generated capability block
+  (~2k) plus a bounded conversation tail (≤4k) — is ~29k, so the old 24000 cap
+  could not hold it. Raising the cap is not a fix on its own: the budget is a
+  **hard** limit (a keep-only overflow is shaved, not exceeded).
+- The conversation tail is required continuity context. It is bounded at 4000
+  chars and pushed `keep: true`; dropping it silently makes a mid-conversation
+  turn re-answer from scratch. `server/test-memory-direct-path.js:94` guards it.
+- Regression origin: `9bf359d` added the capability block as a `keep` section
+  on top of the already-grown persona, pushing the floor above 24k. The drop
+  loop then shed every non-keep section (thread, tmux, time) and returned an
+  over-budget prompt with the thread gone.
+
 ## Gotchas
 
 - **A local test run can hang on an untracked artifact, not the code.**
