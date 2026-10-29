@@ -100,6 +100,32 @@ const p2 = await assemblePrompt({ budget: { maxChars: 2000 }, stats: s2 });
 ok(p2.length <= 2001 && s2.trimmed.length > 0, 'tiny budget enforced with trim report');
 ok(s2.kept.includes('persona'), 'persona survives even a tiny budget');
 
+console.log('\n== 7b. Budget is a HARD cap, and the thread survives the default ==');
+// Two `keep` sections whose combined floor exceeds the budget must still be
+// shaved to fit — the budget is a limit, not a suggestion. Before the fix the
+// drop loop broke with no droppable section and returned an over-budget prompt.
+const bigKeep = CE.compileSections(
+  [{ name: 'persona', content: 'p'.repeat(30000), keep: true }, { name: 'capabilities', content: 'c'.repeat(5000), keep: true }],
+  { maxChars: 20000, maxTokens: 100000 }
+);
+ok(bigKeep.chars <= 20001, `keep-only overflow is shaved to the budget (${bigKeep.chars} <= 20000)`);
+ok(bigKeep.kept.includes('persona'), 'the highest-priority keep section survives');
+ok(bigKeep.trimmed.some((t) => /^(clipped|dropped):/.test(t)), 'the shave is reported in trimmed');
+
+// The regression itself: a bounded conversation tail is REQUIRED context and
+// must survive an ordinary (default-budget) assembly, not be dropped because
+// the persona + capability block already fill the prompt.
+const { appendConversationEvent } = await import('./src/services/SessionConversations.js');
+const tailConv = 'ctx-tail-conv';
+appendConversationEvent(tailConv, { role: 'user', text: 'remember the keyword: zebra-alpha', kind: 'chat' });
+appendConversationEvent(tailConv, { role: 'jexi', text: 'Got it — zebra-alpha noted.', kind: 'chat' });
+const s7 = {};
+const p7 = await assemblePrompt({ convId: tailConv, includeSkills: false, includeState: false, stats: s7 });
+ok(/zebra-alpha/.test(p7), 'conversation tail survives the DEFAULT budget (continuity kept)');
+ok(s7.kept.includes('thread'), 'thread section is kept under the default budget');
+ok(s7.trimmed.length === 0, 'default budget needs no trimming for an ordinary prompt');
+ok(s7.chars <= 32001, `default budget is respected (${s7.chars})`);
+
 console.log('\n== 8. Live compiler: repoRoot injects the repo map ==');
 const p3 = await assemblePrompt({ repoRoot: repo });
 ok(p3.includes('Repo map (repo/)') && p3.includes('index.js'), 'repo-map section present with real files');

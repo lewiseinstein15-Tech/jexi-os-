@@ -159,7 +159,11 @@ export async function assemblePrompt({
     try {
       const { projectedConversationBlock } = await import('./SessionProjection.js');
       const tail = projectedConversationBlock(convId, { maxChars: 4000 });
-      if (tail) push('thread', tail);
+      // Bounded at 4000 chars and marked `keep`: dropping the tail silently
+      // breaks continuity (the model re-answers from scratch mid-conversation),
+      // which is exactly what the 24k budget did once the persona plus the
+      // generated capability block filled it. Required context is not optional.
+      if (tail) push('thread', tail, true);
     } catch { /* the tail must never break the prompt */ }
   }
 
