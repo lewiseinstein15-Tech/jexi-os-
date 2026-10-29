@@ -122,8 +122,8 @@ export function classifyRisk(slug, args = {}) {
   const reasons = [];
   let level = 'low';
 
-  const cmd = String(args.command || args.query || args.url || '');
-  if (slug === 'code-run' && cmd) {
+  const cmd = String(args.command || args.query || args.url || (slug === 'terminal_send' ? args.input : '') || '');
+  if ((slug === 'code-run' || slug === 'terminal_send') && cmd) {
     const r = classifyCommand(cmd);
     level = r.level;
     reasons.push(...r.reasons);

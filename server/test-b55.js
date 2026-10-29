@@ -47,6 +47,8 @@ ok(toolTier('memory-recall') === 'read', 'memory-recall is READ');
 ok(toolTier('memory-write') === 'write_local', 'memory-write is WRITE_LOCAL (autonomous, own data)');
 ok(toolTier('code-write') === 'write_local', 'code-write is WRITE_LOCAL');
 ok(toolTier('code-run') === 'exec', 'code-run is EXEC (autonomous by default, logged)');
+ok(toolTier('terminal_send') === 'exec', 'terminal_send is EXEC (writes raw stdin to a live shell)');
+ok(toolTier('terminal_signal') === 'exec', 'terminal_signal is EXEC (sends signals to a live process)');
 ok(toolTier('github-cli') === 'external', 'github-cli is EXTERNAL (sends/irreversible)');
 ok(toolTier('form-fill') === 'external', 'form-fill is EXTERNAL');
 ok(toolTier('mcp-call', { tool: 'get_health' }) === 'read', 'built-in read-only MCP tool is READ');

@@ -592,6 +592,11 @@ const TOOL_TIERS = {
   // exec
   'code-run': 'exec', 'git-status': 'exec', 'branch-manage': 'exec', 'issue-track': 'exec',
   'tab-manage': 'exec',
+  // terminal_send writes raw stdin into a live shell and terminal_signal sends
+  // signals — both execute host commands, so they are exec, never read. (A
+  // 'read' tier would let a read-only profile drive a shell, and would hide
+  // the call from the exec risk path.)
+  'terminal_send': 'exec', 'terminal_signal': 'exec',
   // external
   'github-cli': 'external', 'browser-drive': 'external', 'form-fill': 'external',
   'mcp-call': 'external', // refined by args below — the default is CONFIRM, per OpenWorker

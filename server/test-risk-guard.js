@@ -39,6 +39,16 @@ ok(bomb.level === 'high', 'blocked call reports high risk');
 ok(classifyRisk('code-write', { filename: '../../etc/passwd', content: 'x' }).canRun === false, 'path-escape write blocked');
 ok(classifyRisk('web-search', { query: 'reset api key=sk-123' }).level === 'medium', 'secret-looking query flagged medium');
 
+console.log('\n== classifyRisk: terminal_send executes host commands ==');
+// terminal_send writes raw stdin into a live shell — the same destructive
+// command must classify identically to code-run, not slip through as low.
+const termBomb = classifyRisk('terminal_send', { input: 'rm -rf / --no-preserve-root' });
+ok(termBomb.level === 'high' && termBomb.canRun === false, 'destructive terminal_send input is blocked (matches code-run)');
+ok(classifyRisk('terminal_send', { input: 'git push --force origin main' }).canRun === false, 'force-push via terminal_send blocked');
+ok(classifyRisk('terminal_send', { input: 'sudo rm -rf /var' }).canRun === false, 'sudo via terminal_send blocked');
+ok(classifyRisk('terminal_send', { input: 'echo hello' }).canRun === true, 'benign terminal_send input runs');
+ok(classifyRisk('terminal_send', { input: 'ls -la' }).level === 'low', 'read-only terminal_send input is low');
+
 console.log('\n== Trust store ==');
 clearTrust();
 const st = trustStatus();
