@@ -85,9 +85,29 @@ only, no prose narratives in commits.
     (`gen.pollinations.ai/v1` now 401s for tools), kilo is tool-capable.
 - `KILO_API_URL` / `KILO_API_KEY` are the env seams (base-URL override + an
   optional key that only raises the rate limit).
+- **Phase 3B — remote fallback policy** (`server/src/services/NetworkPolicy.js`):
+  keyless ⇒ "configured" ≠ local. `kilo` and `pollinations` are keyless AND
+  REMOTE; the Phase 3A audit proved a local-lane failure slid a Director turn
+  to `api.kilo.ai` (×3) / `gen.pollinations.ai` (×2). Locality is now decided
+  by ENDPOINT, never by the absence of a key.
+  - `JEXI_NETWORK_POLICY=allow-remote` (DEFAULT — unchanged) | `local-only`
+    (hermetic: only loopback endpoints may be dialed; a local failure fails
+    honestly, it never widens to a remote rung).
+  - Per-call `opts.networkPolicy` may only TIGHTEN. `beginProviderAttempt()` is
+    the single choke point before every dial (audit log + `__setProviderAttemptHook`
+    guard seam). Enforced in `configuredProviders()`, `runtimeChain()`,
+    `RealAdapters` altLanes, and LLMClient `netGate` (stream / walk / tool /
+    plain-text fallback).
+  - `providerHealthSnapshot()` rows now carry `local` + `allowed` alongside
+    `configured`; `providerNetworkSummary()` reports the active policy.
 
 ## Testing
 
+- `tests/agi/test-network-policy.js` — Phase 3B remote-fallback policy (14
+  tests). Installs a `globalThis.fetch` EGRESS GUARD that throws on any
+  non-loopback dial, so a regression that leaks a remote request is a loud
+  failure, not silent egress. Uses loopback fixtures only (`http.createServer`
+  on `127.0.0.1:0`). Mutation-verified: reverting any guard makes suites fail.
 - `tests/agi/test-verification-independence.js` — Scope D determinism suites.
 - `interfaces/cli/test-tui.js` — TUI suites (39 checks): ansi primitives, the
   wire→row map for the real emitted vocabulary, the transcript reducer, frame

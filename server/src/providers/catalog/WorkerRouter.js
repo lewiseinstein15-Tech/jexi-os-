@@ -32,6 +32,7 @@
 
 import { generateWithToolsLoop, generateContentSafe, resolveKeys, GROQ_TEXT_MODEL, TOOL_CAPABLE } from '../runtime/LLMClient.js';
 import { providerOrder } from '../runtime/ProviderRouter.js';
+import { filterProvidersByPolicy } from '../../services/NetworkPolicy.js'; // PHASE 3B — explicit remote-fallback policy
 import { isUnifiedConfigured } from '../../services/providers/modelConfig.js';
 import { executeTool } from '../../services/ToolRuntime.js';
 import { appendEvent } from '../../services/EventLog.js'; // B78 — coworker calls/results are first-class events
@@ -222,7 +223,11 @@ export function runtimeChain(role, keys = resolveKeys()) {
   // CALLS on the keyless tier; pollinations serves plain text only.
   if (!out.some((p) => p.key === 'kilo')) out.push({ key: 'kilo' });
   if (!out.some((p) => p.key === 'pollinations')) out.push({ key: 'pollinations' });
-  return out;
+  // PHASE 3B — the keyless floor is REMOTE. Under `local-only` it (and every
+  // other non-loopback leg) is removed, so the worker chain cannot leak a
+  // remote dial. Enforced again at the dial itself in LLMClient (defence in
+  // depth) — this keeps the chain the router hands out honest.
+  return filterProvidersByPolicy(out, {});
 }
 
 /** Exposed for the Models/status screen — the REAL running roster (B66 honesty). */
