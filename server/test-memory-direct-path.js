@@ -88,10 +88,15 @@ console.log('\n== B155: conversation projection tail (assemblePrompt) ==');
   const { assemblePrompt } = await import('./src/services/PromptAssembly.js');
   const { appendConversationEvent } = await import('./src/services/SessionConversations.js');
   const conv = 'tail-test-conv';
+  const stats = {};
   appendConversationEvent(conv, { role: 'user', text: 'remember the keyword: zebra-alpha', kind: 'chat' });
   appendConversationEvent(conv, { role: 'jexi', text: 'Got it — zebra-alpha noted.', kind: 'chat' });
-  const sys = await assemblePrompt({ convId: conv, includeSkills: false, includeState: false });
+  const sys = await assemblePrompt({ convId: conv, includeSkills: false, includeState: false, stats });
   ok(/zebra-alpha/.test(sys), 'current conversation tail reaches assemblePrompt (runners keep the thread)');
+  // The tail is required continuity context, not an optional extra: an
+  // ordinary assembly must neither drop it nor exceed the default budget.
+  ok(stats.kept.includes('thread'), 'thread section is KEPT (not trimmed away) by the default budget');
+  ok(stats.chars <= 32001, `assembly stays within the default budget (${stats.chars} chars)`);
 }
 
 console.log(`\nRESULT: ${failures === 0 ? 'ALL PASS' : failures + ' FAILED'}`);

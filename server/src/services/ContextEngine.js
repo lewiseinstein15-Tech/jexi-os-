@@ -244,11 +244,17 @@ export function getCachedRepoMap(root, opts = {}) {
  * M4 — enforce a total budget over ORDERED named sections
  * ([{ name, content, keep?: bool }], highest priority FIRST).
  * Clips each section to its per-section cap, then drops lowest-priority
- * sections until maxChars AND maxTokens hold. `keep` sections are never
- * dropped (clipped at most). Returns { text, trimmed, chars, tokens, kept }.
+ * sections until maxChars AND maxTokens hold. `keep` sections are not dropped
+ * by the priority pass; if their combined floor still exceeds the budget they
+ * are shaved from the lowest priority up, so the budget stays a HARD limit
+ * rather than a suggestion. Returns { text, trimmed, chars, tokens, kept }.
  */
 export function compileSections(named = [], budget = {}) {
-  const maxChars = budget.maxChars ?? 24000;
+  // 32k chars / 8k tokens. The mandatory floor — the persona (~23k) plus the
+  // generated capability block (~2k) plus a bounded conversation tail — rose
+  // above the earlier 24k cap, which silently dropped the thread. Keeping the
+  // default above the floor makes an ordinary prompt byte-stable.
+  const maxChars = budget.maxChars ?? 32000;
   const maxTokens = budget.maxTokens ?? 8000;
   // Per-section clip fires only when ONE section exceeds the whole budget
   // (pathological); ordinary budgeting works by dropping low-priority
@@ -279,6 +285,24 @@ export function compileSections(named = [], budget = {}) {
     if (idx < 0) break;
     trimmed.push(`dropped:${sections[idx].name}`);
     sections.splice(idx, 1);
+  }
+  // Hard cap: with only `keep` sections left they can still overflow (a large
+  // persona plus the capability block). Shave from the LOWEST-priority section
+  // up so the highest-priority section survives intact where possible. The
+  // guard bounds the loop for a pathological budget.
+  for (let guard = 0; sections.length > 0 && over(sections) && guard < 64; guard++) {
+    const last = sections.length - 1;
+    const others = sections.reduce((a, s, i) => a + (i === last ? 0 : s.content.length), 0);
+    const joinChars = Math.max(0, sections.length - 1);
+    let target = Math.max(0, maxChars - others - joinChars);
+    if (target >= sections[last].content.length) {
+      // Chars fit — the token cap is what binds; shave ~10% and re-check.
+      target = Math.floor(sections[last].content.length * 0.9);
+    }
+    if (target <= 0) { trimmed.push(`dropped:${sections[last].name}`); sections.pop(); continue; }
+    if (target >= sections[last].content.length) break; // nothing left to shave
+    trimmed.push(`clipped:${sections[last].name}`);
+    sections[last] = { ...sections[last], content: `${sections[last].content.slice(0, Math.max(0, target - 1))}…` };
   }
   const text = sections.map((s) => s.content).join('\n');
   return { text, trimmed, chars: text.length, tokens: estimateTokens(text), kept: sections.map((s) => s.name) };
