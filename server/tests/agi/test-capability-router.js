@@ -20,6 +20,15 @@ const { routeCapabilities, selectMcpToolset, resolveMcpFunction, mcpToolFunction
  * (an abandoned connect still spawns a child); always disconnects in cleanup.
  */
 async function probeLiveWeather(timeoutMs = 20_000) {
+  // M8 — the weather MCP is launched through `npx`, which needs the npm
+  // registry (and its own child inherits the hermetic preload). Under the
+  // test harness that egress is refused, so do not spawn at all: a skipped
+  // live test is honest, a hung runner is not.
+  try {
+    await fetch('https://registry.npmjs.org/', { method: 'HEAD' });
+  } catch {
+    throw new Error('no egress (hermetic test harness) — live weather MCP cannot boot');
+  }
   const { invokeMcpTool } = await import('../../src/services/MCPGateway.js');
   const call = await Promise.race([
     invokeMcpTool({ server: 'weather', tool: 'get_weather_summary', args: { city_name: 'Nairobi' }, timeoutMs: Math.min(timeoutMs, 15_000) }),

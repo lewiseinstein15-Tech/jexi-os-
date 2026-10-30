@@ -1,0 +1,1264 @@
+{
+  "_comment": "M8 \u2014 ordered test suites. Generated from the former package.json `test` chain so the aggregate runner preserves exact coverage and order. Each entry is argv after the `node` binary.",
+  "suites": [
+    {
+      "bin": "node",
+      "args": [
+        "test-planner-routing.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-new-agents.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-books.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-preview.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-pdf.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-perf.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-llm-models.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-planner-orchestrator.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-chat-books.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-trusted-library.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-memory-preferences.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-memory-direct-path.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-memory-vector.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-context-resolution.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-mcp.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-roster-skills.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-roster-registry.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-video-analyzer.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-news-topic.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-search-diversity.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-tasks.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-scheduler.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-tools.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-domain-verify.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-workspace.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-process.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-subagents.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-hooks.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-learning.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-hud.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-plugins.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-notifications-models.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-risk-guard.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-computer-runtime.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-browser-verify.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-sessions-b96.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-plugin-seam.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-plugins-all.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-skill-discovery.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-marketplace.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-code-mode.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-compaction.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-tool-contracts.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-presets.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-time-context.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-gaps-b106.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-session-titles.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-dsh-fidelity.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-plan-mode.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-workflow.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-lifecycle.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-dsh-research.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-autonomous-coding.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-preview.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-project-memory.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-lsp.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-dsh-batch.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-dsh-batch2.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-dsh-batch3.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-dsh-batch4.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-dsh-batch5.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-dsh-batch6.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-dsh-batch7.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-dsh-batch8.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-dsh-batch9.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-dsh-batch10.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-dsh-batch11.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-dsh-batch12.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-dsh-batch13.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-dsh-coding.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-video-watch.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-presenter.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-speed.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-math-stream.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-incident-b177.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-hermes-parity.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-hermes-wiring.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-team-router.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-hermes-full.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b186.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b187.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b189.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b191.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-everything.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-api-surface.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-rich-render.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-build47.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-audit-b47.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "scripts/audit-roster.js",
+        "--check"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b49.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-reliability.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-skill-progressive.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-knowledge-base.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-coding-loop.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-subagent-isolation.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-graph-runner.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b51.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b52.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b53.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b55.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-connectors.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-memory-persistence.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-worker-router.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b78.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-security-hardening.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-chat-jobs.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-do-anything.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-travel.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-universal-link.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-github-repo.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-builder.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-goal-jobs.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-goal-notify.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-goal-schedules.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-limiter-keys.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-onekey-providers.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-unified-providers.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-agent-contracts.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-context-engine.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-recovery-lessons.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-judge-gates.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-code-intel.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-setup-wizard.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-permissions-modes.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-mcp-minimal.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-f5-hardening.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "../interfaces/cli/test-cli.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "../interfaces/cli/test-tui.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-web-mesh.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-turso-adapter.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-github-push.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-tooluse-bridge.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-mcp-arg-alias.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "test-session-keys.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-rate-limiter.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-goal-engine.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-identity.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b197.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b199.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b201.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b202.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b203.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b204.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b206.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b206b.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b206c.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b207.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b208.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b209.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b210.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b211.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b211b2.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b211b3.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "tests/autonomy/long-horizon-mission.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "tests/autonomy/failure-injection.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "tests/autonomy/backend-restart.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "tests/autonomy/browser-disconnect.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b212.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b213.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b214.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b215.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b217.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b218.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b218b.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b220.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b223.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b224.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-b225.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-epistemics.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-provider-health.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-request-economy.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-mcp-gateway.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-worker-registry.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-unified-tools.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-world-memory.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-loop-detection.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-skills.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-skill-progressive.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-skill-execution.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-plan-simulator.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-capability-router.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-architecture-upgrade.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-director-mcp.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-jexi-kernel.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-ollama-provider.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-request-meter.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-work-graph-steering.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-workgraph-persistence.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-verification-independence.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-verification-spawn.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-lsp-manager.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-scheduler.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-context-manager.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-browser-router.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-memory-lifecycle.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-memory-provider.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-intent-lean.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-internal-context-boundary.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-m6-execution-integrity.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-apk-browser-channel.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "tests/agi/benchmark.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "test-arena-astra.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "evaluation/run.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-hermetic-test-environment.js"
+      ]
+    }
+  ]
+}

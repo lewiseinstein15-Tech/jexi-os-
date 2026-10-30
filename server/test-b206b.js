@@ -22,7 +22,7 @@
  */
 import { JSDOM } from 'jsdom';
 import fs from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -35,7 +35,17 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // → "Cannot read properties of null (reading 'useState')". (Phase 3 C1 fix.)
 const bundlePath = path.join(ROOT, 'server/node_modules/.tmp/at.mjs');
 fs.mkdirSync(path.dirname(bundlePath), { recursive: true });
-execSync(`npx esbuild interfaces/console/components/AgentThinking.jsx --bundle --format=esm --outfile="${bundlePath}" --external:react --jsx=automatic --log-level=error`, { cwd: ROOT, stdio: 'pipe' });
+// M8 — use the LOCALLY INSTALLED esbuild, never `npx`. `npx` silently
+// downloads esbuild from registry.npmjs.org when it is missing, so the suite
+// passed on a machine with network and failed without one — a dishonest
+// signal. Fail loudly here instead (matching test-rich-render/setup-wizard/
+// b197); run `npm install` at the repo root to provide the binary.
+const esbuild = path.join(ROOT, 'node_modules', 'esbuild', 'bin', 'esbuild');
+if (!fs.existsSync(esbuild)) {
+  console.error(`❌ esbuild not installed at ${esbuild} — run \`npm install\` at the repo root (no network fetch at test time).`);
+  process.exit(1);
+}
+execFileSync(esbuild, ['interfaces/console/components/AgentThinking.jsx', '--bundle', '--format=esm', `--outfile=${bundlePath}`, '--external:react', '--jsx=automatic', '--log-level=error'], { cwd: ROOT, stdio: 'pipe' });
 
 const { default: AgentThinking } = await import(bundlePath);
 const React = (await import('react')).default;

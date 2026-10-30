@@ -35,6 +35,13 @@ import { loadWorldState, runtimeCapabilities } from './WorldState.js'; // B215 �
 import { lspManager } from '../../lsp/manager.js'; // Phase 6 Scope A — real language-server indexing at mission start
 import { WORKSPACE_DIR } from '../../config.js';
 
+/**
+ * M8 — set JEXI_LSP_INDEX_IN_TESTS=1 to let a suite exercise the real
+ * language-server indexing path (it must then shut the server down itself).
+ * Read once at module load so a suite can import this module first.
+ */
+const INDEX_LSP_IN_TESTS = process.env.JEXI_LSP_INDEX_IN_TESTS === '1';
+
 /* Final F5 — coerce planner JSON fields that SHOULD be string arrays but a
  * weak model may emit as a bare string, number, or object. Never throws. */
 export function asStringArray(v, n = 10) {
@@ -160,9 +167,18 @@ export class MissionRunner {
     // Index the workspace in the LSP manager at mission start so diagnostics
     // populate before the first agent turn. Best-effort and non-blocking: a
     // missing language server or an absent workspace never blocks creation.
-    try {
-      lspManager().startMission(WORKSPACE_DIR, { maxFiles: 200 }).catch(() => {});
-    } catch { /* lsp index is best-effort */ }
+    //
+    // M8 — the index is a COLD START convenience, not mission semantics, and
+    // it spawns a real language server. A test that creates a mission never
+    // waits on it, so the child outlives the suite and `node --test` hangs on
+    // the leaked stdio pipe (reproduced: test-observer-chat-events.js alone).
+    // Skip it in a test process unless a suite opts in explicitly.
+    const inTestProcess = process.env.NODE_TEST_CONTEXT || process.env.JEXI_TEST_HARNESS;
+    if (INDEX_LSP_IN_TESTS || !inTestProcess) {
+      try {
+        lspManager().startMission(WORKSPACE_DIR, { maxFiles: 200 }).catch(() => {});
+      } catch { /* lsp index is best-effort */ }
+    }
     this.kick(mission.id);
     return mission;
   }

@@ -133,6 +133,49 @@ only, no prose narratives in commits.
 
 ## Testing
 
+### Hermetic aggregate runner (M8)
+
+`npm test` in `server/` is now `node tests/setup/run-suites.mjs`, which runs
+`tests/setup/suites.json` — the exact ordered 204-suite list the old
+`package.json` `test` chain contained (verified 1:1: same order, same
+multiset, duplicates preserved). Add a suite by appending to `suites.json`.
+
+`tests/setup/hermetic-preload.mjs` is preloaded into every child via an
+ABSOLUTE `--import` in `NODE_OPTIONS` (a relative path breaks grandchildren
+with a different cwd). It:
+- sets `JEXI_TEST_HARNESS=1` (covers plain-script suites, which have no
+  `NODE_TEST_CONTEXT`);
+- refuses every non-loopback dial at the transport — `globalThis.fetch`,
+  `node-fetch` (via `http.request`), and the default-object
+  `node:http(s).request/get` — using `isLoopbackUrl()` from
+  `src/services/NetworkPolicy.js`. Loopback keeps working. Refusals are
+  recorded and printed on exit, never silent.
+- Does NOT change `JEXI_NETWORK_POLICY` (leaving the product default intact
+  keeps provider-classification suites honest); the guard blocks the transport
+  instead. Opt out with `JEXI_TEST_ALLOW_EGRESS=1`.
+- Caveat: ESM *named* imports of `node:http`/`node:https` are read-only
+  bindings and cannot be patched. No `src` module uses that form, so coverage
+  is complete; use the default object / CJS form in new code.
+
+The runner gives each suite a wall-clock timeout and SIGKILLs its process
+group on expiry, so a leaked language-server child can never hang the run.
+
+Suites that genuinely need the network (Commons image search, DSH tool-web
+contracts, hermes demo (c), the live weather MCP round-trip) guard their live
+assertions with a `HEAD` preflight and print `⏭️ SKIPPED` under the harness
+instead of failing on an environment property. This matters for the MCP case:
+`@dangahagan/weather-mcp` boots via `npx`, and the spawned child inherits the
+preload, so a blocked registry lookup inside that child is a hang, not an
+error — the preflight must run in the parent and skip the spawn entirely.
+
+`MissionRunner.create` skips its fire-and-forget `lspManager().startMission`
+when `JEXI_TEST_HARNESS` / `NODE_TEST_CONTEXT` is set (opt back in with
+`JEXI_LSP_INDEX_IN_TESTS=1`). The spawn leaked `tsserver` and hung
+`node --test` on the stdio pipe; the index is a cold-start convenience, not
+mission semantics, so the gate changes nothing a test asserts.
+
+`tests/agi/test-hermetic-test-environment.js` pins all of the above.
+
 - `tests/agi/test-network-policy.js` — Phase 3B remote-fallback policy (20
   tests). Installs a `globalThis.fetch` EGRESS GUARD that throws on any
   non-loopback dial, so a regression that leaks a remote request is a loud
