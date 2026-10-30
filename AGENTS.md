@@ -44,6 +44,32 @@ only, no prose narratives in commits.
   on fail/error. Task completion stays gated on `verification_pending` /
   `verification_no_evidence` until the verification node is completed.
 
+## Internal context boundary (M4-1)
+
+- The brain-recall block (conversation hot-memory, brain pages, ontology,
+  instincts — up to `BRAIN_TOTAL_BUDGET = 1500`) is INTERNAL prompt context.
+  It is composed onto the coordinator node's query by
+  `withCoordinatorContext` (`services/BrainRecall.js`), which now wraps it
+  behind `INTERNAL_CONTEXT_MARKER` from `services/InternalContext.js`.
+- INVARIANT: internal context must NEVER be transmitted to an external service.
+  Before M4-1 it was appended with a bare `\n\n`, and
+  `SearchEngine.extractCoreQuery` returns the query VERBATIM when it contains
+  `:` (the block header ends with `):`), so the private block rode the literal
+  search query to every provider.
+- Egress choke points strip/split at their boundary: `SearchEngine.extractCoreQuery`
+  (single search-egress point — strips before derivation),
+  `SearchAgent.runSearchTeam` (splits; block reaches the SYNTHESIS prompt only,
+  via `opts.internalContext`), `ComputerUseAgent.executeTask`,
+  `NewsAgent.runNewsTeam` (feed URLs), `DataAgent.runDataAgent` (URL scan).
+- `services/InternalContext.js` is deliberately dependency-free (no import of
+  BrainRecall) so egress modules can import it without the wiring bootstrap.
+- Test seam: `aggregateSearch` accepts `opts.__providerSearch` (mirrors
+  `opts.__providers`) to assert the exact egress string with zero network.
+- Regression suite: `tests/agi/test-internal-context-boundary.js` (wired into
+  `jexi.verify.test` and the npm test chain).
+- KNOWN, NOT FIXED: the director's task-graph framing ("Current task: TASK-001
+  — … (completed)") also rides the search query. No private data; relevance only.
+
 ## TUI (`interfaces/cli/lib/tui`)
 
 - `jexi tui` opens a full-screen TUI; needs a TTY (refuses pipes with exit 2).
