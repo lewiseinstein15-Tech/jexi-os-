@@ -97,6 +97,49 @@ only, no prose narratives in commits.
   hermetic via a loopback provider; registered in `tests/setup/suites.json`).
   All three regressions fail against the pre-M9 implementation.
 
+## Durable chat recovery (M10)
+
+- The chat session store (`services/SessionStore.js`) used to be IN-MEMORY only,
+  so a process restart erased a task parked at an approval gate, the resume
+  offer and the last completed result — the paused work and its evidence were
+  silently lost. It is now backed by `services/DurableStore.js` (atomic JSON
+  under `DATA_DIR/sessions/`, added to `RedisMirror.MIRRORED_DIRS`), keyed per
+  session so sessions stay isolated.
+- `services/ChatRecovery.js` is the SINGLE, pure classification authority. The
+  state machine: `not_started | running | interrupted | awaiting_approval |
+  awaiting_verification | completed | failed | cancelled`. Classification keys
+  off the record's `epoch` (the boot identity that wrote it): a record whose
+  epoch is not THIS process is `interrupted`.
+- HONESTY INVARIANTS (each has a test):
+  - a parked approval is RESTORED but NEVER auto-approved — `resolved` is never
+    set by recovery; only a real user "yes" resolves it;
+  - an `interrupted` run is reported `uncertain` (outcome UNKNOWN) and is NEVER
+    presented as done — `resumeSafety()` returns `uncertain` so a possibly
+    side-effecting step is not blindly repeated, and the resume surfaces the
+    uncertainty in the final summary;
+  - a `failed`/`cancelled` run is terminal and never recovered as successful;
+  - where exactly-once is guaranteed, completed steps are never re-run; where it
+    is impossible, the uncertainty is stated, not hidden.
+- CONCURRENCY: `claimRun`/`releaseRun` guarantee a single worker per parked run
+  within a process (a claim held by another worker is refused), so two "yes"
+  turns cannot double-execute the paused node.
+- STALE APPROVALS: the pending offer and the parked run must describe the same
+  task, and `approvalMatches` rejects an approval naming a different
+  node/action — a stale approval never authorizes a different action.
+- CORRUPTION: `DurableStore` writes are atomic (temp + rename) with a `.bak`
+  fallback; a corrupt primary loads as absent (never throws), recovers from the
+  `.bak` when possible, and `recoverSessionsOnBoot()` flags the slot honestly.
+- Boot recovery is called in `index.js` (never blocks boot; logs what it found).
+- Regression suite: `tests/agi/test-durable-chat-recovery.js` (16 tests,
+  deterministic, hermetic — temp storage, injected fake actions with execution
+  counters, ZERO network, ZERO model calls; includes a real cross-process
+  restart via a spawned child). Registered in `tests/setup/suites.json`.
+- WHY NOT the SQLite `src/workgraph` engine as the chat engine: it persists ONE
+  graph snapshot per file and models mission nodes/leases, not the chat
+  `RunState` (intermediateResults / confirmationPayload / resumeNode), and it is
+  not wired into the chat path. Reusing its storage PATTERN (atomic JSON under
+  DATA_DIR, Redis-mirrored) is the smallest defensible change.
+
 ## TUI (`interfaces/cli/lib/tui`)
 
 - `jexi tui` opens a full-screen TUI; needs a TTY (refuses pipes with exit 2).

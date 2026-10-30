@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DATA_DIR } from '../config.js';
 
-const MIRRORED_DIRS = ['missions', 'world', 'conversations'];
+const MIRRORED_DIRS = ['missions', 'world', 'conversations', 'sessions'];
 const KEY_PREFIX = 'jexi:mirror:';
 const TTL_SECONDS = 45 * 24 * 3600; // 45 days, refreshed on every sync
 const SYNC_INTERVAL_DEFAULT = 30 * 1000;

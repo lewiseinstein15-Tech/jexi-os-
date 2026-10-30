@@ -320,6 +320,23 @@ setGoalNotifier(notifyGoalComplete);
 setGoalCallConnector(callConnector);
 hydrateGoalJobsFromRedis().catch((e) => recordError('goals', e.message));
 
+// M10 — DURABLE CHAT RECOVERY: classify any chat run that was parked or in
+// flight when the previous process died. A parked approval is RESTORED (never
+// auto-approved); an interrupted run is reported as UNKNOWN, never as done.
+// Results and offers already survived on disk — nothing is re-run here.
+try {
+  const rec = recoverSessionsOnBoot();
+  const parked = rec.awaitingApproval.length + rec.awaitingVerification.length;
+  if (rec.scanned) {
+    console.log(`♻️ M10 chat recovery: ${rec.scanned} parked/in-flight run(s) — ${parked} awaiting your input (NOT auto-approved), ${rec.interrupted.length} interrupted (outcome unknown), ${rec.completed} completed result(s) preserved.`);
+    for (const r of rec.records) {
+      if (r.state === 'awaiting_approval' || r.state === 'interrupted') {
+        console.log(`   [chat-recovery] session=${r.conversationId} → ${r.state} (${r.safety}) — ${r.note}`);
+      }
+    }
+  }
+} catch (e) { console.warn('chat recovery:', e.message); }
+
 // B61/B66 — Email auto-reply loop: when a verified inbound email arrives,
 // JEXI generates the reply and sends it back automatically via the
 // connector's reply() (same thread — Re:, In-Reply-To + References). B62
@@ -1574,7 +1591,7 @@ app.post('/api/vision', async (req, res) => {
 //   user: "no / never mind"                → pending task cleared, no search
 // P5/P9 — conversation-scoped store replaces the old module-level singleton,
 // so concurrent chats from different users/sessions never race.
-import { saveOffer, loadOffer, clearOffer, saveRun, loadRun, clearRun, saveResult, loadResult, clearResult, recordRecoveryEvent } from './src/services/SessionStore.js';
+import { saveOffer, loadOffer, clearOffer, saveRun, loadRun, clearRun, claimRun, releaseRun, saveResult, loadResult, clearResult, recordRecoveryEvent, recoverSessionsOnBoot } from './src/services/SessionStore.js';
 import { preferencesBlock } from './src/services/PreferenceLearner.js';
 const RESUME_TTL_MS = 15 * 60 * 1000;
 
@@ -2236,14 +2253,47 @@ app.post('/api/chat', async (req, res) => {
       // P5 — a graph confirmationPause was parked for this conversation: resume
       // the FULL RunState at the exact paused node (never re-plan from scratch).
       const pausedRun = loadRun(convId);
-      if (pausedRun && pausedRun.state && pausedRun.plan) {
+      // M10 — STALE-APPROVAL GUARD: the pending offer and the parked run must
+      // describe the SAME task. If a newer offer replaced the parked one, this
+      // "yes" must not authorize the older action — fall through to re-planning.
+      const offerMatchesRun = pausedRun && pausedRun.query && String(pendingOffer.query || '') === String(pausedRun.query || '');
+      if (pausedRun && pausedRun.state && pausedRun.plan && offerMatchesRun) {
+        // M10 — CONCURRENCY GUARD: only ONE worker may resume this parked run.
+        // A second concurrent "yes" for the same session is refused rather than
+        // double-executing the paused node (duplicate side effects).
+        const workerId = `w-${convId}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+        const claim = claimRun(convId, workerId);
+        if (!claim.ok) {
+          sendEvent('log', { agent: 'Planner', message: `⏳ This task is already being resumed by another worker — not running it twice.` });
+          done({ success: false, query, summary: '⏳ This paused task is already being resumed elsewhere — I did not run it a second time.' });
+          return;
+        }
+        // M10 — HONEST UNCERTAINTY: a run interrupted by a restart may have
+        // executed an action whose outcome is unknown. We surface that instead
+        // of presenting the resume as a clean, exactly-once continuation.
+        let uncertaintyNote = '';
+        try {
+          const { classifyRun, resumeSafety } = await import('./src/services/ChatRecovery.js');
+          const cls = classifyRun(pausedRun);
+          if (cls === 'interrupted' || resumeSafety(pausedRun) === 'uncertain') {
+            uncertaintyNote = '⚠️ This task was interrupted by a restart while a step was in flight. Its outcome is UNKNOWN — any action it had begun is not reported as done. Reconcile before relying on it.';
+            sendEvent('log', { agent: 'Planner', message: uncertaintyNote });
+            recordRecoveryEvent({ convId, cause: 'resume:uncertain', recovered: false, detail: 'resumed an interrupted run — outcome unknown' });
+          }
+        } catch { /* classification is best-effort; never blocks the resume */ }
         sendEvent('log', { agent: 'Planner', message: `✓ Confirmed — resuming your task from where it paused: “${String(pausedRun.query || original).slice(0, 90)}”` });
-        const resumed = await orchestrator.executePlan(pausedRun.plan, pausedRun.query, sendEvent, { image, resumeState: pausedRun.state, confirmed: true });
+        let resumed;
+        try {
+          resumed = await orchestrator.executePlan(pausedRun.plan, pausedRun.query, sendEvent, { image, resumeState: pausedRun.state, confirmed: true });
+        } finally {
+          releaseRun(convId, workerId); // the claim never outlives the resume
+        }
         clearRun(convId);
         clearOffer(convId);
-        const finalSummary = resumed.summary && String(resumed.summary).trim()
+        const baseSummary = resumed.summary && String(resumed.summary).trim()
           ? resumed.summary
           : (resumed.error || 'The task finished, but produced no readable summary.');
+        const finalSummary = uncertaintyNote ? `${baseSummary}\n\n---\n\n${uncertaintyNote}` : baseSummary;
         done({ success: resumed.success, query, summary: finalSummary, sources: resumed.sources || [], statistics: resumed.statistics, files: resumed.files || [] });
         return;
       }

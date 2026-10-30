@@ -1155,6 +1155,13 @@
       "bin": "node",
       "args": [
         "--test",
+        "tests/agi/test-durable-chat-recovery.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
         "tests/agi/test-verification-independence.js"
       ]
     },
