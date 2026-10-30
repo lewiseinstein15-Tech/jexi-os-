@@ -28,6 +28,7 @@ import { setGoalEngine } from './src/services/PromptAssembly.js'; // B158 — go
 import { orchestrator } from './src/services/Orchestrator.js';
 import { runSimpleTask } from './src/services/SimpleTask.js'; // B66 — Orchestrator-Workers SIMPLE fast path
 import { brainHotWriteTurn } from './src/services/BrainRecall.js'; // GAP 2 — chat turns write back into brain.hot (GAP 3's graph-lane recall lives in Orchestrator)
+import { withInternalContext } from './src/services/InternalContext.js'; // M5 — task-state framing is internal metadata: never egress to a search engine
 import { Director } from './src/services/director/Director.js'; // B208 — JEXI the boss: interpret→plan→staff→delegate→supervise→verify→report
 import { realLlmAdapter, realTools } from './src/services/director/RealAdapters.js';
 import { missionRunner } from './src/services/director/MissionRunner.js'; // B211 — persistent missions (work graph)
@@ -2555,8 +2556,20 @@ app.post('/api/chat', async (req, res) => {
       // Build 48, P3 — the label is neutral ("User's follow-up"), never the word
       // "Continue:", so the model acts on the context without narrating that
       // this continues a previous conversation.
+      //
+      // M5 — the task-state block is INTERNAL metadata (task id, objective,
+      // completed/remaining steps, files touched). It must inform the planner
+      // but never ride an EXTERNAL query: a research/continue turn sends this
+      // composed string to the search team, whose extractCoreQuery returns it
+      // VERBATIM whenever it contains ':' — and this block does. So it is
+      // composed behind the internal-context marker with the user's real
+      // follow-up FIRST, letting every egress choke point strip it and recover
+      // the exact question. The block still reaches the model's prompt.
       if (decision.contextBlock && (decision.metadata.classification === 'continue' || decision.metadata.classification === 'switch')) {
-        executionQuery = `${decision.contextBlock}\n\nUser's follow-up: ${effectiveQuery}`;
+        executionQuery = withInternalContext(
+          effectiveQuery,
+          `Task state for this follow-up (internal — plan a step, not a restart):\n${decision.contextBlock}`,
+        );
       }
       sendEvent('intel', {
         classification: decision.metadata.classification,

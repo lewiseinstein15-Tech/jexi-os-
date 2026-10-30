@@ -153,3 +153,81 @@ test('T-h: news + data + browser boundaries strip the block before external fetc
   // The browser boundary recovers the exact user task.
   assert.equal(stripInternalContext(withInternalContext('open example.com', BRAIN)), 'open example.com');
 });
+
+/**
+ * M5 — TASK-STATE FRAMING IS INTERNAL METADATA.
+ *
+ * On continue/switch turns the handler injects the task's state (id, objective,
+ * completed/remaining steps, files touched) into the execution query so the
+ * planner plans a step, not a restart. That block is internal metadata: it must
+ * never ride an external search query. It used to be composed with a bare
+ * "\n\n" AHEAD of the user's follow-up, so a research/continue turn shipped the
+ * whole task block to third-party search engines — extractCoreQuery returns the
+ * string verbatim whenever it contains ':' (and the block is full of colons).
+ */
+test('T-i: task-state framing composes behind the marker and strips to the question', async () => {
+  const { taskContextBlock } = await import('../../src/services/TaskRegistry.js');
+  const task = {
+    id: 'TASK-001', title: 'Node.js error handling research', status: 'active',
+    project: 'research', objective: 'Research Node.js error handling best practices',
+    completedSteps: ['searched the basics'], pendingSteps: ['cover async errors'],
+    decisions: [], filesChanged: ['/home/user/private-project/notes.md'],
+    lastVerified: null, checkpoint: null,
+  };
+  const block = taskContextBlock(task);
+  assert.ok(block.includes('Current task:'), 'taskContextBlock carries the framing');
+
+  const effectiveQuery = 'what about async error handling?';
+  const composed = withInternalContext(
+    effectiveQuery,
+    `Task state for this follow-up (internal — plan a step, not a restart):\n${block}`,
+  );
+  // The user's real question is recovered byte-identically...
+  assert.equal(stripInternalContext(composed), effectiveQuery);
+  // ...and the internal block never survives the strip.
+  const clean = stripInternalContext(composed);
+  for (const leak of ['Current task:', 'Objective:', 'Completed:', 'Remaining:', 'private-project']) {
+    assert.ok(!clean.includes(leak), `internal metadata leaked past the boundary: ${leak}`);
+  }
+});
+
+test('T-j: task-state framing never reaches a search provider (real composition shape)', async () => {
+  const { taskContextBlock } = await import('../../src/services/TaskRegistry.js');
+  const { aggregateSearch, __extractCoreQueryForTest } = await import('../../src/services/SearchEngine.js');
+  const task = {
+    id: 'TASK-001', title: 'Node.js error handling research', status: 'active',
+    project: 'research', objective: 'Research Node.js error handling best practices',
+    completedSteps: ['searched the basics'], pendingSteps: ['cover async errors'],
+    decisions: [], filesChanged: ['/home/user/private-project/notes.md'],
+    lastVerified: null, checkpoint: null,
+  };
+  // EXACT composition shape the handler applies on a continue/switch turn.
+  const composed = withInternalContext(
+    'what about async error handling?',
+    `Task state for this follow-up (internal — plan a step, not a restart):\n${taskContextBlock(task)}`,
+  );
+
+  // The search derivation yields only the user's words.
+  const core = __extractCoreQueryForTest(composed);
+  assert.ok(!/Current task:|Objective:|Completed:|Remaining:|private-project/.test(core),
+    `task framing survived the search derivation: ${core}`);
+
+  // The exact string handed to a provider search fn is clean.
+  const seen = [];
+  await aggregateSearch(composed, null, {
+    __providers: [{ id: 'capture', name: 'Capture' }],
+    __providerSearch: async (id, { query }) => { seen.push(query); return { sources: [] }; },
+  });
+  assert.ok(seen.length >= 1, 'provider seam exercised');
+  for (const q of seen) {
+    assert.ok(!/Current task:|Objective:|private-project/.test(q),
+      `task framing transmitted to provider: ${q}`);
+  }
+
+  // The handler composes through the boundary module — no bare "\n\n" prepend.
+  const idx = fs.readFileSync(new URL('../../index.js', import.meta.url), 'utf8');
+  assert.ok(idx.includes('withInternalContext('),
+    'the handler composes the resume query behind the internal marker');
+  assert.ok(!/\$\{decision\.contextBlock\}\s*\\n\\n\s*User's follow-up/.test(idx),
+    'the bare "\\n\\n" task-block prepend is gone');
+});

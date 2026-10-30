@@ -353,3 +353,33 @@ only, no prose narratives in commits.
 - `$HOME` is load-bearing for the CLI (`~/.jexi`, `~/.local/bin`). If you export
   `HOME` to sandbox a test, EXPORT IT BACK (`export HOME=/home/openhands`)
   before committing — a stray `HOME` breaks `git config` identity lookup.
+
+## M5 — privacy closure + capability proof (2026-10-27)
+
+- TASK-FRAMING EGRESS (fixed): `server/index.js:2559` composed the task-state
+  block (`decision.contextBlock` = `taskContextBlock`, full of `:`) AHEAD of the
+  user's follow-up with a bare `\n\n`. On continue/switch research turns that
+  string reached `runSearchTeam`, and `SearchEngine.extractCoreQuery` returns
+  the string VERBATIM when it contains `:` — so task id/objective/steps/files
+  egressed to third-party engines. Now composed via
+  `withInternalContext(effectiveQuery, ...)` (question first), so every egress
+  choke point (`extractCoreQuery`, `SearchAgent` split, news/data/browser
+  strips) recovers the exact question. Regression: `tests/agi/test-internal-
+  context-boundary.js` T-i / T-j. `test-audit-b48.js` (which pinned the old
+  literal) is RETIRED (SKIP, rc=0).
+- PROBE-DISCOVERED DEFECTS (open, not yet fixed — recorded for the next pass):
+  1. `AgenticDecision.runFileRead` (`file_read` lane) reads ANY absolute path
+     with no confinement — `resolveWithin` (`src/tools/security/path-
+     confinement.js`) is bypassed, and no `tool_use` event is emitted. Verified
+     live: read `/etc/passwd` and an out-of-workspace canary verbatim.
+  2. Final-response consistency: the Director/Forge lane executed `node
+     fail.js` (tool_use shows `exit 3`, twice) yet the delivered summary said
+     "It wasn't executed this turn". Evidence and prose disagree.
+  3. `Vera` verification verdict: `exact.txt` was 6 bytes (`HELLO\n`) against a
+     required 5, and the log itself noted "wrote exact.txt (6 bytes)", yet
+     verification returned `pass (0.75)`. The byte-level criterion was not
+     enforced.
+- EGRESS NOTE: the `file_read` / `web_search` agentic runners are REAL (`fs`
+  / `aggregateSearch`) but emit no `tool_use` event — absence of a tool event
+  is NOT evidence a tool did not run. Read the runner source, not the event
+  stream, when judging.
