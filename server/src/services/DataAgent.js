@@ -4,6 +4,7 @@ import fetch from 'node-fetch';
 import { generateContent } from '../providers/runtime/LLMClient.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { WORKSPACE_DIR } from '../config.js';
+import { stripInternalContext } from './InternalContext.js';
 
 /**
  * DATA ANALYST — JEXI's numbers brain (skill: 16-data-agent.md).
@@ -161,7 +162,10 @@ function buildChartHtml(table, stats) {
 </script></body></html>`;
 }
 
-export async function runDataAgent({ query, sendEvent }) {
+export async function runDataAgent({ query: rawQuery, sendEvent }) {
+  // M4-1 — strip internal context before extractData scans for a URL/filename;
+  // otherwise a URL inside the brain block becomes a fetched external target.
+  const query = stripInternalContext(rawQuery);
   const found = extractData(query);
   if (!found) {
     return { success: true, summary: '### 📊 DATA ANALYST\n\nI don\'t have any data to analyze — paste a **CSV/JSON** in the chat, give me a **filename** (e.g. `sales.csv` in the workspace), or drop a **direct .csv/.json URL**.' };

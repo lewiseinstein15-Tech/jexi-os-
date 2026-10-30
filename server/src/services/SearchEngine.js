@@ -16,6 +16,7 @@
 import {
   activeSearchProviders, providerSearch, webSearchHealth, canonicalUrl,
 } from './WebSearch.js';
+import { stripInternalContext } from './InternalContext.js';
 
 // Trusted-source ranking (kept — it works).
 const TRUSTED_DOMAINS = ['wikipedia.org', '.edu', '.gov', '.org', 'arxiv.org', 'github.com', 'mdn.', 'developer.', 'stackoverflow.com', 'geeksforgeeks.org', 'khanacademy.org', 'britannica.com', 'coursera.org', 'mit.edu', 'stanford.edu', 'openstax.org', 'docs.', 'nature.com', 'sciencedirect.com', 'reuters.com', 'bbc.com', 'nasa.gov', 'who.int'];
@@ -36,6 +37,11 @@ function trustedScore(url) {
 }
 
 function extractCoreQuery(query) {
+  // M4-1 — INTERNAL CONTEXT NEVER EGREES. A coordinator-composed query carries
+  // the private brain-recall block behind a marker; strip it BEFORE any
+  // derivation so the block can never ride a search engine request (the
+  // `includes(':')` early return below would otherwise pass it through whole).
+  query = stripInternalContext(query);
   if (query.includes(':')) return query;
   let q = query.toLowerCase();
   q = q.replace(/[^a-z0-9\s]/g, ' ');
@@ -43,6 +49,9 @@ function extractCoreQuery(query) {
   const words = q.split(/\s+/).filter((w) => w.length > 2 && !stopWords.has(w));
   return words.slice(0, 8).join(' ');
 }
+
+/** M4-1 test seam — the search-egress derivation, exported for the boundary suite. */
+export const __extractCoreQueryForTest = extractCoreQuery;
 
 /**
  * Fan one query across EVERY active provider in parallel (dsh web seam),
@@ -57,11 +66,14 @@ export async function aggregateSearch(query, specificEngine = null, opts = {}) {
   const wantAcademic = isAcademicQuery(coreQuery);
   // `__providers` is the hermetic-test injection point (no real network).
   const actives = opts.__providers || activeSearchProviders({ includeAcademic: wantAcademic });
+  // `__providerSearch` lets the boundary suite capture the EXACT query string
+  // that would egress to a real engine.
+  const search = opts.__providerSearch || providerSearch;
   const chosen = specificEngine
     ? actives.filter((p) => p.id === specificEngine || p.name.toLowerCase() === String(specificEngine).toLowerCase())
     : actives;
 
-  const settled = await Promise.allSettled(chosen.map((p) => providerSearch(p.id, { query: coreQuery, maxResults: 8 })));
+  const settled = await Promise.allSettled(chosen.map((p) => search(p.id, { query: coreQuery, maxResults: 8 })));
 
   // Fuse: rank position (engine's own order) + cross-engine agreement.
   const fused = new Map(); // canonical url → { entry, engines:Set, bestRank }

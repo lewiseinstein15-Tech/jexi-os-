@@ -4,6 +4,7 @@ import { generateContent } from '../providers/runtime/LLMClient.js';
 import { saveInternetKnowledge } from './MemoryManager.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
 import { twitterLatest } from './TrustedLibrary.js';
+import { stripInternalContext } from './InternalContext.js';
 
 /**
  * NEWS AGENT — the specialist news team (patterns from ai-news-agent, RSSHub,
@@ -302,7 +303,10 @@ export async function editNews(query, items, twitterItems) {
 }
 
 /* ---------------- THE TEAM ---------------- */
-export async function runNewsTeam(query, sendEvent) {
+export async function runNewsTeam(rawQuery, sendEvent) {
+  // M4-1 — the internal brain block must never reach a news feed URL
+  // (scoutFeeds builds `.../rss/search?q=<query>` — a direct external egress).
+  const query = stripInternalContext(rawQuery);
   // 1. News Scout — parallel feeds (X/Twitter best-effort runs alongside, never blocks)
   sendEvent?.('log', { agent: 'News Scout', message: `📡 Scanning trusted news feeds for: "${query}"` });
   const [rawItems, tw] = await Promise.allSettled([

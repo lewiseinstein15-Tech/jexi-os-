@@ -16,6 +16,7 @@ import { preferencesBlock } from './PreferenceLearner.js';
 import { WORKSPACE_DIR, MANAGER_URL, MAX_DEBUG_ATTEMPTS } from '../config.js';
 import { extractContent } from './Extractor.js';
 import { aggregateSearch } from './SearchEngine.js';
+import { stripInternalContext } from './InternalContext.js';
 import { saveInternetKnowledge, saveCodingKnowledge } from './MemoryManager.js';
 import { runtimeCall, activeProvider } from './ComputerRuntime.js';
 import { resolveInside } from './PathSafety.js';
@@ -108,7 +109,11 @@ export class ComputerUseAgent {
     return out;
   }
 
-  async executeTask(task, sendEvent, opts = {}) {
+  async executeTask(rawTask, sendEvent, opts = {}) {
+    // M4-1 — a coordinator-composed task may carry the internal brain block.
+    // The browser/computer agent searches and navigates on the user's real
+    // question; the internal block must never reach a search engine or a page.
+    const task = stripInternalContext(rawTask);
     const intent = opts.intent || 'task';
     const isResearch = intent === 'research';
     const isLink = intent === 'link_analysis';

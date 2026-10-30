@@ -1,5 +1,6 @@
 import { aggregateSearch, isAcademicQuery } from './SearchEngine.js';
 import { extractContent } from './Extractor.js';
+import { stripInternalContext, splitInternalContext } from './InternalContext.js';
 import { generateContent } from '../providers/runtime/LLMClient.js';
 import { saveInternetKnowledge } from './MemoryManager.js';
 import { JEXI_SYSTEM_PROMPT } from './JexiPrompt.js';
@@ -314,10 +315,16 @@ export async function synthesizeGrounded(query, deep, context = '', opts = {}) {
   const thread = context && String(context).trim()
     ? `\n\nYou are continuing a conversation. The user was just discussing:\n${String(context).slice(0, 1400)}\n\nKeep your answer in that thread — connect it to what came before where it helps, but never announce that this continues a conversation (no "continuing our conversation", no recap) — just answer.`
     : '';
+  // M4-1 — internal context (brain recall) rides the PROMPT only, clearly
+  // labelled, never the query the user is reported to have asked.
+  const internal = opts.internalContext && String(opts.internalContext).trim()
+    ? `\n\nInternal context for you only (never quote it, never say you recalled it):\n${String(opts.internalContext).slice(0, 1500)}`
+    : '';
 
   const prompt =
     `The user asked: "${query}"\n\n` +
     thread +
+    internal +
     `\n\n` +
     `I retrieved these numbered sources from the web:\n\n${sourceText}\n\n` +
     `Write the final answer. RULES:\n` +
@@ -359,7 +366,12 @@ async function needsMore(deep, summary) {
 // ---------------------------------------------------------------------------
 // THE TEAM — main entry: run all stages and return a grounded, cited answer
 // ---------------------------------------------------------------------------
-export async function runSearchTeam(query, sendEvent, opts = {}) {
+export async function runSearchTeam(rawQuery, sendEvent, opts = {}) {
+  // M4-1 — split the coordinator-composed query at the boundary: SEARCH on the
+  // user's real question only; the internal brain block may reach the SYNTHESIS
+  // prompt (opts.internalContext) but never a search engine, a sub-query, the
+  // gap-filler, or the knowledge store.
+  const { query, context: internalContext } = splitInternalContext(rawQuery);
   // Conversation thread from earlier turns — lets the team resolve references
   // like "this course" / "the app" / "continue" (continuity pattern).
   const context = opts?.context || '';
@@ -434,7 +446,7 @@ export async function runSearchTeam(query, sendEvent, opts = {}) {
   // B200 — the FIRST synthesis streams its tokens live (opts.onToken). The
   // gap-filler re-synthesis below intentionally does NOT stream: appending a
   // second answer to the same message would concatenate two texts.
-  let summary = await synthesizeGrounded(query, deep, context, { onToken: opts.onToken });
+  let summary = await synthesizeGrounded(query, deep, context, { onToken: opts.onToken, internalContext });
 
   // 5.5 Gap-filler — one bounded extra pass if the answer is thin
   if (await needsMore(deep, summary)) {
@@ -446,7 +458,7 @@ export async function runSearchTeam(query, sendEvent, opts = {}) {
       const extraDeep = await deepRead(extraRanked, query, sendEvent);
       const combined = [...deep, ...extraDeep].slice(0, 10);
       if (combined.length > deep.length) {
-        summary = await synthesizeGrounded(query, combined, context);
+        summary = await synthesizeGrounded(query, combined, context, { internalContext });
         sendEvent?.('log', { agent: 'Synthesizer', message: `↻ Re-synthesized with ${combined.length} sources.` });
       }
     } catch (e) { /* keep the first answer */ }

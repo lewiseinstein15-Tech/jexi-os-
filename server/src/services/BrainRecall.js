@@ -40,6 +40,7 @@ export const BRAIN_TOTAL_BUDGET = 1500;
 import fs from 'node:fs';
 import path from 'node:path';
 import { DATA_DIR } from '../config.js';
+import { withInternalContext } from './InternalContext.js';
 
 function clip(text, n) {
   const s = String(text || '').replace(/\s+/g, ' ').trim();
@@ -233,11 +234,18 @@ export async function brainHotWriteTurn({ sessionId = null, userMessage = '', as
  * The graph lane's coordinator (the FIRST specialist node to run for a
  * plan) receives the brain block prepended to its query; every later node
  * sees the original query untouched (wrapCase one-shot — see Orchestrator).
+ *
+ * M4-1 — the block is INTERNAL prompt context, never search input. It used to
+ * be appended with a bare "\n\n", so any node that feeds its `query` to an
+ * EXTERNAL service (the search team, the browser) transmitted the private
+ * recall block — conversation hot-memory, brain pages, ontology nodes — to
+ * third-party search engines verbatim (extractCoreQuery returns the string
+ * unchanged when it contains ':'). The marker + strip now live in the
+ * dependency-free InternalContext module so every egress choke point can strip
+ * the block without importing this module's wiring bootstrap.
  */
 export function withCoordinatorContext(query, brainContext) {
-  const bc = String(brainContext || '').trim();
-  if (!bc) return String(query || '');
-  return `${String(query || '')}\n\n${bc}`;
+  return withInternalContext(query, brainContext);
 }
 
 /**
