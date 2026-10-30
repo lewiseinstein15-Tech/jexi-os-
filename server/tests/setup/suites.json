@@ -1259,6 +1259,13 @@
         "--test",
         "tests/agi/test-hermetic-test-environment.js"
       ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-subagent-isolation-boundary.js"
+      ]
     }
   ]
 }

@@ -24,10 +24,20 @@ import { runAgentLoop } from './AgentLoop.js';
 import { loadAgentDefinition, wantsIsolation, validateAgentContract } from './AgentDefinitions.js';
 import { TOOL_REGISTRY } from './ToolRegistry.js';
 import { skillWantsIsolation } from './SkillChain.js';
+import { openReportChannel, closeReportChannel } from './SubagentReport.js';
+import {
+  MAX_PARENT_SUMMARY_CHARS,
+  sanitizeStatus,
+  boundSummary,
+  extractApprovedArtifacts,
+  sanitizeError,
+  sanitizeChildEvent,
+} from './SubagentIsolation.js';
 
 const MAX_PARALLEL = 3;   // bounded concurrency (Grok Build: never unlimited)
 const MAX_SUBAGENTS = 8;
 const TOOL_SLUGS = TOOL_REGISTRY.map((t) => t.slug);
+let childChannelSeq = 0;  // guarantees a unique report channel per isolated run
 
 /**
  * M3 decideJob seam — resolve a subagent job to its agent definition.
@@ -49,7 +59,6 @@ export function resolveJobAgent(job = {}) {
   if (!v.ok) return { def, isolated: wantsIsolation(def), blocked: `agent contract refused: ${v.errors.join('; ')}` };
   return { def, isolated: wantsIsolation(def), blocked: null };
 }
-const MAX_SUMMARY_CHARS = 350; // what the parent is allowed to see for forked runs
 
 /** Deterministic mission decomposition: split on 'and/then/also', ';' or newlines. */
 export function decomposeQuery(query) {
@@ -61,13 +70,17 @@ export function decomposeQuery(query) {
 }
 
 /**
- * Summarize a subagent's full transcript for the parent (isolation boundary).
- * Prefers an LLM one-liner; falls back to a deterministic head truncation so
- * the isolation contract holds even with no keys.
+ * Summarize a child transcript for the parent (M9 isolation boundary).
+ * An LLM one-liner is a COSMETIC refinement only: it is accepted solely when
+ * it passes the deterministic gate (non-empty and within the hard cap) and is
+ * then bounded again by `boundSummary`. With no provider, a hostile provider,
+ * or a paraphrasing provider, the deterministic head-truncation is used — so
+ * the parent-visible summary is ALWAYS bounded regardless of the model.
  */
 async function summarizeForParent(fullAnswer, name) {
   const text = String(fullAnswer || '');
-  if (text.length <= MAX_SUMMARY_CHARS) return text;
+  if (text.length <= MAX_PARENT_SUMMARY_CHARS) return boundSummary({ transcript: text });
+  let modelText = '';
   try {
     const { generateContent } = await import('../providers/runtime/LLMClient.js');
     const s = await generateContent(
@@ -76,36 +89,42 @@ async function summarizeForParent(fullAnswer, name) {
       null,
       { temperature: 0.2 }
     );
-    if (String(s || '').trim()) return String(s).trim().slice(0, MAX_SUMMARY_CHARS * 2);
-  } catch (e) { /* fall through */ }
-  return text.slice(0, MAX_SUMMARY_CHARS) + '…';
-}
-
-/** Extract key artifacts (headings / file-ish lines) from a full answer. */
-function keyArtifacts(answer) {
-  const lines = String(answer || '').split('\n').filter((l) => /^#{1,3}\s/.test(l.trim()) || /^(`|\*\*)?[A-Z][A-Z -]{3,}/.test(l.trim()));
-  return lines.slice(0, 6).map((l) => l.trim().replace(/^#{1,3}\s*/, '').replace(/[*`]/g, '').slice(0, 80));
+    modelText = String(s || '').trim();
+  } catch (e) { /* no provider → deterministic summary below */ }
+  return boundSummary({ transcript: text, modelText });
 }
 
 /**
  * Run ONE isolated subagent: own context window, and the parent gets only
  * { name, status, summary, artifacts, toolCalls, durationMs } — the full
- * transcript stays inside the fork.
+ * transcript stays inside the fork. Every parent-visible field is produced by
+ * the M9 isolation boundary (`SubagentIsolation.js`); the child's streamed
+ * events are filtered so no transcript, reasoning, or raw tool output crosses.
  */
 export async function runIsolatedSubagent({ name, query, image, sendEvent, opts = {} }) {
   if (typeof sendEvent !== 'function') sendEvent = () => {};
   const emit = (type, payload) => { try { sendEvent(type, payload); } catch (e) {} };
   const started = Date.now();
+  // The child's private channel: it may only reach the parent through the
+  // allowlisted projection below, never by forwarding raw events.
+  const childId = `iso-${name}-${started}-${++childChannelSeq}`;
+  const forwardChildEvent = (type, data) => {
+    const safe = sanitizeChildEvent(type, data);
+    if (safe) emit(type, { ...safe, subagent: name });
+  };
+  openReportChannel({ subagentId: childId, parentConv: null });
   emit('subagent.start', { name, isolated: true });
   try {
-    const res = await runAgentLoop({ query, image, opts: { ...opts, signal: opts.signal }, sendEvent: (t, d) => sendEvent(t, { ...d, subagent: name }) });
-    const status = res.cancelled ? 'cancelled' : (res.answer ? 'PASS' : 'FAIL');
+    const res = await runAgentLoop({ query, image, opts: { ...opts, subagentId: childId, signal: opts.signal }, sendEvent: forwardChildEvent });
+    const reports = closeReportChannel(childId);
+    const status = sanitizeStatus(res.cancelled ? 'cancelled' : (res.answer ? 'PASS' : 'FAIL'));
     const summary = res.cancelled ? '' : await summarizeForParent(res.answer, name);
-    const out = { name, query, status, summary, artifacts: keyArtifacts(res.answer), toolCalls: res.stats?.toolCalls || 0, durationMs: Date.now() - started, isolated: true };
+    const out = { name, query, status, summary, artifacts: extractApprovedArtifacts(reports), toolCalls: res.stats?.toolCalls || 0, durationMs: Date.now() - started, isolated: true };
     emit('subagent.done', { name, status, toolCalls: out.toolCalls, durationMs: out.durationMs, preview: String(summary).slice(0, 120) });
     return out;
   } catch (e) {
-    const out = { name, query, status: 'FAIL', summary: '', artifacts: [], toolCalls: 0, durationMs: Date.now() - started, isolated: true, error: (e && e.message) || String(e) };
+    try { closeReportChannel(childId); } catch { /* channel may already be closed */ }
+    const out = { name, query, status: 'FAIL', summary: '', artifacts: [], toolCalls: 0, durationMs: Date.now() - started, isolated: true, error: sanitizeError(e) };
     emit('subagent.done', { name, status: 'FAIL', error: out.error });
     return out;
   }
