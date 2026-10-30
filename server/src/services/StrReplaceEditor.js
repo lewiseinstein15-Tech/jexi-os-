@@ -17,6 +17,7 @@
 import fs from 'fs';
 import path from 'path';
 import { WORKSPACE_DIR } from '../config.js';
+import { resolveWithin } from '../tools/security/path-confinement.js';
 
 export const MAX_OUTPUT_CHARS = 16000; // dsh default
 const CLIP_NOTICE = '<response clipped><NOTE>Output exceeds the configured limit; only the prefix is shown.</NOTE>';
@@ -25,12 +26,18 @@ const absence = new Set(); // absolute paths CONFIRMED absent by view/replace/in
 
 const OUT = { ok: false, code: 'FS_OUT_OF_WORKSPACE', error: 'only workspace-relative paths are editable' };
 
+/** Resolve a workspace-relative path, refusing anything that escapes the
+ *  workspace root. M6 — routed through the ONE path authority
+ *  (`resolveWithin`) instead of a string-prefix check, so `..` traversal AND
+ *  symlinks that step outside the workspace are refused. A leading slash is
+ *  still treated as workspace-relative (the dsh contract this editor keeps). */
 function abs(p) {
   const clean = String(p || '').replace(/^\/+/, '');
-  if (clean.split('/').includes('..')) return null; // traversal refused
-  const full = path.resolve(WORKSPACE_DIR, clean);
-  if (!full.startsWith(path.resolve(WORKSPACE_DIR))) return null;
-  return full;
+  try {
+    return resolveWithin(WORKSPACE_DIR, clean, { followSymlinks: true });
+  } catch {
+    return null; // callers report OUT (escape, NUL byte, …)
+  }
 }
 
 function clip(text) {

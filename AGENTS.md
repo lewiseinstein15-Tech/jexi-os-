@@ -367,7 +367,8 @@ only, no prose narratives in commits.
   strips) recovers the exact question. Regression: `tests/agi/test-internal-
   context-boundary.js` T-i / T-j. `test-audit-b48.js` (which pinned the old
   literal) is RETIRED (SKIP, rc=0).
-- PROBE-DISCOVERED DEFECTS (open, not yet fixed — recorded for the next pass):
+- PROBE-DISCOVERED DEFECTS (open in M5, ALL THREE CLOSED IN M6 — see the M6
+  section below):
   1. `AgenticDecision.runFileRead` (`file_read` lane) reads ANY absolute path
      with no confinement — `resolveWithin` (`src/tools/security/path-
      confinement.js`) is bypassed, and no `tool_use` event is emitted. Verified
@@ -383,3 +384,44 @@ only, no prose narratives in commits.
   / `aggregateSearch`) but emit no `tool_use` event — absence of a tool event
   is NOT evidence a tool did not run. Read the runner source, not the event
   stream, when judging.
+
+## M6 — execution-integrity closure (2026-10-27)
+
+Three confirmed execution defects, fixed in priority order and proven by
+`tests/agi/test-m6-execution-integrity.js` (27 tests, deterministic, headless,
+zero network, zero real model calls).
+
+- D1 FILESYSTEM CONFINEMENT. `AgenticDecision.runFileRead` resolved any path
+  with `path.resolve(p)` — absolute paths, `../` traversal and symlinks out of
+  the workspace all returned real bytes. It now routes EVERY caller path
+  through the one authority (`resolveWithin(..., { followSymlinks: true })`);
+  a refusal returns NO contents, only the reason. The coding-lane editor
+  (`StrReplaceEditor.abs`) had the same symlink hole (a bare `startsWith` after
+  `path.resolve`) and now also uses `resolveWithin`. `tool_use` rows are emitted
+  truthfully (`status: 'error'` on denial, `'success'` on a real read) via the
+  new `emitAgenticToolUse`; `sendEvent` is threaded `agenticTurn → executePlan →
+  runner` and `AgentLoop → executeCapabilityKeyless` so sub-agent reads emit too.
+  `deriveArgs('file_read')` now extracts full path tokens (`sub/dir/f.txt`), not
+  just absolute ones.
+- D2 EXECUTION-RESULT INTEGRITY. `Director.composeReport` told the report model
+  "Real commands executed this task: NONE" whenever it saw no
+  `COMMAND_COMPLETED`/`TEST_COMPLETED` — ignoring `COMMAND_FAILED`. A command
+  that ran and exited 3 was reported as "not executed this turn". New
+  `src/services/director/ExecutionRecord.js` derives ONE authoritative record
+  from the event log (a failed run is still a run; blocked ≠ not attempted;
+  started-without-terminal = still running; timed-out ≠ never ran). It feeds the
+  report prompt, the fallback answer, `task.result.execution`, and a
+  deterministic backstop (`appendExecutionNoteIfContradicted`) that appends the
+  record when a model still claims nothing ran.
+- D3 VERIFICATION CORRECTNESS. A criterion demanding a file be "exactly 5
+  bytes" passed against a record showing 6 bytes, because the verdict came from
+  the rubric model alone. `Verifier` now has Gate 1.8 (`evidenceContradictions`):
+  machine-checkable exact values are decided from the task's own record
+  (`FILE_CREATED`/`FILE_UPDATED` `data.bytes`); a contradiction fails
+  deterministically and the rubric cannot override it (ANDed with the gates).
+  The rubric prompt's execution evidence now carries recorded byte counts.
+- VERIFIED: 42/42 `tests/agi/*` suites, the `jexi.verify.test` set (99 tests),
+  and the Director suites (b208 96, b210 64, b213 28, f5 37) all pass. The
+  `tests/tickets/*` failures (sandbox/testing/verify/profiles/pytest) are
+  PRE-EXISTING environment failures — identical counts at the `ca3b91e`
+  baseline.

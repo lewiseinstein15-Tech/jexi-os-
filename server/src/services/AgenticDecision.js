@@ -37,6 +37,7 @@ import { WORKSPACE_DIR } from '../config.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
+import { resolveWithin, PathEscapeError } from '../tools/security/path-confinement.js';
 
 /* ════════════════════════════════════════════════════════════════════
  * THE CAPABILITY CATALOG (SWE-agent ACI: small, explicit, observable)
@@ -449,30 +450,96 @@ async function runWebSearch(args, opts = {}) {
   };
 }
 
+/**
+ * The confinement root for agentic filesystem reads.
+ *
+ * M6 — a read lane MUST NOT touch anything outside the workspace. The root is
+ * overridable per call (`opts.workspaceRoot`) so a task/mission can pin its own
+ * staging area, and defaults to the configured WORKSPACE_DIR. It is resolved
+ * ONCE here so every entry point (the direct lane, a compound sub-agent, the
+ * recovery backstop) shares the same policy.
+ */
+function agenticWorkspaceRoot(opts = {}) {
+  return path.resolve(String(opts.workspaceRoot || opts.root || WORKSPACE_DIR));
+}
+
+/** Truthful `tool_use` row for an agentic capability invocation. Mirrors the
+ *  ToolRuntime/SearchAgent convention (running → success|error) so the UI shows
+ *  the REAL outcome of a file read, denial included. Never fabricated: the
+ *  status is derived from the runner result, not from the request. */
+function emitAgenticToolUse(sendEvent, { slug, kind = 'Read', summary, detail, status, durationMs = 0, id }) {
+  try {
+    if (typeof sendEvent !== 'function') return;
+    sendEvent('tool_use', {
+      id: id || `agentic-${slug}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      tool: kind, slug, status, duration_ms: durationMs, summary, detail: String(detail || '').slice(0, 4000),
+    });
+  } catch { /* the transcript row is a nicety, never critical */ }
+}
+
 async function runFileRead(args, opts = {}) {
   const p = String(args.path || '');
-  const resolved = p.startsWith('~') ? path.join(process.env.HOME || '/home/z', p.slice(1)) : path.resolve(p);
-  // ACI precondition: read-only, exists, regular file, size-capped.
+  const root = agenticWorkspaceRoot(opts);
+  const sendEvent = opts.sendEvent;
+  const t0 = Date.now();
+  const detail = (extra) => `$ file-read ${p || '(no path)'}${extra ? `\n${extra}` : ''}`;
+  const deny = (code, reason) => {
+    emitAgenticToolUse(sendEvent, { slug: 'file-read', summary: `read denied: ${p || '(no path)'} — ${reason}`, detail: detail(`error: ${reason}`), status: 'error', durationMs: Date.now() - t0 });
+    // Denied reads return NO file contents — only the honest reason.
+    return { ok: false, output: '', observation: `file read refused: ${reason}`, meta: { path: p, denied: true, code, toolInvocations: 1 } };
+  };
+
+  if (!p.trim()) return deny('E_NO_PATH', 'no path supplied');
+
+  // P0 — CONFINEMENT. Every caller-supplied path goes through the repo's one
+  // path authority. Absolute paths outside the workspace, `../` traversal,
+  // NUL-byte truncation, and symlinks that step outside are ALL refused here —
+  // a plain string-prefix check is not sufficient (see path-confinement.js).
+  let resolved;
+  try {
+    resolved = resolveWithin(root, p, { followSymlinks: true });
+  } catch (e) {
+    if (e instanceof PathEscapeError) {
+      const viaSymlink = /symlink/.test(String(e.message));
+      return deny('E_PATH_ESCAPE', `${p} is outside the workspace${viaSymlink ? ' (symlink escape)' : ''}`);
+    }
+    return deny('E_RESOLVE', String((e && e.message) || e).slice(0, 160));
+  }
+
+  // Precondition: read-only, exists, regular file, size-capped.
   let st;
   try { st = fs.statSync(resolved); } catch {
     // P11 A4 — the read was ATTEMPTED and failed: one real invocation.
-    return { ok: false, output: '', observation: `file not found: ${resolved}`, meta: { path: resolved, toolInvocations: 1 } };
+    emitAgenticToolUse(sendEvent, { slug: 'file-read', summary: `read failed: ${p} — file not found`, detail: detail(`error: file not found`), status: 'error', durationMs: Date.now() - t0 });
+    return { ok: false, output: '', observation: `file not found: ${resolved}`, meta: { path: resolved, code: 'ENOENT', toolInvocations: 1 } };
   }
-  if (!st.isFile()) return { ok: false, output: '', observation: `not a regular file: ${resolved}`, meta: { path: resolved, toolInvocations: 1 } };
+  if (!st.isFile()) {
+    emitAgenticToolUse(sendEvent, { slug: 'file-read', summary: `read failed: ${p} — not a regular file`, detail: detail('error: not a regular file'), status: 'error', durationMs: Date.now() - t0 });
+    return { ok: false, output: '', observation: `not a regular file: ${resolved}`, meta: { path: resolved, code: 'E_NOT_FILE', toolInvocations: 1 } };
+  }
   const CAP = 64 * 1024;
-  const fd = fs.openSync(resolved, 'r');
+  let text;
+  let bytes;
   try {
-    const buf = Buffer.alloc(Math.min(st.size, CAP));
-    fs.readSync(fd, buf, 0, buf.length, 0);
-    const text = buf.toString('utf-8');
-    const truncated = st.size > CAP ? `\n\n_…truncated (${st.size} bytes total, showing first ${CAP})_` : '';
-    return {
-      ok: true,
-      output: `Contents of \`${resolved}\`:\n\n\`\`\`\n${text}${truncated}\n\`\`\``,
-      observation: `read ${buf.length} bytes from ${resolved}`,
-      meta: { path: resolved, bytes: buf.length, toolInvocations: 1 }, // P11 A4 — one real read
-    };
-  } finally { fs.closeSync(fd); }
+    const fd = fs.openSync(resolved, 'r');
+    try {
+      const buf = Buffer.alloc(Math.min(st.size, CAP));
+      bytes = fs.readSync(fd, buf, 0, buf.length, 0);
+      text = buf.subarray(0, bytes).toString('utf-8');
+    } finally { fs.closeSync(fd); }
+  } catch (e) {
+    const code = e && e.code === 'EACCES' ? 'EACCES' : (e && e.code === 'EISDIR' ? 'EISDIR' : 'E_READ');
+    emitAgenticToolUse(sendEvent, { slug: 'file-read', summary: `read failed: ${p} — ${code === 'EACCES' ? 'permission denied' : String((e && e.message) || e).slice(0, 60)}`, detail: detail(`error: ${String((e && e.message) || e).slice(0, 160)}`), status: 'error', durationMs: Date.now() - t0 });
+    return { ok: false, output: '', observation: `cannot read ${resolved}: ${String((e && e.message) || e).slice(0, 120)}`, meta: { path: resolved, code, toolInvocations: 1 } };
+  }
+  const truncated = st.size > CAP ? `\n\n_…truncated (${st.size} bytes total, showing first ${CAP})_` : '';
+  emitAgenticToolUse(sendEvent, { slug: 'file-read', summary: `read ${bytes} bytes from ${path.relative(root, resolved) || resolved}`, detail: detail(`${bytes} bytes read`), status: 'success', durationMs: Date.now() - t0 });
+  return {
+    ok: true,
+    output: `Contents of \`${resolved}\`:\n\n\`\`\`\n${text}${truncated}\n\`\`\``,
+    observation: `read ${bytes} bytes from ${resolved}`,
+    meta: { path: resolved, bytes, toolInvocations: 1 }, // P11 A4 — one real read
+  };
 }
 
 /** Derive the script the user asked for. Live model writes bespoke code; the
@@ -670,8 +737,12 @@ function deriveArgs(route, query) {
       return { query: cleaned };
     }
     case 'file_read': {
-      const m = q.match(/\/[\w.\-\/]+|~\/[\w.\-\/]+/) || q.match(/\b(?:the\s+)?(file|contents)\b/i);
-      return { path: m ? m[0] : '' };
+      // Prefer the FULL path token: absolute (~/, /), workspace-relative with
+      // a subdirectory (sub/dir/f.txt), or a bare filename (f.txt). Anchored to
+      // a token boundary so the leading "/" of "sub/deep.txt" is not mistaken
+      // for an absolute path.
+      const m = q.match(/(?:^|[\s"'`([])(~\/[\w.\-/]+|\/[\w.\-/]+|[\w.-]+\/[\w.\-/]+|[\w.-]+\.\w{1,8})\b/);
+      return { path: m ? m[1] : '' };
     }
     case 'code_run': return { query: q };
     case 'terminal': {
@@ -1042,7 +1113,7 @@ export async function agenticTurn({ raw, effectiveQuery, sessionId = null, sendE
     delegation = await dispatchSubagents(q, compoundRoutes, { sendEvent: emit, sessionId });
   }
 
-  const executed = await executePlan(decision, q, { sessionId, brainContext });
+  const executed = await executePlan(decision, q, { sessionId, brainContext, sendEvent: emit });
   if (!executed.success || !executed.summary) {
     // P10 GAP 1 — when the compound dispatch produced real child results, the
     // coordinator's composed answer IS the turn's answer (the primary lane

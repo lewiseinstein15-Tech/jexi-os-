@@ -88,6 +88,69 @@ export function echoesBriefScaffolding(text) {
   return hits >= 2;
 }
 
+/* ── M6 — EVIDENCE-BASED CRITERION CHECK ─────────────────────────────────
+ * A criterion like "exact.txt contains exactly 5 bytes" is a MACHINE-CHECKABLE
+ * claim about a produced artifact. The task's own event record (FILE_CREATED /
+ * FILE_UPDATED with `data.bytes`) is the ground truth. When the record shows a
+ * different exact value, the deliverable is a false pass no matter what the
+ * rubric says. This closes the defect where a 6-byte write was accepted
+ * against a criterion that demanded exactly 5 bytes.
+ */
+
+/** Extract the exact byte count a criterion demands, or null. */
+export function exactByteCountIn(criterionText) {
+  const t = String(criterionText || '');
+  // Require an explicit exactness cue; a bare number ("50 lines") is not enough.
+  const exact = /\b(exactly|precisely|exact)\b/i.test(t) || /\b(?:is|equals?|=)\s*(\d+)\s*bytes?\b/i.test(t);
+  if (!exact) return null;
+  const m = t.match(/(\d+)\s*bytes?\b/i);
+  return m ? Number(m[1]) : null;
+}
+
+/** The file name a criterion refers to, or null. */
+function fileNameIn(criterionText) {
+  const m = String(criterionText || '').match(/[\w][\w.-]*\.(?:txt|md|json|js|mjs|cjs|ts|py|html|css|yml|yaml|sh)\b/i);
+  return m ? m[0] : null;
+}
+
+/** Byte counts recorded for a file in the task's event log (last wins). */
+function recordedBytesFor(task, fileName) {
+  const events = (task && task.events) || [];
+  let bytes = null;
+  let seen = false;
+  for (const e of events) {
+    if (!e || !e.data) continue;
+    const type = String(e.type || '');
+    if (type !== 'FILE_CREATED' && type !== 'FILE_UPDATED') continue;
+    const file = String(e.data.file || e.data.path || '');
+    if (!file) continue;
+    if (fileName && !file.endsWith(fileName) && file !== fileName) continue;
+    const b = Number(e.data.bytes);
+    if (Number.isFinite(b)) { bytes = b; seen = true; }
+  }
+  return seen ? bytes : null;
+}
+
+/**
+ * Deterministic contradictions between a criterion's exact value and the
+ * task's execution record. Returns a list of problem strings (empty = clean).
+ */
+export function evidenceContradictions(deliverable, task, criteria = []) {
+  const problems = [];
+  for (const criterion of criteria) {
+    const wanted = exactByteCountIn(criterion);
+    if (wanted === null) continue;
+    const fileName = fileNameIn(criterion);
+    const actual = recordedBytesFor(task, fileName);
+    if (actual === null) continue; // no record to contradict — the rubric decides
+    if (actual !== wanted) {
+      const label = fileName ? `\`${fileName}\`` : 'the produced file';
+      problems.push(`the criterion requires ${label} to be exactly ${wanted} byte${wanted === 1 ? '' : 's'}, but the execution record shows ${actual} bytes were written — the record is the truth, not the claim`);
+    }
+  }
+  return problems;
+}
+
 /** Compact, honest summary of what ACTUALLY executed in a task — the only
  *  source of truth for HOW work was done. Fed to the rubric prompt. */
 export function executionEvidence(events = []) {
@@ -106,7 +169,13 @@ export function executionEvidence(events = []) {
   const cmds = [...of('COMMAND_COMPLETED'), ...of('COMMAND_FAILED'), ...of('TEST_COMPLETED'), ...of('TEST_FAILED')];
   lines.push(`commands/tests executed: ${cmds.length}${cmds.length ? ` (last: ${String(cmds[cmds.length - 1].summary || '').slice(0, 90)})` : ' — NONE'}`);
   const files = [...of('FILE_CREATED'), ...of('FILE_UPDATED')];
-  if (files.length) lines.push(`files written: ${files.length} (${files.slice(0, 4).map((e) => String(e.summary || '').slice(0, 50)).join(' · ')})`);
+  if (files.length) {
+    lines.push(`files written: ${files.length} (${files.slice(0, 4).map((e) => {
+      const f = String(e.data?.file || e.summary || '').slice(0, 50);
+      const b = Number(e.data?.bytes);
+      return Number.isFinite(b) ? `${f} [${b} bytes]` : f;
+    }).join(' · ')})`);
+  }
   lines.push(`searches: ${of('SEARCH_COMPLETED').length}`);
   lines.push(`model calls: ${of('MODEL_REQUEST_COMPLETED').length}`);
   return lines.join('\n').slice(0, 1200);
@@ -178,6 +247,17 @@ export async function verifyDeliverable(p) {
     if (echoesBriefScaffolding(deliverable)) {
       gateProblems.push('the deliverable echoes the assignment instructions instead of doing the work (template echo) — produce the real work product, not the scaffolding words');
     }
+  }
+
+  // Gate 1.8 (M6) — EVIDENCE vs CLAIM: a criterion that states a MACHINE-
+  // CHECKABLE exact value (e.g. "exactly 5 bytes") is decided from the task's
+  // own execution record, not from the rubric's opinion. A rubric judge cannot
+  // be trusted to byte-check a file, and a weak one passes a deliverable that
+  // contradicts the record — the record is the truth. Deterministic, so the
+  // model can never override it (rubric pass is ANDed with the gates).
+  {
+    const contradictions = evidenceContradictions(deliverable, task, criteria);
+    for (const c of contradictions) gateProblems.push(c);
   }
 
   // Gate 2 — rubric evaluation (model; verifier identity, routed preference)

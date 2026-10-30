@@ -34,6 +34,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 import { missionEventToToolUse } from './ToolUseBridge.js'; // transcript rows for real tool runs
 import { runEmployeeSession, assembleBrief } from './EmployeeSession.js';
 import { verifyDeliverable, acceptanceGates } from './Verifier.js';
+import { deriveExecutionRecord, executionRecordLines, executionSummaryLine } from './ExecutionRecord.js'; // M6 D2 — one authoritative execution record
 import { structureObjective } from './ObjectiveInterpreter.js'; // B215 — provenance-tagged objective state
 import { discoverTools } from '../ToolDiscovery.js'; // B223 — Part 20: objective → capability → tool discovery
 import { preferencesBlock } from '../PreferenceLearner.js'; // B208b — employees receive relevant user context
@@ -421,7 +422,7 @@ export class Director {
     }));
     const finalSummary = await this.composeReport({ task, refinement, leadResult, results, verification, teamRecap, emit, onToken: hooks_report_onToken });
 
-    task.result = { summary: finalSummary.slice(0, 4000), verification: task.verification, team: teamRecap };
+    task.result = { summary: finalSummary.slice(0, 4000), verification: task.verification, team: teamRecap, execution: executionSummaryLine(deriveExecutionRecord(task.events || [])) };
     task._persist();
     emit({ type: 'TASK_COMPLETED', summary: 'Done — result delivered.', data: { team: teamRecap.map((t) => t.name) } });
 
@@ -587,7 +588,7 @@ Your answer IS the final user-facing message. Deliverable content should be pres
         task.assumptions.length ? `# ASSUMPTIONS MADE\n${task.assumptions.map((a) => `- ${a}`).join('\n')}` : '',
         task.successCriteria.length ? `# SUCCESS CRITERIA\n${task.successCriteria.map((c) => `- ${c}`).join('\n')}` : '',
         `# EXECUTION RECORD (what actually ran)`,
-        `Real commands executed this task: ${(task.events || []).filter((e) => e.type === 'COMMAND_COMPLETED' || e.type === 'TEST_COMPLETED').map((e) => e.data?.command).filter(Boolean).join(' · ') || 'NONE — no command was executed; do NOT present any output as "executed" — label code as provided-but-not-run'}`,
+        ...executionRecordLines(deriveExecutionRecord(task.events || [])),
         teamRecap.map((t) => `- ${t.name} (${t.role}) — ${t.work}${t.confidence ? ` [confidence: ${t.confidence}]` : ''}`).join('\n'),
         task.recoveries.length ? `# RECOVERY EVENTS (real)\n${task.recoveries.map((r) => `- ${r.action}: ${r.reason}`).join('\n')}` : '',
         verification ? `# VERIFICATION\nverdict: ${verification.verdict} · score ${verification.score}${verification.problems?.length ? `\nproblems: ${verification.problems.join('; ')}` : ''}` : '# VERIFICATION\nskipped (not needed for this task type)',
@@ -596,14 +597,33 @@ Your answer IS the final user-facing message. Deliverable content should be pres
         leadResult?.claims?.length ? `# CLAIMS TO KEEP HONEST\n${leadResult.claims.map((c) => `- ${c}`).join('\n')}` : '',
       ].filter(Boolean).join('\n\n');
       const text = await this.llm.report({ system, user, ...(onToken ? { onToken } : {}) });
-      if (text && text.trim()) return text.trim();
+      if (text && text.trim()) return appendExecutionNoteIfContradicted(text.trim(), deriveExecutionRecord(task.events || []));
     } catch (e) {
       emit({ type: 'ERROR_DETECTED', summary: `Report writer unavailable — delivering the lead employee's work directly.`, severity: 'warn' });
     }
-    // Honest fallback: the verified deliverable itself, clearly framed.
+    // Honest fallback: the verified deliverable itself, clearly framed, with
+    // the authoritative execution record appended so the truth is always shown.
     const head = `${pickOpener()} ${nameLine(teamRecap, verification)}`;
-    return `${head}\n\n${String(leadResult?.content || 'The work completed but no deliverable was captured.').slice(0, 15000)}`;
+    const execLines = executionRecordLines(deriveExecutionRecord(task.events || []));
+    const execNote = execLines.length ? `\n\n---\n**Execution record:** ${execLines.slice(1).join(' ').trim() || execLines[0]}` : '';
+    return `${head}\n\n${String(leadResult?.content || 'The work completed but no deliverable was captured.').slice(0, 15000)}${execNote}`;
   }
+}
+
+/* ── M6 D2 — DETERMINISTIC BACKSTOP ──────────────────────────────────────
+ * The report prompt carries the execution record, but a model can still
+ * contradict it. When the record proves a command RAN and the final answer
+ * claims nothing executed, append the record so the user always sees the
+ * truth. Additive only: a model that already reported honestly is untouched.
+ */
+export function appendExecutionNoteIfContradicted(answer, record) {
+  const text = String(answer || '');
+  if (!record || !record.ran) return text;
+  const deniesExecution = /\b(?:wasn[\u2019']?t|was not|hasn[\u2019']?t|has not|never)\s+(?:actually\s+)?(?:run|executed)\b|\bnot\s+executed\b|\bno\s+command\s+(?:was\s+)?(?:run|executed)\b|\bnothing\s+(?:was\s+)?(?:run|executed)\b/i.test(text);
+  if (!deniesExecution) return text;
+  const lines = executionRecordLines(record).filter((l) => l && !/^Real commands executed this task: NONE/.test(l));
+  if (!lines.length) return text;
+  return `${text}\n\n---\n**Execution record (from the run log):**\n${lines.join('\n')}`;
 }
 
 /* ── plan normalization: trust the LLM's shape, enforce the contract ── */

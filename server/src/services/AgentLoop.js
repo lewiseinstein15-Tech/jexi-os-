@@ -390,7 +390,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
       try {
         const { executeCapabilityKeyless } = await import('./AgenticDecision.js');
         const capQuery = String(opts.subagentCapabilityQuery || query);
-        const res = await executeCapabilityKeyless(opts.subagentCapability, capQuery, { sessionId: opts.sessionId || null, subagentId: opts.subagentId || null });
+        const res = await executeCapabilityKeyless(opts.subagentCapability, capQuery, { sessionId: opts.sessionId || null, subagentId: opts.subagentId || null, workspaceRoot: opts.workspaceRoot || null, sendEvent: typeof opts.sendEvent === 'function' ? opts.sendEvent : null });
         finalText = String(res && res.output || '').trim();
         // P11 A4 — REAL METERING, not a stub: the capability runner reports
         // the ACTUAL number of primitive tool invocations it performed
