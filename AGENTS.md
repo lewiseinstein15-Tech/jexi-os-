@@ -70,6 +70,33 @@ only, no prose narratives in commits.
 - KNOWN, NOT FIXED: the director's task-graph framing ("Current task: TASK-001
   — … (completed)") also rides the search query. No private data; relevance only.
 
+## Subagent isolation boundary (M9)
+
+- An isolated child (`context: fork`) keeps its execution transcript private.
+  `services/SubagentIsolation.js` is the SINGLE enforcement point every
+  parent-visible path funnels through: the result object, the summary, the
+  artifacts, the error string, and the streamed events.
+- RULE: model-generated prose is a COSMETIC layer, never a security control.
+  A summarizer's output is accepted only after deterministic gates, and the
+  hard cap (`MAX_PARENT_SUMMARY_CHARS = 350`) is applied LAST — so the boundary
+  holds with no provider, a hostile provider, or a paraphrasing provider.
+- artifacts come ONLY from the child's explicit `report` tool
+  (`services/SubagentReport.js`, opened per isolated run in
+  `SubagentRuntime.runIsolatedSubagent`); transcript lines are NEVER lifted
+  (the pre-M9 `keyArtifacts` shape heuristic is gone).
+- events: `sanitizeChildEvent` allowlists `subagent.start|plan|progress` and
+  drops `stream`, `think`, `agent.done`, `agent.log`, `log`, `tool.result|call`
+  (default-deny). Pre-M9 the child's raw `sendEvent` was forwarded, so
+  `agent.done` carried the whole transcript to the parent.
+- status is validated (unknown → FAIL, never a silent pass); errors are bounded
+  and single-line. Residual limitation (documented, not hidden): a marker the
+  child placed near the HEAD of its report can appear inside the bounded
+  summary — the boundary guarantees boundedness and the absence of the raw
+  transcript, not semantic secrecy of every token the child emitted.
+- Regression suite: `tests/agi/test-subagent-isolation-boundary.js` (16 tests,
+  hermetic via a loopback provider; registered in `tests/setup/suites.json`).
+  All three regressions fail against the pre-M9 implementation.
+
 ## TUI (`interfaces/cli/lib/tui`)
 
 - `jexi tui` opens a full-screen TUI; needs a TTY (refuses pipes with exit 2).
