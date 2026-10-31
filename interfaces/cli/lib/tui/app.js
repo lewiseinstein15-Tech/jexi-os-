@@ -684,6 +684,9 @@ function installTerminal(input, output, state, writer) {
     writer.leave();
     if (input.isTTY && input.setRawMode) input.setRawMode(wasRaw || false);
     input.pause?.();
+    // The key pump holds stdin open in a detached async loop; unref it so the
+    // handle does not keep the event loop alive once the loop has quit.
+    input.unref?.();
   };
 }
 
