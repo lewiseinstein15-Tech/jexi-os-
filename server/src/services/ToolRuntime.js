@@ -502,7 +502,17 @@ export function resolveToolDef(slug) {
   if (reg) return reg;
   try { const pt = getPluginTool(s); if (pt) return { slug: s, name: pt.name || s, desc: pt.desc || 'plugin tool', permission: pt.permission || 'medium' }; } catch { /* no plugin context */ }
   const probe = globalThis.__jexiDomainExecutor;
-  if (probe?.hasDomainTool?.(s)) return { slug: s, name: s, desc: `domain tool ${s}`, permission: 'medium' };
+  if (probe?.hasDomainTool?.(s)) {
+    /* JEXI-017 (offering half) — a domain tool must be offered with the schema
+       it already declares. Returning a bare `{slug, name, permission}` stub
+       dropped `parameters`, so every domain tool reached the model with an
+       empty argument object: it was told the tool existed but not what to pass
+       it. Return the real definition when the probe can supply one, and keep
+       the stub only as the last-resort shape. */
+    const def = probe.getDomainTool?.(s);
+    if (def) return { ...def, slug: def.slug || def.name || s, name: def.name || s, desc: def.description || def.desc || `domain tool ${s}`, permission: def.permission || 'medium' };
+    return { slug: s, name: s, desc: `domain tool ${s}`, permission: 'medium' };
+  }
   return null;
 }
 
@@ -510,6 +520,22 @@ export function buildNativeSchemas(defs) {
   return (defs || [])
     .map((t) => {
       if (!t || !t.slug) return null;
+      /* JEXI-017 (offering half) — a DOMAIN tool already carries a complete
+         JSON-Schema `parameters` object (path/content/required). Pass it
+         through verbatim rather than rebuilding it from the legacy
+         `schema`/`args` property-map shape, which a domain definition does not
+         use and which therefore produced an empty argument object. */
+      const native = t.parameters && typeof t.parameters === 'object' && t.parameters.type === 'object' && t.parameters.properties;
+      if (native) {
+        return {
+          type: 'function',
+          function: {
+            name: t.slug,
+            description: String(t.description || t.desc || t.name || t.slug).slice(0, 500),
+            parameters: t.parameters,
+          },
+        };
+      }
       // B105 — schema sources: explicit `schema` (registry style), `args`
       // (plugin style), TOOL_SCHEMAS, or a generic empty-object fallback so
       // plugin tools are ALWAYS visible to the model (never silently dropped).

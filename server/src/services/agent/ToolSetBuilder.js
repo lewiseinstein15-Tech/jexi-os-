@@ -31,6 +31,7 @@ import { selectMcpToolset } from '../CapabilityRouter.js';
 import { isCodingIntent, isCodingToolSchema, CODING_TOOL_PREFIXES } from './CodingLoop.js';
 import { activeCodingSkill } from './IntentRouter.js';
 import { selectCapabilityTools } from '../../capability/registry/selection.js';
+import { initialDisclosure } from './ToolDisclosure.js';
 
 /** Control-plane tools a model may always reach, whatever the plan says. */
 export const ALWAYS_AVAILABLE = [
@@ -41,6 +42,14 @@ export const ALWAYS_AVAILABLE = [
   // is unsure whether a request is possible. Safe, read-only, idempotent.
   'capability_check',
 ];
+
+/**
+ * The MINIMAL control-plane subset kept in a narrowed initial menu. The full
+ * ALWAYS_AVAILABLE set is orchestration machinery (goals, workflow, agent
+ * messaging) that is noise on a task turn and reachable through request_tools;
+ * these two are genuinely turn-level (ask the user; ask what I can do).
+ */
+export const CORE_CONTROL = ['capability_check', 'ask_user_question'];
 
 const schemaNameOf = (sc) => String(sc?.name || sc?.function?.name || '').toLowerCase();
 
@@ -275,5 +284,49 @@ export async function buildOfferedTools({ plan, query, codeMode = false, emit = 
     } catch { /* code mode is optional */ }
   }
 
-  return { schemas, toolDefs, skill, notes, withheldCount, mcpCount, coding, codeModeTools, capability: capabilityReport, requiredTools };
+  /* 9 — PROGRESSIVE DISCLOSURE (M12). The measured defect this fixes: a coding
+     turn was offered 41 tools (25 plan + 16 routed MCP) and a small model
+     answered in prose instead of calling any of them. A controlled probe
+     isolated the cause as the SIZE of the menu, so the final step here is to
+     NARROW the initial menu to a small, relevant bundle set.
+
+     This is additive-safe: it only ever keeps a tool that is either (a) in an
+     initial bundle, (b) one the request EXPLICITLY required, or (c) a
+     turn-level control-plane tool — so it can never withhold what the turn
+     plainly needs. The plan's 25-tool union is deliberately NOT re-added; that
+     union is what caused the failure. Everything else stays reachable through
+     the `request_tools` meta-tool, which the loop executes by pushing the
+     newly resolved schemas into the live menu. Permission, RiskGuard and
+     approval gates are untouched: they run in `executeTool` at call time
+     regardless of what is offered.
+
+     An intent with NO bundle mapping is left exactly as before, so unrelated
+     flows are unchanged. */
+  let disclosure = null;
+  if (!codeMode) {
+    const knownSlugs = schemas.map(schemaNameOf);
+    const requiredSlugs = requiredTools.map((t) => t.slug);
+    const disc = initialDisclosure({ intent: plan?.intent, knownSlugs, requiredSlugs, controlSlugs: CORE_CONTROL });
+    const hasMapping = disc.bundles.length > 0;
+    if (hasMapping) {
+      /* The initial menu is built from the disclosure SLUGS, resolved through
+         the live registry — not by filtering whatever survived the earlier
+         steps. Earlier steps (notably the skill restriction) can legitimately
+         narrow to a set that no longer CONTAINS a required tool, and filtering
+         would then silently starve the turn: the exact "the tool was
+         registered the whole time but never offered" failure this runtime
+         exists to prevent. Resolving from slugs guarantees the turn always has
+         its bundle core plus every required tool, whatever upstream did. */
+      const keepSlugs = disc.slugs.filter((s) => resolveToolDef(s));
+      const before = schemas.length;
+      schemas = buildNativeSchemas(keepSlugs.map((s) => resolveToolDef(s)).filter(Boolean));
+      disclosure = { ...disc, initialCount: schemas.length, previousCount: before };
+      emit('agent.log', {
+        message: `🪜 progressive disclosure: ${disc.bundles.join(', ')} → ${schemas.length} initial tools`
+          + ` (from ${before}); ${disc.availableBundles.length} bundle(s) reachable via request_tools.`,
+      });
+    }
+  }
+
+  return { schemas, toolDefs, skill, notes, withheldCount, mcpCount, coding, codeModeTools, capability: capabilityReport, requiredTools, disclosure };
 }

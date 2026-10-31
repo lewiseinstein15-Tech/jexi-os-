@@ -100,9 +100,70 @@ node benchmarks/humaneval-live/report.mjs   # renders every result in results/ t
 Run legs **one at a time**. Ollama serves one model on one CPU; concurrent runs
 contend for it and inflate every task's wall-clock time.
 
-## Next step (not done here — this mission is measurement only)
+## M12 — the narrowing was done, and tool adoption flipped
 
-The single highest-leverage change is to **narrow the offered tool menu for a
-coding turn** so a small model is not choosing among 41 tools. That is an agent
-architecture change and is explicitly out of scope for M11; it is recorded here
-as the measured, evidence-backed follow-up.
+M11 named the highest-leverage change as narrowing the offered menu for a coding
+turn. M12 implemented it. Same harness, same model (`llama3.2:3b` via local
+keyless ollama), same 15 tasks, same `--profile full`:
+
+| leg | offered menu | tasks that called a tool | result |
+|---|---|---|---|
+| M11 jexi, as shipped | 41 tools | **1/15** | **0/15 = 0.0%** |
+| M12 jexi, as shipped | 8 tools | **14/15** | **7/15 = 46.7%** |
+
+Raw evidence: `results/humaneval-jexi-as-shipped-2026-10-31T16-59-19-811Z.json`.
+Per-task tool calls in the M12 run: `[7,12,1,1,5,1,7,1,6,8,5,1,0,1,1]`.
+
+The M11 failure was **never calling a tool** (`tools=0` on 14/15). After M12, 14
+of 15 tasks make at least one real tool call. The failures that remain are
+ordinary wrong-answer failures and one 300s timeout, not "answered in prose and
+never touched the file".
+
+### The three defects that were actually blocking it
+
+None of these was a model-capability problem; all three were silent.
+
+1. **The coding cap never engaged.** `isCodingIntent` matched
+   `code`/`coding`/`fix`/`debug`/`refactor`/`test`, but the Planner emits
+   `code_task`/`code_fix` — so the cap returned false for every real coding
+   turn.
+2. **Domain tools reached the model with EMPTY argument schemas.**
+   `resolveToolDef` synthesised a bare `{slug,name,permission}` stub for domain
+   tools, dropping the `parameters` they already declare. The model was told
+   `fs_write` existed but not that it needs `path` and `content`, so it could
+   not form a valid call. This is the "offering half" of JEXI-017; M11 saw the
+   symptom but it was masked by the 41-tool menu. Fixed by publishing
+   `getDomainTool` on the domain probe and passing a native JSON-Schema
+   `parameters` through `buildNativeSchemas`.
+3. **An unmapped intent fell back to the FULL catalogue.** Disclosure was gated
+   on the LLM intent label; a coding task the classifier labelled
+   `observability` matched no bundle and silently received all 24 tools. A
+   universal `filesystem`+`terminal` floor now applies to any unmapped intent;
+   an explicit `[]` mapping still means "no disclosure".
+
+### A measurement trap worth recording
+
+An early M12 run reported **12/15 = 80%** — on the **keyless network ladder**,
+not llama3.2:3b. `run.mjs` uses the network ladder unless
+`MODEL_PROVIDER=ollama OLLAMA_HOST=… MODEL_NAME=…` are exported, and records
+`model: provider-ladder (keyless floor: kilo/pollinations)` in the manifest when
+they are not. That number is **not** comparable to the M11 baseline and is not
+reported as an M12 result. Always read `manifest.model` before comparing.
+
+A second trap: a resumed sandbox has no ollama, and installing only the
+`ollama` binary (not `lib/ollama/llama-server`) makes every generation 500 in
+~3s. A batch of ~3s zero-tool failures is a dead provider, not an agent
+regression.
+
+### Reproduce
+
+```bash
+export DOTENV_CONFIG_QUIET=true MODEL_PROVIDER=ollama \
+       OLLAMA_HOST=http://127.0.0.1:11434 MODEL_NAME=llama3.2:3b \
+       BENCH_MODEL=llama3.2:3b
+node benchmarks/humaneval-live/run.mjs --leg jexi --tasks 15 --timeout 300 \
+     --schema as-shipped --profile full
+```
+
+`--timeout 300` (seconds) is needed: real tool use makes each task take 1–5
+minutes on one CPU, and the 150s default truncates work mid-task.

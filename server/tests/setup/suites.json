@@ -1273,6 +1273,13 @@
         "--test",
         "tests/agi/test-subagent-isolation-boundary.js"
       ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-tool-disclosure.js"
+      ]
     }
   ]
 }

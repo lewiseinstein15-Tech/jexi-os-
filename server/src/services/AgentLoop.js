@@ -47,6 +47,7 @@ import { INTENT_BUDGETS, budgetForIntent, activeCodingSkill } from './agent/Inte
 import { LOOP_BREAKER_LIMIT, loopKeyFor, loopBreakerTrips, loopBreakerMessage, repeatReminderFor } from './agent/LoopBreaker.js';
 import { checkToolAgainstContract } from './agent/ContractGate.js';
 import { buildOfferedTools } from './agent/ToolSetBuilder.js';
+import { isDisclosureCall, resolveDisclosureRequest } from './agent/ToolDisclosure.js';
 import { recordOutcome as recordCapabilityOutcome } from '../capability/registry/ledger.js'; // capability evidence ledger
 import { verifyAfterEdit } from '../verification/loop/auto-verify.js'; // JEXI-002 — the REAL verification subsystem
 
@@ -174,10 +175,24 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   // order (plan → control plane → engine filter → MCP routing → skill → cap →
   // code mode). It used to be four filters interleaved in this function, which
   // is how a coding turn could end up offering the whole catalogue.
-  const offered = await buildOfferedTools({ plan, query, emit });
+  const offered = await buildOfferedTools({ plan, query, codeMode: !!opts.codeMode, emit });
   let schemas = offered.schemas;
   const toolDefs = offered.toolDefs;
   const profile = opts.profile || activeToolProfile();
+
+  /* M12 — progressive disclosure. The initial menu is intentionally small.
+     `request_tools` is the escape hatch: when the model calls it, we resolve
+     the requested bundles/slugs through the SAME registries and push the new
+     schemas into the LIVE menu (see runToolCalls). Permission, RiskGuard and
+     approval are untouched — a disclosed tool is still gated at execute time. */
+  const disclosure = offered.disclosure || null;
+  let menu = schemas;
+  if (disclosure && disclosure.availableBundles?.length) {
+    const { buildRequestToolsSchema } = await import('./agent/ToolDisclosure.js');
+    menu = [...schemas, buildRequestToolsSchema(disclosure.availableBundles)];
+    schemas = menu;
+  }
+  const currentSchemas = () => menu;
   // Per-domain model routing: a planning turn and a writing turn want
   // different models, and the turn below hands this to the provider.
   const prefer = providerPreferenceForIntent(plan.intent);
@@ -193,7 +208,14 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
   emit('agent.plan', {
     query, intent: plan.intent,
     team: team.length ? team : plan.steps || [],
-    tools: toolDefs.map((t) => ({ slug: t.slug, name: t.name, type: t.type })),
+    /* M12 — report the tools the MODEL is actually offered (the narrowed
+       initial menu), not the pre-narrowing union. The old event published the
+       25-tool list while the model saw 7, which made the stream and the
+       benchmark misreport adoption. `plannedTools` keeps the wider list for
+       anyone who needs to see what the plan considered. */
+    tools: schemas.map((sc) => ({ slug: sc.function?.name || sc.name, name: sc.function?.name || sc.name, type: 'tool' })),
+    plannedTools: toolDefs.map((t) => ({ slug: t.slug, name: t.name, type: t.type })),
+    disclosure: disclosure ? { bundles: disclosure.bundles, initialCount: disclosure.initialCount, previousCount: disclosure.previousCount, availableBundles: disclosure.availableBundles } : null,
     profile, profileLabel: TOOL_PROFILES[profile]?.label,
     codeMode,
     /* The capabilities the REQUEST required, and any that were required but
@@ -298,6 +320,41 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
       // step events: tool/call + tool/result on the wire.
       try { emit('step/start', { turn: 1, step: callsMade }); } catch (e) {}
       try { emit('tool/call', { callId: call.id, name: call.name, arguments: JSON.stringify(call.arguments || {}).slice(0, 500) }); } catch (e) {}
+
+      /* M12 — `request_tools` is the progressive-disclosure escape hatch, not a
+         real tool execution. Resolve the requested bundles/slugs through the
+         SAME registries, push the new schemas into the LIVE menu (so the next
+         provider round can call them), and feed the outcome back honestly.
+         Nothing here grants permission: the disclosed tools still pass the
+         permission/risk/approval gates in executeTool when they are called. */
+      if (disclosure && isDisclosureCall(call.name)) {
+        const args = call.arguments || {};
+        const requested = [
+          ...(Array.isArray(args.bundles) ? args.bundles : []),
+          ...(Array.isArray(args.tools) ? args.tools : []),
+        ].map((x) => String(x));
+        const offeredNames = menu.map((sc) => String(sc?.function?.name || sc?.name || '').toLowerCase());
+        const resolved = resolveDisclosureRequest({ requested, alreadyOffered: offeredNames, knownSlugs: offeredNames });
+        for (const sc of resolved.schemas) {
+          const nm = String(sc?.function?.name || '').toLowerCase();
+          if (!offeredNames.includes(nm)) { menu.push(sc); offeredNames.push(nm); }
+        }
+        const newly = resolved.slugs.length;
+        try { emit('tool/result', { callId: call.id, name: call.name, ok: true }); } catch (e) {}
+        emit('agent.log', {
+          message: `🪜 request_tools: +${newly} tool(s)${resolved.bundles.length ? ` from ${resolved.bundles.join(', ')}` : ''}`
+            + `${resolved.unknown.length ? `; unavailable: ${resolved.unknown.join(', ')}` : ''} — menu is now ${menu.length} tools.`,
+        });
+        const content = newly
+          ? `Loaded ${newly} tool(s): ${resolved.slugs.join(', ')}. They are now callable in your next turn.`
+            + (resolved.unknown.length ? ` Unavailable (not in this session): ${resolved.unknown.join(', ')}.` : '')
+          : `No new tools loaded.${resolved.unknown.length ? ` Unavailable: ${resolved.unknown.join(', ')}.` : ' Those tools are already available.'}`;
+        // step/start was emitted above; close it so the stream has no dangling step.
+        try { emit('step/end', { turn: 1, step: callsMade }); } catch (e) {}
+        results.push({ tool_call_id: call.id, content });
+        continue;
+      }
+
       // durable lifecycle events (session-event vocabulary).
       try { lifecycleStepStart(convId, 1, callsMade); lifecycleToolCall(convId, 1, callsMade, call.id, call.name, call.arguments || {}); } catch { /* noop */ }
       const r = await executeTool({ slug: call.name, args: call.arguments || {}, profile, sendEvent: emit, confirm: opts.confirm, codeTools: codeMode ? codeTools : undefined, spillOwner: opts.spillOwner, ...(opts.subagentId ? { subagentId: opts.subagentId } : {}) });
@@ -480,6 +537,10 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         // the same permission/risk/approval path as every other tool call.
         // runToolCalls now ALSO carries the child contract gate.
         executeToolCalls: runToolCalls,
+        // M12 — progressive disclosure: the provider loop re-reads the live
+        // menu each round, so a `request_tools` call in one round makes its
+        // tools callable in the next.
+        getTools: currentSchemas,
       }
     );
     finalText = res.ok ? res.text : '';

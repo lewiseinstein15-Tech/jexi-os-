@@ -37,7 +37,7 @@ export function domainExecutor() {
   // answer synchronously without a circular import back into this module.
   try {
     const rt = globalThis.__jexiToolRuntime;
-    if (rt && typeof rt.registerDomainProbe === 'function') rt.registerDomainProbe({ hasDomainTool, domainToolCount, domainDispatch });
+    if (rt && typeof rt.registerDomainProbe === 'function') rt.registerDomainProbe({ hasDomainTool, getDomainTool, domainToolCount, domainDispatch });
   } catch { /* ToolRuntime not loaded — schemas fall back to registry-only */ }
   return _domains;
 }
@@ -155,6 +155,20 @@ export function domainToolCount() {
 /** True when the slug is an actual registered domain tool. */
 export function hasDomainTool(slug) {
   return hasTool(slug);
+}
+
+/**
+ * The full definition for a registered domain tool, or null.
+ *
+ * `hasDomainTool` alone was not enough to OFFER a domain tool: `resolveToolDef`
+ * could only see the slug, so it synthesised a stub with no `parameters` and
+ * every domain tool reached the model with an empty argument schema — the model
+ * was told `fs_write` exists but not that it needs `path` and `content`, so it
+ * could not form a valid call. Publishing the definition lets the schema
+ * builder emit the real parameters the tool already declares.
+ */
+export function getDomainTool(slug) {
+  return getTool(slug) || null;
 }
 
 export const _resetDomains = () => { _domains = null; };

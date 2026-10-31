@@ -467,6 +467,50 @@ mission semantics, so the gate changes nothing a test asserts.
   `HOME` to sandbox a test, EXPORT IT BACK (`export HOME=/home/openhands`)
   before committing — a stray `HOME` breaks `git config` identity lookup.
 
+## M12 — intelligent tool selection / progressive disclosure (2026-10-31)
+
+- **Architecture.** `services/agent/ToolBundles.js` (bundle vocabulary as data)
+  + `services/agent/ToolDisclosure.js` (initial-menu selection + on-demand
+  expansion). `ToolSetBuilder.buildOfferedTools` runs a final disclosure step
+  that REBUILDS the initial menu from the disclosure slugs resolved through the
+  live registry (not by filtering earlier steps, which could starve the turn).
+  `AgentLoop` adds a `request_tools` meta-tool and handles it in the tool-call
+  loop by pushing newly resolved schemas into the LIVE menu; `LLMClient`
+  re-reads `opts.getTools()` each provider round so a disclosure in round N is
+  callable in round N+1. Permission/RiskGuard/approval are untouched — a
+  disclosed tool is still gated at execute time (there is a test for this).
+- **Root causes fixed (all three were real, all three were silent):**
+  1. `isCodingIntent` matched `code`/`coding`/`fix`/… but the Planner emits
+     `code_task`/`code_fix`, so the coding cap never engaged.
+  2. `resolveToolDef` returned a bare `{slug,name,permission}` stub for DOMAIN
+     tools, dropping `parameters` — every domain tool (`fs_write`, `fs_edit`,
+     `term_execute`) reached the model with an EMPTY argument schema, so the
+     model could not form a valid call. Fixed by publishing `getDomainTool` on
+     the domain probe and passing a native JSON-Schema `parameters` straight
+     through `buildNativeSchemas`. (This is the "offering half" of JEXI-017; M11
+     saw it but it was masked by the 41-tool menu.)
+  3. An intent with NO bundle mapping fell back to the FULL catalogue, so the
+     narrowing was a coin flip on the LLM intent label — a coding task
+     classified `observability` got 24 tools. Unmapped intents now get
+     `DEFAULT_BUNDLES` (`filesystem`+`terminal`); an explicit `[]` mapping
+     (`self_check`) still means "no disclosure".
+- New narrowed coding menu: `fs_read, fs_write, fs_edit, term_execute,
+  pytest_run, capability_check, ask_user_question, request_tools`.
+- Tests: `tests/agi/test-tool-disclosure.js` (14 pass) covers the vocabulary
+  mismatch, the unmapped-intent floor, the domain-schema pass-through, honest
+  expansion, and the execute-time gate.
+- **Harness gotcha (cost me a false result).** `run.mjs` reports
+  `model: provider-ladder (keyless floor: kilo/pollinations)` in the manifest
+  unless `BENCH_MODEL` is set — and the run silently uses the NETWORK keyless
+  ladder unless `MODEL_PROVIDER=ollama OLLAMA_HOST=… MODEL_NAME=…` are exported.
+  A run that looks like llama3.2:3b can be a remote model. ALWAYS check
+  `manifest.model` before comparing to an M11 number.
+- **Env gotcha.** A resumed sandbox has NO ollama. Install the full tarball
+  (`ollama-linux-amd64.tar.zst`) — copying only `bin/ollama` leaves
+  `lib/ollama/llama-server` missing and every generation 500s in ~3s with
+  `llama-server binary not found`. That fast-500 is the signature of a dead
+  provider, not an agent regression.
+
 ## M11 — HumanEval-live benchmark (2026-10-30)
 
 - Harness: `benchmarks/humaneval-live/` (`run.mjs`, `report.mjs`,

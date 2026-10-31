@@ -1337,6 +1337,11 @@ async function runToolLoopForProvider(provider, messages, tools, opts, errors) {
     if (opts.signal && opts.signal.aborted) break;
     costGate(opts, provider); // ZONE-OWNER ITEM 5 — every tool-loop round is a model call
     iterations++;
+    /* M12 — the tool menu may GROW between rounds (progressive disclosure): a
+       `request_tools` call in round N must make its tools callable in round
+       N+1. Re-read the live accessor each round so the loop always sends the
+       current menu; fall back to the fixed list when no accessor is given. */
+    const roundTools = (typeof opts.getTools === 'function' && opts.getTools()) || tools;
     // First round picks the first working model; later rounds pin it so the
     // loop doesn't hop mid-conversation (tool results stay coherent).
     const candidates = model ? [model] : cfg.models;
@@ -1344,7 +1349,7 @@ async function runToolLoopForProvider(provider, messages, tools, opts, errors) {
     let lastErr = null;
     for (const m of candidates) {
       try {
-        round = await chatWithToolsOnce(provider, cfg, m, messages, tools, { ...opts, onToken: opts.onToken });
+        round = await chatWithToolsOnce(provider, cfg, m, messages, roundTools, { ...opts, onToken: opts.onToken });
         model = m;
         break;
       } catch (e) {

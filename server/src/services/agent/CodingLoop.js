@@ -37,8 +37,9 @@ export const MUTATING_TOOLS = new Set(['fs_write', 'fs_edit', 'fs_append', 'fs_d
 /** Test tools count as verification on their own — but only when they pass. */
 export const TEST_TOOLS = new Set(['test_run', 'pytest_run', 'test_coverage', 'run_tests']);
 
-/** Intents that must not be answered without real verification evidence. */
-export const CODING_INTENTS = new Set(['code', 'coding', 'fix', 'debug', 'refactor', 'test']);
+/** Intents that must not be answered without real verification evidence.
+ *  M12: includes the planner's real code_task/code_fix, which the cap missed. */
+export const CODING_INTENTS = new Set(['code', 'coding', 'code_task', 'code_fix', 'fix', 'debug', 'refactor', 'test']);
 
 /** Is this query a coding request by intent or by its own words? */
 export function isCodingIntent(plan, query = '') {
