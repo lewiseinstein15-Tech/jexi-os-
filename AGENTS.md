@@ -467,6 +467,35 @@ mission semantics, so the gate changes nothing a test asserts.
   `HOME` to sandbox a test, EXPORT IT BACK (`export HOME=/home/openhands`)
   before committing — a stray `HOME` breaks `git config` identity lookup.
 
+## M11 — HumanEval-live benchmark (2026-10-30)
+
+- Harness: `benchmarks/humaneval-live/` (`run.mjs`, `report.mjs`,
+  `probe-toolmenu.mjs`, `lib/{tasks,agent,schema-patch}.mjs`). Measurement only;
+  no JEXI source changed. Result + root cause: `benchmarks/humaneval-live/RESULTS.md`.
+- **First externally grounded result** (llama3.2:3b, local keyless ollama,
+  `--profile full`, commit `d10d72cf`): gold **10/10**, jexi as-shipped **0/15**,
+  jexi schema-repaired **0/15**. Dataset sha256 `094a17ac…c157`, 164 tasks.
+- **The zero is a tool-adoption failure, not bad Python.** 14/15 tasks make
+  ZERO tool calls — the model writes the answer as prose. Measured by replaying
+  the exact request JEXI sends, varying one input at a time:
+  - 41 tools → 0/4 tool-call (both JEXI and short prompts)
+  - 3 tools → 3/4 with a short prompt, 1/4 with the JEXI prompt
+  So the **offered tool-menu size is the dominant factor**, and the ~25 KB JEXI
+  system prompt suppresses tool use further at 3 tools. `qwen3:4b` also gives 0
+  tool calls at 41/15/6 tools — a small-model capacity limit.
+- Streaming is NOT the cause: `stream:true` and `stream:false` both fail. The
+  schema-repair leg changes schema *contents*, not the tool *count*, so it does
+  not move the score. Permission gate (`code-write`/`code-run` are `risky`) is
+  real but not binding — under `full`, which permits them, the model still does
+  not call them.
+- Harness gotchas: **run legs one at a time** — ollama serves one model on one
+  CPU and concurrent runs inflate every wall-clock. `run.mjs` calls
+  `process.exit(0)` after writing results because JEXI's runtime leaves
+  health-check timers armed; `withTimeout` unrefs its timer for the same reason.
+  `settings.json` under the harness dir is gitignored (root `.gitignore:14`).
+- Highest-leverage follow-up (NOT done — M11 is measurement only): narrow the
+  offered tool menu for a coding turn. That is an agent-architecture change.
+
 ## M5 — privacy closure + capability proof (2026-10-27)
 
 - TASK-FRAMING EGRESS (fixed): `server/index.js:2559` composed the task-state
