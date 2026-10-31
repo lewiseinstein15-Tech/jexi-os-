@@ -9,7 +9,8 @@
  * real error and the loop keeps running.
  */
 import { composeView, CHROME_ROWS } from './render.js';
-import { createTranscript, applyEvent, pushLocal, resetTranscript } from './transcript.js';
+import { createTranscript, applyEvent, pushLocal, pushList, resetTranscript } from './transcript.js';
+import { parseCommand, helpLines, isLocalCommand } from './commands.js';
 import { JexiApi } from '../api.js';
 
 const ALT_ON = '\x1b[?1049h';
@@ -45,11 +46,32 @@ export async function runTui(deps = {}) {
     cols: output.columns || 80,
     rows: output.rows || 24,
     needRender: true,
+    history: [],       // submitted inputs (↑ recalls)
+    histIdx: -1,       // -1 = editing a fresh line
+    pendingApproval: null, // { tool, approvalId, details } from a paused action
+    secretAsk: null,       // ask.secret seen during a turn (handled after it)
+    pendingSecret: null,   // open one-time paste prompt (owns the keyboard)
+    turn: null,            // in-flight turn promise (awaited on exit)
   };
 
   const writer = createWriter(output);
   const cleanup = installTerminal(input, output, state, writer);
-  const keys = readKeys(input, state)[Symbol.asyncIterator]();
+
+  /* M13 — KEY PUMP. The old loop awaited the whole turn before reading the
+     next key, so Ctrl+C during a turn did nothing (the turn held the loop).
+     The pump reads stdin continuously into an inbox, so the app can process
+     keys DURING a streaming turn — which is what makes cancellation real. */
+  const inbox = [];
+  let waiter = null;
+  const pushKey = (k) => { if (waiter) { const w = waiter; waiter = null; w(k); } else inbox.push(k); };
+  const nextKey = () => (inbox.length ? Promise.resolve(inbox.shift())
+    : new Promise((resolve) => { waiter = resolve; }));
+  (async () => {
+    try {
+      for await (const k of readKeys(input, state)) { if (state.quit) break; pushKey(k); }
+    } catch { /* stream error ends the pump */ }
+    pushKey(null);
+  })();
 
   const render = () => {
     if (!state.needRender) return;
@@ -67,6 +89,8 @@ export async function runTui(deps = {}) {
   };
 
   const handleKey = async (key) => {
+    // A one-time secret paste owns the keyboard while it is open.
+    if (state.pendingSecret) { routeSecretKey(key); return; }
     switch (key) {
       case 'CTRL_C':
       case 'CTRL_D':
@@ -81,7 +105,7 @@ export async function runTui(deps = {}) {
         return;
       case 'ENTER':
         if (state.busy) return;
-        await submit();
+        submit();
         return;
       case 'BACKSPACE':
         if (state.cursor > 0) {
@@ -105,8 +129,23 @@ export async function runTui(deps = {}) {
       case 'END':
         state.cursor = state.input.length; state.needRender = true; return;
       case 'UP':
+        // ↑ recalls history when the composer is not scrolled up.
+        if (state.scroll === 0 && state.history.length) {
+          state.histIdx = Math.min(state.history.length - 1, state.histIdx + 1);
+          state.input = state.history[state.history.length - 1 - state.histIdx];
+          state.cursor = state.input.length;
+          state.needRender = true;
+          return;
+        }
         state.scroll += 1; state.needRender = true; return;
       case 'DOWN':
+        if (state.scroll === 0 && state.histIdx >= 0) {
+          state.histIdx -= 1;
+          state.input = state.histIdx < 0 ? '' : state.history[state.history.length - 1 - state.histIdx];
+          state.cursor = state.input.length;
+          state.needRender = true;
+          return;
+        }
         state.scroll = Math.max(0, state.scroll - 1); state.needRender = true; return;
       case 'PGUP':
         state.scroll += Math.max(1, state.rows - CHROME_ROWS); state.needRender = true; return;
@@ -134,43 +173,67 @@ export async function runTui(deps = {}) {
     state.input = '';
     state.cursor = 0;
     state.scroll = 0;
+    state.histIdx = -1;
+    state.history.push(q);
 
-    if (q.startsWith('/')) { await command(q); state.needRender = true; render(); return; }
+    const parsed = parseCommand(q);
+    if (parsed.isCommand) { await command(parsed); state.needRender = true; render(); return; }
 
-    pushLocal(state.t, 'user', q);
+    // Detached: the key pump keeps running so Ctrl+C can abort mid-turn.
+    beginTurn(q);
+  };
+
+  /**
+   * Start a chat turn WITHOUT blocking the key loop. The key pump keeps
+   * feeding keys while this runs, so Ctrl+C can abort mid-turn. `state.turn`
+   * is the in-flight promise the loop awaits on exit.
+   */
+  const beginTurn = (query) => {
+    if (state.busy) return state.turn;
+    pushLocal(state.t, 'user', query);
     state.busy = true;
     state.abort = new AbortController();
     state.notice = '';
     state.needRender = true;
     render();
-
-    try {
-      await runTurn(q, keys);
-    } catch (e) {
-      pushLocal(state.t, 'turn-end-fail', `turn failed: ${(e && e.message) || e}`);
-    } finally {
-      state.busy = false;
-      state.abort = null;
-      state.needRender = true;
-      render();
-    }
+    state.turn = (async () => {
+      try {
+        await runTurn(query);
+      } catch (e) {
+        if (!(e && (e.name === 'AbortError' || /aborted/i.test(e.message || '')))) {
+          pushLocal(state.t, 'turn-end-fail', `turn failed: ${(e && e.message) || e}`);
+        } else {
+          pushLocal(state.t, 'log', 'turn cancelled');
+        }
+      } finally {
+        state.busy = false;
+        state.abort = null;
+        state.needRender = true;
+        render();
+      }
+    })();
+    return state.turn;
   };
 
-  const runTurn = async (query, keyIter) => {
-    let pendingSecret = null;
+  const runTurn = async (query) => {
     const t0 = Date.now();
     const res = await api.chatStream(query, {
       signal: state.abort ? state.abort.signal : null,
       onEvent: (evt) => {
         const out = applyEvent(state.t, evt);
-        if (out.secretAsk) pendingSecret = out.secretAsk;
+        if (out.secretAsk) state.secretAsk = out.secretAsk;
+        // M13 — a protected action paused: remember it so /approve and /deny
+        // can answer the engine's OWN confirmation (a plain yes/no turn).
+        const ap = approvalFromEvent(evt);
+        if (ap) state.pendingApproval = ap;
         if (out.changed) { state.needRender = true; render(); }
       },
     });
 
-    if (pendingSecret && pendingSecret.id) {
-      const ask = pendingSecret;
-      const value = await askSecret(ask, keyIter);
+    if (state.secretAsk && state.secretAsk.id) {
+      const ask = state.secretAsk;
+      state.secretAsk = null;
+      const value = await openSecretPrompt(ask);
       if (value) {
         const ans = await api.secretsAnswer({ conv: ask.conv, id: ask.id, value })
           .catch((e) => ({ ok: false, data: { error: e.message } }));
@@ -178,7 +241,7 @@ export async function runTui(deps = {}) {
           pushLocal(state.t, 'narration', 'key accepted — continuing the turn…');
           state.needRender = true;
           render();
-          return runTurn(`continue: ${query}`, keyIter);
+          return runTurn(`continue: ${query}`);
         }
         pushLocal(state.t, 'turn-end-fail', `key rejected: ${(ans.data && ans.data.error) || `HTTP ${ans.status}`}`);
       } else {
@@ -192,66 +255,248 @@ export async function runTui(deps = {}) {
   };
 
   /**
-   * One-time secret paste, read through the SAME key iterator (never a second
-   * stdin consumer). Input is masked; the value goes straight to the backend
-   * and is never written to disk.
+   * One-time secret paste. The prompt is opened here and the KEY PUMP routes
+   * keys to it (routeSecretKey), so the turn never owns stdin directly.
+   * Resolves with the pasted value ('' if skipped). Never written to disk.
    */
-  const askSecret = async (ask, keyIter) => {
-    let buf = '';
-    const paintPrompt = () => {
-      state.input = `[one-time ${ask.tool || 'key'}] ${'•'.repeat(buf.length)}`;
+  const openSecretPrompt = (ask) => new Promise((resolve) => {
+    state.pendingSecret = { ask, buf: '', resolve };
+    state.input = `[one-time ${ask.tool || 'key'}] `;
+    state.cursor = state.input.length;
+    state.notice = 'Enter to submit · Esc to skip';
+    state.needRender = true;
+    render();
+  });
+
+  const routeSecretKey = (key) => {
+    const ps = state.pendingSecret;
+    if (!ps) return;
+    if (key === 'ENTER') return finishSecret(ps.buf);
+    if (key === 'ESC' || key === 'CTRL_C' || key === 'CTRL_D') return finishSecret('');
+    if (key === 'BACKSPACE') {
+      ps.buf = ps.buf.slice(0, -1);
+      state.input = `[one-time ${ps.ask.tool || 'key'}] ${'•'.repeat(ps.buf.length)}`;
       state.cursor = state.input.length;
-      state.notice = 'Enter to submit · Esc to skip';
       state.needRender = true;
       render();
-    };
-    paintPrompt();
-    for (;;) {
-      const { value: key, done } = await keyIter.next();
-      if (done) return '';
-      if (key === 'ENTER') break;
-      if (key === 'ESC' || key === 'CTRL_C') { buf = ''; break; }
-      if (key === 'BACKSPACE') { buf = buf.slice(0, -1); paintPrompt(); continue; }
-      if (isTextKey(key)) { buf += key; paintPrompt(); }
+      return;
     }
+    if (isTextKey(key)) {
+      ps.buf += key;
+      state.input = `[one-time ${ps.ask.tool || 'key'}] ${'•'.repeat(ps.buf.length)}`;
+      state.cursor = state.input.length;
+      state.needRender = true;
+      render();
+    }
+  };
+
+  const finishSecret = (value) => {
+    const ps = state.pendingSecret;
+    if (!ps) return;
+    state.pendingSecret = null;
     state.input = '';
     state.cursor = 0;
     state.notice = '';
     state.needRender = true;
     render();
-    return buf;
+    ps.resolve(value);
   };
 
-  const command = async (line) => {
-    const [cmd, ...rest] = line.slice(1).split(' ');
-    switch (cmd) {
+  const command = async (parsed) => {
+    const { name, arg } = parsed;
+    if (parsed.unknown) {
+      pushLocal(state.t, 'log', `unknown command: /${name} — try /help`);
+      return;
+    }
+    switch (name) {
       case 'help':
-        pushLocal(state.t, 'log', '/help /clear /new /model /doctor /exit');
-        pushLocal(state.t, 'log', 'Enter sends · ↑↓ scroll · PgUp/PgDn page · Ctrl+C cancels or quits');
+        for (const line of helpLines()) pushLocal(state.t, 'log', line);
         return;
       case 'clear':
         resetTranscript(state.t);
         return;
       case 'new':
         state.t.sessionId = `tui-${Date.now().toString(36)}`;
+        api.setSession(state.t.sessionId);
+        state.pendingApproval = null;
         resetTranscript(state.t);
         pushLocal(state.t, 'narration', `new session ${state.t.sessionId}`);
         return;
+      case 'resume':
+        await resume(arg);
+        return;
       case 'model':
-        if (rest.join(' ').trim()) { state.model = rest.join(' ').trim(); return; }
+        if (arg) { state.model = arg; pushLocal(state.t, 'log', `model label set to ${arg} (backend model unchanged — use jexi init to switch)`); return; }
         if (await refreshModel()) pushLocal(state.t, 'log', `model: ${state.model}`);
         else pushLocal(state.t, 'log', 'no provider configured — set one with: jexi init --model');
+        return;
+      case 'tools':
+        await listTools(arg);
+        return;
+      case 'skills':
+        await listSkills(arg);
+        return;
+      case 'memory':
+        await showMemory(arg);
+        return;
+      case 'status':
+        await showStatus();
+        return;
+      case 'permissions':
+        await permissions(arg);
+        return;
+      case 'approve':
+        await answerApproval(true);
+        return;
+      case 'deny':
+        await answerApproval(false);
+        return;
+      case 'cancel':
+        if (state.busy && state.abort) { state.abort.abort(); pushLocal(state.t, 'log', 'cancelling…'); }
+        else pushLocal(state.t, 'log', 'nothing to cancel');
         return;
       case 'doctor':
         await doctor();
         return;
       case 'exit':
-      case 'quit':
         state.quit = true;
         return;
       default:
-        pushLocal(state.t, 'log', `unknown command: /${cmd} — try /help`);
+        pushLocal(state.t, 'log', `unknown command: /${name} — try /help`);
     }
+  };
+
+  /** /resume — list sessions, or switch to one by id (real conversation). */
+  const resume = async (arg) => {
+    if (!arg) {
+      const r = await api.sessions().catch((e) => ({ ok: false, data: { error: e.message } }));
+      const convs = (r && r.data && (r.data.conversations || r.data.convs)) || [];
+      if (!r.ok || !convs.length) { pushLocal(state.t, 'log', `no sessions found (${(r.data && r.data.error) || `HTTP ${r.status}`})`); return; }
+      const items = convs.slice(0, 12).map((c) => `${c.id}  ${c.title ? `· ${c.title}` : ''}`);
+      pushList(state.t, 'sessions', items, { more: convs.length > 12 ? convs.length - 12 : 0 });
+      pushLocal(state.t, 'log', 'resume with: /resume <id>');
+      return;
+    }
+    // Switch the session, then replay the stored conversation so the user sees
+    // the real history (not a fabricated summary).
+    const r = await api.conversation(arg).catch((e) => ({ ok: false, data: { error: e.message } }));
+    if (!r.ok || !r.data || !r.data.events) {
+      pushLocal(state.t, 'turn-end-fail', `cannot resume ${arg}: ${(r.data && r.data.error) || `HTTP ${r.status}`}`);
+      return;
+    }
+    api.setSession(arg);
+    state.t.sessionId = arg;
+    state.pendingApproval = null;
+    resetTranscript(state.t);
+    for (const e of r.data.events) {
+      if (!e || !e.role || !e.text) continue;
+      if (e.role === 'user') pushLocal(state.t, 'user', e.text);
+      else pushLocal(state.t, 'text', e.text);
+    }
+    pushLocal(state.t, 'narration', `resumed session ${arg} (${r.data.events.length} events)`);
+  };
+
+  /** /tools [filter] — real native tool catalog. */
+  const listTools = async (filter) => {
+    const r = await api.tools().catch((e) => ({ ok: false, data: { error: e.message } }));
+    if (!r.ok || !r.data || !Array.isArray(r.data.tools)) {
+      pushLocal(state.t, 'turn-end-fail', `cannot list tools: ${(r.data && r.data.error) || `HTTP ${r.status}`}`);
+      return;
+    }
+    const q = String(filter || '').toLowerCase();
+    const all = r.data.tools;
+    const match = q ? all.filter((t) => `${t.slug} ${t.name} ${t.desc || ''}`.toLowerCase().includes(q)) : all;
+    const items = match.slice(0, 30).map((t) => `${(t.slug || t.name || '').padEnd(20)} ${t.tier || ''} ${t.permission || ''} ${oneLineLocal(t.desc || '', 70)}`.trim());
+    pushList(state.t, `tools (${match.length}${q ? ` match "${q}"` : ''}${r.data.activeProfile ? `, profile ${r.data.activeProfile}` : ''})`, items, { more: match.length > 30 ? match.length - 30 : 0 });
+  };
+
+  /** /skills [filter] — real skills registry. */
+  const listSkills = async (filter) => {
+    const r = await api.skills().catch((e) => ({ ok: false, data: { error: e.message } }));
+    if (!r.ok || !r.data) {
+      pushLocal(state.t, 'turn-end-fail', `cannot list skills: ${(r.data && r.data.error) || `HTTP ${r.status}`}`);
+      return;
+    }
+    const q = String(filter || '').toLowerCase();
+    const skills = Array.isArray(r.data.skills) ? r.data.skills : [];
+    const match = q ? skills.filter((s) => `${s.slug} ${s.name} ${s.desc || ''} ${s.category || ''}`.toLowerCase().includes(q)) : skills;
+    const items = match.slice(0, 30).map((s) => `${(s.slug || s.name || '').padEnd(24)} ${s.category ? `[${s.category}] ` : ''}${oneLineLocal(s.desc || '', 60)}`.trim());
+    pushList(state.t, `skills (${match.length}${q ? ` match "${q}"` : ''} of ${r.data.total ?? skills.length})`, items, { more: match.length > 30 ? match.length - 30 : 0 });
+  };
+
+  /** /memory [query] — stored memory, or a real semantic search. */
+  const showMemory = async (arg) => {
+    const q = String(arg || '').trim();
+    if (q.length >= 3) {
+      const r = await api.memorySearch(q).catch((e) => ({ ok: false, data: { error: e.message } }));
+      const results = (r && r.data && r.data.results) || [];
+      if (!r.ok) { pushLocal(state.t, 'turn-end-fail', `memory search failed: ${(r.data && r.data.error) || `HTTP ${r.status}`}`); return; }
+      const items = results.slice(0, 12).map((x) => oneLineLocal(x.text || x.summary || JSON.stringify(x), 100));
+      pushList(state.t, `memory search "${q}" (${results.length})`, items.length ? items : ['(no matches)']);
+      return;
+    }
+    const r = await api.memory().catch((e) => ({ ok: false, data: { error: e.message } }));
+    if (!r.ok || !r.data) { pushLocal(state.t, 'turn-end-fail', `cannot read memory: ${(r.data && r.data.error) || `HTTP ${r.status}`}`); return; }
+    const m = r.data;
+    const items = [];
+    if (Array.isArray(m.userProfile?.facts) && m.userProfile.facts.length) {
+      items.push('profile facts:');
+      for (const f of m.userProfile.facts.slice(0, 8)) items.push(`  · ${oneLineLocal(typeof f === 'string' ? f : (f.text || f.fact || JSON.stringify(f)), 90)}`);
+    }
+    const chatLen = Array.isArray(m.chatHistory) ? m.chatHistory.length : 0;
+    items.push(`chat history entries: ${chatLen}`);
+    const keys = Object.keys(m).filter((k) => !['userProfile', 'chatHistory'].includes(k));
+    if (keys.length) items.push(`sections: ${keys.join(', ')}`);
+    pushList(state.t, 'memory', items);
+  };
+
+  /** /status — backend, model, session, permissions. */
+  const showStatus = async () => {
+    const items = [];
+    const h = await api.health().catch(() => null);
+    if (h && h.ok && h.data) items.push(`backend: ${h.data.name || 'brain'} v${h.data.version || '?'} · up ${h.data.uptime || 0}s · port ${h.data.port ?? '?'}`);
+    else items.push(`backend: unreachable at ${state.baseUrl}`);
+    items.push(`session: ${state.t.sessionId}`);
+    items.push(`model: ${state.model || '(none configured)'}`);
+    items.push(`workspace: ${state.workspace || '(unset)'}`);
+    const p = await api.permissions().catch(() => null);
+    if (p && p.ok && p.data) items.push(`permissions: preset ${p.data.preset} · approval ${p.data.approval} · sandbox ${p.data.sandbox}`);
+    items.push(`tools used this session: ${state.t.stats.tools}${state.t.stats.toolErrors ? ` (${state.t.stats.toolErrors} failed)` : ''}`);
+    if (state.pendingApproval) items.push(`⚠ pending approval: ${state.pendingApproval.tool || 'protected action'} — /approve or /deny`);
+    pushList(state.t, 'status', items);
+  };
+
+  /** /permissions [preset] — show or set the session approval preset. */
+  const permissions = async (arg) => {
+    if (arg) {
+      const r = await api.setPermissions(arg).catch((e) => ({ ok: false, data: { error: e.message } }));
+      if (!r.ok) { pushLocal(state.t, 'turn-end-fail', `cannot set preset: ${(r.data && r.data.error) || `HTTP ${r.status}`}`); return; }
+      pushLocal(state.t, 'narration', `permission preset → ${(r.data && r.data.preset) || arg}`);
+      return;
+    }
+    const r = await api.permissions().catch((e) => ({ ok: false, data: { error: e.message } }));
+    if (!r.ok || !r.data) { pushLocal(state.t, 'turn-end-fail', `cannot read permissions: ${(r.data && r.data.error) || `HTTP ${r.status}`}`); return; }
+    const items = [`preset: ${r.data.preset}`, `approval: ${r.data.approval}`, `sandbox: ${r.data.sandbox}`];
+    const presets = (r.data.presets || []).map((p) => p.key);
+    if (presets.length) items.push(`available presets: ${presets.join(', ')}`);
+    pushList(state.t, 'permissions', items);
+  };
+
+  /**
+   * /approve and /deny — answer the engine's own confirmation.
+   *
+   * The engine parks a protected action and resumes it when the NEXT turn is
+   * "yes"/"no" (CONFIRM_RE / DECLINE_RE in server/index.js). So this submits
+   * that literal turn through the SAME stream; it does not call any private
+   * approval API and it cannot grant anything the engine would refuse.
+   */
+  const answerApproval = async (yes) => {
+    if (!state.pendingApproval) { pushLocal(state.t, 'log', 'no pending approval'); return; }
+    const word = yes ? 'yes' : 'no';
+    const tool = state.pendingApproval.tool || 'protected action';
+    state.pendingApproval = null;
+    pushLocal(state.t, 'user', yes ? `/approve (yes) — ${tool}` : `/deny (no) — ${tool}`);
+    await beginTurn(word);
   };
 
   const refreshModel = async () => {
@@ -277,10 +522,12 @@ export async function runTui(deps = {}) {
     if (!state.model) await refreshModel().catch(() => false);
     render();
     while (!state.quit) {
-      const { value: key, done } = await keys.next();
-      if (done) break;
+      const key = await nextKey();
+      if (key === null || key === undefined) break; // stdin closed
       await handleKey(key);
     }
+    // Let any in-flight turn settle before tearing the terminal down.
+    if (state.turn) await state.turn.catch(() => {});
   } finally {
     cleanup();
   }
@@ -291,6 +538,29 @@ export async function runTui(deps = {}) {
 const NAMED_KEYS = new Set(['ENTER', 'BACKSPACE', 'DELETE', 'TAB', 'ESC',
   'LEFT', 'RIGHT', 'UP', 'DOWN', 'HOME', 'END', 'PGUP', 'PGDN',
   'CTRL_C', 'CTRL_D', 'CTRL_L']);
+
+/** Collapse whitespace and clip for one-line list output. */
+function oneLineLocal(s, max = 90) {
+  const t = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+}
+
+/**
+ * Extract a pending approval from a wire event, if it is one.
+ * Recognizes the engine's real shapes: an `approval.requested` event, or a
+ * tool result flagged approvalRequired/paused. Returns null otherwise.
+ */
+export function approvalFromEvent(evt) {
+  if (!evt || typeof evt !== 'object') return null;
+  const p = (evt.payload && typeof evt.payload === 'object') ? evt.payload : evt;
+  if (evt.type === 'approval.requested') {
+    return { tool: p.tool || p.action || '', approvalId: p.approvalId || '', details: oneLineLocal(p.details || p.reason || '', 200) };
+  }
+  if (p.approvalRequired === true || p.paused === true) {
+    return { tool: p.tool || p.name || '', approvalId: p.approvalId || '', details: oneLineLocal(p.details || p.error || '', 200) };
+  }
+  return null;
+}
 
 export function isTextKey(key) {
   return typeof key === 'string' && key.length >= 1

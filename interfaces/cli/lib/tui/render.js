@@ -117,6 +117,20 @@ export function rowLines(r, cols) {
       return wrap(`${who}${r.text || ''}`, w - 2).map((l) => `  ${paint(l, 'ink3')}`);
     }
 
+    /* M13 — command output (/tools, /skills, /memory, /resume, /status, …).
+       A titled block: an ember heading, then indented ink2 lines. */
+    case 'list': {
+      const m = r.meta || {};
+      const out = [];
+      if (m.title) out.push(`  ${paint(oneLine(m.title, w - 4), 'ember', { bold: true })}`);
+      const lines = Array.isArray(m.items) ? m.items : String(r.text || '').split('\n');
+      for (const l of lines.slice(0, 40)) {
+        for (const wl of wrap(String(l), w - 4)) out.push(`    ${paint(wl, 'ink2')}`);
+      }
+      if (m.more) out.push(`    ${paint(`+${m.more} more`, 'ink3')}`);
+      return out;
+    }
+
     case 'turn-end-ok':
     case 'turn-end-fail': {
       const ok = r.kind === 'turn-end-ok';

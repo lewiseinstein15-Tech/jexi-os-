@@ -120,6 +120,17 @@ export function eventToRows(evt) {
       const ok = p.ok !== false && !p.error;
       const body = p.result !== undefined ? (typeof p.result === 'string' ? p.result : safeJson(p.result))
         : (p.content !== undefined ? String(p.content) : '');
+      /* M13 — a PROTECTED action that paused for approval is not a failure.
+         The engine emits it with approvalRequired/paused true; render it as an
+         approval row so the user is told to /approve or /deny, and keep the
+         real reason (the finalized details) in the body. */
+      if (p.approvalRequired === true || p.paused === true) {
+        return [row('approval', {
+          id: p.id || p.callId || `tu-${toolNameOf(p, evt)}`,
+          text: oneLine(p.error || p.details || 'protected action needs your approval', 400),
+          meta: { tool: toolNameOf(p, evt), approvalId: p.approvalId || '', decision: 'requested', risk: p.risk || 'irreversible', tier: p.tier || 'external' },
+        })];
+      }
       return [row(ok ? 'tool-result' : 'tool-error', {
         id: p.id || p.callId || `tu-${toolNameOf(p, evt)}`,
         text: toolNameOf(p, evt),

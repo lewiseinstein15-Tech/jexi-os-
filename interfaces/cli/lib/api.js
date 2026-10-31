@@ -59,6 +59,43 @@ export class JexiApi {
   missionSnapshot(id) { return this.get(`/api/missions/${encodeURIComponent(id)}`); }
   missionEvents(id, since = '') { return this.get(`/api/missions/${encodeURIComponent(id)}/events?sinceEventId=${encodeURIComponent(since)}`); }
 
+  /* ---------- M13 — session, tools, skills, memory, status ---------- */
+
+  /**
+   * Point this client at a conversation. The backend derives the session from
+   * the `x-jexi-session` header, so changing it here is what makes the next
+   * turn continue THAT conversation (history + memory are session-scoped).
+   */
+  setSession(id) {
+    const next = String(id || '').trim();
+    if (next) this.session = next;
+    return this.session;
+  }
+
+  /** Recent conversations, newest-active first. */
+  sessions() { return this.get('/api/sessions'); }
+  /** Alias endpoint used by the console (same payload). */
+  conversations() { return this.get('/api/conversations'); }
+  /** One conversation's stored events (for replay on resume). */
+  conversation(id, limit = 200) { return this.get(`/api/conversations/${encodeURIComponent(id)}?limit=${Number(limit) || 200}`); }
+
+  /** Full native tool catalog + profiles. */
+  tools() { return this.get('/api/tools'); }
+  /** Unified catalog (native + MCP + computer) with live MCP servers. */
+  toolsUnified() { return this.get('/api/tools/unified'); }
+  /** Skills registry (grouped by category). */
+  skills() { return this.get('/api/skills'); }
+  /** Memory blob. */
+  memory() { return this.get('/api/memory'); }
+  /** Semantic memory search (needs >=3 chars). */
+  memorySearch(q) { return this.get(`/api/memory/search?q=${encodeURIComponent(q)}`); }
+
+  /** Permission preset status for this session. */
+  permissions() { return this.get('/api/permissions'); }
+  /** Set the approval preset for this session. */
+  setPermissions(preset) { return this.post('/api/permissions', { preset }); }
+
+
   /**
    * POST /api/chat and stream NDJSON events to onEvent(evt).
    * Resolves { done: <terminal event|null>, events: count }.

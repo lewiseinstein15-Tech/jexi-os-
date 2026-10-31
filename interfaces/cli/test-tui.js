@@ -391,7 +391,9 @@ function fakeApi(script) {
   const calls = { chat: [], secrets: [] };
   return {
     baseUrl: 'http://127.0.0.1:9',
+    session: 'tui',
     calls,
+    setSession(id) { if (id) this.session = String(id); return this.session; },
     async chatStream(query, { onEvent, signal } = {}) {
       calls.chat.push(query);
       const events = script(query) || [];
@@ -516,5 +518,217 @@ await ok('app: /model reads the real active provider', async () => {
   const state = await app.runTui({ input: stdin, output: stdout, api, headless: true });
   assert.strictEqual(state.model, 'groq/llama');
 });
+
+// ── M13: commands, redaction, approvals, resume, narrow terminals ─────────
+const commands = await import('./lib/tui/commands.js');
+const redact = await import('./lib/tui/redact.js');
+
+await ok('commands: parse name + raw argument, aliases, unknown', () => {
+  assert.deepStrictEqual(commands.parseCommand('/help'), { isCommand: true, name: 'help', arg: '', unknown: false });
+  assert.deepStrictEqual(commands.parseCommand('/tools fs_write'), { isCommand: true, name: 'tools', arg: 'fs_write', unknown: false });
+  assert.strictEqual(commands.parseCommand('/q').name, 'exit', 'alias q → exit');
+  assert.strictEqual(commands.parseCommand('/nope').unknown, true);
+  assert.strictEqual(commands.parseCommand('hello').isCommand, false);
+  assert.strictEqual(commands.parseCommand('/').unknown, true, 'bare slash is unknown');
+  assert.strictEqual(commands.parseCommand('/resume conv-abc 123').arg, 'conv-abc 123');
+});
+
+await ok('commands: local commands never need the backend', () => {
+  for (const n of ['help', 'clear', 'new', 'exit', 'cancel']) assert.ok(commands.isLocalCommand(n), `${n} is local`);
+  for (const n of ['tools', 'skills', 'memory', 'status', 'resume']) assert.ok(!commands.isLocalCommand(n), `${n} is not local`);
+});
+
+await ok('commands: help lists every command including the M13 set', () => {
+  const text = commands.helpLines().join('\n');
+  for (const n of ['/help', '/clear', '/new', '/resume', '/model', '/tools', '/skills', '/memory', '/status', '/exit']) {
+    assert.ok(text.includes(n), `help mentions ${n}`);
+  }
+});
+
+await ok('redact: github/sk/aws/bearer/url-credential/pem are all caught', () => {
+  assert.ok(!redact.redact('token ghp_' + 'a'.repeat(36)).includes('ghp_aaaa'), 'github token');
+  assert.ok(!redact.redact('key sk-' + 'b'.repeat(24)).includes('sk-bbbb'), 'sk key');
+  assert.ok(!redact.redact('AKIA' + 'C'.repeat(16)).includes('AKIACCCC'), 'aws id');
+  assert.ok(!redact.redact('Authorization: Bearer abcdefghijklmnop1234').includes('abcdefghijklmnop1234'), 'bearer');
+  assert.ok(!redact.redact('https://user:s3cretpw@github.com/x').includes('s3cretpw'), 'url creds');
+  assert.ok(!redact.redact('password=hunter2xyz').includes('hunter2xyz'), 'key=value');
+  assert.ok(!redact.redact('-----BEGIN RSA PRIVATE KEY-----\nMIIabc\n-----END RSA PRIVATE KEY-----').includes('MIIabc'), 'pem');
+});
+
+await ok('redact: ordinary prose is left alone', () => {
+  for (const s of ['monkey business', 'the key is under the mat', 'a 40-char hash 0123456789abcdef0123456789abcdef01234567', 'hello world']) {
+    assert.strictEqual(redact.redact(s), s, `unchanged: ${s}`);
+  }
+});
+
+await ok('redact: applyEvent redacts tool output before it reaches the transcript', () => {
+  const t = tx.createTranscript();
+  tx.applyEvent(t, { type: 'tool_use', id: 'x', tool: 'read_file', status: 'success', summary: 'contents: ghp_' + 'z'.repeat(36) });
+  const joined = JSON.stringify(t.rows);
+  assert.ok(!joined.includes('ghp_zzzz'), 'secret never stored');
+  assert.ok(joined.includes('[redacted'), 'redaction marker present');
+});
+
+await ok('redact: pushLocal redacts a local notice too', () => {
+  const t = tx.createTranscript();
+  tx.pushLocal(t, 'log', 'pasted sk-' + 'q'.repeat(24));
+  assert.ok(!JSON.stringify(t.rows).includes('sk-qqqq'), 'local secret redacted');
+});
+
+await ok('rows: an approvalRequired tool result becomes an approval row', () => {
+  const rs = rows.eventToRows({ type: 'tool/result', tool: 'connector-call', ok: false, approvalRequired: true, tier: 'external', details: 'send email to a@b.c' });
+  assert.strictEqual(rs.length, 1);
+  assert.strictEqual(rs[0].kind, 'approval');
+  assert.strictEqual(rs[0].meta.tool, 'connector-call');
+  assert.strictEqual(rs[0].meta.decision, 'requested');
+  assert.ok(rs[0].text.includes('send email'), 'real details preserved');
+});
+
+await ok('render: a list row renders a title and items', () => {
+  const lines = render.rowLines({ kind: 'list', meta: { title: 'tools (2)', items: ['fs_write  write', 'term_execute  exec'] } }, 60);
+  assert.ok(lines.some((l) => l.includes('tools (2)')));
+  assert.ok(lines.some((l) => l.includes('fs_write')));
+});
+
+await ok('render: narrow terminals still produce exact-height frames', () => {
+  const t = tx.createTranscript();
+  tx.pushLocal(t, 'user', 'a very long question '.repeat(6));
+  tx.pushList(t, 'tools', Array.from({ length: 30 }, (_, i) => `tool-${i} does something useful`));
+  for (const cols of [24, 30, 40]) {
+    const frame = render.composeView(t, { cols, rows: 12, input: '/tools' });
+    assert.strictEqual(frame.length, 12, `cols=${cols} exact height`);
+    for (const l of frame) assert.ok(ansi.visibleWidth(l) <= cols, `cols=${cols} no overflow: ${JSON.stringify(l)}`);
+  }
+});
+
+await ok('app: /tools reads the real catalog and renders a list', async () => {
+  const api = fakeApi(() => []);
+  api.tools = async () => ({ ok: true, status: 200, data: { activeProfile: 'full', tools: [
+    { slug: 'fs_write', name: 'write', desc: 'write a file', tier: 'write_local', permission: 'safe' },
+    { slug: 'term_execute', name: 'exec', desc: 'run a command', tier: 'exec', permission: 'medium' },
+  ] } });
+  const stdin = fakeStdin(['/tools', '\r', '\x03']);
+  const stdout = fakeStdout();
+  const state = await app.runTui({ input: stdin, output: stdout, api, headless: true });
+  const list = state.t.rows.find((r) => r.kind === 'list');
+  assert.ok(list, 'a list row rendered');
+  assert.ok(list.meta.items.some((l) => l.includes('fs_write')));
+  assert.strictEqual(api.calls.chat.length, 0, 'no chat turn for /tools');
+});
+
+await ok('app: /skills, /memory, /status each hit their real endpoint', async () => {
+  const api = fakeApi(() => []);
+  const hit = { skills: 0, memory: 0, health: 0, perms: 0 };
+  api.skills = async () => { hit.skills += 1; return { ok: true, status: 200, data: { total: 1, skills: [{ slug: 'debug', name: 'debug', category: 'Eng', desc: 'debug code' }] } }; };
+  api.memory = async () => { hit.memory += 1; return { ok: true, status: 200, data: { userProfile: { facts: ['likes dark mode'] }, chatHistory: [{ role: 'user', text: 'hi' }] } }; };
+  api.health = async () => { hit.health += 1; return { ok: true, status: 200, data: { ok: true, name: 'brain', version: '1.6.2', uptime: 3, port: 3210 } }; };
+  api.permissions = async () => { hit.perms += 1; return { ok: true, status: 200, data: { preset: 'default', approval: 'ask', sandbox: 'workspace', presets: [{ key: 'default' }, { key: 'yolo' }] } }; };
+  const stdin = fakeStdin(['/skills', '\r', '/memory', '\r', '/status', '\r', '\x03']);
+  const stdout = fakeStdout();
+  const state = await app.runTui({ input: stdin, output: stdout, api, headless: true });
+  assert.deepStrictEqual(hit, { skills: 1, memory: 1, health: 1, perms: 1 });
+  const lists = state.t.rows.filter((r) => r.kind === 'list');
+  assert.ok(lists.some((l) => l.meta.title.startsWith('skills')));
+  assert.ok(lists.some((l) => l.meta.title === 'memory'));
+  assert.ok(lists.some((l) => l.meta.title === 'status'));
+  assert.ok(lists.find((l) => l.meta.title === 'status').meta.items.some((i) => i.includes('1.6.2')));
+});
+
+await ok('app: /resume with an id replays the real conversation and switches session', async () => {
+  const api = fakeApi(() => []);
+  api.conversation = async (id) => ({ ok: true, status: 200, data: { id, events: [
+    { role: 'user', text: 'first question' }, { role: 'jexi', text: 'first answer' },
+  ] } });
+  const stdin = fakeStdin(['/resume conv-xyz', '\r', '\x03']);
+  const stdout = fakeStdout();
+  const state = await app.runTui({ input: stdin, output: stdout, api, headless: true });
+  assert.strictEqual(state.t.sessionId, 'conv-xyz', 'session switched');
+  assert.strictEqual(api.session, 'conv-xyz', 'api client follows the session');
+  assert.ok(state.t.rows.some((r) => r.kind === 'user' && r.text === 'first question'));
+  assert.ok(state.t.rows.some((r) => r.kind === 'text' && r.text === 'first answer'));
+});
+
+await ok('app: a paused protected action surfaces, and /approve sends the engine "yes"', async () => {
+  let turn = 0;
+  const api = fakeApi((query) => {
+    turn += 1;
+    if (turn === 1) return [
+      { type: 'tool/result', tool: 'connector-call', ok: false, approvalRequired: true, tier: 'external', details: 'send email' },
+      { type: 'done', summary: 'needs approval' },
+    ];
+    return [{ type: 'stream', text: `approved: ${query}` }, { type: 'done', summary: 'sent' }];
+  });
+  const stdin = fakeStdin(['send the email', '\r', '/approve', '\r', '\x03']);
+  const stdout = fakeStdout();
+  const state = await app.runTui({ input: stdin, output: stdout, api, headless: true });
+  assert.ok(state.t.rows.some((r) => r.kind === 'approval'), 'approval row shown');
+  assert.strictEqual(api.calls.chat.length, 2, 'approval resumed a second turn');
+  assert.strictEqual(api.calls.chat[1], 'yes', 'engine got its literal confirmation');
+  assert.ok(state.t.rows.some((r) => r.kind === 'text' && r.text.includes('approved')));
+});
+
+await ok('app: /deny sends the engine "no" and grants nothing', async () => {
+  let turn = 0;
+  const api = fakeApi(() => {
+    turn += 1;
+    if (turn === 1) return [{ type: 'tool/result', tool: 'connector-call', approvalRequired: true, paused: true }, { type: 'done', summary: 'paused' }];
+    return [{ type: 'done', summary: 'declined' }];
+  });
+  const stdin = fakeStdin(['do it', '\r', '/deny', '\r', '\x03']);
+  const stdout = fakeStdout();
+  const state = await app.runTui({ input: stdin, output: stdout, api, headless: true });
+  assert.strictEqual(api.calls.chat[1], 'no');
+  assert.ok(!JSON.stringify(state.t.rows).toLowerCase().includes('"yes"'), 'no yes was ever sent');
+});
+
+await ok('app: /approve with nothing pending is a no-op, not a fake success', async () => {
+  const api = fakeApi(() => []);
+  const stdin = fakeStdin(['/approve', '\r', '\x03']);
+  const state = await app.runTui({ input: stdin, output: stdout2(), api, headless: true });
+  assert.strictEqual(api.calls.chat.length, 0);
+  assert.ok(state.t.rows.some((r) => r.text && r.text.includes('no pending approval')));
+});
+
+await ok('app: Ctrl+C cancels a running turn', async () => {
+  let aborted = false;
+  const api = fakeApi(() => []);
+  api.chatStream = async (query, { onEvent, signal } = {}) => {
+    onEvent({ type: 'stream', text: 'starting' });
+    // hang until aborted
+    await new Promise((resolve) => {
+      if (signal) signal.addEventListener('abort', () => { aborted = true; resolve(); });
+      else setTimeout(resolve, 50);
+    });
+    return { done: null, events: 1 };
+  };
+  const stdin = fakeStdin(['long task', '\r', '\x03', '\x03']);
+  const stdout = fakeStdout();
+  await app.runTui({ input: stdin, output: stdout, api, headless: true });
+  assert.ok(aborted, 'the abort signal reached the backend call');
+});
+
+await ok('app: provider error is reported honestly and the loop survives', async () => {
+  const api = fakeApi(() => { throw new Error('provider 503: model overloaded'); });
+  const stdin = fakeStdin(['task one', '\r', 'task two', '\r', '\x03']);
+  const stdout = fakeStdout();
+  const state = await app.runTui({ input: stdin, output: stdout, api, headless: true });
+  const fails = state.t.rows.filter((r) => r.kind === 'turn-end-fail');
+  assert.strictEqual(fails.length, 2, 'both turns reported the real failure');
+  assert.ok(fails[0].text.includes('503'));
+});
+
+await ok('app: input history recalls with ↑/↓', async () => {
+  const api = fakeApi(() => [{ type: 'done', summary: 'ok' }]);
+  // type two turns, then ↑ ↑ to recall the older one, then quit
+  const stdin = fakeStdin(['first', '\r', 'second', '\r', '\x1b[A', '\x1b[A', '\x03']);
+  const stdout = fakeStdout();
+  const state = await app.runTui({ input: stdin, output: stdout, api, headless: true });
+  assert.deepStrictEqual(api.calls.chat, ['first', 'second']);
+  assert.strictEqual(state.history.length, 2);
+});
+
+/** A throwaway stdout for tests that do not inspect frames. */
+function stdout2() { return fakeStdout(); }
+
 
 console.log(`\njexi tui: ${passed} checks passed${process.exitCode ? ' (WITH FAILURES)' : ''}`);

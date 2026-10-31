@@ -773,6 +773,14 @@
     {
       "bin": "node",
       "args": [
+        "--test",
+        "--test-reporter=spec",
+        "tests/agi/test-tui-engine.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
         "test-web-mesh.js"
       ]
     },

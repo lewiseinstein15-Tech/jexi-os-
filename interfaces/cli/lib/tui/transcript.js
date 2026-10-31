@@ -7,6 +7,7 @@
  */
 
 import { eventToRows } from './rows.js';
+import { redact, redactEvent } from './redact.js';
 
 /** Row kinds whose consecutive deltas merge into one growing row. */
 const STREAMING = new Set(['text', 'thinking']);
@@ -25,15 +26,19 @@ export function createTranscript() {
  */
 export function applyEvent(t, evt) {
   if (!evt || typeof evt !== 'object') return { changed: false, terminal: false, secretAsk: null };
-  const type = String(evt.type || '');
+  /* M13 — redact BEFORE anything is stored: a tool result or log line can
+     quote a secret the model read. The backend sanitizes its own output, but
+     this is the last boundary before the transcript and the screen. */
+  const safe = redactEvent(evt);
+  const type = String(safe.type || '');
 
   if (type === 'heartbeat') return { changed: false, terminal: false, secretAsk: null };
 
   if (type === 'ask.secret') {
-    return { changed: false, terminal: false, secretAsk: { conv: evt.conv || 'default', id: evt.id, tool: evt.tool, reason: evt.reason } };
+    return { changed: false, terminal: false, secretAsk: { conv: safe.conv || 'default', id: safe.id, tool: safe.tool, reason: safe.reason } };
   }
 
-  const incoming = eventToRows(evt);
+  const incoming = eventToRows(safe);
   if (!incoming.length) return { changed: false, terminal: false, secretAsk: null };
 
   let changed = false;
@@ -103,7 +108,13 @@ export function applyRow(t, r) {
 
 /** Append a local row (the user's own input, local notices). */
 export function pushLocal(t, kind, text, meta = {}) {
-  return applyRow(t, { kind, text, meta, ts: new Date().toISOString(), local: true });
+  return applyRow(t, { kind, text: redact(text), meta, ts: new Date().toISOString(), local: true });
+}
+
+/** Append a titled list block (command output). `items` is an array of lines. */
+export function pushList(t, title, items, meta = {}) {
+  const arr = (Array.isArray(items) ? items : [items]).map((x) => redact(x));
+  return applyRow(t, { kind: 'list', text: '', meta: { title: redact(title), items: arr, ...meta }, ts: new Date().toISOString(), local: true });
 }
 
 /** Drop everything (used by /clear). */
@@ -125,4 +136,4 @@ export function statusLine(t, extra = {}) {
   return bits.join(' · ');
 }
 
-export default { createTranscript, applyEvent, applyRow, pushLocal, resetTranscript, statusLine };
+export default { createTranscript, applyEvent, applyRow, pushLocal, pushList, resetTranscript, statusLine };
