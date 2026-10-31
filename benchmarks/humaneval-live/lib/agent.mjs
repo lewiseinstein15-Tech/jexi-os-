@@ -8,7 +8,7 @@
  * file left on disk.
  *
  * Two configurations are measured, because JEXI currently advertises domain
- * tools with EMPTY parameter schemas (see lib/README.md):
+ * tools with EMPTY parameter schemas (see ../README.md, "Known finding"):
  *
  *   as-shipped  — the loop is handed exactly what it builds today.
  *   documented  — the system prompt additionally states each offered tool's

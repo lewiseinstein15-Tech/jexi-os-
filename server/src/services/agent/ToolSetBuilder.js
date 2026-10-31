@@ -300,8 +300,13 @@ export async function buildOfferedTools({ plan, query, codeMode = false, emit = 
      approval gates are untouched: they run in `executeTool` at call time
      regardless of what is offered.
 
-     An intent with NO bundle mapping is left exactly as before, so unrelated
-     flows are unchanged. */
+     An intent with NO bundle mapping still gets narrowed — to the universal
+     `filesystem`+`terminal` floor (see `DEFAULT_BUNDLES` in ToolBundles.js),
+     never to the full catalogue. Falling back to the catalogue here was the
+     bug that made the narrowing intermittent: the disclosure decision is gated
+     on the LLM intent label, and a coding task classified `observability`
+     matched no bundle and silently received every tool. An explicit `[]`
+     mapping (e.g. `self_check`) is the only remaining opt-out. */
   let disclosure = null;
   if (!codeMode) {
     const knownSlugs = schemas.map(schemaNameOf);

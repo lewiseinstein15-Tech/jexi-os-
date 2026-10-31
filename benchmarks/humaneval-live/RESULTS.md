@@ -131,8 +131,12 @@ None of these was a model-capability problem; all three were silent.
    `resolveToolDef` synthesised a bare `{slug,name,permission}` stub for domain
    tools, dropping the `parameters` they already declare. The model was told
    `fs_write` existed but not that it needs `path` and `content`, so it could
-   not form a valid call. This is the "offering half" of JEXI-017; M11 saw the
-   symptom but it was masked by the 41-tool menu. Fixed by publishing
+   not form a valid call. This is the "offering half" of JEXI-017. M11 did not
+   merely glimpse this: it named the exact mechanism, shipped a `repaired`
+   ablation leg (`lib/schema-patch.mjs`) that patches the schemas at runtime,
+   and measured that leg at 0/15 — same as as-shipped, because the 41-tool menu
+   dominated. The bug was documented, not hidden; the narrowing is what made it
+   binding, so M12 fixes it in JEXI source. Fixed by publishing
    `getDomainTool` on the domain probe and passing a native JSON-Schema
    `parameters` through `buildNativeSchemas`.
 3. **An unmapped intent fell back to the FULL catalogue.** Disclosure was gated
