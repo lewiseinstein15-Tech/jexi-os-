@@ -611,3 +611,39 @@ zero network, zero real model calls).
   `tests/tickets/*` failures (sandbox/testing/verify/profiles/pytest) are
   PRE-EXISTING environment failures — identical counts at the `ca3b91e`
   baseline.
+
+## M13 — Native TUI (`interfaces/cli`)
+
+- `interfaces/cli` is a **zero-dependency** Node client to the local backend.
+  The TUI drives the REAL engine over NDJSON `/api/chat`; nothing is canned.
+- Module map: `commands.js` (pure parser+registry), `redact.js` (secret
+  scrub at the transcript boundary), `app.js` (control flow), `rows.js`
+  (wire→row), `transcript.js` (pure reducer), `render.js` (pure frame).
+- **KEY PUMP** (`app.js`): stdin is read continuously into an inbox and a
+  chat turn runs DETACHED from it, so keys are processed *during* a streaming
+  turn. This is what makes mid-turn Ctrl+C real. `runTui` awaits any
+  in-flight turn before teardown. Do NOT go back to awaiting the whole turn
+  inside the key loop — that silently breaks cancellation.
+- Approval flow: the TUI only *asks*; the engine still decides. `/approve`
+  and `/deny` submit the engine's OWN `yes`/`no` confirmation as a normal
+  turn (`CONFIRM_RE`/`DECLINE_RE` in `server/src/services/Orchestrator.js`).
+
+### Testing the TUI
+- `interfaces/cli/test-tui.js` — offline unit checks (60), no backend.
+- `server/tests/agi/test-tui-engine.js` — integration: boots the REAL backend
+  as a child with `MODEL_PROVIDER=ollama` + `OLLAMA_HOST=http://127.0.0.1:<port>`
+  pointing at a mock OpenAI-compatible server, then drives turns through the
+  TUI's own `JexiApi` + transcript. Hermetic (loopback only). Registered in
+  `server/tests/setup/suites.json`.
+- `interfaces/cli/bench-tui.mjs` — runs benchmark tasks THROUGH `runTui`
+  headless with a scripted stdin (never a private API path). Feed tasks as
+  JSONL `{id, prompt, expect?}`.
+- GOTCHA — a `Promise.race` timeout arm leaves a live timer that holds the
+  event loop open (process hangs after the work is done). Always `clearTimeout`
+  in a `finally`.
+- GOTCHA — a fast conversational turn answers in the terminal event's
+  `summary` (a `turn-end-ok` row's `text`), NOT as streamed `text` rows. Read
+  both when extracting an answer.
+- GOTCHA — for a headless/scripted run, end stdin with EOF (not Ctrl+C) when
+  you want the COMPLETE answer: `runTui` drains the in-flight turn on exit,
+  whereas Ctrl+C aborts it.
