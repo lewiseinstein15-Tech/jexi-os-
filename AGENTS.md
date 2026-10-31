@@ -647,3 +647,14 @@ zero network, zero real model calls).
 - GOTCHA — for a headless/scripted run, end stdin with EOF (not Ctrl+C) when
   you want the COMPLETE answer: `runTui` drains the in-flight turn on exit,
   whereas Ctrl+C aborts it.
+- GOTCHA — the key pump keeps stdin referenced; after `/exit` the TUI restored
+  the alt screen but the Node process never exited (stdin held the event loop
+  open). `cleanup()` in `lib/tui/app.js` now calls `input.unref?.()` after
+  `input.pause?.()`. Regression existed from M13 (`c93e822`); pre-M13 `cc95a45`
+  exited cleanly. Headless (`stdin` a pipe) never showed it — TTY-only.
+- GOTCHA — `server/settings.json` (untracked, written by a real session) makes
+  `server/tests/agi/test-tui-engine.js` fail: the child backend boots with
+  `cwd=server`, `SettingsManager` reads that file, a configured `unified`
+  provider answers the turn, and the mock provider records 0 calls. The suite
+  passes 8/8 once the file is absent. The test is not hermetic against that
+  file; not a code regression.
