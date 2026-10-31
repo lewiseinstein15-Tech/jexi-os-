@@ -1,0 +1,180 @@
+{
+  "manifest": {
+    "benchmark": "humaneval",
+    "dataset": {
+      "repo": "openai/openai_humaneval",
+      "config": "openai_humaneval",
+      "split": "test",
+      "sha256": "094a17ace7a536483e83cd6bb0348c9df1e2bb532ff4e09961665a8b9414c157",
+      "numRowsTotal": 164
+    },
+    "leg": "jexi",
+    "schemaMode": "repaired",
+    "toolProfile": "full",
+    "model": "llama3.2:3b",
+    "tasks": 3,
+    "taskIds": [
+      "HumanEval/0",
+      "HumanEval/1",
+      "HumanEval/2"
+    ],
+    "gitCommit": "d10d72cfe937aa93eeeaf5b0bb4f2652e2f93f0d",
+    "gitDirty": true,
+    "grader": "docker --network none",
+    "gradedWithoutIsolation": false,
+    "dockerImage": "python:3.11-slim",
+    "node": "v24.21.0",
+    "platform": "linux/x64",
+    "startedAt": "2026-10-30T22:34:38.444Z",
+    "runId": "humaneval-jexi-repaired-2026-10-30T22-30-55-453Z"
+  },
+  "resolved": 0,
+  "passed": 0,
+  "failed": 3,
+  "rows": [
+    {
+      "taskId": "HumanEval/0",
+      "entryPoint": "has_close_elements",
+      "pass": false,
+      "durationMs": 80977,
+      "gradedIsolated": true,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/w/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n  File \"<string>\", line 20, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [
+        "Eli"
+      ],
+      "offeredTools": [
+        "knowledge-load",
+        "code-run",
+        "code-write",
+        "code-fix",
+        "code-review",
+        "security-scan",
+        "fact-check",
+        "self-consistency",
+        "test-automation",
+        "lint-check",
+        "dependency-audit",
+        "build-check",
+        "fs_read",
+        "fs_write",
+        "term_execute",
+        "pytest_run",
+        "ask_user_question",
+        "exit_plan_mode",
+        "workflow",
+        "send_message",
+        "interrupt_agent",
+        "get_goal",
+        "create_goal",
+        "update_goal",
+        "capability_check"
+      ],
+      "toolCalls": [],
+      "toolResults": [],
+      "stats": {
+        "toolCalls": 0,
+        "tools": 41,
+        "durationMs": 79373
+      },
+      "solutionHead": "from typing import List\n\n\ndef has_close_elements(numbers: List[float], threshold: float) -> bool:\n    \"\"\" Check if in given list of numbers, are any two numbers closer to each other than\n    given threshold.\n    >>> has_close_elements([1.0, 2.0, 3.0], 0.5)\n    False\n    >>> has_close_elements([1.0, 2.8, 3.0, 4.0, 5.0, 2.0], 0.3)\n    True\n    \"\"\"\n\n"
+    },
+    {
+      "taskId": "HumanEval/1",
+      "entryPoint": "separate_paren_groups",
+      "pass": false,
+      "durationMs": 79307,
+      "gradedIsolated": true,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/w/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n  File \"<string>\", line 22, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [
+        "Eli"
+      ],
+      "offeredTools": [
+        "knowledge-load",
+        "code-run",
+        "code-write",
+        "code-fix",
+        "code-review",
+        "security-scan",
+        "fact-check",
+        "self-consistency",
+        "test-automation",
+        "lint-check",
+        "dependency-audit",
+        "build-check",
+        "fs_read",
+        "fs_write",
+        "term_execute",
+        "pytest_run",
+        "ask_user_question",
+        "exit_plan_mode",
+        "workflow",
+        "send_message",
+        "interrupt_agent",
+        "get_goal",
+        "create_goal",
+        "update_goal",
+        "capability_check"
+      ],
+      "toolCalls": [],
+      "toolResults": [],
+      "stats": {
+        "toolCalls": 0,
+        "tools": 41,
+        "durationMs": 78704
+      },
+      "solutionHead": "from typing import List\n\n\ndef separate_paren_groups(paren_string: str) -> List[str]:\n    \"\"\" Input to this function is a string containing multiple groups of nested parentheses. Your goal is to\n    separate those group into separate strings and return the list of those.\n    Separate groups are balanced (each open brace is properly closed) and not nested within each other\n    Ignore any spaces in t"
+    },
+    {
+      "taskId": "HumanEval/2",
+      "entryPoint": "truncate_number",
+      "pass": false,
+      "durationMs": 62526,
+      "gradedIsolated": true,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/w/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [
+        "Eli"
+      ],
+      "offeredTools": [
+        "knowledge-load",
+        "code-run",
+        "code-write",
+        "code-fix",
+        "code-review",
+        "security-scan",
+        "fact-check",
+        "self-consistency",
+        "test-automation",
+        "lint-check",
+        "dependency-audit",
+        "build-check",
+        "fs_read",
+        "fs_write",
+        "term_execute",
+        "pytest_run",
+        "ask_user_question",
+        "exit_plan_mode",
+        "workflow",
+        "send_message",
+        "interrupt_agent",
+        "get_goal",
+        "create_goal",
+        "update_goal",
+        "capability_check"
+      ],
+      "toolCalls": [],
+      "toolResults": [],
+      "stats": {
+        "toolCalls": 0,
+        "tools": 41,
+        "durationMs": 61880
+      },
+      "solutionHead": "\n\ndef truncate_number(number: float) -> float:\n    \"\"\" Given a positive floating point number, it can be decomposed into\n    and integer part (largest integer smaller than given number) and decimals\n    (leftover part always smaller than 1).\n\n    Return the decimal part of the number.\n    >>> truncate_number(3.5)\n    0.5\n    \"\"\"\n\n"
+    }
+  ]
+}
