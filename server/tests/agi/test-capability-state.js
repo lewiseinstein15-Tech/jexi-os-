@@ -38,11 +38,14 @@ const RING = 'container';
 
 test('capability truth: a capability the ring guard blocks is NOT executable', async () => {
   await primeCapabilities();
-  // Every tool provider of `terminal` is ring 2; the container ring allows 1.
-  const d = describeCapability('terminal', { sandboxRing: RING });
-  assert.equal(d.registered, true, 'terminal must still be registered');
-  assert.equal(d.permitted, true, 'the profile does not block terminal — the RING does');
-  assert.equal(d.ringAllowed, false, 'the ring guard must refuse terminal at the container ring');
+  /* M15 — `terminal` used to be the ring-2 example, but `term_execute` now
+     declares ring 1 (it runs inside SessionSandbox, like pytest_run), so it is
+     executable at the container ring. `git` is still ring-2-only and is the
+     honest example of a ring-blocked capability. */
+  const d = describeCapability('git', { sandboxRing: RING });
+  assert.equal(d.registered, true, 'git must still be registered');
+  assert.equal(d.permitted, true, 'the profile does not block git — the RING does');
+  assert.equal(d.ringAllowed, false, 'the ring guard must refuse git at the container ring');
   assert.equal(d.executable, false, 'a ring-blocked capability must not be executable');
   assert.equal(d.available, false, 'the deprecated alias must not claim a blocked capability runs');
   assert.ok(d.blockedBy.includes('runtime_ring'), `blockedBy must name runtime_ring, got ${d.blockedBy}`);
@@ -51,7 +54,7 @@ test('capability truth: a capability the ring guard blocks is NOT executable', a
 test('capability truth: the same capability IS executable when the ring permits it', async () => {
   await primeCapabilities();
   // Proves the result is derived from the guard, not hard-coded to false.
-  const d = describeCapability('terminal', { sandboxRing: 'host' });
+  const d = describeCapability('git', { sandboxRing: 'host' });
   assert.equal(d.ringAllowed, true);
   assert.equal(d.executable, true, 'ring 2 is allowed at the host ring');
   assert.equal(d.available, true);
@@ -100,11 +103,16 @@ test('capability truth: the live sandbox ring never grants MORE than the host ri
   const atHost = (await listCapabilityStatesAsync({ sandboxRing: 'host' })).filter((c) => c.executable).length;
   assert.ok(atLive <= atHost, 'a stricter ring must never enable more capabilities');
   // The guard itself must agree with the capability report on the ring-2 tools.
+  // M15 — `term_execute` moved to ring 1 (it runs inside SessionSandbox), so it
+  // is no longer refused; the remaining ring-2 domain tools still are.
   const guard = makeRiskGuard({ sandboxRing: liveRing });
-  for (const slug of ['term_execute', 'git_status', 'data_json']) {
+  for (const slug of ['git_status', 'data_json']) {
     const def = getTool(slug);
     assert.equal(guard.check(def).allowed, false, `${slug} must be refused at the live ring ${liveRing}`);
   }
+  // And the tool that now runs inside the sandbox is allowed — the guard agrees.
+  assert.equal(guard.check(getTool('term_execute')).allowed, true,
+    'term_execute runs in the session sandbox, so the container ring allows it');
 });
 
 /* ── provider-level honesty (web_search vs web-search, synthetic defs) ──── */
@@ -171,32 +179,33 @@ test('capability truth: an executable MCP-backed capability is not counted ring-
 
 /* ── Phase 2B F3: the prompt states the RING, not the profile ───────────── */
 
-test('capability prompt: a ring-blocked terminal is reported as a ring limit, not a profile limit', async () => {
+test('capability prompt: a ring-blocked capability is reported as a ring limit, not a profile limit', async () => {
   await primeCapabilities();
   const { capabilityPromptBlock } = await import('../../src/services/CapabilityPrompt.js');
   const block = await capabilityPromptBlock({ sandboxRing: RING });
-  assert.ok(block.includes('terminal'), 'the block must mention terminal');
-  // Find the terminal line and assert it names the ring, not the profile.
-  const line = block.split('\n').find((l) => l.trim().startsWith('- terminal:'));
-  assert.ok(line, `terminal must be listed as unavailable, block was:\n${block}`);
-  assert.match(line, /sandbox ring/i, `the terminal line must name the execution ring: ${line}`);
+  /* M15 — the ring-2 example is now `git` (term_execute moved to ring 1). */
+  assert.ok(block.includes('git'), 'the block must mention git');
+  // Find the git line and assert it names the ring, not the profile.
+  const line = block.split('\n').find((l) => l.trim().startsWith('- git:'));
+  assert.ok(line, `git must be listed as unavailable, block was:\n${block}`);
+  assert.match(line, /sandbox ring/i, `the git line must name the execution ring: ${line}`);
   assert.doesNotMatch(line, /permission profile/i,
-    `the terminal line must NOT blame the permission profile: ${line}`);
+    `the git line must NOT blame the permission profile: ${line}`);
 });
 
 /* ── Phase 2B F4: the available/executable/succeeded relationship ───────── */
 
 test('capability truth: a capability can hold historical success while currently blocked', async () => {
   await primeCapabilities();
-  // `terminal` is ring-blocked at the container ring, but the ledger may record
+  // `git` is ring-blocked at the container ring, but the ledger may record
   // that it succeeded earlier (e.g. on a host-ring run). Historical success is
   // preserved — it is NOT overwritten by the current gate — so the state is
   // SUCCEEDED while `executable` is false. The summary invariant
   // `available + succeeded === executable` therefore holds ONLY while no
   // succeeded capability is currently non-executable.
-  const succeeded = new Set(['terminal']);
-  const d = describeCapability('terminal', { sandboxRing: RING, succeeded });
-  assert.equal(d.executable, false, 'terminal is ring-blocked right now');
+  const succeeded = new Set(['git']);
+  const d = describeCapability('git', { sandboxRing: RING, succeeded });
+  assert.equal(d.executable, false, 'git is ring-blocked right now');
   assert.equal(d.succeeded, true, 'historical success must be preserved');
   assert.equal(d.state, 'succeeded', 'the strongest historical claim is SUCCEEDED');
   assert.equal(d.available, false, 'the deprecated alias reflects the CURRENT gate, not history');
@@ -204,7 +213,7 @@ test('capability truth: a capability can hold historical success while currently
   const s = await capabilitySummaryAsync({ sandboxRing: RING, succeeded });
   const exec = s.capabilities.filter((c) => c.executable).length;
   const blockedButSucceeded = s.capabilities.filter((c) => c.succeeded && !c.executable).length;
-  assert.ok(blockedButSucceeded >= 1, 'terminal is succeeded-but-blocked');
+  assert.ok(blockedButSucceeded >= 1, 'git is succeeded-but-blocked');
   // Pin the intended relationship: available + succeeded counts the succeeded
   // bucket once, and the executable set excludes the blocked-but-succeeded
   // capability, so the two differ by exactly that count.
@@ -216,10 +225,11 @@ test('capability truth: a capability can hold historical success while currently
 
 test('capability truth: capability_check reports executability, not just availability', async () => {
   await primeCapabilities();
-  const r = await domainDispatch('capability_check', { capability: 'terminal' }, { profile: 'auto' });
+  // M15 — `git` is the ring-2 example now (term_execute moved to ring 1).
+  const r = await domainDispatch('capability_check', { capability: 'git' }, { profile: 'auto' });
   assert.equal(r.ok, true, `capability_check must succeed, got ${JSON.stringify(r).slice(0, 200)}`);
-  const entry = (r.result.capabilities || []).find((c) => c.id === 'terminal');
-  assert.ok(entry, 'terminal must appear in the report');
+  const entry = (r.result.capabilities || []).find((c) => c.id === 'git');
+  assert.ok(entry, 'git must appear in the report');
   assert.equal(entry.executable, false, 'capability_check must not claim a ring-blocked tool can run');
   assert.ok(Array.isArray(entry.blockedBy) && entry.blockedBy.includes('runtime_ring'),
     `capability_check must explain WHY, got ${JSON.stringify(entry.blockedBy)}`);

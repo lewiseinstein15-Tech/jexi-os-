@@ -256,6 +256,11 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
     },
   });
   if (codingIntent) emit('agent.log', { message: `🔎 coding intent "${plan.intent}" — closed loop armed: edit → verify → replan (up to ${budget.verifyRounds} rounds, ${budget.toolCalls} tool calls).` });
+  /* M15 — a coding task that produces NO evidence at all (no file written, no
+     test run) must not be reported as a success. The gate is set here because
+     the intent is what makes "no evidence" a failure rather than a plain
+     answer. A non-coding turn keeps the not_applicable/true default. */
+  coding.evidenceRequired = codingIntent;
 
   let callsMade = 0;
   let finalText = '';
@@ -376,7 +381,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
          runs, and the result decides whether this turn may continue as if it
          were working. A test tool that passed counts as verification too —
          running the tests IS the verification for a test fix. */
-      coding.noteToolCall(call.name, r.ok);
+      coding.noteToolCall(call.name, r.ok, { error: r.error, blocked: r.blocked === true, contractRefused: r.contractRefused === true });
       // JEXI-002 — a test tool's VERDICT is evidence even when no edit
       // followed it. Record it before the pass/fail branch so a red suite
       // still reaches the success gate.
@@ -537,6 +542,12 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         // the same permission/risk/approval path as every other tool call.
         // runToolCalls now ALSO carries the child contract gate.
         executeToolCalls: runToolCalls,
+        // M15 — a tool call the model wrote as PROSE (no native tool_calls) is
+        // recovered and executed through the same gated path; say so on the
+        // stream so the recovery is visible rather than silent.
+        onRecoveredToolCalls: (calls) => {
+          emit('agent.log', { message: `♻ recovered ${calls.length} tool call(s) the model wrote as text instead of a native call: ${calls.map((c) => c.name).join(', ')} — executing through the normal gates.` });
+        },
         // M12 — progressive disclosure: the provider loop re-reads the live
         // menu each round, so a `request_tools` call in one round makes its
         // tools callable in the next.

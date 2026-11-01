@@ -4,31 +4,21 @@
  * The closed loop for "fix the failing test", split out of AgentLoop.
  *
  * JEXI-002 — the verification subsystem existed and was correct
- * (verifyAfterEdit returns a structured injectedFailure), but NOTHING in the
- * chat loop called it. An edit landed and the turn ended on model prose:
- * "I've fixed the bug." No exit code, no verifier, no evidence. The
- * "definition of done" in the roadmap required a real exit code and verifier
- * evidence, and the loop could not produce either.
+ * (verifyAfterEdit returns a structured injectedFailure) but NOTHING called it:
+ * an edit landed, the turn ended on model prose, and there was no exit code or
+ * verifier evidence to contradict it. This module wires that in.
  *
- * JEXI-008 — the loop was generic: plan → tool_calls → execute → model answer.
- * There was no CODE state machine. This module IS that state machine:
+ * JEXI-008 — the CODE state machine: EDIT → VERIFY → (fail) INJECT evidence +
+ * REPLAN → EDIT … → (pass) → allow a success claim.
  *
- *     EDIT  → VERIFY → (fail) INJECT evidence + REPLAN → EDIT …
- *           → (pass) → allow the turn to claim success
+ * JEXI-009 — final success used to be whatever the model wrote; now a coding
+ * turn without a real green verification is reported `unverified`.
  *
- * JEXI-009 — final success used to be whatever the model wrote. Now a coding
- * turn that has not produced at least one real green verification is reported
- * as `unverified`, and the answer is annotated so a "fixed it" claim cannot
- * ride on prose alone.
+ * JEXI-013 — `context.injectedFailure` is consumed (fed back to the model)
+ * rather than dropped, and the round budget bounds the replanning.
  *
- * JEXI-013 — verifyAfterEdit could return `context.injectedFailure` and
- * AgentLoop simply dropped it. Here it is consumed: the structured failure is
- * appended to the messages fed back to the model and the loop continues with
- * a replan, and the budget is decremented so it cannot spin forever.
- *
- * The module is pure with respect to the model: it takes a `runVerify`
- * function and a `send` callback. That makes the whole state machine
- * unit-testable with no API key — see tests/tickets/jexi-002-008-009-013.
+ * The module is pure with respect to the model — it takes `runVerify` and
+ * `send` — so the whole state machine is unit-testable with no API key.
  */
 
 /** Tools whose success implies the workspace changed and must be verified. */
@@ -95,17 +85,28 @@ export class CodingLoop {
     this.verified = false;        // JEXI-009 — at least one real PASS
     this.editSeen = false;        // JEXI-002 — did this turn actually change anything?
     this.budgetExhausted = false;
-    /** JEXI-002 — a test tool that ran and came back NOT green. The old gate
-     *  only looked at `editSeen`, so a turn that ran pytest, watched it fail,
-     *  changed nothing, and then narrated a fix was graded `not_applicable`
-     *  with canClaimSuccess=true. Red output is red output whether or not an
-     *  edit accompanied it. */
+    /** JEXI-002 — a test tool that ran and came back NOT green. The gate used
+     *  to look only at `editSeen`, so "ran pytest, watched it fail, changed
+     *  nothing, narrated a fix" graded not_applicable/true. Red is red whether
+     *  or not an edit accompanied it. */
     this.failingTest = null;
+    /** M15 — EVIDENCE-GROUNDED COMPLETION. A turn whose every tool attempt
+     *  failed, or a coding turn that produced no evidence at all, must not be
+     *  reported as a success. Previously "read the file and summarised it"
+     *  rode on one failed `fs_read` and was graded not_applicable/true. */
+    this.failedCalls = [];        // { tool, error } for attempts that did NOT complete
+    this.succeededCalls = [];     // tools that actually completed this turn
+    this.evidenceRequired = false; // set by AgentLoop for a coding-intent turn
     return this;
   }
 
   /** Did this call change the workspace? */
-  noteToolCall(name, ok) {
+  noteToolCall(name, ok, info = {}) {
+    if (ok === false) {
+      this.failedCalls.push({ tool: String(name || ''), error: info.error || info.reason || null, blocked: info.blocked === true });
+    } else {
+      this.succeededCalls.push({ tool: String(name || '') });
+    }
     if (MUTATING_TOOLS.has(name) && ok !== false) this.editSeen = true;
   }
 
@@ -203,16 +204,47 @@ export class CodingLoop {
         annotation: `[UNVERIFIED] ${this.failingTest.tool} ran in this turn and did not pass (${this.failingTest.reason}). Nothing here is a confirmed fix.`,
       };
     }
-    if (!this.editSeen) {
-      return { status: 'not_applicable', canClaimSuccess: true, annotation: null, reason: 'no mutating tool call in this turn' };
+    if (this.editSeen) {
+      if (this.verified) {
+        return { status: 'verified', canClaimSuccess: true, annotation: null, reason: 'a real verification layer returned pass' };
+      }
+      if (this.budgetExhausted) {
+        return { status: 'unverified', canClaimSuccess: false, reason: 'verification budget exhausted without a pass', annotation: '[UNVERIFIED] The edits in this turn were never confirmed by a passing test run. The failure is reported above.' };
+      }
+      return { status: 'unverified', canClaimSuccess: false, reason: this.pendingFailure?.reason || 'no verification pass was produced', annotation: '[UNVERIFIED] A change was made but no verification layer returned a pass, so this is not a confirmed fix.' };
     }
-    if (this.verified) {
-      return { status: 'verified', canClaimSuccess: true, annotation: null, reason: 'a real verification layer returned pass' };
+    /* M15 — EVIDENCE-GROUNDED COMPLETION.
+       No edit landed, so there is nothing to verify — but that is NOT the same
+       as "the turn succeeded". A tool call that failed and was NEVER retried
+       successfully is an unresolved failure: the outcome the caller asked for
+       did not happen (e.g. `fs_read` on a missing file, then "I have
+       summarised it"). A successful call of the SAME tool later in the turn
+       resolves it — a probe that fails before the real read is normal and must
+       not be punished. A plain answer with no tool use stays
+       not_applicable/true: asking a question is not a completion claim. */
+    const unresolved = this.failedCalls.filter((f) => !this.succeededCalls.some((s) => s.tool === f.tool));
+    if (unresolved.length) {
+      const names = [...new Set(unresolved.map((c) => c.tool))].join(', ');
+      const first = unresolved.find((c) => c.error) || unresolved[0];
+      const allFailed = !this.succeededCalls.length;
+      return {
+        status: 'unverified',
+        canClaimSuccess: false,
+        reason: allFailed
+          ? `every tool call this turn failed (${names})`
+          : `tool call(s) failed and were never retried successfully (${names})`,
+        annotation: `[UNVERIFIED] ${allFailed ? 'Every tool call in this turn failed' : 'A tool call in this turn failed and was not successfully retried'} (${names})${first?.error ? ` — ${String(first.error).slice(0, 200)}` : ''}. No outcome was produced, so nothing here is a confirmed result.`,
+      };
     }
-    if (this.budgetExhausted) {
-      return { status: 'unverified', canClaimSuccess: false, reason: 'verification budget exhausted without a pass', annotation: '[UNVERIFIED] The edits in this turn were never confirmed by a passing test run. The failure is reported above.' };
+    if (this.evidenceRequired && !this.succeededCalls.length) {
+      return {
+        status: 'unverified',
+        canClaimSuccess: false,
+        reason: 'the task required tool evidence and none was produced',
+        annotation: '[UNVERIFIED] This task required real tool evidence and the turn produced none — no file was written, no test ran, nothing was confirmed.',
+      };
     }
-    return { status: 'unverified', canClaimSuccess: false, reason: this.pendingFailure?.reason || 'no verification pass was produced', annotation: '[UNVERIFIED] A change was made but no verification layer returned a pass, so this is not a confirmed fix.' };
+    return { status: 'not_applicable', canClaimSuccess: true, annotation: null, reason: 'no mutating tool call in this turn' };
   }
 }
 

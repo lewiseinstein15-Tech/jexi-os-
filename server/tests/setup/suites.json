@@ -1,5 +1,5 @@
 {
-  "_comment": "M8 \u2014 ordered test suites. Generated from the former package.json `test` chain so the aggregate runner preserves exact coverage and order. Each entry is argv after the `node` binary.",
+  "_comment": "M8 — ordered test suites. Generated from the former package.json `test` chain so the aggregate runner preserves exact coverage and order. Each entry is argv after the `node` binary.",
   "suites": [
     {
       "bin": "node",
@@ -1287,6 +1287,14 @@
       "args": [
         "--test",
         "tests/agi/test-tool-disclosure.js"
+      ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "--test-reporter=spec",
+        "tests/agi/test-m15-reliability.js"
       ]
     }
   ]

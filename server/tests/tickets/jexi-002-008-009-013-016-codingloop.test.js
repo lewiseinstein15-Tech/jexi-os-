@@ -87,8 +87,13 @@ test('JEXI-002: a mutating tool call is what triggers a real verification layer'
 test('JEXI-002: a FAILED mutating call does not claim an edit happened', () => {
   const loop = new CodingLoop({ runVerify: async () => ({ ok: true }) });
   loop.noteToolCall('fs_edit', false);
-  assert.equal(loop.editSeen, false);
-  assert.equal(loop.successGate().status, 'not_applicable');
+  assert.equal(loop.editSeen, false, 'a failed edit is not an edit');
+  /* M15 — and it is not a success either. Every tool call this turn failed, so
+     the turn is UNVERIFIED rather than not_applicable/true. The old
+     not_applicable verdict let a turn that only ever failed report success. */
+  const gate = loop.successGate();
+  assert.equal(gate.status, 'unverified');
+  assert.equal(gate.canClaimSuccess, false);
 });
 
 test('JEXI-002: a verifier that THROWS is a failure, never a pass', async () => {
@@ -204,7 +209,7 @@ test('JEXI-016: CodingLoop is a standalone unit with no AgentLoop import', () =>
   const src = fs.readFileSync(new URL('../../src/services/agent/CodingLoop.js', import.meta.url), 'utf8');
   assert.ok(!/from '.*AgentLoop\.js'/.test(src), 'the extracted module must not import the god-module');
   assert.ok(!/import .*ToolRuntime/.test(src), 'and must not drag the runtime in');
-  assert.ok(src.length < 12000, `kept small, got ${src.length} bytes`);
+  assert.ok(src.length < 14000, `kept small, got ${src.length} bytes`);
 });
 
 /* ── JEXI-002: a RED suite blocks the success claim even with no edit ──

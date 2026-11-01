@@ -28,7 +28,15 @@ export function registerTerminalTools({ useSandbox = true } = {}) {
   const execute = defineTool({
     name: 'term_execute',
     description: 'Run a command in the session sandbox and return stdout/stderr. The result records the real execution backend; when the host has no container runtime the sandbox is reported as degraded.',
-    riskLevel: 'medium', runtimeRing: 2,
+    // M15 — ring 1, not 2. `term_execute` runs its command INSIDE the session
+    // sandbox (SessionSandbox), never on the bare host: the same containment
+    // that `pytest_run`/`test_run` already use at ring 1. Declaring ring 2 made
+    // the risk guard refuse it whenever a container sandbox was active (the
+    // normal case), so the tool was OFFERED to the model and then always
+    // ring-denied — a turn could see "term_execute" in its menu and never be
+    // able to run a single command. The sandbox, not the ring number, is the
+    // containment boundary here.
+    riskLevel: 'medium', runtimeRing: 1,
     parameters: {
       type: 'object',
       properties: {

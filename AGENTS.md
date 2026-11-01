@@ -467,6 +467,69 @@ mission semantics, so the gate changes nothing a test asserts.
   `HOME` to sandbox a test, EXPORT IT BACK (`export HOME=/home/openhands`)
   before committing — a stray `HOME` breaks `git config` identity lookup.
 
+## M15 — reliable tool execution + evidence-grounded completion (2026-11-01)
+
+Two reliability weaknesses M14 found, plus the test-isolation bug they exposed.
+
+- **Fix 1 — the tool was offered but could never run.** `term_execute`
+  declared `runtimeRing: 2` while `SessionSandbox` enforces ring 1, so the
+  RiskGuard refused it on every coding turn under a container sandbox: the
+  model saw it in its menu and every call came back "requires runtime ring 2,
+  sandbox allows container (1)". `term_execute` runs INSIDE `SessionSandbox`
+  (like `pytest_run`), so the sandbox — not the ring number — is the
+  containment boundary. Now ring 1.
+  - Second, real half of the same failure: the container ran `--user 1000:1000`
+    while the host workspace is owned by uid 10001, so a `fs_write` succeeded
+    and the follow-up `python3 hello.py` failed "Permission denied". The
+    container user is now the HOST uid:gid (`SessionSandbox.sandboxUser()`,
+    `JEXI_SANDBOX_UID` overrides). Verified: write-then-run works and files
+    created in the container land on the host owned by the host user.
+  - `detectSandboxBackends` claimed `namespaces:true` whenever the `unshare`
+    BINARY existed; in a nested container the kernel refuses the user
+    namespace, so the fallback chain selected a backend that then failed every
+    command. It now probes `unshare` for real and falls through to the honest
+    `cwd` backend, with `namespacesReason`.
+- **Fix 2 — success without evidence.** `CodingLoop.successGate` graded a turn
+  with no mutating call `not_applicable/canClaimSuccess:true`, so "read a file,
+  call it done" — or a turn whose every tool call failed — was a reported
+  success. Now: an unresolved failed call (failed and never retried
+  successfully) is `unverified/false`; a coding-intent turn
+  (`coding.evidenceRequired`) that produced NO successful tool call is
+  `unverified/false`. A plain answer with no tool use stays
+  `not_applicable/true` (asking is not completing).
+- **Fix 2 (tool selection) — prose tool-call recovery.**
+  `services/agent/ToolCallRecovery.js`. Small models write the call they mean
+  as text (`{"name":"fs_write","parameters":{…}}`) instead of a native
+  `tool_calls` array; the round then looked like a direct answer and the task
+  ended with zero tool calls. `LLMClient.runToolLoopForProvider` recovers such
+  a call ONLY when the round produced no native calls, ONLY for a tool already
+  in the offered menu, and executes it through the SAME gated
+  `executeToolCalls` path. Observable via `opts.onRecoveredToolCalls`.
+- **Honest disclosure.** `buildNativeSchemas` appends a `[NOT RUNNABLE …]` note
+  to a tool whose declared ring exceeds the enforced ring, via
+  `ToolRuntime.toolRunnable` (same ring comparison as the guard). The tool is
+  still OFFERED (M12) and still callable — the note only removes the surprise
+  of a guaranteed refusal.
+- **Test isolation (settings.json).** `SettingsManager` pinned
+  `SETTINGS_FILE = cwd/settings.json` at import time, so any test booting the
+  backend with `cwd=server/` read/wrote the developer's REAL config: a
+  configured provider overrode the mock (test-tui-engine failed), and a test
+  could clobber the saved config. `settingsFile()` now honours
+  `JEXI_SETTINGS_FILE` (resolved per call), absent which the path is unchanged.
+  `test-tui-engine.js` sets it to a temp file.
+- Tests: `tests/agi/test-m15-reliability.js` (26) — prose recovery incl. a real
+  loopback-provider round-trip that proves the recovered call is EXECUTED; the
+  evidence gate; honest disclosure; a REAL docker write-then-run; the ring
+  fix; settings isolation both directions. `test-capability-state.js` updated
+  to use `git` (still ring-2) as the ring-blocked example.
+- **Gotcha — nested `node --test`.** A child `node --test` under a parent
+  `node --test` exits 0 immediately ("recursively … skipping"), so a failing
+  child looks green. Use a plain assert script as the child command under the
+  harness; real `node --test` only outside it.
+- **Gotcha — `sessionSandbox` takes an OBJECT** (`{root, backend}`), not a
+  path. `sessionSandbox('/tmp/x')` silently falls back to `process.cwd()` and
+  the run touches the repo, not the intended workspace.
+
 ## M12 — intelligent tool selection / progressive disclosure (2026-10-31)
 
 - **Architecture.** `services/agent/ToolBundles.js` (bundle vocabulary as data)
@@ -652,9 +715,10 @@ zero network, zero real model calls).
   open). `cleanup()` in `lib/tui/app.js` now calls `input.unref?.()` after
   `input.pause?.()`. Regression existed from M13 (`c93e822`); pre-M13 `cc95a45`
   exited cleanly. Headless (`stdin` a pipe) never showed it — TTY-only.
-- GOTCHA — `server/settings.json` (untracked, written by a real session) makes
-  `server/tests/agi/test-tui-engine.js` fail: the child backend boots with
-  `cwd=server`, `SettingsManager` reads that file, a configured `unified`
-  provider answers the turn, and the mock provider records 0 calls. The suite
-  passes 8/8 once the file is absent. The test is not hermetic against that
-  file; not a code regression.
+- GOTCHA — `server/settings.json` (untracked, written by a real session) used to
+  make `server/tests/agi/test-tui-engine.js` fail: the child backend booted with
+  `cwd=server`, `SettingsManager` read that file, a configured `unified` provider
+  answered the turn, and the mock provider recorded 0 calls. FIXED in M15 — the
+  suite now pins `JEXI_SETTINGS_FILE` to a temp path (and `SettingsManager`
+  honours it), so it is hermetic in both directions and no longer depends on the
+  developer's config being absent.

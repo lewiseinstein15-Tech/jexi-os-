@@ -89,6 +89,14 @@ async function waitHealthy(port, ms = 30000) {
 
 before(async () => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'm13-tui-engine-'));
+  /* M15 — TEST ISOLATION. The backend reads `cwd/settings.json` for the model
+     credential, and cwd here is server/ — so the DEVELOPER's saved provider
+     (e.g. a real ollama) silently overrode the mock this suite points at, and
+     the "provider received a call" assertion failed against a real backend.
+     Pin the settings file to a temp path so the suite is hermetic in both
+     directions: it cannot read the developer's config, and it cannot write to
+     it. */
+  process.env.JEXI_SETTINGS_FILE = path.join(tmpDir, 'settings.json');
   const p = await startProvider();
   provider = p;
   const port = await freePort();
@@ -97,6 +105,7 @@ before(async () => {
     env: {
       ...process.env,
       DATA_DIR: tmpDir,
+      JEXI_SETTINGS_FILE: path.join(tmpDir, 'settings.json'),
       PORT: String(port),
       HOST: '127.0.0.1',
       MODEL_PROVIDER: 'ollama',
@@ -114,6 +123,7 @@ after(() => {
   try { if (backend) backend.kill('SIGKILL'); } catch { /* best effort */ }
   try { if (provider && provider.server) provider.server.close(); } catch { /* best effort */ }
   try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* best effort */ }
+  delete process.env.JEXI_SETTINGS_FILE;
 });
 
 /* ═══ 1. a real turn reaches the interface and terminates ═════════════════ */

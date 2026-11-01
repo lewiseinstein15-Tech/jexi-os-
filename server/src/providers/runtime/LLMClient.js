@@ -15,6 +15,7 @@ import { OllamaAdapter } from '../adapters/ollama.js'; // ZONE-OWNER 2-COMPLETIO
 import { hudNoteSpend } from '../../kernel/hooks/hud-seam.js'; // Phase 7(F) — HUD cost feed (real call sizes)
 import { ensureIdentityBlock } from '../../services/IdentityGuard.js'; // PHASE 3 — non-removable identity block on EVERY system prompt (provider bridge)
 import { beginProviderAttempt } from '../../services/NetworkPolicy.js'; // PHASE 3B — explicit remote-fallback policy: every provider dial passes the network boundary first
+import { recoverToolCallsFromText } from '../../services/agent/ToolCallRecovery.js'; // M15 — recover a tool call the model wrote as prose instead of a native tool_calls array
 // ZONE-OWNER ITEM 5 (Phase 9 E seam): cost caps are consulted on the LIVE
 // model-call path. providers/cost/caps.js README: "check({ spendUsd }) … is
 // the pre-call gate a provider bridge uses BEFORE a model call."
@@ -1362,18 +1363,36 @@ async function runToolLoopForProvider(provider, messages, tools, opts, errors) {
       return null; // provider failed → outer walk tries the next provider
     }
 
-    if (!round.toolCalls.length) {
+    /* M15 — PROSE TOOL-CALL RECOVERY. A small model frequently writes the call
+       it meant to make as text (`{"name":"fs_write","parameters":{…}}`) instead
+       of emitting a native `tool_calls` array; measured ~60% of rounds on the
+       real JEXI request. Without this the round looks like a direct answer and
+       the task ends with zero tool calls. Recover ONLY when the round produced
+       no native calls, and ONLY for tools already in the offered menu. The
+       recovered call runs through the same gated `executeToolCalls` below. */
+    let roundCalls = round.toolCalls;
+    let roundRaw = round.rawToolCalls;
+    if (!roundCalls.length && round.text && typeof opts.executeToolCalls === 'function') {
+      const recovered = recoverToolCallsFromText(round.text, roundTools.map((t) => t?.function?.name || t?.name));
+      if (recovered.length) {
+        roundCalls = recovered.map((c, i) => ({ id: `recovered_${iterations}_${i}`, name: c.name, arguments: c.arguments }));
+        roundRaw = recovered.map((c, i) => ({ id: `recovered_${iterations}_${i}`, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.arguments) } }));
+        try { opts.onRecoveredToolCalls?.(roundCalls); } catch { /* observability only */ }
+      }
+    }
+
+    if (!roundCalls.length) {
       finalText = round.text;
       break; // model answered directly — loop done
     }
 
-    allCalls.push(...round.toolCalls);
+    allCalls.push(...roundCalls);
     const results = typeof opts.executeToolCalls === 'function'
-      ? await opts.executeToolCalls(round.toolCalls).catch((e) => [{ tool_call_id: null, content: `EXECUTION ERROR: ${(e && e.message) || e}` }])
+      ? await opts.executeToolCalls(roundCalls).catch((e) => [{ tool_call_id: null, content: `EXECUTION ERROR: ${(e && e.message) || e}` }])
       : [];
 
     // Feed the assistant's tool_calls and the real results back as messages.
-    messages.push({ role: 'assistant', content: round.text || null, tool_calls: round.rawToolCalls });
+    messages.push({ role: 'assistant', content: round.text || null, tool_calls: roundRaw });
     for (const r of results) {
       messages.push({ role: 'tool', tool_call_id: r.tool_call_id || `call_${allCalls.length}`, content: String(r.content ?? '').slice(0, 12000) });
     }

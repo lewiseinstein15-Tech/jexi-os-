@@ -32,6 +32,7 @@ import { extractContent, extractPdfText, downloadBookFromUrl } from './Extractor
 import { runNewsTeam } from './NewsAgent.js';
 import { searchTrustedBooks, getTrustedBookText, latestNews } from './TrustedLibrary.js';
 import { runCommand } from './Runner.js';
+import { detectSandboxBackends } from './Sandbox.js'; // M15 — ring probe for disclosure (toolRunnable)
 import { computeStats } from './DataAgent.js';
 import { synthesizeAnswer } from './Summarizer.js';
 import { analyzeVideo, getVideoTranscript } from './VideoAnalyzer.js';
@@ -483,6 +484,36 @@ export function toolHasEngine(slug) {
 export function registerDomainProbe(mod) { globalThis.__jexiDomainExecutor = mod || null; }
 
 /**
+ * M15 — can this tool ACTUALLY run in this session's execution ring?
+ *
+ * A tool that is offered but can never execute is worse than a tool that is
+ * not offered: the model reads its own menu, calls it, and gets a refusal it
+ * could not have predicted. Measured: `term_execute` was disclosed on every
+ * coding turn and then ring-denied 100% of the time under a container sandbox,
+ * because it declared ring 2 while the sandbox enforced ring 1.
+ *
+ * This mirrors the risk guard's own comparison (`toolRing > allowedRing`) using
+ * the SAME ring numbers, so disclosure and enforcement cannot drift. It is a
+ * best-effort, sync, read-only check: on any error it returns true and lets the
+ * real gate decide at call time (never silently withhold a tool).
+ */
+export function toolRunnable(slug) {
+  try {
+    const def = resolveToolDef(slug);
+    if (!def) return false;                 // no definition → cannot run
+    // Only DOMAIN tools carry a runtimeRing and pass through the ring gate. A
+    // registry/plugin tool (e.g. ask_user_question) declares none and is not
+    // ring-checked at execution, so it is runnable by definition here.
+    if (!Number.isFinite(def.runtimeRing)) return true;
+    const caps = detectSandboxBackends();
+    const enforced = (caps.docker.available || caps.namespaces) ? 1 : 2; // container vs host
+    return def.runtimeRing <= enforced;
+  } catch {
+    return true; // never let a probe failure withhold a tool
+  }
+}
+
+/**
  * Resolve a slug to a tool definition, across ALL four sources.
  *
  * JEXI-017 asked for one registry. The inverse half of the same bug is worse:
@@ -517,9 +548,21 @@ export function resolveToolDef(slug) {
 }
 
 export function buildNativeSchemas(defs) {
+  /* M15 — HONEST DISCLOSURE. A tool whose declared runtime ring exceeds what
+     the session's sandbox actually enforces is OFFERED (M12: the menu must not
+     withhold what a request named, and the capability registry reports the
+     refusal honestly) but the model cannot run it — every call comes back
+     `requires runtime ring 2, sandbox allows container (1)`. Rather than let
+     the model discover that by wasting a call, the description says so up
+     front. The tool is still callable; this only removes the surprise. */
+  const UNRUNNABLE_NOTE = ' [NOT RUNNABLE in this session: the active sandbox ring refuses this tool, so a call will be refused — prefer a tool that can run.]';
   return (defs || [])
     .map((t) => {
       if (!t || !t.slug) return null;
+      const descOf = (base) => {
+        const text = String(base || t.slug).slice(0, 500);
+        return toolRunnable(t.slug) ? text : text.slice(0, 500 - UNRUNNABLE_NOTE.length) + UNRUNNABLE_NOTE;
+      };
       /* JEXI-017 (offering half) — a DOMAIN tool already carries a complete
          JSON-Schema `parameters` object (path/content/required). Pass it
          through verbatim rather than rebuilding it from the legacy
@@ -531,7 +574,7 @@ export function buildNativeSchemas(defs) {
           type: 'function',
           function: {
             name: t.slug,
-            description: String(t.description || t.desc || t.name || t.slug).slice(0, 500),
+            description: descOf(t.description || t.desc || t.name),
             parameters: t.parameters,
           },
         };
@@ -551,7 +594,7 @@ export function buildNativeSchemas(defs) {
         type: 'function',
         function: {
           name: t.slug,
-          description: String(t.desc || t.name || t.slug).slice(0, 500),
+          description: descOf(t.desc || t.name),
           parameters: { type: 'object', properties, required },
         },
       };

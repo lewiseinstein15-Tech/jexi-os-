@@ -78,9 +78,31 @@ export function detectSandboxBackends({ force = false } = {}) {
       return { available: false, bin, reason: 'docker daemon not reachable' };
     }
   })();
-  const namespaces = fs.existsSync('/usr/bin/unshare') || fs.existsSync('/bin/unshare');
-  _backends = { docker, namespaces, unshare: namespaces ? '/usr/bin/unshare' : null };
+  /* M15 — `namespaces` used to be `unshare` EXISTS, which is not the same as
+     `unshare` WORKS. Inside a nested/unprivileged container the binary is
+     present but the kernel refuses the user namespace (`write failed
+     /proc/self/uid_map: Operation not permitted`), so the fallback chain would
+     select the namespace backend and then every command would fail — the
+     sandbox reported an isolation primitive it did not have. Probe it for real
+     and fall through to the honest cwd backend instead. */
+  const unshareBin = ['/usr/bin/unshare', '/bin/unshare'].find((p) => fs.existsSync(p)) || null;
+  const namespaces = unshareBin ? unshareWorks(unshareBin) : false;
+  _backends = {
+    docker,
+    namespaces,
+    unshare: namespaces ? unshareBin : null,
+    ...(unshareBin && !namespaces ? { namespacesReason: 'unshare is installed but user namespaces are not permitted on this host' } : {}),
+  };
   return _backends;
+}
+
+/** Does `unshare` actually create a user namespace here? (binary presence ≠ capability) */
+function unshareWorks(bin) {
+  try {
+    execFileSync(bin, ['--user', '--map-root-user', '--mount', '--net', '--pid', '--fork', '--', '/bin/sh', '-c', 'true'],
+      { stdio: 'ignore', timeout: 4000 });
+    return true;
+  } catch { return false; }
 }
 
 function envScrub(extra = {}) {
@@ -156,7 +178,27 @@ export class SessionSandbox {
    * host, including one with no Docker daemon — the hardening flags are the
    * contract, and a contract that can only be checked where Docker happens to
    * be installed is a contract nobody checks.
+   *
+   * M15 — the `--user` is the HOST user, not a hard-coded `1000:1000`. The
+   * workspace is bind-mounted read-write so the agent can edit real files, but
+   * a fixed container uid only has permission when the host user happens to BE
+   * 1000. On any other host the agent could write NOTHING through the sandbox:
+   * `python3 hello.py` after a `fs_write` failed with "Permission denied", the
+   * write half worked and the run half could not. Mapping to the host uid:gid
+   * makes the bind usable and keeps ownership of created files correct.
+   * `JEXI_SANDBOX_UID` overrides it for hosts that need a fixed value.
    */
+  static sandboxUser() {
+    const override = String(process.env.JEXI_SANDBOX_UID || '').trim();
+    if (/^\d+(:\d+)?$/.test(override)) return override.includes(':') ? override : `${override}:${override}`;
+    try {
+      const uid = process.getuid?.();
+      const gid = process.getgid?.();
+      if (Number.isInteger(uid) && Number.isInteger(gid)) return `${uid}:${gid}`;
+    } catch { /* no getuid on this platform */ }
+    return '1000:1000'; // Windows / no-uid platform: the documented default
+  }
+
   static dockerSpec(root, argv, { cwd = '/workspace', bin = 'docker' } = {}) {
     const [command, ...args] = argv;
     return {
@@ -175,7 +217,8 @@ export class SessionSandbox {
         // coding agent has to edit real files
         '-v', `${path.resolve(root)}:/workspace:rw`,
         '--workdir', cwd,
-        '--user', '1000:1000',
+        // M15 — the host user, so the read-write bind is actually usable.
+        '--user', SessionSandbox.sandboxUser(),
         '--env', 'HOME=/workspace',
         '--env', 'PATH=/usr/local/bin:/usr/bin:/bin',
         DOCKER_IMAGE,

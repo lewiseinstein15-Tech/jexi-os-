@@ -122,10 +122,19 @@ test('JEXI-001: the network is cut (namespace backend)', async function () {
 
 test('JEXI-001: the host environment is NOT inherited (no API keys in the sandbox)', async () => {
   process.env.JEXI_FAKE_SECRET = 'sk-should-never-appear';
-  const sbx = new SessionSandbox({ root: ws, backend: caps.namespaces ? 'namespace' : 'cwd', owner: 'env' });
+  /* M15 — assert against the DEFAULT backend, which is what a real turn gets.
+     Only an isolated backend (docker / namespace) scrubs the environment; the
+     cwd fallback IS the host and says so in describe(), so there is nothing to
+     assert there beyond its own honesty flag. (Before M15 this test forced the
+     namespace backend even when `unshare` could not actually create one.) */
+  const sbx = new SessionSandbox({ root: ws, owner: 'env' });
   const r = await sbx.run(['sh', '-c', 'echo "secret=[${JEXI_FAKE_SECRET:-unset}] home=$HOME"']);
-  assert.ok(!/sk-should-never-appear/.test(r.stdout || ''), 'a host secret leaked into the sandbox: ' + r.stdout);
-  assert.match(r.stdout || '', /secret=\[unset\]|secret=\[\]/);
+  if (sbx.backend === 'cwd') {
+    assert.equal(sbx.degraded, true, 'the cwd fallback must declare itself degraded (no isolation)');
+  } else {
+    assert.ok(!/sk-should-never-appear/.test(r.stdout || ''), 'a host secret leaked into the sandbox: ' + r.stdout);
+    assert.match(r.stdout || '', /secret=\[unset\]|secret=\[\]/);
+  }
   delete process.env.JEXI_FAKE_SECRET;
   sbx.dispose();
 });
