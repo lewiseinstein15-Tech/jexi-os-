@@ -60,7 +60,7 @@ export function isCodingToolSchema(schema) {
 // WorkGraph verifier uses. Exported so a test can assert identity rather than
 // infer it: `CodingLoop.runTestEvidence === TestVerifier.runTestEvidence`.
 import { runTestEvidence } from '../../verification/verifiers/TestVerifier.js';
-import { readTestVerdict, isFailingVerdict } from './test-verdict.js';
+import { readVerdict, isFailingVerdict } from './test-verdict.js';
 export { runTestEvidence };
 
 export class CodingLoop {
@@ -111,17 +111,15 @@ export class CodingLoop {
   }
 
   /**
-   * Record what a test tool actually returned.
-   *
-   * A test tool "succeeding" at the transport level is not a passing suite —
-   * `pytest_run` returns ok:true with result.status:'fail' when the suite is
-   * red. That distinction is the whole point: the red case must survive into
-   * the success gate instead of being laundered into a success.
+   * Record what a test tool actually returned. Transport success is NOT a
+   * passing suite (pytest_run returns ok:true with status:'fail' when red) —
+   * the red case must survive into the success gate, not be laundered.
    */
-  noteTestResult(name, result) {
-    const verdict = readTestVerdict(name, result);
+  noteTestResult(name, result, meta = null) {
+    // M17/D1 — the reader prefers typed metadata, else the legacy object.
+    const verdict = readVerdict(name, result, meta);
     if (verdict) { this.failingTest = verdict; this.pendingFailure = this.pendingFailure ?? verdict; }
-    else if (!isFailingVerdict(result?.status)) this.failingTest = null;   // green clears red
+    else if (meta?.kind === 'test' || !isFailingVerdict(result?.status)) this.failingTest = null;   // green clears red
     return this;
   }
 

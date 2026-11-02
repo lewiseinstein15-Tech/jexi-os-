@@ -41,6 +41,7 @@ import {
   loadMemory, rememberEpisode, saveMemory, getActiveSession,
 } from './MemoryManager.js';
 import { appendEvent } from './EventLog.js'; // B78 — tool calls/results are first-class events
+import { attachExecMeta } from './agent/exec-meta.js'; // M17/D1 — typed execution metadata beside the formatted text
 import { getPluginTool } from './PluginContext.js'; // B97 — plugin-mounted tools run through the same gated pipeline
 import { discoverSkills, loadSkillForModel, observeHostMutationFromArgs } from './SkillDiscovery.js'; // B98 — dsh-style ranked skill discovery + progressive load
 import { SPILL_THRESHOLD } from './SpillStore.js'; // B100 — spill oversized tool results (dsh spill-policy)
@@ -1657,6 +1658,11 @@ export async function executeTool(params) {
     throw e;
   }
   hudObservePostToolUse({ name: slug }, { ok: !!result.ok, blocked: !!result.blocked, declined: !!result.declined, durationMs: result.durationMs || (Date.now() - __t0), error: result.error }, params); // Phase 7(F): HUD records the resolved call
+  /* M17/D1 — every return path from executeToolInner (blocked, declined,
+     paused, permission-denied, unknown-tool, timeout, failure) gets typed
+     metadata here, so the gate has a verdict for EVERY outcome, not just the
+     happy path that happens to build one inline. Idempotent. */
+  try { attachExecMeta(result, slug); } catch { /* metadata is additive */ }
   try {
     appendEvent('tool_result', {
       tool: slug,
@@ -1921,6 +1927,7 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
       // B135 — carry the structured engine result through so the model sees
       // real output/exit codes on failure (dsh presentResult parity).
       const failed = { ok: false, tool: slug, code: result.code ?? result.error?.code, error: msg, ...(result.kind ? { result } : {}), durationMs: Date.now() - started };
+      try { attachExecMeta(failed, slug, result); } catch { /* metadata is additive */ }
       emit('tool.result', { tool: slug, ok: false, error: msg, durationMs: failed.durationMs });
       return failed;
     }
@@ -1966,11 +1973,16 @@ async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, c
       }
     }
     if (finalText === undefined) finalText = formatResult(result);
+    /* M17/D1 — the formatted string is for the model/TUI; `meta` is the typed
+       truth for the completion gate. Both travel together on the same result
+       so the gate never has to parse prose. */
     const ok = { ok: true, tool: slug, permission: perm, tier, result: finalText, durationMs: Date.now() - started };
+    try { attachExecMeta(ok, slug, result); } catch { /* metadata is additive */ }
     emit('tool.result', { tool: slug, ok: true, durationMs: ok.durationMs, preview: String(ok.result).slice(0, 300) });
     return ok;
   } catch (e) {
     const failed = { ok: false, tool: slug, error: (e && e.message) || String(e), durationMs: Date.now() - started };
+    try { attachExecMeta(failed, slug); } catch { /* metadata is additive */ }
     emit('tool.result', { tool: slug, ok: false, error: failed.error, durationMs: failed.durationMs });
     return failed;
   }

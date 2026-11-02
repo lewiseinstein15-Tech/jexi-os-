@@ -166,6 +166,16 @@ const PREFER_HEAD = {
  * healthy ones keep priority.
  */
 export function providerOrder(prefer = '') {
+  // M17/D2 — BENCHMARK PROVIDER LOCK. The M16 benchmark could not be
+  // reproduced because the keyless ladder (Kilo / Pollinations) could silently
+  // substitute for the primary provider mid-run: the signature was tasks that
+  // "emitted no tool call and looped until timeout" with no agentError, at a
+  // different position each run. When JEXI_PROVIDER_LOCK is set the ladder is
+  // reduced to EXACTLY that one provider — a failure is a failure, never a
+  // silent slide onto a different model. Determinism is the whole point.
+  const lock = (process.env.JEXI_PROVIDER_LOCK || '').trim().toLowerCase();
+  if (lock) return [lock];
+
   // UNIFIED (one-secret model): an explicitly configured JEXI_MODEL_*
   // provider (or settings.unified from the setup wizard) ALWAYS leads the
   // ladder — the user chose their reasoning engine. Legacy legs remain as

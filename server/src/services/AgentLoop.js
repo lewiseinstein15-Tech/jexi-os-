@@ -43,6 +43,7 @@ import { providerPreferenceForIntent } from '../providers/catalog/ModelRouting.j
 import { canChat } from '../providers/index.js'; // keyless child brain gate
 import { REPORT_GUIDANCE } from './SubagentReport.js'; // report guidance for children
 import { CodingLoop, isCodingIntent, shapeToolResult, TEST_TOOLS, isCodingToolSchema } from './agent/CodingLoop.js';
+import * as execMeta from './agent/exec-meta.js'; // M17/D1 — typed verdict for the completion gate
 import { INTENT_BUDGETS, budgetForIntent, activeCodingSkill } from './agent/IntentRouter.js';
 import { LOOP_BREAKER_LIMIT, loopKeyFor, loopBreakerTrips, loopBreakerMessage, repeatReminderFor } from './agent/LoopBreaker.js';
 import { checkToolAgainstContract } from './agent/ContractGate.js';
@@ -380,17 +381,18 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
          This is the call the old loop never made: the edit lands, the verifier
          runs, and the result decides whether this turn may continue as if it
          were working. A test tool that passed counts as verification too —
-         running the tests IS the verification for a test fix. */
+         running the tests IS the verification for a test fix.
+         M17/D1 — the verdict comes from the TYPED metadata ToolRuntime attaches
+         (`r.meta`); reading `r.result.status` off a formatted STRING was dead code. */
       coding.noteToolCall(call.name, r.ok, { error: r.error, blocked: r.blocked === true, contractRefused: r.contractRefused === true });
-      // JEXI-002 — a test tool's VERDICT is evidence even when no edit
-      // followed it. Record it before the pass/fail branch so a red suite
-      // still reaches the success gate.
-      if (r.ok && r.result && typeof r.result === 'object' && TEST_TOOLS.has(call.name)) {
-        coding.noteTestResult(call.name, r.result);
+      const testMeta = r.meta && r.meta.kind === 'test' ? r.meta : null;
+      // Record the verdict before the pass/fail branch so a red suite reaches the gate.
+      if (testMeta || (r.ok && r.result && typeof r.result === 'object' && TEST_TOOLS.has(call.name))) {
+        coding.noteTestResult(call.name, r.result, testMeta);
       }
       if (r.ok && !r.paused && !r.approvalRequired) {
         const isMutating = coding.editSeen && !TEST_TOOLS.has(call.name);
-        const isPassingTest = TEST_TOOLS.has(call.name) && r.ok && r.result && r.result.status === 'pass';
+        const isPassingTest = execMeta.isPassingTestMeta(testMeta);
         if (isMutating || isPassingTest) {
           if (isPassingTest) { coding.verified = true; coding.pendingFailure = null; }
           else await coding.verify(`${call.name} on ${JSON.stringify(call.arguments || {}).slice(0, 120)}`);

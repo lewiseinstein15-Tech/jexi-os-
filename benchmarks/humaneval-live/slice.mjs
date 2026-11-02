@@ -16,6 +16,7 @@ import path from 'node:path';
 
 import { loadDataset, materialiseTask, gradeLocally } from './lib/tasks.mjs';
 import { runTaskWithJexi } from './lib/agent.mjs';
+import { scoreTask } from './lib/score.mjs';
 
 const arg = (name, dflt) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -39,8 +40,13 @@ async function runOne(task) {
     info = await runTaskWithJexi({ task, sandboxDir, schemaMode: 'as-shipped', toolProfile: 'full', timeoutMs, log: () => {} });
   } catch (e) { info = { error: String(e && e.message || e) }; }
   const graded = gradeLocally({ sandboxDir, solutionName: 'solution.py', testName: `test_${task.entry_point}.py`, entryPoint: task.entry_point });
+  // M17/D3 — same reconciliation as run.mjs: a timed-out/errored task is not
+  // resolved even if its leftover solution.py grades green.
+  const scored = scoreTask({ graded, agentError: info.error || null });
   return {
-    taskId: task.task_id, pass: graded.passed, durationMs: Date.now() - t0,
+    taskId: task.task_id, pass: scored.pass, gradedPass: scored.gradedPass,
+    agentTimedOut: scored.agentTimedOut, resolveReason: scored.reason,
+    durationMs: Date.now() - t0,
     tools: (info.toolCalls || []).length, error: info.error || null,
   };
 }
@@ -51,9 +57,11 @@ const rows = [];
 for (let i = start; i < end; i += 1) {
   const r = await runOne(tasks[i]);
   rows.push(r);
-  console.log(`  ${r.pass ? 'PASS' : 'FAIL'}  ${r.taskId.padEnd(14)} ${String(r.durationMs).padStart(7)}ms  tools=${r.tools}  ${r.error ? 'err=' + r.error.slice(0, 50) : ''}`);
+  const flag = r.pass ? 'PASS' : (r.gradedPass ? 'FAIL(green-but-unresolved)' : 'FAIL');
+  console.log(`  ${flag}  ${r.taskId.padEnd(14)} ${String(r.durationMs).padStart(7)}ms  tools=${r.tools}  ${r.error ? 'err=' + r.error.slice(0, 50) : ''}`);
 }
 const passed = rows.filter((r) => r.pass).length;
-console.log(`\nslice [${start},${end}) warm=${warm}: ${passed}/${rows.length} = ${(passed / rows.length * 100).toFixed(1)}%`);
+const green = rows.filter((r) => r.gradedPass).length;
+console.log(`\nslice [${start},${end}) warm=${warm}: ${passed}/${rows.length} = ${(passed / rows.length * 100).toFixed(1)}% (gradedGreen=${green})`);
 fs.rmSync(tmpRoot, { recursive: true, force: true });
 process.exit(0);

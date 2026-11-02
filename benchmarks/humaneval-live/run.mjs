@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 
 import { loadDataset, materialiseTask, gradeLocally } from './lib/tasks.mjs';
 import { runTaskWithJexi, runGoldTask } from './lib/agent.mjs';
+import { scoreTask, summarise, isTimeoutError } from './lib/score.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..', '..');
@@ -115,16 +116,26 @@ async function main() {
     const graded = gradeOne({ dockerPrefix, sandboxDir, solutionName: 'solution.py', testName, entryPoint: task.entry_point });
     const durationMs = Date.now() - t0;
 
+    // M17/D3 — reconcile the grader's verdict with the agent's own outcome.
+    // A timed-out or errored task is NOT resolved, even if a leftover
+    // solution.py happens to grade green. Both facts are recorded.
+    const scored = scoreTask({ graded, agentError: agentInfo.error || null });
+
     const row = {
       taskId: task.task_id,
       entryPoint: task.entry_point,
-      pass: graded.passed,
+      pass: scored.pass,
+      gradedPass: scored.gradedPass,
+      agentTimedOut: scored.agentTimedOut,
+      resolveReason: scored.reason,
       durationMs,
       gradedIsolated: graded.isolated,
       gradeOutput: graded.output.slice(-800),
       agentError: agentInfo.error || null,
       intent: agentInfo.intent || null,
       models: agentInfo.models || null,
+      providersThatServed: agentInfo.providersThatServed || null,
+      providerAttempts: (agentInfo.providerAttempts || []).map((a) => ({ provider: a.provider, model: a.model, ok: a.ok, ms: a.ms, lane: a.lane, reason: a.reason ? String(a.reason).slice(0, 160) : null })),
       offeredTools: agentInfo.offeredTools || null,
       toolCalls: (agentInfo.toolCalls || []).map((c) => ({ name: c.name, args: String(c.args || '').slice(0, 300) })),
       toolResults: (agentInfo.toolResults || []).map((r) => ({ name: r.name, ok: r.ok, error: r.error ? String(r.error).slice(0, 200) : null })),
@@ -132,11 +143,21 @@ async function main() {
       solutionHead: (agentInfo.solution || '').slice(0, 400),
     };
     rows.push(row);
-    console.log(`  ${graded.passed ? 'PASS' : 'FAIL'}  ${task.task_id.padEnd(16)} ${String(durationMs).padStart(7)}ms  tools=${row.toolCalls.length}  ${agentInfo.error ? 'agentError=' + agentInfo.error.slice(0, 60) : ''}`);
+    const flag = scored.pass ? 'PASS' : (row.gradedPass ? 'FAIL(green-but-unresolved)' : 'FAIL');
+    console.log(`  ${flag}  ${task.task_id.padEnd(16)} ${String(durationMs).padStart(7)}ms  tools=${row.toolCalls.length}  ${agentInfo.error ? 'agentError=' + agentInfo.error.slice(0, 60) : ''}`);
   }
 
-  const passed = rows.filter((r) => r.pass).length;
-  const resolved = rows.length ? passed / rows.length : 0;
+  const metrics = summarise(rows);
+  // M17/D2 — a locked run that was served by anything but the lock slid the
+  // ladder; that is a determinism break and must be visible, not inferred.
+  const lock = (process.env.JEXI_PROVIDER_LOCK || '').trim().toLowerCase() || null;
+  metrics.providerLock = lock;
+  metrics.ladderSlid = lock
+    ? rows.filter((r) => (r.providersThatServed || []).some((p) => p !== lock)).length
+    : null;
+  metrics.providersObserved = [...new Set(rows.flatMap((r) => r.providersThatServed || []))];
+  const passed = metrics.resolved;
+  const resolved = metrics.resolvedRate;
 
   const manifest = {
     benchmark: 'humaneval',
@@ -145,6 +166,9 @@ async function main() {
     schemaMode,
     toolProfile,
     model: model || 'provider-ladder (keyless floor: kilo/pollinations)',
+    providerLock: process.env.JEXI_PROVIDER_LOCK || null, // M17/D2 — null means the ladder may slide
+    modelProviderEnv: process.env.MODEL_PROVIDER || null,
+    ollamaHost: process.env.OLLAMA_HOST || null,
     tasks: selected.length,
     taskIds: selected.map((t) => t.task_id),
     gitCommit: gitRev(),
@@ -162,6 +186,7 @@ async function main() {
     resolved,
     passed,
     failed: rows.length - passed,
+    metrics,
     rows,
   };
 
@@ -169,6 +194,8 @@ async function main() {
   const outPath = path.join(HERE, 'results', `${runId}.json`);
   fs.writeFileSync(outPath, JSON.stringify(result, null, 2));
   console.log(`\n[bench] ${leg}/${schemaMode}: resolved ${passed}/${rows.length} = ${(resolved * 100).toFixed(1)}%`);
+  console.log(`[bench] metrics: gradedGreen=${metrics.gradedGreen} unresolvedGreen=${metrics.unresolvedGreen} timeouts=${metrics.timeouts} agentErrors=${metrics.agentErrors} graderErrors=${metrics.graderErrors}`);
+  console.log(`[bench] providers served: ${metrics.providersObserved.join(', ') || '(none)'}${lock ? ` · lock=${lock} · ladderSlid=${metrics.ladderSlid} tasks` : ' (no lock — ladder may slide)'}`);
   console.log(`[bench] wrote ${outPath}`);
 }
 

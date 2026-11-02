@@ -80,9 +80,20 @@ async function main() {
   const provider = await startMockProvider();
   process.env.OLLAMA_HOST = `http://127.0.0.1:${provider.port}`;
   process.env.MODEL_NAME = 'mock-llama';
+  // M17/D2 — LOCK the ladder to the scripted provider. Without this, a 500 from
+  // the mock (the dead-provider scenario) slid the ladder onto a keyless REMOTE
+  // leg that happily ran tools and wrote files into the sandbox — the exact
+  // mid-run substitution D2 is about. A scenario must measure the scripted
+  // provider and nothing else.
+  process.env.MODEL_PROVIDER = 'ollama';
+  process.env.JEXI_PROVIDER_LOCK = 'ollama';
   await fetch(`http://127.0.0.1:${provider.port}/control/script`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ rounds: spec.rounds }) });
 
   const sandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'm16-p3-'));
+  // A pytest marker so `test_run` actually runs the suite instead of honestly
+  // erroring "no test project detected" — the scenarios measure the GATE, not
+  // project detection.
+  fs.writeFileSync(path.join(sandboxDir, 'pyproject.toml'), '[tool.pytest.ini_options]\n');
   fs.writeFileSync(path.join(sandboxDir, 'test_add.py'), 'from solution import add\n\ndef test_add():\n    assert add(1, 2) == 3\n');
 
   let info = null; let thrown = null;

@@ -760,3 +760,42 @@ zero network, zero real model calls).
   per process because `runTaskWithJexi` mutates `process.env.WORKSPACE_DIR` and
   `AgentLoop` keeps one global turn. `benchmarks/humaneval-live/slice.mjs` runs
   an arbitrary `[start,end)` task slice in a fresh process.
+
+## M17 — verification integrity + benchmark determinism (D1/D2/D3 FIXED)
+
+- VERDICT: all three M16 blocking defects fixed. See `docs/M17-FINDINGS.md`.
+- D1 — the completion gate now reads TYPED metadata, not a formatted string.
+  `server/src/services/agent/exec-meta.js` derives `meta` (kind/status/
+  timedOut/exitCode/tests/passed/failed) from the engine's RAW result;
+  `attachExecMeta` is called on EVERY `executeTool` return path in
+  `ToolRuntime.js` (blocked/declined/paused/denied/unknown/timeout/fail/ok).
+  `result` stays the string the model sees; `meta` is the machine truth.
+  `AgentLoop.js` uses `isPassingTestMeta(r.meta)`; `CodingLoop.noteTestResult`
+  uses `readVerdict(name, result, meta)` (typed first, legacy fallback).
+  Honesty: pass-with-0-tests => error; exitCode -1 with no output => timeout;
+  blocked/denied/not_run/error are never passes. `LintVerifier` now reports a
+  runner error (nonzero exit, zero diagnostics, zero messages) as `error`, not
+  a false `fail`.
+- D2 — deterministic provider via `JEXI_PROVIDER_LOCK`. `providerOrder(prefer)`
+  in `providers/runtime/ProviderRouter.js` reduces the ladder to exactly the
+  locked provider (survives intent/lane preference); unset keeps fallbacks.
+  `providers/runtime/ProviderAttempts.js` (new) records every lane dial
+  (`beginProviderAttempt`/`recordProviderAttempt`, bounded buffer,
+  `providersThatServed()`, `resetProviderAttempts()`); `LLMClient.js` records
+  on all three lanes (text/tools/plain-text-fallback). `run.mjs` manifest
+  records `providerLock` + `ladderSlid`; rows record `providerAttempts`.
+  Two identical locked runs: 0/15 each, `ladderSlid=0`, only `ollama` served,
+  zero false passes. 0/15 is the TRUE capability of llama3.2:3b on CPU with
+  the ladder locked (no silent substitution) — not a harness artifact.
+- D3 — `benchmarks/humaneval-live/lib/score.mjs` (new) reconciles grader +
+  agent outcome, shared by `run.mjs` and `slice.mjs`: RESOLVED only when the
+  agent loop completed without error AND the grader ran AND the grader passed.
+  M16's two false positives (HumanEval/13, HumanEval/3: `pass=true` + timeout)
+  now score `pass:false` with `agentTimedOut:true`.
+- GOTCHA (re-confirmed) — never run tests or any CPU-heavy process during a
+  benchmark; a killed run can orphan a `llama-server` that keeps burning CPU
+  (check `ps aux | grep llama-server` and kill it before the next run).
+- Pre-existing, NOT caused by M17: `jexi-016-019-structure.test.js` fails 2/10
+  at HEAD (AgentLoop line budget — HEAD is 616 lines vs budget 560; and
+  ToolSetBuilder ordering). M17 grew AgentLoop by only 2 lines.
+

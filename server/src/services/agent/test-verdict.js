@@ -36,3 +36,36 @@ export function readTestVerdict(name, result) {
     evidence: raw ? [{ content: String(raw) }] : [],
   };
 }
+
+/**
+ * M17/D1 — the typed-metadata verdict. This is the reader the gate uses now:
+ * it consumes the `meta` object ToolRuntime attaches to every result, so the
+ * decision rests on typed facts (status/exitCode/timedOut) instead of on a
+ * shape the result never had. Returns a structured failure for a test tool
+ * that did NOT pass — red, errored, timed out, blocked, denied, or never run.
+ * A green suite returns null (it clears any earlier red).
+ */
+export function readTestMetaVerdict(name, meta) {
+  if (!meta || meta.kind !== 'test') return null;
+  if (meta.status === 'pass') return null;
+  const parts = [`${name} reported status=${meta.status}`];
+  if (meta.exitCode !== undefined) parts.push(` exitCode=${meta.exitCode}`);
+  if (meta.failed !== undefined) parts.push(` · ${meta.failed} failed`);
+  if (meta.reason) parts.push(` (${meta.reason})`);
+  return {
+    layer: 'test',
+    tool: name,
+    reason: parts.join(''),
+    evidence: meta.evidence ? [{ content: String(meta.evidence) }] : [],
+  };
+}
+
+/**
+ * M17/D1 — the ONE reader the loop uses. Prefers the typed metadata when the
+ * runtime attached it; falls back to the legacy structured object so a caller
+ * that still hands us the raw engine result keeps working. Returns a
+ * structured failure, or null when the suite is green / gave no verdict.
+ */
+export function readVerdict(name, result, meta = null) {
+  return meta && meta.kind === 'test' ? readTestMetaVerdict(name, meta) : readTestVerdict(name, result);
+}

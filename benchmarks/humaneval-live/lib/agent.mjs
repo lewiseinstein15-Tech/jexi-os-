@@ -68,6 +68,10 @@ export async function runTaskWithJexi({ task, sandboxDir, schemaMode = 'document
   const prevWorkspace = process.env.WORKSPACE_DIR;
   process.env.WORKSPACE_DIR = sandboxDir;
 
+  // M17/D2 — reset the provider audit trail so this task's entries are its own.
+  let attemptsApi = null;
+  try { attemptsApi = await import(path.join(SERVER, 'src/providers/runtime/ProviderAttempts.js')); attemptsApi.resetProviderAttempts(); } catch { /* optional */ }
+
   const events = [];
   const sendEvent = (type, data) => { events.push({ type, data }); };
   const query = buildQuery(task, solutionPath, testName);
@@ -117,6 +121,10 @@ export async function runTaskWithJexi({ task, sandboxDir, schemaMode = 'document
   const toolResults = events.filter((e) => e.type === 'tool/result').map((e) => ({ name: e.data?.name, ok: e.data?.ok, error: e.data?.error }));
   const planEvent = events.find((e) => e.type === 'agent.plan');
 
+  // M17/D2 — which provider actually served this task (the audit trail).
+  let providerAttempts = [];
+  try { if (attemptsApi) providerAttempts = attemptsApi.providerAttempts(); } catch { providerAttempts = []; }
+
   return {
     solution,
     answer: result ? String(result.answer || '') : '',
@@ -127,6 +135,8 @@ export async function runTaskWithJexi({ task, sandboxDir, schemaMode = 'document
     offeredTools: planEvent ? (planEvent.data?.tools || []).map((t) => t.slug || t.name) : null,
     intent: planEvent ? planEvent.data?.intent : null,
     models,
+    providerAttempts,
+    providersThatServed: [...new Set(providerAttempts.filter((a) => a.ok).map((a) => a.provider))],
     transcript: { query, events: events.length },
   };
 }

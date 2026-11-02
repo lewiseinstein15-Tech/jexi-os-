@@ -95,6 +95,24 @@ export const LintVerifier = {
     }
 
     const pass = res.ok && diagnostics === 0;
+    /* M17/D1 — a runner that never linted anything is NOT a failing lint.
+       eslint exits 2 with "No files matching the pattern src" and zero parsed
+       messages; the old code reported that as `fail` with reason
+       "0 diagnostics", which reads as "your code has problems" when in fact
+       nothing was checked. Distinguish the two: nonzero exit WITH zero
+       diagnostics and zero messages is an `error` (the runner failed), not a
+       `fail` (the code failed). This is what made a bare sandbox report a
+       false red on a correct Python edit. */
+    const runnerError = !res.ok && diagnostics === 0 && messages.length === 0;
+    if (runnerError) {
+      const why = (res.stderr || res.stdout || res.output || '').trim().slice(0, 300) || `linter exited ${res.code} with no diagnostics`;
+      return {
+        status: 'error',
+        evidence: [{ source: 'LintVerifier', snapshotId, content: why, at: Date.now(), meta: { spawn: { command: resolved[0], args: resolved.slice(1), timedOut: res.timedOut, exitCode: res.code } } }],
+        reason: `linter did not run: ${why}`,
+        durationMs: Date.now() - started,
+      };
+    }
     const evidence = [{
       source: 'LintVerifier',
       snapshotId,

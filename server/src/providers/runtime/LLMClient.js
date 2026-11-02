@@ -15,6 +15,7 @@ import { OllamaAdapter } from '../adapters/ollama.js'; // ZONE-OWNER 2-COMPLETIO
 import { hudNoteSpend } from '../../kernel/hooks/hud-seam.js'; // Phase 7(F) — HUD cost feed (real call sizes)
 import { ensureIdentityBlock } from '../../services/IdentityGuard.js'; // PHASE 3 — non-removable identity block on EVERY system prompt (provider bridge)
 import { beginProviderAttempt } from '../../services/NetworkPolicy.js'; // PHASE 3B — explicit remote-fallback policy: every provider dial passes the network boundary first
+import { recordAttempt } from './ProviderAttempts.js'; // M17/D2 — provider audit trail: a mid-run ladder slide must be visible
 import { recoverToolCallsFromText } from '../../services/agent/ToolCallRecovery.js'; // M15 — recover a tool call the model wrote as prose instead of a native tool_calls array
 // ZONE-OWNER ITEM 5 (Phase 9 E seam): cost caps are consulted on the LIVE
 // model-call path. providers/cost/caps.js README: "check({ spendUsd }) … is
@@ -975,8 +976,8 @@ async function __generateWalk(prompt, systemInstruction, imageBase64, opts) {
       errors.push(`${provider}: ${slot.reason} (rate limiter)`);
       continue;
     }
+    const __t0 = Date.now(); // B172 — measure real latency for speed routing
     try {
-      const __t0 = Date.now(); // B172 — measure real latency for speed routing
       let text;
       try {
         text = await call(prompt, system, imageBase64, opts, errors);
@@ -990,6 +991,7 @@ async function __generateWalk(prompt, systemInstruction, imageBase64, opts) {
       if (text) {
         recordProviderSuccess(provider, Date.now() - __t0);
         recordProviderCallSuccess(provider, { latencyMs: Date.now() - __t0 }); // Phase 1
+        recordAttempt({ provider, model: opts.model || null, ok: true, ms: Date.now() - __t0, lane: 'text' }); // M17/D2
         if (opts.budget && typeof opts.budget.consume === 'function') opts.budget.consume({ tokens: Math.ceil(String(text).length / 4) }); // Phase 1 — model calls are a limited resource
         releaseSlot();
         // B162b — if this provider answered WITHOUT streaming deltas (SDK
@@ -1006,6 +1008,7 @@ async function __generateWalk(prompt, systemInstruction, imageBase64, opts) {
       // provider failure: fail fast WITHOUT health penalty or fallback legs.
       if (opts && opts.signal && opts.signal.aborted) { releaseSlot(); throw e; }
       errors.push(`${provider}: ${e.message}`);
+      recordAttempt({ provider, model: opts.model || null, ok: false, ms: Date.now() - __t0, lane: 'text', reason: String(e.message).slice(0, 160) }); // M17/D2
       recordProviderCallFailure(provider, e); // Phase 1 — classified + persisted
     }
     noteProviderFailure(provider); // B220 — retry-after aware
@@ -1486,16 +1489,19 @@ export async function generateWithToolsLoop(prompt, systemInstruction = '', tool
       errors.push(`${provider}: ${slot.reason} (rate limiter)`);
       continue;
     }
+    const __tt0 = Date.now(); // M17/D2 — provider audit trail for the tool lane
     try {
       const res = await runToolLoopForProvider(provider, messages, tools, opts, errors);
       if (res) {
         recordProviderSuccess(provider);
+        recordAttempt({ provider, model: res.model || null, ok: true, ms: Date.now() - __tt0, lane: 'tools' }); // M17/D2
         releaseSlot();
         return { ok: true, provider, model: res.model || null, text: res.text, toolCalls: res.toolCalls, iterations: res.iterations };
       }
     } catch (e) {
       if (isSessionCapped(e)) { releaseSlot(); throw e; } // ZONE-OWNER ITEM 5 — a cap is terminal, never a ladder slide
       errors.push(`${provider}: ${e.message}`);
+      recordAttempt({ provider, model: opts.model || null, ok: false, ms: Date.now() - __tt0, lane: 'tools', reason: String(e.message).slice(0, 160) }); // M17/D2
     }
     noteProviderFailure(provider); // B220 — retry-after aware
     releaseSlot();
@@ -1521,12 +1527,14 @@ export async function generateWithToolsLoop(prompt, systemInstruction = '', tool
         __meterNote(provider, null, Date.now() - __ft0, Boolean(text)); // ARENA meter
         if (text) {
           recordProviderSuccess(provider);
+          recordAttempt({ provider, model: null, ok: true, ms: Date.now() - __ft0, lane: 'plain-text-fallback' }); // M17/D2 — a tool-calling failure that produced a plain answer is a substitution worth recording
           releaseSlot();
           return { ok: true, provider, model: null, text: String(text).trim(), toolCalls: [], iterations: 1, fallback: 'plain-text' };
         }
       } catch (e) {
         if (isSessionCapped(e)) { releaseSlot(); throw e; } // ZONE-OWNER ITEM 5 — terminal
         fallbackErrors.push(`${provider}: ${e.message}`);
+        recordAttempt({ provider, model: null, ok: false, lane: 'plain-text-fallback', reason: String(e.message).slice(0, 160) }); // M17/D2
       }
       noteProviderFailure(provider); // B220 — retry-after aware
       releaseSlot();
