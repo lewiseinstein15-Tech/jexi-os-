@@ -799,3 +799,34 @@ zero network, zero real model calls).
   at HEAD (AgentLoop line budget — HEAD is 616 lines vs budget 560; and
   ToolSetBuilder ordering). M17 grew AgentLoop by only 2 lines.
 
+## M18 — failure attribution (docs/M18-FINDINGS.md)
+
+- 0/15 on the locked `llama3.2:3b`/`ollama` run is dominated by a MODEL
+  capability ceiling, not a plumbing defect. Categories: A=4 (fs_write called,
+  `content` written with literal `\n` -> `SyntaxError`), B=10 (NO tool call;
+  `solution.py` left as the materialised stub -> `check()` asserts), C=1
+  (written correctly, wrong algorithm). 4 of these also hit the 300s timeout.
+- R1 (dominant): `llama3.2:3b` emits a NATIVE tool call only ~1/3 of the time
+  on JEXI's ~7.5k-token prompt, even at temp 0 and `tool_choice:'required'`;
+  otherwise it writes the call as prose with a name (`code_write`) not in the
+  offered menu, so `recoverToolCallsFromText` correctly refuses it. Same prompt
+  served by `kilo-auto/free` scored **11/15** (6-9 native calls/task, 0
+  timeouts) — see `results/humaneval-jexi-as-shipped-2026-11-02T13-45-25-239Z.json`
+  (ladder slid because `JEXI_PROVIDER_LOCK` was unset).
+- R2 (real, small defect): a recovered/prose `fs_write` call can carry literal
+  `\n` in `content`; `fs_write` writes it verbatim -> `SyntaxError`.
+  Escape-normalising `HumanEval/3`'s content grades PASS (raw grades FAIL).
+  Smallest evidence-supported change = normalise `\n`/`\t` in write-tool
+  content; bounded to ~1/15 on this slice.
+- R3: Ollama's OpenAI `/v1/chat/completions` lane evaluates only **2050** prompt
+  tokens regardless of `options.num_ctx`, top-level `num_ctx`, or the loaded
+  context; native `/api/chat` honours `options.num_ctx` (7220). The user task
+  message survives (a codeword in it is reproduced); the middle of the 25k
+  system prompt is dropped. Real, but NOT the dominant cause (a bounded prompt
+  still gave prose 2/3 probes).
+- GOTCHA: probing the ollama `/v1` lane with the SHIPPED shape can run away for
+  >30 min (the model never emits a call and keeps generating) — always pass
+  `max_tokens` in probes and `kill` any orphan `llama-server` after.
+- GOTCHA: run the unlocked contrast run only when a ladder slide is intended;
+  otherwise set `JEXI_PROVIDER_LOCK` so the measurement stays honest.
+

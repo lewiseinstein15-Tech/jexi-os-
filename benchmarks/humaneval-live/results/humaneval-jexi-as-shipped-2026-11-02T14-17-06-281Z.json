@@ -1,0 +1,777 @@
+{
+  "manifest": {
+    "benchmark": "humaneval",
+    "dataset": {
+      "repo": "openai/openai_humaneval",
+      "config": "openai_humaneval",
+      "split": "test",
+      "sha256": "094a17ace7a536483e83cd6bb0348c9df1e2bb532ff4e09961665a8b9414c157",
+      "numRowsTotal": 164
+    },
+    "leg": "jexi",
+    "schemaMode": "as-shipped",
+    "toolProfile": "full",
+    "model": "llama3.2:3b",
+    "providerLock": "ollama",
+    "modelProviderEnv": "ollama",
+    "ollamaHost": "http://127.0.0.1:11434",
+    "tasks": 15,
+    "taskIds": [
+      "HumanEval/0",
+      "HumanEval/1",
+      "HumanEval/2",
+      "HumanEval/3",
+      "HumanEval/4",
+      "HumanEval/5",
+      "HumanEval/6",
+      "HumanEval/7",
+      "HumanEval/8",
+      "HumanEval/9",
+      "HumanEval/10",
+      "HumanEval/11",
+      "HumanEval/12",
+      "HumanEval/13",
+      "HumanEval/14"
+    ],
+    "gitCommit": "cfc9581052abba48282ccbf0f3ce69834bbc7fbe",
+    "gitDirty": true,
+    "grader": "local subprocess (NOT isolated)",
+    "gradedWithoutIsolation": true,
+    "dockerImage": null,
+    "node": "v24.21.0",
+    "platform": "linux/x64",
+    "startedAt": "2026-11-02T15:05:41.489Z",
+    "runId": "humaneval-jexi-as-shipped-2026-11-02T14-17-06-281Z"
+  },
+  "resolved": 0,
+  "passed": 0,
+  "failed": 15,
+  "metrics": {
+    "total": 15,
+    "resolved": 0,
+    "resolvedRate": 0,
+    "gradedGreen": 0,
+    "gradedGreenRate": 0,
+    "timeouts": 4,
+    "agentErrors": 0,
+    "graderErrors": 0,
+    "unresolvedGreen": 0,
+    "providerLock": "ollama",
+    "ladderSlid": 0,
+    "providersObserved": [
+      "ollama"
+    ]
+  },
+  "rows": [
+    {
+      "taskId": "HumanEval/0",
+      "entryPoint": "has_close_elements",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 135782,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/humaneval-live-2jm5M8/HumanEval_0/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 1\n    from typing import List\\n\\ndef has_close_elements(numbers: List[float], threshold: float) -> bool:\\n    \\t\\n    # Your implementation here\\n\\n    return False\n                            ^\nSyntaxError: unexpected character after line continuation character",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [
+        "Eli"
+      ],
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": "llama3.2:3b",
+          "ok": true,
+          "ms": 134652,
+          "lane": "tools",
+          "reason": null
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "args": "{\"path\":\"/tmp/humaneval-live-2jm5M8/HumanEval_0/solution.py\",\"content\":\"from typing import List\\\\n\\\\ndef has_close_elements(numbers: List[float], threshold: float) -> bool:\\\\n    \\\\t\\\\n    # Your implementation here\\\\n\\\\n    return False\"}"
+        }
+      ],
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": true,
+          "error": null
+        }
+      ],
+      "stats": {
+        "toolCalls": 1,
+        "tools": 8,
+        "durationMs": 134764,
+        "verification": "unverified"
+      },
+      "solutionHead": "from typing import List\\n\\ndef has_close_elements(numbers: List[float], threshold: float) -> bool:\\n    \\t\\n    # Your implementation here\\n\\n    return False"
+    },
+    {
+      "taskId": "HumanEval/1",
+      "entryPoint": "separate_paren_groups",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 174308,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/humaneval-live-2jm5M8/HumanEval_1/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 22, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [],
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 84252,
+          "lane": "plain-text-fallback",
+          "reason": null
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "toolResults": [],
+      "stats": {
+        "toolCalls": 0,
+        "tools": 8,
+        "durationMs": 174273,
+        "verification": "unverified"
+      },
+      "solutionHead": "from typing import List\n\n\ndef separate_paren_groups(paren_string: str) -> List[str]:\n    \"\"\" Input to this function is a string containing multiple groups of nested parentheses. Your goal is to\n    separate those group into separate strings and return the list of those.\n    Separate groups are balanced (each open brace is properly closed) and not nested within each other\n    Ignore any spaces in t"
+    },
+    {
+      "taskId": "HumanEval/2",
+      "entryPoint": "truncate_number",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 76232,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/humaneval-live-2jm5M8/HumanEval_2/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [
+        "Eli"
+      ],
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": "llama3.2:3b",
+          "ok": true,
+          "ms": 76182,
+          "lane": "tools",
+          "reason": null
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "toolResults": [],
+      "stats": {
+        "toolCalls": 0,
+        "tools": 8,
+        "durationMs": 76199,
+        "verification": "unverified"
+      },
+      "solutionHead": "\n\ndef truncate_number(number: float) -> float:\n    \"\"\" Given a positive floating point number, it can be decomposed into\n    and integer part (largest integer smaller than given number) and decimals\n    (leftover part always smaller than 1).\n\n    Return the decimal part of the number.\n    >>> truncate_number(3.5)\n    0.5\n    \"\"\"\n\n"
+    },
+    {
+      "taskId": "HumanEval/3",
+      "entryPoint": "below_zero",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 158123,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/humaneval-live-2jm5M8/HumanEval_3/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 1\n    from typing import List\\n\\ndef below_zero(operations: List[int]) -> bool:\\n    balance = 0\\n    for op in operations:\\n        balance += op\\n        if balance < 0:\\n            return True\\n    return False\n                            ^\nSyntaxError: unexpected character after line continuation character",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [
+        "Eli"
+      ],
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": "llama3.2:3b",
+          "ok": true,
+          "ms": 158076,
+          "lane": "tools",
+          "reason": null
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "args": "{\"path\":\"/tmp/humaneval-live-2jm5M8/HumanEval_3/solution.py\",\"content\":\"from typing import List\\\\n\\\\ndef below_zero(operations: List[int]) -> bool:\\\\n    balance = 0\\\\n    for op in operations:\\\\n        balance += op\\\\n        if balance < 0:\\\\n            return True\\\\n    return False\"}"
+        }
+      ],
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": true,
+          "error": null
+        }
+      ],
+      "stats": {
+        "toolCalls": 1,
+        "tools": 8,
+        "durationMs": 158092,
+        "verification": "unverified"
+      },
+      "solutionHead": "from typing import List\\n\\ndef below_zero(operations: List[int]) -> bool:\\n    balance = 0\\n    for op in operations:\\n        balance += op\\n        if balance < 0:\\n            return True\\n    return False"
+    },
+    {
+      "taskId": "HumanEval/4",
+      "entryPoint": "mean_absolute_deviation",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 137577,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/humaneval-live-2jm5M8/HumanEval_4/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 16, in <module>\n  File \"<string>\", line 10, in check\nTypeError: unsupported operand type(s) for -: 'NoneType' and 'float'",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [],
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 47521,
+          "lane": "plain-text-fallback",
+          "reason": null
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "data_json",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "toolResults": [],
+      "stats": {
+        "toolCalls": 0,
+        "tools": 9,
+        "durationMs": 137541,
+        "verification": "unverified"
+      },
+      "solutionHead": "from typing import List\n\n\ndef mean_absolute_deviation(numbers: List[float]) -> float:\n    \"\"\" For a given list of input numbers, calculate Mean Absolute Deviation\n    around the mean of this dataset.\n    Mean Absolute Deviation is the average absolute difference between each\n    element and a centerpoint (mean in this case):\n    MAD = average | x - x_mean |\n    >>> mean_absolute_deviation([1.0, 2."
+    },
+    {
+      "taskId": "HumanEval/5",
+      "entryPoint": "intersperse",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 153936,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/humaneval-live-2jm5M8/HumanEval_5/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [],
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 63877,
+          "lane": "plain-text-fallback",
+          "reason": null
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "toolResults": [],
+      "stats": {
+        "toolCalls": 0,
+        "tools": 8,
+        "durationMs": 153898,
+        "verification": "unverified"
+      },
+      "solutionHead": "from typing import List\n\n\ndef intersperse(numbers: List[int], delimeter: int) -> List[int]:\n    \"\"\" Insert a number 'delimeter' between every two consecutive elements of input list `numbers'\n    >>> intersperse([], 4)\n    []\n    >>> intersperse([1, 2, 3], 4)\n    [1, 4, 2, 4, 3]\n    \"\"\"\n\n"
+    },
+    {
+      "taskId": "HumanEval/6",
+      "entryPoint": "parse_nested_parens",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 143746,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/humaneval-live-2jm5M8/HumanEval_6/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [
+        "Eli"
+      ],
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": "llama3.2:3b",
+          "ok": true,
+          "ms": 143693,
+          "lane": "tools",
+          "reason": null
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "args": "{\"path\":\"tmp/humaneval-live-2jm5M8/HumanEval_6/solution.py\",\"content\":\"from typing import List\\n\\ndef parse_nested_parens(paren_string: str) -> List[int]:\\\\n    \\\\\\n        \\\"\\\"\\\"\\\\n        Input to this function is a string represented multiple groups for nested parentheses separated by spaces.\\\\n "
+        }
+      ],
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": true,
+          "error": null
+        }
+      ],
+      "stats": {
+        "toolCalls": 1,
+        "tools": 8,
+        "durationMs": 143707,
+        "verification": "unverified"
+      },
+      "solutionHead": "from typing import List\n\n\ndef parse_nested_parens(paren_string: str) -> List[int]:\n    \"\"\" Input to this function is a string represented multiple groups for nested parentheses separated by spaces.\n    For each of the group, output the deepest level of nesting of parentheses.\n    E.g. (()()) has maximum two levels of nesting while ((())) has three.\n\n    >>> parse_nested_parens('(()()) ((())) () (("
+    },
+    {
+      "taskId": "HumanEval/7",
+      "entryPoint": "filter_by_substring",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": true,
+      "resolveReason": "timeout: agent loop timed out after 300000ms",
+      "durationMs": 300050,
+      "gradedIsolated": false,
+      "gradeOutput": ", 'a')\\n    ['abc', 'bacd', 'array']\\n    \"\"\"\\n    def filter(strings: List[str], substring: str) -> List[str]:\\n        return [s for s in strings if substring in s]\\n\\nfilter_by_substring = filter\\n\\nif __name__ == \"__main__\":\\n    import pytest\\n\\n    def test_filter_by_substring():\\n        assert filter_by_substring([], 'a') == []\\n        assert filter_by_substring(['abc', 'bacd', 'cde', 'array'], 'a') == ['abc', 'bacd', 'array']\\n        assert filter_by_substring(['abc', 'bacd', 'cde', 'array'], 'b') == ['abc', 'bacd', 'cde', 'array']\\n        assert filter_by_substring(['abc', 'bacd', 'cde', 'array'], '') == ['abc', 'bacd', 'cde', 'array']\\n\\n    pytest_run(test_filter_by_substring)\\n\n                            ^\nSyntaxError: unexpected character after line continuation character",
+      "agentError": "agent loop timed out after 300000ms",
+      "intent": "code_task",
+      "models": [
+        "Eli"
+      ],
+      "providersThatServed": [],
+      "providerAttempts": [],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "args": "{\"path\":\"/tmp/humaneval-live-2jm5M8/HumanEval_7/solution.py\",\"content\":\"from typing import List\\\\n\\\\ndef filter_by_substring(strings: List[str], substring: str) -> List[str]:\\\\n    \\\"\\\"\\\" Filter an input list of strings only for ones that contain given substring\\\\n    >>> filter_by_substring([], 'a'"
+        }
+      ],
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": true,
+          "error": null
+        }
+      ],
+      "stats": null,
+      "solutionHead": "from typing import List\\n\\ndef filter_by_substring(strings: List[str], substring: str) -> List[str]:\\n    \"\"\" Filter an input list of strings only for ones that contain given substring\\n    >>> filter_by_substring([], 'a')\\n    []\\n    >>> filter_by_substring(['abc', 'bacd', 'cde', 'array'], 'a')\\n    ['abc', 'bacd', 'array']\\n    \"\"\"\\n    def filter(strings: List[str], substring: str) -> List[str"
+    },
+    {
+      "taskId": "HumanEval/8",
+      "entryPoint": "sum_product",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": true,
+      "resolveReason": "timeout: agent loop timed out after 300000ms",
+      "durationMs": 300051,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/humaneval-live-2jm5M8/HumanEval_8/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 17, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "agentError": "agent loop timed out after 300000ms",
+      "intent": "code_task",
+      "models": [],
+      "providersThatServed": [],
+      "providerAttempts": [],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "toolResults": [],
+      "stats": null,
+      "solutionHead": "from typing import List, Tuple\n\n\ndef sum_product(numbers: List[int]) -> Tuple[int, int]:\n    \"\"\" For a given list of integers, return a tuple consisting of a sum and a product of all the integers in a list.\n    Empty sum should be equal to 0 and empty product should be equal to 1.\n    >>> sum_product([])\n    (0, 1)\n    >>> sum_product([1, 2, 3, 4])\n    (10, 24)\n    \"\"\"\n\n"
+    },
+    {
+      "taskId": "HumanEval/9",
+      "entryPoint": "rolling_max",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 222933,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/humaneval-live-2jm5M8/HumanEval_9/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 16, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [],
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 70326,
+          "lane": "plain-text-fallback",
+          "reason": null
+        },
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 132920,
+          "lane": "plain-text-fallback",
+          "reason": null
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "toolResults": [],
+      "stats": {
+        "toolCalls": 0,
+        "tools": 8,
+        "durationMs": 222897,
+        "verification": "unverified"
+      },
+      "solutionHead": "from typing import List, Tuple\n\n\ndef rolling_max(numbers: List[int]) -> List[int]:\n    \"\"\" From a given list of integers, generate a list of rolling maximum element found until given moment\n    in the sequence.\n    >>> rolling_max([1, 2, 3, 2, 3, 4, 2])\n    [1, 2, 3, 3, 3, 4, 4]\n    \"\"\"\n\n"
+    },
+    {
+      "taskId": "HumanEval/10",
+      "entryPoint": "make_palindrome",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 157219,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/humaneval-live-2jm5M8/HumanEval_10/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 17, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [],
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 67170,
+          "lane": "plain-text-fallback",
+          "reason": null
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "toolResults": [],
+      "stats": {
+        "toolCalls": 0,
+        "tools": 8,
+        "durationMs": 157187,
+        "verification": "unverified"
+      },
+      "solutionHead": "\n\ndef is_palindrome(string: str) -> bool:\n    \"\"\" Test if given string is a palindrome \"\"\"\n    return string == string[::-1]\n\n\ndef make_palindrome(string: str) -> str:\n    \"\"\" Find the shortest palindrome that begins with a supplied string.\n    Algorithm idea is simple:\n    - Find the longest postfix of supplied string that is a palindrome.\n    - Append to the end of the string reverse of a string"
+    },
+    {
+      "taskId": "HumanEval/11",
+      "entryPoint": "string_xor",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": true,
+      "resolveReason": "timeout: agent loop timed out after 300000ms",
+      "durationMs": 300045,
+      "gradedIsolated": false,
+      "gradeOutput": "<module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 1\n    from typing import List\\n\\ndef string_xor(a: str, b: str) -> str:\\n    \\t\"\"\" Input are two strings a and b consisting only of 1s and 0s.\\n    Perform binary XOR on these inputs and return result also as a string.\\n    \\n    \\t\\>\\> string_xor('010', '110')\\n    \\t\\\"\\n\\t\\n    def xor_char(c1: str, c2: str) -> str:\\n\\t\\t\\n\\t    if c1 == c2:\\n\\t\\t\\n\\t        return '0'\\n\\t\\n\\t    return '1'\\n\\n\\tdef string_xor(a: str, b: str) -> str:\\n\\t\\t\\n\\t    result = ''\\n\\t\\t\\n\\t    for c1, c2 in zip(a, b):\\n\\t\\t\\n\\t        result += xor_char(c1, c2)\\n\\t\\n\\t    return result\n                            ^\nSyntaxError: unexpected character after line continuation character",
+      "agentError": "agent loop timed out after 300000ms",
+      "intent": "code_task",
+      "models": [
+        "Eli"
+      ],
+      "providersThatServed": [],
+      "providerAttempts": [],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "args": "{\"content\":\"from typing import List\\\\n\\\\ndef string_xor(a: str, b: str) -> str:\\\\n    \\\\t\\\"\\\"\\\" Input are two strings a and b consisting only of 1s and 0s.\\\\n    Perform binary XOR on these inputs and return result also as a string.\\\\n    \\\\n    \\\\t\\\\>\\\\> string_xor('010', '110')\\\\n    \\\\t\\\\\\\"\\\\n\\\\t"
+        }
+      ],
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": true,
+          "error": null
+        }
+      ],
+      "stats": null,
+      "solutionHead": "from typing import List\\n\\ndef string_xor(a: str, b: str) -> str:\\n    \\t\"\"\" Input are two strings a and b consisting only of 1s and 0s.\\n    Perform binary XOR on these inputs and return result also as a string.\\n    \\n    \\t\\>\\> string_xor('010', '110')\\n    \\t\\\"\\n\\t\\n    def xor_char(c1: str, c2: str) -> str:\\n\\t\\t\\n\\t    if c1 == c2:\\n\\t\\t\\n\\t        return '0'\\n\\t\\n\\t    return '1'\\n\\n\\tdef s"
+    },
+    {
+      "taskId": "HumanEval/12",
+      "entryPoint": "longest",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": true,
+      "resolveReason": "timeout: agent loop timed out after 300000ms",
+      "durationMs": 300055,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/humaneval-live-2jm5M8/HumanEval_12/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 11, in check\nAssertionError",
+      "agentError": "agent loop timed out after 300000ms",
+      "intent": "code_task",
+      "models": [],
+      "providersThatServed": [],
+      "providerAttempts": [],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "toolResults": [],
+      "stats": null,
+      "solutionHead": "from typing import List, Optional\n\n\ndef longest(strings: List[str]) -> Optional[str]:\n    \"\"\" Out of list of strings, return the longest one. Return the first one in case of multiple\n    strings of the same length. Return None in case the input list is empty.\n    >>> longest([])\n\n    >>> longest(['a', 'b', 'c'])\n    'a'\n    >>> longest(['a', 'bb', 'ccc'])\n    'ccc'\n    \"\"\"\n\n"
+    },
+    {
+      "taskId": "HumanEval/13",
+      "entryPoint": "greatest_common_divisor",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 207680,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/humaneval-live-2jm5M8/HumanEval_13/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 16, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [],
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 71167,
+          "lane": "plain-text-fallback",
+          "reason": null
+        },
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 117675,
+          "lane": "plain-text-fallback",
+          "reason": null
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "toolResults": [],
+      "stats": {
+        "toolCalls": 0,
+        "tools": 8,
+        "durationMs": 207650,
+        "verification": "unverified"
+      },
+      "solutionHead": "\n\ndef greatest_common_divisor(a: int, b: int) -> int:\n    \"\"\" Return a greatest common divisor of two integers a and b\n    >>> greatest_common_divisor(3, 5)\n    1\n    >>> greatest_common_divisor(25, 15)\n    5\n    \"\"\"\n\n"
+    },
+    {
+      "taskId": "HumanEval/14",
+      "entryPoint": "all_prefixes",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 147130,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/humaneval-live-2jm5M8/HumanEval_14/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [],
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 57078,
+          "lane": "plain-text-fallback",
+          "reason": null
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "toolResults": [],
+      "stats": {
+        "toolCalls": 0,
+        "tools": 8,
+        "durationMs": 147097,
+        "verification": "unverified"
+      },
+      "solutionHead": "from typing import List\n\n\ndef all_prefixes(string: str) -> List[str]:\n    \"\"\" Return list of all prefixes from shortest to longest of the input string\n    >>> all_prefixes('abc')\n    ['a', 'ab', 'abc']\n    \"\"\"\n\n"
+    }
+  ]
+}
