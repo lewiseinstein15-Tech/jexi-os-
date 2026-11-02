@@ -722,3 +722,41 @@ zero network, zero real model calls).
   suite now pins `JEXI_SETTINGS_FILE` to a temp path (and `SettingsManager`
   honours it), so it is hermetic in both directions and no longer depends on the
   developer's config being absent.
+
+## M16 — benchmark qualification (read before trusting any JEXI pass-rate)
+
+- VERDICT: NOT READY for the head-to-head. See `docs/M16-READINESS.md`.
+- D1 — a green `test_run` CANNOT make a turn `verified`. `executeTool` returns
+  `result` as a formatted STRING (`ToolRuntime.js:1969`,
+  `finalText = formatResult(result)`), but the M15 gate reads
+  `r.result.status` (`AgentLoop.js:388/393`), so those branches are dead code
+  and `noteTestResult`/`readTestVerdict` never see a real verdict. The other
+  route (`verifyAfterEdit`) is also unreachable in a bare sandbox: `lint` fails
+  with "0 diagnostics" (eslint exits 2, no `src/`), `unit`/`build` error "no
+  command configured". A coding turn is unverifiable by construction there.
+  `test-m15-reliability.js` is 26/26 green because it INJECTS the seam and
+  never wires a real `executeTool` result into the gate — that is the test gap.
+- D2 — the HumanEval harness is NOT reproducible. Same dataset/model/prompt
+  gave 8/15, 2/15, 1/15, 9/15, 0/6. b1-vs-b2 disagreement is purely the 150 s
+  timeout cap (the disagreeing rows are exactly the `durationMs >= 150000`
+  rows; `RESULTS.md` already requires `--timeout 300`). At 300 s a clean run
+  passed tasks 0-8 then failed 9-14 with ZERO tool calls and no `agentError` —
+  intermittent and run-dependent, not task difficulty (a fresh slice of 9-14
+  also scored 0/6) and not the model server (a direct `api/generate` probe
+  returned correct code). Suspect: cross-task state or a silent keyless-ladder
+  slide in `providers/runtime/LLMClient.js`. Unconfirmed — next mission.
+- D3 — `run.mjs` scores a TIMED-OUT task `pass` if the file it left happens to
+  grade (bench4 HumanEval/3: `pass=True` with
+  `agentError="agent loop timed out after 300000ms"`). Reconcile before any
+  comparison.
+- GOTCHA — never run another CPU-heavy process while a benchmark runs. A
+  concurrent scenario harness starved the model and produced a bogus 1/15
+  (8 rows with zero tool calls). One bench process at a time.
+- GOTCHA — the model's own answer can quote the false lint failure ("The ESLint
+  verification error is unrelated to the Python code"), i.e. the D1 false-fail
+  is visible to the agent under test.
+- HARNESS — `benchmarks/humaneval-live/completion-integrity/` (scripted SSE
+  provider + 7 completion-integrity scenarios + `run-all.mjs`); one scenario
+  per process because `runTaskWithJexi` mutates `process.env.WORKSPACE_DIR` and
+  `AgentLoop` keeps one global turn. `benchmarks/humaneval-live/slice.mjs` runs
+  an arbitrary `[start,end)` task slice in a fresh process.
