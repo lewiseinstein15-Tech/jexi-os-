@@ -1,0 +1,133 @@
+{
+  "model": "llama3.2:3b",
+  "host": "127.0.0.1:11434",
+  "task": "HumanEval/0",
+  "reps": 3,
+  "generatedAt": "2026-11-02T22:11:30.010Z",
+  "captured": {
+    "systemChars": 25176,
+    "menuSize": 0
+  },
+  "conditions": [
+    {
+      "key": "A_full-prompt",
+      "menuSize": 0,
+      "systemChars": 25176,
+      "tally": {
+        "error": 3
+      },
+      "usable": 0,
+      "usableRate": 0,
+      "trials": [
+        {
+          "label": "A_full-prompt",
+          "kind": "error",
+          "why": "Failed to parse URL from 127.0.0.1:11434/v1/chat/completions",
+          "ms": 1
+        },
+        {
+          "label": "A_full-prompt",
+          "kind": "error",
+          "why": "Failed to parse URL from 127.0.0.1:11434/v1/chat/completions",
+          "ms": 0
+        },
+        {
+          "label": "A_full-prompt",
+          "kind": "error",
+          "why": "Failed to parse URL from 127.0.0.1:11434/v1/chat/completions",
+          "ms": 1
+        }
+      ]
+    },
+    {
+      "key": "B_reduced-prompt",
+      "menuSize": 0,
+      "systemChars": 258,
+      "tally": {
+        "error": 3
+      },
+      "usable": 0,
+      "usableRate": 0,
+      "trials": [
+        {
+          "label": "B_reduced-prompt",
+          "kind": "error",
+          "why": "Failed to parse URL from 127.0.0.1:11434/v1/chat/completions",
+          "ms": 0
+        },
+        {
+          "label": "B_reduced-prompt",
+          "kind": "error",
+          "why": "Failed to parse URL from 127.0.0.1:11434/v1/chat/completions",
+          "ms": 0
+        },
+        {
+          "label": "B_reduced-prompt",
+          "kind": "error",
+          "why": "Failed to parse URL from 127.0.0.1:11434/v1/chat/completions",
+          "ms": 0
+        }
+      ]
+    },
+    {
+      "key": "C_reduced-catalogue",
+      "menuSize": 0,
+      "systemChars": 25176,
+      "tally": {
+        "error": 3
+      },
+      "usable": 0,
+      "usableRate": 0,
+      "trials": [
+        {
+          "label": "C_reduced-catalogue",
+          "kind": "error",
+          "why": "Failed to parse URL from 127.0.0.1:11434/v1/chat/completions",
+          "ms": 0
+        },
+        {
+          "label": "C_reduced-catalogue",
+          "kind": "error",
+          "why": "Failed to parse URL from 127.0.0.1:11434/v1/chat/completions",
+          "ms": 1
+        },
+        {
+          "label": "C_reduced-catalogue",
+          "kind": "error",
+          "why": "Failed to parse URL from 127.0.0.1:11434/v1/chat/completions",
+          "ms": 0
+        }
+      ]
+    },
+    {
+      "key": "D_concise-desc",
+      "menuSize": 0,
+      "systemChars": 25176,
+      "tally": {
+        "error": 3
+      },
+      "usable": 0,
+      "usableRate": 0,
+      "trials": [
+        {
+          "label": "D_concise-desc",
+          "kind": "error",
+          "why": "Failed to parse URL from 127.0.0.1:11434/v1/chat/completions",
+          "ms": 0
+        },
+        {
+          "label": "D_concise-desc",
+          "kind": "error",
+          "why": "Failed to parse URL from 127.0.0.1:11434/v1/chat/completions",
+          "ms": 0
+        },
+        {
+          "label": "D_concise-desc",
+          "kind": "error",
+          "why": "Failed to parse URL from 127.0.0.1:11434/v1/chat/completions",
+          "ms": 0
+        }
+      ]
+    }
+  ]
+}

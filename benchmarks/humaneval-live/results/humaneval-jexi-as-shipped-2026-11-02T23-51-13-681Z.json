@@ -1,0 +1,327 @@
+{
+  "manifest": {
+    "benchmark": "humaneval",
+    "dataset": {
+      "repo": "openai/openai_humaneval",
+      "config": "openai_humaneval",
+      "split": "test",
+      "sha256": "094a17ace7a536483e83cd6bb0348c9df1e2bb532ff4e09961665a8b9414c157",
+      "numRowsTotal": 164
+    },
+    "leg": "jexi",
+    "schemaMode": "as-shipped",
+    "toolProfile": "full",
+    "model": "llama3.2:3b",
+    "providerLock": "ollama",
+    "modelProviderEnv": "ollama",
+    "ollamaHost": "http://127.0.0.1:11434",
+    "tasks": 5,
+    "taskIds": [
+      "HumanEval/0",
+      "HumanEval/1",
+      "HumanEval/2",
+      "HumanEval/3",
+      "HumanEval/4"
+    ],
+    "gitCommit": "4e6d0e584bc4b12153893098a5c897ddf3cb769e",
+    "gitDirty": true,
+    "grader": "local subprocess (NOT isolated)",
+    "gradedWithoutIsolation": true,
+    "dockerImage": null,
+    "node": "v24.21.0",
+    "platform": "linux/x64",
+    "startedAt": "2026-11-03T00:06:21.533Z",
+    "runId": "humaneval-jexi-as-shipped-2026-11-02T23-51-13-681Z"
+  },
+  "resolved": 0.2,
+  "passed": 1,
+  "failed": 4,
+  "metrics": {
+    "total": 5,
+    "resolved": 1,
+    "resolvedRate": 0.2,
+    "gradedGreen": 1,
+    "gradedGreenRate": 0.2,
+    "timeouts": 0,
+    "agentErrors": 0,
+    "graderErrors": 0,
+    "unresolvedGreen": 0,
+    "providerLock": "ollama",
+    "ladderSlid": 0,
+    "providersObserved": [
+      "ollama"
+    ]
+  },
+  "rows": [
+    {
+      "taskId": "HumanEval/0",
+      "entryPoint": "has_close_elements",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 162151,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/humaneval-live-avpj4T/HumanEval_0/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 20, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [],
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 70982,
+          "lane": "plain-text-fallback",
+          "reason": null
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "toolResults": [],
+      "stats": {
+        "toolCalls": 0,
+        "tools": 8,
+        "durationMs": 161105,
+        "verification": "unverified"
+      },
+      "solutionHead": "from typing import List\n\n\ndef has_close_elements(numbers: List[float], threshold: float) -> bool:\n    \"\"\" Check if in given list of numbers, are any two numbers closer to each other than\n    given threshold.\n    >>> has_close_elements([1.0, 2.0, 3.0], 0.5)\n    False\n    >>> has_close_elements([1.0, 2.8, 3.0, 4.0, 5.0, 2.0], 0.3)\n    True\n    \"\"\"\n\n"
+    },
+    {
+      "taskId": "HumanEval/1",
+      "entryPoint": "separate_paren_groups",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 202977,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/humaneval-live-avpj4T/HumanEval_1/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 22, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [
+        "Eli"
+      ],
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": "llama3.2:3b",
+          "ok": true,
+          "ms": 202925,
+          "lane": "tools",
+          "reason": null
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "args": "{\"path\":\"server/README.md\",\"content\":\"This is the first part of the README content.\"}"
+        }
+      ],
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": true,
+          "error": null
+        }
+      ],
+      "stats": {
+        "toolCalls": 1,
+        "tools": 8,
+        "durationMs": 202941,
+        "verification": "unverified"
+      },
+      "solutionHead": "from typing import List\n\n\ndef separate_paren_groups(paren_string: str) -> List[str]:\n    \"\"\" Input to this function is a string containing multiple groups of nested parentheses. Your goal is to\n    separate those group into separate strings and return the list of those.\n    Separate groups are balanced (each open brace is properly closed) and not nested within each other\n    Ignore any spaces in t"
+    },
+    {
+      "taskId": "HumanEval/2",
+      "entryPoint": "truncate_number",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 164279,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/humaneval-live-avpj4T/HumanEval_2/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [],
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 74230,
+          "lane": "plain-text-fallback",
+          "reason": null
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "toolResults": [],
+      "stats": {
+        "toolCalls": 0,
+        "tools": 8,
+        "durationMs": 164247,
+        "verification": "unverified"
+      },
+      "solutionHead": "\n\ndef truncate_number(number: float) -> float:\n    \"\"\" Given a positive floating point number, it can be decomposed into\n    and integer part (largest integer smaller than given number) and decimals\n    (leftover part always smaller than 1).\n\n    Return the decimal part of the number.\n    >>> truncate_number(3.5)\n    0.5\n    \"\"\"\n\n"
+    },
+    {
+      "taskId": "HumanEval/3",
+      "entryPoint": "below_zero",
+      "pass": true,
+      "gradedPass": true,
+      "agentTimedOut": false,
+      "resolveReason": null,
+      "durationMs": 141531,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=PASS",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [
+        "Eli"
+      ],
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": "llama3.2:3b",
+          "ok": true,
+          "ms": 141485,
+          "lane": "tools",
+          "reason": null
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "args": "{\"path\":\"/tmp/humaneval-live-avpj4T/HumanEval_3/solution.py\",\"content\":\"from typing import List\\\\n\\\\ndef below_zero(operations: List[int]) -> bool:\\\\n    balance = 0\\n\\\\n    for operation in operations:\\\\n        balance += operation\\n\\\\n        if balance < 0:\\\\n            return True\\\\n\\\\n    ret"
+        }
+      ],
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": true,
+          "error": null
+        }
+      ],
+      "stats": {
+        "toolCalls": 1,
+        "tools": 8,
+        "durationMs": 141501,
+        "verification": "unverified"
+      },
+      "solutionHead": "from typing import List\n\ndef below_zero(operations: List[int]) -> bool:\n    balance = 0\n\n    for operation in operations:\n        balance += operation\n\n        if balance < 0:\n            return True\n\n    return False"
+    },
+    {
+      "taskId": "HumanEval/4",
+      "entryPoint": "mean_absolute_deviation",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 236736,
+      "gradedIsolated": false,
+      "gradeOutput": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/humaneval-live-avpj4T/HumanEval_4/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 16, in <module>\n  File \"<string>\", line 10, in check\nTypeError: unsupported operand type(s) for -: 'NoneType' and 'float'",
+      "agentError": null,
+      "intent": "code_task",
+      "models": [
+        "Eli"
+      ],
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": "llama3.2:3b",
+          "ok": true,
+          "ms": 236687,
+          "lane": "tools",
+          "reason": null
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "data_json",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "args": "{\"content\":\"<html><body>Hello World!</body></body></html>\",\"path\":\"/tmp/openhands-agent-server-38/tmux-10001/openhands-22743625b0ae44b987f6ca24a4170bfb,152,0\"}"
+        }
+      ],
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": false,
+          "error": "path escapes root: /tmp/openhands-agent-server-38/tmux-10001/openhands-22743625b0ae44b987f6ca24a4170bfb,152,0"
+        }
+      ],
+      "stats": {
+        "toolCalls": 1,
+        "tools": 9,
+        "durationMs": 236702,
+        "verification": "unverified"
+      },
+      "solutionHead": "from typing import List\n\n\ndef mean_absolute_deviation(numbers: List[float]) -> float:\n    \"\"\" For a given list of input numbers, calculate Mean Absolute Deviation\n    around the mean of this dataset.\n    Mean Absolute Deviation is the average absolute difference between each\n    element and a centerpoint (mean in this case):\n    MAD = average | x - x_mean |\n    >>> mean_absolute_deviation([1.0, 2."
+    }
+  ]
+}

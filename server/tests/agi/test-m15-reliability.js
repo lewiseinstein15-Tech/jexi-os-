@@ -78,8 +78,24 @@ test('M15/F1: a call inside a fenced block is recovered', () => {
 });
 
 test('M15/F1: an INVENTED tool is never recovered (recovery cannot expand the menu)', () => {
-  const calls = recoverToolCallsFromText('{"name":"code_write","parameters":{"content":"x"}}', MENU);
+  const calls = recoverToolCallsFromText('{"name":"totally_made_up_tool","parameters":{"content":"x"}}', MENU);
   assert.equal(calls.length, 0, 'a tool not in the offered menu must be refused');
+});
+
+/* M19 — the alias bridge is bounded by the menu. An alias is only honoured
+   when its TARGET is offered; an alias to a tool this session did not offer is
+   still refused, so alias resolution can never expand the menu either. */
+test('M15/F5: an alias whose target is NOT offered is refused', () => {
+  // fs_delete is a real domain tool but is absent from MENU.
+  assert.equal(recoverToolCallsFromText('{"name":"code_delete","parameters":{"path":"x"}}', MENU).length, 0);
+  assert.equal(recoverToolCallsFromText('{"name":"fs_delete","parameters":{"path":"x"}}', MENU).length, 0);
+});
+
+test('M15/F6: a known alias to an OFFERED tool is recovered under the canonical name', () => {
+  const calls = recoverToolCallsFromText('{"name":"code_write","parameters":{"path":"a.py","content":"x"}}', MENU);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].name, 'fs_write', 'resolved to the offered canonical tool');
+  assert.equal(calls[0].aliasedFrom, 'code_write');
 });
 
 test('M15/F1: a call with no argument object is not a call', () => {

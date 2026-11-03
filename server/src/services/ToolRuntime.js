@@ -42,6 +42,7 @@ import {
 } from './MemoryManager.js';
 import { appendEvent } from './EventLog.js'; // B78 — tool calls/results are first-class events
 import { attachExecMeta } from './agent/exec-meta.js'; // M17/D1 — typed execution metadata beside the formatted text
+import { normalizeWriteArgs } from './agent/WritePayloadNormalizer.js'; // M19 — decode literal \n/\t in whole-file write payloads
 import { getPluginTool } from './PluginContext.js'; // B97 — plugin-mounted tools run through the same gated pipeline
 import { discoverSkills, loadSkillForModel, observeHostMutationFromArgs } from './SkillDiscovery.js'; // B98 — dsh-style ranked skill discovery + progressive load
 import { SPILL_THRESHOLD } from './SpillStore.js'; // B100 — spill oversized tool results (dsh spill-policy)
@@ -1685,6 +1686,19 @@ export async function executeTool(params) {
 async function executeToolInner({ slug, args = {}, profile, intent, sendEvent, confirm, codeTools, signal, spillOwner, subagentId }) {
   const started = Date.now();
   const emit = (type, payload) => { try { if (typeof sendEvent === 'function') sendEvent(type, payload); } catch (e) {} };
+  /* M19 — WRITE-PAYLOAD NORMALIZATION. A double-escaped whole-file body
+     (literal `\n`/`\t`, no real newlines) is decoded before anything else sees
+     the args, so every downstream path — domain dispatch, fs_write engine,
+     validation, observation — writes real newlines. The decision is audited as
+     an event; when the payload is ambiguous the original is preserved and no
+     event is emitted. This changes WHICH bytes are written, never the gates:
+     permission, risk, ring and approval all still run on the same call. */
+  const __norm = normalizeWriteArgs(slug, args);
+  if (__norm.changed) {
+    args = __norm.args;
+    try { appendEvent('tool_payload_normalized', { tool: slug, reason: __norm.reason, stats: __norm.stats || null }); } catch (e) {}
+    emit('tool.payload_normalized', { tool: slug, reason: __norm.reason, stats: __norm.stats || null });
+  }
   // B97 — PLUGIN SEAM: plugin-mounted tools are first-class. If the static
   // registry misses, synthesize the tool record from the plugin context so
   // the same gates (allowlist, permission, risk, approval, events) apply.

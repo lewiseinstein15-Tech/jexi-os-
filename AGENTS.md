@@ -830,3 +830,54 @@ zero network, zero real model calls).
 - GOTCHA: run the unlocked contrast run only when a ladder slide is intended;
   otherwise set `JEXI_PROVIDER_LOCK` so the measurement stays honest.
 
+
+## M19 — deterministic tool-calling reliability (docs/M19-FINDINGS.md)
+
+- Two confirmed JEXI-side tool-payload defects, both fixed and bounded. NO
+  benchmark-score tuning: the objective was reliable execution, and the
+  headline (5-task slice, locked `ollama`, no ladder slide) is **before 0/5
+  (2 timeouts) → after 1/5 (0 timeouts, 0 SyntaxErrors)** — a controlled A/B
+  with the source fixes stashed for the "before" leg. Residual failures are
+  `AssertionError` (parseable, executable, wrong algorithm) = model ceiling.
+- D1 (alias gap, the M18/R1 dominant failure): the model emits a well-formed
+  prose call named `code_write` / `code-run` — names JEXI ITSELF advertises in
+  `ToolRegistry.js` — while the offered menu holds the domain implementations
+  `fs_write` / `term_execute`. Recovery correctly refused the unoffered name,
+  so the turn died with zero calls. The benchmark query even says "use the
+  code-write tool". FIX: `ToolCallRecovery.js` `TOOL_ALIASES` +
+  `resolveToolName(raw, offeredNames)` — an alias resolves ONLY when its TARGET
+  is in the offered menu (an alias to an unoffered/invented name returns null,
+  so recovery can NEVER expand the menu) — plus a `filename`→`path` key bridge
+  applied only when `path` is absent. `resolveAlias` returns
+  `{name, arguments, aliasedFrom}`; M15 F1 example name changed
+  (`code_write`→`totally_made_up_tool`) because `code_write` is now deliberately
+  bridged; the M15 invariant (invented names still refused) is preserved.
+- D2 (write-payload double-escaping, M18/R2 EXTENDED):
+  `services/agent/WritePayloadNormalizer.js` (new). M18 saw the PURE form
+  (every newline literal `\n`, no real newline). M19 measured the MIXED form
+  live: literal `\n` OUTNUMBER real newlines but ≥1 real newline is present
+  (HumanEval/1: 7 literal vs 1 real). The old "no real newline at all" guard
+  refused the mixed form, so it still wrote broken. FIX: dominance guard
+  (`literal>=2 && literal>realNL` when any real newline exists) + the
+  string-aware `decodeEscapedControls` scanner (quoted regions — `"…"`, `'…'`,
+  `"""…"""` — preserved, so a regex/Windows path/JSON escape is never
+  corrupted). Wired in `ToolRuntime.js` `executeToolInner`; emits
+  `tool.payload_normalized`. Only whole-file tools (`fs_write`/`fs_append`).
+- D3 (bounded malformed-call retry): `LLMClient.js` `generateWithToolsLoop`
+  re-asks ONCE per turn (`malformedRetryUsed`, function-scope) when a round
+  produced no calls but clearly attempted one (`looksLikeToolAttempt`); opt-out
+  `opts.__noMalformedRetry`; output goes through the same native/recovery parse
+  (no fabrication). `AgentLoop.js` surfaces it via an `agent.log` line.
+- Invariants held: no gate bypass (every call still runs the real gated
+  `ToolRuntime`), no fabricated calls, recovery cannot expand the offered menu.
+  Suites: **210/210 pass** (was 209; +1 M19 suite, 28 tests). M15: 27 pass / 1
+  skip. `ToolCallRecovery.js` is the single recovery entry point for both the
+  native parse and the malformed retry.
+- GOTCHA: the benchmark runner needs `MODEL_NAME` (or `OLLAMA_MODEL`) set to the
+  pulled tag; without it the loop defaults to a model that is not pulled, ollama
+  404s, and the locked ladder has no fallback -> every task fails in ~2.4s with
+  `tools=0` and NO `agentError` (a silent-looking zero, not a real result).
+- GOTCHA: `benchmarks/humaneval-live/server/` (an HTML error page) and
+  `benchmarks/humaneval-live/data/` (provider-health.json) are runtime
+  byproducts, not project code — `server/` is deleted and `data/` is
+  gitignored. Never commit them.

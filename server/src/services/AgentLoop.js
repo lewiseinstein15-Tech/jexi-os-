@@ -550,6 +550,12 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         onRecoveredToolCalls: (calls) => {
           emit('agent.log', { message: `♻ recovered ${calls.length} tool call(s) the model wrote as text instead of a native call: ${calls.map((c) => c.name).join(', ')} — executing through the normal gates.` });
         },
+        // M19 — a call the model clearly intended but wrote with unparseable
+        // arguments (usually a truncated `content`) gets ONE bounded re-ask;
+        // say so on the stream rather than retrying silently.
+        onMalformedCallRetry: () => {
+          emit('agent.log', { message: '↻ the model\'s tool call had unparseable arguments — asking once for a valid native call.' });
+        },
         // M12 — progressive disclosure: the provider loop re-reads the live
         // menu each round, so a `request_tools` call in one round makes its
         // tools callable in the next.

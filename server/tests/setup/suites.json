@@ -1296,6 +1296,13 @@
         "--test-reporter=spec",
         "tests/agi/test-m15-reliability.js"
       ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-m19-write-payload-normalization.js"
+      ]
     }
   ]
 }

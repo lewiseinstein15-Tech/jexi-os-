@@ -1,0 +1,172 @@
+{
+  "model": "llama3.2:3b",
+  "host": "http://127.0.0.1:11434",
+  "task": "HumanEval/0",
+  "reps": 3,
+  "generatedAt": "2026-11-02T22:36:53.946Z",
+  "captured": {
+    "systemChars": 25176,
+    "menuSize": 8
+  },
+  "conditions": [
+    {
+      "key": "A_full-prompt",
+      "menuSize": 8,
+      "systemChars": 25176,
+      "tally": {
+        "native": 2,
+        "invalid": 1
+      },
+      "usable": 2,
+      "usableRate": 0.6666666666666666,
+      "trials": [
+        {
+          "label": "A_full-prompt",
+          "kind": "native",
+          "count": 1,
+          "names": [
+            "fs_write"
+          ],
+          "ms": 61002
+        },
+        {
+          "label": "A_full-prompt",
+          "kind": "invalid",
+          "why": "prose call, name not in menu",
+          "tried": [
+            "fs_write"
+          ],
+          "ms": 27006
+        },
+        {
+          "label": "A_full-prompt",
+          "kind": "native",
+          "count": 1,
+          "names": [
+            "fs_write"
+          ],
+          "ms": 31558
+        }
+      ]
+    },
+    {
+      "key": "B_reduced-prompt",
+      "menuSize": 8,
+      "systemChars": 258,
+      "tally": {
+        "invalid": 3
+      },
+      "usable": 0,
+      "usableRate": 0,
+      "trials": [
+        {
+          "label": "B_reduced-prompt",
+          "kind": "invalid",
+          "why": "prose call, name not in menu",
+          "tried": [
+            "fs_write"
+          ],
+          "ms": 106766
+        },
+        {
+          "label": "B_reduced-prompt",
+          "kind": "invalid",
+          "why": "prose call, name not in menu",
+          "tried": [
+            "fs_write"
+          ],
+          "ms": 100930
+        },
+        {
+          "label": "B_reduced-prompt",
+          "kind": "invalid",
+          "why": "prose call, name not in menu",
+          "tried": [
+            "fs_write"
+          ],
+          "ms": 100602
+        }
+      ]
+    },
+    {
+      "key": "C_reduced-catalogue",
+      "menuSize": 5,
+      "systemChars": 25176,
+      "tally": {
+        "invalid": 2,
+        "native": 1
+      },
+      "usable": 1,
+      "usableRate": 0.3333333333333333,
+      "trials": [
+        {
+          "label": "C_reduced-catalogue",
+          "kind": "invalid",
+          "why": "prose call, name not in menu",
+          "tried": [
+            "fs_write"
+          ],
+          "ms": 167211
+        },
+        {
+          "label": "C_reduced-catalogue",
+          "kind": "invalid",
+          "why": "prose call, name not in menu",
+          "tried": [
+            "fs_write"
+          ],
+          "ms": 121898
+        },
+        {
+          "label": "C_reduced-catalogue",
+          "kind": "native",
+          "count": 1,
+          "names": [
+            "fs_write"
+          ],
+          "ms": 27774
+        }
+      ]
+    },
+    {
+      "key": "D_concise-desc",
+      "menuSize": 8,
+      "systemChars": 25176,
+      "tally": {
+        "invalid": 2,
+        "native": 1
+      },
+      "usable": 1,
+      "usableRate": 0.3333333333333333,
+      "trials": [
+        {
+          "label": "D_concise-desc",
+          "kind": "invalid",
+          "why": "prose call, name not in menu",
+          "tried": [
+            "code_write"
+          ],
+          "ms": 70531
+        },
+        {
+          "label": "D_concise-desc",
+          "kind": "native",
+          "count": 1,
+          "names": [
+            "pytest_run"
+          ],
+          "ms": 24533
+        },
+        {
+          "label": "D_concise-desc",
+          "kind": "invalid",
+          "why": "prose call, name not in menu",
+          "tried": [
+            "fs_write"
+          ],
+          "ms": 122447
+        }
+      ]
+    }
+  ]
+}

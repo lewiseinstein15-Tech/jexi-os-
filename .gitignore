@@ -52,3 +52,4 @@ scripts/.chunked-state.json
 server/live-model.config.env
 *.config.env
 !*.config.env.example
+benchmarks/humaneval-live/data/

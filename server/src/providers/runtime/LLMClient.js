@@ -16,7 +16,7 @@ import { hudNoteSpend } from '../../kernel/hooks/hud-seam.js'; // Phase 7(F) —
 import { ensureIdentityBlock } from '../../services/IdentityGuard.js'; // PHASE 3 — non-removable identity block on EVERY system prompt (provider bridge)
 import { beginProviderAttempt } from '../../services/NetworkPolicy.js'; // PHASE 3B — explicit remote-fallback policy: every provider dial passes the network boundary first
 import { recordAttempt } from './ProviderAttempts.js'; // M17/D2 — provider audit trail: a mid-run ladder slide must be visible
-import { recoverToolCallsFromText } from '../../services/agent/ToolCallRecovery.js'; // M15 — recover a tool call the model wrote as prose instead of a native tool_calls array
+import { recoverToolCallsFromText, looksLikeToolAttempt } from '../../services/agent/ToolCallRecovery.js'; // M15/M19 — recover a tool call the model wrote as prose (incl. aliases) instead of a native tool_calls array
 // ZONE-OWNER ITEM 5 (Phase 9 E seam): cost caps are consulted on the LIVE
 // model-call path. providers/cost/caps.js README: "check({ spendUsd }) … is
 // the pre-call gate a provider bridge uses BEFORE a model call."
@@ -1336,6 +1336,7 @@ async function runToolLoopForProvider(provider, messages, tools, opts, errors) {
   const allCalls = [];
   let finalText = '';
   let iterations = 0;
+  let malformedRetryUsed = false; // M19 — the malformed-call retry fires at most once per turn
 
   for (let i = 0; i < maxIter; i++) {
     if (opts.signal && opts.signal.aborted) break;
@@ -1371,12 +1372,16 @@ async function runToolLoopForProvider(provider, messages, tools, opts, errors) {
        of emitting a native `tool_calls` array; measured ~60% of rounds on the
        real JEXI request. Without this the round looks like a direct answer and
        the task ends with zero tool calls. Recover ONLY when the round produced
-       no native calls, and ONLY for tools already in the offered menu. The
-       recovered call runs through the same gated `executeToolCalls` below. */
+       no native calls, and ONLY for tools already in the offered menu (M19:
+       after alias resolution, so a legacy name like `code_write` still lands on
+       the offered `fs_write`). The recovered call runs through the same gated
+       `executeToolCalls` below. */
     let roundCalls = round.toolCalls;
     let roundRaw = round.rawToolCalls;
+    let roundText = round.text;
+    const offeredNames = roundTools.map((t) => t?.function?.name || t?.name);
     if (!roundCalls.length && round.text && typeof opts.executeToolCalls === 'function') {
-      const recovered = recoverToolCallsFromText(round.text, roundTools.map((t) => t?.function?.name || t?.name));
+      const recovered = recoverToolCallsFromText(round.text, offeredNames);
       if (recovered.length) {
         roundCalls = recovered.map((c, i) => ({ id: `recovered_${iterations}_${i}`, name: c.name, arguments: c.arguments }));
         roundRaw = recovered.map((c, i) => ({ id: `recovered_${iterations}_${i}`, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.arguments) } }));
@@ -1384,8 +1389,45 @@ async function runToolLoopForProvider(provider, messages, tools, opts, errors) {
       }
     }
 
+    /* M19 — BOUNDED MALFORMED-CALL RETRY. A small model also writes a call it
+       clearly INTENDED (prose contains a `{"name": …}` shape) but the payload
+       does not parse — usually a truncated/large `content` whose closing quotes
+       never arrive. Recovery cannot parse it and the turn would end with zero
+       calls even though the model was trying. Re-ask ONCE with a short, precise
+       instruction to emit the SAME call as a compact native tool call (or a
+       smaller file). Bounded to a single extra round per turn, offered tools
+       only, and the retry's output is parsed by the SAME recovery/native path —
+       nothing is fabricated and no gate is bypassed. */
+    if (!roundCalls.length && !malformedRetryUsed && round.text && looksLikeToolAttempt(round.text) && typeof opts.executeToolCalls === 'function' && !opts.__noMalformedRetry) {
+      malformedRetryUsed = true;
+      try { opts.onMalformedCallRetry?.(round.text); } catch { /* observability only */ }
+      const retryMessages = [
+        ...messages,
+        { role: 'assistant', content: round.text },
+        { role: 'user', content: 'Your last message looked like a tool call but its arguments were not valid JSON — most often because the `content` string was truncated. Call the tool again now as a native tool call with COMPLETE, valid JSON arguments. Keep the `content` as small as the task allows. If it is too large to emit reliably, split it: write the first part, then append the rest with a second call.' },
+      ];
+      const retryRound = await chatWithToolsOnce(provider, cfg, model, retryMessages, roundTools, { ...opts, onToken: opts.onToken }).catch(() => null);
+      if (retryRound) {
+        iterations++;
+        const retryNative = retryRound.toolCalls || [];
+        if (retryNative.length) {
+          roundCalls = retryNative;
+          roundRaw = retryRound.rawToolCalls;
+          roundText = retryRound.text;
+        } else if (retryRound.text) {
+          const rec2 = recoverToolCallsFromText(retryRound.text, offeredNames);
+          if (rec2.length) {
+            roundCalls = rec2.map((c, i) => ({ id: `recovered_retry_${iterations}_${i}`, name: c.name, arguments: c.arguments }));
+            roundRaw = rec2.map((c, i) => ({ id: `recovered_retry_${iterations}_${i}`, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.arguments) } }));
+            roundText = retryRound.text;
+            try { opts.onRecoveredToolCalls?.(roundCalls); } catch { /* observability only */ }
+          }
+        }
+      }
+    }
+
     if (!roundCalls.length) {
-      finalText = round.text;
+      finalText = roundText;
       break; // model answered directly — loop done
     }
 
