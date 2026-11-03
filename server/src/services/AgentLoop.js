@@ -325,9 +325,9 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
       callsMade++;
       // step events: tool/call + tool/result on the wire.
       try { emit('step/start', { turn: 1, step: callsMade }); } catch (e) {}
-      try { emit('tool/call', { callId: call.id, name: call.name, arguments: JSON.stringify(call.arguments || {}).slice(0, 500) }); } catch (e) {}
+      try { emit('tool/call', { callId: call.id, name: call.name, arguments: JSON.stringify(call.arguments || {}).slice(0, 500), ...(call.recovery ? { recovery: call.recovery } : {}) }); } catch (e) {}
 
-      /* M12 — `request_tools` is the progressive-disclosure escape hatch, not a
+      /* M19 — `request_tools` is the progressive-disclosure escape hatch, not a
          real tool execution. Resolve the requested bundles/slugs through the
          SAME registries, push the new schemas into the LIVE menu (so the next
          provider round can call them), and feed the outcome back honestly.
@@ -549,6 +549,11 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         // stream so the recovery is visible rather than silent.
         onRecoveredToolCalls: (calls) => {
           emit('agent.log', { message: `♻ recovered ${calls.length} tool call(s) the model wrote as text instead of a native call: ${calls.map((c) => c.name).join(', ')} — executing through the normal gates.` });
+          // M20 — emit a structured per-call record so recovery and alias
+          // resolution are auditable without parsing the prose log line.
+          for (const c of calls) {
+            try { emit('tool/recovered', { callId: c.id, name: c.name, aliasedFrom: c.recovery?.aliasedFrom || null, path: c.recovery?.path || 'recovered' }); } catch { /* observability only */ }
+          }
         },
         // M19 — a call the model clearly intended but wrote with unparseable
         // arguments (usually a truncated `content`) gets ONE bounded re-ask;

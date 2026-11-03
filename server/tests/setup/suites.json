@@ -1303,6 +1303,13 @@
         "--test",
         "tests/agi/test-m19-write-payload-normalization.js"
       ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-m20-repair-loop.js"
+      ]
     }
   ]
 }

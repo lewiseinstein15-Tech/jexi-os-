@@ -1385,6 +1385,10 @@ async function runToolLoopForProvider(provider, messages, tools, opts, errors) {
       if (recovered.length) {
         roundCalls = recovered.map((c, i) => ({ id: `recovered_${iterations}_${i}`, name: c.name, arguments: c.arguments }));
         roundRaw = recovered.map((c, i) => ({ id: `recovered_${iterations}_${i}`, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.arguments) } }));
+        // M20 — carry per-call provenance so a recovered/aliased call is
+        // auditable end-to-end (which name the model wrote, whether an alias
+        // resolved it, and through which path). Observability only.
+        roundCalls.forEach((c, i) => { c.recovery = { path: 'recovered', aliasedFrom: recovered[i].aliasedFrom || null }; });
         try { opts.onRecoveredToolCalls?.(roundCalls); } catch { /* observability only */ }
       }
     }
@@ -1419,6 +1423,7 @@ async function runToolLoopForProvider(provider, messages, tools, opts, errors) {
           if (rec2.length) {
             roundCalls = rec2.map((c, i) => ({ id: `recovered_retry_${iterations}_${i}`, name: c.name, arguments: c.arguments }));
             roundRaw = rec2.map((c, i) => ({ id: `recovered_retry_${iterations}_${i}`, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.arguments) } }));
+            roundCalls.forEach((c, i) => { c.recovery = { path: 'recovered_retry', aliasedFrom: rec2[i].aliasedFrom || null }; });
             roundText = retryRound.text;
             try { opts.onRecoveredToolCalls?.(roundCalls); } catch { /* observability only */ }
           }

@@ -40,7 +40,7 @@ with exactly the keys listed above.`;
  * hunting through files to discover what it is being asked to do. The test
  * file is named once, as a verification aid, not as the subject of the task.
  */
-function buildQuery(task, solutionPath, testName) {
+export function buildQuery(task, solutionPath, testName) {
   return [
     `Complete this Python function by writing the full implementation to the file ${solutionPath}.`,
     '',
@@ -56,11 +56,19 @@ function buildQuery(task, solutionPath, testName) {
   ].join('\n');
 }
 
+/** The solution/test paths for a task inside its sandbox. */
+export function taskPaths(task, sandboxDir) {
+  return {
+    solutionPath: path.join(sandboxDir, 'solution.py'),
+    testName: `test_${task.entry_point}.py`,
+  };
+}
+
 /**
  * Run one task through JEXI's real agent loop.
  * Returns { solution, transcript, stats, events, error, offeredTools }.
  */
-export async function runTaskWithJexi({ task, sandboxDir, schemaMode = 'documented', toolProfile = null, maxIterations = null, timeoutMs = 300_000, log = () => {} }) {
+export async function runTaskWithJexi({ task, sandboxDir, schemaMode = 'documented', toolProfile = null, maxIterations = null, timeoutMs = 300_000, log = () => {}, queryOverride = null }) {
   const { solutionName, testName } = { solutionName: 'solution.py', testName: `test_${task.entry_point}.py` };
   const solutionPath = path.join(sandboxDir, solutionName);
 
@@ -74,7 +82,7 @@ export async function runTaskWithJexi({ task, sandboxDir, schemaMode = 'document
 
   const events = [];
   const sendEvent = (type, data) => { events.push({ type, data }); };
-  const query = buildQuery(task, solutionPath, testName);
+  const query = queryOverride || buildQuery(task, solutionPath, testName);
 
   const systemDoc = schemaMode === 'documented' ? TOOL_DOC : '';
 
@@ -137,6 +145,9 @@ export async function runTaskWithJexi({ task, sandboxDir, schemaMode = 'document
     models,
     providerAttempts,
     providersThatServed: [...new Set(providerAttempts.filter((a) => a.ok).map((a) => a.provider))],
+    // M20 — expose the raw event stream so a capture driver can audit
+    // recovery/alias/payload-normalization without re-running the loop.
+    events,
     transcript: { query, events: events.length },
   };
 }

@@ -881,3 +881,45 @@ zero network, zero real model calls).
   `benchmarks/humaneval-live/data/` (provider-health.json) are runtime
   byproducts, not project code — `server/` is deleted and `data/` is
   gitignored. Never commit them.
+
+## M20 — verified coding capability
+
+- STOCHASTIC BASELINE (important): the tool lane calls the model at
+  `temperature 0.3` with **no seed**, so single small-n runs are not
+  reproducible. Proof: commit `4e6d0e5`, locked ollama, SAME 5-task slice →
+  preserved artifacts show 0/5 (23-21-22), 1/5 (23-51-13), 0/5 (00-09-03). The
+  documented M19 "1/5" is one draw. Report rates with a variance band; prefer
+  **paired** designs (same task, first attempt vs repaired attempt) over
+  matching a single baseline number.
+- MEASURED (M20, 15-task slice, llama3.2:3b, locked, `ladderSlid=0`):
+  tool-execution reliability is materially better than coding. Only 6/15 tasks
+  emitted a tool call at all; the one PASS (HumanEval/7) came through the M19
+  alias bridge (`code_write`→`fs_write`, recovered from prose). 13/15 written
+  files parsed; **1/15 (6.7%)** passed the official test. Dominant failure =
+  model ceiling (9/15 produced no usable call / wrong code), NOT a JEXI defect.
+- M19 fixes confirmed on the wire: alias bridge produced the pass; the
+  write-payload normalizer fired on HumanEval/3 and /13 (both still failed for
+  other reasons — the normalizer cannot make wrong code right). `fs_write`
+  correctly BLOCKED two out-of-sandbox paths (`path escapes root`, HE/0 & /14).
+- BOUNDED REPAIR (new): `benchmarks/humaneval-live/lib/repair.mjs`
+  (`runBoundedRepair`, `MAX_REPAIRS=2`) + `m20-repair.mjs` driver. Seam is
+  injected `runAttempt`/`grade`/`makeRepairContext` (deterministic tests).
+  Guarantees enforced in code: ≤2 repairs, OFFICIAL grader is the only arbiter
+  (no self-grading), timeout/grader-error never a pass, failing-test output
+  scrubbed, official test file never modified. Paired result on the same 15
+  tasks: **A 1/15 (6.7%) → B 3/15 (20.0%), +13.3 pp, 2 recovered-by-repair, 0
+  false successes**. CAVEAT: per-attempt repair rate ≈ base rate and the gain
+  ≈ the ±1–2 task noise band, so it is directional, not conclusive.
+- Benchmark path (`AgentLoop.js` via `runTaskWithJexi`) is SINGLE-PASS; the
+  existing `CodingLoop.js` (`runCodingLoop`) is wired only into `Orchestrator.js`
+  (`N.debugger`). M20 did not rewire the product path — it added a
+  benchmark-level bounded loop reusing the real loop + official grader.
+- Observability added (no behaviour change): `LLMClient.js` tags recovered calls
+  with `{path, aliasedFrom}`; `AgentLoop.js` emits `tool/recovered` and forwards
+  `recovery` on `tool/call`; `lib/agent.mjs` exports `buildQuery`/`taskPaths`,
+  adds a `queryOverride` seam and returns raw `events`.
+- Suites: **211/211 pass** (was 210; +1 M20 suite `test-m20-repair-loop.js`,
+  9 tests). No pre-existing failure introduced.
+- GOTCHA: a killed benchmark leaves the ollama `llama-server` child spinning
+  down; wait for its instantaneous CPU to reach 0 (`/proc/<pid>/stat` fields
+  14+15 delta) before relaunching, or the next run competes for CPU.
