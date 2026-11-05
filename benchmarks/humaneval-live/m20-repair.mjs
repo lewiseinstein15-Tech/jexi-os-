@@ -31,7 +31,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { loadDataset, materialiseTask, gradeLocally } from './lib/tasks.mjs';
-import { runTaskWithJexi, buildQuery, taskPaths } from './lib/agent.mjs';
+import { runTaskWithJexi, buildQuery, taskPaths, fsNamesQuery } from './lib/agent.mjs';
 import { scoreTask, summarise } from './lib/score.mjs';
 import { runBoundedRepair, MAX_REPAIRS } from './lib/repair.mjs';
 
@@ -117,7 +117,7 @@ async function main() {
       runAttempt: async ({ attempt, ctx }) => {
         const t0 = Date.now();
         const query = attempt === 0
-          ? buildQuery(task, solutionPath, testName)
+          ? fsNamesQuery(task, solutionPath, testName)
           : buildRepairQuery({
               task, solutionPath, testName,
               currentSolution: fs.existsSync(solutionPath) ? fs.readFileSync(solutionPath, 'utf8') : '',
@@ -160,6 +160,13 @@ async function main() {
     resolvedByRepair = loop.resolvedByRepair;
 
     const first = attempts[0];
+    /* The harness seeds `solution.py` with the task prompt (the signature +
+       docstring stub). A file equal to that stub is NOT generated code, so
+       "wrote" must be a real comparison, not a file-exists check — otherwise
+       every task reads as written. */
+    const stub = `${task.prompt}\n`;
+    const finalSolution = fs.existsSync(solutionPath) ? fs.readFileSync(solutionPath, 'utf8') : null;
+    const wroteSolution = finalSolution !== null && finalSolution.trim() !== stub.trim();
     const row = {
       taskId: task.task_id,
       entryPoint: task.entry_point,
@@ -168,6 +175,10 @@ async function main() {
       resolvedByRepair,
       repairAttempts: attempts.length - 1,
       attempts,
+      wroteSolution,
+      /* M22 — the final on-disk bytes, so the AST classifier (measure.mjs) can
+         score the repair leg without a second transcript file. */
+      finalSolution,
       model,
       providerLock: lock,
     };
@@ -194,6 +205,9 @@ async function main() {
     providerLock: lock, modelProviderEnv: process.env.MODEL_PROVIDER || null,
     ollamaHost: process.env.OLLAMA_HOST || null,
     tasks: selected.length, taskIds: selected.map((t) => t.task_id),
+    /* M22 — record the prompt shape so a paired comparison cannot silently drift. */
+    promptVariant: 'A', promptLabel: 'current',
+    queryMode: 'fs-names',
     gitCommit: gitRev(), gitDirty: gitDirty(),
     grader: 'local subprocess (NOT isolated)', gradedWithoutIsolation: true,
     node: process.version, platform: `${process.platform}/${process.arch}`,

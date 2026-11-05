@@ -33,7 +33,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { loadDataset, materialiseTask, gradeLocally } from './lib/tasks.mjs';
-import { runTaskWithJexi, buildQuery, taskPaths } from './lib/agent.mjs';
+import { runTaskWithJexi, buildQuery, taskPaths, fsNamesQuery } from './lib/agent.mjs';
 import { scoreTask, summarise } from './lib/score.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -116,22 +116,8 @@ const PROMPT_VARIANTS = {
 
 /* --------------------------------------------------------------- query mode */
 
-/** fs-names: name the tools that are actually in the offered menu. */
-function fsNamesQuery(task, solutionPath, testName) {
-  return [
-    `Write the complete implementation of the Python function below to the file ${solutionPath}.`,
-    '',
-    '```python',
-    task.prompt.trim(),
-    '```',
-    '',
-    `Use the fs_write tool to write the complete file to ${solutionPath}. Do not reply with the code`,
-    'as text — the file on disk is what is graded.',
-    `Keep the exact function name (${task.entry_point}) and signature. Put any imports you need at the top of the file.`,
-    `The finished file must define ${task.entry_point} and be valid, self-contained Python.`,
-    `A test file, ${testName}, is already in the same directory. Use the term_execute tool to run it and confirm it passes. Do not modify the test file.`,
-  ].join('\n');
-}
+/* fs-names lives in lib/agent.mjs so the bounded-repair leg (m20-repair.mjs)
+   runs the same first-attempt prompt. Re-exported here for back-compat. */
 
 /* ------------------------------------------------------------------ signals */
 

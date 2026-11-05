@@ -338,7 +338,12 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
       callsMade++;
       // step events: tool/call + tool/result on the wire.
       try { emit('step/start', { turn: 1, step: callsMade }); } catch (e) {}
-      try { emit('tool/call', { callId: call.id, name: call.name, arguments: JSON.stringify(call.arguments || {}).slice(0, 500), ...(call.recovery ? { recovery: call.recovery } : {}) }); } catch (e) {}
+      /* The 500-char cap is a UI courtesy (the TUI renders 120 chars anyway),
+         but it also truncated the generated code out of every recorded
+         transcript, so a benchmark could not inspect what the model actually
+         wrote. `emitFullToolArgs` (benchmarks set it) keeps the whole payload. */
+      const callArgs = JSON.stringify(call.arguments || {});
+      try { emit('tool/call', { callId: call.id, name: call.name, arguments: opts.emitFullToolArgs ? callArgs : callArgs.slice(0, 500), ...(call.recovery ? { recovery: call.recovery } : {}) }); } catch (e) {}
 
       /* M19 — `request_tools` is the progressive-disclosure escape hatch, not a
          real tool execution. Resolve the requested bundles/slugs through the

@@ -999,3 +999,43 @@ zero network, zero real model calls).
   OFFICIAL test yourself on the transcript's `solution` bytes. `pass` in the
   row table is the harness's own grader; a `NameError`/`SyntaxError` from an
   independent run is the ground truth.
+
+### M22 follow-up — findings doc, measurement tool, bounded-repair result (2026-11-05)
+
+- `docs/M22-FINDINGS.md` is the named M22 deliverable (9 sections). Every number
+  in it is re-derivable from committed artefacts under
+  `benchmarks/humaneval-live/results/`.
+- NEW `benchmarks/humaneval-live/measure.mjs` — AST classifier over the real
+  bytes via CPython `ast.parse`. Two counting rules it enforces:
+  1. AST rows (syntax-valid, syntax buckets, duplicate-def, placeholder-stub) are
+     over WRITTEN files only. The harness seeds a valid Python stub, so counting
+     an untouched stub as syntax-valid reports a high rate for a run that wrote
+     nothing. The metric table prints each row's own denominator.
+  2. The repair leg's `file-write` is derived by comparing the final bytes to the
+     seeded stub (`task.prompt + "\n"`), because `m20-repair.mjs` used to leave
+     the stub in place and a file-exists check read as "wrote" on every task.
+- `emitFullToolArgs` (opt-in, `opts.emitFullToolArgs`, set by benchmarks): the
+  `tool/call` event kept only `arguments.slice(0,500)`, so the transcript cut the
+  generated code off mid-line and no failure was attributable from the artefact.
+  Default stays capped for the UI. Tests M22/D7 pin both halves.
+- REPRODUCED baseline on a pristine `43d518f` worktree: **0/15**, wrote=4/15,
+  validToolCall=5/15, proseOnly=10/15 — M21's headline was real.
+- MEASURED M22 no-repair (later draw): **1/15**, wrote 4→9, validToolCall 5→9,
+  proseOnly 10→6, timeouts 3→4. First verified pass in the M18–M22 sequence
+  (`HumanEval/7`). Code quality did NOT improve: syntax-valid 4/9 written.
+- ATTRIBUTION (full bytes now captured): the 5 syntax failures are
+  `unterminated string/triple-quote` (+1 `IndentationError`), NOT M21's literal
+  `\n` double-escape — zero files carried a lone backslash or literal `\n`, so
+  `repairCorruptEscapes` correctly did not fire. 3 more files parse but never
+  define the entry point. This is a *generation/stopping* defect, not transport.
+- MEASURED bounded repair (Condition B, `m20-repair.mjs --repairs 2`, same
+  `fs-names` first-attempt prompt): **A 0/15 → B 3/15 (+20 pp)**, 3 recovered by
+  repair (/3 from a `SyntaxError`, /5 and /7 from `AssertionError`). The
+  unterminated-string defect drops to **0/11 written files** under repair —
+  proof the defect is a *stopping* failure the model fixes once told, so repair
+  (not a smarter decoder) is the demonstrated fix. Cost: 28 repairs, ~2 h 15 m.
+- PROBE COUNTING BUG: `m21-probe.mjs` reports `syntaxErrors` by regexing the
+  grader tail for `SyntaxError`, so it misses `IndentationError` (undercounted
+  4 vs the true 5). `measure.mjs` classifies bytes directly instead.
+- Suites: M22 **35/35** (+2 D7), M21 35/35, M20 9/9. No stray files (a D7 test
+  wrote `server/solution.py` until the path was made absolute).

@@ -1,0 +1,1237 @@
+{
+  "manifest": {
+    "benchmark": "humaneval",
+    "mission": "M20",
+    "condition": "B (bounded test-driven repair)",
+    "dataset": {
+      "repo": "openai/openai_humaneval",
+      "config": "openai_humaneval",
+      "split": "test",
+      "sha256": "094a17ace7a536483e83cd6bb0348c9df1e2bb532ff4e09961665a8b9414c157",
+      "numRowsTotal": 164
+    },
+    "leg": "jexi",
+    "schemaMode": "as-shipped",
+    "toolProfile": "full",
+    "maxRepairs": 2,
+    "model": "llama3.2:3b",
+    "providerLock": "ollama",
+    "modelProviderEnv": "ollama",
+    "ollamaHost": "http://127.0.0.1:11434",
+    "tasks": 15,
+    "taskIds": [
+      "HumanEval/0",
+      "HumanEval/1",
+      "HumanEval/2",
+      "HumanEval/3",
+      "HumanEval/4",
+      "HumanEval/5",
+      "HumanEval/6",
+      "HumanEval/7",
+      "HumanEval/8",
+      "HumanEval/9",
+      "HumanEval/10",
+      "HumanEval/11",
+      "HumanEval/12",
+      "HumanEval/13",
+      "HumanEval/14"
+    ],
+    "queryMode": "fs-names",
+    "gitCommit": "4ac7cba99fc4ff18d1f38cdc4ef98d4166525793",
+    "gitDirty": true,
+    "grader": "local subprocess (NOT isolated)",
+    "gradedWithoutIsolation": true,
+    "node": "v24.21.0",
+    "platform": "linux/x64",
+    "startedAt": "2026-11-05T15:09:33.439Z",
+    "runId": "m20-repair-2026-11-05T15-09-33-439Z"
+  },
+  "conditionA": {
+    "total": 15,
+    "resolved": 0,
+    "resolvedRate": 0,
+    "gradedGreen": 0,
+    "gradedGreenRate": 0,
+    "timeouts": 0,
+    "agentErrors": 0,
+    "graderErrors": 0,
+    "unresolvedGreen": 0
+  },
+  "conditionB": {
+    "total": 15,
+    "resolved": 3,
+    "resolvedRate": 0.2,
+    "gradedGreen": 3,
+    "gradedGreenRate": 0.2,
+    "timeouts": 0,
+    "agentErrors": 0,
+    "graderErrors": 0,
+    "unresolvedGreen": 0
+  },
+  "metrics": {
+    "conditionA": {
+      "total": 15,
+      "resolved": 0,
+      "resolvedRate": 0,
+      "gradedGreen": 0,
+      "gradedGreenRate": 0,
+      "timeouts": 0,
+      "agentErrors": 0,
+      "graderErrors": 0,
+      "unresolvedGreen": 0
+    },
+    "conditionB": {
+      "total": 15,
+      "resolved": 3,
+      "resolvedRate": 0.2,
+      "gradedGreen": 3,
+      "gradedGreenRate": 0.2,
+      "timeouts": 0,
+      "agentErrors": 0,
+      "graderErrors": 0,
+      "unresolvedGreen": 0
+    },
+    "recoveredByRepair": 3,
+    "repairsAttempted": 28,
+    "tasksUsingRepair": 15,
+    "providerLock": "ollama"
+  },
+  "rows": [
+    {
+      "taskId": "HumanEval/0",
+      "entryPoint": "has_close_elements",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 2,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 169323,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_0/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 20, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 1,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 123618,
+          "toolCalls": [
+            "fs_read"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_read",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_0/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 20, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 2,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 100680,
+          "toolCalls": [
+            "fs_read"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_read",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_0/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 20, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        }
+      ],
+      "finalSolution": "from typing import List\n\n\ndef has_close_elements(numbers: List[float], threshold: float) -> bool:\n    \"\"\" Check if in given list of numbers, are any two numbers closer to each other than\n    given threshold.\n    >>> has_close_elements([1.0, 2.0, 3.0], 0.5)\n    False\n    >>> has_close_elements([1.0, 2.8, 3.0, 4.0, 5.0, 2.0], 0.3)\n    True\n    \"\"\"\n\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/1",
+      "entryPoint": "separate_paren_groups",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 2,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 203068,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_1/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 22, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 1,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": true,
+          "agentError": "agent loop timed out after 300000ms",
+          "resolveReason": "timeout: agent loop timed out after 300000ms",
+          "durationMs": 300003,
+          "toolCalls": [
+            "fs_write",
+            "fs_write",
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_1/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 22, in <module>\nNameError: name 'separate_paren_groups' is not defined"
+        },
+        {
+          "attempt": 2,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": true,
+          "agentError": "agent loop timed out after 300000ms",
+          "resolveReason": "timeout: agent loop timed out after 300000ms",
+          "durationMs": 300002,
+          "toolCalls": [
+            "fs_write",
+            "fs_write",
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_1/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 4\n    if __name__ == \"__main__\":\n    ^^\nIndentationError: expected an indented block after function definition on line 1"
+        }
+      ],
+      "finalSolution": "def main():\n    # code here\n\nif __name__ == \"__main__\":\n    main()\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/2",
+      "entryPoint": "truncate_number",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 2,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 203067,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_2/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 1,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 166919,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_2/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 2,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 135090,
+          "toolCalls": [
+            "fs_edit"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_edit",
+              "ok": false
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_2/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        }
+      ],
+      "finalSolution": "\n\ndef truncate_number(number: float) -> float:\n    \"\"\" Given a positive floating point number, it can be decomposed into\n    and integer part (largest integer smaller than given number) and decimals\n    (leftover part always smaller than 1).\n\n    Return the decimal part of the number.\n    >>> truncate_number(3.5)\n    0.5\n    \"\"\"\n\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/3",
+      "entryPoint": "below_zero",
+      "firstAttemptPass": false,
+      "finalPass": true,
+      "resolvedByRepair": true,
+      "repairAttempts": 1,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 150507,
+          "toolCalls": [
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_3/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 4\n    \"\"\" You're given a list of deposit and withdrawal operations on a bank account that starts with\n    ^\nSyntaxError: unterminated triple-quoted string literal (detected at line 20)"
+        },
+        {
+          "attempt": 1,
+          "pass": true,
+          "gradedPass": true,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": null,
+          "durationMs": 140680,
+          "toolCalls": [
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "PASS",
+          "gradeOutputTail": "HUMANEVAL_GRADE=PASS"
+        }
+      ],
+      "finalSolution": "from typing import List\n\ndef below_zero(operations: List[int]) -> bool:\n    balance = 0\n    for op in operations:\n        balance += op\n        if balance < 0:\n            return True\n    return False",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/4",
+      "entryPoint": "mean_absolute_deviation",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 2,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 240519,
+          "toolCalls": [
+            "fs_write",
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_4/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 4\n    if __name__ == \"__main__\":\n    ^^\nIndentationError: expected an indented block after function definition on line 1"
+        },
+        {
+          "attempt": 1,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 128754,
+          "toolCalls": [
+            "data_json"
+          ],
+          "toolResults": [
+            {
+              "name": "data_json",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_4/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 4\n    if __name__ == \"__main__\":\n    ^^\nIndentationError: expected an indented block after function definition on line 1"
+        },
+        {
+          "attempt": 2,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": true,
+          "agentError": "agent loop timed out after 300000ms",
+          "resolveReason": "timeout: agent loop timed out after 300000ms",
+          "durationMs": 300003,
+          "toolCalls": [
+            "data_json",
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "data_json",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_4/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 16, in <module>\nNameError: name 'mean_absolute_deviation' is not defined"
+        }
+      ],
+      "finalSolution": "def solution():\n    return \"example\"\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/5",
+      "entryPoint": "intersperse",
+      "firstAttemptPass": false,
+      "finalPass": true,
+      "resolvedByRepair": true,
+      "repairAttempts": 2,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 155272,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_5/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 1,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 268981,
+          "toolCalls": [
+            "fs_write",
+            "fs_write",
+            "fs_write",
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_5/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\nNameError: name 'intersperse' is not defined"
+        },
+        {
+          "attempt": 2,
+          "pass": true,
+          "gradedPass": true,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": null,
+          "durationMs": 204659,
+          "toolCalls": [
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "PASS",
+          "gradeOutputTail": "HUMANEVAL_GRADE=PASS"
+        }
+      ],
+      "finalSolution": "def intersperse(numbers, delimiter):\n    result = []\n    for i, num in enumerate(numbers):\n        if i == 0:\n            result.append(num)\n        else:\n            result.append(delimiter)\n            result.append(num)\n    return result\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/6",
+      "entryPoint": "parse_nested_parens",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 2,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 198286,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_6/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 1,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 123012,
+          "toolCalls": [
+            "fs_read"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_read",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_6/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 2,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 179043,
+          "toolCalls": [
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_6/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        }
+      ],
+      "finalSolution": "def parse_nested_parens(s):\n    stack = []\n    result = []\n    for char in s:\n        if char == '(':\n            stack.append(char)\n        elif char == ')':\n            if stack:\n                stack.pop()\n            else:\n                result.append(char)\n    return result\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/7",
+      "entryPoint": "filter_by_substring",
+      "firstAttemptPass": false,
+      "finalPass": true,
+      "resolvedByRepair": true,
+      "repairAttempts": 1,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 155435,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_7/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 16, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 1,
+          "pass": true,
+          "gradedPass": true,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": null,
+          "durationMs": 88595,
+          "toolCalls": [
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "PASS",
+          "gradeOutputTail": "HUMANEVAL_GRADE=PASS"
+        }
+      ],
+      "finalSolution": "from typing import List\n\ndef filter_by_substring(strings: List[str], substring: str) -> List[str]:\n    \"\"\" Filter an input list of strings only for ones that contain given substring\\n    >>> filter_by_substring([], 'a')\\n    []\\n    >>> filter_by_substring(['abc', 'bacd', 'cde', 'array'], 'a')\\n    ['abc', 'bacd', 'array']\\n    \"\"\"\n    result = [s for s in strings if substring in s]\n    return result\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/8",
+      "entryPoint": "sum_product",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 2,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 153216,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_8/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 17, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 1,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 119472,
+          "toolCalls": [
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": false
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_8/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 17, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 2,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 85393,
+          "toolCalls": [
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": false
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_8/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 17, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        }
+      ],
+      "finalSolution": "from typing import List, Tuple\n\n\ndef sum_product(numbers: List[int]) -> Tuple[int, int]:\n    \"\"\" For a given list of integers, return a tuple consisting of a sum and a product of all the integers in a list.\n    Empty sum should be equal to 0 and empty product should be equal to 1.\n    >>> sum_product([])\n    (0, 1)\n    >>> sum_product([1, 2, 3, 4])\n    (10, 24)\n    \"\"\"\n\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/9",
+      "entryPoint": "rolling_max",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 2,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 162931,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_9/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 16, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 1,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 85918,
+          "toolCalls": [
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": false
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_9/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 16, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 2,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 157740,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_9/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 16, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        }
+      ],
+      "finalSolution": "from typing import List, Tuple\n\n\ndef rolling_max(numbers: List[int]) -> List[int]:\n    \"\"\" From a given list of integers, generate a list of rolling maximum element found until given moment\n    in the sequence.\n    >>> rolling_max([1, 2, 3, 2, 3, 4, 2])\n    [1, 2, 3, 3, 3, 4, 4]\n    \"\"\"\n\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/10",
+      "entryPoint": "make_palindrome",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 2,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 168556,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_10/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 17, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 1,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 128051,
+          "toolCalls": [
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_10/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 17, in <module>\n  File \"<string>\", line 12, in check\nAssertionError"
+        },
+        {
+          "attempt": 2,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 265347,
+          "toolCalls": [
+            "fs_write",
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_10/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 17, in <module>\n  File \"<string>\", line 11, in check\nAssertionError"
+        }
+      ],
+      "finalSolution": "def make_palindrome(s):\n    if not s:\n        return ''\n    # ... rest of the function remains the same ...\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/11",
+      "entryPoint": "string_xor",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 2,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 176578,
+          "toolCalls": [
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_11/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 1,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 148579,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_11/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 2,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": true,
+          "agentError": "agent loop timed out after 300000ms",
+          "resolveReason": "timeout: agent loop timed out after 300000ms",
+          "durationMs": 300001,
+          "toolCalls": [
+            "fs_write",
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_11/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 4\n    if __name__ == \"__main__\":\n    ^^\nIndentationError: expected an indented block after function definition on line 1"
+        }
+      ],
+      "finalSolution": "def main():\n    # code here\n\nif __name__ == \"__main__\":\n    main()\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/12",
+      "entryPoint": "longest",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 2,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 128330,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_12/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 11, in check\nAssertionError"
+        },
+        {
+          "attempt": 1,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 271716,
+          "toolCalls": [
+            "fs_write",
+            "fs_write",
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_12/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 4\n    if __name__ == \"__main__\":\n    ^^\nIndentationError: expected an indented block after function definition on line 1"
+        },
+        {
+          "attempt": 2,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 238888,
+          "toolCalls": [
+            "fs_write",
+            "fs_write",
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_12/grade.py\", line 7, in <module>\n    ns[\"check\"](ns[entry])\n    ~~^^^^^^^^^\nKeyError: 'check'"
+        }
+      ],
+      "finalSolution": "def main():\n    # Your code here\n    pass\n\nif __name__ == \"__main__\":\n    main()\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/13",
+      "entryPoint": "greatest_common_divisor",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 2,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 153354,
+          "toolCalls": [
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_13/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 16, in <module>\nNameError: name 'greatest_common_divisor' is not defined"
+        },
+        {
+          "attempt": 1,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": true,
+          "agentError": "agent loop timed out after 300000ms",
+          "resolveReason": "timeout: agent loop timed out after 300000ms",
+          "durationMs": 300003,
+          "toolCalls": [
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_13/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 2\n    # ... (rest of the code remains the same)\n                                             ^\nIndentationError: expected an indented block after function definition on line 1"
+        },
+        {
+          "attempt": 2,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": true,
+          "agentError": "agent loop timed out after 300000ms",
+          "resolveReason": "timeout: agent loop timed out after 300000ms",
+          "durationMs": 300001,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_13/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 2\n    # ... (rest of the code remains the same)\n                                             ^\nIndentationError: expected an indented block after function definition on line 1"
+        }
+      ],
+      "finalSolution": "def solve():\n    # ... (rest of the code remains the same)\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/14",
+      "entryPoint": "all_prefixes",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 2,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 226037,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_14/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 1,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 162723,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_14/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        },
+        {
+          "attempt": 2,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 208474,
+          "toolCalls": [
+            "fs_write",
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "graderVerdict": "FAIL",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-repair-XUPUXP/HumanEval_14/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\nNameError: name 'all_prefixes' is not defined"
+        }
+      ],
+      "finalSolution": "def main():\n    # Your code here\n    pass\n\nif __name__ == \"__main__\":\n    main()\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    }
+  ]
+}

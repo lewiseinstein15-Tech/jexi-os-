@@ -405,3 +405,51 @@ test('M22/D6: a same-size edit in the same second is NOT served from a stale .py
     assert.match(second.output, /FRESH/);
   } finally { cleanup(); }
 });
+
+/* ── D7: the recorded tool/call must hold the code the model wrote ──────── */
+
+test('M22/D7: the tool/call event keeps the whole fs_write payload, so the transcript holds the code', async () => {
+  /* MEASURED DEFECT (M22): `tool/call` carried `arguments` sliced to 500
+     chars, so a benchmark transcript cut the generated code off mid-line and a
+     failure could not be attributed from the committed artefact. The write
+     itself was never truncated — only the recording — which is exactly the
+     kind of defect that makes a pipeline look like a model limitation. */
+  const { runAgentLoop } = await import('../../src/services/AgentLoop.js');
+  const { d, cleanup } = tmpdir('m22-args-');
+  try {
+    const body = `def truncate_number(number: float) -> float:\n    """${'x'.repeat(2000)}"""\n    return number % 1.0\n`;
+    const events = [];
+    await runAgentLoop({
+      query: 'write solution.py',
+      sendEvent: (type, payload) => events.push({ type, payload }),
+      opts: {
+        root: d,
+        profile: 'full',
+        emitFullToolArgs: true,
+        __scriptedToolCalls: [{ name: 'fs_write', args: { path: path.join(d, 'solution.py'), content: body } }],
+      },
+    });
+    const call = events.find((e) => e.type === 'tool/call' && e.payload.name === 'fs_write');
+    assert.ok(call, 'a tool/call event must be emitted for the write');
+    const recorded = JSON.parse(call.payload.arguments);
+    assert.equal(recorded.content, body, 'the recorded payload must be byte-identical to what was written');
+    assert.ok(recorded.content.length > 2000, 'the payload must not be capped at 500 chars');
+  } finally { cleanup(); }
+});
+
+test('M22/D7: without the opt-in the event stays capped (the UI courtesy is preserved)', async () => {
+  const { runAgentLoop } = await import('../../src/services/AgentLoop.js');
+  const { d, cleanup } = tmpdir('m22-args-cap-');
+  try {
+    const body = `def f():\n    return ${'1'.repeat(900)}\n`;
+    const events = [];
+    await runAgentLoop({
+      query: 'write solution.py',
+      sendEvent: (type, payload) => events.push({ type, payload }),
+      opts: { root: d, profile: 'full', __scriptedToolCalls: [{ name: 'fs_write', args: { path: path.join(d, 'solution.py'), content: body } }] },
+    });
+    const call = events.find((e) => e.type === 'tool/call' && e.payload.name === 'fs_write');
+    assert.ok(call, 'a tool/call event must be emitted');
+    assert.ok(call.payload.arguments.length <= 500, 'the default recording stays capped for the UI');
+  } finally { cleanup(); }
+});

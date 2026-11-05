@@ -64,6 +64,26 @@ export function taskPaths(task, sandboxDir) {
   };
 }
 
+/* M22 — the `fs-names` query used by the M21/M22 probe: it names the tools that
+   are actually in the offered menu, instead of the generic "code-write" phrasing
+   the model cannot map to a slug. Shared so the bounded-repair leg runs the
+   IDENTICAL first-attempt prompt as the no-repair leg (paired comparison). */
+export function fsNamesQuery(task, solutionPath, testName) {
+  return [
+    `Write the complete implementation of the Python function below to the file ${solutionPath}.`,
+    '',
+    '```python',
+    task.prompt.trim(),
+    '```',
+    '',
+    `Use the fs_write tool to write the complete file to ${solutionPath}. Do not reply with the code`,
+    'as text — the file on disk is what is graded.',
+    `Keep the exact function name (${task.entry_point}) and signature. Put any imports you need at the top of the file.`,
+    `The finished file must define ${task.entry_point} and be valid, self-contained Python.`,
+    `A test file, ${testName}, is already in the same directory. Use the term_execute tool to run it and confirm it passes. Do not modify the test file.`,
+  ].join('\n');
+}
+
 /**
  * Run one task through JEXI's real agent loop.
  * Returns { solution, transcript, stats, events, error, offeredTools }.
@@ -112,7 +132,10 @@ export async function runTaskWithJexi({ task, sandboxDir, schemaMode = 'document
        leaving the loop to guess `pytest` and report `unverifiable`. This is the
        same class of configuration as `toolProfile` above and is recorded in the
        manifest. Set BENCH_VERIFY_LAYERS="" to fall back to auto-detection. */
-    const opts = { root: sandboxDir, entryPoint: task.entry_point };
+    /* `emitFullToolArgs` keeps the whole `fs_write` payload on the tool/call
+       event so the transcript holds the bytes the model actually wrote; the
+       default 500-char cap cut the code out of every recorded run. */
+    const opts = { root: sandboxDir, entryPoint: task.entry_point, emitFullToolArgs: true };
     const declared = process.env.BENCH_VERIFY_LAYERS;
     if (declared !== '') {
       const { parseVerifyLayers } = await import(path.join(SERVER, 'src/services/agent/verify-config.js'));
