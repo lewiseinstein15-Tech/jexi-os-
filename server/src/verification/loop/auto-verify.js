@@ -132,7 +132,32 @@ export async function verifyAfterEdit(ctx, layers = {}, { real = null } = {}) {
   for (const layer of realLayers) {
     const res = await realVerifyLayer(layer, ctx);
     results.push(res);
+    /* M21 — a layer that does not APPLY to this project (e.g. ESLint on a
+       Python sandbox) is skipped, not failed: `inapplicable` must not block the
+       cheaper-first loop before the layers that DO apply. A `fail` or `error`
+       still stops the loop. An `unverifiable` layer (the auto-detected runner
+       cannot check this edit — e.g. an exec-style pytest file) is skipped the
+       same way: it is neither a green tick nor a defect to inject. */
+    if (res.status === 'inapplicable' || res.status === 'unverifiable') continue;
     if (res.status !== 'pass') return finishFail(results, layer);
+  }
+
+  /* M21 — an all-skipped verify must NOT read as `verified`, and it must not
+     masquerade as a FAILURE either. If every real layer was inapplicable
+     (nothing could check the change — e.g. a flat sandbox with no lint runner
+     and no test suite), the honest answer is `unverifiable`: no green tick, but
+     also no "your work failed" message. Reporting it as a failure sent the
+     model into a rewrite loop (measured: 16 iterations rewriting the same
+     file) because it was told to fix something that was never broken. */
+  const ranSomething = results.some((r) => r.status === 'pass' || r.status === 'fail' || r.status === 'error');
+  if (!ranSomething && results.length) {
+    return {
+      ok: false,
+      unverifiable: true,
+      context: { verified: false, unverifiable: true, injectedFailure: null },
+      results,
+      reason: 'no applicable verification layer for this project — nothing was checked',
+    };
   }
 
   return {
@@ -143,7 +168,16 @@ export async function verifyAfterEdit(ctx, layers = {}, { real = null } = {}) {
 }
 
 function finishFail(results, failedLayer) {
-  const failed = results.find((r) => r.status !== 'pass');
+  /* M21 — report the layer that ACTUALLY blocked the loop, not the first
+     non-pass entry. With a language-gated lint, the first non-pass result is
+     now an `inapplicable` (skipped) layer; picking it by `status !== 'pass'`
+     would report "lint: no applicable lint command" while the real blocker —
+     e.g. a failing unit layer — is silently dropped from the injected failure
+     the model reads. Match the named failed layer, and prefer a genuine
+     fail/error over a skip. */
+  const failed = results.find((r) => r.layer === failedLayer)
+    || results.find((r) => r.status === 'fail' || r.status === 'error')
+    || results[results.length - 1];
   return {
     ok: false,
     context: {

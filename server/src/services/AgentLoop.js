@@ -51,6 +51,7 @@ import { buildOfferedTools } from './agent/ToolSetBuilder.js';
 import { isDisclosureCall, resolveDisclosureRequest } from './agent/ToolDisclosure.js';
 import { recordOutcome as recordCapabilityOutcome } from '../capability/registry/ledger.js'; // capability evidence ledger
 import { verifyAfterEdit } from '../verification/loop/auto-verify.js'; // JEXI-002 — the REAL verification subsystem
+import { extractTargetPath, isWriteInstruction } from './agent/ToolCallRecovery.js'; // M21 — target path + write-intent for fenced-code prose recovery
 
 // DeepSeek-Harness-style loop: more steps per turn (the rate limiter
 // protects free tiers), with turn/step events streamed like a session event log.
@@ -544,6 +545,11 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         // the same permission/risk/approval path as every other tool call.
         // runToolCalls now ALSO carries the child contract gate.
         executeToolCalls: runToolCalls,
+        // M21 — a coding turn's FIRST round forces a native tool call
+        // (tool_choice:'required') so the model cannot answer a coding task
+        // with prose and leave the turn with zero calls. Later rounds relax to
+        // 'auto'. Off for non-coding turns, so a plain answer is never forced.
+        forceToolCall: codingIntent,
         // M15 — a tool call the model wrote as PROSE (no native tool_calls) is
         // recovered and executed through the same gated path; say so on the
         // stream so the recovery is visible rather than silent.
@@ -565,6 +571,15 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
         // menu each round, so a `request_tools` call in one round makes its
         // tools callable in the next.
         getTools: currentSchemas,
+        // M21 — the turn's own instruction names the file being written; hand
+        // it to prose recovery so a fenced code block with no path reference
+        // still lands on the right file. `writeInstruction` is true only when
+        // the turn is a coding turn AND the instruction actually asks for a
+        // write, so an "explain this file" turn can never overwrite it.
+        recoveryHint: {
+          targetPath: extractTargetPath(query),
+          writeInstruction: codingIntent && isWriteInstruction(query),
+        },
       }
     );
     finalText = res.ok ? res.text : '';

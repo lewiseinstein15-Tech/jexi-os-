@@ -1,0 +1,186 @@
+{
+  "manifest": {
+    "benchmark": "humaneval",
+    "mission": "M21",
+    "dataset": {
+      "repo": "openai/openai_humaneval",
+      "config": "openai_humaneval",
+      "split": "test",
+      "sha256": "094a17ace7a536483e83cd6bb0348c9df1e2bb532ff4e09961665a8b9414c157",
+      "numRowsTotal": 164
+    },
+    "leg": "jexi",
+    "promptVariant": "A",
+    "promptLabel": "current",
+    "queryMode": "fs-names",
+    "schemaMode": "as-shipped",
+    "toolProfile": "full",
+    "model": "llama3.2:3b",
+    "providerLock": "ollama",
+    "modelProviderEnv": "ollama",
+    "ollamaHost": "http://127.0.0.1:11434",
+    "tasks": 2,
+    "taskIds": [
+      "HumanEval/0",
+      "HumanEval/1"
+    ],
+    "gitCommit": "6a5bc68b9be41677b8be9756757aeddb17546be0",
+    "gitDirty": true,
+    "grader": "local subprocess (NOT isolated)",
+    "node": "v24.21.0",
+    "platform": "linux/x64",
+    "startedAt": "2026-11-05T01:28:24.593Z",
+    "runId": "m21-probe-A-fs-names-2026-11-05T01-28-24-593Z"
+  },
+  "resolved": 0,
+  "passed": 0,
+  "failed": 2,
+  "metrics": {
+    "total": 2,
+    "resolved": 0,
+    "resolvedRate": 0,
+    "gradedGreen": 0,
+    "gradedGreenRate": 0,
+    "timeouts": 0,
+    "agentErrors": 0,
+    "graderErrors": 0,
+    "unresolvedGreen": 0,
+    "providerLock": "ollama",
+    "ladderSlid": 0,
+    "validToolCallTasks": 1,
+    "toolExecutedTasks": 0,
+    "parseableCodeTasks": 2,
+    "syntaxErrorTasks": 0,
+    "wroteSolutionTasks": 0,
+    "proseInsteadOfCallTasks": 1,
+    "promptStats": {
+      "chars": 25178,
+      "estTokens": 6295
+    }
+  },
+  "rows": [
+    {
+      "taskId": "HumanEval/0",
+      "entryPoint": "has_close_elements",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 222924,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "promptVariant": "A",
+      "promptLabel": "current",
+      "queryMode": "fs-names",
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "recovery": null
+        }
+      ],
+      "nativeCalls": 1,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [],
+      "malformedRetry": true,
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": false,
+          "error": "path escapes root: /tmp/openhands-agent-server-37/tmux-10001/openhands-ebb65f9a2985491e8a9a0111499c2502"
+        }
+      ],
+      "wroteSolution": false,
+      "proseInsteadOfCall": false,
+      "answerHead": "The error message indicates that the path `/tmp/openhands-agent-server-37/tmux-10001/openhands-ebb65f9a2985491e8a9a0111499c2502` is trying to escape the root directory. This is likely due to the tmux session trying to access a file or directory that is outside of its allowed path.\n\nTo resolve this issue, you can try one of the following solutions:\n\n1. Run the tool call with the `--allow-root` option:\n```\ntool_call --allow-root <tool>\n```\nThis will allow the tool to access the root directory.\n\n2. Use a relative path instead of an absolute path:\n```\ntool_call <tool> <relative_path>\n```\nFor example, if you want to access a file in the `openhands-ebb65f9a2985491e8a9a0111499c2502` directory, you ",
+      "answerTail": " may need to investigate further to determine the cause of the issue and find a solution.\n\n[UNVERIFIED] Every tool call in this turn failed (fs_write) — path escapes root: /tmp/openhands-agent-server-37/tmux-10001/openhands-ebb65f9a2985491e8a9a0111499c2502. No outcome was produced, so nothing here is a confirmed result.\n\nVerification state: unverified — every tool call this turn failed (fs_write).",
+      "answerHasCodeBlock": true,
+      "answerLooksLikeCall": false,
+      "iterations": 16,
+      "solutionHead": "from typing import List\n\n\ndef has_close_elements(numbers: List[float], threshold: float) -> bool:\n    \"\"\" Check if in given list of numbers, are any two numbers closer to each other than\n    given threshold.\n    >>> has_close_elements([1.0, 2.0, 3.0], 0.5)\n    False\n    >>> has_close_elements([1.0, 2.8, 3.0, 4.0, 5.0, 2.0], 0.3)\n    True\n    \"\"\"\n\n",
+      "graderRan": true,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m21-probe-lwyRnI/HumanEval_0/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 20, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "jexiVerification": {
+        "status": "unverified",
+        "canClaimSuccess": false,
+        "reason": "every tool call this turn failed (fs_write)",
+        "rounds": 0,
+        "layers": []
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 1,
+        "tools": 8,
+        "durationMs": 222886,
+        "verification": "unverified"
+      }
+    },
+    {
+      "taskId": "HumanEval/1",
+      "entryPoint": "separate_paren_groups",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 231590,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "promptVariant": "A",
+      "promptLabel": "current",
+      "queryMode": "fs-names",
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "nativeCalls": 0,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [],
+      "malformedRetry": false,
+      "toolResults": [],
+      "wroteSolution": false,
+      "proseInsteadOfCall": true,
+      "answerHead": "Here is the complete implementation of the Python function `separate_paren_groups` in a file `solution.py`:\n\n```python\nimport re\nfrom typing import List\n\ndef separate_paren_groups(paren_string: str) -> List[str]:\n    \"\"\" Input to this function is a string containing multiple groups of nested parentheses. Your goal is to\n    separate those group into separate strings and return the list of those.\n    Separate groups are balanced (each open brace is properly closed) and not nested within each other\n    Ignore any spaces in the input string.\n    >>> separate_paren_groups('( ) (( )) (( )( ))')\n    ['()', '(())', '(()())']\n    \"\"\"\n    # Remove spaces from the input string\n    paren_string = paren",
+      "answerTail": "rite the `solution.py` file to disk and run the `test_separate_paren_groups.py` file using the `term_execute` tool. If the test file passes, it will print a success message.\n\n[UNVERIFIED] This task required real tool evidence and the turn produced none — no file was written, no test ran, nothing was confirmed.\n\nVerification state: unverified — the task required tool evidence and none was produced.",
+      "answerHasCodeBlock": true,
+      "answerLooksLikeCall": false,
+      "iterations": 1,
+      "solutionHead": "from typing import List\n\n\ndef separate_paren_groups(paren_string: str) -> List[str]:\n    \"\"\" Input to this function is a string containing multiple groups of nested parentheses. Your goal is to\n    separate those group into separate strings and return the list of those.\n    Separate groups are balanced (each open brace is properly closed) and not nested within each other\n    Ignore any spaces in t",
+      "graderRan": true,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m21-probe-lwyRnI/HumanEval_1/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 22, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "jexiVerification": {
+        "status": "unverified",
+        "canClaimSuccess": false,
+        "reason": "the task required tool evidence and none was produced",
+        "rounds": 0,
+        "layers": []
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 0,
+        "tools": 8,
+        "durationMs": 231548,
+        "verification": "unverified"
+      }
+    }
+  ]
+}

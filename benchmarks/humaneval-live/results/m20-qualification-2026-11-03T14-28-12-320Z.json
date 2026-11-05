@@ -1,0 +1,1214 @@
+{
+  "manifest": {
+    "benchmark": "humaneval",
+    "mission": "M20",
+    "dataset": {
+      "repo": "openai/openai_humaneval",
+      "config": "openai_humaneval",
+      "split": "test",
+      "sha256": "094a17ace7a536483e83cd6bb0348c9df1e2bb532ff4e09961665a8b9414c157",
+      "numRowsTotal": 164
+    },
+    "leg": "jexi",
+    "schemaMode": "as-shipped",
+    "toolProfile": "full",
+    "model": "llama3.2:3b",
+    "providerLock": "ollama",
+    "modelProviderEnv": "ollama",
+    "ollamaHost": "http://127.0.0.1:11434",
+    "tasks": 15,
+    "taskIds": [
+      "HumanEval/0",
+      "HumanEval/1",
+      "HumanEval/2",
+      "HumanEval/3",
+      "HumanEval/4",
+      "HumanEval/5",
+      "HumanEval/6",
+      "HumanEval/7",
+      "HumanEval/8",
+      "HumanEval/9",
+      "HumanEval/10",
+      "HumanEval/11",
+      "HumanEval/12",
+      "HumanEval/13",
+      "HumanEval/14"
+    ],
+    "gitCommit": "6a5bc68b9be41677b8be9756757aeddb17546be0",
+    "gitDirty": true,
+    "grader": "local subprocess (NOT isolated)",
+    "gradedWithoutIsolation": true,
+    "node": "v24.21.0",
+    "platform": "linux/x64",
+    "startedAt": "2026-11-03T14:28:12.320Z",
+    "runId": "m20-qualification-2026-11-03T14-28-12-320Z"
+  },
+  "resolved": 1,
+  "passed": 1,
+  "failed": 14,
+  "metrics": {
+    "total": 15,
+    "resolved": 1,
+    "resolvedRate": 0.06666666666666667,
+    "gradedGreen": 2,
+    "gradedGreenRate": 0.13333333333333333,
+    "timeouts": 5,
+    "agentErrors": 0,
+    "graderErrors": 0,
+    "unresolvedGreen": 1,
+    "providerLock": "ollama",
+    "ladderSlid": 0,
+    "providersObserved": [
+      "ollama"
+    ],
+    "validToolCallTasks": 7,
+    "toolExecutedTasks": 5,
+    "parseableCodeTasks": 13,
+    "syntaxErrorTasks": 2
+  },
+  "rows": [
+    {
+      "taskId": "HumanEval/0",
+      "entryPoint": "has_close_elements",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 210035,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": "llama3.2:3b",
+          "ok": true,
+          "ms": 208873,
+          "lane": "tools"
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "recovery": null
+        },
+        {
+          "name": "fs_write",
+          "recovery": null
+        }
+      ],
+      "nativeCalls": 2,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [],
+      "malformedRetry": true,
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": false,
+          "error": "path escapes root: /tmp/openhands-agent-server-37/tmux-10001/openhands-b47cbb9a588d4ee7a9465b0e9bffca27,159,0, pane %1/output.log"
+        },
+        {
+          "name": "fs_write",
+          "ok": false,
+          "error": "path escapes root: /tmp/openhands-agent-server-37/tmux-10001/openhands-b47cbb9a588d4ee7a9465b0e9bffca27,159,0, pane %1/output.log"
+        }
+      ],
+      "filesWritten": [
+        "solution.py",
+        "test_has_close_elements.py"
+      ],
+      "wroteSolution": true,
+      "solutionHead": "from typing import List\n\n\ndef has_close_elements(numbers: List[float], threshold: float) -> bool:\n    \"\"\" Check if in given list of numbers, are any two numbers closer to each other than\n    given threshold.\n    >>> has_close_elements([1.0, 2.0, 3.0], 0.5)\n    False\n    >>> has_close_elements([1.0, 2.8, 3.0, 4.0, 5.0, 2.0], 0.3)\n    True\n    \"\"\"\n\n",
+      "literalNewlines": 0,
+      "realNewlines": 12,
+      "graderRan": true,
+      "graderExitCode": 1,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-live-zhhDPd/HumanEval_0/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 20, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "completionGate": {
+        "status": "unresolved",
+        "reason": "grader: solution did not pass"
+      },
+      "jexiVerification": {
+        "status": "unverified",
+        "canClaimSuccess": false,
+        "reason": "every tool call this turn failed (fs_write)",
+        "rounds": 0,
+        "layers": []
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 2,
+        "tools": 8,
+        "durationMs": 208985,
+        "verification": "unverified"
+      },
+      "recoveryLogs": [
+        "↻ the model's tool call had unparseable arguments — asking once for a valid native call."
+      ]
+    },
+    {
+      "taskId": "HumanEval/1",
+      "entryPoint": "separate_paren_groups",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": true,
+      "resolveReason": "timeout: agent loop timed out after 300000ms",
+      "durationMs": 300050,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "providersThatServed": [],
+      "providerAttempts": [],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "recovery": null
+        }
+      ],
+      "nativeCalls": 1,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [],
+      "malformedRetry": false,
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": true,
+          "error": null
+        }
+      ],
+      "filesWritten": [
+        "solution.py",
+        "test_separate_paren_groups.py"
+      ],
+      "wroteSolution": true,
+      "solutionHead": "from typing import List\n\ndef separate_paren_groups(paren_string: str) -> List[str]:\n    \"\"\"\n    Input to this function is a string containing multiple groups of nested parentheses. Your goal is to\n    separate those group into separate strings and return the list of those.\n    Separate groups are balanced (each open brace is properly closed) and not nested within each other\n    Ignore any spaces i",
+      "literalNewlines": 0,
+      "realNewlines": 21,
+      "graderRan": true,
+      "graderExitCode": 1,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-live-zhhDPd/HumanEval_1/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 22, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "completionGate": {
+        "status": "unresolved",
+        "reason": "timeout: agent loop timed out after 300000ms"
+      },
+      "jexiVerification": null,
+      "agentError": "agent loop timed out after 300000ms",
+      "stats": null,
+      "recoveryLogs": [
+        "❌ verification failed after fs_write on {\"path\":\"/tmp/m20-live-zhhDPd/HumanEval_1/solution.py\",\"content\":\"from typing import List\\n\\ndef separate_paren_groups(p (lint): linter did not run: Oops! Something went wrong! :(\n\nESLint: 10.8.1\n\nNo files matching the pattern \"src\" were found.\nPlease check for typing mistakes in the pattern. — replanning with this evidence."
+      ]
+    },
+    {
+      "taskId": "HumanEval/2",
+      "entryPoint": "truncate_number",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 204426,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": "llama3.2:3b",
+          "ok": true,
+          "ms": 438986,
+          "lane": "tools"
+        },
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 114357,
+          "lane": "plain-text-fallback"
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "nativeCalls": 0,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [],
+      "malformedRetry": false,
+      "toolResults": [],
+      "filesWritten": [
+        "solution.py",
+        "test_truncate_number.py"
+      ],
+      "wroteSolution": true,
+      "solutionHead": "\n\ndef truncate_number(number: float) -> float:\n    \"\"\" Given a positive floating point number, it can be decomposed into\n    and integer part (largest integer smaller than given number) and decimals\n    (leftover part always smaller than 1).\n\n    Return the decimal part of the number.\n    >>> truncate_number(3.5)\n    0.5\n    \"\"\"\n\n",
+      "literalNewlines": 0,
+      "realNewlines": 12,
+      "graderRan": true,
+      "graderExitCode": 1,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-live-zhhDPd/HumanEval_2/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "completionGate": {
+        "status": "unresolved",
+        "reason": "grader: solution did not pass"
+      },
+      "jexiVerification": {
+        "status": "unverified",
+        "canClaimSuccess": false,
+        "reason": "the task required tool evidence and none was produced",
+        "rounds": 0,
+        "layers": []
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 0,
+        "tools": 8,
+        "durationMs": 204385,
+        "verification": "unverified"
+      },
+      "recoveryLogs": []
+    },
+    {
+      "taskId": "HumanEval/3",
+      "entryPoint": "below_zero",
+      "pass": true,
+      "gradedPass": true,
+      "agentTimedOut": false,
+      "resolveReason": null,
+      "durationMs": 136481,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": "llama3.2:3b",
+          "ok": true,
+          "ms": 136431,
+          "lane": "tools"
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "recovery": null
+        }
+      ],
+      "nativeCalls": 1,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [
+        {
+          "tool": "fs_write",
+          "reason": "decoded-literal-newlines",
+          "stats": {
+            "before": {
+              "literalNl": 11,
+              "literalTab": 0,
+              "realNl": 0
+            },
+            "after": {
+              "literalNl": 0,
+              "literalTab": 0,
+              "realNl": 11
+            }
+          }
+        }
+      ],
+      "malformedRetry": false,
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": true,
+          "error": null
+        }
+      ],
+      "filesWritten": [
+        "solution.py",
+        "test_below_zero.py"
+      ],
+      "wroteSolution": true,
+      "solutionHead": "from typing import List\n\ndef below_zero(operations: List[int]) -> bool:\n    balance = 0\n\n    for op in operations:\n        balance += op\n\n        if balance < 0:\n            return True\n\n    return False",
+      "literalNewlines": 0,
+      "realNewlines": 11,
+      "graderRan": true,
+      "graderExitCode": 0,
+      "graderVerdict": "PASS",
+      "gradeOutputTail": "HUMANEVAL_GRADE=PASS",
+      "completionGate": {
+        "status": "resolved",
+        "reason": null
+      },
+      "jexiVerification": {
+        "status": "unverified",
+        "canClaimSuccess": false,
+        "reason": "linter did not run: Oops! Something went wrong! :(\n\nESLint: 10.8.1\n\nNo files matching the pattern \"src\" were found.\nPlease check for typing mistakes in the pattern.",
+        "rounds": 1,
+        "layers": [
+          {
+            "layer": "lint",
+            "status": "error"
+          }
+        ]
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 1,
+        "tools": 8,
+        "durationMs": 136448,
+        "verification": "unverified"
+      },
+      "recoveryLogs": [
+        "❌ verification failed after fs_write on {\"path\":\"/tmp/m20-live-zhhDPd/HumanEval_3/solution.py\",\"content\":\"from typing import List\\\\n\\\\ndef below_zero(operations (lint): linter did not run: Oops! Something went wrong! :(\n\nESLint: 10.8.1\n\nNo files matching the pattern \"src\" were found.\nPlease check for typing mistakes in the pattern. — replanning with this evidence."
+      ]
+    },
+    {
+      "taskId": "HumanEval/4",
+      "entryPoint": "mean_absolute_deviation",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 132139,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 42083,
+          "lane": "plain-text-fallback"
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "data_json",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "nativeCalls": 0,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [],
+      "malformedRetry": false,
+      "toolResults": [],
+      "filesWritten": [
+        "solution.py",
+        "test_mean_absolute_deviation.py"
+      ],
+      "wroteSolution": true,
+      "solutionHead": "from typing import List\n\n\ndef mean_absolute_deviation(numbers: List[float]) -> float:\n    \"\"\" For a given list of input numbers, calculate Mean Absolute Deviation\n    around the mean of this dataset.\n    Mean Absolute Deviation is the average absolute difference between each\n    element and a centerpoint (mean in this case):\n    MAD = average | x - x_mean |\n    >>> mean_absolute_deviation([1.0, 2.",
+      "literalNewlines": 0,
+      "realNewlines": 13,
+      "graderRan": true,
+      "graderExitCode": 1,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-live-zhhDPd/HumanEval_4/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 16, in <module>\n  File \"<string>\", line 10, in check\nTypeError: unsupported operand type(s) for -: 'NoneType' and 'float'",
+      "completionGate": {
+        "status": "unresolved",
+        "reason": "grader: solution did not pass"
+      },
+      "jexiVerification": {
+        "status": "unverified",
+        "canClaimSuccess": false,
+        "reason": "the task required tool evidence and none was produced",
+        "rounds": 0,
+        "layers": []
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 0,
+        "tools": 9,
+        "durationMs": 132102,
+        "verification": "unverified"
+      },
+      "recoveryLogs": []
+    },
+    {
+      "taskId": "HumanEval/5",
+      "entryPoint": "intersperse",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 106408,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": "llama3.2:3b",
+          "ok": true,
+          "ms": 106356,
+          "lane": "tools"
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "recovery": {
+            "path": "recovered",
+            "aliasedFrom": null
+          }
+        }
+      ],
+      "nativeCalls": 0,
+      "recoveredCalls": [
+        {
+          "name": "fs_write",
+          "aliasedFrom": null,
+          "path": "recovered"
+        }
+      ],
+      "aliasResolved": 0,
+      "payloadNormalized": [],
+      "malformedRetry": false,
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": true,
+          "error": null
+        }
+      ],
+      "filesWritten": [
+        "solution.py",
+        "test_intersperse.py"
+      ],
+      "wroteSolution": true,
+      "solutionHead": "from typing import List\n\ndef intersperse(numbers: List[int], delimeter: int) -> List[int]:\n    \"\"\"\n    if not numbers:\n        return []\n    result = []\n    for i in range(len(numbers)-1):\n        result.append(numbers[i])\n        result.append(delimeter)\n    result.append(numbers[-1])\n    return result\n\n# Test the function\nif __name__ == \"__main__\":\n    print(intersperse([1, 2, 3], 4))",
+      "literalNewlines": 0,
+      "realNewlines": 15,
+      "graderRan": true,
+      "graderExitCode": 1,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-live-zhhDPd/HumanEval_5/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 4\n    \"\"\"\n    ^\nSyntaxError: unterminated triple-quoted string literal (detected at line 16)",
+      "completionGate": {
+        "status": "unresolved",
+        "reason": "grader: solution did not pass"
+      },
+      "jexiVerification": {
+        "status": "unverified",
+        "canClaimSuccess": false,
+        "reason": "linter did not run: Oops! Something went wrong! :(\n\nESLint: 10.8.1\n\nNo files matching the pattern \"src\" were found.\nPlease check for typing mistakes in the pattern.",
+        "rounds": 1,
+        "layers": [
+          {
+            "layer": "lint",
+            "status": "error"
+          }
+        ]
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 1,
+        "tools": 8,
+        "durationMs": 106372,
+        "verification": "unverified"
+      },
+      "recoveryLogs": [
+        "♻ recovered 1 tool call(s) the model wrote as text instead of a native call: fs_write — executing through the normal gates.",
+        "❌ verification failed after fs_write on {\"path\":\"/tmp/m20-live-zhhDPd/HumanEval_5/solution.py\",\"content\":\"from typing import List\\n\\ndef intersperse(numbers: Li (lint): linter did not run: Oops! Something went wrong! :(\n\nESLint: 10.8.1\n\nNo files matching the pattern \"src\" were found.\nPlease check for typing mistakes in the pattern. — replanning with this evidence."
+      ]
+    },
+    {
+      "taskId": "HumanEval/6",
+      "entryPoint": "parse_nested_parens",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": true,
+      "resolveReason": "timeout: agent loop timed out after 300000ms",
+      "durationMs": 300096,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "providersThatServed": [],
+      "providerAttempts": [],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "recovery": null
+        }
+      ],
+      "nativeCalls": 1,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [
+        {
+          "tool": "fs_write",
+          "reason": "decoded-literal-newlines",
+          "stats": {
+            "before": {
+              "literalNl": 25,
+              "literalTab": 0,
+              "realNl": 2
+            },
+            "after": {
+              "literalNl": 24,
+              "literalTab": 0,
+              "realNl": 3
+            }
+          }
+        }
+      ],
+      "malformedRetry": false,
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": true,
+          "error": null
+        }
+      ],
+      "filesWritten": [
+        "solution.py",
+        "test_parse_nested_parens.py"
+      ],
+      "wroteSolution": true,
+      "solutionHead": "from typing import List\n\ndef parse_nested_parens(paren_string: str) -> List[int]:\n    \"\"\" Input to this function is a string represented multiple groups for nested parentheses separated by spaces.\\n    For each of the group, output the deepest level of nesting of parentheses.\\n    E.g. (()()) has maximum two levels of nesting while ((())) has three.\\n    \\n    >>> parse_nested_parens('(()()) ((())",
+      "literalNewlines": 24,
+      "realNewlines": 3,
+      "graderRan": true,
+      "graderExitCode": 1,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": " 0\\n        for char in group:\\n            if char == '(':\\n                current_depth += 1\\n            elif char == ')':\\n                current_depth -= 1\\n                if current_depth == 0:\\n                    max_depth = max(max_depth, current_depth)\\n        return max_depth\\n\\n    def parse_nested_parens(paren_string: str) -> List[int]:\\n        groups = paren_string.split()\\n        result = []\\n        for group in groups:\\n            result.append(find_max_depth(group))\\n        return result\n    ^\nSyntaxError: unterminated triple-quoted string literal (detected at line 4)",
+      "completionGate": {
+        "status": "unresolved",
+        "reason": "timeout: agent loop timed out after 300000ms"
+      },
+      "jexiVerification": null,
+      "agentError": "agent loop timed out after 300000ms",
+      "stats": null,
+      "recoveryLogs": [
+        "❌ verification failed after fs_write on {\"path\":\"/tmp/m20-live-zhhDPd/HumanEval_6/solution.py\",\"content\":\"from typing import List\\n\\ndef parse_nested_parens(par (lint): linter did not run: Oops! Something went wrong! :(\n\nESLint: 10.8.1\n\nNo files matching the pattern \"src\" were found.\nPlease check for typing mistakes in the pattern. — replanning with this evidence."
+      ]
+    },
+    {
+      "taskId": "HumanEval/7",
+      "entryPoint": "filter_by_substring",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": true,
+      "resolveReason": "timeout: agent loop timed out after 300000ms",
+      "durationMs": 300050,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "providersThatServed": [],
+      "providerAttempts": [],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "nativeCalls": 0,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [],
+      "malformedRetry": false,
+      "toolResults": [],
+      "filesWritten": [
+        "solution.py",
+        "test_filter_by_substring.py"
+      ],
+      "wroteSolution": true,
+      "solutionHead": "from typing import List\n\n\ndef filter_by_substring(strings: List[str], substring: str) -> List[str]:\n    \"\"\" Filter an input list of strings only for ones that contain given substring\n    >>> filter_by_substring([], 'a')\n    []\n    >>> filter_by_substring(['abc', 'bacd', 'cde', 'array'], 'a')\n    ['abc', 'bacd', 'array']\n    \"\"\"\n\n",
+      "literalNewlines": 0,
+      "realNewlines": 11,
+      "graderRan": true,
+      "graderExitCode": 1,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-live-zhhDPd/HumanEval_7/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 16, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "completionGate": {
+        "status": "unresolved",
+        "reason": "timeout: agent loop timed out after 300000ms"
+      },
+      "jexiVerification": null,
+      "agentError": "agent loop timed out after 300000ms",
+      "stats": null,
+      "recoveryLogs": []
+    },
+    {
+      "taskId": "HumanEval/8",
+      "entryPoint": "sum_product",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 242481,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 96580,
+          "lane": "plain-text-fallback"
+        },
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 152467,
+          "lane": "plain-text-fallback"
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "nativeCalls": 0,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [],
+      "malformedRetry": false,
+      "toolResults": [],
+      "filesWritten": [
+        "solution.py",
+        "test_sum_product.py"
+      ],
+      "wroteSolution": true,
+      "solutionHead": "from typing import List, Tuple\n\n\ndef sum_product(numbers: List[int]) -> Tuple[int, int]:\n    \"\"\" For a given list of integers, return a tuple consisting of a sum and a product of all the integers in a list.\n    Empty sum should be equal to 0 and empty product should be equal to 1.\n    >>> sum_product([])\n    (0, 1)\n    >>> sum_product([1, 2, 3, 4])\n    (10, 24)\n    \"\"\"\n\n",
+      "literalNewlines": 0,
+      "realNewlines": 12,
+      "graderRan": true,
+      "graderExitCode": 1,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-live-zhhDPd/HumanEval_8/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 17, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "completionGate": {
+        "status": "unresolved",
+        "reason": "grader: solution did not pass"
+      },
+      "jexiVerification": {
+        "status": "unverified",
+        "canClaimSuccess": false,
+        "reason": "the task required tool evidence and none was produced",
+        "rounds": 0,
+        "layers": []
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 0,
+        "tools": 8,
+        "durationMs": 242442,
+        "verification": "unverified"
+      },
+      "recoveryLogs": []
+    },
+    {
+      "taskId": "HumanEval/9",
+      "entryPoint": "rolling_max",
+      "pass": false,
+      "gradedPass": true,
+      "agentTimedOut": true,
+      "resolveReason": "timeout: agent loop timed out after 300000ms",
+      "durationMs": 300042,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "providersThatServed": [],
+      "providerAttempts": [],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "recovery": null
+        }
+      ],
+      "nativeCalls": 1,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [
+        {
+          "tool": "fs_write",
+          "reason": "decoded-literal-newlines",
+          "stats": {
+            "before": {
+              "literalNl": 8,
+              "literalTab": 0,
+              "realNl": 4
+            },
+            "after": {
+              "literalNl": 0,
+              "literalTab": 0,
+              "realNl": 12
+            }
+          }
+        }
+      ],
+      "malformedRetry": false,
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": true,
+          "error": null
+        }
+      ],
+      "filesWritten": [
+        "solution.py",
+        "test_rolling_max.py"
+      ],
+      "wroteSolution": true,
+      "solutionHead": "from typing import List, Tuple\n\ndef rolling_max(numbers: List[int]) -> List[int]:\n    \n    result = []\n    max_so_far = float('-inf')\n\n    for num in numbers:\n        max_so_far = max(max_so_far, num)\n        result.append(max_so_far)\n\n    return result\n",
+      "literalNewlines": 0,
+      "realNewlines": 12,
+      "graderRan": true,
+      "graderExitCode": 0,
+      "graderVerdict": "PASS",
+      "gradeOutputTail": "HUMANEVAL_GRADE=PASS",
+      "completionGate": {
+        "status": "unresolved",
+        "reason": "timeout: agent loop timed out after 300000ms"
+      },
+      "jexiVerification": null,
+      "agentError": "agent loop timed out after 300000ms",
+      "stats": null,
+      "recoveryLogs": [
+        "❌ verification failed after fs_write on {\"path\":\"/tmp/m20-live-zhhDPd/HumanEval_9/solution.py\",\"content\":\"from typing import List, Tuple\\n\\ndef rolling_max(numb (lint): linter did not run: Oops! Something went wrong! :(\n\nESLint: 10.8.1\n\nNo files matching the pattern \"src\" were found.\nPlease check for typing mistakes in the pattern. — replanning with this evidence."
+      ]
+    },
+    {
+      "taskId": "HumanEval/10",
+      "entryPoint": "make_palindrome",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": true,
+      "resolveReason": "timeout: agent loop timed out after 300000ms",
+      "durationMs": 300049,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "providersThatServed": [],
+      "providerAttempts": [],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "nativeCalls": 0,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [],
+      "malformedRetry": false,
+      "toolResults": [],
+      "filesWritten": [
+        "solution.py",
+        "test_make_palindrome.py"
+      ],
+      "wroteSolution": true,
+      "solutionHead": "\n\ndef is_palindrome(string: str) -> bool:\n    \"\"\" Test if given string is a palindrome \"\"\"\n    return string == string[::-1]\n\n\ndef make_palindrome(string: str) -> str:\n    \"\"\" Find the shortest palindrome that begins with a supplied string.\n    Algorithm idea is simple:\n    - Find the longest postfix of supplied string that is a palindrome.\n    - Append to the end of the string reverse of a string",
+      "literalNewlines": 0,
+      "realNewlines": 20,
+      "graderRan": true,
+      "graderExitCode": 1,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-live-zhhDPd/HumanEval_10/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 17, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "completionGate": {
+        "status": "unresolved",
+        "reason": "timeout: agent loop timed out after 300000ms"
+      },
+      "jexiVerification": null,
+      "agentError": "agent loop timed out after 300000ms",
+      "stats": null,
+      "recoveryLogs": []
+    },
+    {
+      "taskId": "HumanEval/11",
+      "entryPoint": "string_xor",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 90031,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "providersThatServed": [],
+      "providerAttempts": [],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "nativeCalls": 0,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [],
+      "malformedRetry": false,
+      "toolResults": [],
+      "filesWritten": [
+        "solution.py",
+        "test_string_xor.py"
+      ],
+      "wroteSolution": true,
+      "solutionHead": "from typing import List\n\n\ndef string_xor(a: str, b: str) -> str:\n    \"\"\" Input are two strings a and b consisting only of 1s and 0s.\n    Perform binary XOR on these inputs and return result also as a string.\n    >>> string_xor('010', '110')\n    '100'\n    \"\"\"\n\n",
+      "literalNewlines": 0,
+      "realNewlines": 10,
+      "graderRan": true,
+      "graderExitCode": 1,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-live-zhhDPd/HumanEval_11/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "completionGate": {
+        "status": "unresolved",
+        "reason": "grader: solution did not pass"
+      },
+      "jexiVerification": {
+        "status": "unverified",
+        "canClaimSuccess": false,
+        "reason": "the task required tool evidence and none was produced",
+        "rounds": 0,
+        "layers": []
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 0,
+        "tools": 8,
+        "durationMs": 89978,
+        "verification": "unverified"
+      },
+      "recoveryLogs": []
+    },
+    {
+      "taskId": "HumanEval/12",
+      "entryPoint": "longest",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 131871,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 122986,
+          "lane": "plain-text-fallback"
+        },
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 41804,
+          "lane": "plain-text-fallback"
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "nativeCalls": 0,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [],
+      "malformedRetry": false,
+      "toolResults": [],
+      "filesWritten": [
+        "solution.py",
+        "test_longest.py"
+      ],
+      "wroteSolution": true,
+      "solutionHead": "from typing import List, Optional\n\n\ndef longest(strings: List[str]) -> Optional[str]:\n    \"\"\" Out of list of strings, return the longest one. Return the first one in case of multiple\n    strings of the same length. Return None in case the input list is empty.\n    >>> longest([])\n\n    >>> longest(['a', 'b', 'c'])\n    'a'\n    >>> longest(['a', 'bb', 'ccc'])\n    'ccc'\n    \"\"\"\n\n",
+      "literalNewlines": 0,
+      "realNewlines": 14,
+      "graderRan": true,
+      "graderExitCode": 1,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-live-zhhDPd/HumanEval_12/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 11, in check\nAssertionError",
+      "completionGate": {
+        "status": "unresolved",
+        "reason": "grader: solution did not pass"
+      },
+      "jexiVerification": {
+        "status": "unverified",
+        "canClaimSuccess": false,
+        "reason": "the task required tool evidence and none was produced",
+        "rounds": 0,
+        "layers": []
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 0,
+        "tools": 8,
+        "durationMs": 131827,
+        "verification": "unverified"
+      },
+      "recoveryLogs": []
+    },
+    {
+      "taskId": "HumanEval/13",
+      "entryPoint": "greatest_common_divisor",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 179218,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": "llama3.2:3b",
+          "ok": true,
+          "ms": 179166,
+          "lane": "tools"
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "recovery": null
+        }
+      ],
+      "nativeCalls": 1,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [],
+      "malformedRetry": true,
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": false,
+          "error": "path escapes root: /tmp/openhands-agent-server-37/tmux-10001/openhands-b47cbb9a588d4ee7a9465b0e9bffca27,159,0"
+        }
+      ],
+      "filesWritten": [
+        "solution.py",
+        "test_greatest_common_divisor.py"
+      ],
+      "wroteSolution": true,
+      "solutionHead": "\n\ndef greatest_common_divisor(a: int, b: int) -> int:\n    \"\"\" Return a greatest common divisor of two integers a and b\n    >>> greatest_common_divisor(3, 5)\n    1\n    >>> greatest_common_divisor(25, 15)\n    5\n    \"\"\"\n\n",
+      "literalNewlines": 0,
+      "realNewlines": 10,
+      "graderRan": true,
+      "graderExitCode": 1,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-live-zhhDPd/HumanEval_13/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 16, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "completionGate": {
+        "status": "unresolved",
+        "reason": "grader: solution did not pass"
+      },
+      "jexiVerification": {
+        "status": "unverified",
+        "canClaimSuccess": false,
+        "reason": "every tool call this turn failed (fs_write)",
+        "rounds": 0,
+        "layers": []
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 1,
+        "tools": 8,
+        "durationMs": 179184,
+        "verification": "unverified"
+      },
+      "recoveryLogs": [
+        "↻ the model's tool call had unparseable arguments — asking once for a valid native call."
+      ]
+    },
+    {
+      "taskId": "HumanEval/14",
+      "entryPoint": "all_prefixes",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 146966,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 56910,
+          "lane": "plain-text-fallback"
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "nativeCalls": 0,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [],
+      "malformedRetry": false,
+      "toolResults": [],
+      "filesWritten": [
+        "solution.py",
+        "test_all_prefixes.py"
+      ],
+      "wroteSolution": true,
+      "solutionHead": "from typing import List\n\n\ndef all_prefixes(string: str) -> List[str]:\n    \"\"\" Return list of all prefixes from shortest to longest of the input string\n    >>> all_prefixes('abc')\n    ['a', 'ab', 'abc']\n    \"\"\"\n\n",
+      "literalNewlines": 0,
+      "realNewlines": 9,
+      "graderRan": true,
+      "graderExitCode": 1,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-live-zhhDPd/HumanEval_14/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "completionGate": {
+        "status": "unresolved",
+        "reason": "grader: solution did not pass"
+      },
+      "jexiVerification": {
+        "status": "unverified",
+        "canClaimSuccess": false,
+        "reason": "the task required tool evidence and none was produced",
+        "rounds": 0,
+        "layers": []
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 0,
+        "tools": 8,
+        "durationMs": 146925,
+        "verification": "unverified"
+      },
+      "recoveryLogs": []
+    }
+  ]
+}

@@ -1310,6 +1310,13 @@
         "--test",
         "tests/agi/test-m20-repair-loop.js"
       ]
+    },
+    {
+      "bin": "node",
+      "args": [
+        "--test",
+        "tests/agi/test-m21-execution-strategy.js"
+      ]
     }
   ]
 }

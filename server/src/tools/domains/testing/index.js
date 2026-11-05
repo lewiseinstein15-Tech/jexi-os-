@@ -37,8 +37,13 @@ export function detectProjectKind(root = process.cwd()) {
   const pyMarkers = /\[tool\.pytest|\[pytest\]|pytest/.test(pyproject + pytestIni + cfg('tox.ini'));
   const pySources = fs.existsSync(path.join(root, 'tests')) &&
     fs.readdirSync(path.join(root, 'tests')).some((f) => f.startsWith('test_') && f.endsWith('.py'));
+  /* M21 — a FLAT pytest project (test_*.py beside the module, no tests/ dir,
+     no pyproject) is the HumanEval sandbox shape. Without this it detected as
+     null, so the lint layer could not tell it apart from a JS repo and ran
+     ESLint against it. */
+  const pyFlat = (() => { try { return fs.readdirSync(root).some((f) => /^(test_.+|.+_test)\.py$/.test(f)); } catch { return false; } })();
 
-  if (pyMarkers || pySources || setupPy) return 'pytest';
+  if (pyMarkers || pySources || setupPy || pyFlat) return 'pytest';
 
   try {
     const pkg = JSON.parse(cfg('package.json') || '{}');

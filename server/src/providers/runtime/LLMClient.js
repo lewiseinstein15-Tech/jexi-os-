@@ -1152,7 +1152,7 @@ function providerToolConfig(provider, opts) {
  * stream for chat/completions. Accumulates text + tool_calls deltas and
  * calls onDelta(text) per chunk so the UI renders the answer live.
  */
-async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, temperature, onDelta, onThink, signal, idleMs, maxMs, maxTokens }) {
+async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, temperature, onDelta, onThink, signal, idleMs, maxMs, maxTokens, toolChoice }) {
   const controller = new AbortController();
   const onAbort = () => controller.abort();
   if (signal) { if (signal.aborted) controller.abort(); else signal.addEventListener('abort', onAbort, { once: true }); }
@@ -1174,7 +1174,7 @@ async function streamOpenAICompletion({ baseUrl, key, model, messages, tools, te
       body: JSON.stringify({
         model,
         messages,
-        ...(tools && tools.length ? { tools, tool_choice: 'auto' } : {}),
+        ...(tools && tools.length ? { tools, tool_choice: toolChoice || 'auto' } : {}),
         temperature: temperature ?? 0.3,
         ...(Number.isFinite(maxTokens) && maxTokens > 0 ? { max_tokens: maxTokens } : {}),
         stream: true,
@@ -1280,6 +1280,10 @@ async function __chatWithToolsOnce(provider, cfg, model, messages, tools, opts) 
       return streamOpenAICompletion({
         baseUrl: base, key: cfg.key, model, messages, tools,
         temperature: opts.temperature,
+        // M21 — the first tool round of a coding turn forces a call; later
+        // rounds relax to 'auto'. Threaded through so the OpenAI-compatible
+        // lanes can honor it; providers that ignore it fall back to 'auto'.
+        toolChoice: opts.toolChoice,
         // B162 — deltas carry the provider+model so the UI can name the coworker
         onDelta: (t) => opts.onToken(t, { provider, model }),
         // B173 — reasoning deltas ride their own channel with the same meta
@@ -1291,7 +1295,7 @@ async function __chatWithToolsOnce(provider, cfg, model, messages, tools, opts) 
   if (cfg.sdk) {
     const groq = new Groq({ apiKey: cfg.key });
     const completion = await groq.chat.completions.create(
-      { messages, model, tools, tool_choice: 'auto', temperature: opts.temperature ?? 0.3 },
+      { messages, model, tools, tool_choice: opts.toolChoice || 'auto', temperature: opts.temperature ?? 0.3 },
       { timeout: TIMEOUT_MS }
     );
     const msg = completion.choices?.[0]?.message;
@@ -1303,7 +1307,7 @@ async function __chatWithToolsOnce(provider, cfg, model, messages, tools, opts) 
     const res = await withRetry(() => fetch(`${cfg.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: authHeaders(cfg.key),
-      body: JSON.stringify({ model, messages, tools, tool_choice: 'auto', temperature: opts.temperature ?? 0.3 }),
+      body: JSON.stringify({ model, messages, tools, tool_choice: opts.toolChoice || 'auto', temperature: opts.temperature ?? 0.3 }),
       signal: controller.signal,
     }), { attempts: 3 });
     if (!res.ok) {
@@ -1352,13 +1356,35 @@ async function runToolLoopForProvider(provider, messages, tools, opts, errors) {
     const candidates = model ? [model] : cfg.models;
     let round = null;
     let lastErr = null;
+    /* M21 — FORCE A TOOL CALL ON THE FIRST ROUND.
+       A small/local model routinely answers a coding task with the code in
+       PROSE (or a bare `{"name":...}` blob it never emits as a native call) and
+       the turn dies with zero tool calls — measured as the dominant failure of
+       the M21 baseline. `tool_choice:'auto'` lets it do that. When the caller
+       opts in (`forceToolCall`), the FIRST round of the turn is sent with
+       `tool_choice:'required'`, so the model MUST emit a call; later rounds
+       relax back to 'auto' so it can still answer directly once it has acted.
+       Only applied when a menu is actually offered and the caller asked for it,
+       so a plain question or a tool-less lane is never forced. */
+    const roundToolChoice = (opts.forceToolCall && i === 0 && roundTools.length) ? 'required' : 'auto';
     for (const m of candidates) {
       try {
-        round = await chatWithToolsOnce(provider, cfg, m, messages, roundTools, { ...opts, onToken: opts.onToken });
+        round = await chatWithToolsOnce(provider, cfg, m, messages, roundTools, { ...opts, onToken: opts.onToken, toolChoice: roundToolChoice });
         model = m;
         break;
       } catch (e) {
         lastErr = e;
+        /* M21 — a provider that does not support `tool_choice:'required'`
+           (some reject it with a 400) must not fail the whole turn: retry the
+           SAME model once with 'auto'. The caller's intent is preserved
+           best-effort, and a plain 'auto' round still recovers prose calls. */
+        if (roundToolChoice === 'required' && /tool_choice|tool choice|"required"|400/i.test(String(e?.message || ''))) {
+          try {
+            round = await chatWithToolsOnce(provider, cfg, m, messages, roundTools, { ...opts, onToken: opts.onToken, toolChoice: 'auto' });
+            model = m;
+            break;
+          } catch (e2) { lastErr = e2; }
+        }
         errors.push(`${provider}(${m}): ${e.message}`);
       }
     }
@@ -1381,7 +1407,7 @@ async function runToolLoopForProvider(provider, messages, tools, opts, errors) {
     let roundText = round.text;
     const offeredNames = roundTools.map((t) => t?.function?.name || t?.name);
     if (!roundCalls.length && round.text && typeof opts.executeToolCalls === 'function') {
-      const recovered = recoverToolCallsFromText(round.text, offeredNames);
+      const recovered = recoverToolCallsFromText(round.text, offeredNames, opts.recoveryHint || {});
       if (recovered.length) {
         roundCalls = recovered.map((c, i) => ({ id: `recovered_${iterations}_${i}`, name: c.name, arguments: c.arguments }));
         roundRaw = recovered.map((c, i) => ({ id: `recovered_${iterations}_${i}`, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.arguments) } }));
@@ -1419,7 +1445,7 @@ async function runToolLoopForProvider(provider, messages, tools, opts, errors) {
           roundRaw = retryRound.rawToolCalls;
           roundText = retryRound.text;
         } else if (retryRound.text) {
-          const rec2 = recoverToolCallsFromText(retryRound.text, offeredNames);
+          const rec2 = recoverToolCallsFromText(retryRound.text, offeredNames, opts.recoveryHint || {});
           if (rec2.length) {
             roundCalls = rec2.map((c, i) => ({ id: `recovered_retry_${iterations}_${i}`, name: c.name, arguments: c.arguments }));
             roundRaw = rec2.map((c, i) => ({ id: `recovered_retry_${iterations}_${i}`, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.arguments) } }));

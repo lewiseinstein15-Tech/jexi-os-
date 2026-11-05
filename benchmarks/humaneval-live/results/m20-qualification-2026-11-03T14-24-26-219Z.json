@@ -1,0 +1,128 @@
+{
+  "manifest": {
+    "benchmark": "humaneval",
+    "mission": "M20",
+    "dataset": {
+      "repo": "openai/openai_humaneval",
+      "config": "openai_humaneval",
+      "split": "test",
+      "sha256": "094a17ace7a536483e83cd6bb0348c9df1e2bb532ff4e09961665a8b9414c157",
+      "numRowsTotal": 164
+    },
+    "leg": "jexi",
+    "schemaMode": "as-shipped",
+    "toolProfile": "full",
+    "model": "llama3.2:3b",
+    "providerLock": "ollama",
+    "modelProviderEnv": "ollama",
+    "ollamaHost": "http://127.0.0.1:11434",
+    "tasks": 1,
+    "taskIds": [
+      "HumanEval/0"
+    ],
+    "gitCommit": "6a5bc68b9be41677b8be9756757aeddb17546be0",
+    "gitDirty": false,
+    "grader": "local subprocess (NOT isolated)",
+    "gradedWithoutIsolation": true,
+    "node": "v24.21.0",
+    "platform": "linux/x64",
+    "startedAt": "2026-11-03T14:24:26.219Z",
+    "runId": "m20-qualification-2026-11-03T14-24-26-219Z"
+  },
+  "resolved": 0,
+  "passed": 0,
+  "failed": 1,
+  "metrics": {
+    "total": 1,
+    "resolved": 0,
+    "resolvedRate": 0,
+    "gradedGreen": 0,
+    "gradedGreenRate": 0,
+    "timeouts": 0,
+    "agentErrors": 0,
+    "graderErrors": 0,
+    "unresolvedGreen": 0,
+    "providerLock": "ollama",
+    "ladderSlid": 0,
+    "providersObserved": [
+      "ollama"
+    ],
+    "validToolCallTasks": 0,
+    "toolExecutedTasks": 0,
+    "parseableCodeTasks": 1,
+    "syntaxErrorTasks": 0
+  },
+  "rows": [
+    {
+      "taskId": "HumanEval/0",
+      "entryPoint": "has_close_elements",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 164123,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "providersThatServed": [
+        "ollama"
+      ],
+      "providerAttempts": [
+        {
+          "provider": "ollama",
+          "model": null,
+          "ok": true,
+          "ms": 69525,
+          "lane": "plain-text-fallback"
+        }
+      ],
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "nativeCalls": 0,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [],
+      "malformedRetry": false,
+      "toolResults": [],
+      "filesWritten": [
+        "solution.py",
+        "test_has_close_elements.py"
+      ],
+      "wroteSolution": true,
+      "solutionHead": "from typing import List\n\n\ndef has_close_elements(numbers: List[float], threshold: float) -> bool:\n    \"\"\" Check if in given list of numbers, are any two numbers closer to each other than\n    given threshold.\n    >>> has_close_elements([1.0, 2.0, 3.0], 0.5)\n    False\n    >>> has_close_elements([1.0, 2.8, 3.0, 4.0, 5.0, 2.0], 0.3)\n    True\n    \"\"\"\n\n",
+      "literalNewlines": 0,
+      "realNewlines": 12,
+      "graderRan": true,
+      "graderExitCode": 1,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m20-live-MjgOBs/HumanEval_0/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 20, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "completionGate": {
+        "status": "unresolved",
+        "reason": "grader: solution did not pass"
+      },
+      "jexiVerification": {
+        "status": "unverified",
+        "canClaimSuccess": false,
+        "reason": "the task required tool evidence and none was produced",
+        "rounds": 0,
+        "layers": []
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 0,
+        "tools": 8,
+        "durationMs": 159711,
+        "verification": "unverified"
+      },
+      "recoveryLogs": []
+    }
+  ]
+}

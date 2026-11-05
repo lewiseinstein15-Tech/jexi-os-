@@ -12,9 +12,42 @@
  * pass. stdout/stderr are parsed into failures.
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { runCommand, resolveConfiguredCommand } from '../spawn/execute.js';
 import { verifyCwd, cleanupSandbox } from '../spawn/sandbox.js';
 import { parsePytestReport, parseNodeTestReport, detectTestCommand } from '../../tools/domains/testing/index.js';
+
+/**
+ * M21 — is this an EXEC-STYLE test file that pytest cannot check?
+ *
+ * The HumanEval sandbox ships `test_<entry>.py` as a bare script: it defines
+ * `check(candidate)` and calls `check(<entry>)` with NO import of the module
+ * under test. `pytest -q` imports that file, `check` runs, and `<entry>` is not
+ * defined — so every task reports
+ *     NameError: name '<entry>' is not defined
+ * even when `solution.py` defines it correctly. The official grader `exec`s the
+ * solution into the test namespace first, which is why the grader PASSES the
+ * same bytes. The auto-detected runner therefore cannot check this edit at all,
+ * and injecting that NameError as a failure sent the model into a rewrite loop.
+ *
+ * Narrow on purpose: EVERY failure must be a bare `NameError: name '…'`
+ * (pytest's `-q` FAILED line truncates the message, so the trailing "is not
+ * defined" may be cut), and the test file must not import anything. A real test
+ * file imports its module, so a genuine NameError inside it still fails.
+ */
+export function looksLikeExecStylePytest(parsed, root) {
+  const failures = parsed?.failures ?? [];
+  if (!failures.length) return false;
+  const allNameErrors = failures.every((f) => /NameError:\s*name\s*'/.test(String(f.message ?? '')));
+  if (!allNameErrors) return false;
+  try {
+    const files = fs.readdirSync(root).filter((f) => /^test_.+\.py$/.test(f));
+    if (!files.length) return false;
+    return files.every((f) => !/^\s*(?:import|from)\s+\w/m.test(fs.readFileSync(path.join(root, f), 'utf8')));
+  } catch { return false; }
+}
 
 /**
  * JEXI-024 — a pass is not "exit code 0".
@@ -31,11 +64,30 @@ import { parsePytestReport, parseNodeTestReport, detectTestCommand } from '../..
  * explicitly allows it (`allowEmpty: true`) for repos that genuinely have no
  * tests yet.
  */
-function judge({ res, kind, allowEmpty, explicit = false }) {
+function judge({ res, kind, allowEmpty, explicit = false, detected = false, cwd = process.cwd() }) {
   const output = res.output ?? '';
   const p = kind === 'pytest'
     ? parsePytestReport(output, res.code ?? -1)
     : parseNodeTestReport(output, res.code ?? -1);
+
+  /* M21 — the exec-style pytest false failure (see looksLikeExecStylePytest).
+     The auto-detected runner reports a NameError the model did NOT cause, so
+     the edit is `unverifiable` rather than `fail`. Explicit/configured
+     commands stay strict: the caller chose them. */
+  if (kind === 'pytest' && !explicit && looksLikeExecStylePytest(p, cwd)) {
+    return { status: 'unverifiable', parsed: p, reason: 'pytest cannot check an exec-style test file (the test calls the entry point without importing it) — this edit is unverifiable by the auto-detected runner' };
+  }
+
+  /* M21 — an AUTO-DETECTED runner that collects nothing did not FAIL; it just
+     does not match this project's test shape. `pytest -q` on a sandbox whose
+     test file is a plain script (HumanEval's `check()` idiom) exits 5 with
+     "0 tests collected": reporting that as an `error` injected a bogus "fix
+     this" failure and drove the model to rewrite the same file to the
+     iteration cap. Only for DETECTED commands — an explicit/configured command
+     that runs nothing stays an error (JEXI-024), because the caller chose it. */
+  if (p.tests === 0 && detected && !explicit && !allowEmpty) {
+    return { status: 'inapplicable', parsed: p, reason: `${kind}: no tests matched this project's shape — nothing to verify` };
+  }
 
   /* The "did anything actually run?" check comes FIRST and is independent of
      the exit code — a suite that collected nothing is an error whatever the
@@ -158,7 +210,15 @@ export async function runTestEvidence({
 }) {
   const started = Date.now();
   const { cwd: runCwd, sandbox, materialized, reason: cwdReason } = verifyCwd(snapshot, { cwd, materialize });
-  const res = await runCommand(spec, { cwd: runCwd, timeoutMs });
+  let res = await runCommand(spec, { cwd: runCwd, timeoutMs });
+  /* M21 — `pytest` is frequently installed as a MODULE with no console script
+     on the spawned PATH (pip drops the shim in ~/.local/bin, which the child
+     PATH often lacks). spawn then fails ENOENT and the layer reports an error,
+     which the loop injects to the model as a failure. Retry ONCE as
+     `python3 -m pytest` — the form that resolves wherever the module lives. */
+  if (!res.ok && res.spawnError && /ENOENT/.test(res.spawnError) && spec[0] === 'pytest') {
+    res = await runCommand([process.env.PYTHON || 'python3', '-m', 'pytest', ...spec.slice(1)], { cwd: runCwd, timeoutMs });
+  }
   if (sandbox) cleanupSandbox(sandbox);
 
   // A spawn that never produced output is a harness error, not a test result.
@@ -173,7 +233,7 @@ export async function runTestEvidence({
   }
 
   const kind = detectKind(spec, res.output ?? '');
-  const { status, parsed, reason } = judge({ res, kind, allowEmpty, explicit });
+  const { status, parsed, reason } = judge({ res, kind, allowEmpty, explicit, detected, cwd: runCwd });
   const evidence = [{
     source,
     snapshotId,

@@ -14,6 +14,7 @@
 
 import { runCommand, resolveBin, resolveConfiguredCommand, normalizeCommandSpec } from '../spawn/execute.js';
 import { verifyCwd, cleanupSandbox } from '../spawn/sandbox.js';
+import { detectProjectKind } from '../../tools/domains/testing/index.js';
 
 /** @type {import('../interface/Verifier.js').Verifier} */
 export const LintVerifier = {
@@ -52,13 +53,25 @@ export const LintVerifier = {
       resolved = [eslint || resolveBin('eslint'), '--no-color', '--format', 'json', ...files];
     } else {
       const configured = resolveConfiguredCommand(cwd, 'lint');
-      resolved = configured || [eslint || resolveBin('eslint'), '--no-color', '--format', 'json', 'src'];
+      /* M21 — LANGUAGE GATE. The implicit fallback is ESLint, a JavaScript
+         linter. In a NON-JavaScript project (the Python sandbox the coding
+         loop verifies against) ESLint does not apply: it exits 2 with
+         "No files matching the pattern src" and the layer reported `error`,
+         which SHORT-CIRCUITED the cheaper-first loop before the unit/test
+         layer and injected a JavaScript diagnostic into the model's context.
+         Measured effect: the model thrashed all 16 iterations rewriting the
+         same file. A language-mismatched linter is INAPPLICABLE, not a
+         failure — skip it and let the applicable layers run. An explicit
+         `lintCommand` above still runs whatever it names. */
+      const kind = detectProjectKind(cwd);
+      const eslintApplicable = kind === 'node' || kind == null;
+      resolved = configured || (eslintApplicable ? [eslint || resolveBin('eslint'), '--no-color', '--format', 'json', 'src'] : null);
     }
-    if (!resolved.length) {
+    if (!resolved || !resolved.length) {
       return {
-        status: 'error',
-        evidence: [{ source: 'LintVerifier', snapshotId, content: 'no lint command configured', at: Date.now() }],
-        reason: 'no lint command configured',
+        status: 'inapplicable',
+        evidence: [{ source: 'LintVerifier', snapshotId, content: `no applicable lint command for this project (${detectProjectKind(cwd) ?? 'unknown'} project)`, at: Date.now() }],
+        reason: 'no applicable lint command for this project — skipped, not failed',
         durationMs: Date.now() - started,
       };
     }

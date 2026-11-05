@@ -1,0 +1,433 @@
+{
+  "manifest": {
+    "benchmark": "humaneval",
+    "mission": "M21",
+    "dataset": {
+      "repo": "openai/openai_humaneval",
+      "config": "openai_humaneval",
+      "split": "test",
+      "sha256": "094a17ace7a536483e83cd6bb0348c9df1e2bb532ff4e09961665a8b9414c157",
+      "numRowsTotal": 164
+    },
+    "leg": "jexi",
+    "promptVariant": "A",
+    "promptLabel": "current",
+    "queryMode": "fs-names",
+    "schemaMode": "as-shipped",
+    "toolProfile": "full",
+    "model": "llama3.2:3b",
+    "providerLock": "ollama",
+    "modelProviderEnv": "ollama",
+    "ollamaHost": "http://127.0.0.1:11434",
+    "tasks": 5,
+    "taskIds": [
+      "HumanEval/0",
+      "HumanEval/1",
+      "HumanEval/2",
+      "HumanEval/3",
+      "HumanEval/4"
+    ],
+    "gitCommit": "6a5bc68b9be41677b8be9756757aeddb17546be0",
+    "gitDirty": true,
+    "grader": "local subprocess (NOT isolated)",
+    "node": "v24.21.0",
+    "platform": "linux/x64",
+    "startedAt": "2026-11-05T03:34:26.370Z",
+    "runId": "m21-probe-A-fs-names-2026-11-05T03-34-26-370Z"
+  },
+  "resolved": 0,
+  "passed": 0,
+  "failed": 5,
+  "metrics": {
+    "total": 5,
+    "resolved": 0,
+    "resolvedRate": 0,
+    "gradedGreen": 0,
+    "gradedGreenRate": 0,
+    "timeouts": 0,
+    "agentErrors": 0,
+    "graderErrors": 0,
+    "unresolvedGreen": 0,
+    "providerLock": "ollama",
+    "ladderSlid": 0,
+    "validToolCallTasks": 4,
+    "toolExecutedTasks": 3,
+    "parseableCodeTasks": 2,
+    "syntaxErrorTasks": 3,
+    "wroteSolutionTasks": 3,
+    "proseInsteadOfCallTasks": 1,
+    "promptStats": {
+      "chars": 25178,
+      "estTokens": 6295
+    }
+  },
+  "rows": [
+    {
+      "taskId": "HumanEval/0",
+      "entryPoint": "has_close_elements",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 217983,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "promptVariant": "A",
+      "promptLabel": "current",
+      "queryMode": "fs-names",
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "recovery": null
+        }
+      ],
+      "nativeCalls": 1,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [],
+      "malformedRetry": true,
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": false,
+          "error": "path escapes root: /tmp/openhands-agent-server-37/tmux-10001/openhands-ebb65f9a2985491e8a9a0111499c2502"
+        }
+      ],
+      "wroteSolution": false,
+      "proseInsteadOfCall": false,
+      "answerHead": "It seems like you're trying to access a file system path that starts with `/tmp`, which is not a typical path in most operating systems. The `/tmp` directory is usually used for temporary files and is not a valid path for accessing files or directories in most cases.\n\nIf you're trying to access a file or directory, you'll need to provide a valid path that starts with a drive letter (e.g., `C:\\path\\to\\file`) or an absolute path (e.g., `/home/user/documents/file.txt`).\n\nIf you're trying to access a file or directory within a tmux session, you'll need to use the `tmux` command to navigate to the correct directory. You can do this by using the `ls` command to list the contents of the current dir",
+      "answerTail": "irectory/file.txt` file.\n\nI hope this helps! Let me know if you have any other questions.\n\n[UNVERIFIED] Every tool call in this turn failed (fs_write) — path escapes root: /tmp/openhands-agent-server-37/tmux-10001/openhands-ebb65f9a2985491e8a9a0111499c2502. No outcome was produced, so nothing here is a confirmed result.\n\nVerification state: unverified — every tool call this turn failed (fs_write).",
+      "answerHasCodeBlock": true,
+      "answerLooksLikeCall": false,
+      "iterations": 16,
+      "solutionHead": "from typing import List\n\n\ndef has_close_elements(numbers: List[float], threshold: float) -> bool:\n    \"\"\" Check if in given list of numbers, are any two numbers closer to each other than\n    given threshold.\n    >>> has_close_elements([1.0, 2.0, 3.0], 0.5)\n    False\n    >>> has_close_elements([1.0, 2.8, 3.0, 4.0, 5.0, 2.0], 0.3)\n    True\n    \"\"\"\n\n",
+      "graderRan": true,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m21-probe-jKLjNJ/HumanEval_0/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 20, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "jexiVerification": {
+        "status": "unverified",
+        "canClaimSuccess": false,
+        "reason": "every tool call this turn failed (fs_write)",
+        "rounds": 0,
+        "layers": []
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 1,
+        "tools": 8,
+        "durationMs": 217945,
+        "verification": "unverified"
+      }
+    },
+    {
+      "taskId": "HumanEval/1",
+      "entryPoint": "separate_paren_groups",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 234834,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "promptVariant": "A",
+      "promptLabel": "current",
+      "queryMode": "fs-names",
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [],
+      "nativeCalls": 0,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [],
+      "malformedRetry": false,
+      "toolResults": [],
+      "wroteSolution": false,
+      "proseInsteadOfCall": true,
+      "answerHead": "Here is the complete implementation of the Python function to the file /tmp/m21-probe-jKLjNJ/HumanEval_1/solution.py:\n\n```python\nfrom typing import List\nimport re\n\ndef separate_paren_groups(paren_string: str) -> List[str]:\n    \"\"\" Input to this function is a string containing multiple groups of nested parentheses. Your goal is to\n    separate those group into separate strings and return the list of those.\n    Separate groups are balanced (each open brace is properly closed) and not nested within each other\n    Ignore any spaces in the input string.\n    >>> separate_paren_groups('( ) (( )) (( )( ))')\n    ['()', '(())', '(()())']\n    \"\"\"\n    # Remove spaces from the input string\n    paren_stri",
+      "answerTail": " the `separate_paren_groups` function to the file `/tmp/m21-probe-jKLjNJ/HumanEval_1/solution.py` and run the test file `test_separate_paren_groups.py` to confirm it passes.\n\n[UNVERIFIED] This task required real tool evidence and the turn produced none — no file was written, no test ran, nothing was confirmed.\n\nVerification state: unverified — the task required tool evidence and none was produced.",
+      "answerHasCodeBlock": true,
+      "answerLooksLikeCall": false,
+      "iterations": 1,
+      "solutionHead": "from typing import List\n\n\ndef separate_paren_groups(paren_string: str) -> List[str]:\n    \"\"\" Input to this function is a string containing multiple groups of nested parentheses. Your goal is to\n    separate those group into separate strings and return the list of those.\n    Separate groups are balanced (each open brace is properly closed) and not nested within each other\n    Ignore any spaces in t",
+      "graderRan": true,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m21-probe-jKLjNJ/HumanEval_1/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 22, in <module>\n  File \"<string>\", line 10, in check\nAssertionError",
+      "jexiVerification": {
+        "status": "unverified",
+        "canClaimSuccess": false,
+        "reason": "the task required tool evidence and none was produced",
+        "rounds": 0,
+        "layers": []
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 0,
+        "tools": 8,
+        "durationMs": 234800,
+        "verification": "unverified"
+      }
+    },
+    {
+      "taskId": "HumanEval/2",
+      "entryPoint": "truncate_number",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 137328,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "promptVariant": "A",
+      "promptLabel": "current",
+      "queryMode": "fs-names",
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "recovery": null
+        }
+      ],
+      "nativeCalls": 1,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [
+        {
+          "tool": "fs_write",
+          "reason": "repaired-corrupt-escapes"
+        }
+      ],
+      "malformedRetry": false,
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": true,
+          "error": null
+        }
+      ],
+      "wroteSolution": true,
+      "proseInsteadOfCall": false,
+      "answerHead": "It appears that you are a tool that provides feedback on file system operations. You have just completed a file write operation, and your output indicates that the operation was successful.\n\nHere is a summary of the operation:\n\n*   The file path was `/tmp/m21-probe-jKLjNJ/HumanEval_2/solution.py`.\n*   The operation wrote 479 bytes to the file.\n*   The number of bytes changed during the operation was 147.\n\nYour output also includes a \"result\" object, which provides additional information about the operation. However, the specific details of this object are not relevant to the task at hand.\n\nTo provide a helpful response to the original user, you could summarize the operation in a few sentence",
+      "answerTail": "le write operation completed successfully. 479 bytes were written to `/tmp/m21-probe-jKLjNJ/HumanEval_2/solution.py`. The number of bytes changed during the operation was 147.\"\n\nPlease let me know if you need further assistance.\n\n[UNVERIFIED] A change was made but no verification layer applies here, so it could not be confirmed.\n\nVerification state: unverifiable — no applicable verification layer.",
+      "answerHasCodeBlock": false,
+      "answerLooksLikeCall": false,
+      "iterations": 16,
+      "solutionHead": "import math\n\ndef truncate_number(number: float) -> float:\n    \"\"\"\n    Given a positive floating point number, it can be decomposed into\n    and integer part (largest integer smaller than given number) and decimals\n    (leftover part always smaller than 1).\n\n    Return the decimal part of the number.\n\n    >>> truncate_number(3.5)\n    0.5\n\ndef test_truncate_number():\n    assert math.trunc(3.5) == 3\n",
+      "graderRan": true,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m21-probe-jKLjNJ/HumanEval_2/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 4\n    \"\"\"\n    ^\nSyntaxError: unterminated triple-quoted string literal (detected at line 19)",
+      "jexiVerification": {
+        "status": "unverifiable",
+        "canClaimSuccess": false,
+        "reason": "no applicable verification layer",
+        "rounds": 2,
+        "layers": [
+          {
+            "layer": "lint",
+            "status": "inapplicable"
+          },
+          {
+            "layer": "unit",
+            "status": "unverifiable"
+          }
+        ]
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 1,
+        "tools": 8,
+        "durationMs": 137298,
+        "verification": "unverifiable"
+      }
+    },
+    {
+      "taskId": "HumanEval/3",
+      "entryPoint": "below_zero",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 124083,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "promptVariant": "A",
+      "promptLabel": "current",
+      "queryMode": "fs-names",
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "recovery": null
+        }
+      ],
+      "nativeCalls": 1,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [
+        {
+          "tool": "fs_write",
+          "reason": "repaired-corrupt-escapes"
+        }
+      ],
+      "malformedRetry": false,
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": true,
+          "error": null
+        }
+      ],
+      "wroteSolution": true,
+      "proseInsteadOfCall": false,
+      "answerHead": "You are a helpful assistant with tool calling capabilities.\n\nYou have successfully completed a file write operation. The file `/tmp/m21-probe-jKLjNJ/HumanEval_3/solution.py` has been written with 450 bytes, and 1 byte was changed.\n\nYou can now continue with your session, and the `filesystem_write` capability is still available.\n\nAvailable now (16):\n  - filesystem_read: Inspect a file, list a directory, find files by glob, or grep file contents.\n  - filesystem_write: Write, edit, append to, or delete a file in the workspace.\n  - terminal: Execute a shell command or manage a persistent terminal session.\n  - testing: Run a test suite (pytest, node --test) and read the pass/fail verdict.\n  - git",
+      "answerTail": " - docs_lookup: Read current API docs for a library or framework.\n  - papers: Find or download a research paper / preprint.\n  - encyclopedia: Get a stable, citable overview of a topic or person.\n\nActive permission profile: full.\n\n[UNVERIFIED] A change was made but no verification layer applies here, so it could not be confirmed.\n\nVerification state: unverifiable — no applicable verification layer.",
+      "answerHasCodeBlock": false,
+      "answerLooksLikeCall": false,
+      "iterations": 16,
+      "solutionHead": "from typing import List\n\ndef below_zero(operations: List[int]) -> bool:\n    \"\"\"\n    You're given a list of deposit and withdrawal operations on a bank account that starts with\n    zero balance. Your task is to detect if at any point the balance of account fallls below zero, and\n    at that point function should return True. Otherwise it should return False.\n\n    >>> below_zero([1, 2, 3])\n    False",
+      "graderRan": true,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m21-probe-jKLjNJ/HumanEval_3/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 4\n    \"\"\"\n    ^\nSyntaxError: unterminated triple-quoted string literal (detected at line 15)",
+      "jexiVerification": {
+        "status": "unverifiable",
+        "canClaimSuccess": false,
+        "reason": "no applicable verification layer",
+        "rounds": 2,
+        "layers": [
+          {
+            "layer": "lint",
+            "status": "inapplicable"
+          },
+          {
+            "layer": "unit",
+            "status": "unverifiable"
+          }
+        ]
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 1,
+        "tools": 8,
+        "durationMs": 124052,
+        "verification": "unverifiable"
+      }
+    },
+    {
+      "taskId": "HumanEval/4",
+      "entryPoint": "mean_absolute_deviation",
+      "pass": false,
+      "gradedPass": false,
+      "agentTimedOut": false,
+      "resolveReason": "grader: solution did not pass",
+      "durationMs": 97249,
+      "model": "llama3.2:3b",
+      "providerLock": "ollama",
+      "promptVariant": "A",
+      "promptLabel": "current",
+      "queryMode": "fs-names",
+      "offeredTools": [
+        "fs_read",
+        "fs_write",
+        "fs_edit",
+        "term_execute",
+        "pytest_run",
+        "data_json",
+        "capability_check",
+        "ask_user_question",
+        "request_tools"
+      ],
+      "toolCalls": [
+        {
+          "name": "fs_write",
+          "recovery": null
+        }
+      ],
+      "nativeCalls": 1,
+      "recoveredCalls": [],
+      "aliasResolved": 0,
+      "payloadNormalized": [
+        {
+          "tool": "fs_write",
+          "reason": "repaired-corrupt-escapes"
+        }
+      ],
+      "malformedRetry": false,
+      "toolResults": [
+        {
+          "name": "fs_write",
+          "ok": true,
+          "error": null
+        }
+      ],
+      "wroteSolution": true,
+      "proseInsteadOfCall": false,
+      "answerHead": "It appears that you have successfully written to a file using the `filesystem_write` capability. The file path and size of the written file are provided in the response.\n\nHere is a summary of the operation:\n\n*   Capability used: `filesystem_write`\n*   File path: `/tmp/m21-probe-jKLjNJ/HumanEval_4/solution.py`\n*   File size: 447 bytes\n*   Bytes changed: 16\n\nThis indicates that the file was successfully written to with 16 bytes being written, resulting in a total file size of 447 bytes.\n\nPlease let me know if you need any further assistance or if you have any questions about this operation.\n\n[UNVERIFIED] A change was made but no verification layer applies here, so it could not be confirmed.\n\nV",
+      "answerTail": "icates that the file was successfully written to with 16 bytes being written, resulting in a total file size of 447 bytes.\n\nPlease let me know if you need any further assistance or if you have any questions about this operation.\n\n[UNVERIFIED] A change was made but no verification layer applies here, so it could not be confirmed.\n\nVerification state: unverifiable — no applicable verification layer.",
+      "answerHasCodeBlock": false,
+      "answerLooksLikeCall": false,
+      "iterations": 16,
+      "solutionHead": "from typing import List\n\ndef mean_absolute_deviation(numbers: List[float]) -> float:\n    \"\"\"\n    For a given list of input numbers, calculate Mean Absolute Deviation\n    around the mean of this dataset.\n    \n    Mean Absolute Deviation is the average absolute difference between each\n    element and a centerpoint (mean in this case):\n    \n    MAD = average | x - x_mean |\n\n    \n    \n    >>> mean_abs",
+      "graderRan": true,
+      "graderVerdict": "FAIL",
+      "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m21-probe-jKLjNJ/HumanEval_4/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 4\n    \"\"\"\n    ^\nSyntaxError: unterminated triple-quoted string literal (detected at line 17)",
+      "jexiVerification": {
+        "status": "unverifiable",
+        "canClaimSuccess": false,
+        "reason": "no applicable verification layer",
+        "rounds": 2,
+        "layers": [
+          {
+            "layer": "lint",
+            "status": "inapplicable"
+          },
+          {
+            "layer": "unit",
+            "status": "unverifiable"
+          }
+        ]
+      },
+      "agentError": null,
+      "stats": {
+        "toolCalls": 1,
+        "tools": 9,
+        "durationMs": 97218,
+        "verification": "unverifiable"
+      }
+    }
+  ]
+}

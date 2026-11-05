@@ -27,16 +27,8 @@ export const MUTATING_TOOLS = new Set(['fs_write', 'fs_edit', 'fs_append', 'fs_d
 /** Test tools count as verification on their own — but only when they pass. */
 export const TEST_TOOLS = new Set(['test_run', 'pytest_run', 'test_coverage', 'run_tests']);
 
-/** Intents that must not be answered without real verification evidence.
- *  M12: includes the planner's real code_task/code_fix, which the cap missed. */
-export const CODING_INTENTS = new Set(['code', 'coding', 'code_task', 'code_fix', 'fix', 'debug', 'refactor', 'test']);
-
-/** Is this query a coding request by intent or by its own words? */
-export function isCodingIntent(plan, query = '') {
-  const intent = String(plan?.intent ?? '').toLowerCase();
-  if (CODING_INTENTS.has(intent)) return true;
-  return /\b(fix|repair|make .* pass|failing (test|pytest)|broken|bug|debug|refactor|implement|add a test)\b/i.test(String(query));
-}
+/* M21 — coding-turn heuristic split out to keep this file small (JEXI-016). */
+export { CODING_INTENTS, isCodingIntent } from './intent.js';
 
 /* JEXI-030 — the coding tool set. A turn that is going to read a failing
    test, edit a module and re-run pytest needs these and almost nothing else.
@@ -85,6 +77,7 @@ export class CodingLoop {
     this.verified = false;        // JEXI-009 — at least one real PASS
     this.editSeen = false;        // JEXI-002 — did this turn actually change anything?
     this.budgetExhausted = false;
+    this.unverifiable = false;    // M21 — no applicable layer checked the edit
     /** JEXI-002 — a test tool that ran and came back NOT green. The gate used
      *  to look only at `editSeen`, so "ran pytest, watched it fail, changed
      *  nothing, narrated a fix" graded not_applicable/true. Red is red whether
@@ -155,6 +148,16 @@ export class CodingLoop {
       return { verified: true, failure: null, results, round: this.rounds.length };
     }
 
+    /* M21 — nothing applicable could check the edit. Do NOT inject a failure:
+       a "fix this" prompt with no defect drove the model to rewrite the same
+       file to the iteration cap. */
+    if (outcome?.unverifiable === true || outcome?.context?.unverifiable === true) {
+      this.unverifiable = true;
+      this.pendingFailure = null;
+      this.send('agent.log', { message: `ℹ️ no applicable verification layer — the edit stands but is UNVERIFIED.` });
+      return { verified: false, unverifiable: true, failure: null, results, round: this.rounds.length };
+    }
+
     const failure = outcome?.context?.injectedFailure ?? { layer: 'unknown', reason: 'verification failed with no structured failure' };
     this.pendingFailure = failure;                 // JEXI-013 — do not drop it
     this.send('agent.log', { message: `❌ verification failed after ${reason} (${failure.layer}): ${String(failure.reason ?? '').slice(0, 200)} — replanning with this evidence.` });
@@ -206,6 +209,11 @@ export class CodingLoop {
       if (this.verified) {
         return { status: 'verified', canClaimSuccess: true, annotation: null, reason: 'a real verification layer returned pass' };
       }
+      /* M21 — nothing applicable could check the edit: honest `unverifiable`,
+         NOT a failure claim and NOT a success claim. */
+      if (this.unverifiable) {
+        return { status: 'unverifiable', canClaimSuccess: false, reason: 'no applicable verification layer', annotation: '[UNVERIFIED] A change was made but no verification layer applies here, so it could not be confirmed.' };
+      }
       if (this.budgetExhausted) {
         return { status: 'unverified', canClaimSuccess: false, reason: 'verification budget exhausted without a pass', annotation: '[UNVERIFIED] The edits in this turn were never confirmed by a passing test run. The failure is reported above.' };
       }
@@ -246,27 +254,5 @@ export class CodingLoop {
   }
 }
 
-/** JEXI-014 — tool results were sliced to a flat 6000 chars, which cut the
- *  pytest traceback (always at the END of the output) off exactly when it
- *  mattered. This keeps a head AND a tail, with the tail biased toward the
- *  assertion/failure lines. */
-export function shapeToolResult(text, { maxChars = 6000, isTestResult = false } = {}) {
-  const s = String(text ?? '');
-  if (s.length <= maxChars) return s;
-  const headChars = Math.floor(maxChars * 0.3);
-  const tailChars = maxChars - headChars - 120;
-  const head = s.slice(0, headChars);
-  const tail = s.slice(-tailChars);
-  const elided = s.length - head.length - tail.length;
-
-  if (isTestResult) {
-    // Put the structured failure lines first so they survive any later slicing.
-    const lines = s.split('\n');
-    const signal = lines
-      .filter((l) => /^(FAILED|ERROR)\s|^E\s+|^>+\s|\bassert\b|Traceback|short test summary|^\d+ (passed|failed)|\d+ failed,|\d+ passed,/.test(l))
-      .slice(0, 60);
-    const signalBlock = signal.length ? `\n\n--- key lines (failures/assertions) ---\n${signal.join('\n')}\n` : '';
-    return `${head}\n\n…[${elided} chars elided]…${signalBlock}\n--- tail ---\n${tail}`;
-  }
-  return `${head}\n\n…[${elided} chars elided — the failure detail is in the tail below]…\n\n${tail}`;
-}
+/* M21 — result shaping moved to ./tool-result.js (JEXI-016 size guard). */
+export { shapeToolResult } from './tool-result.js';
