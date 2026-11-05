@@ -16,9 +16,15 @@ export function inTmux(env = process.env) {
 /** Render the tmux context block ('' when not inside tmux). */
 export function tmuxContextBlock(env = process.env) {
   if (!inTmux(env)) return '';
-  const session = String(env.TMUX || '').slice(0, 120);
   const pane = String(env.TMUX_PANE || '').slice(0, 40);
-  return `\n\n[Terminal context: this server runs inside a tmux session (${session}, pane ${pane}). ` +
+  /* M22 — NEVER put the raw tmux socket path in the prompt. `TMUX` is an
+     absolute HOST path (`/tmp/openhands-agent-server-37/tmux-10001/openhands-…`)
+     and the model treated it as a write target: three of fifteen benchmark
+     tasks emitted `fs_write` with that path as `path`, the sandbox correctly
+     refused it ("path escapes root"), and the task died with no file written.
+     The block only needs to say the server lives in a terminal — the path is
+     both a disclosure and a wrong answer. */
+  return `\n\n[Terminal context: this session runs inside a persistent terminal (pane ${pane}). ` +
     'The user may be watching this terminal; long-running commands keep the session alive.]';
 }
 

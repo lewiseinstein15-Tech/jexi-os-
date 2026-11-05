@@ -923,3 +923,79 @@ zero network, zero real model calls).
 - GOTCHA: a killed benchmark leaves the ollama `llama-server` child spinning
   down; wait for its instantaneous CPU to reach 0 (`/proc/<pid>/stat` fields
   14+15 delta) before relaunching, or the next run competes for CPU.
+
+## M22 — code-generation correctness & structured output (2026-11-05)
+
+- ROOT CAUSE for 3/15 benchmark tasks: `TmuxContext.js` emitted the raw `$TMUX`
+  host socket path (`/tmp/openhands-agent-server-37/…`) into every prompt. The
+  small model read it as the file to write and `fs_write` refused with `path
+  escapes root`, so the task ended unwritten. Fixed: `tmuxContextBlock()` no
+  longer emits the path (assembled prompt 25178 → 25094 chars).
+  `test-dsh-batch7.js` had ASSERTED the leak (`block.includes('default')`) and
+  now asserts the path is ABSENT — a test that pins a defect is worse than none.
+- D1 (new): `verifiers/SyntaxVerifier.js` + pure `analysis/python-structure.js`.
+  In a Python sandbox lint is INAPPLICABLE (ESLint is a JS linter) and unit was
+  UNVERIFIABLE (exec-style HumanEval file ≠ pytest), so NOTHING checked the
+  bytes before the turn ended. The syntax layer runs the real compiler
+  (`ast.parse` — no `__pycache__` side effect) and then the structural reader
+  for shapes the compiler ACCEPTS but the task rejects: a body wrapped in
+  `"""`, a duplicate `def`, a placeholder/absent entry point.
+- D5: `TestVerifier` gained a real exec-style runner (`check(candidate)` files)
+  with priority over detected pytest; the detector requires column-0 `check(`.
+- D6 (new, found while fixing D1): STALE BYTECODE. CPython validates a cached
+  `.pyc` by `(mtime, size)` with 1-second mtime granularity, so an edit that
+  keeps the file's size and lands in the same second reuses the PREVIOUS
+  bytecode. Measured: reverting a one-character fix (`+`→`-`) made the run
+  report "1 passed" for a file that was failing on disk — a verifier FALSE PASS.
+  Fix in `spawn/execute.js`: every spawned verifier gets a fresh private
+  `PYTHONPYCACHEPREFIX` dir, removed on exit. `PYTHONDONTWRITEBYTECODE`/`-B`
+  alone is NOT enough — it stops WRITING a cache, not READING an existing one
+  (verified: `-B` still served a stale `.pyc`). Regression test M22/D6 fails
+  without the fix.
+- Structured verify declaration: `services/agent/verify-config.js`
+  (`parseVerifyLayers`, `extractEntryPoint`) + the `CODE_VERIFY` env seam /
+  `opts.verifyLayers`; the harness declares `syntax,unit`. This only chooses
+  WHICH real verifiers run — every gate, honesty rule and refusal still applies.
+- WS5: `m21-probe.mjs` now writes `<runId>.transcript.json` holding the
+  COMPLETE answer, solution bytes and event list per task. The row table kept
+  only `answerHead`/`answerTail`, so the generated code was discarded and could
+  not be recovered without a ~3-minute re-run of a stochastic model.
+- Suites: **212/212 pass** (was 211; +1 M22 suite
+  `tests/agi/test-m22-code-correctness.js`, 33 tests: D1/D3/D4/D5/D6). Lint 0
+  errors. The three "verifyAfterEdit" tickets triaged against a pristine
+  worktree at `43d518f` (NOT the mislabeled log):
+  `tests/tickets/jexi-e2e-planted-pytest.test.js` — baseline pass/fail over 4
+  runs = 2/2/3/3, i.e. **JEXI-002/013 is FLAKY ON BASELINE** (fails ~half the
+  time) and **JEXI-008/029 fails on baseline every time** (PRE-EXISTING,
+  `the real pytest suite must be green after the loop`). With M22: 3/3/3/3 —
+  JEXI-002/013 stable green (the flake WAS the stale-bytecode bug), JEXI-008/029
+  unchanged.
+- GOTCHA: a benchmark started BEFORE an edit keeps running the OLD module graph
+  (Node caches modules per process). Label a baseline run by the commit it
+  actually ran at, not by the log filename you gave it — a "baseline" log can
+  silently be a post-fix run.
+- MEASURED (M22, same 15-task slice, llama3.2:3b, locked, prompt A, fs-names):
+  **0/15 verified passes** — unchanged from the M20/M21 baseline. What MOVED is
+  delivery, and the verification signal that M21 lacked:
+  `wrote 3/15 → 10/15`, `valid tool-call tasks 5/15 → 11/15`,
+  `tool executed 4/15 → 10/15`, and the syntax layer now emits a REAL
+  `verification failed after fs_write … (syntax): Python syntax error: …`
+  which is fed back into the next tool result (M21 emitted nothing here).
+  Residual attribution of the 15 final solutions (re-measured by
+  `ast.parse` + the OFFICIAL test): **8/15 still do not parse** (7 of those 8
+  are the SAME `unterminated triple-quoted string` / `expected an indented
+  block` shapes) and **7/15 parse but are logically wrong** — independently
+  re-graded, every parsing solution dies on `NameError: name '<entry>' is not
+  defined`, i.e. the model never defined the required function. So the binding
+  constraint is now the MODEL (llama3.2:3b cannot emit valid Python for these
+  tasks), not the harness: the loop is correctly armed (edit → verify → replan),
+  detects the failures, and reports them honestly instead of claiming success.
+- TIMEOUT NOTE: 4/15 hit the 300 s per-task cap in M22 (vs 0 in the short
+  baseline). The verify→replan loop makes a failing turn RETRY, so turns run
+  longer; with `recovered=10 tools=11` on HumanEval/13 the model was actively
+  thrashing. Raise `--timeout` or cap the replan rounds before drawing
+  conclusions from a timeout count.
+- HONESTY CHECK (do this before claiming a pass-rate change): re-run the
+  OFFICIAL test yourself on the transcript's `solution` bytes. `pass` in the
+  row table is the harness's own grader; a `NameError`/`SyntaxError` from an
+  independent run is the ground truth.

@@ -106,7 +106,19 @@ export async function runTaskWithJexi({ task, sandboxDir, schemaMode = 'document
   let error = null;
   try {
     const { runAgentLoop } = await import(path.join(SERVER, 'src/services/AgentLoop.js'));
-    const opts = { root: sandboxDir };
+    /* M22 — STRUCTURED VERIFY DECLARATION. The harness KNOWS this project's
+       shape (flat sandbox, `solution.py`, an exec-style test file), so it
+       declares the verification layers and the target function instead of
+       leaving the loop to guess `pytest` and report `unverifiable`. This is the
+       same class of configuration as `toolProfile` above and is recorded in the
+       manifest. Set BENCH_VERIFY_LAYERS="" to fall back to auto-detection. */
+    const opts = { root: sandboxDir, entryPoint: task.entry_point };
+    const declared = process.env.BENCH_VERIFY_LAYERS;
+    if (declared !== '') {
+      const { parseVerifyLayers } = await import(path.join(SERVER, 'src/services/agent/verify-config.js'));
+      const layers = parseVerifyLayers(declared || 'syntax,unit');
+      if (layers) opts.verifyLayers = layers;
+    }
     if (systemDoc) opts.systemPromptOverride = systemDoc;
     result = await withTimeout(
       runAgentLoop({ query, sendEvent, opts }),

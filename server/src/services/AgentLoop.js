@@ -52,6 +52,7 @@ import { isDisclosureCall, resolveDisclosureRequest } from './agent/ToolDisclosu
 import { recordOutcome as recordCapabilityOutcome } from '../capability/registry/ledger.js'; // capability evidence ledger
 import { verifyAfterEdit } from '../verification/loop/auto-verify.js'; // JEXI-002 — the REAL verification subsystem
 import { extractTargetPath, isWriteInstruction } from './agent/ToolCallRecovery.js'; // M21 — target path + write-intent for fenced-code prose recovery
+import { parseVerifyLayers, extractEntryPoint } from './agent/verify-config.js'; // M22 — caller-declared verify layers + target function name
 
 // DeepSeek-Harness-style loop: more steps per turn (the rate limiter
 // protects free tiers), with turn/step events streamed like a session event log.
@@ -243,6 +244,15 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
     send: emit,
     runVerify: async ({ reason }) => {
       if (opts.__verify) return opts.__verify({ reason });          // test seam
+      /* M22 — CODE_VERIFY. When a caller declares how this project is verified
+         (the benchmark, or any harness that knows the shape), that is the
+         authoritative layer order and it REPLACES the auto-detected default.
+         The env var is the seam the benchmark sets; `opts.verifyLayers` is the
+         programmatic equivalent. Both only choose WHICH real verifiers run —
+         every gate, honesty rule and refusal above still applies, and an
+         empty/failed verification still cannot claim success. */
+      const configured = parseVerifyLayers(process.env.CODE_VERIFY) || opts.verifyLayers || null;
+      const real = configured || (codingIntent ? ['syntax', 'lint', 'unit'] : ['syntax', 'lint']);
       return verifyAfterEdit(
         {
           nodeId: opts.missionId || 'chat-turn',
@@ -250,10 +260,12 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
           snapshot: opts.__snapshot || null,
           acceptanceCriteria: query,
           claimantAcbId: opts.missionId || 'chat',
-          options: { cwd: opts.root || process.env.WORKSPACE_DIR || process.cwd() },
+          files: opts.verifyFiles || undefined,
+          entryPoint: opts.entryPoint || extractEntryPoint(query),
+          options: { cwd: opts.root || process.env.WORKSPACE_DIR || process.cwd(), entryPoint: opts.entryPoint || extractEntryPoint(query) },
         },
         {},
-        { real: codingIntent ? ['lint', 'unit'] : ['lint'] },
+        { real },
       );
     },
   });

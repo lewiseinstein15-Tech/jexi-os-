@@ -159,7 +159,13 @@ console.log('\n== 5. Tmux context ==');
   const env = { TMUX: '/tmp/tmux-1000/default,1234,0', TMUX_PANE: '%0' };
   ok('inTmux detects env', inTmux(env) === true);
   const block = tmuxContextBlock(env);
-  ok('block rendered inside tmux', block.includes('tmux session') && block.includes('default'));
+  /* M22 — the block must NOT echo the raw TMUX socket path. `TMUX` is an
+     absolute HOST path; the model read it as a write target and three of
+     fifteen benchmark tasks emitted `fs_write` to it (the sandbox refused,
+     correctly, and the task died unwritten). The block still says the server
+     has a terminal, but the path stays out of the prompt. */
+  ok('block rendered inside tmux', block.includes('persistent terminal') && !block.includes('tmux-1000'));
+  ok('block hides the tmux socket path', !block.includes('/tmp/tmux-1000/default'));
   const st = tmuxStatus(env);
   ok('status shape', st.inTmux === true && st.session.includes('default'));
 }

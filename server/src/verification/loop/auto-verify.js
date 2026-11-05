@@ -13,6 +13,7 @@
  */
 
 import { LintVerifier } from '../verifiers/LintVerifier.js';
+import { SyntaxVerifier } from '../verifiers/SyntaxVerifier.js';
 import { TestVerifier, runTestEvidence } from '../verifiers/TestVerifier.js';
 
 // JEXI-018 — re-exported, not re-implemented. A caller that imports the seam
@@ -23,7 +24,7 @@ import { BuildVerifier } from '../verifiers/BuildVerifier.js';
 import { AgentVerifier } from '../verifiers/AgentVerifier.js';
 
 /** The multi-layer order — cheapest (syntax) first, independent review last. */
-export const VERIFY_LAYER_ORDER = ['lint', 'unit', 'integration', 'build', 'agent'];
+export { VERIFY_LAYER_ORDER } from '../layers.js';
 
 /** Coerce a raw command fn to a {exitCode, output} runner. */
 const runner = (fn) => () => Promise.resolve(fn()).then(
@@ -79,6 +80,7 @@ export async function autoVerify(ctx, layers = {}) {
  */
 export async function realVerifyLayer(layer, ctx = {}) {
   const step = {
+    syntax: { verifier: SyntaxVerifier, defaultOptions: { files: ctx.files, entryPoint: ctx.entryPoint } },
     lint: { verifier: LintVerifier, defaultOptions: { files: ctx.files } },
     unit: { verifier: TestVerifier },
     integration: { verifier: TestVerifier },
@@ -108,10 +110,11 @@ export async function realVerifyLayer(layer, ctx = {}) {
  * the edit that broke it instead of at the end of the turn. Callers that
  * genuinely only want a syntax check pass `{ real: ['lint'] }` explicitly.
  */
-export const DEFAULT_REAL_LAYERS = ['lint', 'unit'];
+export const DEFAULT_REAL_LAYERS = ['syntax', 'lint', 'unit'];
 
 export async function verifyAfterEdit(ctx, layers = {}, { real = null } = {}) {
   const steps = [
+    { name: 'syntax', verifier: SyntaxVerifier },
     { name: 'lint', verifier: LintVerifier },
     { name: 'unit', verifier: TestVerifier },
     { name: 'integration', verifier: TestVerifier },

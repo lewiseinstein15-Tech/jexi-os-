@@ -415,13 +415,17 @@ export function recoverFencedCodeWrite(text, offeredNames = [], hint = {}) {
   const body = implBlocks.slice().sort((a, b) => b.length - a.length)[0];
 
   const refs = [...s.matchAll(BARE_WRITE_REF_RE)].map((m) => m[1]).filter((p) => p && !p.includes('<<'));
-  /* An explicit `fs_write <path>` in the answer is intent enough. With only the
-     instruction-derived hint, the INSTRUCTION must ask for a write — otherwise a
-     task that merely points at an existing file ("explain /app/foo.py") could
-     have the model's quoted snippet written back over it. */
-  const targetPath = refs.length
-    ? refs[refs.length - 1]
-    : (hint && hint.targetPath && hint.writeInstruction ? hint.targetPath : null);
+  /* M22 — RESOLUTION ORDER. The turn's own INSTRUCTION is authoritative when it
+     asks for a write: the task named the file to write, and the model's answer
+     sometimes names a DIFFERENT one (measured: the instruction said
+     `…/HumanEval_10/solution.py`, the answer's `fs_write` ref said
+     `longest.py`, and the write landed on the wrong file so the grader saw an
+     unmodified stub). The instruction hint therefore WINS whenever the
+     instruction asks for a write; the answer's own ref is the fallback for a
+     turn whose instruction names no file. With no hint, the ref must be
+     intent enough on its own. */
+  const hintPath = hint && hint.writeInstruction && hint.targetPath ? hint.targetPath : null;
+  const targetPath = hintPath || (refs.length ? refs[refs.length - 1] : null);
   if (!targetPath) return [];
 
   const args = remapWriteArgs(resolved.name, { path: targetPath, content: `${body}\n` });

@@ -226,6 +226,12 @@ async function main() {
     const durationMs = Date.now() - t0;
     const sig = extractSignals(agentInfo.events || []);
     const solution = agentInfo.solution || '';
+    /* M22/WS5 — stash the full artefacts on the task object for the transcript
+       written at the end. The row table keeps only head/tail; this keeps the
+       whole thing. Underscored so it is never mistaken for task metadata. */
+    task.__answer = sig.answer;
+    task.__solution = solution;
+    task.__events = agentInfo.events || [];
     /* materialiseTask seeds solution.py with the bare prompt stub, so the file
        always exists. A REAL write is one whose content differs from that stub —
        otherwise a zero-tool-call turn would look like it wrote a solution. */
@@ -314,9 +320,40 @@ async function main() {
   fs.mkdirSync(path.join(HERE, 'results'), { recursive: true });
   const outPath = path.join(HERE, 'results', `${runId}.json`);
   fs.writeFileSync(outPath, JSON.stringify(out, null, 2));
+
+  /* M22/WS5 — PRESERVE THE FULL ANSWERS AND EVENTS.
+     The row table above stores only `answerHead`/`answerTail`, so the middle of
+     a long answer — the actual generated code — was thrown away, and no raw
+     event stream survived at all. Diagnosing "why did this task fail" then
+     needed a re-run, and a re-run is ~3 minutes per task of a stochastic
+     model, so the evidence could not be recovered. Write a sibling transcript
+     holding the COMPLETE answer, the COMPLETE solution bytes, and the COMPLETE
+     event list for every task, keyed by task id. It is large on purpose; it is
+     the only copy of what the model actually said. */
+  const transcript = {
+    runId,
+    manifest: { ...manifest, tasks: selected.length },
+    tasks: rows.map((row) => {
+      const t = selected.find((x) => x.task_id === row.taskId) || {};
+      return {
+        taskId: row.taskId,
+        entryPoint: row.entryPoint,
+        pass: row.pass,
+        gradedPass: row.gradedPass,
+        resolveReason: row.resolveReason,
+        solution: t.__solution ?? null,
+        answer: t.__answer ?? null,
+        events: t.__events ?? null,
+      };
+    }),
+  };
+  const txPath = path.join(HERE, 'results', `${runId}.transcript.json`);
+  fs.writeFileSync(txPath, JSON.stringify(transcript, null, 2));
+
   console.log(`\n[m21] prompt=${promptKey} query=${queryMode} resolved ${metrics.resolved}/${rows.length} = ${(metrics.resolvedRate * 100).toFixed(1)}%`);
   console.log(`[m21] wrote=${metrics.wroteSolutionTasks} validToolCallTasks=${metrics.validToolCallTasks} toolExecuted=${metrics.toolExecutedTasks} timeouts=${metrics.timeouts} syntaxErrors=${metrics.syntaxErrorTasks} proseOnly=${metrics.proseInsteadOfCallTasks}`);
   console.log(`[m21] wrote ${outPath}`);
+  console.log(`[m21] transcript ${txPath}`);
 }
 
 main().then(() => process.exit(0), (e) => { console.error('[m21] FATAL', e); process.exit(1); });

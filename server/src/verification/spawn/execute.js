@@ -17,6 +17,7 @@
 
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -94,6 +95,18 @@ export async function runCommand(commandSpec, { cwd = process.cwd(), timeoutMs =
 
   return new Promise((resolve) => {
     let child;
+    /* M22 — NO STALE BYTECODE, part 2: the cache directory.
+       `-B` / PYTHONDONTWRITEBYTECODE stops the child WRITING a cache but does
+       not stop it READING one that is already there. CPython validates a
+       cached `.pyc` by (mtime, size) with one-second mtime granularity, so an
+       edit that preserves a file's size and lands in the same second reuses
+       the PREVIOUS bytecode. Measured: reverting a one-character fix
+       (`+` → `-`) within a second made the run report "1 passed" for a file
+       that was, on disk, failing — a verifier FALSE PASS, the worst kind for
+       this mission. Point every spawned verifier at a fresh, private cache
+       directory instead: a cache miss every time, so the child always compiles
+       the bytes it actually has. Removed on exit. */
+    let pycacheDir = null;
     try {
       // A spawned verifier is an independent process, never a node:test
       // child of the caller. Under `node --test` the parent env carries
@@ -104,6 +117,9 @@ export async function runCommand(commandSpec, { cwd = process.cwd(), timeoutMs =
       // context so the child always speaks on its own stdio.
       const childEnv = { ...process.env, ...env };
       delete childEnv.NODE_TEST_CONTEXT;
+      delete childEnv.PYTHONDONTWRITEBYTECODE;
+      pycacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jexi-pycache-'));
+      childEnv.PYTHONPYCACHEPREFIX = pycacheDir;
       child = spawn(command, args, {
         cwd,
         env: childEnv,
@@ -111,6 +127,7 @@ export async function runCommand(commandSpec, { cwd = process.cwd(), timeoutMs =
         shell: false,
       });
     } catch (e) {
+      if (pycacheDir) { try { fs.rmSync(pycacheDir, { recursive: true, force: true }); } catch { /* gone */ } }
       resolve({ ok: false, code: null, stdout: '', stderr: '', output: '', failures: [], timedOut: false, spawnError: `spawn failed: ${(e && e.message) || e}` });
       return;
     }
@@ -122,6 +139,8 @@ export async function runCommand(commandSpec, { cwd = process.cwd(), timeoutMs =
     child.stdout.on('data', (d) => { stdout = (stdout + d.toString('utf8')).slice(-maxOutputChars); });
     child.stderr.on('data', (d) => { stderr = (stderr + d.toString('utf8')).slice(-maxOutputChars); });
 
+    const cleanupPycache = () => { if (pycacheDir) { try { fs.rmSync(pycacheDir, { recursive: true, force: true }); } catch { /* gone */ } } };
+
     const timer = setTimeout(() => {
       timedOut = true;
       try { child.kill('SIGKILL'); } catch { /* already gone */ }
@@ -129,6 +148,7 @@ export async function runCommand(commandSpec, { cwd = process.cwd(), timeoutMs =
 
     child.on('close', (code) => {
       clearTimeout(timer);
+      cleanupPycache();
       const output = (stdout || stderr).trim();
       const failures = timedOut
         ? [`timed out after ${timeoutMs}ms`]
@@ -150,6 +170,7 @@ export async function runCommand(commandSpec, { cwd = process.cwd(), timeoutMs =
 
     child.on('error', (e) => {
       clearTimeout(timer);
+      cleanupPycache();
       resolve({ ok: false, code: null, stdout: '', stderr: '', output: '', failures: [], timedOut: false, spawnError: `spawn error: ${(e && e.message) || e}` });
     });
   });

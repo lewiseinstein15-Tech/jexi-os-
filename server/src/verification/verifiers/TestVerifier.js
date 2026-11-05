@@ -50,6 +50,59 @@ export function looksLikeExecStylePytest(parsed, root) {
 }
 
 /**
+ * M22 — THE EXEC-STYLE RUNNER.
+ *
+ * `looksLikeExecStylePytest` above correctly says `pytest -q` cannot check the
+ * HumanEval sandbox shape. But that shape IS checkable — the official grader
+ * does it: exec `solution.py` into a namespace, then exec the test file, whose
+ * last line calls `check(<entry>)`. If the candidate is wrong the call raises
+ * and the process exits nonzero. M21 stopped at "unverifiable", so a Python
+ * task never produced a real pass/fail signal and a test-driven repair had
+ * nothing to converge on.
+ *
+ * This returns the real spec that reproduces the official grader, or null when
+ * the project is not that shape. Narrow on purpose:
+ *   - a flat directory (the sandbox shape), with a `solution.py`;
+ *   - at least one `test_*.py` that imports nothing (an exec-style script);
+ *   - the test file calls `check(...)` at module level, so exec runs it.
+ * A normal pytest repo has importing test files, so it is untouched.
+ *
+ * @param {string} root
+ * @returns {string[]|null} [python, '-c', script, solutionName, testName] or null
+ */
+export function execStyleRunner(root) {
+  const script = [
+    'import sys, traceback',
+    'ns = {}',
+    'try:',
+    '    exec(compile(open(sys.argv[1], encoding="utf-8").read(), sys.argv[1], "exec"), ns)',
+    '    exec(compile(open(sys.argv[2], encoding="utf-8").read(), sys.argv[2], "exec"), ns)',
+    'except Exception:',
+    '    traceback.print_exc()',
+    '    sys.exit(1)',
+    'sys.exit(0)',
+  ].join('\n');
+  try {
+    const solution = path.join(root, 'solution.py');
+    if (!fs.existsSync(solution)) return null;
+    const tests = fs.readdirSync(root).filter((f) => /^test_.+\.py$/.test(f));
+    if (tests.length !== 1) return null;
+    const testPath = path.join(root, tests[0]);
+    const src = fs.readFileSync(testPath, 'utf8');
+    if (/^\s*(?:import|from)\s+\w/m.test(src)) return null;   // a real pytest file imports its module
+    /* The official grader's test file calls check() at MODULE level (column 0),
+       so `exec` runs it. A check() call nested inside a function would never
+       run under exec and would false-pass, so require column 0. */
+    if (!/^check\s*\(/m.test(src)) return null;
+    /* Pass the names RELATIVE to the run cwd, not absolute paths under `root`.
+       The spawn layer may run the child in a materialized snapshot tempdir
+       rather than `root`; relative names resolve against whatever cwd the child
+       actually gets, so the spec stays correct under both. */
+    return [process.env.PYTHON || 'python3', '-c', script, 'solution.py', tests[0]];
+  } catch { return null; }
+}
+
+/**
  * JEXI-024 — a pass is not "exit code 0".
  *
  * The real-spawn path ended with `const pass = res.ok`, i.e. exit code only.
@@ -167,8 +220,15 @@ export const TestVerifier = {
     // "fix the failing pytest" is verifiable on a pytest repo.
     const configured = resolveConfiguredCommand(cwd, 'test');
     const detected = configured ? null : detectTestCommand(cwd);
+    /* M22 — EXEC-STYLE FIRST. When the project is the HumanEval sandbox shape,
+       `pytest -q` cannot check it (M21 proved that) but the OFFICIAL exec
+       pattern can. Prefer that runner over the detected `pytest -q`, so a
+       Python task gets a real pass/fail signal instead of `unverifiable`. An
+       explicit caller-supplied command still wins. */
+    const execSpec = (testCommand || command) ? null : execStyleRunner(cwd);
     const spec = testCommand
       || (command ? [command, ...args] : null)
+      || execSpec
       || configured
       || (detected ? detected.split(/\s+/).filter(Boolean) : null);
     if (!spec) {
@@ -183,9 +243,13 @@ export const TestVerifier = {
     return runTestEvidence({
       spec, cwd, snapshot, snapshotId, materialize, timeoutMs,
       allowEmpty: options.allowEmpty === true,
-      detected: !configured && !testCommand && !command,
+      detected: !configured && !testCommand && !command && !execSpec,
       // The caller chose this command; it is not necessarily a test runner.
       explicit: !!command,
+      // An exec-style runner is a real script, not a framework: exit code is
+      // the whole signal, so a nonzero exit is a genuine failure and a zero
+      // exit (check() returned without raising) is a genuine pass.
+      script: Boolean(execSpec),
     });
   },
 };
@@ -206,7 +270,7 @@ export const TestVerifier = {
  */
 export async function runTestEvidence({
   spec, cwd, snapshot, snapshotId, materialize, timeoutMs,
-  allowEmpty = false, detected = false, explicit = false, source = 'TestVerifier',
+  allowEmpty = false, detected = false, explicit = false, script = false, source = 'TestVerifier',
 }) {
   const started = Date.now();
   const { cwd: runCwd, sandbox, materialized, reason: cwdReason } = verifyCwd(snapshot, { cwd, materialize });
@@ -233,7 +297,14 @@ export async function runTestEvidence({
   }
 
   const kind = detectKind(spec, res.output ?? '');
-  const { status, parsed, reason } = judge({ res, kind, allowEmpty, explicit, detected, cwd: runCwd });
+  /* M22 — an exec-style runner is a plain script, so its exit code is the whole
+     verdict: nonzero means check() raised, zero means it returned clean. It is
+     judged like an explicit command, never by the framework output parser. */
+  const { status, parsed, reason } = script
+    ? (res.ok
+      ? { status: 'pass', parsed: { pass: 1, fail: 0, tests: 1 }, reason: undefined }
+      : { status: 'fail', parsed: { pass: 0, fail: 1, tests: 1 }, reason: (res.output || '').trim().split('\n').slice(-6).join('\n') || `exec-style runner exited ${res.code}` })
+    : judge({ res, kind, allowEmpty, explicit, detected, cwd: runCwd });
   const evidence = [{
     source,
     snapshotId,
