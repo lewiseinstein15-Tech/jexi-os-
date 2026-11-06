@@ -24,6 +24,16 @@ import path from 'node:path';
 
 const SERVER = '/workspace/project/jexi-os-/server';
 
+/* M23 — the contract extractor lives in the server tree. It is imported lazily
+   and defensively so this benchmark lib still runs if the server module is
+   unavailable; `contractQuery` then degrades to `fsNamesQuery`. */
+let contractApi = null;
+try {
+  contractApi = await import(path.join(SERVER, 'src/services/agent/FunctionContract.js'));
+} catch {
+  contractApi = null;
+}
+
 const TOOL_DOC = `You work in a sandbox directory. Two tools are available:
 
 1. fs_write — write a file.
@@ -80,6 +90,32 @@ export function fsNamesQuery(task, solutionPath, testName) {
     'as text — the file on disk is what is graded.',
     `Keep the exact function name (${task.entry_point}) and signature. Put any imports you need at the top of the file.`,
     `The finished file must define ${task.entry_point} and be valid, self-contained Python.`,
+    `A test file, ${testName}, is already in the same directory. Use the term_execute tool to run it and confirm it passes. Do not modify the test file.`,
+  ].join('\n');
+}
+
+/* M23 Workstream A/B — the contract-aware query. Same shape as `fsNamesQuery`
+   but it renders the EXTRACTED CONTRACT (name, ordered parameters, return,
+   behaviour, worked examples) as an explicit, checkable block, so the model is
+   not asked to re-derive the interface from a docstring. `contract` is optional
+   — when extraction fails the query degrades to `fsNamesQuery` rather than
+   inventing an interface. */
+export function contractQuery(task, solutionPath, testName, contract = null) {
+  const block = contract && contractApi ? contractApi.renderContractBlock(contract) : null;
+  const base = fsNamesQuery(task, solutionPath, testName);
+  if (!block) return base;
+  return [
+    `Write the complete implementation of the Python function below to the file ${solutionPath}.`,
+    '',
+    '```python',
+    task.prompt.trim(),
+    '```',
+    '',
+    block,
+    '',
+    `Use the fs_write tool to write the complete file to ${solutionPath}. Do not reply with the code`,
+    'as text — the file on disk is what is graded.',
+    `Put any imports you need at the top of the file. The finished file must be valid, self-contained Python.`,
     `A test file, ${testName}, is already in the same directory. Use the term_execute tool to run it and confirm it passes. Do not modify the test file.`,
   ].join('\n');
 }

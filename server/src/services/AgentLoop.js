@@ -53,6 +53,7 @@ import { recordOutcome as recordCapabilityOutcome } from '../capability/registry
 import { verifyAfterEdit } from '../verification/loop/auto-verify.js'; // JEXI-002 — the REAL verification subsystem
 import { extractTargetPath, isWriteInstruction } from './agent/ToolCallRecovery.js'; // M21 — target path + write-intent for fenced-code prose recovery
 import { parseVerifyLayers, extractEntryPoint } from './agent/verify-config.js'; // M22 — caller-declared verify layers + target function name
+import { extractFunctionContract, renderContractBlock } from './agent/FunctionContract.js'; // M23 — structured function contract
 
 // DeepSeek-Harness-style loop: more steps per turn (the rate limiter
 // protects free tiers), with turn/step events streamed like a session event log.
@@ -239,6 +240,21 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
      into the next model turn, and the success gate decides whether this turn
      is allowed to claim the work is done. */
   const codingIntent = isCodingIntent(plan, query);
+  /* M23 Workstream A/B — extract the FUNCTION CONTRACT from the request and
+     state it back to the model before it writes. The extractor is pure and
+     deterministic (no model), so this cannot drift run to run. It is computed
+     only for a coding turn: a plain question has no function contract, and
+     emitting one would be noise. The block is appended to the user turn (so it
+     survives an empty system prompt) AND recorded on the plan event so the
+     transcript shows exactly what the model was told. */
+  const functionContract = codingIntent
+    ? extractFunctionContract(query, { entryPoint: opts.entryPoint || null })
+    : null;
+  /* A caller that already stated the contract (the M23 benchmark's
+     `contractQuery`) must not get it twice — one statement, not two. */
+  const contractAlreadyStated = /REQUIRED CONTRACT/.test(query);
+  const contractBlock = functionContract && !contractAlreadyStated ? renderContractBlock(functionContract) : null;
+  if (contractBlock) emit('agent.contract', { contract: functionContract, block: contractBlock });
   const coding = new CodingLoop({
     maxVerifyRounds: budget.verifyRounds,
     send: emit,
@@ -528,7 +544,7 @@ export async function runAgentLoop({ query, image, sendEvent, opts = {} }) {
     // the scripted seam did not already produce this child's real answer
     // (keyed children always reach the model loop).
     const res = await generateWithToolsLoop(
-      `The user asked: "${query}"`,
+      `The user asked: "${query}"${contractBlock ? `\n\n${contractBlock}` : ''}`,
       await assemblePrompt({
         convId: opts.spillOwner || null,
         codeMode,

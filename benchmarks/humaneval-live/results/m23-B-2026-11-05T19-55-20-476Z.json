@@ -1,0 +1,728 @@
+{
+  "manifest": {
+    "benchmark": "humaneval",
+    "mission": "M23",
+    "condition": "B (contract-aware single pass)",
+    "dataset": {
+      "repo": "openai/openai_humaneval",
+      "config": "openai_humaneval",
+      "split": "test",
+      "sha256": "094a17ace7a536483e83cd6bb0348c9df1e2bb532ff4e09961665a8b9414c157",
+      "numRowsTotal": 164
+    },
+    "leg": "jexi",
+    "schemaMode": "as-shipped",
+    "toolProfile": "full",
+    "maxRepairs": 0,
+    "model": "llama3.2:3b",
+    "providerLock": "ollama",
+    "modelProviderEnv": "ollama",
+    "ollamaHost": "http://127.0.0.1:11434",
+    "tasks": 15,
+    "taskIds": [
+      "HumanEval/0",
+      "HumanEval/1",
+      "HumanEval/2",
+      "HumanEval/3",
+      "HumanEval/4",
+      "HumanEval/5",
+      "HumanEval/6",
+      "HumanEval/7",
+      "HumanEval/8",
+      "HumanEval/9",
+      "HumanEval/10",
+      "HumanEval/11",
+      "HumanEval/12",
+      "HumanEval/13",
+      "HumanEval/14"
+    ],
+    "promptVariant": "A",
+    "promptLabel": "current",
+    "queryMode": "contract-aware",
+    "gitCommit": "c5f13d4ec22c89568b1b63692b5cd520d5fbadba",
+    "gitDirty": true,
+    "grader": "local subprocess (NOT isolated)",
+    "gradedWithoutIsolation": true,
+    "node": "v24.21.0",
+    "platform": "linux/x64",
+    "startedAt": "2026-11-05T19:55:20.476Z",
+    "runId": "m23-B-2026-11-05T19-55-20-476Z"
+  },
+  "firstPass": {
+    "total": 15,
+    "resolved": 0,
+    "resolvedRate": 0,
+    "gradedGreen": 0,
+    "gradedGreenRate": 0,
+    "timeouts": 0,
+    "agentErrors": 0,
+    "graderErrors": 0,
+    "unresolvedGreen": 0
+  },
+  "finalPass": {
+    "total": 15,
+    "resolved": 0,
+    "resolvedRate": 0,
+    "gradedGreen": 0,
+    "gradedGreenRate": 0,
+    "timeouts": 0,
+    "agentErrors": 0,
+    "graderErrors": 0,
+    "unresolvedGreen": 0
+  },
+  "metrics": {
+    "firstPass": {
+      "total": 15,
+      "resolved": 0,
+      "resolvedRate": 0,
+      "gradedGreen": 0,
+      "gradedGreenRate": 0,
+      "timeouts": 0,
+      "agentErrors": 0,
+      "graderErrors": 0,
+      "unresolvedGreen": 0
+    },
+    "finalPass": {
+      "total": 15,
+      "resolved": 0,
+      "resolvedRate": 0,
+      "gradedGreen": 0,
+      "gradedGreenRate": 0,
+      "timeouts": 0,
+      "agentErrors": 0,
+      "graderErrors": 0,
+      "unresolvedGreen": 0
+    },
+    "contractExtractionSuccess": 15,
+    "recoveredByRepair": 0,
+    "repairsAttempted": 0,
+    "tasksUsingRepair": 0,
+    "repeatedAttemptTasks": 0,
+    "diagnosisHistogram": {
+      "assertion-failure": 5,
+      "syntax-error": 4,
+      "missing-entry-point": 2,
+      "timeout": 4
+    },
+    "providerLock": "ollama"
+  },
+  "rows": [
+    {
+      "taskId": "HumanEval/0",
+      "entryPoint": "has_close_elements",
+      "contractExtracted": true,
+      "contractName": "has_close_elements",
+      "contractSignature": "def has_close_elements(numbers: List[float], threshold: float) -> bool:",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 0,
+      "repeatedAttemptObserved": false,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 180397,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "wroteSolution": false,
+          "diagnosis": "assertion-failure",
+          "diagnosisEvidence": "AssertionError",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m23-B-3JU5NZ/HumanEval_0/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 20, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        }
+      ],
+      "finalSolution": "from typing import List\n\n\ndef has_close_elements(numbers: List[float], threshold: float) -> bool:\n    \"\"\" Check if in given list of numbers, are any two numbers closer to each other than\n    given threshold.\n    >>> has_close_elements([1.0, 2.0, 3.0], 0.5)\n    False\n    >>> has_close_elements([1.0, 2.8, 3.0, 4.0, 5.0, 2.0], 0.3)\n    True\n    \"\"\"\n\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/1",
+      "entryPoint": "separate_paren_groups",
+      "contractExtracted": true,
+      "contractName": "separate_paren_groups",
+      "contractSignature": "def separate_paren_groups(paren_string: str) -> List[str]:",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 0,
+      "repeatedAttemptObserved": false,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 137174,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "wroteSolution": false,
+          "diagnosis": "assertion-failure",
+          "diagnosisEvidence": "AssertionError",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m23-B-3JU5NZ/HumanEval_1/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 22, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        }
+      ],
+      "finalSolution": "from typing import List\n\n\ndef separate_paren_groups(paren_string: str) -> List[str]:\n    \"\"\" Input to this function is a string containing multiple groups of nested parentheses. Your goal is to\n    separate those group into separate strings and return the list of those.\n    Separate groups are balanced (each open brace is properly closed) and not nested within each other\n    Ignore any spaces in the input string.\n    >>> separate_paren_groups('( ) (( )) (( )( ))')\n    ['()', '(())', '(()())']\n    \"\"\"\n\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/2",
+      "entryPoint": "truncate_number",
+      "contractExtracted": true,
+      "contractName": "truncate_number",
+      "contractSignature": "def truncate_number(number: float) -> float:",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 0,
+      "repeatedAttemptObserved": false,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 131846,
+          "toolCalls": [
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "wroteSolution": true,
+          "diagnosis": "syntax-error",
+          "diagnosisEvidence": "SyntaxError: invalid syntax",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m23-B-3JU5NZ/HumanEval_2/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 4\n    \"\" Given a positive floating point number, it can be decomposed into\n       ^^^^^\nSyntaxError: invalid syntax"
+        }
+      ],
+      "finalSolution": "import math\n\ndef truncate_number(number: float) -> float:\n    \"\" Given a positive floating point number, it can be decomposed into\n    and integer part (largest integer smaller than given number) and decimals\n    (leftover part always smaller than 1).\n\n    Return the decimal part of the number.\n\n    \\>\\> truncate_number(3.5)\n\\>\\> 0.5\n\n\ndef truncate_number(number: float) -> float:\n    integer_part = math.floor(number)\n    decimal_part = number - integer_part\n    return decimal_part\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/3",
+      "entryPoint": "below_zero",
+      "contractExtracted": true,
+      "contractName": "below_zero",
+      "contractSignature": "def below_zero(operations: List[int]) -> bool:",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 0,
+      "repeatedAttemptObserved": false,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 225820,
+          "toolCalls": [
+            "fs_write",
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "wroteSolution": true,
+          "diagnosis": "missing-entry-point",
+          "diagnosisEvidence": "below_zero is not defined (found: greet)",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m23-B-3JU5NZ/HumanEval_3/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 18, in <module>\nNameError: name 'below_zero' is not defined"
+        }
+      ],
+      "finalSolution": "def greet(name: str) -> str:\n    print(f\"Calling greet with name {name}\")\n    return f\"Hello, {name}!\"\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/4",
+      "entryPoint": "mean_absolute_deviation",
+      "contractExtracted": true,
+      "contractName": "mean_absolute_deviation",
+      "contractSignature": "def mean_absolute_deviation(numbers: List[float]) -> float:",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 0,
+      "repeatedAttemptObserved": false,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 141151,
+          "toolCalls": [
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "wroteSolution": true,
+          "diagnosis": "syntax-error",
+          "diagnosisEvidence": "SyntaxError: unexpected character after line continuation character",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m23-B-3JU5NZ/HumanEval_4/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 12\n    \\# Calculate the absolute deviation of the current number from the mean\n     ^\nSyntaxError: unexpected character after line continuation character"
+        }
+      ],
+      "finalSolution": "from typing import List\n\ndef mean_absolute_deviation(numbers: List[float]) -> float:\n        # Calculate the mean of the input numbers\n    mean = sum(numbers) / len(numbers)\n\n    # Initialize the sum of absolute deviations\n    sum_abs_dev = 0\n\n    # Iterate over each number in the input list\n    for num in numbers:\n        \\# Calculate the absolute deviation of the current number from the mean\n        abs_dev = abs(num - mean)\n\n        \\# Add the absolute deviation to the sum\n        sum_abs_dev += abs_dev\n\n    \\# Calculate the mean absolute deviation\n    mad = sum_abs_dev / len(numbers)\n\n    \\# Return the mean absolute deviation\n    return mad\n\n# Test the function with some worked examples\n\nmean_absolute_deviation([1.0, 2.0, 3.0, 4.0])  # => 1.0\nmean_absolute_deviation([5.0, 5.0, 5.0, 5.0])  # => 0.0\nmean_absolute_deviation([1.0, 1.0, 1.0, 1.0])  # => 0.0",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/5",
+      "entryPoint": "intersperse",
+      "contractExtracted": true,
+      "contractName": "intersperse",
+      "contractSignature": "def intersperse(numbers: List[int], delimeter: int) -> List[int]:",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 0,
+      "repeatedAttemptObserved": false,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 177758,
+          "toolCalls": [
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "wroteSolution": false,
+          "diagnosis": "assertion-failure",
+          "diagnosisEvidence": "AssertionError",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m23-B-3JU5NZ/HumanEval_5/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        }
+      ],
+      "finalSolution": "from typing import List\n\n\ndef intersperse(numbers: List[int], delimeter: int) -> List[int]:\n    \"\"\" Insert a number 'delimeter' between every two consecutive elements of input list `numbers'\n    >>> intersperse([], 4)\n    []\n    >>> intersperse([1, 2, 3], 4)\n    [1, 4, 2, 4, 3]\n    \"\"\"\n\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/6",
+      "entryPoint": "parse_nested_parens",
+      "contractExtracted": true,
+      "contractName": "parse_nested_parens",
+      "contractSignature": "def parse_nested_parens(paren_string: str) -> List[int]:",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 0,
+      "repeatedAttemptObserved": false,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 284296,
+          "toolCalls": [
+            "fs_write",
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "wroteSolution": true,
+          "diagnosis": "missing-entry-point",
+          "diagnosisEvidence": "parse_nested_parens is not defined (found: candidate, extract_indices)",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m23-B-3JU5NZ/HumanEval_6/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 1, in <module>\nModuleNotFoundError: No module named 'pyparsing'"
+        }
+      ],
+      "finalSolution": "import pyparsing as pp\n\ndef candidate(s):\n    # Define a grammar for parsing nested parentheses\n    grammar = pp.Forward()\n    grammar << pp.Group() | pp.one_of('()') | pp.nested_expr()\n\n    # Parse the input string\n    tree = grammar.parseString(s)\n\n    # Extract the indices from the parsed tree\n    indices = []\n    def extract_indices(node):\n        if node.type == 'Group':\n            for child in node.children:\n                extract_indices(child)\n        elif node.type == 'one_of':\n            indices.append(node.index)\n        elif node.type == 'nested_expr':\n            extract_indices(node[0])\n    extract_indices(tree)\n    return indices\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/7",
+      "entryPoint": "filter_by_substring",
+      "contractExtracted": true,
+      "contractName": "filter_by_substring",
+      "contractSignature": "def filter_by_substring(strings: List[str], substring: str) -> List[str]:",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 0,
+      "repeatedAttemptObserved": false,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": true,
+          "agentError": "agent loop timed out after 300000ms",
+          "resolveReason": "timeout: agent loop timed out after 300000ms",
+          "durationMs": 300002,
+          "toolCalls": [
+            "fs_write",
+            "fs_write",
+            "fs_write",
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "wroteSolution": true,
+          "diagnosis": "timeout",
+          "diagnosisEvidence": "agent loop timed out after 300000ms",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m23-B-3JU5NZ/HumanEval_7/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 16, in <module>\nNameError: name 'filter_by_substring' is not defined"
+        }
+      ],
+      "finalSolution": "import time\n\ndef main():\n    start_time = time.time()\n    # code that takes a while to run\n    end_time = time.time()\n    print(f\"Time taken: {end_time - start_time} seconds\")\n\nif __name__ == \"__main__\":\n    main()\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/8",
+      "entryPoint": "sum_product",
+      "contractExtracted": true,
+      "contractName": "sum_product",
+      "contractSignature": "def sum_product(numbers: List[int]) -> Tuple[int, int]:",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 0,
+      "repeatedAttemptObserved": false,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": true,
+          "agentError": "agent loop timed out after 300000ms",
+          "resolveReason": "timeout: agent loop timed out after 300000ms",
+          "durationMs": 300002,
+          "toolCalls": [
+            "fs_write",
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            },
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "wroteSolution": true,
+          "diagnosis": "timeout",
+          "diagnosisEvidence": "agent loop timed out after 300000ms",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m23-B-3JU5NZ/HumanEval_8/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 2\n    # ... (rest of the code remains the same)\n                                             ^\nIndentationError: expected an indented block after function definition on line 1"
+        }
+      ],
+      "finalSolution": "def solve():\n    # ... (rest of the code remains the same)\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/9",
+      "entryPoint": "rolling_max",
+      "contractExtracted": true,
+      "contractName": "rolling_max",
+      "contractSignature": "def rolling_max(numbers: List[int]) -> List[int]:",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 0,
+      "repeatedAttemptObserved": false,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 146575,
+          "toolCalls": [
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "wroteSolution": false,
+          "diagnosis": "assertion-failure",
+          "diagnosisEvidence": "AssertionError",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m23-B-3JU5NZ/HumanEval_9/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 16, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        }
+      ],
+      "finalSolution": "from typing import List, Tuple\n\n\ndef rolling_max(numbers: List[int]) -> List[int]:\n    \"\"\" From a given list of integers, generate a list of rolling maximum element found until given moment\n    in the sequence.\n    >>> rolling_max([1, 2, 3, 2, 3, 4, 2])\n    [1, 2, 3, 3, 3, 4, 4]\n    \"\"\"\n\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/10",
+      "entryPoint": "make_palindrome",
+      "contractExtracted": true,
+      "contractName": "make_palindrome",
+      "contractSignature": "def make_palindrome(string: str) -> str:",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 0,
+      "repeatedAttemptObserved": false,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 170707,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "wroteSolution": false,
+          "diagnosis": "assertion-failure",
+          "diagnosisEvidence": "AssertionError",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m23-B-3JU5NZ/HumanEval_10/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 17, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        }
+      ],
+      "finalSolution": "\n\ndef is_palindrome(string: str) -> bool:\n    \"\"\" Test if given string is a palindrome \"\"\"\n    return string == string[::-1]\n\n\ndef make_palindrome(string: str) -> str:\n    \"\"\" Find the shortest palindrome that begins with a supplied string.\n    Algorithm idea is simple:\n    - Find the longest postfix of supplied string that is a palindrome.\n    - Append to the end of the string reverse of a string prefix that comes before the palindromic suffix.\n    >>> make_palindrome('')\n    ''\n    >>> make_palindrome('cat')\n    'catac'\n    >>> make_palindrome('cata')\n    'catac'\n    \"\"\"\n\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/11",
+      "entryPoint": "string_xor",
+      "contractExtracted": true,
+      "contractName": "string_xor",
+      "contractSignature": "def string_xor(a: str, b: str) -> str:",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 0,
+      "repeatedAttemptObserved": false,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 121596,
+          "toolCalls": [
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "wroteSolution": true,
+          "diagnosis": "syntax-error",
+          "diagnosisEvidence": "SyntaxError: unterminated string literal (detected at line 4)",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m23-B-3JU5NZ/HumanEval_11/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 4\n    \" Input are two strings a and b consisting only of 1s and 0s.\\n    Perform binary XOR on these inputs and return result also as a string.\\n\\n    >>> string_xor('010', '110')\\n    '100'\\n\\n\n    ^\nSyntaxError: unterminated string literal (detected at line 4)"
+        }
+      ],
+      "finalSolution": "from typing import List\n\ndef string_xor(a: str, b: str) -> str:\n    \" Input are two strings a and b consisting only of 1s and 0s.\\n    Perform binary XOR on these inputs and return result also as a string.\\n\\n    >>> string_xor('010', '110')\\n    '100'\\n\\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/12",
+      "entryPoint": "longest",
+      "contractExtracted": true,
+      "contractName": "longest",
+      "contractSignature": "def longest(strings: List[str]) -> Optional[str]:",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 0,
+      "repeatedAttemptObserved": false,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": false,
+          "agentError": null,
+          "resolveReason": "grader: solution did not pass",
+          "durationMs": 95796,
+          "toolCalls": [
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "wroteSolution": true,
+          "diagnosis": "syntax-error",
+          "diagnosisEvidence": "IndentationError: unindent does not match any outer indentation level",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m23-B-3JU5NZ/HumanEval_12/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 7\n    if not strings:\n                   ^\nIndentationError: unindent does not match any outer indentation level"
+        }
+      ],
+      "finalSolution": "from typing import List, Optional\n\ndef longest(strings: List[str]) -> Optional[str]:\n            \"\"\" Out of list of strings, return the longest one. Return the first one in case of multiple\n        strings of the same length. Return None in case the input list is empty.\n        \"\"\"\n    if not strings:\n        return None\n    \n    return strings[0]\nif len(strings) > 1 and strings[0] == strings[1]:\n    return strings[1]\n\n    return strings[0]\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/13",
+      "entryPoint": "greatest_common_divisor",
+      "contractExtracted": true,
+      "contractName": "greatest_common_divisor",
+      "contractSignature": "def greatest_common_divisor(a: int, b: int) -> int:",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 0,
+      "repeatedAttemptObserved": false,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": true,
+          "agentError": "agent loop timed out after 300000ms",
+          "resolveReason": "timeout: agent loop timed out after 300000ms",
+          "durationMs": 300001,
+          "toolCalls": [
+            "fs_write"
+          ],
+          "toolResults": [
+            {
+              "name": "fs_write",
+              "ok": true
+            }
+          ],
+          "graderRan": true,
+          "wroteSolution": true,
+          "diagnosis": "timeout",
+          "diagnosisEvidence": "agent loop timed out after 300000ms",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\n<string>:5: SyntaxWarning: invalid escape sequence '\\#'\nTraceback (most recent call last):\n  File \"/tmp/m23-B-3JU5NZ/HumanEval_13/grade.py\", line 5, in <module>\n    exec(open(sol, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 13\n    \tdfn gcd(a, b):\n    \t    ^^^\nSyntaxError: invalid syntax"
+        }
+      ],
+      "finalSolution": "import math\n\ndef greatest_common_divisor(a: int, b: int) -> int:\n\t\"\"\"\n\t\\# Return a greatest common divisor of two integers a and b\n\t\\# \n\t\\# >>> greatest_common_divisor(3, 5)\n\t\\# 1\n\t\\# >>> greatest_common_divisor(25, 15)\n\t\\# 5\n\t\"\"\"\n\n\tdfn gcd(a, b):\n\t\treturn math.gcd(a, b)\n\n\ndef greatest_common_divisor(a: int, b: int) -> int:\n\t\return gcd(a, b)\n\n\n# Worked examples\n\ngreatest_common_divisor(3, 5)\n\t\\# => 1\n\ngreatest_common_divisor(25, 15)\n\t\\# => 5\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    },
+    {
+      "taskId": "HumanEval/14",
+      "entryPoint": "all_prefixes",
+      "contractExtracted": true,
+      "contractName": "all_prefixes",
+      "contractSignature": "def all_prefixes(string: str) -> List[str]:",
+      "firstAttemptPass": false,
+      "finalPass": false,
+      "resolvedByRepair": false,
+      "repairAttempts": 0,
+      "repeatedAttemptObserved": false,
+      "attempts": [
+        {
+          "attempt": 0,
+          "pass": false,
+          "gradedPass": false,
+          "agentTimedOut": true,
+          "agentError": "agent loop timed out after 300000ms",
+          "resolveReason": "timeout: agent loop timed out after 300000ms",
+          "durationMs": 300002,
+          "toolCalls": [],
+          "toolResults": [],
+          "graderRan": true,
+          "wroteSolution": false,
+          "diagnosis": "timeout",
+          "diagnosisEvidence": "agent loop timed out after 300000ms",
+          "gradeOutputTail": "HUMANEVAL_GRADE=FAIL\nTraceback (most recent call last):\n  File \"/tmp/m23-B-3JU5NZ/HumanEval_14/grade.py\", line 6, in <module>\n    exec(open(test, encoding=\"utf-8\").read(), ns)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 15, in <module>\n  File \"<string>\", line 10, in check\nAssertionError"
+        }
+      ],
+      "finalSolution": "from typing import List\n\n\ndef all_prefixes(string: str) -> List[str]:\n    \"\"\" Return list of all prefixes from shortest to longest of the input string\n    >>> all_prefixes('abc')\n    ['a', 'ab', 'abc']\n    \"\"\"\n\n",
+      "model": "llama3.2:3b",
+      "providerLock": "ollama"
+    }
+  ]
+}

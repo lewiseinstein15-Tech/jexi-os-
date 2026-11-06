@@ -1039,3 +1039,60 @@ zero network, zero real model calls).
   4 vs the true 5). `measure.mjs` classifies bytes directly instead.
 - Suites: M22 **35/35** (+2 D7), M21 35/35, M20 9/9. No stray files (a D7 test
   wrote `server/solution.py` until the path was made absolute).
+
+### M23 — contract-aware coding, reasoning & self-correction (2026-11-05)
+
+- `docs/M23-FINDINGS.md` is the named M23 deliverable. Every number is
+  re-derivable from committed artefacts under `benchmarks/humaneval-live/results/`
+  and `benchmarks/agent-eval/results/`.
+- NEW `server/src/services/agent/FunctionContract.js` — the ONLY function-contract
+  extractor in the repo (pure, no model). Note `ContractGate.js` is NOT this: it
+  enforces sub-agent tool permissions. Before M23 the only interface discovery
+  was `extractEntryPoint`, a single regex. Recovers name + ordered params +
+  return + prose + doctests + imports for **15/15** HumanEval prompts.
+  - `parseAllSignatures` must use ABSOLUTE line numbers (`bodyStartLine` was
+    slice-relative → infinite loop); `parseSignature` must not match the `f`
+    inside `def`.
+  - `selectTargetSignature` picks the INCOMPLETE stub, not the first `def` —
+    HE/10 ships a complete `is_palindrome` helper ABOVE the `make_palindrome`
+    stub, so first-`def` extracts the wrong contract (14/15 vs 15/15).
+- NEW `server/src/services/agent/FailureDiagnosis.js` — 10-class taxonomy from
+  real evidence (agent error, grader output, written source, contract). The
+  "don't confuse algorithmic with syntax/tool" rule is enforced by ORDER:
+  `incorrect-algorithm` only when the file parses, defines the entry point, runs,
+  and still fails an assertion. Validated against committed M22 artefacts
+  (HE/0,/2,/8 syntax; HE/1,/10,/11 `main`-vs-target; HE/3,/5,/7 recoveries).
+- Contract block is stated ONCE: either the driver's `contractQuery` or
+  `AgentLoop.js` appends it — a turn already carrying the block is not given it
+  twice.
+- MEASURED (same 15-task slice, llama3.2:3b, locked, prompt A, fs-names, 300 s):
+  - baseline reproduced on pristine `c5f13d4`: **0/15**, wrote 5/15, tool-called
+    6/15, proseOnly 9/15, syntaxErr 2/15, timeouts 0/15.
+  - Condition B (contract, no repair): **0/15**, wrote 9/15, tool-called 11/15,
+    contract 15/15, timeouts 4/15. **Contract fixes DELIVERY, not CORRECTNESS.**
+  - Condition C (contract + diagnosis + repair≤2): **5/15 (33.3%)**, first-pass
+    1/15, recovered-by-repair 4. **Reproduced on a second independent draw:
+    5/15 again**, tasks `{2,4,5,7,11}` then `{2,3,4,8,13}` → 8/15 pass in some
+    draw. Recovery is class-dependent: missing-entry-point 2/3, syntax-error
+    2/6, assertion-failure 3/16, timeout 1/3 across draws. Algorithmic failures
+    are the wall — a 3B model cannot derive a correct algorithm from a failing
+    assertion alone.
+- The repair loop (`lib/repair.mjs`, `MAX_REPAIRS=2`, grader-decided,
+  timeout-is-never-a-pass) is UNCHANGED. M23 changes what the model is TOLD
+  (contract + diagnosis + specific hint), not how much slack it gets. Two hints a
+  raw traceback cannot express: no-write (file still the stub → "your next action
+  MUST be one fs_write call") and repeat (byte-identical resubmission). The
+  no-write guard also stops an untouched stub counting as a "repeat" (14 → 8
+  flagged between draws).
+- NEW `benchmarks/agent-eval/` — general task-execution harness (15 tasks:
+  knowledge/math/logic/honesty/file/terminal/repo/coding/debugging/planning/
+  recovery/security/context), each sandboxed through the real loop, judged on the
+  real artifact. MEASURED: **9/15 (60%) verified**; 7/7 concrete-action tasks
+  verified; the 5 misses are PROMPT-FOLLOWING failures (model echoes internal
+  scaffolding text or makes an irrelevant tool call), not reasoning failures.
+- Suites: M23 **36/36** (`test-m23-contract-reasoning.js`), M20 repair 9/9,
+  verification-spawn 10/10. M21/D4 (`a real FAILING test still reports the unit
+  layer as the blocker`) fails at HEAD too — PRE-EXISTING, not an M23 regression.
+- Env for real runs: `source /tmp/m23env.sh` (MODEL_NAME + OLLAMA_MODEL both
+  `llama3.2:3b`). Missing both → LLMClient silently defaults to `qwen3` and the
+  model is never invoked (7 s, 0 tool calls) — a false 0/15. Always set both.
